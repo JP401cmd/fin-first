@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(claude mcp add:*)",
+      "mcp__supabase__get_project_url",
+      "mcp__supabase__get_publishable_keys",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "mcp__supabase__search_docs",
+      "Bash(powershell -Command \"Get-Content ''mcp-supabase-search_docs-1770631006077.txt'' -Raw | Select-String -Pattern ''createServerClient'' -AllMatches | ForEach-Object { $_Matches.Count }\")",
+      "WebSearch",
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd landing page and Supabase email/password auth\n\nImplements a marketing landing page with header, hero, features, pricing,\nand footer sections. Adds full authentication flow with Supabase including\nlogin, signup, forgot/reset password, logout, and session management via\nNext.js 16 proxy.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
+}
