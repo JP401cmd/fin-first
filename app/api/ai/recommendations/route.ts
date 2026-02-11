@@ -22,7 +22,7 @@ const recommendationSchema = z.object({
     current_value: z.number().optional(),
     proposed_value: z.number().optional(),
     related_budget_slug: z.string().optional(),
-    priority_score: z.number().min(1).max(5),
+    priority_score: z.number(),
     actions: z.array(z.object({
       title: z.string(),
       description: z.string().optional(),
