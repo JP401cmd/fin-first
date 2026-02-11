@@ -44,12 +44,23 @@ export async function POST() {
   const model = await getModel(supabase)
   const generationId = crypto.randomUUID()
 
-  const { object } = await generateObject({
-    model,
-    schema: recommendationSchema,
-    system: RECOMMENDATIONS_SYSTEM_PROMPT,
-    prompt: `Analyseer het volgende financiële profiel en genereer 3-5 optimalisatievoorstellen:\n\n${context}`,
-  })
+  let object: z.infer<typeof recommendationSchema>
+  try {
+    const result = await generateObject({
+      model,
+      schema: recommendationSchema,
+      system: RECOMMENDATIONS_SYSTEM_PROMPT,
+      prompt: `Analyseer het volgende financiële profiel en genereer 3 optimalisatievoorstellen:\n\n${context}`,
+    })
+    object = result.object
+  } catch (err) {
+    console.error('AI generation failed:', err)
+    const message = err instanceof Error ? err.message : 'Onbekende fout'
+    return Response.json(
+      { error: `AI-generatie mislukt: ${message}` },
+      { status: 500 },
+    )
+  }
 
   // Insert recommendations into database
   const insertedRecommendations = []

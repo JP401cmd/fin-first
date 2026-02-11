@@ -14,29 +14,59 @@ function getTextContent(msg: { parts: Array<{ type: string; text?: string }> }):
     .join('')
 }
 
-/** Simple markdown renderer: bold, lists, newlines */
+/** Markdown renderer for chat bubbles: bold, lists, headers, numbered lists */
 function renderMarkdown(text: string) {
   const lines = text.split('\n')
   const elements: React.ReactNode[] = []
-  let listItems: string[] = []
+  let listItems: { content: string; ordered: boolean }[] = []
 
   const flushList = () => {
     if (listItems.length === 0) return
+    const isOrdered = listItems[0].ordered
+    const Tag = isOrdered ? 'ol' : 'ul'
+    const listClass = isOrdered ? 'my-1 ml-4 list-decimal space-y-0.5' : 'my-1 ml-4 list-disc space-y-0.5'
     elements.push(
-      <ul key={`ul-${elements.length}`} className="my-1 ml-4 list-disc space-y-0.5">
+      <Tag key={`list-${elements.length}`} className={listClass}>
         {listItems.map((item, i) => (
-          <li key={i}>{renderInline(item)}</li>
+          <li key={i}>{renderInline(item.content)}</li>
         ))}
-      </ul>
+      </Tag>
     )
     listItems = []
   }
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
-    const listMatch = line.match(/^[-*]\s+(.+)/)
-    if (listMatch) {
-      listItems.push(listMatch[1])
+
+    // Horizontal rule — skip
+    if (/^---+$/.test(line.trim())) {
+      flushList()
+      continue
+    }
+
+    // Headers (## or #) — render as bold paragraph
+    const headerMatch = line.match(/^#{1,3}\s+(.+)/)
+    if (headerMatch) {
+      flushList()
+      elements.push(
+        <p key={`h-${i}`} className="mb-1 mt-2 font-semibold first:mt-0">
+          {renderInline(headerMatch[1])}
+        </p>
+      )
+      continue
+    }
+
+    // Unordered list (- or *)
+    const ulMatch = line.match(/^\s*[-*]\s+(.+)/)
+    if (ulMatch) {
+      listItems.push({ content: ulMatch[1], ordered: false })
+      continue
+    }
+
+    // Ordered list (1. 2. etc)
+    const olMatch = line.match(/^\s*\d+\.\s+(.+)/)
+    if (olMatch) {
+      listItems.push({ content: olMatch[1], ordered: true })
       continue
     }
 

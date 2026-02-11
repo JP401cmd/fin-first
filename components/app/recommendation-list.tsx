@@ -21,8 +21,15 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
     try {
       const res = await fetch('/api/ai/recommendations', { method: 'POST' })
       if (!res.ok) {
-        const text = await res.text()
-        throw new Error(text || 'Generatie mislukt')
+        let errorMsg = 'Generatie mislukt'
+        try {
+          const errData = await res.json()
+          if (errData.error) errorMsg = errData.error
+        } catch {
+          const text = await res.text()
+          if (text) errorMsg = text
+        }
+        throw new Error(errorMsg)
       }
       const data = await res.json()
       setRecommendations((prev) => [...data.recommendations, ...prev])
@@ -79,7 +86,7 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
           Klaar voor optimalisatie?
         </h2>
         <p className="mb-6 text-zinc-500">
-          FINN analyseert je financieel profiel en ontdekt verborgen vrijheidsdagen.
+          Will analyseert je financieel profiel en ontdekt verborgen vrijheidsdagen.
           Laat de AI kansen vinden die je misschien over het hoofd ziet.
         </p>
         {error && (

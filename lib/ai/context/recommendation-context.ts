@@ -2,12 +2,44 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildSharedContext } from './shared-context'
 import { section, formatCurrency, bulletList } from './formatter'
 
+const TEMPORAL_LABELS: Record<number, string> = {
+  1: 'De Levensgenieter (level 1) — Comfort > Snelheid. Wil niet inleveren op comfort. FIRE is een leuke bonus, geen obsessie.',
+  2: 'De Reiziger (level 2) — Spaart wat overblijft. Ervaringen en herinneringen gaan voor. Balans, licht hellend naar nu.',
+  3: 'De Architect (level 3) — Optimaliseert bewust. Bereid luxe op te offeren als het tijd oplevert, maar geen kluizenaar. De gulden middenweg.',
+  4: 'De Stoïcijn (level 4) — Haalt plezier uit soberheid en efficiency. Streng en doelgericht. Snelheid > Comfort.',
+  5: 'De Essentialist (level 5) — Alles wat niet essentieel is, moet weg. Minimalistisch leven voor maximale snelheid naar vrijheid.',
+}
+
 /**
  * Build the full financial context for AI recommendation generation.
- * Uses real Supabase data for budgets, transactions, assets, debts, and feedback.
+ * Uses real Supabase data for budgets, transactions, assets, debts, profile, and feedback.
  */
 export async function buildRecommendationContext(supabase: SupabaseClient): Promise<string> {
   const parts: string[] = []
+
+  // User identity/profile
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, date_of_birth, household_type, temporal_balance')
+      .eq('id', user.id)
+      .single()
+
+    if (profile) {
+      const age = profile.date_of_birth
+        ? Math.floor((Date.now() - new Date(profile.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+        : null
+      const temporal = TEMPORAL_LABELS[profile.temporal_balance ?? 3] ?? TEMPORAL_LABELS[3]
+      const identityLines = [
+        age ? `Leeftijd: ${age} jaar` : null,
+        `Huishoudtype: ${profile.household_type ?? 'solo'}`,
+        `Temporal Balance: ${temporal}`,
+      ].filter(Boolean) as string[]
+
+      parts.push(section('IDENTITEIT & VOORKEUREN', identityLines.join('\n')))
+    }
+  }
 
   // Shared financial overview (net worth, FIRE, freedom %)
   const shared = await buildSharedContext(supabase)
