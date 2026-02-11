@@ -79,7 +79,7 @@ export async function POST() {
         current_value: rec.current_value ?? null,
         proposed_value: rec.proposed_value ?? null,
         related_budget_slug: rec.related_budget_slug ?? null,
-        priority_score: rec.priority_score,
+        priority_score: Math.max(1, Math.min(5, Math.round(rec.priority_score))),
         suggested_actions: rec.actions,
         ai_generation_id: generationId,
         status: 'pending',

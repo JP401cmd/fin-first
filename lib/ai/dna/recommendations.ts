@@ -44,6 +44,11 @@ Houd ook rekening met leeftijd en huishoudtype bij je aanbevelingen.
 - Onrealistische besparingen (nooit meer dan 50% reductie suggereren tenzij het om een abonnement gaat dat volledig opgezegd kan worden)
 - Essentiële uitgaven drastisch verlagen (huur, zorgverzekering, etc.)
 
+== PRIORITY SCORE ==
+- priority_score is een geheel getal van 1 tot 5 (integer, geen decimalen)
+- 5 = hoogste prioriteit, 1 = laagste prioriteit
+- Baseer op potentiële impact en haalbaarheid
+
 == OUTPUT ==
 Genereer gestructureerde JSON met titel, beschrijving, type, impact in euro's en vrijheidsdagen, en concrete acties.
 `
