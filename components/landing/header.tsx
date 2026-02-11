@@ -42,17 +42,8 @@ export function Header() {
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link href="/" className="text-xl font-bold text-zinc-900">
-          Fin
+          TriFinity
         </Link>
-
-        <nav className="hidden items-center gap-8 md:flex">
-          <a href="#features" className="text-sm text-zinc-600 hover:text-zinc-900">
-            Features
-          </a>
-          <a href="#pricing" className="text-sm text-zinc-600 hover:text-zinc-900">
-            Pricing
-          </a>
-        </nav>
 
         <div className="flex items-center gap-4">
           {user ? (
@@ -69,13 +60,20 @@ export function Header() {
                 </span>
               </button>
               {menuOpen && (
-                <div className="absolute right-0 mt-2 w-40 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                <div className="absolute right-0 mt-2 w-44 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                  <Link
+                    href="/dashboard"
+                    className="block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Dashboard
+                  </Link>
                   <Link
                     href="/logout"
                     className="block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
                     onClick={() => setMenuOpen(false)}
                   >
-                    Log out
+                    Uitloggen
                   </Link>
                 </div>
               )}
@@ -85,7 +83,7 @@ export function Header() {
               href="/login"
               className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
             >
-              Login
+              Inloggen
             </Link>
           )}
         </div>

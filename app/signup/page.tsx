@@ -38,15 +38,15 @@ export default function SignupPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
         <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-lg text-center">
-          <h1 className="mb-4 text-2xl font-bold text-zinc-900">Check your email</h1>
+          <h1 className="mb-4 text-2xl font-bold text-zinc-900">Controleer je e-mail</h1>
           <p className="text-zinc-600">
-            We&apos;ve sent you a confirmation link. Please check your email to verify your account.
+            We hebben je een bevestigingslink gestuurd. Controleer je e-mail om je account te activeren.
           </p>
           <Link
             href="/login"
             className="mt-6 inline-block text-sm font-medium text-zinc-900 hover:underline"
           >
-            Back to login
+            Terug naar inloggen
           </Link>
         </div>
       </div>
@@ -57,13 +57,13 @@ export default function SignupPage() {
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
       <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-lg">
         <h1 className="mb-6 text-center text-2xl font-bold text-zinc-900">
-          Create your account
+          Account aanmaken
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-zinc-700">
-              Email
+              E-mailadres
             </label>
             <input
               id="email"
@@ -77,7 +77,7 @@ export default function SignupPage() {
 
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-zinc-700">
-              Password
+              Wachtwoord
             </label>
             <input
               id="password"
@@ -99,14 +99,14 @@ export default function SignupPage() {
             disabled={loading}
             className="w-full rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
           >
-            {loading ? 'Creating account...' : 'Sign up'}
+            {loading ? 'Account aanmaken...' : 'Registreren'}
           </button>
         </form>
 
         <p className="mt-6 text-center text-sm text-zinc-600">
-          Already have an account?{' '}
+          Al een account?{' '}
           <Link href="/login" className="font-medium text-zinc-900 hover:underline">
-            Log in
+            Inloggen
           </Link>
         </p>
       </div>

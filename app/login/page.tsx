@@ -27,7 +27,7 @@ export default function LoginPage() {
       setError(error.message)
       setLoading(false)
     } else {
-      router.push('/')
+      router.push('/dashboard')
     }
   }
 
@@ -35,13 +35,13 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
       <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-lg">
         <h1 className="mb-6 text-center text-2xl font-bold text-zinc-900">
-          Log in to Fin
+          Inloggen bij TriFinity
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-zinc-700">
-              Email
+              E-mailadres
             </label>
             <input
               id="email"
@@ -55,7 +55,7 @@ export default function LoginPage() {
 
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-zinc-700">
-              Password
+              Wachtwoord
             </label>
             <input
               id="password"
@@ -76,20 +76,20 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
           >
-            {loading ? 'Logging in...' : 'Log in'}
+            {loading ? 'Bezig met inloggen...' : 'Inloggen'}
           </button>
         </form>
 
         <div className="mt-6 space-y-2 text-center text-sm text-zinc-600">
           <p>
-            Don&apos;t have an account?{' '}
+            Nog geen account?{' '}
             <Link href="/signup" className="font-medium text-zinc-900 hover:underline">
-              Sign up
+              Registreren
             </Link>
           </p>
           <p>
             <Link href="/forgot-password" className="font-medium text-zinc-900 hover:underline">
-              Forgot your password?
+              Wachtwoord vergeten?
             </Link>
           </p>
         </div>
