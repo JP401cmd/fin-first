@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
-  Plus, Trash2, Edit3, ChevronDown, ChevronUp, X, TrendingUp, RefreshCw,
+  Plus, Trash2, Edit3, X, TrendingUp, RefreshCw,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
@@ -23,9 +23,9 @@ export default function AssetsPage() {
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editAsset, setEditAsset] = useState<Asset | null>(null)
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
+  const [modalStep, setModalStep] = useState<'detail' | 'edit' | 'revalue'>('detail')
   const [projectionYears, setProjectionYears] = useState(10)
-  const [revalueAsset, setRevalueAsset] = useState<Asset | null>(null)
   const [valuations, setValuations] = useState<Record<string, Valuation[]>>({})
   const seedingRef = useRef(false)
 
@@ -128,10 +128,18 @@ export default function AssetsPage() {
     const supabase = createClient()
     await supabase.from('assets').delete().eq('id', id)
     setAssets((prev) => prev.filter((a) => a.id !== id))
+    setSelectedAsset(null)
   }
 
-  function toggleExpand(id: string) {
-    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))
+  function openAssetModal(asset: Asset) {
+    setSelectedAsset(asset)
+    setModalStep('detail')
+    loadValuations(asset.id)
+  }
+
+  function closeAssetModal() {
+    setSelectedAsset(null)
+    setModalStep('detail')
   }
 
   if (loading) {
@@ -263,122 +271,98 @@ export default function AssetsPage() {
       </div>
 
       {/* Asset list */}
-      <section className="mt-6 space-y-3">
+      <section className="mt-6 space-y-2">
         {assets.map((asset) => {
           const value = Number(asset.current_value)
           const purchase = Number(asset.purchase_value)
           const returnPct = purchase > 0 ? ((value - purchase) / purchase) * 100 : 0
-          const isOpen = expanded[asset.id] ?? false
           const icon = ASSET_TYPE_ICONS[asset.asset_type] ?? 'Briefcase'
           const color = ASSET_TYPE_COLORS[asset.asset_type]
 
           return (
-            <div key={asset.id} className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+            <div
+              key={asset.id}
+              className="flex cursor-pointer items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 transition-colors hover:border-amber-200 hover:bg-amber-50/30"
+              onClick={() => openAssetModal(asset)}
+            >
               <div
-                className="flex cursor-pointer items-center gap-3 p-4"
-                onClick={() => toggleExpand(asset.id)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+                style={{ backgroundColor: color + '15' }}
               >
-                <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
-                  style={{ backgroundColor: color + '15' }}
-                >
-                  <BudgetIcon name={icon} className="h-5 w-5" />
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-zinc-900">{asset.name}</p>
-                      <p className="text-xs text-zinc-500">
-                        {ASSET_TYPE_LABELS[asset.asset_type]}
-                        {asset.institution ? ` \u2022 ${asset.institution}` : ''}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-zinc-900">{formatCurrency(value)}</p>
-                      {purchase > 0 && (
-                        <p className={`text-xs font-medium ${returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}%
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="shrink-0 text-zinc-400">
-                  {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </div>
+                <BudgetIcon name={icon} className="h-4 w-4" />
               </div>
-
-              {isOpen && (
-                <div className="border-t border-zinc-100 bg-zinc-50/50 p-4">
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                    <div>
-                      <p className="text-xs text-zinc-500">Aankoopwaarde</p>
-                      <p className="text-sm font-medium text-zinc-900">
-                        {purchase > 0 ? formatCurrency(purchase) : '-'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-zinc-500">Verwacht rendement</p>
-                      <p className="text-sm font-medium text-zinc-900">{Number(asset.expected_return)}% p.j.</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-zinc-500">Maandelijkse inleg</p>
-                      <p className="text-sm font-medium text-zinc-900">
-                        {Number(asset.monthly_contribution) > 0 ? formatCurrency(Number(asset.monthly_contribution)) : '-'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-zinc-500">Aankoopdatum</p>
-                      <p className="text-sm font-medium text-zinc-900">
-                        {asset.purchase_date
-                          ? new Date(asset.purchase_date).toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' })
-                          : '-'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {asset.notes && <p className="mt-3 text-xs text-zinc-500">{asset.notes}</p>}
-
-                  <div className="mt-4 flex gap-2">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setRevalueAsset(asset) }}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50"
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" />
-                      Herwaarderen
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setEditAsset(asset); setShowForm(true) }}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
-                    >
-                      <Edit3 className="h-3.5 w-3.5" />
-                      Bewerken
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); deleteAsset(asset.id) }}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Verwijderen
-                    </button>
-                  </div>
-
-                  {/* Value history */}
-                  <ValuationHistory
-                    entityId={asset.id}
-                    valuations={valuations[asset.id]}
-                    onLoad={() => loadValuations(asset.id)}
-                  />
-                </div>
-              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-zinc-900">{asset.name}</p>
+                <p className="truncate text-xs text-zinc-500">
+                  {ASSET_TYPE_LABELS[asset.asset_type]}
+                  {asset.institution ? ` \u2022 ${asset.institution}` : ''}
+                </p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-sm font-semibold text-zinc-900">{formatCurrency(value)}</p>
+                {purchase > 0 && (
+                  <p className={`text-xs font-medium ${returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}%
+                  </p>
+                )}
+              </div>
             </div>
           )
         })}
       </section>
 
-      {/* Form modal */}
+      {/* Asset detail modal */}
+      {selectedAsset && modalStep === 'detail' && (
+        <AssetDetailModal
+          asset={selectedAsset}
+          valuations={valuations[selectedAsset.id]}
+          onClose={closeAssetModal}
+          onEdit={() => setModalStep('edit')}
+          onRevalue={() => setModalStep('revalue')}
+          onDelete={() => deleteAsset(selectedAsset.id)}
+        />
+      )}
+
+      {/* Edit form modal */}
+      {selectedAsset && modalStep === 'edit' && (
+        <AssetForm
+          asset={selectedAsset}
+          onClose={() => setModalStep('detail')}
+          onSaved={() => {
+            setModalStep('detail')
+            loadAssets().then(() => {
+              // Refresh selectedAsset with updated data
+              const supabase = createClient()
+              supabase.from('assets').select('*').eq('id', selectedAsset.id).single().then(({ data }) => {
+                if (data) setSelectedAsset(data as Asset)
+              })
+            })
+          }}
+        />
+      )}
+
+      {/* Revaluation modal */}
+      {selectedAsset && modalStep === 'revalue' && (
+        <ValuationModal
+          entityId={selectedAsset.id}
+          entityType="asset"
+          entityName={selectedAsset.name}
+          currentValue={Number(selectedAsset.current_value)}
+          onClose={() => setModalStep('detail')}
+          onSaved={() => {
+            setModalStep('detail')
+            loadAssets().then(() => {
+              const supabase = createClient()
+              supabase.from('assets').select('*').eq('id', selectedAsset.id).single().then(({ data }) => {
+                if (data) setSelectedAsset(data as Asset)
+              })
+            })
+            loadValuations(selectedAsset.id)
+          }}
+        />
+      )}
+
+      {/* New asset form */}
       {showForm && (
         <AssetForm
           asset={editAsset ?? undefined}
@@ -390,22 +374,162 @@ export default function AssetsPage() {
           }}
         />
       )}
+    </div>
+  )
+}
 
-      {/* Revaluation modal */}
-      {revalueAsset && (
-        <ValuationModal
-          entityId={revalueAsset.id}
-          entityType="asset"
-          entityName={revalueAsset.name}
-          currentValue={Number(revalueAsset.current_value)}
-          onClose={() => setRevalueAsset(null)}
-          onSaved={() => {
-            setRevalueAsset(null)
-            loadAssets()
-            loadValuations(revalueAsset.id)
-          }}
-        />
-      )}
+// ── Asset detail modal ───────────────────────────────────────
+
+function AssetDetailModal({
+  asset,
+  valuations,
+  onClose,
+  onEdit,
+  onRevalue,
+  onDelete,
+}: {
+  asset: Asset
+  valuations: Valuation[] | undefined
+  onClose: () => void
+  onEdit: () => void
+  onRevalue: () => void
+  onDelete: () => void
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const value = Number(asset.current_value)
+  const purchase = Number(asset.purchase_value)
+  const returnPct = purchase > 0 ? ((value - purchase) / purchase) * 100 : 0
+  const icon = ASSET_TYPE_ICONS[asset.asset_type] ?? 'Briefcase'
+  const color = ASSET_TYPE_COLORS[asset.asset_type]
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl"
+        style={{ maxHeight: '90vh' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-3 border-b border-zinc-200 px-6 py-4">
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+            style={{ backgroundColor: color + '15' }}
+          >
+            <BudgetIcon name={icon} className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="font-semibold text-zinc-900">{asset.name}</h2>
+            <p className="text-xs text-zinc-500">
+              {ASSET_TYPE_LABELS[asset.asset_type]}
+              {asset.institution ? ` \u2022 ${asset.institution}` : ''}
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Value highlight */}
+        <div className="border-b border-zinc-100 px-6 py-4 text-center">
+          <p className="text-3xl font-bold text-zinc-900">{formatCurrency(value)}</p>
+          {purchase > 0 && (
+            <p className={`mt-1 text-sm font-medium ${returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}% ({returnPct >= 0 ? '+' : ''}{formatCurrency(value - purchase)})
+            </p>
+          )}
+        </div>
+
+        {/* Details grid */}
+        <div className="space-y-4 px-6 py-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg bg-zinc-50 p-3">
+              <p className="text-xs text-zinc-500">Aankoopwaarde</p>
+              <p className="mt-0.5 text-sm font-medium text-zinc-900">{purchase > 0 ? formatCurrency(purchase) : '-'}</p>
+            </div>
+            <div className="rounded-lg bg-zinc-50 p-3">
+              <p className="text-xs text-zinc-500">Verwacht rendement</p>
+              <p className="mt-0.5 text-sm font-medium text-zinc-900">{Number(asset.expected_return)}% p.j.</p>
+            </div>
+            <div className="rounded-lg bg-zinc-50 p-3">
+              <p className="text-xs text-zinc-500">Maandelijkse inleg</p>
+              <p className="mt-0.5 text-sm font-medium text-zinc-900">
+                {Number(asset.monthly_contribution) > 0 ? formatCurrency(Number(asset.monthly_contribution)) : '-'}
+              </p>
+            </div>
+            <div className="rounded-lg bg-zinc-50 p-3">
+              <p className="text-xs text-zinc-500">Aankoopdatum</p>
+              <p className="mt-0.5 text-sm font-medium text-zinc-900">
+                {asset.purchase_date
+                  ? new Date(asset.purchase_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
+                  : '-'}
+              </p>
+            </div>
+          </div>
+
+          {asset.notes && (
+            <p className="text-xs text-zinc-500">{asset.notes}</p>
+          )}
+
+          {/* Valuation history */}
+          {valuations && valuations.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">Waardehistorie</p>
+              <div className="space-y-1">
+                {valuations.slice(0, 5).map((v) => {
+                  const prev = valuations.find((vv) => vv.valuation_date < v.valuation_date)
+                  const diff = prev ? Number(v.value) - Number(prev.value) : null
+                  return (
+                    <div key={v.id} className="flex items-center gap-3 text-xs">
+                      <span className="w-20 shrink-0 text-zinc-400">
+                        {new Date(v.valuation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                      </span>
+                      <span className="font-medium text-zinc-700">{formatCurrency(Number(v.value))}</span>
+                      {diff !== null && (
+                        <span className={`text-[10px] font-medium ${diff >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2 border-t border-zinc-200 px-6 py-4">
+          <button
+            onClick={onRevalue}
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-amber-200 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-50"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Herwaarderen
+          </button>
+          <button
+            onClick={onEdit}
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-700"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+            Bewerken
+          </button>
+          {confirmDelete ? (
+            <button
+              onClick={onDelete}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-xs font-medium text-white hover:bg-red-700"
+            >
+              Bevestigen
+            </button>
+          ) : (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

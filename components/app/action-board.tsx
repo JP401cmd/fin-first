@@ -58,6 +58,21 @@ export function ActionBoard({ initialActions }: ActionBoardProps) {
     )
   }
 
+  async function handleUpdateAction(id: string, data: Record<string, unknown>) {
+    const res = await fetch(`/api/ai/actions/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+
+    if (!res.ok) return
+
+    const { action: updated } = await res.json()
+    setActions((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, ...updated } : a))
+    )
+  }
+
   async function handleCreateAction(data: {
     title: string
     description?: string
@@ -136,7 +151,7 @@ export function ActionBoard({ initialActions }: ActionBoardProps) {
           </div>
           <div className="space-y-2">
             {openActions.map((action) => (
-              <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} />
+              <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} />
             ))}
           </div>
         </div>
@@ -156,7 +171,7 @@ export function ActionBoard({ initialActions }: ActionBoardProps) {
           {showPostponed && (
             <div className="space-y-2">
               {postponedActions.map((action) => (
-                <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} />
+                <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} />
               ))}
             </div>
           )}
@@ -182,7 +197,7 @@ export function ActionBoard({ initialActions }: ActionBoardProps) {
           {showCompleted && (
             <div className="space-y-2">
               {completedActions.map((action) => (
-                <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} />
+                <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} />
               ))}
             </div>
           )}

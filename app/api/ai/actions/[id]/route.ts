@@ -14,9 +14,16 @@ export async function PATCH(
 
   const { id } = await params
   const body = await req.json() as {
-    status: 'open' | 'postponed' | 'completed' | 'rejected'
+    status?: 'open' | 'postponed' | 'completed' | 'rejected'
     postpone_weeks?: number
     rejection_reason?: string
+    title?: string
+    description?: string
+    freedom_days_impact?: number
+    euro_impact_monthly?: number
+    due_date?: string | null
+    priority_score?: number
+    scheduled_week?: string | null
   }
 
   // Fetch action first
@@ -31,6 +38,31 @@ export async function PATCH(
   }
 
   const now = new Date().toISOString()
+
+  // Field-level update (no status change)
+  if (!body.status) {
+    const updates: Record<string, unknown> = { updated_at: now }
+    if (body.title !== undefined) updates.title = body.title
+    if (body.description !== undefined) updates.description = body.description || null
+    if (body.freedom_days_impact !== undefined) updates.freedom_days_impact = body.freedom_days_impact
+    if (body.euro_impact_monthly !== undefined) updates.euro_impact_monthly = body.euro_impact_monthly || null
+    if (body.due_date !== undefined) updates.due_date = body.due_date || null
+    if (body.priority_score !== undefined) updates.priority_score = body.priority_score
+    if (body.scheduled_week !== undefined) updates.scheduled_week = body.scheduled_week || null
+
+    const { data: updated, error } = await supabase
+      .from('actions')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      return Response.json({ error: error.message }, { status: 500 })
+    }
+
+    return Response.json({ action: updated })
+  }
 
   if (body.status === 'completed') {
     const { error } = await supabase

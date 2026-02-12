@@ -35,29 +35,14 @@ export function BudgetIcon({ name, className }: { name: string; className?: stri
   return <Icon className={className} />
 }
 
-export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('nl-NL', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value)
-}
-
-export function formatCurrencyDecimals(value: number): string {
-  return new Intl.NumberFormat('nl-NL', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)
-}
+import { formatCurrency as _formatCurrency, formatCurrencyDecimals as _formatCurrencyDecimals } from '@/lib/format'
+export { _formatCurrency as formatCurrency, _formatCurrencyDecimals as formatCurrencyDecimals }
 
 export type BudgetType = 'income' | 'expense' | 'savings'
 
 export function formatRollover(amount: number, type: string): string {
   if (amount <= 0) return ''
-  const formatted = formatCurrency(amount)
+  const formatted = _formatCurrency(amount)
   switch (type) {
     case 'carry-over':
       return `+${formatted} doorgeschoven`

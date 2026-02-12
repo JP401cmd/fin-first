@@ -8,10 +8,12 @@ import {
   LIFE_EVENT_CATALOG,
   type HorizonInput, type LifeEvent, type LifeEventImpact,
 } from '@/lib/horizon-data'
+import type { Action, ActionStatus } from '@/lib/recommendation-data'
+import { ActionCard } from '@/components/app/action-card'
 import {
-  Plus, X, Trash2, Edit3, ChevronUp, ChevronDown, ArrowRight,
+  Plus, X, Trash2, Edit3,
   Calendar, Globe, Baby, Hammer, GraduationCap, Briefcase,
-  Clock, Sunset, Home, Heart,
+  Clock, Sunset, Home, Heart, Zap, Target,
 } from 'lucide-react'
 
 const EVENT_ICONS: Record<string, React.ReactNode> = {
@@ -28,10 +30,18 @@ const EVENT_ICONS: Record<string, React.ReactNode> = {
   Heart: <Heart className="h-4 w-4" />,
 }
 
+// Logarithmic position: maps months-from-now to 0..1 range
+// Near future gets more space: log(1 + offset) / log(1 + total)
+function logPosition(offsetMonths: number, totalMonths: number): number {
+  if (totalMonths <= 0) return 0
+  return Math.log(1 + Math.max(0, offsetMonths)) / Math.log(1 + totalMonths)
+}
+
 export default function TimelinePage() {
   const [input, setInput] = useState<HorizonInput | null>(null)
   const [events, setEvents] = useState<LifeEvent[]>([])
   const [impacts, setImpacts] = useState<LifeEventImpact[]>([])
+  const [actions, setActions] = useState<Action[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingEvent, setEditingEvent] = useState<LifeEvent | null>(null)
@@ -51,14 +61,24 @@ export default function TimelinePage() {
       const now = new Date()
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
       const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+      const oneYearFromNow = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()).toISOString().split('T')[0]
+      const today = now.toISOString().split('T')[0]
 
-      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult] = await Promise.all([
+      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, actionsResult] = await Promise.all([
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution').eq('is_active', true),
         supabase.from('debts').select('current_balance').eq('is_active', true),
         supabase.from('profiles').select('date_of_birth').single(),
         supabase.from('budgets').select('default_limit, interval').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
         supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
+        supabase
+          .from('actions')
+          .select('*, recommendation:recommendations(title, recommendation_type)')
+          .eq('status', 'open')
+          .not('scheduled_week', 'is', null)
+          .gte('scheduled_week', today)
+          .lte('scheduled_week', oneYearFromNow)
+          .order('scheduled_week', { ascending: true }),
       ])
 
       let monthlyIncome = 0
@@ -90,10 +110,11 @@ export default function TimelinePage() {
 
       const loadedEvents = (eventsResult.data ?? []) as LifeEvent[]
       setEvents(loadedEvents)
+      setActions((actionsResult.data ?? []) as Action[])
 
-      // Compute impacts
-      const imps = loadedEvents.map(ev => computeLifeEventImpact(inp, ev))
-      setImpacts(imps)
+      // Compute cumulative FIRE impacts
+      const cumImpacts = computeCumulativeImpacts(inp, loadedEvents)
+      setImpacts(cumImpacts)
     } catch (err) {
       console.error('Error loading timeline data:', err)
     } finally {
@@ -106,6 +127,18 @@ export default function TimelinePage() {
   const currentAge = input?.dateOfBirth ? ageAtDate(input.dateOfBirth) : null
   const baseFire = input ? computeFireProjection(input) : null
   const totalDelayMonths = impacts.reduce((s, i) => s + i.fireDelayMonths, 0)
+  const adjustedFireAge = baseFire?.fireAge != null ? baseFire.fireAge + totalDelayMonths / 12 : null
+
+  async function handleActionStatusChange(id: string, status: ActionStatus, data?: Record<string, unknown>) {
+    const res = await fetch(`/api/ai/actions/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, ...data }),
+    })
+    if (res.ok) {
+      loadData()
+    }
+  }
 
   function openCatalogForm(type: string) {
     const catalog = LIFE_EVENT_CATALOG[type]
@@ -183,24 +216,29 @@ export default function TimelinePage() {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
-      <h1 className="text-xl font-bold text-zinc-900">Levenstijdlijn</h1>
-      <p className="mt-1 text-sm text-zinc-500">
-        Plan levensgebeurtenissen en zie hun impact op je FIRE-datum
-      </p>
+      {/* Header with FIRE comparison */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-zinc-900">Jouw tijdlijn</h1>
+          <p className="mt-1 text-sm text-zinc-500">
+            Plan levensgebeurtenissen en acties, en zie hun impact op je FIRE-datum
+          </p>
+        </div>
+      </div>
 
-      {/* Summary */}
-      <section className="mt-8 rounded-xl border border-purple-200 bg-purple-50 p-6">
+      {/* FIRE comparison summary */}
+      <section className="mt-6 rounded-xl border border-purple-200 bg-purple-50 p-5">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="text-center">
-            <p className="text-xs font-medium text-purple-600 uppercase">Baseline FIRE</p>
+            <p className="text-xs font-medium text-purple-600 uppercase">Basis FIRE</p>
             <p className="mt-1 text-3xl font-bold text-zinc-900">
-              {baseFire?.fireAge !== null ? `${Math.round(baseFire!.fireAge!)}j` : '-'}
+              {baseFire?.fireAge != null ? `${Math.round(baseFire.fireAge)}j` : '-'}
             </p>
           </div>
           <div className="text-center">
             <p className="text-xs font-medium text-purple-600 uppercase">Aangepast (met events)</p>
             <p className="mt-1 text-3xl font-bold text-zinc-900">
-              {baseFire?.fireAge !== null ? `${Math.round(baseFire!.fireAge! + totalDelayMonths / 12)}j` : '-'}
+              {adjustedFireAge != null ? `${Math.round(adjustedFireAge)}j` : '-'}
             </p>
           </div>
           <div className="text-center">
@@ -208,57 +246,56 @@ export default function TimelinePage() {
             <p className={`mt-1 text-3xl font-bold ${totalDelayMonths > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
               {totalDelayMonths > 0 ? `+${totalDelayMonths} mnd` : '0 mnd'}
             </p>
-            <p className="text-xs text-zinc-500">door {events.length} events</p>
+            <p className="text-xs text-zinc-500">door {events.length} event{events.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
       </section>
 
-      {/* Visual Timeline */}
-      {currentAge !== null && baseFire?.fireAge !== null && events.length > 0 && (
+      {/* Logarithmic Visual Timeline */}
+      {currentAge != null && baseFire?.fireAge != null && (
         <section className="mt-8">
           <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
             Visuele Tijdlijn
           </h2>
           <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
-            <TimelineVisual
+            <LogTimeline
               currentAge={currentAge}
-              fireAge={Math.round(baseFire!.fireAge!)}
+              baseFireAge={Math.round(baseFire.fireAge)}
+              adjustedFireAge={adjustedFireAge != null ? Math.round(adjustedFireAge) : null}
               events={events}
               impacts={impacts}
+              actions={actions}
+              dateOfBirth={input?.dateOfBirth ?? null}
             />
           </div>
         </section>
       )}
 
-      {/* Event Catalog */}
-      <section className="mt-8">
-        <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-          Evenement toevoegen
-        </h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {Object.entries(LIFE_EVENT_CATALOG).map(([key, val]) => (
-            <button
-              key={key}
-              onClick={() => openCatalogForm(key)}
-              className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 text-left transition-colors hover:border-purple-200 hover:bg-purple-50/30"
-            >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-purple-600">
-                {EVENT_ICONS[val.icon] ?? <Calendar className="h-4 w-4" />}
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-zinc-900">{val.label}</p>
-                <p className="truncate text-xs text-zinc-400">{val.description}</p>
-              </div>
-            </button>
-          ))}
-        </div>
-      </section>
+      {/* Planned actions this year */}
+      {actions.length > 0 && (
+        <section className="mt-8">
+          <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+            <Zap className="mr-1.5 inline h-3.5 w-3.5 text-teal-500" />
+            Geplande acties (komend jaar)
+          </h2>
+          <div className="space-y-2">
+            {actions.map((action) => (
+              <ActionCard
+                key={action.id}
+                action={action}
+                onStatusChange={handleActionStatusChange}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
-      {/* Active events */}
+      {/* Life events list */}
       {events.length > 0 && (
         <section className="mt-8">
           <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-            Geplande gebeurtenissen
+            <Target className="mr-1.5 inline h-3.5 w-3.5 text-purple-500" />
+            Levensgebeurtenissen
           </h2>
           <div className="space-y-3">
             {events.map((ev, i) => {
@@ -312,8 +349,8 @@ export default function TimelinePage() {
                           <p className="text-xs text-zinc-600">
                             <span className="font-medium">Impact:</span>{' '}
                             FIRE {impact.fireDelayMonths > 0 ? `+${impact.fireDelayMonths} maanden later` : 'geen vertraging'}{' '}
-                            \u00B7 totale kosten {formatCurrency(impact.totalCost)}{' '}
-                            \u00B7 {impact.freedomDaysLost} vrijheidsdagen
+                            {'\u00B7'} totale kosten {formatCurrency(impact.totalCost)}{' '}
+                            {'\u00B7'} {impact.freedomDaysLost} vrijheidsdagen
                           </p>
                         </div>
                       )}
@@ -326,15 +363,39 @@ export default function TimelinePage() {
         </section>
       )}
 
-      {events.length === 0 && (
+      {events.length === 0 && actions.length === 0 && (
         <section className="mt-8">
           <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
             <p className="text-sm text-zinc-500">
-              Nog geen levensgebeurtenissen gepland. Klik op een evenement hierboven om te beginnen.
+              Nog geen levensgebeurtenissen gepland. Klik op een evenement hieronder om te beginnen.
             </p>
           </div>
         </section>
       )}
+
+      {/* Event Catalog */}
+      <section className="mt-8">
+        <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          Evenement toevoegen
+        </h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {Object.entries(LIFE_EVENT_CATALOG).map(([key, val]) => (
+            <button
+              key={key}
+              onClick={() => openCatalogForm(key)}
+              className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 text-left transition-colors hover:border-purple-200 hover:bg-purple-50/30"
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-purple-600">
+                {EVENT_ICONS[val.icon] ?? <Calendar className="h-4 w-4" />}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-zinc-900">{val.label}</p>
+                <p className="truncate text-xs text-zinc-400">{val.description}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
 
       {/* Event Form Modal */}
       {showForm && (
@@ -417,65 +478,179 @@ export default function TimelinePage() {
   )
 }
 
-function TimelineVisual({
-  currentAge, fireAge, events, impacts,
-}: {
-  currentAge: number; fireAge: number; events: LifeEvent[]; impacts: LifeEventImpact[]
-}) {
-  const W = 600
-  const H = 120
-  const PAD = 30
-  const minAge = currentAge
-  const maxAge = Math.max(fireAge + 5, ...events.filter(e => e.target_age).map(e => Number(e.target_age)))
-  const range = maxAge - minAge || 1
+// ── Cumulative FIRE impact calculation ────────────────────────
+// Each event shifts FIRE for subsequent events
 
-  function x(age: number) { return PAD + ((age - minAge) / range) * (W - PAD * 2) }
+function computeCumulativeImpacts(
+  baseInput: HorizonInput,
+  events: LifeEvent[],
+): LifeEventImpact[] {
+  const sorted = [...events].sort((a, b) => (a.target_age ?? 999) - (b.target_age ?? 999))
+  const results: LifeEventImpact[] = []
+  let runningInput = { ...baseInput }
+
+  for (const ev of sorted) {
+    const impact = computeLifeEventImpact(runningInput, ev)
+    results.push(impact)
+    // Shift running input to account for this event's permanent effects
+    runningInput = {
+      ...runningInput,
+      totalAssets: runningInput.totalAssets - Number(ev.one_time_cost),
+      monthlyExpenses: runningInput.monthlyExpenses + Number(ev.monthly_cost_change),
+      monthlyIncome: runningInput.monthlyIncome + Number(ev.monthly_income_change),
+    }
+  }
+
+  // Return in original order
+  return events.map(ev => {
+    const idx = sorted.findIndex(s => s.id === ev.id)
+    return results[idx]
+  })
+}
+
+// ── Logarithmic timeline SVG ──────────────────────────────────
+
+function LogTimeline({
+  currentAge, baseFireAge, adjustedFireAge, events, impacts, actions, dateOfBirth,
+}: {
+  currentAge: number
+  baseFireAge: number
+  adjustedFireAge: number | null
+  events: LifeEvent[]
+  impacts: LifeEventImpact[]
+  actions: Action[]
+  dateOfBirth: string | null
+}) {
+  const W = 800
+  const H = 160
+  const PAD_L = 20
+  const PAD_R = 20
+  const DRAW_W = W - PAD_L - PAD_R
+
+  // Total months from now to end of timeline
+  const endAge = Math.max(
+    (adjustedFireAge ?? baseFireAge) + 5,
+    baseFireAge + 5,
+    ...events.filter(e => e.target_age).map(e => Number(e.target_age) + 2),
+  )
+  const totalMonths = Math.max(12, (endAge - currentAge) * 12)
+
+  function x(ageOrMonths: number, isAge = true): number {
+    const offsetMonths = isAge ? (ageOrMonths - currentAge) * 12 : ageOrMonths
+    const pos = logPosition(offsetMonths, totalMonths)
+    return PAD_L + pos * DRAW_W
+  }
+
+  // Time labels with logarithmic spacing
+  const now = new Date()
+  const timeLabels: { label: string; months: number }[] = [
+    { label: 'Nu', months: 0 },
+    { label: '3 mnd', months: 3 },
+    { label: '6 mnd', months: 6 },
+    { label: '1 jaar', months: 12 },
+    { label: '2 jaar', months: 24 },
+    { label: '5 jaar', months: 60 },
+    { label: '10 jaar', months: 120 },
+    { label: '20 jaar', months: 240 },
+    { label: '30 jaar', months: 360 },
+  ].filter(l => l.months <= totalMonths)
+
+  // Map action scheduled_week to months from now
+  function actionToMonths(action: Action): number {
+    if (!action.scheduled_week) return 0
+    const actionDate = new Date(action.scheduled_week)
+    const diffMs = actionDate.getTime() - now.getTime()
+    return Math.max(0, diffMs / (1000 * 60 * 60 * 24 * 30.44))
+  }
+
+  const Y_LINE = 80
+  const Y_LABELS = H - 8
+  const Y_ACTION = 40
+  const Y_EVENT = 30
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 140 }}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 200 }}>
       {/* Main timeline line */}
-      <line x1={PAD} y1={60} x2={W - PAD} y2={60} stroke="#e4e4e7" strokeWidth="2" />
+      <line x1={PAD_L} y1={Y_LINE} x2={W - PAD_R} y2={Y_LINE} stroke="#e4e4e7" strokeWidth="2" />
 
-      {/* Current age marker */}
-      <circle cx={x(currentAge)} cy={60} r="6" fill="#8B5CB8" />
-      <text x={x(currentAge)} y={85} textAnchor="middle" className="fill-zinc-600" style={{ fontSize: 10, fontWeight: 600 }}>
-        Nu ({currentAge})
-      </text>
-
-      {/* FIRE marker */}
-      <circle cx={x(fireAge)} cy={60} r="6" fill="#10b981" stroke="#10b981" strokeWidth="2" />
-      <text x={x(fireAge)} y={85} textAnchor="middle" className="fill-emerald-600" style={{ fontSize: 10, fontWeight: 600 }}>
-        FIRE ({fireAge})
-      </text>
-
-      {/* Event markers */}
-      {events.map((ev, i) => {
-        if (!ev.target_age) return null
-        const evX = x(Number(ev.target_age))
-        const isExpense = Number(ev.one_time_cost) > 0 || Number(ev.monthly_cost_change) > 0
-        const color = isExpense ? '#ef4444' : '#10b981'
-
+      {/* Time labels along bottom */}
+      {timeLabels.map((tl) => {
+        const px = x(tl.months, false)
         return (
-          <g key={ev.id}>
-            <line x1={evX} y1={30} x2={evX} y2={55} stroke={color} strokeWidth="1.5" strokeDasharray="3" />
-            <circle cx={evX} cy={26} r="8" fill={color} opacity="0.15" stroke={color} strokeWidth="1" />
-            <text x={evX} y={30} textAnchor="middle" className="fill-zinc-700" style={{ fontSize: 8 }}>
-              {ev.name.substring(0, 3)}
-            </text>
-            <text x={evX} y={18} textAnchor="middle" style={{ fontSize: 8, fill: color }}>
-              {ev.target_age}
+          <g key={tl.label}>
+            <line x1={px} y1={Y_LINE - 4} x2={px} y2={Y_LINE + 4} stroke="#d4d4d8" strokeWidth="1" />
+            <text x={px} y={Y_LABELS} textAnchor="middle" className="fill-zinc-400" style={{ fontSize: 9 }}>
+              {tl.label}
             </text>
           </g>
         )
       })}
 
-      {/* Age labels */}
-      {Array.from({ length: 6 }, (_, i) => {
-        const age = Math.round(minAge + (i / 5) * range)
-        return (
-          <text key={i} x={x(age)} y={H - 5} textAnchor="middle" className="fill-zinc-400" style={{ fontSize: 9 }}>
-            {age}
+      {/* Current position marker */}
+      <circle cx={x(currentAge)} cy={Y_LINE} r="6" fill="#8B5CB8" />
+      <text x={x(currentAge)} y={Y_LINE + 20} textAnchor="middle" style={{ fontSize: 9, fontWeight: 600 }} className="fill-purple-600">
+        {currentAge}j
+      </text>
+
+      {/* Base FIRE marker */}
+      <circle cx={x(baseFireAge)} cy={Y_LINE} r="6" fill="#10b981" />
+      <text x={x(baseFireAge)} y={Y_LINE + 20} textAnchor="middle" style={{ fontSize: 9, fontWeight: 600 }} className="fill-emerald-600">
+        FIRE {baseFireAge}j
+      </text>
+
+      {/* Adjusted FIRE marker (if different) */}
+      {adjustedFireAge != null && adjustedFireAge !== baseFireAge && (
+        <>
+          <line
+            x1={x(baseFireAge)} y1={Y_LINE}
+            x2={x(adjustedFireAge)} y2={Y_LINE}
+            stroke="#ef4444" strokeWidth="2" strokeDasharray="4"
+          />
+          <circle cx={x(adjustedFireAge)} cy={Y_LINE} r="5" fill="none" stroke="#ef4444" strokeWidth="2" />
+          <text x={x(adjustedFireAge)} y={Y_LINE + 20} textAnchor="middle" style={{ fontSize: 8 }} className="fill-red-500">
+            {adjustedFireAge}j
           </text>
+        </>
+      )}
+
+      {/* Action markers (teal, above timeline) */}
+      {actions.map((action) => {
+        const months = actionToMonths(action)
+        const px = x(months, false)
+        return (
+          <g key={action.id}>
+            <line x1={px} y1={Y_ACTION + 8} x2={px} y2={Y_LINE - 6} stroke="#14b8a6" strokeWidth="1.5" strokeDasharray="3" />
+            <circle cx={px} cy={Y_ACTION} r="7" fill="#14b8a6" opacity="0.2" stroke="#14b8a6" strokeWidth="1" />
+            <text x={px} y={Y_ACTION + 3} textAnchor="middle" style={{ fontSize: 7, fontWeight: 500 }} className="fill-teal-700">
+              {action.freedom_days_impact != null ? `${Math.round(action.freedom_days_impact)}d` : ''}
+            </text>
+          </g>
+        )
+      })}
+
+      {/* Life event markers (purple, above timeline) */}
+      {events.map((ev, i) => {
+        if (!ev.target_age) return null
+        const px = x(Number(ev.target_age))
+        const impact = impacts[i]
+        const isExpense = Number(ev.one_time_cost) > 0 || Number(ev.monthly_cost_change) > 0
+
+        return (
+          <g key={ev.id}>
+            <line x1={px} y1={Y_EVENT + 8} x2={px} y2={Y_LINE - 6} stroke="#8B5CB8" strokeWidth="1.5" strokeDasharray="3" />
+            <circle cx={px} cy={Y_EVENT - 2} r="8" fill="#8B5CB8" opacity="0.15" stroke="#8B5CB8" strokeWidth="1" />
+            <text x={px} y={Y_EVENT + 2} textAnchor="middle" style={{ fontSize: 7, fontWeight: 500 }} className="fill-purple-700">
+              {ev.name.substring(0, 4)}
+            </text>
+            <text x={px} y={Y_EVENT - 10} textAnchor="middle" style={{ fontSize: 8 }} className="fill-purple-500">
+              {ev.target_age}j
+            </text>
+            {impact && impact.fireDelayMonths > 0 && (
+              <text x={px} y={Y_LINE - 10} textAnchor="middle" style={{ fontSize: 7 }} className="fill-red-500">
+                +{impact.fireDelayMonths}m
+              </text>
+            )}
+          </g>
         )
       })}
     </svg>

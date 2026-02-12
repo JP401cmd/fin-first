@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Sparkles, Loader2 } from 'lucide-react'
 import { FinnAvatar } from '@/components/app/avatars'
 import { RecommendationCard } from '@/components/app/recommendation-card'
+import { RecommendationModal } from '@/components/app/recommendation-modal'
 import type { Recommendation } from '@/lib/recommendation-data'
 
 type RecommendationListProps = {
@@ -14,6 +15,7 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
   const [recommendations, setRecommendations] = useState<Recommendation[]>(initialRecommendations)
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null)
 
   async function generateRecommendations() {
     setIsGenerating(true)
@@ -64,6 +66,8 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
         return r
       })
     )
+
+    setSelectedRec(null)
   }
 
   const pending = recommendations.filter(
@@ -146,17 +150,16 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
 
       {/* Skeleton cards while generating */}
       {isGenerating && (
-        <div className="space-y-4">
+        <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse rounded-xl border border-teal-100 bg-teal-50/30 p-5">
-              <div className="mb-3 h-6 w-32 rounded-full bg-teal-100" />
-              <div className="mb-2 h-5 w-3/4 rounded bg-zinc-200" />
-              <div className="mb-4 h-4 w-full rounded bg-zinc-100" />
-              <div className="mx-auto mb-4 h-16 w-48 rounded-lg bg-teal-100" />
-              <div className="flex gap-2">
-                <div className="h-9 flex-1 rounded-lg bg-teal-200" />
-                <div className="h-9 w-20 rounded-lg bg-teal-100" />
-                <div className="h-9 w-10 rounded-lg bg-zinc-100" />
+            <div key={i} className="animate-pulse rounded-xl border border-teal-100 bg-teal-50/30 px-4 py-3">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-lg bg-teal-100" />
+                <div className="flex-1">
+                  <div className="mb-1 h-4 w-3/4 rounded bg-zinc-200" />
+                  <div className="h-3 w-1/2 rounded bg-zinc-100" />
+                </div>
+                <div className="h-4 w-16 rounded bg-teal-100" />
               </div>
             </div>
           ))}
@@ -164,15 +167,24 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
       )}
 
       {/* Recommendation cards */}
-      <div className="space-y-4">
+      <div className="space-y-2">
         {pending.map((rec) => (
           <RecommendationCard
             key={rec.id}
             recommendation={rec}
-            onDecide={handleDecide}
+            onClick={() => setSelectedRec(rec)}
           />
         ))}
       </div>
+
+      {/* Modal */}
+      {selectedRec && (
+        <RecommendationModal
+          recommendation={selectedRec}
+          onDecide={handleDecide}
+          onClose={() => setSelectedRec(null)}
+        />
+      )}
     </div>
   )
 }

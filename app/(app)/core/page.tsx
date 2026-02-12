@@ -21,6 +21,7 @@ export default function CorePage() {
   const [alertBudgets, setAlertBudgets] = useState<{ budget: Budget; spent: number }[]>([])
   const [snapshots, setSnapshots] = useState<NetWorthSnapshot[]>([])
   const [snapshotLoading, setSnapshotLoading] = useState(false)
+  const [incomeMonths, setIncomeMonths] = useState(12)
 
   const loadData = useCallback(async () => {
     try {
@@ -33,7 +34,7 @@ export default function CorePage() {
       const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split('T')[0]
 
       // Fetch all in parallel
-      const [txResult, assetsResult, debtsResult, income12Result, essentialBudgetsResult] = await Promise.all([
+      const [txResult, assetsResult, debtsResult, income12Result, essentialBudgetsResult, earliestIncomeResult] = await Promise.all([
         supabase
           .from('transactions')
           .select('amount')
@@ -59,6 +60,13 @@ export default function CorePage() {
           .eq('is_essential', true)
           .in('budget_type', ['expense'])
           .is('parent_id', null),
+        supabase
+          .from('transactions')
+          .select('date')
+          .gt('amount', 0)
+          .gte('date', twelveMonthsAgo)
+          .order('date', { ascending: true })
+          .limit(1),
       ])
 
       if (txResult.error) throw txResult.error
@@ -66,6 +74,7 @@ export default function CorePage() {
       if (debtsResult.error) throw debtsResult.error
       if (income12Result.error) throw income12Result.error
       if (essentialBudgetsResult.error) throw essentialBudgetsResult.error
+      if (earliestIncomeResult.error) throw earliestIncomeResult.error
 
       // Calculate monthly income & expenses from transactions
       let monthlyIncome = 0
@@ -76,8 +85,23 @@ export default function CorePage() {
         else monthlyExpenses += Math.abs(amt)
       }
 
-      // Last 12 months income
+      // Last 12 months income — extrapolate if less than 12 months of data
       const last12MonthsIncome = income12Result.data.reduce((s, t) => s + Number(t.amount), 0)
+      let extrapolatedIncome = last12MonthsIncome
+      let actualIncomeMonths = 12
+      const earliestIncomeDate = earliestIncomeResult.data?.[0]?.date
+      if (earliestIncomeDate && last12MonthsIncome > 0) {
+        const earliest = new Date(earliestIncomeDate)
+        actualIncomeMonths = Math.max(1,
+          (now.getFullYear() - earliest.getFullYear()) * 12 +
+          (now.getMonth() - earliest.getMonth()) + 1
+        )
+        actualIncomeMonths = Math.min(actualIncomeMonths, 12)
+        if (actualIncomeMonths < 12) {
+          extrapolatedIncome = (last12MonthsIncome / actualIncomeMonths) * 12
+        }
+      }
+      setIncomeMonths(actualIncomeMonths)
 
       // Yearly must expenses from essential budgets
       let yearlyMustExpenses = 0
@@ -94,7 +118,7 @@ export default function CorePage() {
       // Total debts
       const totalDebts = debtsResult.data.reduce((s, d) => s + Number(d.current_balance), 0)
 
-      const coreData = computeCoreData(monthlyIncome, monthlyExpenses, totalAssets, totalDebts, last12MonthsIncome, yearlyMustExpenses)
+      const coreData = computeCoreData(monthlyIncome, monthlyExpenses, totalAssets, totalDebts, extrapolatedIncome, yearlyMustExpenses)
       setData(coreData)
 
       // Fetch budget alert data
@@ -434,11 +458,15 @@ export default function CorePage() {
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50">
                 <TrendingUp className="h-6 w-6 text-emerald-600" />
               </div>
-              <KpiTooltip text="Som van alle inkomsten over de laatste 12 maanden. Gebaseerd op werkelijke transacties, niet op een schatting." />
+              <KpiTooltip text="Geschat jaarinkomen gebaseerd op werkelijke transacties. Bij minder dan 12 maanden data wordt het gemiddelde geextrapoleerd naar een jaar." />
             </div>
             <p className="text-sm font-medium text-zinc-500">Geschat Jaarinkomen</p>
             <p className="mt-1 text-2xl font-bold text-zinc-900">{formatCurrency(data.estimatedYearlyIncome)}</p>
-            <p className="mt-1 text-xs text-zinc-400">laatste 12 maanden</p>
+            <p className="mt-1 text-xs text-zinc-400">
+              {incomeMonths < 12
+                ? `geextrapoleerd vanuit ${incomeMonths} maand${incomeMonths > 1 ? 'en' : ''}`
+                : 'laatste 12 maanden'}
+            </p>
           </div>
 
           <div className="rounded-xl border border-zinc-200 bg-white p-6">

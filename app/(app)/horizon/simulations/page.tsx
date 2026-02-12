@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/components/app/budget-shared'
+import { X } from 'lucide-react'
 import {
   runMonteCarlo, computeFireProjection, ageAtDate,
   type HorizonInput, type MonteCarloResult,
@@ -14,6 +15,7 @@ export default function SimulationsPage() {
   const [loading, setLoading] = useState(true)
   const [computing, setComputing] = useState(false)
   const [hoveredYear, setHoveredYear] = useState<number | null>(null)
+  const [selectedMetric, setSelectedMetric] = useState<'fire_prob' | 'p50' | 'p10' | null>(null)
 
   const loadData = useCallback(async () => {
     try {
@@ -124,38 +126,56 @@ export default function SimulationsPage() {
         1.000 gesimuleerde toekomsten op basis van historische marktvolatiliteit
       </p>
 
-      {/* Confidence summary */}
-      <section className="mt-8 rounded-xl border border-purple-200 bg-purple-50 p-6">
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-          <div className="text-center">
-            <p className="text-xs font-medium text-purple-600 uppercase">FIRE kans</p>
-            <p className="mt-1 text-4xl font-bold text-zinc-900">
-              {Math.round(mc.fireProb * 100)}%
-            </p>
-            <p className="mt-1 text-sm text-zinc-500">
-              van {mc.simulations} simulaties
-            </p>
-          </div>
-          <div className="text-center">
-            <p className="text-xs font-medium text-purple-600 uppercase">Verwachte FIRE leeftijd (P50)</p>
-            <p className="mt-1 text-4xl font-bold text-zinc-900">
-              {mc.p50FireAge !== null ? Math.round(mc.p50FireAge) : '-'}
-            </p>
-            <p className="mt-1 text-sm text-zinc-500">
-              {mc.p10FireAge !== null && mc.p90FireAge !== null
-                ? `range: ${Math.round(mc.p10FireAge)} - ${Math.round(mc.p90FireAge)}`
-                : 'onvoldoende data'}
-            </p>
-          </div>
-          <div className="text-center">
-            <p className="text-xs font-medium text-purple-600 uppercase">Beste scenario (P10)</p>
-            <p className="mt-1 text-4xl font-bold text-zinc-900">
-              {mc.p10FireAge !== null ? Math.round(mc.p10FireAge) : '-'}
-            </p>
-            <p className="mt-1 text-sm text-zinc-500">10% kans op eerder</p>
-          </div>
+      {/* Confidence summary - clickable cards */}
+      <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div
+          className="cursor-pointer rounded-xl border border-purple-200 bg-purple-50 p-5 text-center transition-colors hover:border-purple-300"
+          onClick={() => setSelectedMetric('fire_prob')}
+        >
+          <p className="text-xs font-medium text-purple-600 uppercase">FIRE kans</p>
+          <p className="mt-1 text-4xl font-bold text-zinc-900">
+            {Math.round(mc.fireProb * 100)}%
+          </p>
+          <p className="mt-1 text-sm text-zinc-500">
+            van {mc.simulations} simulaties
+          </p>
+        </div>
+        <div
+          className="cursor-pointer rounded-xl border border-purple-200 bg-purple-50 p-5 text-center transition-colors hover:border-purple-300"
+          onClick={() => setSelectedMetric('p50')}
+        >
+          <p className="text-xs font-medium text-purple-600 uppercase">Verwachte FIRE leeftijd (P50)</p>
+          <p className="mt-1 text-4xl font-bold text-zinc-900">
+            {mc.p50FireAge !== null ? Math.round(mc.p50FireAge) : '-'}
+          </p>
+          <p className="mt-1 text-sm text-zinc-500">
+            {mc.p10FireAge !== null && mc.p90FireAge !== null
+              ? `range: ${Math.round(mc.p10FireAge)} - ${Math.round(mc.p90FireAge)}`
+              : 'onvoldoende data'}
+          </p>
+        </div>
+        <div
+          className="cursor-pointer rounded-xl border border-purple-200 bg-purple-50 p-5 text-center transition-colors hover:border-purple-300"
+          onClick={() => setSelectedMetric('p10')}
+        >
+          <p className="text-xs font-medium text-purple-600 uppercase">Beste scenario (P10)</p>
+          <p className="mt-1 text-4xl font-bold text-zinc-900">
+            {mc.p10FireAge !== null ? Math.round(mc.p10FireAge) : '-'}
+          </p>
+          <p className="mt-1 text-sm text-zinc-500">10% kans op eerder</p>
         </div>
       </section>
+
+      {/* Metric detail modal */}
+      {selectedMetric && (
+        <SimulationDetailModal
+          metric={selectedMetric}
+          mc={mc}
+          fireTarget={fireTarget}
+          currentAge={currentAge}
+          onClose={() => setSelectedMetric(null)}
+        />
+      )}
 
       {/* Cone of Freedom chart */}
       <section className="mt-8">
@@ -392,5 +412,141 @@ function HistogramChart({ buckets, max }: { buckets: { label: string; count: num
       <text x={PAD - 4} y={PAD + 4} textAnchor="end" className="fill-zinc-400" style={{ fontSize: 9 }}>{max}</text>
       <text x={PAD - 4} y={H - PAD + 4} textAnchor="end" className="fill-zinc-400" style={{ fontSize: 9 }}>0</text>
     </svg>
+  )
+}
+
+function SimulationDetailModal({
+  metric,
+  mc,
+  fireTarget,
+  currentAge,
+  onClose,
+}: {
+  metric: 'fire_prob' | 'p50' | 'p10'
+  mc: MonteCarloResult
+  fireTarget: number
+  currentAge: number | null
+  onClose: () => void
+}) {
+  const titles = {
+    fire_prob: 'FIRE-kans',
+    p50: 'Verwachte FIRE-leeftijd (P50)',
+    p10: 'Beste scenario (P10)',
+  }
+
+  // Sample percentiles every 5 years
+  const sampleYears = [5, 10, 15, 20, 25, 30, 35, 40].filter((y) => y <= mc.years)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl"
+        style={{ maxHeight: '90vh' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-purple-200 bg-purple-50 px-6 py-4">
+          <h2 className="text-lg font-semibold text-zinc-900">{titles[metric]}</h2>
+          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4 px-6 py-4">
+          {metric === 'fire_prob' && (
+            <>
+              <div className="text-center">
+                <p className="text-5xl font-bold text-zinc-900">{Math.round(mc.fireProb * 100)}%</p>
+                <p className="mt-2 text-sm text-zinc-500">
+                  In {Math.round(mc.fireProb * mc.simulations)} van {mc.simulations} simulaties wordt FIRE bereikt
+                </p>
+              </div>
+              <div className="rounded-lg bg-zinc-50 p-4 text-sm text-zinc-600">
+                <p>De FIRE-kans is het percentage simulaties waarin je doelvermogen van {formatCurrency(fireTarget)} wordt bereikt binnen 40 jaar.</p>
+                <p className="mt-2">Dit doelvermogen is gebaseerd op de 4%-regel: je jaarlijkse uitgaven gedeeld door 0,04.</p>
+              </div>
+            </>
+          )}
+
+          {metric === 'p50' && (
+            <>
+              <div className="text-center">
+                <p className="text-5xl font-bold text-zinc-900">
+                  {mc.p50FireAge !== null ? Math.round(mc.p50FireAge) : '-'}
+                </p>
+                <p className="mt-2 text-sm text-zinc-500">Mediaan FIRE-leeftijd (50% kans op eerder)</p>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-lg bg-zinc-50 p-3 text-center">
+                  <p className="text-xs text-zinc-500">P10 (optimistisch)</p>
+                  <p className="mt-0.5 text-lg font-bold text-emerald-600">
+                    {mc.p10FireAge !== null ? Math.round(mc.p10FireAge) : '-'}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-purple-50 p-3 text-center">
+                  <p className="text-xs text-purple-600">P50 (mediaan)</p>
+                  <p className="mt-0.5 text-lg font-bold text-zinc-900">
+                    {mc.p50FireAge !== null ? Math.round(mc.p50FireAge) : '-'}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-zinc-50 p-3 text-center">
+                  <p className="text-xs text-zinc-500">P90 (conservatief)</p>
+                  <p className="mt-0.5 text-lg font-bold text-red-600">
+                    {mc.p90FireAge !== null ? Math.round(mc.p90FireAge) : '-'}
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+
+          {metric === 'p10' && (
+            <>
+              <div className="text-center">
+                <p className="text-5xl font-bold text-emerald-600">
+                  {mc.p10FireAge !== null ? Math.round(mc.p10FireAge) : '-'}
+                </p>
+                <p className="mt-2 text-sm text-zinc-500">Beste 10% van de simulaties bereikt FIRE op deze leeftijd</p>
+              </div>
+              <div className="rounded-lg bg-emerald-50 p-4 text-sm text-zinc-600">
+                <p>Het P10-scenario representeert een optimistisch maar realistisch pad waarbij de markt bovengemiddeld presteert.</p>
+                {mc.p50FireAge !== null && mc.p10FireAge !== null && (
+                  <p className="mt-2 font-medium text-emerald-700">
+                    Dat is {Math.round(mc.p50FireAge - mc.p10FireAge)} jaar eerder dan de mediaan.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Vermogensgroei per 5 jaar */}
+          <div>
+            <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">Vermogensgroei per 5 jaar</p>
+            <div className="space-y-2">
+              {sampleYears.map((yr) => {
+                const p = metric === 'p10' ? 'p10' : metric === 'p50' ? 'p50' : 'p50'
+                const value = mc.percentiles[p][yr] ?? 0
+                const pctOfFire = fireTarget > 0 ? Math.round((value / fireTarget) * 100) : 0
+                return (
+                  <div key={yr} className="flex items-center gap-3">
+                    <span className="w-14 shrink-0 text-xs text-zinc-400">
+                      {currentAge !== null ? `${currentAge + yr}j` : `+${yr}j`}
+                    </span>
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100">
+                      <div
+                        className="h-full rounded-full bg-purple-500 transition-all"
+                        style={{ width: `${Math.min(pctOfFire, 100)}%` }}
+                      />
+                    </div>
+                    <span className="w-20 shrink-0 text-right text-xs font-medium text-zinc-700">
+                      {formatCurrency(value)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }

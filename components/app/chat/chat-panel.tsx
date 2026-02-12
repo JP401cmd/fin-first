@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useMemo } from 'react'
 import { useChat } from '@ai-sdk/react'
-import { TextStreamChatTransport } from 'ai'
+import { DefaultChatTransport } from 'ai'
 import { useChatContext } from './chat-provider'
 import { FinnAvatar } from '@/components/app/avatars'
 import { X, Send, Loader2 } from 'lucide-react'
@@ -116,7 +116,7 @@ export function ChatPanel() {
   const [input, setInput] = useState('')
 
   const transport = useMemo(
-    () => new TextStreamChatTransport({ api: '/api/ai/chat', body: { domain: 'wil' } }),
+    () => new DefaultChatTransport({ api: '/api/ai/chat', body: { domain: 'wil' } }),
     [],
   )
 

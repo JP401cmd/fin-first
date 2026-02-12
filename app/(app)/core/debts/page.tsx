@@ -2,8 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
-  Plus, Trash2, Edit3, ChevronDown, ChevronUp, TrendingDown, Calendar,
-  AlertTriangle, CheckCircle2, X, RefreshCw,
+  Plus, Trash2, Edit3, AlertTriangle, CheckCircle2, X, RefreshCw,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
@@ -25,10 +24,10 @@ export default function DebtsPage() {
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editDebt, setEditDebt] = useState<Debt | null>(null)
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null)
+  const [modalStep, setModalStep] = useState<'detail' | 'edit' | 'revalue'>('detail')
   const [strategy, setStrategy] = useState<PayoffStrategy>('avalanche')
   const [extraMonthly, setExtraMonthly] = useState(0)
-  const [revalueDebt, setRevalueDebt] = useState<Debt | null>(null)
   const [valuations, setValuations] = useState<Record<string, Valuation[]>>({})
   const seedingRef = useRef(false)
 
@@ -129,10 +128,18 @@ export default function DebtsPage() {
     const supabase = createClient()
     await supabase.from('debts').delete().eq('id', id)
     setDebts((prev) => prev.filter((d) => d.id !== id))
+    setSelectedDebt(null)
   }
 
-  function toggleExpand(id: string) {
-    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))
+  function openDebtModal(debt: Debt) {
+    setSelectedDebt(debt)
+    setModalStep('detail')
+    loadValuations(debt.id)
+  }
+
+  function closeDebtModal() {
+    setSelectedDebt(null)
+    setModalStep('detail')
   }
 
   if (loading) {
@@ -274,127 +281,43 @@ export default function DebtsPage() {
       </section>
 
       {/* Debt list */}
-      <section className="mt-6 space-y-3">
+      <section className="mt-6 space-y-2">
         {debts.map((debt) => {
           const balance = Number(debt.current_balance)
           const original = Number(debt.original_amount)
           const pct = original > 0 ? ((original - balance) / original) * 100 : 0
-          const proj = debtProjection(debt)
-          const isOpen = expanded[debt.id] ?? false
           const icon = DEBT_TYPE_ICONS[debt.debt_type] ?? 'CircleDot'
 
           return (
             <div
               key={debt.id}
-              className="overflow-hidden rounded-xl border border-zinc-200 bg-white"
+              className="flex cursor-pointer items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 transition-colors hover:border-amber-200 hover:bg-amber-50/30"
+              onClick={() => openDebtModal(debt)}
             >
-              <div
-                className="flex cursor-pointer items-center gap-3 p-4"
-                onClick={() => toggleExpand(debt.id)}
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-50">
-                  <BudgetIcon name={icon} className="h-5 w-5 text-amber-600" />
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-zinc-900">{debt.name}</p>
-                      <p className="text-xs text-zinc-500">
-                        {DEBT_TYPE_LABELS[debt.debt_type]}
-                        {debt.creditor ? ` \u2022 ${debt.creditor}` : ''}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-zinc-900">{formatCurrency(balance)}</p>
-                      <p className="text-xs text-zinc-400">van {formatCurrency(original)}</p>
-                    </div>
-                  </div>
-                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
-                    <div
-                      className="h-full rounded-full bg-amber-500 transition-all"
-                      style={{ width: `${Math.min(pct, 100)}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="shrink-0 text-zinc-400">
-                  {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </div>
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-50">
+                <BudgetIcon name={icon} className="h-4 w-4 text-amber-600" />
               </div>
-
-              {isOpen && (
-                <div className="border-t border-zinc-100 bg-zinc-50/50 p-4">
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                    <div>
-                      <p className="text-xs text-zinc-500">Rente</p>
-                      <p className="text-sm font-medium text-zinc-900">{Number(debt.interest_rate)}%</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-zinc-500">Maandelijkse betaling</p>
-                      <p className="text-sm font-medium text-zinc-900">{formatCurrency(Number(debt.monthly_payment))}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-zinc-500">Aflossing op</p>
-                      <p className="text-sm font-medium text-zinc-900">
-                        {proj.isPayable && proj.payoffDate
-                          ? new Date(proj.payoffDate).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
-                          : 'Onbekend'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-zinc-500">Totale rente (restant)</p>
-                      <p className="text-sm font-medium text-red-600">
-                        {proj.isPayable ? formatCurrency(proj.totalInterest) : 'Onbetaalbaar'}
-                      </p>
-                    </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-zinc-900">{debt.name}</p>
+                    <p className="truncate text-xs text-zinc-500">
+                      {DEBT_TYPE_LABELS[debt.debt_type]}
+                      {debt.creditor ? ` \u2022 ${debt.creditor}` : ''}
+                    </p>
                   </div>
-
-                  {!proj.isPayable && (
-                    <div className="mt-3 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
-                      <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
-                      <p className="text-xs text-red-700">
-                        De maandelijkse betaling dekt de rente niet. Verhoog de betaling om deze schuld af te lossen.
-                      </p>
-                    </div>
-                  )}
-
-                  {debt.notes && (
-                    <p className="mt-3 text-xs text-zinc-500">{debt.notes}</p>
-                  )}
-
-                  <div className="mt-4 flex gap-2">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setRevalueDebt(debt) }}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50"
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" />
-                      Saldo bijwerken
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setEditDebt(debt); setShowForm(true) }}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
-                    >
-                      <Edit3 className="h-3.5 w-3.5" />
-                      Bewerken
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); deleteDebt(debt.id) }}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Verwijderen
-                    </button>
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm font-semibold text-zinc-900">{formatCurrency(balance)}</p>
+                    <p className="text-xs text-zinc-400">van {formatCurrency(original)}</p>
                   </div>
-
-                  {/* Value history */}
-                  <ValuationHistory
-                    entityId={debt.id}
-                    valuations={valuations[debt.id]}
-                    onLoad={() => loadValuations(debt.id)}
+                </div>
+                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+                  <div
+                    className="h-full rounded-full bg-amber-500 transition-all"
+                    style={{ width: `${Math.min(pct, 100)}%` }}
                   />
                 </div>
-              )}
+              </div>
             </div>
           )
         })}
@@ -408,7 +331,57 @@ export default function DebtsPage() {
         )}
       </section>
 
-      {/* Form modal */}
+      {/* Debt detail modal */}
+      {selectedDebt && modalStep === 'detail' && (
+        <DebtDetailModal
+          debt={selectedDebt}
+          valuations={valuations[selectedDebt.id]}
+          onClose={closeDebtModal}
+          onEdit={() => setModalStep('edit')}
+          onRevalue={() => setModalStep('revalue')}
+          onDelete={() => deleteDebt(selectedDebt.id)}
+        />
+      )}
+
+      {/* Edit form modal */}
+      {selectedDebt && modalStep === 'edit' && (
+        <DebtForm
+          debt={selectedDebt}
+          onClose={() => setModalStep('detail')}
+          onSaved={() => {
+            setModalStep('detail')
+            loadDebts().then(() => {
+              const supabase = createClient()
+              supabase.from('debts').select('*').eq('id', selectedDebt.id).single().then(({ data }) => {
+                if (data) setSelectedDebt(data as Debt)
+              })
+            })
+          }}
+        />
+      )}
+
+      {/* Revaluation modal */}
+      {selectedDebt && modalStep === 'revalue' && (
+        <ValuationModal
+          entityId={selectedDebt.id}
+          entityType="debt"
+          entityName={selectedDebt.name}
+          currentValue={Number(selectedDebt.current_balance)}
+          onClose={() => setModalStep('detail')}
+          onSaved={() => {
+            setModalStep('detail')
+            loadDebts().then(() => {
+              const supabase = createClient()
+              supabase.from('debts').select('*').eq('id', selectedDebt.id).single().then(({ data }) => {
+                if (data) setSelectedDebt(data as Debt)
+              })
+            })
+            loadValuations(selectedDebt.id)
+          }}
+        />
+      )}
+
+      {/* New debt form */}
       {showForm && (
         <DebtForm
           debt={editDebt ?? undefined}
@@ -420,22 +393,165 @@ export default function DebtsPage() {
           }}
         />
       )}
+    </div>
+  )
+}
 
-      {/* Revaluation modal */}
-      {revalueDebt && (
-        <ValuationModal
-          entityId={revalueDebt.id}
-          entityType="debt"
-          entityName={revalueDebt.name}
-          currentValue={Number(revalueDebt.current_balance)}
-          onClose={() => setRevalueDebt(null)}
-          onSaved={() => {
-            setRevalueDebt(null)
-            loadDebts()
-            loadValuations(revalueDebt.id)
-          }}
-        />
-      )}
+// ── Debt detail modal ────────────────────────────────────────
+
+function DebtDetailModal({
+  debt,
+  valuations,
+  onClose,
+  onEdit,
+  onRevalue,
+  onDelete,
+}: {
+  debt: Debt
+  valuations: Valuation[] | undefined
+  onClose: () => void
+  onEdit: () => void
+  onRevalue: () => void
+  onDelete: () => void
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const balance = Number(debt.current_balance)
+  const original = Number(debt.original_amount)
+  const pct = original > 0 ? ((original - balance) / original) * 100 : 0
+  const proj = debtProjection(debt)
+  const icon = DEBT_TYPE_ICONS[debt.debt_type] ?? 'CircleDot'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl"
+        style={{ maxHeight: '90vh' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-3 border-b border-zinc-200 px-6 py-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-50">
+            <BudgetIcon name={icon} className="h-5 w-5 text-amber-600" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="font-semibold text-zinc-900">{debt.name}</h2>
+            <p className="text-xs text-zinc-500">
+              {DEBT_TYPE_LABELS[debt.debt_type]}
+              {debt.creditor ? ` \u2022 ${debt.creditor}` : ''}
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Balance highlight */}
+        <div className="border-b border-zinc-100 px-6 py-4 text-center">
+          <p className="text-3xl font-bold text-zinc-900">{formatCurrency(balance)}</p>
+          <p className="mt-1 text-sm text-zinc-500">van {formatCurrency(original)} ({pct.toFixed(1)}% afgelost)</p>
+          <div className="mx-auto mt-2 h-2 w-48 overflow-hidden rounded-full bg-zinc-100">
+            <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
+          </div>
+        </div>
+
+        {/* Details grid */}
+        <div className="space-y-4 px-6 py-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg bg-zinc-50 p-3">
+              <p className="text-xs text-zinc-500">Rente</p>
+              <p className="mt-0.5 text-sm font-medium text-zinc-900">{Number(debt.interest_rate)}% p.j.</p>
+            </div>
+            <div className="rounded-lg bg-zinc-50 p-3">
+              <p className="text-xs text-zinc-500">Maandelijkse betaling</p>
+              <p className="mt-0.5 text-sm font-medium text-zinc-900">{formatCurrency(Number(debt.monthly_payment))}</p>
+            </div>
+            <div className="rounded-lg bg-zinc-50 p-3">
+              <p className="text-xs text-zinc-500">Aflossing op</p>
+              <p className="mt-0.5 text-sm font-medium text-zinc-900">
+                {proj.isPayable && proj.payoffDate
+                  ? new Date(proj.payoffDate).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
+                  : 'Onbekend'}
+              </p>
+            </div>
+            <div className="rounded-lg bg-zinc-50 p-3">
+              <p className="text-xs text-zinc-500">Resterende rente</p>
+              <p className="mt-0.5 text-sm font-medium text-red-600">
+                {proj.isPayable ? formatCurrency(proj.totalInterest) : 'Onbetaalbaar'}
+              </p>
+            </div>
+          </div>
+
+          {!proj.isPayable && (
+            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+              <p className="text-xs text-red-700">
+                De maandelijkse betaling dekt de rente niet. Verhoog de betaling om deze schuld af te lossen.
+              </p>
+            </div>
+          )}
+
+          {debt.notes && <p className="text-xs text-zinc-500">{debt.notes}</p>}
+
+          {/* Valuation history */}
+          {valuations && valuations.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">Saldohistorie</p>
+              <div className="space-y-1">
+                {valuations.slice(0, 5).map((v) => {
+                  const prev = valuations.find((vv) => vv.valuation_date < v.valuation_date)
+                  const diff = prev ? Number(v.value) - Number(prev.value) : null
+                  return (
+                    <div key={v.id} className="flex items-center gap-3 text-xs">
+                      <span className="w-20 shrink-0 text-zinc-400">
+                        {new Date(v.valuation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                      </span>
+                      <span className="font-medium text-zinc-700">{formatCurrency(Number(v.value))}</span>
+                      {diff !== null && (
+                        <span className={`text-[10px] font-medium ${diff <= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2 border-t border-zinc-200 px-6 py-4">
+          <button
+            onClick={onRevalue}
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-amber-200 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-50"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Saldo bijwerken
+          </button>
+          <button
+            onClick={onEdit}
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-700"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+            Bewerken
+          </button>
+          {confirmDelete ? (
+            <button
+              onClick={onDelete}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-xs font-medium text-white hover:bg-red-700"
+            >
+              Bevestigen
+            </button>
+          ) : (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
