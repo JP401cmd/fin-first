@@ -75,7 +75,7 @@ export default function CashPage() {
     if (data) {
       setBudgets(data as Budget[])
       const parents = (data as Budget[]).filter((b) => !b.parent_id)
-      const children = (data as Budget[]).filter((b) => b.parent_id)
+      const children = (data as Budget[]).filter((b) => b.parent_id && Number(b.default_limit) > 0)
       const groups = parents.map((parent) => ({
         parent,
         children: children.filter((c) => c.parent_id === parent.id),
@@ -436,7 +436,7 @@ export default function CashPage() {
   function handleSankeyNodeClick(nodeId: string) {
     const match = nodeId.match(/^(?:sub|grp|inc)-(.+)$/)
     if (match && match[1] !== 'uncategorized') {
-      router.push(`/core/budgets/${match[1]}`)
+      router.push(`/core/budgets?budget=${match[1]}`)
     }
   }
 

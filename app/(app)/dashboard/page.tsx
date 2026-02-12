@@ -22,17 +22,18 @@ export default async function DashboardPage() {
   const [
     txResult, assetsResult, debtsResult, profileResult,
     essentialBudgetsResult, actionsResult, eventsResult,
-    allBudgetsResult, recsResult,
+    allBudgetsResult, recsResult, childBudgetsResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('current_value, monthly_contribution').eq('is_active', true),
     supabase.from('debts').select('current_balance').eq('is_active', true),
     supabase.from('profiles').select('date_of_birth').single(),
-    supabase.from('budgets').select('default_limit, interval').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
+    supabase.from('budgets').select('id, default_limit, interval').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
     supabase.from('actions').select('id, status, freedom_days_impact').in('status', ['open', 'completed']),
     supabase.from('life_events').select('id').eq('is_active', true),
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, alert_threshold, parent_id').is('parent_id', null),
     supabase.from('recommendations').select('id, title').eq('status', 'pending').limit(1),
+    supabase.from('budgets').select('id, parent_id, default_limit').not('parent_id', 'is', null),
   ])
 
   // Core calculations
@@ -49,9 +50,13 @@ export default async function DashboardPage() {
   const netWorth = totalAssets - totalDebts
   const monthlyContributions = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.monthly_contribution), 0)
 
+  const allChildren = childBudgetsResult.data ?? []
   let yearlyMustExpenses = 0
   for (const b of essentialBudgetsResult.data ?? []) {
-    const limit = Number(b.default_limit)
+    const children = allChildren.filter(c => c.parent_id === b.id)
+    const limit = children.length > 0
+      ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
+      : Number(b.default_limit)
     if (b.interval === 'monthly') yearlyMustExpenses += limit * 12
     else if (b.interval === 'quarterly') yearlyMustExpenses += limit * 4
     else yearlyMustExpenses += limit
@@ -59,7 +64,7 @@ export default async function DashboardPage() {
 
   const yearlyExpenses = monthlyExpenses * 12
   const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / 0.04 : 0
-  const freedomPct = fireTarget > 0 ? Math.min((netWorth / fireTarget) * 100, 100) : 0
+  const freedomPct = fireTarget > 0 ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0) : 0
 
   // FIRE projection
   const horizonInput: HorizonInput = {

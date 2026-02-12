@@ -1,211 +1,172 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useEffect, useState } from 'react'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { X } from 'lucide-react'
 import {
-  computeScenarios, computeResilienceScore, formatFireAge,
+  computeScenarios, computeResilienceScore,
   MARKET_WEATHER, type MarketWeather, type HorizonInput,
   type ScenarioPath, type ResilienceScore,
 } from '@/lib/horizon-data'
 
-export default function ScenariosPage() {
-  const [input, setInput] = useState<HorizonInput | null>(null)
+type Props = {
+  input: HorizonInput
+  open: boolean
+  onClose: () => void
+}
+
+export function ScenariosModal({ input, open, onClose }: Props) {
   const [scenarios, setScenarios] = useState<ScenarioPath[]>([])
   const [resilience, setResilience] = useState<ResilienceScore | null>(null)
   const [weather, setWeather] = useState<MarketWeather>('normal')
-  const [loading, setLoading] = useState(true)
   const [selectedScenario, setSelectedScenario] = useState<ScenarioPath | null>(null)
 
-  const loadData = useCallback(async () => {
-    try {
-      const supabase = createClient()
-      const now = new Date()
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
-
-      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult] = await Promise.all([
-        supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
-        supabase.from('assets').select('current_value, monthly_contribution').eq('is_active', true),
-        supabase.from('debts').select('current_balance').eq('is_active', true),
-        supabase.from('profiles').select('date_of_birth').single(),
-        supabase.from('budgets').select('default_limit, interval').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
-      ])
-
-      let monthlyIncome = 0
-      let monthlyExpenses = 0
-      for (const tx of txResult.data ?? []) {
-        const amt = Number(tx.amount)
-        if (amt > 0) monthlyIncome += amt
-        else monthlyExpenses += Math.abs(amt)
-      }
-
-      const totalAssets = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.current_value), 0)
-      const totalDebts = (debtsResult.data ?? []).reduce((s, d) => s + Number(d.current_balance), 0)
-      const monthlyContributions = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.monthly_contribution), 0)
-
-      let yearlyMustExpenses = 0
-      for (const b of essentialBudgetsResult.data ?? []) {
-        const limit = Number(b.default_limit)
-        if (b.interval === 'monthly') yearlyMustExpenses += limit * 12
-        else if (b.interval === 'quarterly') yearlyMustExpenses += limit * 4
-        else yearlyMustExpenses += limit
-      }
-
-      setInput({
-        totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
-        monthlyContributions, yearlyMustExpenses,
-        dateOfBirth: profileResult.data?.date_of_birth ?? null,
-      })
-    } catch (err) {
-      console.error('Error loading scenario data:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { loadData() }, [loadData])
-
   useEffect(() => {
-    if (!input) return
+    if (!open) return
     setScenarios(computeScenarios(input, 40))
     setResilience(computeResilienceScore(input))
-  }, [input, weather])
+  }, [input, weather, open])
 
-  if (loading || !input) {
-    return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
-        <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
-        </div>
-      </div>
-    )
-  }
+  if (!open) return null
 
   const drifter = scenarios.find(s => s.name === 'drifter')
   const current = scenarios.find(s => s.name === 'current')
   const optimizer = scenarios.find(s => s.name === 'optimizer')
+  const fireTarget = (input.monthlyExpenses * 12) / 0.04
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
-      <h1 className="text-xl font-bold text-zinc-900">Toekomstpaden</h1>
-      <p className="mt-1 text-sm text-zinc-500">Drie scenario&apos;s: wat als je drifted, doorgaat, of optimaliseert?</p>
-
-      {/* Diverging paths chart */}
-      <section className="mt-8">
-        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
-          <DivergingPathsChart scenarios={scenarios} fireTarget={(input.monthlyExpenses * 12) / 0.04} />
-        </div>
-      </section>
-
-      {/* Scenario cards */}
-      <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {drifter && (
-          <ScenarioCard
-            title="Drifter"
-            subtitle="Lifestyle creep, dalende discipline"
-            color="red"
-            fireAge={drifter.fireAge}
-            description="Uitgaven stijgen 3%/jaar, spaarquote daalt. FIRE verdwijnt uit zicht."
-            onClick={() => setSelectedScenario(drifter)}
-          />
-        )}
-        {current && (
-          <ScenarioCard
-            title="Huidige Koers"
-            subtitle="Doorgaan zoals nu"
-            color="purple"
-            fireAge={current.fireAge}
-            description="Je huidige spaar- en beleggingspatroon constant doorgezet."
-            onClick={() => setSelectedScenario(current)}
-          />
-        )}
-        {optimizer && (
-          <ScenarioCard
-            title="Optimizer"
-            subtitle="Bewust optimaliseren"
-            color="green"
-            fireAge={optimizer.fireAge}
-            description={
-              current?.fireAge && optimizer.fireAge
-                ? `${Math.round(current.fireAge - optimizer.fireAge)} jaar eerder FIRE door bewuste keuzes.`
-                : 'Uitgaven -10%, bijdragen +20%. Maximale groei.'
-            }
-            onClick={() => setSelectedScenario(optimizer)}
-          />
-        )}
-      </section>
-
-      {/* Scenario detail modal */}
-      {selectedScenario && (
-        <ScenarioDetailModal
-          scenario={selectedScenario}
-          fireTarget={(input.monthlyExpenses * 12) / 0.04}
-          onClose={() => setSelectedScenario(null)}
-        />
-      )}
-
-      {/* Market weather */}
-      <section className="mt-8">
-        <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-          Marktweeer
-        </h2>
-        <p className="mb-4 text-sm text-zinc-500">Hoe presteren de scenario&apos;s bij verschillende marktomstandigheden?</p>
-
-        <div className="flex flex-wrap gap-2">
-          {(Object.entries(MARKET_WEATHER) as [MarketWeather, typeof MARKET_WEATHER[MarketWeather]][]).map(([key, val]) => (
-            <button
-              key={key}
-              onClick={() => setWeather(key)}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                weather === key
-                  ? 'bg-purple-600 text-white'
-                  : 'border border-zinc-200 bg-white text-zinc-600 hover:border-purple-200 hover:bg-purple-50'
-              }`}
-            >
-              {val.label}
-            </button>
-          ))}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-xl"
+        style={{ maxHeight: '90vh' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
+          <div>
+            <h2 className="text-lg font-bold text-zinc-900">Toekomstpaden</h2>
+            <p className="text-sm text-zinc-500">Drie scenario&apos;s: wat als je drifted, doorgaat, of optimaliseert?</p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        <p className="mt-3 text-xs text-zinc-400">{MARKET_WEATHER[weather].description}</p>
-      </section>
+        <div className="space-y-6 px-6 py-6">
+          {/* Diverging paths chart */}
+          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
+            <DivergingPathsChart scenarios={scenarios} fireTarget={fireTarget} />
+          </div>
 
-      {/* Resilience score */}
-      {resilience && (
-        <section className="mt-8">
-          <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-            Veerkrachtscore
-          </h2>
-          <div className="rounded-xl border border-zinc-200 bg-white p-6">
-            <div className="flex flex-col items-center gap-6 sm:flex-row">
-              <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
-                <svg viewBox="0 0 100 100" className="h-full w-full">
-                  <circle cx="50" cy="50" r="42" fill="none" stroke="#e4e4e7" strokeWidth="8" />
-                  <circle
-                    cx="50" cy="50" r="42" fill="none"
-                    stroke="#8B5CB8" strokeWidth="8" strokeLinecap="round"
-                    strokeDasharray={`${(resilience.total / 100) * 264} 264`}
-                    transform="rotate(-90 50 50)"
-                  />
-                </svg>
-                <span className="absolute text-2xl font-bold text-zinc-900">{resilience.total}</span>
-              </div>
+          {/* Scenario cards */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {drifter && (
+              <ScenarioCard
+                title="Drifter"
+                subtitle="Lifestyle creep, dalende discipline"
+                color="red"
+                fireAge={drifter.fireAge}
+                description="Uitgaven stijgen 3%/jaar, spaarquote daalt. FIRE verdwijnt uit zicht."
+                onClick={() => setSelectedScenario(drifter)}
+              />
+            )}
+            {current && (
+              <ScenarioCard
+                title="Huidige Koers"
+                subtitle="Doorgaan zoals nu"
+                color="purple"
+                fireAge={current.fireAge}
+                description="Je huidige spaar- en beleggingspatroon constant doorgezet."
+                onClick={() => setSelectedScenario(current)}
+              />
+            )}
+            {optimizer && (
+              <ScenarioCard
+                title="Optimizer"
+                subtitle="Bewust optimaliseren"
+                color="green"
+                fireAge={optimizer.fireAge}
+                description={
+                  current?.fireAge && optimizer.fireAge
+                    ? `${Math.round(current.fireAge - optimizer.fireAge)} jaar eerder FIRE door bewuste keuzes.`
+                    : 'Uitgaven -10%, bijdragen +20%. Maximale groei.'
+                }
+                onClick={() => setSelectedScenario(optimizer)}
+              />
+            )}
+          </div>
 
-              <div className="flex-1">
-                <p className="text-lg font-bold text-zinc-900">{resilience.label}</p>
-                <div className="mt-3 space-y-2">
-                  <ResilienceBar label="Noodfonds" value={resilience.breakdown.emergency} max={25} />
-                  <ResilienceBar label="Diversificatie" value={resilience.breakdown.diversification} max={25} />
-                  <ResilienceBar label="Schuldratio" value={resilience.breakdown.debtRatio} max={25} />
-                  <ResilienceBar label="Spaarquote" value={resilience.breakdown.savingsRate} max={25} />
+          {/* Scenario detail submodal */}
+          {selectedScenario && (
+            <ScenarioDetailModal
+              scenario={selectedScenario}
+              fireTarget={fireTarget}
+              onClose={() => setSelectedScenario(null)}
+            />
+          )}
+
+          {/* Market weather */}
+          <section>
+            <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+              Marktweeer
+            </h2>
+            <p className="mb-4 text-sm text-zinc-500">Hoe presteren de scenario&apos;s bij verschillende marktomstandigheden?</p>
+
+            <div className="flex flex-wrap gap-2">
+              {(Object.entries(MARKET_WEATHER) as [MarketWeather, typeof MARKET_WEATHER[MarketWeather]][]).map(([key, val]) => (
+                <button
+                  key={key}
+                  onClick={() => setWeather(key)}
+                  className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                    weather === key
+                      ? 'bg-purple-600 text-white'
+                      : 'border border-zinc-200 bg-white text-zinc-600 hover:border-purple-200 hover:bg-purple-50'
+                  }`}
+                >
+                  {val.label}
+                </button>
+              ))}
+            </div>
+
+            <p className="mt-3 text-xs text-zinc-400">{MARKET_WEATHER[weather].description}</p>
+          </section>
+
+          {/* Resilience score */}
+          {resilience && (
+            <section>
+              <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+                Veerkrachtscore
+              </h2>
+              <div className="rounded-xl border border-zinc-200 bg-white p-6">
+                <div className="flex flex-col items-center gap-6 sm:flex-row">
+                  <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
+                    <svg viewBox="0 0 100 100" className="h-full w-full">
+                      <circle cx="50" cy="50" r="42" fill="none" stroke="#e4e4e7" strokeWidth="8" />
+                      <circle
+                        cx="50" cy="50" r="42" fill="none"
+                        stroke="#8B5CB8" strokeWidth="8" strokeLinecap="round"
+                        strokeDasharray={`${(resilience.total / 100) * 264} 264`}
+                        transform="rotate(-90 50 50)"
+                      />
+                    </svg>
+                    <span className="absolute text-2xl font-bold text-zinc-900">{resilience.total}</span>
+                  </div>
+
+                  <div className="flex-1">
+                    <p className="text-lg font-bold text-zinc-900">{resilience.label}</p>
+                    <div className="mt-3 space-y-2">
+                      <ResilienceBar label="Noodfonds" value={resilience.breakdown.emergency} max={25} />
+                      <ResilienceBar label="Diversificatie" value={resilience.breakdown.diversification} max={25} />
+                      <ResilienceBar label="Schuldratio" value={resilience.breakdown.debtRatio} max={25} />
+                      <ResilienceBar label="Spaarquote" value={resilience.breakdown.savingsRate} max={25} />
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </section>
-      )}
+            </section>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -248,17 +209,15 @@ function ScenarioDetailModal({
   }
   const c = colorMap[scenario.name] ?? colorMap.current
 
-  // Sample year-by-year data (every 5 years + last)
   const yearlyPoints = scenario.months.filter((m, i) => m.month % 60 === 0 || i === scenario.months.length - 1).slice(0, 9)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
         className="w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl"
         style={{ maxHeight: '90vh' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className={`flex items-center justify-between border-b ${c.border} ${c.bg} px-6 py-4`}>
           <div>
             <h2 className="text-lg font-semibold text-zinc-900">{scenario.label}</h2>
@@ -269,7 +228,6 @@ function ScenarioDetailModal({
           </button>
         </div>
 
-        {/* FIRE age highlight */}
         <div className="px-6 py-4 text-center">
           <p className="text-4xl font-bold text-zinc-900">
             {scenario.fireAge !== null ? `${Math.round(scenario.fireAge)} jaar` : 'Nooit / 67+'}
@@ -284,7 +242,6 @@ function ScenarioDetailModal({
           </p>
         </div>
 
-        {/* Year-by-year table */}
         <div className="border-t border-zinc-100 px-6 py-4">
           <p className="mb-3 text-xs font-semibold text-zinc-500 uppercase">Projectie per 5 jaar</p>
           <div className="space-y-2">
@@ -298,7 +255,7 @@ function ScenarioDetailModal({
                   </span>
                   <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100">
                     <div
-                      className={`h-full rounded-full ${c.bg.replace('50', '400')} transition-all`}
+                      className="h-full rounded-full transition-all"
                       style={{ width: `${Math.min(pctOfFire, 100)}%`, backgroundColor: scenario.name === 'drifter' ? '#f87171' : scenario.name === 'optimizer' ? '#34d399' : '#a78bfa' }}
                     />
                   </div>
@@ -312,7 +269,6 @@ function ScenarioDetailModal({
           </div>
         </div>
 
-        {/* Key metrics */}
         <div className="border-t border-zinc-100 px-6 py-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-lg bg-zinc-50 p-3">
@@ -357,7 +313,6 @@ function DivergingPathsChart({ scenarios, fireTarget }: { scenarios: ScenarioPat
   const H = 260
   const PAD = 50
 
-  // Sample every 24 months
   const sampled = scenarios.map(s => ({
     ...s,
     months: s.months.filter((_, i) => i % 24 === 0 || i === s.months.length - 1),
@@ -384,7 +339,6 @@ function DivergingPathsChart({ scenarios, fireTarget }: { scenarios: ScenarioPat
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 280 }}>
-      {/* Grid */}
       {[0.25, 0.5, 0.75].map(pct => {
         const yPos = H - PAD - pct * (H - PAD * 2)
         const val = minVal + pct * valRange
@@ -398,7 +352,6 @@ function DivergingPathsChart({ scenarios, fireTarget }: { scenarios: ScenarioPat
         )
       })}
 
-      {/* FIRE target */}
       {fireInRange && (
         <>
           <line x1={PAD} y1={fireY} x2={W - PAD} y2={fireY} stroke="#8B5CB8" strokeWidth="1" strokeDasharray="6 3" opacity="0.5" />
@@ -406,12 +359,10 @@ function DivergingPathsChart({ scenarios, fireTarget }: { scenarios: ScenarioPat
         </>
       )}
 
-      {/* Scenario lines */}
       {sampled.map(s => (
         <path key={s.name} d={linePath(s.months)} fill="none" stroke={colors[s.name] ?? '#71717a'} strokeWidth={s.name === 'current' ? '2.5' : '2'} />
       ))}
 
-      {/* X-axis labels */}
       {sampled[0]?.months.filter((_, i) => i % Math.max(1, Math.floor(sampled[0].months.length / 6)) === 0 || i === sampled[0].months.length - 1).map((d) => {
         const i = sampled[0].months.indexOf(d)
         return (
@@ -421,7 +372,6 @@ function DivergingPathsChart({ scenarios, fireTarget }: { scenarios: ScenarioPat
         )
       })}
 
-      {/* Legend */}
       {sampled.map((s, i) => (
         <g key={s.name}>
           <line x1={PAD + i * 120} y1={12} x2={PAD + i * 120 + 16} y2={12} stroke={colors[s.name]} strokeWidth="2" />

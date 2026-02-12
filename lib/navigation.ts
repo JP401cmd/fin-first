@@ -31,10 +31,6 @@ export const willNav: ModuleNavConfig = {
   color: 'teal',
   items: [
     { label: 'Overzicht', href: '/will' },
-    { label: 'Acties', href: '/will/actions' },
-    { label: 'Doelen', href: '/will/goals' },
-    { label: "Scenario's", href: '/will/scenarios' },
-    { label: 'Optimalisatie', href: '/will/optimization' },
   ],
 }
 
@@ -44,10 +40,5 @@ export const horizonNav: ModuleNavConfig = {
   color: 'purple',
   items: [
     { label: 'Overzicht', href: '/horizon' },
-    { label: 'Projecties', href: '/horizon/projections' },
-    { label: "Scenario's", href: '/horizon/scenarios' },
-    { label: 'Tijdlijn', href: '/horizon/timeline' },
-    { label: 'Simulaties', href: '/horizon/simulations' },
-    { label: 'Opnamestrategie', href: '/horizon/withdrawal' },
   ],
 }

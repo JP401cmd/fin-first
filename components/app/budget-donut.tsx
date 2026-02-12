@@ -95,7 +95,9 @@ function buildSegments(
         spent: spending[c.id] ?? 0,
       }))
 
-      const limit = Number(g.default_limit)
+      const limit = children.length > 0
+        ? children.reduce((s, c) => s + c.limit, 0)
+        : Number(g.default_limit)
       const spent = children.length > 0
         ? children.reduce((s, c) => s + c.spent, 0)
         : (spending[g.id] ?? 0)

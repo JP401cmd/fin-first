@@ -288,7 +288,9 @@ function TreeGroup({
   const totalSpent = parent.children.length > 0
     ? parent.children.reduce((sum, c) => sum + (spending[c.id] ?? 0), 0)
     : (spending[parent.id] ?? 0)
-  const totalLimit = Number(parent.default_limit)
+  const totalLimit = parent.children.length > 0
+    ? parent.children.reduce((sum, c) => sum + Number(c.default_limit), 0)
+    : Number(parent.default_limit)
 
   const childIds = parent.children.map((c) => c.id)
 

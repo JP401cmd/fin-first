@@ -80,7 +80,7 @@ export default function ImportPage() {
         const allBudgets = budgetsRes.data as Budget[]
         setBudgets(allBudgets)
         const parents = allBudgets.filter((b) => !b.parent_id)
-        const children = allBudgets.filter((b) => b.parent_id)
+        const children = allBudgets.filter((b) => b.parent_id && Number(b.default_limit) > 0)
         setBudgetGroups(parents.map((p) => ({
           parent: p,
           children: children.filter((c) => c.parent_id === p.id),
@@ -606,15 +606,13 @@ export default function ImportPage() {
                         className="w-full max-w-[200px] rounded border border-zinc-200 px-2 py-1 text-xs outline-none focus:border-amber-500"
                       >
                         <option value="">Niet gecategoriseerd</option>
-                        {budgetGroups.map((group) => (
+                        {budgetGroups
+                          .filter((group) => group.children.length > 0)
+                          .map((group) => (
                           <optgroup key={group.parent.id} label={group.parent.name}>
-                            {group.children.length > 0
-                              ? group.children.map((child) => (
-                                  <option key={child.id} value={child.id}>{child.name}</option>
-                                ))
-                              : (
-                                  <option value={group.parent.id}>{group.parent.name}</option>
-                                )}
+                            {group.children.map((child) => (
+                              <option key={child.id} value={child.id}>{child.name}</option>
+                            ))}
                           </optgroup>
                         ))}
                       </select>

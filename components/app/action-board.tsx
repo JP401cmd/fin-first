@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, ChevronDown, ChevronRight, Sparkles, Link as LinkIcon } from 'lucide-react'
+import { Plus, ChevronDown, ChevronRight, Sparkles } from 'lucide-react'
 import { ActionCard } from '@/components/app/action-card'
 import { ActionForm } from '@/components/app/action-form'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
@@ -102,11 +102,7 @@ export function ActionBoard({ initialActions }: ActionBoardProps) {
         </div>
         <h2 className="mb-2 text-xl font-bold text-zinc-900">Nog geen acties</h2>
         <p className="mb-6 text-zinc-500">
-          Maak handmatig een actie aan of genereer suggesties op de{' '}
-          <a href="/will/optimization" className="inline-flex items-center gap-1 text-teal-600 hover:underline">
-            <LinkIcon className="h-3 w-3" /> Optimalisatie
-          </a>{' '}
-          pagina.
+          Maak handmatig een actie aan of bekijk de suggesties hierboven.
         </p>
         <button
           type="button"

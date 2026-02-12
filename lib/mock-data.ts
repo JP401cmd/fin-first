@@ -52,7 +52,7 @@ export function computeCoreData(
 
   // FIRE calculations
   const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / SWR : 0
-  const freedomPercentage = fireTarget > 0 ? Math.min((netWorth / fireTarget) * 100, 100) : 0
+  const freedomPercentage = fireTarget > 0 ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0) : 0
 
   // Freedom time: how long could you live off net worth
   const freedomMonthsTotal = yearlyExpenses > 0 ? (netWorth / yearlyExpenses) * 12 : 0

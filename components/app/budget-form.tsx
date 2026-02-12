@@ -35,6 +35,7 @@ export function BudgetForm({
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [categoryName, setCategoryName] = useState('')
 
   const [form, setForm] = useState<FormData>({
     name: budget?.name ?? '',
@@ -53,6 +54,8 @@ export function BudgetForm({
     parent_id: budget?.parent_id ?? '',
   })
 
+  const needsAutoParent = !budget && !form.parent_id
+
   function update<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
@@ -61,6 +64,10 @@ export function BudgetForm({
     e.preventDefault()
     if (!form.name.trim()) {
       setError('Naam is verplicht')
+      return
+    }
+    if (needsAutoParent && !categoryName.trim()) {
+      setError('Categorie-naam is verplicht')
       return
     }
 
@@ -75,25 +82,26 @@ export function BudgetForm({
       return
     }
 
-    const row = {
-      user_id: user.id,
-      name: form.name.trim(),
-      icon: form.icon,
-      description: form.description.trim() || null,
-      default_limit: parseFloat(form.default_limit) || 0,
-      budget_type: form.budget_type,
-      interval: form.interval,
-      rollover_type: form.rollover_type,
-      limit_type: form.limit_type,
-      alert_threshold: form.alert_threshold,
-      max_single_transaction_amount: parseFloat(form.max_single_transaction_amount) || 0,
-      is_essential: form.is_essential,
-      priority_score: form.priority_score,
-      is_inflation_indexed: form.is_inflation_indexed,
-      parent_id: form.parent_id || null,
-    }
-
     if (budget) {
+      // Edit existing budget
+      const row = {
+        user_id: user.id,
+        name: form.name.trim(),
+        icon: form.icon,
+        description: form.description.trim() || null,
+        default_limit: parseFloat(form.default_limit) || 0,
+        budget_type: form.budget_type,
+        interval: form.interval,
+        rollover_type: form.rollover_type,
+        limit_type: form.limit_type,
+        alert_threshold: form.alert_threshold,
+        max_single_transaction_amount: parseFloat(form.max_single_transaction_amount) || 0,
+        is_essential: form.is_essential,
+        priority_score: form.priority_score,
+        is_inflation_indexed: form.is_inflation_indexed,
+        parent_id: form.parent_id || null,
+      }
+
       const { error: updateError } = await supabase
         .from('budgets')
         .update({ ...row, updated_at: new Date().toISOString() })
@@ -104,7 +112,82 @@ export function BudgetForm({
         setSaving(false)
         return
       }
+    } else if (needsAutoParent) {
+      // Create parent + child automatically
+      const { data: parentData, error: parentError } = await supabase
+        .from('budgets')
+        .insert({
+          user_id: user.id,
+          name: categoryName.trim(),
+          icon: form.icon,
+          description: form.description.trim() || null,
+          default_limit: 0,
+          budget_type: form.budget_type,
+          interval: form.interval,
+          rollover_type: form.rollover_type,
+          limit_type: form.limit_type,
+          alert_threshold: form.alert_threshold,
+          max_single_transaction_amount: 0,
+          is_essential: form.is_essential,
+          priority_score: form.priority_score,
+          is_inflation_indexed: form.is_inflation_indexed,
+          parent_id: null,
+        })
+        .select('id')
+        .single()
+
+      if (parentError || !parentData) {
+        setError(parentError?.message ?? 'Fout bij aanmaken categorie')
+        setSaving(false)
+        return
+      }
+
+      const { error: childError } = await supabase
+        .from('budgets')
+        .insert({
+          user_id: user.id,
+          name: form.name.trim(),
+          icon: form.icon,
+          description: null,
+          default_limit: parseFloat(form.default_limit) || 0,
+          budget_type: form.budget_type,
+          interval: form.interval,
+          rollover_type: form.rollover_type,
+          limit_type: form.limit_type,
+          alert_threshold: form.alert_threshold,
+          max_single_transaction_amount: parseFloat(form.max_single_transaction_amount) || 0,
+          is_essential: form.is_essential,
+          priority_score: form.priority_score,
+          is_inflation_indexed: form.is_inflation_indexed,
+          parent_id: parentData.id,
+          sort_order: 0,
+        })
+
+      if (childError) {
+        setError(childError.message)
+        setSaving(false)
+        return
+      }
     } else {
+      // Create child under existing parent
+      const row = {
+        user_id: user.id,
+        name: form.name.trim(),
+        icon: form.icon,
+        description: form.description.trim() || null,
+        default_limit: parseFloat(form.default_limit) || 0,
+        budget_type: form.budget_type,
+        interval: form.interval,
+        rollover_type: form.rollover_type,
+        limit_type: form.limit_type,
+        alert_threshold: form.alert_threshold,
+        max_single_transaction_amount: parseFloat(form.max_single_transaction_amount) || 0,
+        is_essential: form.is_essential,
+        priority_score: form.priority_score,
+        is_inflation_indexed: form.is_inflation_indexed,
+        parent_id: form.parent_id || null,
+      }
+
       const { error: insertError } = await supabase
         .from('budgets')
         .insert(row)
@@ -150,10 +233,31 @@ export function BudgetForm({
           Identiteit
         </legend>
         <div className="space-y-4">
+          {/* Categorie-naam (alleen bij nieuw standalone budget) */}
+          {needsAutoParent && (
+            <div>
+              <label htmlFor="category_name" className="mb-1.5 block text-sm font-medium text-zinc-700">
+                Categorie-naam
+              </label>
+              <input
+                id="category_name"
+                type="text"
+                value={categoryName}
+                onChange={(e) => setCategoryName(e.target.value)}
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                placeholder="bijv. Abonnementen"
+                required
+              />
+              <p className="mt-1 text-xs text-zinc-400">
+                De overkoepelende categorie (hoofdbudget)
+              </p>
+            </div>
+          )}
+
           {/* Naam */}
           <div>
             <label htmlFor="name" className="mb-1.5 block text-sm font-medium text-zinc-700">
-              Naam
+              {needsAutoParent ? 'Sub-budget naam' : 'Naam'}
             </label>
             <input
               id="name"
@@ -161,9 +265,14 @@ export function BudgetForm({
               value={form.name}
               onChange={(e) => update('name', e.target.value)}
               className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
-              placeholder="bijv. Boodschappen"
+              placeholder={needsAutoParent ? 'bijv. Streaming' : 'bijv. Boodschappen'}
               required
             />
+            {needsAutoParent && (
+              <p className="mt-1 text-xs text-zinc-400">
+                Het specifieke sub-budget binnen de categorie
+              </p>
+            )}
           </div>
 
           {/* Icoon */}
@@ -434,7 +543,7 @@ export function BudgetForm({
         </legend>
         <div>
           <label htmlFor="parent_id" className="mb-1.5 block text-sm font-medium text-zinc-700">
-            Ouder-budget (optioneel)
+            Bestaande categorie
           </label>
           <select
             id="parent_id"
@@ -442,7 +551,7 @@ export function BudgetForm({
             onChange={(e) => update('parent_id', e.target.value)}
             className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
           >
-            <option value="">Geen (hoofdbudget)</option>
+            <option value="">Nieuwe categorie aanmaken</option>
             {parentBudgets
               .filter((b) => b.id !== budget?.id)
               .map((b) => (
@@ -451,6 +560,11 @@ export function BudgetForm({
                 </option>
               ))}
           </select>
+          {!form.parent_id && !budget && (
+            <p className="mt-1 text-xs text-zinc-400">
+              Er wordt automatisch een nieuwe categorie aangemaakt met een sub-budget
+            </p>
+          )}
         </div>
       </fieldset>
 

@@ -114,14 +114,35 @@ export async function POST(req: Request) {
           institution: a.institution || null,
           is_active: true,
           sort_order: i,
+          // Type-specific fields
+          subtype: a.subtype || null,
+          risk_profile: a.risk_profile || null,
+          tax_benefit: a.tax_benefit ?? null,
+          is_liquid: a.is_liquid ?? null,
+          lock_end_date: a.lock_end_date || null,
+          ticker_symbol: a.ticker_symbol || null,
+          rental_income: a.rental_income ?? null,
+          woz_value: a.woz_value ?? null,
+          retirement_provider_type: a.retirement_provider_type || null,
+          depreciation_rate: a.depreciation_rate ?? null,
+          address_postcode: a.address_postcode || null,
+          address_house_number: a.address_house_number || null,
         }))
         const { data: insertedAssets, error: assetErr } = await supabase
           .from('assets')
           .insert(assetRows)
-          .select('id')
+          .select('id, name')
         if (assetErr) throw new Error(`Assets insert mislukt: ${assetErr.message}`)
         progress('Bezittingen toevoegen...', 'assets', 'insert', insertedAssets?.length ?? 0)
         summary.assets = insertedAssets?.length ?? 0
+
+        // Build asset name -> id mapping for mortgage linking
+        const assetNameToId: Record<string, string> = {}
+        if (insertedAssets) {
+          for (let i = 0; i < insertedAssets.length; i++) {
+            assetNameToId[persona.assets[i].name] = insertedAssets[i].id
+          }
+        }
 
         // Debts
         if (persona.debts.length > 0) {
@@ -138,6 +159,14 @@ export async function POST(req: Request) {
             creditor: d.creditor || null,
             is_active: true,
             sort_order: i,
+            // Type-specific fields
+            subtype: d.subtype || null,
+            is_tax_deductible: d.is_tax_deductible ?? null,
+            fixed_rate_end_date: d.fixed_rate_end_date || null,
+            nhg: d.nhg ?? null,
+            credit_limit: d.credit_limit ?? null,
+            repayment_type: d.repayment_type || null,
+            draagkrachtmeting_date: d.draagkrachtmeting_date || null,
           }))
           const { data: insertedDebts, error: debtErr } = await supabase
             .from('debts')
@@ -146,6 +175,19 @@ export async function POST(req: Request) {
           if (debtErr) throw new Error(`Schulden insert mislukt: ${debtErr.message}`)
           progress('Schulden toevoegen...', 'debts', 'insert', insertedDebts?.length ?? 0)
           summary.debts = insertedDebts?.length ?? 0
+
+          // Link mortgages to assets via linked_asset_id
+          if (insertedDebts) {
+            for (let i = 0; i < persona.debts.length; i++) {
+              const debtDef = persona.debts[i]
+              if (debtDef.linked_asset_name && assetNameToId[debtDef.linked_asset_name]) {
+                await supabase
+                  .from('debts')
+                  .update({ linked_asset_id: assetNameToId[debtDef.linked_asset_name] })
+                  .eq('id', insertedDebts[i].id)
+              }
+            }
+          }
         } else {
           progress('Schulden toevoegen... (geen)', 'debts', 'insert', 0)
           summary.debts = 0

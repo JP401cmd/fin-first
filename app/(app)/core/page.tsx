@@ -6,6 +6,7 @@ import { computeCoreData, type CoreData } from '@/lib/mock-data'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/components/app/budget-shared'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { BudgetAlert, shouldAlert } from '@/components/app/budget-alert'
 import type { Budget } from '@/lib/budget-data'
 import type { NetWorthSnapshot } from '@/lib/net-worth-data'
@@ -15,10 +16,11 @@ import {
 } from 'lucide-react'
 
 export default function CorePage() {
+  const router = useRouter()
   const [data, setData] = useState<CoreData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [alertBudgets, setAlertBudgets] = useState<{ budget: Budget; spent: number }[]>([])
+  const [alertBudgets, setAlertBudgets] = useState<{ budget: Budget; spent: number; limit: number }[]>([])
   const [snapshots, setSnapshots] = useState<NetWorthSnapshot[]>([])
   const [snapshotLoading, setSnapshotLoading] = useState(false)
   const [incomeMonths, setIncomeMonths] = useState(12)
@@ -34,7 +36,7 @@ export default function CorePage() {
       const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split('T')[0]
 
       // Fetch all in parallel
-      const [txResult, assetsResult, debtsResult, income12Result, essentialBudgetsResult, earliestIncomeResult] = await Promise.all([
+      const [txResult, assetsResult, debtsResult, income12Result, essentialBudgetsResult, earliestIncomeResult, childBudgetsResult] = await Promise.all([
         supabase
           .from('transactions')
           .select('amount')
@@ -56,7 +58,7 @@ export default function CorePage() {
           .lt('date', monthEnd),
         supabase
           .from('budgets')
-          .select('default_limit, interval, budget_type, is_essential')
+          .select('id, default_limit, interval, budget_type, is_essential')
           .eq('is_essential', true)
           .in('budget_type', ['expense'])
           .is('parent_id', null),
@@ -67,6 +69,10 @@ export default function CorePage() {
           .gte('date', twelveMonthsAgo)
           .order('date', { ascending: true })
           .limit(1),
+        supabase
+          .from('budgets')
+          .select('id, parent_id, default_limit')
+          .not('parent_id', 'is', null),
       ])
 
       if (txResult.error) throw txResult.error
@@ -75,6 +81,7 @@ export default function CorePage() {
       if (income12Result.error) throw income12Result.error
       if (essentialBudgetsResult.error) throw essentialBudgetsResult.error
       if (earliestIncomeResult.error) throw earliestIncomeResult.error
+      if (childBudgetsResult.error) throw childBudgetsResult.error
 
       // Calculate monthly income & expenses from transactions
       let monthlyIncome = 0
@@ -103,10 +110,14 @@ export default function CorePage() {
       }
       setIncomeMonths(actualIncomeMonths)
 
-      // Yearly must expenses from essential budgets
+      // Yearly must expenses from essential budgets (sum of children per parent)
+      const allChildren = childBudgetsResult.data ?? []
       let yearlyMustExpenses = 0
       for (const b of essentialBudgetsResult.data) {
-        const limit = Number(b.default_limit)
+        const children = allChildren.filter(c => c.parent_id === b.id)
+        const limit = children.length > 0
+          ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
+          : Number(b.default_limit)
         if (b.interval === 'monthly') yearlyMustExpenses += limit * 12
         else if (b.interval === 'quarterly') yearlyMustExpenses += limit * 4
         else yearlyMustExpenses += limit
@@ -142,9 +153,12 @@ export default function CorePage() {
             const spent = children.length > 0
               ? children.reduce((sum, c) => sum + (spendMap[c.id] ?? 0), 0)
               : (spendMap[b.id] ?? 0)
-            return { budget: b as Budget, spent }
+            const limit = children.length > 0
+              ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
+              : Number(b.default_limit)
+            return { budget: b as Budget, spent, limit }
           })
-          .filter(({ budget, spent }) => shouldAlert(spent, Number(budget.default_limit), Number(budget.alert_threshold)))
+          .filter(({ spent, limit, budget }) => shouldAlert(spent, limit, Number(budget.alert_threshold)))
           .slice(0, 5)
         setAlertBudgets(triggered)
       }
@@ -238,7 +252,7 @@ export default function CorePage() {
             <div className="h-3 w-full overflow-hidden rounded-full bg-amber-950/60">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-amber-600 via-amber-400 to-amber-300 transition-all duration-1000"
-                style={{ width: `${Math.min(data.freedomPercentage, 100)}%` }}
+                style={{ width: `${Math.max(Math.min(data.freedomPercentage, 100), 0)}%` }}
               />
             </div>
             <div className="mt-2 flex justify-between text-xs text-amber-300/50">
@@ -341,15 +355,15 @@ export default function CorePage() {
             Aandachtspunten
           </h2>
           <div className="space-y-2">
-            {alertBudgets.map(({ budget, spent }) => (
+            {alertBudgets.map(({ budget, spent, limit }) => (
               <BudgetAlert
                 key={budget.id}
                 budgetName={budget.name}
                 budgetId={budget.id}
                 spent={spent}
-                limit={Number(budget.default_limit)}
+                limit={limit}
                 threshold={Number(budget.alert_threshold)}
-                onNavigate={(id) => window.location.href = `/core/budgets/${id}`}
+                onNavigate={(id) => router.push(`/core/budgets?budget=${id}`)}
               />
             ))}
           </div>

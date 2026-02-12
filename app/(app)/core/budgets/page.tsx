@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
+import { useSearchParams, useRouter } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, Plus, X, Pencil, Save,
   List, GitFork, Fingerprint, PieChart,
@@ -33,6 +34,8 @@ function ProgressBar({ spent, limit, budgetType = 'expense' }: { spent: number; 
 }
 
 export default function BudgetsPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [budgets, setBudgets] = useState<BudgetWithChildren[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -110,7 +113,7 @@ export default function BudgetsPage() {
       }
 
       const parents = (data as Budget[]).filter((b) => !b.parent_id)
-      const children = (data as Budget[]).filter((b) => b.parent_id)
+      const children = (data as Budget[]).filter((b) => b.parent_id && Number(b.default_limit) > 0)
 
       const tree: BudgetWithChildren[] = parents.map((parent) => ({
         ...parent,
@@ -187,6 +190,21 @@ export default function BudgetsPage() {
       loadSpending()
     }
   }, [loading, loadSpending])
+
+  // Open modal from URL search params (e.g. ?budget=id&edit=true)
+  useEffect(() => {
+    if (loading || budgets.length === 0) return
+    const budgetParam = searchParams.get('budget')
+    if (budgetParam) {
+      const exists = budgets.some(b => b.id === budgetParam || b.children.some(c => c.id === budgetParam))
+      if (exists) {
+        setSelectedBudgetId(budgetParam)
+        setModalStep(searchParams.get('edit') === 'true' ? 'edit' : 'detail')
+      }
+      // Clean up URL params without triggering navigation
+      router.replace('/core/budgets', { scroll: false })
+    }
+  }, [loading, budgets, searchParams, router])
 
   function openBudgetModal(id: string) {
     setSelectedBudgetId(id)
@@ -548,6 +566,12 @@ export default function BudgetsPage() {
       {selectedBudget && modalStep === 'edit' && (
         <BudgetEditModal
           budget={selectedBudget}
+          isParent={selectedParent?.id === selectedBudget.id && (selectedParent?.children.length ?? 0) > 0}
+          childrenLimitSum={
+            selectedParent?.id === selectedBudget.id && (selectedParent?.children.length ?? 0) > 0
+              ? selectedParent!.children.reduce((sum, c) => sum + Number(c.default_limit), 0)
+              : undefined
+          }
           onClose={() => setModalStep('detail')}
           onSaved={() => {
             setModalStep('detail')
@@ -844,10 +868,14 @@ function BudgetDetailModal({
 
 function BudgetEditModal({
   budget,
+  isParent = false,
+  childrenLimitSum,
   onClose,
   onSaved,
 }: {
   budget: Budget
+  isParent?: boolean
+  childrenLimitSum?: number
   onClose: () => void
   onSaved: () => void
 }) {
@@ -872,7 +900,7 @@ function BudgetEditModal({
   const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const [effectiveFrom, setEffectiveFrom] = useState(currentPeriod)
 
-  const limitChanged = (parseFloat(defaultLimit) || 0) !== Number(budget.default_limit)
+  const limitChanged = !isParent && (parseFloat(defaultLimit) || 0) !== Number(budget.default_limit)
 
   // Generate month options: current month + up to 12 months back
   const monthOptions: { value: string; label: string }[] = []
@@ -888,7 +916,7 @@ function BudgetEditModal({
     setSaving(true)
 
     const supabase = createClient()
-    const newLimit = parseFloat(defaultLimit) || 0
+    const newLimit = isParent ? Number(budget.default_limit) : (parseFloat(defaultLimit) || 0)
 
     const { error } = await supabase
       .from('budgets')
@@ -1018,7 +1046,14 @@ function BudgetEditModal({
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-zinc-600">Limiet</label>
-              <input type="number" min="0" step="0.01" value={defaultLimit} onChange={(e) => setDefaultLimit(e.target.value)} className={inputCls} />
+              {isParent ? (
+                <div className={`${inputCls} cursor-not-allowed bg-zinc-50 text-zinc-500`}>
+                  {formatCurrency(childrenLimitSum ?? 0)}
+                  <p className="mt-0.5 text-[10px] text-zinc-400">Som van sub-budgetten</p>
+                </div>
+              ) : (
+                <input type="number" min="0" step="0.01" value={defaultLimit} onChange={(e) => setDefaultLimit(e.target.value)} className={inputCls} />
+              )}
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-zinc-600">Interval</label>

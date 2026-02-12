@@ -9,14 +9,20 @@ import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import {
   type Debt,
   type DebtType,
+  type RepaymentType,
   type PayoffStrategy,
   DEBT_TYPE_LABELS,
   DEBT_TYPE_ICONS,
+  DEBT_SUBTYPE_LABELS,
+  DEBT_SUBTYPE_DEFAULTS,
+  DEBT_TYPE_FIELDS,
+  REPAYMENT_TYPE_LABELS,
   getDefaultDebts,
   debtProjection,
   simulatePayoff,
   payoffSummary,
 } from '@/lib/debt-data'
+import { type Asset, ASSET_TYPE_LABELS } from '@/lib/asset-data'
 
 export default function DebtsPage() {
   const [debts, setDebts] = useState<Debt[]>([])
@@ -29,6 +35,7 @@ export default function DebtsPage() {
   const [strategy, setStrategy] = useState<PayoffStrategy>('avalanche')
   const [extraMonthly, setExtraMonthly] = useState(0)
   const [valuations, setValuations] = useState<Record<string, Valuation[]>>({})
+  const [userAssets, setUserAssets] = useState<Asset[]>([])
   const seedingRef = useRef(false)
 
   const loadDebts = useCallback(async () => {
@@ -77,6 +84,13 @@ export default function DebtsPage() {
       start_date: d.start_date,
       creditor: d.creditor,
       sort_order: i,
+      subtype: d.subtype || null,
+      is_tax_deductible: d.is_tax_deductible ?? null,
+      fixed_rate_end_date: d.fixed_rate_end_date || null,
+      nhg: d.nhg ?? null,
+      credit_limit: d.credit_limit ?? null,
+      repayment_type: d.repayment_type || null,
+      draagkrachtmeting_date: d.draagkrachtmeting_date || null,
     }))
 
     await supabase.from('debts').insert(rows)
@@ -97,9 +111,16 @@ export default function DebtsPage() {
     }
   }, [])
 
+  const loadUserAssets = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase.from('assets').select('id, name, asset_type').order('name')
+    if (data) setUserAssets(data as Asset[])
+  }, [])
+
   useEffect(() => {
     loadDebts()
-  }, [loadDebts])
+    loadUserAssets()
+  }, [loadDebts, loadUserAssets])
 
   const activeDebts = debts.filter((d) => d.is_active && Number(d.current_balance) > 0)
   const totalBalance = activeDebts.reduce((s, d) => s + Number(d.current_balance), 0)
@@ -303,6 +324,9 @@ export default function DebtsPage() {
                     <p className="truncate text-sm font-medium text-zinc-900">{debt.name}</p>
                     <p className="truncate text-xs text-zinc-500">
                       {DEBT_TYPE_LABELS[debt.debt_type]}
+                      {debt.subtype && DEBT_SUBTYPE_LABELS[debt.debt_type]?.[debt.subtype]
+                        ? ` \u2022 ${DEBT_SUBTYPE_LABELS[debt.debt_type]![debt.subtype]}`
+                        : ''}
                       {debt.creditor ? ` \u2022 ${debt.creditor}` : ''}
                     </p>
                   </div>
@@ -336,6 +360,7 @@ export default function DebtsPage() {
         <DebtDetailModal
           debt={selectedDebt}
           valuations={valuations[selectedDebt.id]}
+          userAssets={userAssets}
           onClose={closeDebtModal}
           onEdit={() => setModalStep('edit')}
           onRevalue={() => setModalStep('revalue')}
@@ -347,6 +372,7 @@ export default function DebtsPage() {
       {selectedDebt && modalStep === 'edit' && (
         <DebtForm
           debt={selectedDebt}
+          userAssets={userAssets}
           onClose={() => setModalStep('detail')}
           onSaved={() => {
             setModalStep('detail')
@@ -385,6 +411,7 @@ export default function DebtsPage() {
       {showForm && (
         <DebtForm
           debt={editDebt ?? undefined}
+          userAssets={userAssets}
           onClose={() => { setShowForm(false); setEditDebt(null) }}
           onSaved={() => {
             setShowForm(false)
@@ -402,6 +429,7 @@ export default function DebtsPage() {
 function DebtDetailModal({
   debt,
   valuations,
+  userAssets,
   onClose,
   onEdit,
   onRevalue,
@@ -409,6 +437,7 @@ function DebtDetailModal({
 }: {
   debt: Debt
   valuations: Valuation[] | undefined
+  userAssets: Asset[]
   onClose: () => void
   onEdit: () => void
   onRevalue: () => void
@@ -420,6 +449,7 @@ function DebtDetailModal({
   const pct = original > 0 ? ((original - balance) / original) * 100 : 0
   const proj = debtProjection(debt)
   const icon = DEBT_TYPE_ICONS[debt.debt_type] ?? 'CircleDot'
+  const linkedAsset = debt.linked_asset_id ? userAssets.find((a) => a.id === debt.linked_asset_id) : null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -437,6 +467,9 @@ function DebtDetailModal({
             <h2 className="font-semibold text-zinc-900">{debt.name}</h2>
             <p className="text-xs text-zinc-500">
               {DEBT_TYPE_LABELS[debt.debt_type]}
+              {debt.subtype && DEBT_SUBTYPE_LABELS[debt.debt_type]?.[debt.subtype]
+                ? ` \u2022 ${DEBT_SUBTYPE_LABELS[debt.debt_type]![debt.subtype]}`
+                : ''}
               {debt.creditor ? ` \u2022 ${debt.creditor}` : ''}
             </p>
           </div>
@@ -451,6 +484,20 @@ function DebtDetailModal({
           <p className="mt-1 text-sm text-zinc-500">van {formatCurrency(original)} ({pct.toFixed(1)}% afgelost)</p>
           <div className="mx-auto mt-2 h-2 w-48 overflow-hidden rounded-full bg-zinc-100">
             <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
+          </div>
+          {/* Badges */}
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
+            {debt.repayment_type && (
+              <span className="inline-block rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700">
+                {REPAYMENT_TYPE_LABELS[debt.repayment_type]}
+              </span>
+            )}
+            {debt.nhg && (
+              <span className="inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">NHG</span>
+            )}
+            {debt.is_tax_deductible && (
+              <span className="inline-block rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700">Renteaftrek</span>
+            )}
           </div>
         </div>
 
@@ -468,9 +515,11 @@ function DebtDetailModal({
             <div className="rounded-lg bg-zinc-50 p-3">
               <p className="text-xs text-zinc-500">Aflossing op</p>
               <p className="mt-0.5 text-sm font-medium text-zinc-900">
-                {proj.isPayable && proj.payoffDate
-                  ? new Date(proj.payoffDate).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
-                  : 'Onbekend'}
+                {debt.repayment_type === 'aflossingsvrij'
+                  ? 'Aflossingsvrij'
+                  : proj.isPayable && proj.payoffDate
+                    ? new Date(proj.payoffDate).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
+                    : 'Onbekend'}
               </p>
             </div>
             <div className="rounded-lg bg-zinc-50 p-3">
@@ -481,7 +530,27 @@ function DebtDetailModal({
             </div>
           </div>
 
-          {!proj.isPayable && (
+          {/* Type-specific details */}
+          {(() => {
+            const details: { label: string; value: string }[] = []
+            if (debt.fixed_rate_end_date) details.push({ label: 'Rentevast tot', value: new Date(debt.fixed_rate_end_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' }) })
+            if (debt.credit_limit) details.push({ label: 'Kredietlimiet', value: formatCurrency(Number(debt.credit_limit)) })
+            if (linkedAsset) details.push({ label: 'Gekoppelde woning', value: linkedAsset.name })
+            if (debt.draagkrachtmeting_date) details.push({ label: 'Draagkrachtmeting', value: new Date(debt.draagkrachtmeting_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' }) })
+            if (details.length === 0) return null
+            return (
+              <div className="grid grid-cols-2 gap-3">
+                {details.map((d) => (
+                  <div key={d.label} className="rounded-lg bg-amber-50/50 p-3">
+                    <p className="text-xs text-amber-700/60">{d.label}</p>
+                    <p className="mt-0.5 text-sm font-medium text-zinc-900">{d.value}</p>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
+          {!proj.isPayable && debt.repayment_type !== 'aflossingsvrij' && (
             <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
               <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
               <p className="text-xs text-red-700">
@@ -663,10 +732,12 @@ function PayoffChart({ months, debts }: { months: ReturnType<typeof simulatePayo
 
 function DebtForm({
   debt,
+  userAssets,
   onClose,
   onSaved,
 }: {
   debt?: Debt
+  userAssets: Asset[]
   onClose: () => void
   onSaved: () => void
 }) {
@@ -684,6 +755,39 @@ function DebtForm({
   const [creditor, setCreditor] = useState(debt?.creditor ?? '')
   const [notes, setNotes] = useState(debt?.notes ?? '')
   const [saving, setSaving] = useState(false)
+  // Type-specific state
+  const [subtype, setSubtype] = useState(debt?.subtype ?? '')
+  const [repaymentType, setRepaymentType] = useState<string>(debt?.repayment_type ?? '')
+  const [isTaxDeductible, setIsTaxDeductible] = useState(debt?.is_tax_deductible ?? false)
+  const [fixedRateEndDate, setFixedRateEndDate] = useState(debt?.fixed_rate_end_date ?? '')
+  const [nhg, setNhg] = useState(debt?.nhg ?? false)
+  const [linkedAssetId, setLinkedAssetId] = useState(debt?.linked_asset_id ?? '')
+  const [creditLimit, setCreditLimit] = useState(String(debt?.credit_limit ?? ''))
+  const [draagkrachtmetingDate, setDraagkrachtmetingDate] = useState(debt?.draagkrachtmeting_date ?? '')
+
+  const subtypeOptions = DEBT_SUBTYPE_LABELS[debtType]
+  const visibleFields = DEBT_TYPE_FIELDS[debtType]
+
+  function handleTypeChange(type: DebtType) {
+    setDebtType(type)
+    setSubtype('')
+    if (!isEdit) {
+      setRepaymentType('')
+      setIsTaxDeductible(false)
+      setNhg(false)
+    }
+  }
+
+  function handleSubtypeChange(st: string) {
+    setSubtype(st)
+    if (!isEdit && st) {
+      const defaults = DEBT_SUBTYPE_DEFAULTS[st]
+      if (defaults) {
+        if (defaults.repayment_type) setRepaymentType(defaults.repayment_type)
+        if (defaults.is_tax_deductible !== undefined) setIsTaxDeductible(defaults.is_tax_deductible)
+      }
+    }
+  }
 
   async function handleSave() {
     if (!name || !currentBalance) return
@@ -706,6 +810,15 @@ function DebtForm({
       end_date: endDate || null,
       creditor: creditor || null,
       notes: notes || null,
+      // Type-specific fields
+      subtype: subtype || null,
+      repayment_type: repaymentType || null,
+      is_tax_deductible: visibleFields.includes('is_tax_deductible') ? isTaxDeductible : null,
+      fixed_rate_end_date: fixedRateEndDate || null,
+      nhg: visibleFields.includes('nhg') ? nhg : null,
+      linked_asset_id: linkedAssetId || null,
+      credit_limit: creditLimit ? Number(creditLimit) : null,
+      draagkrachtmeting_date: draagkrachtmetingDate || null,
     }
 
     if (isEdit && debt) {
@@ -748,7 +861,7 @@ function DebtForm({
               <label className="mb-1 block text-xs font-medium text-zinc-600">Type</label>
               <select
                 value={debtType}
-                onChange={(e) => setDebtType(e.target.value as DebtType)}
+                onChange={(e) => handleTypeChange(e.target.value as DebtType)}
                 className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
               >
                 {Object.entries(DEBT_TYPE_LABELS).map(([key, label]) => (
@@ -757,6 +870,23 @@ function DebtForm({
               </select>
             </div>
           </div>
+
+          {/* Subtype dropdown (conditional) */}
+          {subtypeOptions && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">Subtype</label>
+              <select
+                value={subtype}
+                onChange={(e) => handleSubtypeChange(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              >
+                <option value="">Selecteer subtype...</option>
+                {Object.entries(subtypeOptions).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -840,6 +970,100 @@ function DebtForm({
               placeholder="ABN AMRO, ING, DUO..."
             />
           </div>
+
+          {/* Type-specific fields */}
+          {visibleFields.length > 0 && visibleFields.some((f) => f !== 'subtype') && (
+            <div className="space-y-3 rounded-lg border border-amber-100 bg-amber-50/30 p-3">
+              <p className="text-xs font-semibold text-amber-700/60 uppercase">Details</p>
+              <div className="grid grid-cols-2 gap-3">
+                {visibleFields.includes('repayment_type') && (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600">Aflossingstype</label>
+                    <select
+                      value={repaymentType}
+                      onChange={(e) => setRepaymentType(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="">-</option>
+                      {Object.entries(REPAYMENT_TYPE_LABELS).map(([k, l]) => (
+                        <option key={k} value={k}>{l}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {visibleFields.includes('is_tax_deductible') && (
+                  <label className="flex items-center gap-2 text-sm text-zinc-700">
+                    <input
+                      type="checkbox"
+                      checked={isTaxDeductible}
+                      onChange={(e) => setIsTaxDeductible(e.target.checked)}
+                      className="rounded border-zinc-300"
+                    />
+                    Hypotheekrenteaftrek
+                  </label>
+                )}
+                {visibleFields.includes('nhg') && (
+                  <label className="flex items-center gap-2 text-sm text-zinc-700">
+                    <input
+                      type="checkbox"
+                      checked={nhg}
+                      onChange={(e) => setNhg(e.target.checked)}
+                      className="rounded border-zinc-300"
+                    />
+                    NHG
+                  </label>
+                )}
+                {visibleFields.includes('fixed_rate_end_date') && (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600">Rentevast tot</label>
+                    <input
+                      type="date"
+                      value={fixedRateEndDate}
+                      onChange={(e) => setFixedRateEndDate(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                    />
+                  </div>
+                )}
+                {visibleFields.includes('linked_asset_id') && (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600">Gekoppelde woning</label>
+                    <select
+                      value={linkedAssetId}
+                      onChange={(e) => setLinkedAssetId(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="">-</option>
+                      {userAssets.filter((a) => a.asset_type === 'real_estate').map((a) => (
+                        <option key={a.id} value={a.id}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {visibleFields.includes('credit_limit') && (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600">Kredietlimiet</label>
+                    <input
+                      type="number"
+                      value={creditLimit}
+                      onChange={(e) => setCreditLimit(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                    />
+                  </div>
+                )}
+                {visibleFields.includes('draagkrachtmeting_date') && (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600">Draagkrachtmeting</label>
+                    <input
+                      type="date"
+                      value={draagkrachtmetingDate}
+                      onChange={(e) => setDraagkrachtmetingDate(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="mb-1 block text-xs font-medium text-zinc-600">Notities (optioneel)</label>

@@ -234,7 +234,10 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
             const lobeVisible = activeGroups.size === 0 || activeGroups.has(lobe.colorIndex)
             const c = groupColorsList[lobe.colorIndex]
             const lobeSpent = lobe.cells.reduce((sum, cell) => sum + cell.spent, 0)
-            const lobeLimit = Number(groups[lobe.colorIndex]?.default_limit ?? 0)
+            const group = groups[lobe.colorIndex]
+            const lobeLimit = group && group.children.length > 0
+              ? group.children.reduce((sum, c) => sum + Number(c.default_limit), 0)
+              : Number(group?.default_limit ?? 0)
             const lobeIsOver = lobeLimit > 0 && lobeSpent > lobeLimit
             return (
               <g key={`lobe-${lobe.id}`} opacity={lobeVisible ? 1 : 0.15}>

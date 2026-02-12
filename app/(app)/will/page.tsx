@@ -1,70 +1,152 @@
-import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
+'use client'
+
+import { useEffect, useState, useCallback } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { FinnAvatar } from '@/components/app/avatars'
+import { RecommendationList } from '@/components/app/recommendation-list'
+import { ActionBoard } from '@/components/app/action-board'
+import { GoalDetailModal } from '@/components/app/will/goal-detail-modal'
+import { GoalForm } from '@/components/app/goal-form'
 import {
   type RecommendationType,
   RECOMMENDATION_TYPE_LABELS,
+  type Recommendation,
+  type Action,
 } from '@/lib/recommendation-data'
 import { computeGoalProgress, getGoalColorClasses, type Goal } from '@/lib/goal-data'
 import {
-  CheckCircle, Sparkles, Target, Flame, ArrowRight, Info,
-  AlertTriangle, Clock, TrendingDown,
+  CheckCircle, Sparkles, Target, Flame, Info, Plus,
+  AlertTriangle, Clock, TrendingDown, ArrowRight,
 } from 'lucide-react'
 
-export default async function WillPage() {
-  const supabase = await createClient()
+type KpiData = {
+  completedActions: { id: string; status: string; freedom_days_impact: number; source: string; completed_at: string | null; due_date: string | null; created_at: string; recommendation: { recommendation_type: string }[] | null }[]
+  allActions: { id: string; status: string; freedom_days_impact: number; source: string; completed_at: string | null; due_date: string | null; created_at: string; recommendation: { recommendation_type: string }[] | null }[]
+  openActions: { id: string; status: string; freedom_days_impact: number; due_date: string | null }[]
+  allPendingRecs: { id: string; status: string; recommendation_type: string; freedom_days_per_year: number; decided_at: string | null; created_at: string }[]
+  goals: Goal[]
+  completedGoalCount: number
+  totalGoalCount: number
+  goalProgresses: { current: number; target: number; pct: number; onTrack: boolean; eta: string | null }[]
+}
 
-  const [
-    { data: actions },
-    { data: pendingRecs },
-    { data: feedback },
-    { data: activeGoals },
-    { count: completedGoalCount },
-    { count: totalGoalCount },
-  ] = await Promise.all([
-    supabase
-      .from('actions')
-      .select('id, status, freedom_days_impact, source, completed_at, due_date, created_at, recommendation:recommendations(recommendation_type)')
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('recommendations')
-      .select('id, status, recommendation_type, freedom_days_per_year, decided_at, created_at')
-      .in('status', ['pending', 'postponed']),
-    supabase
-      .from('recommendation_feedback')
-      .select('id, feedback_type, recommendation_type, freedom_days_impact, created_at'),
-    supabase
-      .from('goals')
-      .select('*')
-      .eq('is_completed', false)
-      .order('sort_order', { ascending: true })
-      .limit(5),
-    supabase
-      .from('goals')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_completed', true),
-    supabase
-      .from('goals')
-      .select('*', { count: 'exact', head: true }),
-  ])
+export default function WillPage() {
+  const [kpi, setKpi] = useState<KpiData | null>(null)
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([])
+  const [actions, setActions] = useState<Action[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showGoalModal, setShowGoalModal] = useState(false)
+  const [showGoalForm, setShowGoalForm] = useState(false)
+  const [goalAssets, setGoalAssets] = useState<{ id: string; name: string; current_value: number }[]>([])
+  const [goalDebts, setGoalDebts] = useState<{ id: string; name: string; current_balance: number }[]>([])
 
-  const allActions = actions ?? []
-  const allPendingRecs = pendingRecs ?? []
-  const allFeedback = feedback ?? []
-  const goals = (activeGoals ?? []) as Goal[]
+  const loadData = useCallback(async () => {
+    const supabase = createClient()
+    const today = new Date().toISOString().split('T')[0]
+
+    const [
+      actionsRes,
+      pendingRecsRes,
+      feedbackRes,
+      activeGoalsRes,
+      completedGoalCountRes,
+      totalGoalCountRes,
+      recsForListRes,
+      actionsForBoardRes,
+      assetsRes,
+      debtsRes,
+    ] = await Promise.all([
+      supabase
+        .from('actions')
+        .select('id, status, freedom_days_impact, source, completed_at, due_date, created_at, recommendation:recommendations(recommendation_type)')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('recommendations')
+        .select('id, status, recommendation_type, freedom_days_per_year, decided_at, created_at')
+        .in('status', ['pending', 'postponed']),
+      supabase
+        .from('recommendation_feedback')
+        .select('id, feedback_type, recommendation_type, freedom_days_impact, created_at'),
+      supabase
+        .from('goals')
+        .select('*')
+        .eq('is_completed', false)
+        .order('sort_order', { ascending: true })
+        .limit(5),
+      supabase
+        .from('goals')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_completed', true),
+      supabase
+        .from('goals')
+        .select('*', { count: 'exact', head: true }),
+      // For RecommendationList inline
+      supabase
+        .from('recommendations')
+        .select('*')
+        .or(`status.eq.pending,and(status.eq.postponed,postponed_until.lte.${today})`)
+        .order('priority_score', { ascending: false })
+        .order('created_at', { ascending: false }),
+      // For ActionBoard inline
+      supabase
+        .from('actions')
+        .select('*, recommendation:recommendations(title, recommendation_type)')
+        .order('status', { ascending: true })
+        .order('priority_score', { ascending: false })
+        .order('sort_order', { ascending: true }),
+      // For GoalForm
+      supabase.from('assets').select('id, name, current_value').eq('is_active', true),
+      supabase.from('debts').select('id, name, current_balance').eq('is_active', true),
+    ])
+
+    const allActions = (actionsRes.data ?? []) as KpiData['allActions']
+    const allPendingRecs = (pendingRecsRes.data ?? []) as KpiData['allPendingRecs']
+    const goals = (activeGoalsRes.data ?? []) as Goal[]
+    const goalProgresses = goals.map(g => computeGoalProgress(g))
+
+    setKpi({
+      completedActions: allActions.filter(a => a.status === 'completed'),
+      allActions,
+      openActions: allActions.filter(a => a.status === 'open' || a.status === 'postponed'),
+      allPendingRecs,
+      goals,
+      completedGoalCount: completedGoalCountRes.count ?? 0,
+      totalGoalCount: totalGoalCountRes.count ?? 0,
+      goalProgresses,
+    })
+
+    setRecommendations((recsForListRes.data as Recommendation[]) ?? [])
+    setActions((actionsForBoardRes.data as Action[]) ?? [])
+    setGoalAssets((assetsRes.data ?? []) as { id: string; name: string; current_value: number }[])
+    setGoalDebts((debtsRes.data ?? []) as { id: string; name: string; current_balance: number }[])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  function scrollToSection(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  if (loading || !kpi) {
+    return (
+      <div className="mx-auto max-w-6xl px-6 py-12">
+        <div className="flex items-center justify-center py-20">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
+        </div>
+      </div>
+    )
+  }
 
   // --- Calculations ---
+  const { completedActions, allActions, openActions, allPendingRecs, goals, completedGoalCount, totalGoalCount, goalProgresses } = kpi
 
-  const completedActions = allActions.filter(a => a.status === 'completed')
-  const openActions = allActions.filter(a => a.status === 'open' || a.status === 'postponed')
-  const totalActions = allActions.length
-
-  // Total freedom days won from completed actions
   const totalFreedomDaysWon = completedActions.reduce(
     (sum, a) => sum + (Number(a.freedom_days_impact) || 0), 0
   )
 
-  // Open potential: freedom days from open actions + pending recommendations
   const openActionDays = openActions.reduce(
     (sum, a) => sum + (Number(a.freedom_days_impact) || 0), 0
   )
@@ -73,12 +155,11 @@ export default async function WillPage() {
   )
   const openPotential = openActionDays + pendingRecDays
 
-  // Completion ratio
+  const totalActions = allActions.length
   const completionRatio = totalActions > 0
     ? Math.round((completedActions.length / totalActions) * 100)
     : 0
 
-  // Decision speed: average days between created_at and completed_at
   const decisionDays: number[] = []
   for (const a of allActions) {
     if (a.status === 'completed' && a.completed_at) {
@@ -92,13 +173,10 @@ export default async function WillPage() {
     ? Math.round(decisionDays.reduce((s, d) => s + d, 0) / decisionDays.length)
     : 0
 
-  // Goal progress average
-  const goalProgresses = goals.map(g => computeGoalProgress(g))
   const avgGoalProgress = goalProgresses.length > 0
     ? Math.round(goalProgresses.reduce((s, g) => s + g.pct, 0) / goalProgresses.length)
     : 0
 
-  // Willpower score
   function getWillpowerScore(ratio: number): string {
     if (ratio > 80) return 'A'
     if (ratio > 60) return 'B'
@@ -117,22 +195,18 @@ export default async function WillPage() {
 
   // --- Alerts ---
   const today = new Date().toISOString().split('T')[0]
-
   const overdueActions = openActions.filter(a => a.due_date && a.due_date < today)
-
   const reactivatedRecs = allPendingRecs.filter(
     r => r.status === 'postponed' && r.decided_at && r.decided_at <= today
   )
-
-  const offTrackGoals = goals.filter((g, i) => goalProgresses[i] && !goalProgresses[i].onTrack)
+  const offTrackGoals = goals.filter((_g, i) => goalProgresses[i] && !goalProgresses[i].onTrack)
 
   // --- Impact by recommendation type ---
   const impactByType: Record<string, number> = {}
   for (const a of completedActions) {
     const days = Number(a.freedom_days_impact) || 0
     if (days <= 0) continue
-    const recArr = a.recommendation as unknown as { recommendation_type: string }[] | null
-    const rec = recArr?.[0] ?? null
+    const rec = a.recommendation?.[0] ?? null
     const type = rec?.recommendation_type ?? 'manual'
     impactByType[type] = (impactByType[type] || 0) + days
   }
@@ -157,13 +231,9 @@ export default async function WillPage() {
     return RECOMMENDATION_TYPE_LABELS[type as RecommendationType] ?? type
   }
 
-  // Quick link counts
-  const openActionCount = allActions.filter(a => a.status === 'open').length
-  const pendingRecCount = allPendingRecs.filter(r => r.status === 'pending').length
-
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
-      {/* === Hero: Jouw Wilskracht in Actie === */}
+      {/* === 1. Hero: Jouw Wilskracht in Actie === */}
       <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-950 via-teal-900 to-teal-950 p-8 text-white sm:p-10">
         <div className="pointer-events-none absolute -top-24 right-1/4 h-64 w-64 rounded-full bg-teal-500/10 blur-3xl" />
 
@@ -226,7 +296,7 @@ export default async function WillPage() {
         </div>
       </section>
 
-      {/* === KPI Stat Cards === */}
+      {/* === 2. KPI Stat Cards === */}
       <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-zinc-200 bg-white p-5">
           <div className="mb-3 flex items-center justify-between">
@@ -263,7 +333,7 @@ export default async function WillPage() {
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-50">
               <Target className="h-5 w-5 text-teal-600" />
             </div>
-            <KpiTooltip text="Gemiddelde voortgang over al je actieve financiële doelen." />
+            <KpiTooltip text="Gemiddelde voortgang over al je actieve financiele doelen." />
           </div>
           <p className="text-sm font-medium text-zinc-500">Doelvoortgang</p>
           <p className="mt-1 text-3xl font-bold text-zinc-900">
@@ -287,7 +357,7 @@ export default async function WillPage() {
         </div>
       </section>
 
-      {/* === Alerts === */}
+      {/* === 3. Alerts === */}
       {(overdueActions.length > 0 || reactivatedRecs.length > 0 || offTrackGoals.length > 0) && (
         <section className="mt-8">
           <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
@@ -298,7 +368,7 @@ export default async function WillPage() {
               <AlertBanner
                 icon={<AlertTriangle className="h-4 w-4 text-red-500" />}
                 message={`${overdueActions.length} ${overdueActions.length === 1 ? 'actie' : 'acties'} met verlopen deadline`}
-                href="/will/actions"
+                onClick={() => scrollToSection('section-acties')}
                 color="red"
               />
             )}
@@ -306,7 +376,7 @@ export default async function WillPage() {
               <AlertBanner
                 icon={<Clock className="h-4 w-4 text-amber-500" />}
                 message={`${reactivatedRecs.length} uitgestelde ${reactivatedRecs.length === 1 ? 'suggestie' : 'suggesties'} weer beschikbaar`}
-                href="/will/optimization"
+                onClick={() => scrollToSection('section-suggesties')}
                 color="amber"
               />
             )}
@@ -314,7 +384,7 @@ export default async function WillPage() {
               <AlertBanner
                 icon={<TrendingDown className="h-4 w-4 text-purple-500" />}
                 message={`${offTrackGoals.length} ${offTrackGoals.length === 1 ? 'doel loopt' : 'doelen lopen'} achter op schema`}
-                href="/will/goals"
+                onClick={() => scrollToSection('section-doelen')}
                 color="purple"
               />
             )}
@@ -322,29 +392,85 @@ export default async function WillPage() {
         </section>
       )}
 
-      {/* === Quick Links === */}
-      <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <QuickLink
-          href="/will/actions"
-          title="Open Acties"
-          value={`${openActionCount} acties`}
-          subtitle="wachten op actie"
-        />
-        <QuickLink
-          href="/will/optimization"
-          title="Suggesties"
-          value={`${pendingRecCount} nieuw`}
-          subtitle="aanbevelingen beschikbaar"
-        />
-        <QuickLink
-          href="/will/goals"
-          title="Doelen"
-          value={`${completedGoalCount ?? 0}/${totalGoalCount ?? 0}`}
-          subtitle="doelen bereikt"
-        />
+      {/* === 4. Suggesties (RecommendationList inline) === */}
+      <section id="section-suggesties" className="mt-10 scroll-mt-8">
+        <div className="mb-5">
+          <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+            Suggesties
+          </h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            Ontdek verborgen vrijheidsdagen
+          </p>
+        </div>
+        <RecommendationList initialRecommendations={recommendations} />
       </section>
 
-      {/* === Impact Chart: Beslissingspatronen === */}
+      {/* === 5. Acties (ActionBoard inline) === */}
+      <section id="section-acties" className="mt-10 scroll-mt-8">
+        <div className="mb-5">
+          <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+            Acties
+          </h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            Concrete stappen die je vrijheid laten groeien
+          </p>
+        </div>
+        <ActionBoard initialActions={actions} />
+      </section>
+
+      {/* === 6. Doelen (compact + modal) === */}
+      <section id="section-doelen" className="mt-10 scroll-mt-8">
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+              Doelvoortgang
+            </h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              Je actieve financiele doelen
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowGoalForm(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 px-3 py-1.5 text-sm font-medium text-teal-600 hover:bg-teal-50"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Nieuw doel
+            </button>
+            {goals.length > 0 && (
+              <button
+                onClick={() => setShowGoalModal(true)}
+                className="rounded-lg border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+              >
+                Alle doelen bekijken
+              </button>
+            )}
+          </div>
+        </div>
+
+        {goals.length > 0 ? (
+          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+            <div className="divide-y divide-zinc-100">
+              {goals.map((goal, i) => (
+                <GoalSummaryRow
+                  key={goal.id}
+                  goal={goal}
+                  progress={goalProgresses[i]}
+                  onClick={() => setShowGoalModal(true)}
+                />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
+            <p className="text-sm text-zinc-500">
+              Nog geen doelen ingesteld. Klik op &quot;Nieuw doel&quot; om te starten.
+            </p>
+          </div>
+        )}
+      </section>
+
+      {/* === 7. Beslissingspatronen === */}
       <section className="mt-10">
         <div className="mb-5">
           <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
@@ -362,50 +488,34 @@ export default async function WillPage() {
         ) : (
           <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
             <p className="text-sm text-zinc-500">
-              Nog geen acties afgerond. Ga naar{' '}
-              <Link href="/will/optimization" className="font-medium text-teal-600 hover:underline">
-                Optimalisatie
-              </Link>{' '}
-              om je eerste suggesties te ontvangen.
+              Nog geen acties afgerond. Scroll naar de{' '}
+              <button onClick={() => scrollToSection('section-suggesties')} className="font-medium text-teal-600 hover:underline">
+                suggesties
+              </button>{' '}
+              om je eerste voorstellen te ontvangen.
             </p>
           </div>
         )}
       </section>
 
-      {/* === Goal Summary === */}
-      <section className="mt-10">
-        <div className="mb-5">
-          <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-            Doelvoortgang
-          </h2>
-          <p className="mt-1 text-sm text-zinc-500">
-            Je actieve financiële doelen
-          </p>
-        </div>
+      {/* === Modals === */}
+      <GoalDetailModal
+        open={showGoalModal}
+        onClose={() => setShowGoalModal(false)}
+        onGoalsChanged={loadData}
+      />
 
-        {goals.length > 0 ? (
-          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-            <div className="divide-y divide-zinc-100">
-              {goals.map((goal, i) => (
-                <GoalSummaryRow
-                  key={goal.id}
-                  goal={goal}
-                  progress={goalProgresses[i]}
-                />
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
-            <p className="text-sm text-zinc-500">
-              Nog geen doelen ingesteld.{' '}
-              <Link href="/will/goals" className="font-medium text-teal-600 hover:underline">
-                Stel je eerste doel in
-              </Link>
-            </p>
-          </div>
-        )}
-      </section>
+      {showGoalForm && (
+        <GoalForm
+          assets={goalAssets}
+          debts={goalDebts}
+          onClose={() => setShowGoalForm(false)}
+          onSaved={() => {
+            setShowGoalForm(false)
+            loadData()
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -423,55 +533,29 @@ function KpiTooltip({ text }: { text: string }) {
   )
 }
 
-function QuickLink({
-  href,
-  title,
-  value,
-  subtitle,
-}: {
-  href: string
-  title: string
-  value: string
-  subtitle: string
-}) {
-  return (
-    <Link
-      href={href}
-      className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition-colors hover:border-teal-200 hover:bg-teal-50/30"
-    >
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium text-zinc-500">{title}</p>
-        <p className="text-lg font-bold text-zinc-900">{value}</p>
-        <p className="text-xs text-zinc-400">{subtitle}</p>
-      </div>
-      <ArrowRight className="h-4 w-4 shrink-0 text-zinc-300 group-hover:text-teal-500" />
-    </Link>
-  )
-}
-
 function AlertBanner({
   icon,
   message,
-  href,
+  onClick,
   color,
 }: {
   icon: React.ReactNode
   message: string
-  href: string
+  onClick: () => void
   color: 'red' | 'amber' | 'purple'
 }) {
   const borderClass = color === 'red' ? 'border-red-200 bg-red-50/50' : color === 'amber' ? 'border-amber-200 bg-amber-50/50' : 'border-purple-200 bg-purple-50/50'
   const textClass = color === 'red' ? 'text-red-700' : color === 'amber' ? 'text-amber-700' : 'text-purple-700'
 
   return (
-    <Link
-      href={href}
-      className={`flex items-center gap-3 rounded-lg border p-3 transition-colors hover:opacity-80 ${borderClass}`}
+    <button
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:opacity-80 ${borderClass}`}
     >
       {icon}
       <span className={`flex-1 text-sm font-medium ${textClass}`}>{message}</span>
       <ArrowRight className={`h-4 w-4 ${textClass} opacity-50`} />
-    </Link>
+    </button>
   )
 }
 
@@ -539,14 +623,19 @@ function ImpactChart({
 function GoalSummaryRow({
   goal,
   progress,
+  onClick,
 }: {
   goal: Goal
   progress: { current: number; target: number; pct: number; onTrack: boolean; eta: string | null }
+  onClick: () => void
 }) {
   const colors = getGoalColorClasses(goal.color)
 
   return (
-    <div className="flex items-center gap-4 px-5 py-4">
+    <button
+      onClick={onClick}
+      className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-zinc-50"
+    >
       <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${colors.bgLight}`}>
         <span className="text-sm">{goal.icon}</span>
       </div>
@@ -570,6 +659,6 @@ function GoalSummaryRow({
           />
         </div>
       </div>
-    </div>
+    </button>
   )
 }

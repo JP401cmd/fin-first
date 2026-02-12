@@ -68,6 +68,19 @@ export interface PersonaAsset {
   expected_return: number
   monthly_contribution: number
   institution: string
+  // Type-specific fields (all optional)
+  subtype?: string
+  risk_profile?: string
+  tax_benefit?: boolean
+  is_liquid?: boolean
+  lock_end_date?: string
+  ticker_symbol?: string
+  rental_income?: number
+  woz_value?: number
+  retirement_provider_type?: string
+  depreciation_rate?: number
+  address_postcode?: string
+  address_house_number?: string
 }
 
 export interface PersonaDebt {
@@ -80,6 +93,15 @@ export interface PersonaDebt {
   monthly_payment: number
   start_date: string
   creditor: string
+  // Type-specific fields (all optional)
+  subtype?: string
+  is_tax_deductible?: boolean
+  fixed_rate_end_date?: string
+  nhg?: boolean
+  credit_limit?: number
+  repayment_type?: string
+  draagkrachtmeting_date?: string
+  linked_asset_name?: string
 }
 
 export interface PersonaBudget {
@@ -383,12 +405,12 @@ const roosData: PersonaData = {
     { name: 'Tweede rekening ABN', iban: 'NL02ABNA0450884700', bank_name: 'ABN AMRO', account_type: 'checking', balance: -180, is_active: true, sort_order: 1 },
   ],
   assets: [
-    { name: 'Auto (private lease)', asset_type: 'vehicle', current_value: 0, purchase_value: 0, purchase_date: '2024-01-01', expected_return: 0, monthly_contribution: 0, institution: 'LeasePlan' },
-    { name: 'Inboedel', asset_type: 'physical', current_value: 3500, purchase_value: 8000, purchase_date: '2020-01-01', expected_return: -10, monthly_contribution: 0, institution: '' },
+    { name: 'Auto (private lease)', asset_type: 'vehicle', current_value: 0, purchase_value: 0, purchase_date: '2024-01-01', expected_return: 0, monthly_contribution: 0, institution: 'LeasePlan', subtype: 'auto_financial_lease', depreciation_rate: 15 },
+    { name: 'Inboedel', asset_type: 'physical', current_value: 3500, purchase_value: 8000, purchase_date: '2020-01-01', expected_return: -10, monthly_contribution: 0, institution: '', subtype: 'inboedel' },
   ],
   debts: [
-    { name: 'Creditcard ICS Visa', debt_type: 'credit_card', original_amount: 5000, current_balance: 4800, interest_rate: 14.0, minimum_payment: 75, monthly_payment: 75, start_date: '2024-06-01', creditor: 'ICS' },
-    { name: 'Persoonlijke lening Santander', debt_type: 'personal_loan', original_amount: 15000, current_balance: 12500, interest_rate: 7.9, minimum_payment: 200, monthly_payment: 200, start_date: '2023-01-01', creditor: 'Santander' },
+    { name: 'Creditcard ICS Visa', debt_type: 'credit_card', original_amount: 5000, current_balance: 4800, interest_rate: 14.0, minimum_payment: 75, monthly_payment: 75, start_date: '2024-06-01', creditor: 'ICS', subtype: 'regulier', credit_limit: 5000 },
+    { name: 'Persoonlijke lening Santander', debt_type: 'personal_loan', original_amount: 15000, current_balance: 12500, interest_rate: 7.9, minimum_payment: 200, monthly_payment: 200, start_date: '2023-01-01', creditor: 'Santander', subtype: 'aflopend' },
     { name: 'Achterstallige energierekening', debt_type: 'payment_plan', original_amount: 1500, current_balance: 1200, interest_rate: 0, minimum_payment: 50, monthly_payment: 50, start_date: '2025-06-01', creditor: 'Eneco' },
   ],
   budgets: makeBudgets({
@@ -531,11 +553,11 @@ const daanData: PersonaData = {
     { name: 'Spaarrekening ING', iban: 'NL11INGB0001234568', bank_name: 'ING', account_type: 'savings', balance: 6200, is_active: true, sort_order: 1 },
   ],
   assets: [
-    { name: 'Spaarrekening noodfonds', asset_type: 'savings', current_value: 6200, purchase_value: 0, purchase_date: '2024-06-01', expected_return: 2.8, monthly_contribution: 500, institution: 'ING' },
-    { name: 'Meesman Wereldwijd Totaal', asset_type: 'investment', current_value: 5400, purchase_value: 4800, purchase_date: '2024-09-01', expected_return: 7, monthly_contribution: 200, institution: 'Meesman' },
+    { name: 'Spaarrekening noodfonds', asset_type: 'savings', current_value: 6200, purchase_value: 0, purchase_date: '2024-06-01', expected_return: 2.8, monthly_contribution: 500, institution: 'ING', subtype: 'vrij_opneembaar', risk_profile: 'laag', is_liquid: true },
+    { name: 'Meesman Wereldwijd Totaal', asset_type: 'investment', current_value: 5400, purchase_value: 4800, purchase_date: '2024-09-01', expected_return: 7, monthly_contribution: 200, institution: 'Meesman', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'MEESMAN-WWT' },
   ],
   debts: [
-    { name: 'Studielening DUO', debt_type: 'student_loan', original_amount: 14000, current_balance: 13900, interest_rate: 0.46, minimum_payment: 0, monthly_payment: 100, start_date: '2024-01-01', creditor: 'DUO' },
+    { name: 'Studielening DUO', debt_type: 'student_loan', original_amount: 14000, current_balance: 13900, interest_rate: 0.46, minimum_payment: 0, monthly_payment: 100, start_date: '2024-01-01', creditor: 'DUO', subtype: 'nieuw_stelsel', draagkrachtmeting_date: '2026-09-01' },
   ],
   budgets: makeBudgets({
     [S.INKOMEN]: 3400, [S.SALARIS_UITKERING]: 3400,
@@ -670,14 +692,13 @@ const lisaData: PersonaData = {
     { name: 'Eigen betaalrekening', iban: 'NL91INGB0001234567', bank_name: 'ING', account_type: 'checking', balance: 850, is_active: true, sort_order: 2 },
   ],
   assets: [
-    { name: 'Spaarrekening gezin', asset_type: 'savings', current_value: 15000, purchase_value: 0, purchase_date: '2019-01-01', expected_return: 2.5, monthly_contribution: 200, institution: 'Rabobank' },
-    { name: 'Meesman Wereldwijd Totaal', asset_type: 'investment', current_value: 42000, purchase_value: 33600, purchase_date: '2020-03-01', expected_return: 7, monthly_contribution: 400, institution: 'Meesman' },
-    { name: 'Pensioenfonds PFZW', asset_type: 'retirement', current_value: 68000, purchase_value: 0, purchase_date: '2005-09-01', expected_return: 6, monthly_contribution: 0, institution: 'PFZW' },
-    { name: 'Woning (overwaarde)', asset_type: 'real_estate', current_value: 120000, purchase_value: 320000, purchase_date: '2015-06-01', expected_return: 3, monthly_contribution: 0, institution: '' },
-    { name: 'Auto Toyota Corolla', asset_type: 'vehicle', current_value: 12000, purchase_value: 24000, purchase_date: '2022-03-01', expected_return: -12, monthly_contribution: 0, institution: '' },
+    { name: 'Spaarrekening gezin', asset_type: 'savings', current_value: 15000, purchase_value: 0, purchase_date: '2019-01-01', expected_return: 2.5, monthly_contribution: 200, institution: 'Rabobank', subtype: 'vrij_opneembaar', risk_profile: 'laag', is_liquid: true },
+    { name: 'Meesman Wereldwijd Totaal', asset_type: 'investment', current_value: 42000, purchase_value: 33600, purchase_date: '2020-03-01', expected_return: 7, monthly_contribution: 400, institution: 'Meesman', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'MEESMAN-WWT' },
+    { name: 'Woning Utrecht', asset_type: 'eigen_huis', current_value: 385000, purchase_value: 285000, purchase_date: '2015-06-01', expected_return: 3.5, monthly_contribution: 0, institution: '', woz_value: 385000, address_postcode: '3581 KP', address_house_number: '24' },
+    { name: 'Auto Toyota Corolla', asset_type: 'vehicle', current_value: 8000, purchase_value: 24000, purchase_date: '2022-03-01', expected_return: -12, monthly_contribution: 0, institution: '', subtype: 'auto_eigendom', depreciation_rate: 12 },
   ],
   debts: [
-    { name: 'Hypotheek Rabobank', debt_type: 'mortgage', original_amount: 320000, current_balance: 245000, interest_rate: 2.9, minimum_payment: 1100, monthly_payment: 1150, start_date: '2015-06-01', creditor: 'Rabobank' },
+    { name: 'Hypotheek woning Utrecht', debt_type: 'mortgage', original_amount: 320000, current_balance: 350000, interest_rate: 2.9, minimum_payment: 1100, monthly_payment: 1100, start_date: '2015-06-01', creditor: 'Rabobank', subtype: 'annuiteit', is_tax_deductible: true, nhg: false, linked_asset_name: 'Woning Utrecht' },
   ],
   budgets: makeBudgets({
     [S.INKOMEN]: 5200, [S.SALARIS_UITKERING]: 4200,
@@ -756,12 +777,12 @@ const lisaData: PersonaData = {
     },
   ],
   net_worth_snapshots: [
-    { monthsAgo: 5, total_assets: 248000, total_debts: 247500, net_worth: 87500 },
-    { monthsAgo: 4, total_assets: 250000, total_debts: 247000, net_worth: 90000 },
-    { monthsAgo: 3, total_assets: 252500, total_debts: 246500, net_worth: 93000 },
-    { monthsAgo: 2, total_assets: 254000, total_debts: 246000, net_worth: 95500 },
-    { monthsAgo: 1, total_assets: 256000, total_debts: 245500, net_worth: 97800 },
-    { monthsAgo: 0, total_assets: 257000, total_debts: 245000, net_worth: 100000 },
+    { monthsAgo: 5, total_assets: 437500, total_debts: 350000, net_worth: 87500 },
+    { monthsAgo: 4, total_assets: 440000, total_debts: 350000, net_worth: 90000 },
+    { monthsAgo: 3, total_assets: 443000, total_debts: 350000, net_worth: 93000 },
+    { monthsAgo: 2, total_assets: 445500, total_debts: 350000, net_worth: 95500 },
+    { monthsAgo: 1, total_assets: 447800, total_debts: 350000, net_worth: 97800 },
+    { monthsAgo: 0, total_assets: 450000, total_debts: 350000, net_worth: 100000 },
   ],
 }
 
@@ -819,12 +840,12 @@ const willemData: PersonaData = {
     { name: 'Gezamenlijke rekening', iban: 'NL39RABO0300065264', bank_name: 'Rabobank', account_type: 'checking', balance: 4200, is_active: true, sort_order: 2 },
   ],
   assets: [
-    { name: 'Spaarrekening', asset_type: 'savings', current_value: 45000, purchase_value: 0, purchase_date: '2010-01-01', expected_return: 3.2, monthly_contribution: 500, institution: 'ABN AMRO' },
-    { name: 'DEGIRO beleggingsportefeuille', asset_type: 'investment', current_value: 420000, purchase_value: 280000, purchase_date: '2008-01-01', expected_return: 7, monthly_contribution: 2500, institution: 'DEGIRO' },
-    { name: 'Pensioenfonds ABP', asset_type: 'retirement', current_value: 285000, purchase_value: 0, purchase_date: '1995-01-01', expected_return: 5.5, monthly_contribution: 0, institution: 'ABP' },
-    { name: 'Woning Wassenaar', asset_type: 'real_estate', current_value: 650000, purchase_value: 380000, purchase_date: '2002-06-01', expected_return: 2.5, monthly_contribution: 0, institution: '' },
-    { name: 'Garage (verhuurd)', asset_type: 'real_estate', current_value: 35000, purchase_value: 18000, purchase_date: '2010-01-01', expected_return: 3, monthly_contribution: 0, institution: '' },
-    { name: 'BMW 3-serie', asset_type: 'vehicle', current_value: 22000, purchase_value: 45000, purchase_date: '2023-01-01', expected_return: -15, monthly_contribution: 0, institution: '' },
+    { name: 'Spaarrekening', asset_type: 'savings', current_value: 45000, purchase_value: 0, purchase_date: '2010-01-01', expected_return: 3.2, monthly_contribution: 500, institution: 'ABN AMRO', subtype: 'vrij_opneembaar', risk_profile: 'laag', is_liquid: true },
+    { name: 'DEGIRO beleggingsportefeuille', asset_type: 'investment', current_value: 420000, purchase_value: 280000, purchase_date: '2008-01-01', expected_return: 7, monthly_contribution: 2500, institution: 'DEGIRO', subtype: 'etf', risk_profile: 'middel', ticker_symbol: 'VWRL' },
+    { name: 'Pensioenfonds ABP', asset_type: 'retirement', current_value: 285000, purchase_value: 0, purchase_date: '1995-01-01', expected_return: 5.5, monthly_contribution: 0, institution: 'ABP', subtype: 'uitkeringsregeling', risk_profile: 'laag', tax_benefit: true, retirement_provider_type: 'bedrijfspensioenfonds' },
+    { name: 'Woning Wassenaar', asset_type: 'eigen_huis', current_value: 650000, purchase_value: 380000, purchase_date: '2002-06-01', expected_return: 3.5, monthly_contribution: 0, institution: '', woz_value: 720000, address_postcode: '2242 PJ', address_house_number: '8' },
+    { name: 'Garage (verhuurd)', asset_type: 'real_estate', current_value: 35000, purchase_value: 18000, purchase_date: '2010-01-01', expected_return: 3, monthly_contribution: 0, institution: '', subtype: 'beleggingspand', rental_income: 500 },
+    { name: 'BMW 3-serie', asset_type: 'vehicle', current_value: 22000, purchase_value: 45000, purchase_date: '2023-01-01', expected_return: -15, monthly_contribution: 0, institution: '', subtype: 'auto_eigendom', depreciation_rate: 15 },
   ],
   debts: [],
   budgets: makeBudgets({
