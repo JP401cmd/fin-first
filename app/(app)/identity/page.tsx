@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { computeSovereigntyLevel } from '@/lib/feature-phases'
 
 // ── Temporal Balance levels ──────────────────────────────────────────
 
@@ -82,47 +84,6 @@ const chronologyLevels: ChronologyLevel[] = [
   { level: 6, name: 'Timeless', focus: 'Infinity', metaphor: 'Meer tijd dan je op kunt maken. Je bouwt aan de tijdlijnen van anderen.', phase: 4 },
 ]
 
-/**
- * Compute sovereignty level from financial data.
- * Levels range from -2 (Time Deficit) to 6 (Timeless).
- */
-function computeSovereigntyLevel(
-  netWorth: number,
-  monthlyExpenses: number,
-  freedomPercentage: number,
-  hasConsumerDebt: boolean,
-): number {
-  if (monthlyExpenses <= 0) return 0
-
-  const monthsCovered = netWorth / monthlyExpenses
-
-  // Negative net worth
-  if (netWorth < 0) {
-    return hasConsumerDebt ? -2 : -1
-  }
-
-  // Around zero (less than 1 month covered)
-  if (monthsCovered < 1) return 0
-
-  // Positive but less than 3 months (no emergency fund yet)
-  if (monthsCovered < 3) return 1
-
-  // Emergency fund built (3-6 months)
-  if (monthsCovered < 6 || freedomPercentage < 10) return 2
-
-  // Investments growing, freedom 10-25%
-  if (freedomPercentage < 25) return 3
-
-  // Coast FIRE territory, freedom 25-75%
-  if (freedomPercentage < 75) return 4
-
-  // Near independence, freedom 75-100%
-  if (freedomPercentage < 100) return 5
-
-  // Full financial independence
-  return 6
-}
-
 // ── Phase color helpers ──────────────────────────────────────────────
 
 const phaseColors: Record<string, { dot: string; activeDot: string; line: string; badge: string; text: string }> = {
@@ -132,11 +93,76 @@ const phaseColors: Record<string, { dot: string; activeDot: string; line: string
   amber: { dot: 'bg-amber-200', activeDot: 'bg-amber-500', line: 'bg-amber-200', badge: 'bg-amber-50 text-amber-700 border-amber-200', text: 'text-amber-600' },
 }
 
+// ── Level criteria & progress ────────────────────────────────────────
+
+type LevelCriteria = {
+  label: string
+  criteria: string[]
+  progress: (data: { netWorth: number; monthsCovered: number; freedomPct: number; hasConsumerDebt: boolean }) => number
+}
+
+const levelCriteriaMap: Record<number, LevelCriteria> = {
+  [-2]: {
+    label: 'Voorbij',
+    criteria: ['Negatief vermogen', 'Actieve consumptieve schulden (creditcard, persoonlijke lening, etc.)'],
+    progress: (d) => d.netWorth < 0 && d.hasConsumerDebt ? 100 : 0,
+  },
+  [-1]: {
+    label: 'Voorbij',
+    criteria: ['Negatief vermogen', 'Geen consumptieve schulden'],
+    progress: (d) => d.netWorth < 0 && !d.hasConsumerDebt ? 100 : (d.netWorth >= 0 ? 0 : 0),
+  },
+  [0]: {
+    label: 'Nulpunt bereikt',
+    criteria: ['Vermogen \u2265 \u20AC0 (geen schulden meer)'],
+    progress: (d) => {
+      if (d.netWorth >= 0) return 100
+      // Show how close to 0 — assume starting from worst observed
+      return 0
+    },
+  },
+  [1]: {
+    label: '1 maand buffer',
+    criteria: ['Minimaal 1 maand aan uitgaven als buffer opzij'],
+    progress: (d) => Math.min(100, Math.round((Math.max(0, d.monthsCovered) / 1) * 100)),
+  },
+  [2]: {
+    label: '3\u20136 maanden noodfonds',
+    criteria: ['Minimaal 3 maanden aan uitgaven als noodfonds'],
+    progress: (d) => Math.min(100, Math.round((Math.max(0, d.monthsCovered) / 3) * 100)),
+  },
+  [3]: {
+    label: 'Groeiend vermogen',
+    criteria: ['Minimaal 6 maanden buffer', 'Vrijheidspercentage \u2265 10%'],
+    progress: (d) => {
+      const bufferPct = Math.min(100, (Math.max(0, d.monthsCovered) / 6) * 100)
+      const freedomPct = Math.min(100, (Math.max(0, d.freedomPct) / 10) * 100)
+      return Math.round((bufferPct + freedomPct) / 2)
+    },
+  },
+  [4]: {
+    label: 'Coast FIRE',
+    criteria: ['Vrijheidspercentage \u2265 25%'],
+    progress: (d) => Math.min(100, Math.round((Math.max(0, d.freedomPct) / 25) * 100)),
+  },
+  [5]: {
+    label: 'Bijna onafhankelijk',
+    criteria: ['Vrijheidspercentage \u2265 75%'],
+    progress: (d) => Math.min(100, Math.round((Math.max(0, d.freedomPct) / 75) * 100)),
+  },
+  [6]: {
+    label: 'Volledige onafhankelijkheid',
+    criteria: ['Vrijheidspercentage \u2265 100% (passief inkomen dekt alle uitgaven)'],
+    progress: (d) => Math.min(100, Math.round((Math.max(0, d.freedomPct) / 100) * 100)),
+  },
+}
+
 // ── Component ────────────────────────────────────────────────────────
 
 type HouseholdType = 'solo' | 'samen' | 'gezin'
 
 export default function IdentityPage() {
+  const router = useRouter()
   const supabase = createClient()
 
   // Profile state
@@ -146,13 +172,25 @@ export default function IdentityPage() {
   const [householdType, setHouseholdType] = useState<HouseholdType>('solo')
   const [temporalBalance, setTemporalBalance] = useState(3)
 
+  // Household profile state (NIBUD matching)
+  const [numberOfChildren, setNumberOfChildren] = useState(0)
+  const [childrenAges, setChildrenAges] = useState<number[]>([])
+  const [housingType, setHousingType] = useState<string | null>(null)
+  const [energyLabel, setEnergyLabel] = useState<string | null>(null)
+  const [hasCar, setHasCar] = useState(false)
+  const [netMonthlyIncome, setNetMonthlyIncome] = useState<string>('')
+  const [childAgeInput, setChildAgeInput] = useState('')
+
   // Financial state for sovereignty level
   const [sovereigntyLevel, setSovereigntyLevel] = useState(0)
+  const [financialData, setFinancialData] = useState({ netWorth: 0, monthsCovered: 0, freedomPct: 0, hasConsumerDebt: false })
 
   // UI state
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [showResetDialog, setShowResetDialog] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   // Load profile on mount
   useEffect(() => {
@@ -172,6 +210,12 @@ export default function IdentityPage() {
         setCountry(data.country ?? 'NL')
         setHouseholdType(data.household_type ?? 'solo')
         setTemporalBalance(data.temporal_balance ?? 3)
+        setNumberOfChildren(data.number_of_children ?? 0)
+        setChildrenAges(data.children_ages ?? [])
+        setHousingType(data.housing_type ?? null)
+        setEnergyLabel(data.energy_label ?? null)
+        setHasCar(data.has_car ?? false)
+        setNetMonthlyIncome(data.net_monthly_income ? String(data.net_monthly_income) : '')
       }
 
       // Fetch financial data for sovereignty level calculation
@@ -195,6 +239,7 @@ export default function IdentityPage() {
         .reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
       const months = Math.max(1, 3)
       const monthlyExpenses = expenses / months
+      const monthsCovered = monthlyExpenses > 0 ? netWorth / monthlyExpenses : 0
 
       const yearlyExpenses = monthlyExpenses * 12
       const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / 0.04 : 0
@@ -204,6 +249,7 @@ export default function IdentityPage() {
       const hasConsumerDebt = debts.some(d => consumerDebtTypes.includes(d.debt_type) && Number(d.current_balance) > 0)
 
       setSovereigntyLevel(computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPct, hasConsumerDebt))
+      setFinancialData({ netWorth, monthsCovered, freedomPct, hasConsumerDebt })
       setLoading(false)
     }
     loadProfile()
@@ -230,6 +276,12 @@ export default function IdentityPage() {
         country: country || 'NL',
         household_type: householdType,
         temporal_balance: temporalBalance,
+        number_of_children: numberOfChildren,
+        children_ages: childrenAges,
+        housing_type: housingType,
+        energy_label: energyLabel,
+        has_car: hasCar,
+        net_monthly_income: netMonthlyIncome ? Number(netMonthlyIncome) : null,
         updated_at: new Date().toISOString(),
       })
 
@@ -240,7 +292,7 @@ export default function IdentityPage() {
       setTimeout(() => setSaveMessage(null), 3000)
     }
     setSaving(false)
-  }, [supabase, fullName, dateOfBirth, country, householdType, temporalBalance])
+  }, [supabase, fullName, dateOfBirth, country, householdType, temporalBalance, numberOfChildren, childrenAges, housingType, energyLabel, hasCar, netMonthlyIncome])
 
   // Save temporal balance immediately on change
   const updateTemporalBalance = useCallback(async (value: number) => {
@@ -374,6 +426,190 @@ export default function IdentityPage() {
         </div>
       </section>
 
+      {/* ── A2. Huishoudprofiel (NIBUD matching) ─────────────────────── */}
+      <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
+        <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          Huishoudprofiel
+        </h2>
+        <p className="mt-1 mb-6 text-sm text-zinc-500">
+          Deze gegevens worden gebruikt voor je NIBUD Budget Gezondheidscheck.
+        </p>
+
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          {/* Aantal kinderen */}
+          <div>
+            <label htmlFor="numChildren" className="mb-1.5 block text-sm font-medium text-zinc-700">
+              Aantal kinderen
+            </label>
+            <input
+              id="numChildren"
+              type="number"
+              min={0}
+              max={10}
+              value={numberOfChildren}
+              onChange={(e) => {
+                const n = Math.max(0, Number(e.target.value))
+                setNumberOfChildren(n)
+                if (n < childrenAges.length) setChildrenAges(childrenAges.slice(0, n))
+              }}
+              className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+            />
+          </div>
+
+          {/* Leeftijden kinderen */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-zinc-700">
+              Leeftijden kinderen
+            </label>
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {childrenAges.map((age, i) => (
+                <span
+                  key={i}
+                  className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700"
+                >
+                  {age} jaar
+                  <button
+                    onClick={() => setChildrenAges(childrenAges.filter((_, idx) => idx !== i))}
+                    className="ml-0.5 text-zinc-400 hover:text-zinc-600"
+                  >
+                    &times;
+                  </button>
+                </span>
+              ))}
+            </div>
+            {childrenAges.length < numberOfChildren && (
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  max={25}
+                  value={childAgeInput}
+                  onChange={(e) => setChildAgeInput(e.target.value)}
+                  placeholder="Leeftijd"
+                  className="w-24 rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && childAgeInput) {
+                      e.preventDefault()
+                      setChildrenAges([...childrenAges, Math.max(0, Number(childAgeInput))])
+                      setChildAgeInput('')
+                    }
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    if (childAgeInput) {
+                      setChildrenAges([...childrenAges, Math.max(0, Number(childAgeInput))])
+                      setChildAgeInput('')
+                    }
+                  }}
+                  className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50"
+                >
+                  Toevoegen
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Woningtype */}
+          <div>
+            <label htmlFor="housingType" className="mb-1.5 block text-sm font-medium text-zinc-700">
+              Woningtype
+            </label>
+            <select
+              id="housingType"
+              value={housingType ?? ''}
+              onChange={(e) => setHousingType(e.target.value || null)}
+              className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+            >
+              <option value="">Selecteer...</option>
+              <option value="huur_sociaal">Huur (sociaal)</option>
+              <option value="huur_vrij">Huur (vrije sector)</option>
+              <option value="koop">Koopwoning</option>
+            </select>
+          </div>
+
+          {/* Energielabel */}
+          <div>
+            <label htmlFor="energyLabel" className="mb-1.5 block text-sm font-medium text-zinc-700">
+              Energielabel
+            </label>
+            <select
+              id="energyLabel"
+              value={energyLabel ?? ''}
+              onChange={(e) => setEnergyLabel(e.target.value || null)}
+              className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+            >
+              <option value="">Selecteer...</option>
+              {['A++', 'A+', 'A', 'B', 'C', 'D', 'E', 'F', 'G'].map(label => (
+                <option key={label} value={label}>{label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Auto */}
+          <div>
+            <span className="mb-1.5 block text-sm font-medium text-zinc-700">Auto</span>
+            <div className="flex gap-2">
+              {[
+                { value: false, label: 'Nee' },
+                { value: true, label: 'Ja' },
+              ].map((opt) => (
+                <button
+                  key={String(opt.value)}
+                  onClick={() => setHasCar(opt.value)}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                    hasCar === opt.value
+                      ? 'border-zinc-900 bg-zinc-900 text-white'
+                      : 'border-zinc-300 bg-zinc-50 text-zinc-600 hover:border-zinc-400'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Netto maandinkomen */}
+          <div>
+            <label htmlFor="netIncome" className="mb-1.5 block text-sm font-medium text-zinc-700">
+              Netto maandinkomen
+              <span className="ml-1 text-xs font-normal text-zinc-400">(optioneel)</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
+              <input
+                id="netIncome"
+                type="number"
+                min={0}
+                step={50}
+                value={netMonthlyIncome}
+                onChange={(e) => setNetMonthlyIncome(e.target.value)}
+                placeholder="0"
+                className="w-full rounded-lg border border-zinc-300 bg-zinc-50 py-2 pr-3 pl-7 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+              />
+            </div>
+            <p className="mt-1 text-[10px] text-zinc-400">
+              Wordt gebruikt voor gepersonaliseerde NIBUD-berekeningen.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 flex items-center gap-3">
+          <button
+            onClick={saveProfile}
+            disabled={saving}
+            className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
+          >
+            {saving ? 'Opslaan...' : 'Opslaan'}
+          </button>
+          {saveMessage && (
+            <span className={`text-sm ${saveMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+              {saveMessage.text}
+            </span>
+          )}
+        </div>
+      </section>
+
       {/* ── B. The Temporal Balance ──────────────────────────────────── */}
       <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
         <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
@@ -445,8 +681,11 @@ export default function IdentityPage() {
               const levels = chronologyLevels.filter(l => l.phase === phase.phase)
               const startIdx = chronologyLevels.indexOf(levels[0])
               const endIdx = chronologyLevels.indexOf(levels[levels.length - 1])
-              const left = (startIdx / (chronologyLevels.length - 1)) * 100
-              const width = ((endIdx - startIdx) / (chronologyLevels.length - 1)) * 100
+              const total = chronologyLevels.length
+              const step = total - 1
+              // Extend segments to midpoints between phases so they're contiguous
+              const left = pi === 0 ? 0 : ((startIdx - 0.5) / step) * 100
+              const right = pi === chronologyPhases.length - 1 ? 100 : ((endIdx + 0.5) / step) * 100
               const activeIdx = chronologyLevels.findIndex(l => l.level === sovereigntyLevel)
               const isReached = activeIdx >= startIdx
               const colors = phaseColors[phase.color]
@@ -454,7 +693,7 @@ export default function IdentityPage() {
                 <div
                   key={pi}
                   className={`absolute top-0 h-full transition-opacity ${isReached ? colors.activeDot : 'bg-zinc-300'}`}
-                  style={{ left: `${left}%`, width: `${width + (pi < chronologyPhases.length - 1 ? 0.5 : 0)}%`, opacity: isReached ? 1 : 0.3 }}
+                  style={{ left: `${left}%`, width: `${right - left}%`, opacity: isReached ? 1 : 0.3 }}
                 />
               )
             })}
@@ -523,6 +762,8 @@ export default function IdentityPage() {
                     const isActive = lvl.level === sovereigntyLevel
                     const isPast = lvl.level < sovereigntyLevel
                     const isFuture = lvl.level > sovereigntyLevel
+                    const criteria = levelCriteriaMap[lvl.level]
+                    const progressPct = isPast ? 100 : criteria ? criteria.progress(financialData) : 0
 
                     return (
                       <div
@@ -538,7 +779,7 @@ export default function IdentityPage() {
                         />
 
                         <div className={`rounded-lg p-3 ${isActive ? 'bg-zinc-50 border border-zinc-200' : ''}`}>
-                          <div className="flex items-baseline gap-2">
+                          <div className="flex items-center gap-2">
                             <span className={`text-xs font-bold ${isActive ? colors.text : 'text-zinc-400'}`}>
                               Lvl {lvl.level}
                             </span>
@@ -549,6 +790,44 @@ export default function IdentityPage() {
                               <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${colors.badge}`}>
                                 Huidige positie
                               </span>
+                            )}
+                            {/* Info tooltip */}
+                            {criteria && (
+                              <div className="group relative ml-auto shrink-0">
+                                <div className="flex h-5 w-5 cursor-help items-center justify-center rounded-full border border-zinc-300 text-[10px] font-bold text-zinc-400 transition-colors group-hover:border-zinc-500 group-hover:text-zinc-600">
+                                  i
+                                </div>
+                                <div className="pointer-events-none absolute right-0 bottom-full z-20 mb-2 w-64 rounded-lg border border-zinc-200 bg-white p-3 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+                                  <p className="mb-1.5 text-[11px] font-semibold text-zinc-700">
+                                    {criteria.label}
+                                  </p>
+                                  <ul className="mb-2 space-y-0.5">
+                                    {criteria.criteria.map((c, i) => (
+                                      <li key={i} className="flex items-start gap-1.5 text-[11px] text-zinc-500">
+                                        <span className="mt-0.5 shrink-0">
+                                          {progressPct >= 100 ? '\u2705' : '\u25CB'}
+                                        </span>
+                                        {c}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100">
+                                      <div
+                                        className={`h-full rounded-full transition-all ${
+                                          progressPct >= 100 ? 'bg-emerald-500' : progressPct >= 50 ? 'bg-amber-400' : 'bg-zinc-300'
+                                        }`}
+                                        style={{ width: `${Math.min(100, progressPct)}%` }}
+                                      />
+                                    </div>
+                                    <span className={`text-[11px] font-bold ${
+                                      progressPct >= 100 ? 'text-emerald-600' : 'text-zinc-500'
+                                    }`}>
+                                      {Math.min(100, progressPct)}%
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
                             )}
                           </div>
                           <p className={`mt-0.5 text-xs ${isActive ? 'text-zinc-500' : 'text-zinc-400'}`}>
@@ -596,6 +875,63 @@ export default function IdentityPage() {
           Badges worden binnenkort ontgrendeld.
         </p>
       </section>
+
+      {/* ── E. Gegevens resetten ──────────────────────────────────── */}
+      <section className="mb-10 rounded-2xl border border-red-200 bg-white p-6 sm:p-8">
+        <h2 className="text-xs font-semibold tracking-[0.15em] text-red-400 uppercase">
+          Gegevens Resetten
+        </h2>
+        <p className="mt-1 mb-6 text-sm text-zinc-500">
+          Wis al je financiele gegevens en doorloop de onboarding opnieuw.
+          Dit verwijdert al je bankrekeningen, transacties, budgetten, doelen en overige data.
+        </p>
+
+        <button
+          onClick={() => setShowResetDialog(true)}
+          disabled={resetting}
+          className="rounded-lg border border-red-300 bg-red-50 px-5 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
+        >
+          {resetting ? 'Bezig met wissen...' : 'Alle gegevens wissen'}
+        </button>
+      </section>
+
+      {/* Reset confirmation dialog */}
+      {showResetDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-zinc-900">Weet je het zeker?</h3>
+            <p className="mt-2 text-sm text-zinc-600">
+              Dit wist <span className="font-semibold text-red-600">al je financiele data</span> permanent.
+              Je wordt teruggeleid naar de onboarding om opnieuw te beginnen.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setShowResetDialog(false)}
+                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+              >
+                Annuleren
+              </button>
+              <button
+                onClick={async () => {
+                  setShowResetDialog(false)
+                  setResetting(true)
+                  try {
+                    const res = await fetch('/api/onboarding/reset', { method: 'POST' })
+                    if (!res.ok) throw new Error('Reset failed')
+                    router.push('/onboarding')
+                  } catch {
+                    setResetting(false)
+                    setSaveMessage({ type: 'error', text: 'Reset mislukt. Probeer opnieuw.' })
+                  }
+                }}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors"
+              >
+                Alles wissen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

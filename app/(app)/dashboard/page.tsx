@@ -27,7 +27,7 @@ export default async function DashboardPage() {
     supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('current_value, monthly_contribution').eq('is_active', true),
     supabase.from('debts').select('current_balance').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth').single(),
+    supabase.from('profiles').select('date_of_birth, last_known_phase').single(),
     supabase.from('budgets').select('id, default_limit, interval').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
     supabase.from('actions').select('id, status, freedom_days_impact').in('status', ['open', 'completed']),
     supabase.from('life_events').select('id').eq('is_active', true),
@@ -87,6 +87,8 @@ export default async function DashboardPage() {
   // For simplicity, estimate budget alerts as budgets where spending might be high
   // We'll just show the count of active top-level budgets
   const budgetCount = allBudgetsResult.data?.length ?? 0
+
+  const activated = profileResult.data?.last_known_phase !== null
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-10">
@@ -153,109 +155,113 @@ export default async function DashboardPage() {
           </div>
         </Link>
 
-        {/* De Wil */}
-        <Link
-          href="/will"
-          className="group rounded-2xl border border-teal-200 bg-white p-6 transition-all hover:border-teal-300 hover:shadow-lg hover:shadow-teal-50"
-        >
-          <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-50">
-              <FinnAvatar size={36} />
+        {/* De Wil — hidden until activation */}
+        {activated && (
+          <Link
+            href="/will"
+            className="group rounded-2xl border border-teal-200 bg-white p-6 transition-all hover:border-teal-300 hover:shadow-lg hover:shadow-teal-50"
+          >
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-50">
+                <FinnAvatar size={36} />
+              </div>
+              <div>
+                <h2 className="font-bold text-zinc-900">De Wil</h2>
+                <p className="text-xs text-teal-600">Wat ga je doen?</p>
+              </div>
             </div>
-            <div>
-              <h2 className="font-bold text-zinc-900">De Wil</h2>
-              <p className="text-xs text-teal-600">Wat ga je doen?</p>
-            </div>
-          </div>
-          <p className="mb-5 text-sm leading-relaxed text-zinc-500">
-            Bewuste keuzes en acties. Van inzicht naar impact.
-          </p>
+            <p className="mb-5 text-sm leading-relaxed text-zinc-500">
+              Bewuste keuzes en acties. Van inzicht naar impact.
+            </p>
 
-          {/* Preview metrics */}
-          <div className="space-y-3 border-t border-zinc-100 pt-4">
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                <Zap className="h-3.5 w-3.5" /> Open acties
-              </span>
-              <span className="text-sm font-semibold text-zinc-900">
-                {openActions.length}
-              </span>
+            {/* Preview metrics */}
+            <div className="space-y-3 border-t border-zinc-100 pt-4">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-xs text-zinc-400">
+                  <Zap className="h-3.5 w-3.5" /> Open acties
+                </span>
+                <span className="text-sm font-semibold text-zinc-900">
+                  {openActions.length}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-xs text-zinc-400">
+                  <Target className="h-3.5 w-3.5" /> Potentiele vrijheidsdagen
+                </span>
+                <span className="text-sm font-semibold text-teal-600">
+                  {Math.round(totalFreedomDaysOpen)} dagen
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-xs text-zinc-400">
+                  <Clock className="h-3.5 w-3.5" /> Laatste aanbeveling
+                </span>
+                <span className="max-w-[140px] truncate text-sm font-medium text-zinc-600">
+                  {latestRec?.title ?? 'Geen'}
+                </span>
+              </div>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                <Target className="h-3.5 w-3.5" /> Potentiele vrijheidsdagen
-              </span>
-              <span className="text-sm font-semibold text-teal-600">
-                {Math.round(totalFreedomDaysOpen)} dagen
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                <Clock className="h-3.5 w-3.5" /> Laatste aanbeveling
-              </span>
-              <span className="max-w-[140px] truncate text-sm font-medium text-zinc-600">
-                {latestRec?.title ?? 'Geen'}
-              </span>
-            </div>
-          </div>
 
-          <div className="mt-5 flex items-center gap-1 text-xs font-medium text-teal-600 opacity-0 transition-opacity group-hover:opacity-100">
-            Bekijken <ArrowRight className="h-3 w-3" />
-          </div>
-        </Link>
+            <div className="mt-5 flex items-center gap-1 text-xs font-medium text-teal-600 opacity-0 transition-opacity group-hover:opacity-100">
+              Bekijken <ArrowRight className="h-3 w-3" />
+            </div>
+          </Link>
+        )}
 
-        {/* De Horizon */}
-        <Link
-          href="/horizon"
-          className="group rounded-2xl border border-purple-200 bg-white p-6 transition-all hover:border-purple-300 hover:shadow-lg hover:shadow-purple-50"
-        >
-          <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50">
-              <FfinAvatar size={36} />
+        {/* De Horizon — hidden until activation */}
+        {activated && (
+          <Link
+            href="/horizon"
+            className="group rounded-2xl border border-purple-200 bg-white p-6 transition-all hover:border-purple-300 hover:shadow-lg hover:shadow-purple-50"
+          >
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50">
+                <FfinAvatar size={36} />
+              </div>
+              <div>
+                <h2 className="font-bold text-zinc-900">De Horizon</h2>
+                <p className="text-xs text-purple-600">Waar ga je naartoe?</p>
+              </div>
             </div>
-            <div>
-              <h2 className="font-bold text-zinc-900">De Horizon</h2>
-              <p className="text-xs text-purple-600">Waar ga je naartoe?</p>
-            </div>
-          </div>
-          <p className="mb-5 text-sm leading-relaxed text-zinc-500">
-            Je pad naar financiele vrijheid. Projecties, scenario&apos;s en je tijdlijn.
-          </p>
+            <p className="mb-5 text-sm leading-relaxed text-zinc-500">
+              Je pad naar financiele vrijheid. Projecties, scenario&apos;s en je tijdlijn.
+            </p>
 
-          {/* Preview metrics */}
-          <div className="space-y-3 border-t border-zinc-100 pt-4">
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                <Compass className="h-3.5 w-3.5" /> Verwachte FIRE-leeftijd
-              </span>
-              <span className="text-sm font-semibold text-zinc-900">
-                {fireProjResult.fireAge != null ? `${Math.round(fireProjResult.fireAge)} jaar` : '-'}
-              </span>
+            {/* Preview metrics */}
+            <div className="space-y-3 border-t border-zinc-100 pt-4">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-xs text-zinc-400">
+                  <Compass className="h-3.5 w-3.5" /> Verwachte FIRE-leeftijd
+                </span>
+                <span className="text-sm font-semibold text-zinc-900">
+                  {fireProjResult.fireAge != null ? `${Math.round(fireProjResult.fireAge)} jaar` : '-'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-xs text-zinc-400">
+                  <TrendingUp className="h-3.5 w-3.5" /> Countdown
+                </span>
+                <span className="text-sm font-semibold text-purple-600">
+                  {fireProjResult.countdownDays > 0
+                    ? `${fireProjResult.countdownYears}j ${fireProjResult.countdownMonths}mnd`
+                    : fireProjResult.fireDate === 'Bereikt!' ? 'Bereikt!' : '-'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-xs text-zinc-400">
+                  <Target className="h-3.5 w-3.5" /> Levensgebeurtenissen
+                </span>
+                <span className="text-sm font-medium text-zinc-600">
+                  {eventCount} gepland
+                </span>
+              </div>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                <TrendingUp className="h-3.5 w-3.5" /> Countdown
-              </span>
-              <span className="text-sm font-semibold text-purple-600">
-                {fireProjResult.countdownDays > 0
-                  ? `${fireProjResult.countdownYears}j ${fireProjResult.countdownMonths}mnd`
-                  : fireProjResult.fireDate === 'Bereikt!' ? 'Bereikt!' : '-'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                <Target className="h-3.5 w-3.5" /> Levensgebeurtenissen
-              </span>
-              <span className="text-sm font-medium text-zinc-600">
-                {eventCount} gepland
-              </span>
-            </div>
-          </div>
 
-          <div className="mt-5 flex items-center gap-1 text-xs font-medium text-purple-600 opacity-0 transition-opacity group-hover:opacity-100">
-            Bekijken <ArrowRight className="h-3 w-3" />
-          </div>
-        </Link>
+            <div className="mt-5 flex items-center gap-1 text-xs font-medium text-purple-600 opacity-0 transition-opacity group-hover:opacity-100">
+              Bekijken <ArrowRight className="h-3 w-3" />
+            </div>
+          </Link>
+        )}
       </div>
 
       {/* Freedom indicator */}

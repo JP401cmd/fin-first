@@ -3,6 +3,7 @@ export type DomainColor = 'amber' | 'teal' | 'purple'
 export type ModuleNavItem = {
   label: string
   href: string
+  featureId?: string
 }
 
 export type ModuleNavConfig = {
@@ -22,6 +23,7 @@ export const coreNav: ModuleNavConfig = {
     { label: 'Cash', href: '/core/cash' },
     { label: 'Schulden', href: '/core/debts' },
     { label: 'Assets', href: '/core/assets' },
+    { label: 'Belasting', href: '/core/belasting', featureId: 'box3_belasting' },
   ],
 }
 

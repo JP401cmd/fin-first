@@ -3,11 +3,12 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useFeatureAccess } from '@/components/app/feature-access-provider'
 
-const navItems = [
-  { label: 'De Kern', href: '/core', color: 'amber' },
-  { label: 'De Wil', href: '/will', color: 'teal' },
-  { label: 'De Horizon', href: '/horizon', color: 'purple' },
+const allNavItems = [
+  { label: 'De Kern', href: '/core', color: 'amber', requiresActivation: false },
+  { label: 'De Wil', href: '/will', color: 'teal', requiresActivation: true },
+  { label: 'De Horizon', href: '/horizon', color: 'purple', requiresActivation: true },
 ] as const
 
 const activeClasses: Record<string, string> = {
@@ -26,6 +27,9 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const { needsActivation } = useFeatureAccess()
+
+  const navItems = allNavItems.filter(item => !item.requiresActivation || !needsActivation)
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white">
@@ -72,11 +76,11 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
               <div className="absolute right-0 mt-2 w-40 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
                 {role === 'superadmin' && (
                   <Link
-                    href="/admin"
+                    href="/beheer"
                     className="block px-4 py-2 text-sm text-amber-700 font-medium hover:bg-amber-50"
                     onClick={() => setMenuOpen(false)}
                   >
-                    Admin
+                    Beheer
                   </Link>
                 )}
                 <Link

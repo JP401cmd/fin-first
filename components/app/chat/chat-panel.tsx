@@ -1,20 +1,42 @@
 'use client'
 
-import { useRef, useEffect, useState, useMemo } from 'react'
+import { useRef, useEffect, useState, useMemo, useCallback } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
+import { useRouter } from 'next/navigation'
 import { useChatContext } from './chat-provider'
 import { FinnAvatar } from '@/components/app/avatars'
-import { X, Send, Loader2 } from 'lucide-react'
+import { ActionEditModal } from '@/components/app/action-edit-modal'
+import type { Action, ActionStatus } from '@/lib/recommendation-data'
+import { X, Send, Loader2, Zap, Check } from 'lucide-react'
 
-function getTextContent(msg: { parts: Array<{ type: string; text?: string }> }): string {
-  return msg.parts
-    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-    .map((p) => p.text)
-    .join('')
+/* ── Types ─────────────────────────────────────────────────────────── */
+
+type SuggestActionResult = {
+  title: string
+  description: string | null
+  freedom_days_impact: number
+  euro_impact_monthly: number | null
+  priority_score: number
 }
 
-/** Markdown renderer for chat bubbles: bold, lists, headers, numbered lists */
+// AI SDK v6 dynamic tool invocation part
+type DynamicToolPart = {
+  type: 'dynamic-tool'
+  toolName: string
+  toolCallId: string
+  state: string
+  input?: unknown
+  output?: unknown
+}
+
+type MessagePart =
+  | { type: 'text'; text: string }
+  | DynamicToolPart
+  | { type: string; [key: string]: unknown }
+
+/* ── Markdown helpers ──────────────────────────────────────────────── */
+
 function renderMarkdown(text: string) {
   const lines = text.split('\n')
   const elements: React.ReactNode[] = []
@@ -38,13 +60,8 @@ function renderMarkdown(text: string) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
 
-    // Horizontal rule — skip
-    if (/^---+$/.test(line.trim())) {
-      flushList()
-      continue
-    }
+    if (/^---+$/.test(line.trim())) { flushList(); continue }
 
-    // Headers (## or #) — render as bold paragraph
     const headerMatch = line.match(/^#{1,3}\s+(.+)/)
     if (headerMatch) {
       flushList()
@@ -56,19 +73,11 @@ function renderMarkdown(text: string) {
       continue
     }
 
-    // Unordered list (- or *)
     const ulMatch = line.match(/^\s*[-*]\s+(.+)/)
-    if (ulMatch) {
-      listItems.push({ content: ulMatch[1], ordered: false })
-      continue
-    }
+    if (ulMatch) { listItems.push({ content: ulMatch[1], ordered: false }); continue }
 
-    // Ordered list (1. 2. etc)
     const olMatch = line.match(/^\s*\d+\.\s+(.+)/)
-    if (olMatch) {
-      listItems.push({ content: olMatch[1], ordered: true })
-      continue
-    }
+    if (olMatch) { listItems.push({ content: olMatch[1], ordered: true }); continue }
 
     flushList()
 
@@ -87,7 +96,6 @@ function renderMarkdown(text: string) {
   return elements
 }
 
-/** Render inline markdown: **bold** */
 function renderInline(text: string): React.ReactNode[] {
   const parts: React.ReactNode[] = []
   const regex = /\*\*(.+?)\*\*/g
@@ -95,25 +103,88 @@ function renderInline(text: string): React.ReactNode[] {
   let match: RegExpExecArray | null
 
   while ((match = regex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(text.slice(lastIndex, match.index))
-    }
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index))
     parts.push(<strong key={match.index}>{match[1]}</strong>)
     lastIndex = match.index + match[0].length
   }
 
-  if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex))
-  }
-
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex))
   return parts.length > 0 ? parts : [text]
 }
 
+/* ── Action suggestion card ────────────────────────────────────────── */
+
+function ActionSuggestionCard({
+  data,
+  added,
+  loading,
+  onClick,
+}: {
+  data: SuggestActionResult
+  added: boolean
+  loading: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={added || loading}
+      className={`mt-2 w-full rounded-xl border text-left transition-all ${
+        added
+          ? 'border-emerald-200 bg-emerald-50'
+          : 'border-teal-200 bg-white hover:border-teal-400 hover:shadow-sm active:scale-[0.98]'
+      }`}
+    >
+      <div className="px-3 py-2.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <Zap className={`h-3.5 w-3.5 shrink-0 ${added ? 'text-emerald-500' : 'text-teal-500'}`} />
+            <span className="text-xs font-semibold text-zinc-800">{data.title}</span>
+          </div>
+          {added ? (
+            <span className="flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+              <Check className="h-3 w-3" /> Toegevoegd
+            </span>
+          ) : loading ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-teal-500" />
+          ) : (
+            <span className="rounded-full bg-teal-100 px-1.5 py-0.5 text-[10px] font-medium text-teal-700">
+              + Toevoegen
+            </span>
+          )}
+        </div>
+        {data.description && (
+          <p className="mt-1 text-[11px] leading-snug text-zinc-500">{data.description}</p>
+        )}
+        <div className="mt-1.5 flex items-center gap-3 text-[11px] text-zinc-500">
+          <span className="font-medium text-teal-600">
+            +{data.freedom_days_impact} {data.freedom_days_impact === 1 ? 'dag' : 'dagen'} vrijheid
+          </span>
+          {data.euro_impact_monthly != null && data.euro_impact_monthly > 0 && (
+            <span>&euro;{data.euro_impact_monthly}/mnd</span>
+          )}
+        </div>
+      </div>
+    </button>
+  )
+}
+
+/* ── Main ChatPanel ────────────────────────────────────────────────── */
+
 export function ChatPanel() {
   const { isOpen, close, toggle } = useChatContext()
+  const router = useRouter()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [input, setInput] = useState('')
+
+  // Track which suggestions have been added (by toolInvocationId)
+  const [addedActions, setAddedActions] = useState<Set<string>>(new Set())
+  const [loadingAction, setLoadingAction] = useState<string | null>(null)
+
+  // Modal state
+  const [editAction, setEditAction] = useState<Action | null>(null)
 
   const transport = useMemo(
     () => new DefaultChatTransport({ api: '/api/ai/chat', body: { domain: 'wil' } }),
@@ -127,12 +198,10 @@ export function ChatPanel() {
 
   const isStreaming = status === 'streaming' || status === 'submitted'
 
-  // Auto-scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Focus input when opened
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 100)
@@ -153,7 +222,147 @@ export function ChatPanel() {
     }
   }
 
-  // FAB trigger button (always visible)
+  /* ── Action creation from suggestion ──────────────────────────── */
+
+  const handleAddAction = useCallback(async (invocationId: string, data: SuggestActionResult) => {
+    if (addedActions.has(invocationId)) return
+    setLoadingAction(invocationId)
+
+    try {
+      const res = await fetch('/api/ai/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: data.title,
+          description: data.description,
+          freedom_days_impact: data.freedom_days_impact,
+          euro_impact_monthly: data.euro_impact_monthly,
+          priority_score: data.priority_score,
+          source: 'chat',
+        }),
+      })
+
+      if (!res.ok) throw new Error('Failed to create action')
+
+      const { action } = await res.json() as { action: Action }
+      setAddedActions((prev) => new Set(prev).add(invocationId))
+      setEditAction(action)
+    } catch {
+      // silently fail — user can retry
+    } finally {
+      setLoadingAction(null)
+    }
+  }, [addedActions])
+
+  /* ── Modal handlers ───────────────────────────────────────────── */
+
+  const handleModalSave = useCallback(async (data: Record<string, unknown>) => {
+    if (!editAction) return
+    const res = await fetch(`/api/ai/actions/${editAction.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (res.ok) {
+      setEditAction(null)
+      router.refresh()
+    }
+  }, [editAction, router])
+
+  const handleStatusChange = useCallback(async (status: ActionStatus, data?: Record<string, unknown>) => {
+    if (!editAction) return
+    const res = await fetch(`/api/ai/actions/${editAction.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, ...data }),
+    })
+    if (res.ok) {
+      setEditAction(null)
+      router.refresh()
+    }
+  }, [editAction, router])
+
+  /* ── Render message parts ─────────────────────────────────────── */
+
+  function findSuggestAction(part: Record<string, unknown>): {
+    toolCallId: string
+    state: string
+    output?: unknown
+  } | null {
+    // AI SDK v6: type 'dynamic-tool' with toolName
+    if (part.type === 'dynamic-tool' && part.toolName === 'suggestAction') {
+      return { toolCallId: part.toolCallId as string, state: part.state as string, output: part.output }
+    }
+    // AI SDK v6: typed tool part 'tool-suggestAction'
+    if (part.type === 'tool-suggestAction') {
+      return { toolCallId: part.toolCallId as string, state: part.state as string, output: part.output }
+    }
+    // AI SDK v4/v5 compat: type 'tool-invocation'
+    if (part.type === 'tool-invocation') {
+      const p = part as Record<string, unknown>
+      // Flat structure (v4)
+      if (p.toolName === 'suggestAction') {
+        return { toolCallId: (p.toolInvocationId ?? p.toolCallId) as string, state: p.state as string, output: p.result ?? p.output }
+      }
+      // Nested structure (v5)
+      const inv = p.toolInvocation as Record<string, unknown> | undefined
+      if (inv?.toolName === 'suggestAction') {
+        return { toolCallId: (inv.toolCallId ?? inv.toolInvocationId) as string, state: inv.state as string, output: inv.result ?? inv.output }
+      }
+    }
+    return null
+  }
+
+  function renderAssistantMessage(parts: MessagePart[]) {
+    const elements: React.ReactNode[] = []
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i] as Record<string, unknown>
+
+      if (part.type === 'text' && part.text) {
+        elements.push(
+          <div key={`text-${i}`}>
+            {renderMarkdown(part.text as string)}
+          </div>
+        )
+      }
+
+      const action = findSuggestAction(part)
+      if (action) {
+        const isLoading = ['input-streaming', 'input-available', 'call', 'partial-call'].includes(action.state)
+        const hasOutput = ['output-available', 'result'].includes(action.state) && action.output
+
+        if (isLoading) {
+          elements.push(
+            <div key={`action-loading-${action.toolCallId}`} className="mt-2 w-full rounded-xl border border-teal-100 bg-white px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-teal-400" />
+                <span className="text-xs text-zinc-400">Actie wordt voorbereid...</span>
+              </div>
+            </div>
+          )
+        }
+
+        if (hasOutput) {
+          const data = action.output as SuggestActionResult
+          elements.push(
+            <ActionSuggestionCard
+              key={`action-${action.toolCallId}`}
+              data={data}
+              added={addedActions.has(action.toolCallId)}
+              loading={loadingAction === action.toolCallId}
+              onClick={() => handleAddAction(action.toolCallId, data)}
+            />
+          )
+        }
+      }
+    }
+
+    return elements
+  }
+
+  /* ── FAB ──────────────────────────────────────────────────────── */
+
   if (!isOpen) {
     return (
       <button
@@ -204,23 +413,38 @@ export function ChatPanel() {
 
           {messages.map((msg) => {
             const isUser = msg.role === 'user'
-            const text = getTextContent(msg)
-            if (!text) return null
-            return (
-              <div key={msg.id} className={`mb-3 flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-                {!isUser && (
-                  <div className="mr-2 mt-1 shrink-0">
-                    <FinnAvatar size={24} />
+            const parts = msg.parts as MessagePart[]
+
+            // For user messages: only show text
+            if (isUser) {
+              const text = parts
+                .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+                .map((p) => p.text)
+                .join('')
+              if (!text) return null
+              return (
+                <div key={msg.id} className="mb-3 flex justify-end">
+                  <div className="max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed bg-zinc-100 text-zinc-800">
+                    {text}
                   </div>
-                )}
-                <div
-                  className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
-                    isUser
-                      ? 'bg-zinc-100 text-zinc-800'
-                      : 'bg-teal-50 text-zinc-700'
-                  }`}
-                >
-                  {isUser ? text : renderMarkdown(text)}
+                </div>
+              )
+            }
+
+            // For assistant messages: render text + tool invocations
+            const hasContent =
+              parts.some((p) => p.type === 'text' && 'text' in p && p.text) ||
+              parts.some((p) => findSuggestAction(p as Record<string, unknown>) !== null)
+
+            if (!hasContent) return null
+
+            return (
+              <div key={msg.id} className="mb-3 flex justify-start">
+                <div className="mr-2 mt-1 shrink-0">
+                  <FinnAvatar size={24} />
+                </div>
+                <div className="max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed bg-teal-50 text-zinc-700">
+                  {renderAssistantMessage(parts)}
                 </div>
               </div>
             )
@@ -263,6 +487,16 @@ export function ChatPanel() {
           </div>
         </div>
       </div>
+
+      {/* Action edit modal */}
+      {editAction && (
+        <ActionEditModal
+          action={editAction}
+          onClose={() => setEditAction(null)}
+          onSave={handleModalSave}
+          onStatusChange={handleStatusChange}
+        />
+      )}
     </>
   )
 }

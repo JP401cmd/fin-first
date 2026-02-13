@@ -5,34 +5,16 @@ import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, Plus, X, Pencil, Save,
-  List, GitFork, Fingerprint, PieChart, Workflow,
+  GitFork, Fingerprint, Workflow,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getDefaultBudgets, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
 import { BudgetIcon, formatCurrency, getTypeColors, iconMap, iconOptions, type BudgetType } from '@/components/app/budget-shared'
+import { buildSegments, groupColor, childColor } from '@/components/app/budget-donut'
 import { type BudgetRollover, formatPeriod, getCarriedAmount, getPreviousPeriod, computeRollover } from '@/lib/budget-rollover'
-import { shouldAlert } from '@/components/app/budget-alert'
 import { BudgetTree } from '@/components/app/budget-tree'
 import { BudgetBlob } from '@/components/app/budget-blob'
-import { BudgetDonut } from '@/components/app/budget-donut'
 import { BudgetSankey } from '@/components/app/budget-sankey'
-
-function ProgressBar({ spent, limit, budgetType = 'expense' }: { spent: number; limit: number; budgetType?: BudgetType }) {
-  const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0
-  const overBudget = spent > limit && limit > 0
-  const colors = getTypeColors(budgetType)
-
-  return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100">
-      <div
-        className={`h-full rounded-full transition-all duration-500 ${
-          overBudget ? 'bg-red-500' : pct > 80 ? colors.barWarning : colors.barDefault
-        }`}
-        style={{ width: `${pct}%` }}
-      />
-    </div>
-  )
-}
 
 export default function BudgetsPage() {
   const searchParams = useSearchParams()
@@ -42,9 +24,10 @@ export default function BudgetsPage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null)
   const [modalStep, setModalStep] = useState<'detail' | 'edit'>('detail')
-  const [viewMode, setViewMode] = useState<'list' | 'tree' | 'blob' | 'donut' | 'sankey'>(() => {
+  const [viewMode, setViewMode] = useState<'tree' | 'blob' | 'sankey'>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('budgets-view-mode') as 'list' | 'tree' | 'blob' | 'donut' | 'sankey') || 'tree'
+      const stored = localStorage.getItem('budgets-view-mode')
+      if (stored === 'tree' || stored === 'blob' || stored === 'sankey') return stored
     }
     return 'tree'
   })
@@ -56,6 +39,7 @@ export default function BudgetsPage() {
   const [transactions, setTransactions] = useState<{ budget_id: string; amount: number; date: string; description: string; counterparty_name: string | null }[]>([])
   const [rollovers, setRollovers] = useState<BudgetRollover[]>([])
   const [budgetAmounts, setBudgetAmounts] = useState<{ id: string; budget_id: string; effective_from: string; amount: number }[]>([])
+  const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null)
 
   const monthStart = monthDate.toISOString().split('T')[0]
   const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1).toISOString().split('T')[0]
@@ -296,7 +280,7 @@ export default function BudgetsPage() {
     setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))
   }
 
-  function toggleViewMode(mode: 'list' | 'tree' | 'blob' | 'donut' | 'sankey') {
+  function toggleViewMode(mode: 'tree' | 'blob' | 'sankey') {
     setViewMode(mode)
     localStorage.setItem('budgets-view-mode', mode)
   }
@@ -376,83 +360,6 @@ export default function BudgetsPage() {
     )
   }
 
-  function renderBudgetGroup(title: string, groupBudgets: BudgetWithChildren[], budgetType: BudgetType, totalBudget: number, totalSpent: number) {
-    const colors = getTypeColors(budgetType)
-    if (groupBudgets.length === 0) return null
-
-    return (
-      <div className="mt-8">
-        <div className={`mb-4 rounded-xl border ${colors.border} bg-gradient-to-br ${colors.headerGradient} p-4`}>
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-zinc-700">{title}</h3>
-            <div className="text-right">
-              <span className={`text-sm font-bold ${colors.text}`}>
-                {formatCurrency(totalSpent)}
-              </span>
-              <span className="text-sm text-zinc-400">
-                {' / '}{formatCurrency(totalBudget)}
-              </span>
-            </div>
-          </div>
-          <div className="mt-2">
-            <ProgressBar spent={totalSpent} limit={totalBudget} budgetType={budgetType} />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          {groupBudgets.map((parent) => {
-            const parentSpent = getParentSpent(parent)
-            const parentLimit = getParentEffectiveLimit(parent)
-            const parentCarry = parent.children.length === 0
-              ? getBudgetCarry(parent)
-              : parent.children.reduce((sum, c) => sum + getBudgetCarry(c), 0)
-
-            return (
-              <div
-                key={parent.id}
-                className={`flex cursor-pointer items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 transition-colors ${colors.hoverBorder} ${colors.hoverBg}`}
-                onClick={() => openBudgetModal(parent.id)}
-              >
-                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${colors.bg}`}>
-                  <BudgetIcon name={parent.icon} className={`h-4 w-4 ${colors.text}`} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between">
-                    <p className="truncate text-sm font-medium text-zinc-900">
-                      {parent.name}
-                      {parentCarry > 0 && (
-                        <span className="ml-1.5 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">doorgeschoven</span>
-                      )}
-                      {parent.children.length > 0 && (
-                        <span className="ml-1.5 text-xs text-zinc-400">({parent.children.length})</span>
-                      )}
-                    </p>
-                    <div className="ml-4 shrink-0 text-right">
-                      <span className="text-sm font-medium text-zinc-900">
-                        {formatCurrency(parentSpent)}
-                      </span>
-                      <span className="text-sm text-zinc-400">
-                        {' / '}{formatCurrency(parentLimit)}
-                      </span>
-                      {parentSpent >= parentLimit && parentLimit > 0 ? (
-                        <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-red-500" title="Budget overschreden" />
-                      ) : shouldAlert(parentSpent, parentLimit, parent.alert_threshold) ? (
-                        <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-amber-500" title="Nadert limiet" />
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="mt-1.5">
-                    <ProgressBar spent={parentSpent} limit={parentLimit} budgetType={budgetType} />
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* Month selector */}
@@ -515,17 +422,6 @@ export default function BudgetsPage() {
             Boom
           </button>
           <button
-            onClick={() => toggleViewMode('list')}
-            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              viewMode === 'list'
-                ? 'bg-zinc-900 text-white'
-                : 'text-zinc-500 hover:text-zinc-700'
-            }`}
-          >
-            <List className="h-3.5 w-3.5" />
-            Lijst
-          </button>
-          <button
             onClick={() => toggleViewMode('blob')}
             className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               viewMode === 'blob'
@@ -535,17 +431,6 @@ export default function BudgetsPage() {
           >
             <Fingerprint className="h-3.5 w-3.5" />
             Organisme
-          </button>
-          <button
-            onClick={() => toggleViewMode('donut')}
-            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              viewMode === 'donut'
-                ? 'bg-zinc-900 text-white'
-                : 'text-zinc-500 hover:text-zinc-700'
-            }`}
-          >
-            <PieChart className="h-3.5 w-3.5" />
-            Donut
           </button>
           <button
             onClick={() => toggleViewMode('sankey')}
@@ -570,14 +455,7 @@ export default function BudgetsPage() {
       </div>
 
       {/* Budget groups */}
-      {viewMode === 'list' ? (
-        <>
-          {renderBudgetGroup('Inkomen', incomeBudgets, 'income', totalIncome, totalIncomeActual)}
-          {renderBudgetGroup('Uitgaven', expenseBudgets, 'expense', totalExpenseBudget, totalExpenseSpent)}
-          {renderBudgetGroup('Sparen', savingsBudgets, 'savings', totalSavingsBudget, totalSavingsActual)}
-          {renderBudgetGroup('Schulden', debtBudgets, 'debt', totalDebtBudget, totalDebtActual)}
-        </>
-      ) : viewMode === 'tree' ? (
+      {viewMode === 'tree' ? (
         <>
           {incomeBudgets.length > 0 && (
             <div className="mt-8">
@@ -630,22 +508,25 @@ export default function BudgetsPage() {
           spending={spending}
           onNavigate={(id) => openBudgetModal(id)}
         />
-      ) : viewMode === 'sankey' ? (
-        <BudgetSankey
-          groups={[...incomeBudgets, ...expenseBudgets, ...savingsBudgets, ...debtBudgets]}
-          spending={spending}
-          getEffectiveLimit={getEffectiveLimit}
-          getParentEffectiveLimit={getParentEffectiveLimit}
-          getSpent={getSpent}
-          getParentSpent={getParentSpent}
-          onNavigate={(id) => openBudgetModal(id)}
-        />
       ) : (
-        <BudgetDonut
-          groups={[...incomeBudgets, ...expenseBudgets, ...savingsBudgets, ...debtBudgets]}
-          spending={spending}
-          onNavigate={(id) => openBudgetModal(id)}
-        />
+        <>
+          <BudgetSankey
+            groups={[...incomeBudgets, ...expenseBudgets, ...savingsBudgets, ...debtBudgets]}
+            spending={spending}
+            getEffectiveLimit={getEffectiveLimit}
+            getParentEffectiveLimit={getParentEffectiveLimit}
+            getSpent={getSpent}
+            getParentSpent={getParentSpent}
+            onNavigate={(id) => openBudgetModal(id)}
+          />
+          <BudgetLegend
+            groups={[...incomeBudgets, ...expenseBudgets, ...savingsBudgets, ...debtBudgets]}
+            spending={spending}
+            expandedGroupId={expandedGroupId}
+            onToggleGroup={(id) => setExpandedGroupId(expandedGroupId === id ? null : id)}
+            onNavigate={(id) => openBudgetModal(id)}
+          />
+        </>
       )}
 
       {/* Budget detail modal */}
@@ -684,6 +565,126 @@ export default function BudgetsPage() {
           }}
         />
       )}
+    </div>
+  )
+}
+
+// ── Budget legend (donut-style, under Sankey) ────────────────
+
+function BudgetLegend({
+  groups,
+  spending,
+  expandedGroupId,
+  onToggleGroup,
+  onNavigate,
+}: {
+  groups: BudgetWithChildren[]
+  spending: Record<string, number>
+  expandedGroupId: string | null
+  onToggleGroup: (id: string) => void
+  onNavigate: (id: string) => void
+}) {
+  const segments = buildSegments(groups, spending)
+  if (segments.length === 0) return null
+
+  return (
+    <div className="mt-4 space-y-2">
+      {/* Header swatches */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs text-zinc-500">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-6 rounded-sm bg-zinc-600" />
+          Besteed
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-6 rounded-sm bg-zinc-300" />
+          Budget
+        </span>
+      </div>
+
+      {segments.map((seg) => {
+        const c = groupColor(seg.colorIdx)
+        const pct = seg.limit > 0 ? Math.round((seg.spent / seg.limit) * 100) : 0
+        const isOver = seg.spent > seg.limit && seg.limit > 0
+        const isExpanded = expandedGroupId === seg.id
+
+        return (
+          <div key={seg.id}>
+            <button
+              className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all ${
+                isExpanded ? 'ring-2 ring-amber-400' : ''
+              }`}
+              style={{
+                borderColor: isExpanded ? c.border : '#e4e4e7',
+                backgroundColor: isExpanded ? c.bg : 'white',
+              }}
+              onClick={() => onToggleGroup(seg.id)}
+            >
+              {/* Color swatch: spent (dark) + budget (light) */}
+              <div className="flex items-center gap-0.5">
+                <span className="block h-5 w-2.5 rounded-l-sm" style={{ backgroundColor: c.spent }} />
+                <span className="block h-5 w-2.5 rounded-r-sm" style={{ backgroundColor: c.budget }} />
+              </div>
+
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: c.bg }}>
+                <BudgetIcon name={seg.icon} className="h-4 w-4" />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-zinc-900">{seg.name}</p>
+                <p className="text-xs text-zinc-500">
+                  <span className={isOver ? 'font-semibold text-red-600' : ''}>
+                    {formatCurrency(seg.spent)}
+                  </span>
+                  {' / '}
+                  {formatCurrency(seg.limit)}
+                </p>
+              </div>
+
+              <span className={`shrink-0 text-xs font-bold ${isOver ? 'text-red-600' : 'text-zinc-600'}`}>
+                {pct}%
+              </span>
+            </button>
+
+            {/* Subcategories when expanded */}
+            {isExpanded && seg.children.length > 0 && (
+              <div className="ml-5 mt-1 mb-1 space-y-0.5">
+                {seg.children.map((child, ci) => {
+                  const childPct = child.limit > 0 ? Math.round((child.spent / child.limit) * 100) : 0
+                  const childOver = child.spent > child.limit && child.limit > 0
+                  const cc = childColor(c.h, ci, seg.children.length)
+
+                  return (
+                    <button
+                      key={child.id}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left transition-colors hover:bg-zinc-50"
+                      onClick={() => onNavigate(child.id)}
+                    >
+                      <div className="flex items-center gap-0.5">
+                        <span className="block h-3 w-1.5 rounded-l-sm" style={{ backgroundColor: cc.spent }} />
+                        <span className="block h-3 w-1.5 rounded-r-sm" style={{ backgroundColor: cc.budget }} />
+                      </div>
+                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded" style={{ backgroundColor: c.bg }}>
+                        <BudgetIcon name={child.icon} className="h-3 w-3" />
+                      </div>
+                      <span className="min-w-0 flex-1 truncate text-xs text-zinc-700">{child.name}</span>
+                      <span className="text-xs text-zinc-500">
+                        <span className={childOver ? 'font-semibold text-red-600' : ''}>
+                          {formatCurrency(child.spent)}
+                        </span>
+                        {' / '}
+                        {formatCurrency(child.limit)}
+                      </span>
+                      <span className={`w-8 text-right text-xs font-medium ${childOver ? 'text-red-600' : 'text-zinc-400'}`}>
+                        {childPct}%
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

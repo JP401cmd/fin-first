@@ -7,7 +7,7 @@ export function Hero() {
       <div className="pointer-events-none absolute top-[15%] left-1/2 h-[700px] w-[700px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(212,168,67,0.05)_0%,rgba(60,200,200,0.04)_40%,rgba(139,92,184,0.03)_70%,transparent_100%)]" />
 
       <p className="mb-6 text-xs font-medium tracking-widest uppercase text-zinc-400 animate-[fade-up_0.8s_0.2s_both]">
-        Vermogensbeheer, AI-coaching &amp; vrijheidsplanning in een app
+        Financiële administratie, AI-coaching &amp; vrijheidsplanning in een app
       </p>
 
       <h1 className="text-4xl font-bold leading-tight tracking-tight max-w-[780px] mb-6 md:text-5xl lg:text-6xl animate-[fade-up_0.8s_0.35s_both]">

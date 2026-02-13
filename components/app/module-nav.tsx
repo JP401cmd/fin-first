@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ModuleNavConfig, DomainColor } from '@/lib/navigation'
+import { useFeatureAccess } from '@/components/app/feature-access-provider'
 
 const colorStyles: Record<DomainColor, { active: string; hover: string; border: string }> = {
   amber: {
@@ -32,6 +33,11 @@ function isActive(pathname: string, href: string, basePath: string): boolean {
 export function ModuleNav({ config }: { config: ModuleNavConfig }) {
   const pathname = usePathname()
   const styles = colorStyles[config.color]
+  const { features } = useFeatureAccess()
+
+  const visibleItems = config.items.filter(
+    item => !item.featureId || features[item.featureId] !== false
+  )
 
   return (
     <div className={`sticky top-[var(--header-height)] z-40 border-b bg-white ${styles.border}`}>
@@ -40,7 +46,7 @@ export function ModuleNav({ config }: { config: ModuleNavConfig }) {
           className="scrollbar-none -mb-px flex gap-1 overflow-x-auto"
           aria-label={`${config.module} navigatie`}
         >
-          {config.items.map((item) => {
+          {visibleItems.map((item) => {
             const active = isActive(pathname, item.href, config.basePath)
             return (
               <Link

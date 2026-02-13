@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildSharedContext } from './shared-context'
 import { section, formatCurrency, bulletList } from './formatter'
+import { getNibudHouseholdType, getNibudReferences, calculateBenchmarks } from '@/lib/nibud/reference-data'
 
 const TEMPORAL_LABELS: Record<number, string> = {
   1: 'De Levensgenieter (level 1) — Comfort > Snelheid. Wil niet inleveren op comfort. FIRE is een leuke bonus, geen obsessie.',
@@ -96,6 +97,68 @@ export async function buildRecommendationContext(supabase: SupabaseClient): Prom
 
     if (budgetLines.length > 0) {
       parts.push(section('BUDGET & UITGAVEN (gem. 3 maanden)', bulletList(budgetLines)))
+    }
+
+    // NIBUD benchmark section
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('household_type, number_of_children, children_ages')
+        .eq('id', user.id)
+        .single()
+
+      if (profile) {
+        const householdType = getNibudHouseholdType(profile)
+        const references = await getNibudReferences(supabase, householdType)
+
+        if (references.length > 0) {
+          // Build spending-by-slug map from child budgets
+          const spendingBySlug: Record<string, number> = {}
+          for (const budget of budgets ?? []) {
+            if (!budget.slug || budget.budget_type === 'income') continue
+            const totalSpent = spendingMap.get(budget.id) || 0
+            const monthlyAvg = Math.round(totalSpent / 3)
+            if (monthlyAvg > 0) {
+              spendingBySlug[budget.slug] = (spendingBySlug[budget.slug] ?? 0) + monthlyAvg
+            }
+          }
+
+          // Calculate daily expense for freedom-day conversion
+          const totalMonthlySpending = Object.values(spendingBySlug).reduce((s, v) => s + v, 0)
+          const dailyExpense = totalMonthlySpending > 0 ? (totalMonthlySpending * 12) / 365 : 1
+
+          const benchmarks = calculateBenchmarks(references, spendingBySlug, dailyExpense)
+          const householdLabel: Record<string, string> = {
+            alleenstaand: 'alleenstaand',
+            paar: 'paar zonder kinderen',
+            gezin_jong: 'gezin met jonge kinderen',
+            gezin_tiener: 'gezin met tieners',
+          }
+
+          const benchmarkLines = benchmarks
+            .filter(b => b.user_spending > 0 || (b.voorbeeld_amount ?? 0) > 0)
+            .map(b => {
+              const ref = b.voorbeeld_amount != null ? `NIBUD voorbeeld ${formatCurrency(b.voorbeeld_amount)}/mnd` : `NIBUD basis ${formatCurrency(b.basis_amount)}/mnd`
+              const status = b.delta > 0
+                ? `BOVEN NIBUD (+${formatCurrency(b.delta)}${b.freedom_days_potential > 0 ? `, ~${b.freedom_days_potential} dagen vrijheid/jaar` : ', marktconform'})`
+                : b.delta < 0
+                  ? `ONDER NIBUD (${formatCurrency(b.delta)})`
+                  : 'op NIBUD-niveau'
+              return `${b.nibud_category_name}: ${ref} | gebruiker ${formatCurrency(b.user_spending)}/mnd | ${status}`
+            })
+
+          if (benchmarkLines.length > 0) {
+            const totalPotential = benchmarks.reduce((s, b) => s + b.freedom_days_potential, 0)
+            const footer = totalPotential > 0
+              ? `\nTotaal optimalisatiepotentieel: ~${totalPotential} vrijheidsdagen/jaar`
+              : ''
+            parts.push(section(
+              `NIBUD BENCHMARK (referentie: ${householdLabel[householdType]}, 2026)`,
+              bulletList(benchmarkLines) + footer,
+            ))
+          }
+        }
+      }
     }
   }
 

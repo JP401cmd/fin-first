@@ -25,6 +25,7 @@ import {
   AlertTriangle, Calendar, BarChart3, Clock, FlaskConical, Landmark,
   Plus, X, Trash2, Edit3, Zap, Target,
 } from 'lucide-react'
+import { FeatureGate } from '@/components/app/feature-gate'
 
 type ActiveModal = null | 'projections' | 'scenarios' | 'simulations' | 'withdrawal'
 
@@ -359,6 +360,7 @@ export default function HorizonPage() {
           <p className="mt-1 text-xs text-zinc-400">van FIRE doel</p>
         </div>
 
+        <FeatureGate featureId="veerkracht_score">
         <div className="rounded-xl border border-zinc-200 bg-white p-5">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-50">
@@ -370,6 +372,7 @@ export default function HorizonPage() {
           <p className="mt-1 text-3xl font-bold text-zinc-900">{resilience.total}</p>
           <p className="mt-1 text-xs text-zinc-400">{resilience.label}</p>
         </div>
+        </FeatureGate>
       </section>
 
       {/* === 3. Alerts === */}
@@ -409,37 +412,46 @@ export default function HorizonPage() {
 
       {/* === 4. Verken-kaarten (Explore Cards) === */}
       <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <ExploreCard
-          onClick={() => setActiveModal('projections')}
-          icon={<TrendingUp className="h-5 w-5 text-purple-600" />}
-          title="Projecties"
-          value={fire.fireAge !== null ? `FIRE op ${Math.round(fire.fireAge)}` : fire.fireDate}
-          subtitle="FIRE voorspelling"
-        />
-        <ExploreCard
-          onClick={() => setActiveModal('scenarios')}
-          icon={<BarChart3 className="h-5 w-5 text-purple-600" />}
-          title="Scenario's"
-          value="3 paden"
-          subtitle="drifter, koers, optimizer"
-        />
-        <ExploreCard
-          onClick={() => setActiveModal('simulations')}
-          icon={<FlaskConical className="h-5 w-5 text-purple-600" />}
-          title="Simulaties"
-          value="Monte Carlo"
-          subtitle="1.000 simulaties"
-        />
-        <ExploreCard
-          onClick={() => setActiveModal('withdrawal')}
-          icon={<Landmark className="h-5 w-5 text-purple-600" />}
-          title="Opnamestrategie"
-          value="4 strategieen"
-          subtitle="hoe je vermogen opneemt"
-        />
+        <FeatureGate featureId="fire_projecties">
+          <ExploreCard
+            onClick={() => setActiveModal('projections')}
+            icon={<TrendingUp className="h-5 w-5 text-purple-600" />}
+            title="Projecties"
+            value={fire.fireAge !== null ? `FIRE op ${Math.round(fire.fireAge)}` : fire.fireDate}
+            subtitle="FIRE voorspelling"
+          />
+        </FeatureGate>
+        <FeatureGate featureId="fire_scenario_analyse">
+          <ExploreCard
+            onClick={() => setActiveModal('scenarios')}
+            icon={<BarChart3 className="h-5 w-5 text-purple-600" />}
+            title="Scenario's"
+            value="3 paden"
+            subtitle="drifter, koers, optimizer"
+          />
+        </FeatureGate>
+        <FeatureGate featureId="monte_carlo">
+          <ExploreCard
+            onClick={() => setActiveModal('simulations')}
+            icon={<FlaskConical className="h-5 w-5 text-purple-600" />}
+            title="Simulaties"
+            value="Monte Carlo"
+            subtitle="1.000 simulaties"
+          />
+        </FeatureGate>
+        <FeatureGate featureId="withdrawal_strategie">
+          <ExploreCard
+            onClick={() => setActiveModal('withdrawal')}
+            icon={<Landmark className="h-5 w-5 text-purple-600" />}
+            title="Opnamestrategie"
+            value="4 strategieen"
+            subtitle="hoe je vermogen opneemt"
+          />
+        </FeatureGate>
       </section>
 
-      {/* === 5. Tijdlijn === */}
+      {/* === 5. Tijdlijn + 6. Levensgebeurtenissen === */}
+      <FeatureGate featureId="levensgebeurtenissen">
       <section className="mt-10">
         <div className="mb-5">
           <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
@@ -597,6 +609,7 @@ export default function HorizonPage() {
           </div>
         </div>
       </section>
+      </FeatureGate>
 
       {/* === 7. Acties === */}
       {actions.length > 0 && (
@@ -618,6 +631,7 @@ export default function HorizonPage() {
       )}
 
       {/* === 8. Projectie-chart === */}
+      <FeatureGate featureId="vermogensprojectie_chart">
       <section className="mt-10">
         <div className="mb-5">
           <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
@@ -631,6 +645,7 @@ export default function HorizonPage() {
           <ProjectionChart data={projection} fireTarget={fire.fireTarget} />
         </div>
       </section>
+      </FeatureGate>
 
       {/* === 9. Samenvatting === */}
       <section className="mt-10">

@@ -23,6 +23,7 @@ import {
   payoffSummary,
 } from '@/lib/debt-data'
 import { type Asset, ASSET_TYPE_LABELS } from '@/lib/asset-data'
+import { FeatureGate } from '@/components/app/feature-gate'
 
 export default function DebtsPage() {
   const [debts, setDebts] = useState<Debt[]>([])
@@ -233,6 +234,7 @@ export default function DebtsPage() {
       </section>
 
       {/* Payoff strategy */}
+      <FeatureGate featureId="schulden_aflosplan" fallback="locked">
       <section className="mt-6 rounded-2xl border border-zinc-200 bg-white p-6">
         <h2 className="text-sm font-semibold text-zinc-700">Aflosstrategie</h2>
         <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -300,6 +302,7 @@ export default function DebtsPage() {
           </div>
         )}
       </section>
+      </FeatureGate>
 
       {/* Debt list */}
       <section className="mt-6 space-y-2">

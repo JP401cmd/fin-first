@@ -12,7 +12,7 @@ interface BudgetDonutProps {
 
 /* ── Colour palette ─────────────────────────────────────────────── */
 
-const PALETTE = [
+export const PALETTE = [
   { h: 142 },  // groen — inkomen
   { h: 25 },   // oranje — vaste lasten
   { h: 350 },  // rose — dagelijks
@@ -23,7 +23,7 @@ const PALETTE = [
   { h: 310 },  // fuchsia
 ]
 
-function groupColor(idx: number) {
+export function groupColor(idx: number) {
   const p = PALETTE[idx % PALETTE.length]
   return {
     h: p.h,
@@ -35,7 +35,7 @@ function groupColor(idx: number) {
   }
 }
 
-function childColor(parentH: number, childIdx: number, total: number) {
+export function childColor(parentH: number, childIdx: number, total: number) {
   const spread = Math.min(total * 8, 40)
   const offset = total > 1 ? -spread / 2 + (childIdx / (total - 1)) * spread : 0
   const h = parentH + offset
@@ -62,7 +62,7 @@ function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
 
 /* ── Segment data ───────────────────────────────────────────────── */
 
-interface ChildSeg {
+export interface ChildSeg {
   id: string
   name: string
   icon: string
@@ -70,7 +70,7 @@ interface ChildSeg {
   spent: number
 }
 
-interface Segment {
+export interface Segment {
   id: string
   name: string
   icon: string
@@ -81,7 +81,7 @@ interface Segment {
   children: ChildSeg[]
 }
 
-function buildSegments(
+export function buildSegments(
   groups: BudgetWithChildren[],
   spending: Record<string, number>,
 ): Segment[] {

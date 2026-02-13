@@ -8,6 +8,7 @@ import {
   type HorizonInput, type FireProjection, type FireRange, type ProjectionMonth,
 } from '@/lib/horizon-data'
 import { X, ChevronDown, ChevronUp } from 'lucide-react'
+import { FeatureGate } from '@/components/app/feature-gate'
 
 type Props = {
   input: HorizonInput
@@ -155,6 +156,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
             </div>
 
             {/* Advanced parameters */}
+            <FeatureGate featureId="fire_geavanceerde_params">
             <button
               onClick={() => setShowParams(!showParams)}
               className="mt-4 flex items-center gap-1 text-xs font-medium text-purple-600 hover:text-purple-700"
@@ -191,6 +193,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
                 </div>
               </div>
             )}
+            </FeatureGate>
           </section>
 
           {/* Projection chart with 3 lines */}

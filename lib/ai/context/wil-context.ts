@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { section, formatCurrency, bulletList } from './formatter'
+import { getNibudHouseholdType, getNibudReferences, calculateBenchmarks } from '@/lib/nibud/reference-data'
 
 /**
  * Wil-specific context: goals, budget optimization opportunities,
@@ -83,6 +84,46 @@ export async function buildWilContext(supabase: SupabaseClient): Promise<string>
 
   if (opportunities.length > 0) {
     parts.push(section('OPTIMALISATIEKANSEN', 'Niet-essentiële uitgaven deze maand:\n' + bulletList(opportunities)))
+  }
+
+  // NIBUD benchmark for Wil context
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('household_type, number_of_children, children_ages')
+      .eq('id', user.id)
+      .single()
+
+    if (profile) {
+      const householdType = getNibudHouseholdType(profile)
+      const references = await getNibudReferences(supabase, householdType)
+
+      if (references.length > 0) {
+        // Build spending-by-slug from this month's transactions
+        const spendingBySlug: Record<string, number> = {}
+        for (const child of budgets.filter(b => b.slug)) {
+          const spent = spendingByBudget[child.id] ?? 0
+          if (spent > 0 && child.slug) {
+            spendingBySlug[child.slug] = (spendingBySlug[child.slug] ?? 0) + spent
+          }
+        }
+
+        const benchmarks = calculateBenchmarks(references, spendingBySlug, dailyExpense)
+        const aboveNorm = benchmarks.filter(b => b.delta > 0 && b.freedom_days_potential > 0)
+
+        if (aboveNorm.length > 0) {
+          const lines = aboveNorm.slice(0, 5).map(b =>
+            `${b.nibud_category_name}: ${formatCurrency(b.user_spending)}/mnd vs NIBUD ${formatCurrency(b.voorbeeld_amount ?? b.basis_amount)}/mnd (+${formatCurrency(b.delta)}, ~${b.freedom_days_potential} dagen/jaar)`
+          )
+          const total = aboveNorm.reduce((s, b) => s + b.freedom_days_potential, 0)
+          parts.push(section(
+            'NIBUD BENCHMARK (boven norm)',
+            bulletList(lines) + `\nTotaal potentieel: ~${total} vrijheidsdagen/jaar`,
+          ))
+        }
+      }
+    }
   }
 
   // Real goals summary from database

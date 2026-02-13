@@ -18,6 +18,8 @@ import {
   CheckCircle, Sparkles, Target, Flame, Info, Plus,
   AlertTriangle, Clock, TrendingDown, ArrowRight,
 } from 'lucide-react'
+import { NibudBenchmarkSection } from '@/components/app/will/nibud-benchmark'
+import { FeatureGate } from '@/components/app/feature-gate'
 
 type KpiData = {
   completedActions: { id: string; status: string; freedom_days_impact: number; source: string; completed_at: string | null; due_date: string | null; created_at: string; recommendation: { recommendation_type: string }[] | null }[]
@@ -39,7 +41,6 @@ export default function WillPage() {
   const [showGoalForm, setShowGoalForm] = useState(false)
   const [goalAssets, setGoalAssets] = useState<{ id: string; name: string; current_value: number }[]>([])
   const [goalDebts, setGoalDebts] = useState<{ id: string; name: string; current_balance: number }[]>([])
-
   const loadData = useCallback(async () => {
     const supabase = createClient()
     const today = new Date().toISOString().split('T')[0]
@@ -422,7 +423,14 @@ export default function WillPage() {
         <RecommendationList initialRecommendations={recommendations} />
       </section>
 
-      {/* === 5. Acties (ActionBoard inline) === */}
+      {/* === 5. Budget Gezondheidscheck (NIBUD) — compact card + modal === */}
+      <FeatureGate featureId="nibud_benchmark">
+        <section id="section-gezondheidscheck" className="mt-8 scroll-mt-8">
+          <NibudBenchmarkSection />
+        </section>
+      </FeatureGate>
+
+      {/* === 6. Acties (ActionBoard inline) === */}
       <section id="section-acties" className="mt-10 scroll-mt-8">
         <div className="mb-5">
           <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
@@ -436,6 +444,7 @@ export default function WillPage() {
       </section>
 
       {/* === 6. Doelen (compact + modal) === */}
+      <FeatureGate featureId="doelen_systeem">
       <section id="section-doelen" className="mt-10 scroll-mt-8">
         <div className="mb-5 flex items-center justify-between">
           <div>
@@ -486,8 +495,10 @@ export default function WillPage() {
           </div>
         )}
       </section>
+      </FeatureGate>
 
       {/* === 7. Beslissingspatronen === */}
+      <FeatureGate featureId="beslissingspatronen">
       <section className="mt-10">
         <div className="mb-5">
           <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
@@ -514,8 +525,10 @@ export default function WillPage() {
           </div>
         )}
       </section>
+      </FeatureGate>
 
       {/* === Modals === */}
+      <FeatureGate featureId="doelen_systeem">
       <GoalDetailModal
         open={showGoalModal}
         onClose={() => setShowGoalModal(false)}
@@ -533,6 +546,7 @@ export default function WillPage() {
           }}
         />
       )}
+      </FeatureGate>
     </div>
   )
 }

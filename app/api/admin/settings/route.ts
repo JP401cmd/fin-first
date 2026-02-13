@@ -22,10 +22,12 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const settings: Record<string, string> = {}
+  const settings: Record<string, string | object> = {}
   for (const row of data ?? []) {
     if (row.key === 'anthropic_api_key' || row.key === 'openai_api_key') {
       settings[row.key] = row.value ? maskApiKey(row.value) : ''
+    } else if (row.key === 'feature_phase_matrix') {
+      try { settings[row.key] = JSON.parse(row.value) } catch { settings[row.key] = row.value }
     } else {
       settings[row.key] = row.value
     }
@@ -41,6 +43,7 @@ const ALLOWED_KEYS = [
   'anthropic_api_key',
   'openai_api_key',
   'ai_system_prompt_override',
+  'feature_phase_matrix',
 ]
 
 export async function PUT(req: Request) {
@@ -55,11 +58,16 @@ export async function PUT(req: Request) {
 
   for (const key of ALLOWED_KEYS) {
     if (!(key in body)) continue
-    let value = body[key] as string
+    let value = body[key]
 
     // Don't overwrite API keys if the masked value is sent back
-    if ((key === 'anthropic_api_key' || key === 'openai_api_key') && value.includes('***')) {
+    if ((key === 'anthropic_api_key' || key === 'openai_api_key') && typeof value === 'string' && value.includes('***')) {
       continue
+    }
+
+    // Stringify object values (e.g. feature_phase_matrix)
+    if (typeof value === 'object' && value !== null) {
+      value = JSON.stringify(value)
     }
 
     const { error } = await supabase

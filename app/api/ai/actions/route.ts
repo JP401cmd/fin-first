@@ -16,17 +16,20 @@ export async function POST(req: NextRequest) {
     euro_impact_monthly?: number
     due_date?: string
     priority_score?: number
+    source?: 'manual' | 'chat'
   }
 
   if (!body.title || body.freedom_days_impact == null) {
     return Response.json({ error: 'title and freedom_days_impact are required' }, { status: 400 })
   }
 
+  const source = body.source === 'chat' ? 'chat' : 'manual'
+
   const { data, error } = await supabase
     .from('actions')
     .insert({
       user_id: user.id,
-      source: 'manual',
+      source,
       title: body.title,
       description: body.description || null,
       freedom_days_impact: body.freedom_days_impact,

@@ -204,7 +204,7 @@ export interface PersonaData {
 
 // ── Shared budget structures ──────────────────────────────────
 
-function makeBudgets(overrides: Record<string, number>): PersonaBudget[] {
+export function makeBudgets(overrides: Record<string, number>): PersonaBudget[] {
   const base: PersonaBudget[] = [
     {
       name: 'Inkomen', slug: S.INKOMEN, icon: 'Wallet', description: 'Alle inkomstenbronnen',

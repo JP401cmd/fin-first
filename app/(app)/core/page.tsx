@@ -14,6 +14,7 @@ import {
   Calendar, TrendingUp, Sun, Star, Wallet, ShoppingCart,
   PiggyBank, Building2, ArrowRight, Info, Camera, Download,
 } from 'lucide-react'
+import { FeatureGate } from '@/components/app/feature-gate'
 
 export default function CorePage() {
   const router = useRouter()
@@ -24,6 +25,8 @@ export default function CorePage() {
   const [snapshots, setSnapshots] = useState<NetWorthSnapshot[]>([])
   const [snapshotLoading, setSnapshotLoading] = useState(false)
   const [incomeMonths, setIncomeMonths] = useState(12)
+  const [savingsRate12, setSavingsRate12] = useState(0)
+  const [savingsRateMonths, setSavingsRateMonths] = useState(12)
 
   const loadData = useCallback(async () => {
     try {
@@ -36,7 +39,7 @@ export default function CorePage() {
       const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split('T')[0]
 
       // Fetch all in parallel
-      const [txResult, assetsResult, debtsResult, income12Result, essentialBudgetsResult, earliestIncomeResult, childBudgetsResult] = await Promise.all([
+      const [txResult, assetsResult, debtsResult, income12Result, essentialBudgetsResult, earliestIncomeResult, childBudgetsResult, expense12Result, earliestTxResult] = await Promise.all([
         supabase
           .from('transactions')
           .select('amount')
@@ -73,6 +76,18 @@ export default function CorePage() {
           .from('budgets')
           .select('id, parent_id, default_limit')
           .not('parent_id', 'is', null),
+        supabase
+          .from('transactions')
+          .select('amount')
+          .lt('amount', 0)
+          .gte('date', twelveMonthsAgo)
+          .lt('date', monthEnd),
+        supabase
+          .from('transactions')
+          .select('date')
+          .gte('date', twelveMonthsAgo)
+          .order('date', { ascending: true })
+          .limit(1),
       ])
 
       if (txResult.error) throw txResult.error
@@ -82,6 +97,8 @@ export default function CorePage() {
       if (essentialBudgetsResult.error) throw essentialBudgetsResult.error
       if (earliestIncomeResult.error) throw earliestIncomeResult.error
       if (childBudgetsResult.error) throw childBudgetsResult.error
+      if (expense12Result.error) throw expense12Result.error
+      if (earliestTxResult.error) throw earliestTxResult.error
 
       // Calculate monthly income & expenses from transactions
       let monthlyIncome = 0
@@ -109,6 +126,28 @@ export default function CorePage() {
         }
       }
       setIncomeMonths(actualIncomeMonths)
+
+      // Last 12 months expenses & savings rate
+      const last12MonthsExpenses = Math.abs(expense12Result.data.reduce((s, t) => s + Number(t.amount), 0))
+      const earliestTxDate = earliestTxResult.data?.[0]?.date
+      let savingsRateDataMonths = 12
+      if (earliestTxDate && (last12MonthsIncome > 0 || last12MonthsExpenses > 0)) {
+        const earliest = new Date(earliestTxDate)
+        savingsRateDataMonths = Math.max(1,
+          (now.getFullYear() - earliest.getFullYear()) * 12 +
+          (now.getMonth() - earliest.getMonth()) + 1
+        )
+        savingsRateDataMonths = Math.min(savingsRateDataMonths, 12)
+      }
+      const extYearlyIncome = savingsRateDataMonths < 12
+        ? (last12MonthsIncome / savingsRateDataMonths) * 12
+        : last12MonthsIncome
+      const extYearlyExpenses = savingsRateDataMonths < 12
+        ? (last12MonthsExpenses / savingsRateDataMonths) * 12
+        : last12MonthsExpenses
+      const yearlySavings = extYearlyIncome - extYearlyExpenses
+      setSavingsRate12(extYearlyIncome > 0 ? (yearlySavings / extYearlyIncome) * 100 : 0)
+      setSavingsRateMonths(savingsRateDataMonths)
 
       // Yearly must expenses from essential budgets (sum of children per parent)
       const allChildren = childBudgetsResult.data ?? []
@@ -312,11 +351,15 @@ export default function CorePage() {
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
               <TrendingUp className="h-5 w-5 text-amber-600" />
             </div>
-            <KpiTooltip text="Percentage van je inkomen dat je spaart/belegt. Berekening: (inkomen - uitgaven) / inkomen × 100." />
+            <KpiTooltip text="Percentage van je netto inkomen dat je spaart/belegt over de afgelopen 12 maanden. Bij minder dan 12 maanden data wordt het gemiddelde geëxtrapoleerd naar een jaar." />
           </div>
-          <p className="text-sm font-medium text-zinc-500">Huidige Spaarquote</p>
-          <p className="mt-1 text-3xl font-bold text-zinc-900">{data.savingsRate.toFixed(1)}%</p>
-          <p className="mt-1 text-xs text-zinc-400">van netto inkomen</p>
+          <p className="text-sm font-medium text-zinc-500">Spaarquote</p>
+          <p className="mt-1 text-3xl font-bold text-zinc-900">{savingsRate12.toFixed(1)}%</p>
+          <p className="mt-1 text-xs text-zinc-400">
+            {savingsRateMonths < 12
+              ? `geëxtrapoleerd vanuit ${savingsRateMonths} maand${savingsRateMonths > 1 ? 'en' : ''}`
+              : 'laatste 12 maanden'}
+          </p>
         </div>
 
         <div className="rounded-xl border border-zinc-200 bg-white p-5">
@@ -412,6 +455,7 @@ export default function CorePage() {
       </section>
 
       {/* === Net Worth Chart === */}
+      <FeatureGate featureId="vermogensverloop">
       {snapshots.length > 0 && (
         <section className="mt-10">
           <div className="mb-5 flex items-center justify-between">
@@ -458,11 +502,14 @@ export default function CorePage() {
           </div>
         </section>
       )}
+      </FeatureGate>
 
       {/* === Snapshot Comparison === */}
+      <FeatureGate featureId="snapshot_vergelijking">
       {snapshots.length >= 2 && (
         <SnapshotComparison snapshots={snapshots} />
       )}
+      </FeatureGate>
 
       {/* === Financiële Kerngetallen === */}
       <section className="mt-10">
@@ -475,6 +522,7 @@ export default function CorePage() {
               Gebaseerd op je werkelijke transacties en budgetinstellingen.
             </p>
           </div>
+          <FeatureGate featureId="data_export">
           <div className="flex gap-2">
             <ExportButton type="transactions" label="Transacties" />
             <ExportButton type="budgets" label="Budgetten" />
@@ -483,6 +531,7 @@ export default function CorePage() {
             <ExportButton type="debts" label="Schulden" />
             <ExportButton type="goals" label="Doelen" />
           </div>
+          </FeatureGate>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

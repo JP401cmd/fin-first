@@ -428,7 +428,7 @@ export function Features() {
             je al hebt?
           </h2>
           <p className="text-base text-zinc-500 max-w-md mx-auto mb-10 leading-relaxed">
-            Vermogensbeheer, AI-coaching en FIRE-planning — gebouwd voor Nederland.
+            Financiële administratie, AI-coaching en FIRE-planning — gebouwd voor Nederland.
           </p>
           <Link
             href="/signup"
