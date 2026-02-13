@@ -13,7 +13,7 @@ export async function buildWilContext(supabase: SupabaseClient): Promise<string>
   // Identify optimization opportunities (non-essential categories with high spending)
   const opportunities: string[] = []
   for (const parent of budgets) {
-    if (parent.budget_type === 'income' || parent.budget_type === 'savings') continue
+    if (parent.budget_type === 'income' || parent.budget_type === 'savings' || parent.budget_type === 'debt') continue
     for (const child of parent.children ?? []) {
       const spent = spending[child.name] ?? 0
       if (!parent.is_essential && spent > 0) {

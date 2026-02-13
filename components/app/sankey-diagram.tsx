@@ -9,6 +9,9 @@ export interface SankeyNode {
   value: number
   color: string
   column: number // 0=left, 1=middle, 2=right
+  spent?: number          // actual spending (fill within node)
+  overspent?: boolean     // red border indicator
+  secondaryLabel?: string // e.g. "€420 / €550" instead of formatCurrency(value)
 }
 
 export interface SankeyLink {
@@ -21,14 +24,19 @@ export interface SankeyLink {
 interface SankeyDiagramProps {
   nodes: SankeyNode[]
   links: SankeyLink[]
+  /** @deprecated Use aspectRatio instead */
   height?: number
+  /** Width-to-height ratio (default 2.5 = 2.5x wider than tall) */
+  aspectRatio?: number
   onNodeClick?: (nodeId: string) => void
+  /** Show animated euro coins (default true). Budget view sets this to false. */
+  showAnimatedCoins?: boolean
 }
 
 const NODE_PAD = 8
 const NODE_WIDTH = 14
-// Spread columns to use full width
-const COLUMN_POSITIONS = [0.01, 0.38, 0.76]
+// Spread columns to use full width (col 2 labels go left, so push it to far right)
+const COLUMN_POSITIONS = [0.01, 0.45, 0.98]
 
 interface LayoutNode {
   id: string
@@ -39,6 +47,9 @@ interface LayoutNode {
   x: number
   y: number
   height: number
+  spent?: number
+  overspent?: boolean
+  secondaryLabel?: string
 }
 
 interface LayoutLink {
@@ -100,13 +111,14 @@ function computeLayout(
         x,
         y,
         height: nodeHeight,
+        spent: n.spent,
+        overspent: n.overspent,
+        secondaryLabel: n.secondaryLabel,
       })
       y += nodeHeight + NODE_PAD
     }
   }
 
-  const sourceOffset = new Map<string, number>()
-  const targetOffset = new Map<string, number>()
   const layoutLinks: LayoutLink[] = []
 
   const sortedLinks = [...links].sort((a, b) => {
@@ -119,13 +131,11 @@ function computeLayout(
     return ta.y - tb.y
   })
 
+  // First pass: compute raw link heights
   for (const link of sortedLinks) {
     const sNode = layoutNodeMap.get(link.source)
     const tNode = layoutNodeMap.get(link.target)
     if (!sNode || !tNode) continue
-
-    const sOff = sourceOffset.get(link.source) ?? 0
-    const tOff = targetOffset.get(link.target) ?? 0
 
     const linkSourceHeight = sNode.value > 0
       ? (link.value / sNode.value) * sNode.height : 0
@@ -139,16 +149,56 @@ function computeLayout(
       color: link.color,
       sourceColor: sNode.color,
       targetColor: tNode.color,
-      sourceY: sNode.y + sOff,
+      sourceY: 0,
       sourceHeight: linkSourceHeight,
-      targetY: tNode.y + tOff,
+      targetY: 0,
       targetHeight: linkTargetHeight,
       sourceX: sNode.x + NODE_WIDTH,
       targetX: tNode.x,
     })
+  }
 
-    sourceOffset.set(link.source, sOff + linkSourceHeight)
-    targetOffset.set(link.target, tOff + linkTargetHeight)
+  // Second pass: normalize link heights so they never exceed the node bar.
+  // When income < expenses (or vice versa), raw heights on one side overflow.
+  // Scale them down proportionally so ribbons always fit within each bar.
+  const sourceHeightTotals = new Map<string, number>()
+  const targetHeightTotals = new Map<string, number>()
+  for (const link of layoutLinks) {
+    sourceHeightTotals.set(link.source, (sourceHeightTotals.get(link.source) ?? 0) + link.sourceHeight)
+    targetHeightTotals.set(link.target, (targetHeightTotals.get(link.target) ?? 0) + link.targetHeight)
+  }
+
+  for (const link of layoutLinks) {
+    const sNode = layoutNodeMap.get(link.source)
+    const tNode = layoutNodeMap.get(link.target)
+    if (!sNode || !tNode) continue
+
+    const sTotalHeight = sourceHeightTotals.get(link.source) ?? 0
+    if (sTotalHeight > sNode.height) {
+      link.sourceHeight *= sNode.height / sTotalHeight
+    }
+
+    const tTotalHeight = targetHeightTotals.get(link.target) ?? 0
+    if (tTotalHeight > tNode.height) {
+      link.targetHeight *= tNode.height / tTotalHeight
+    }
+  }
+
+  // Third pass: compute final y-positions with normalized heights
+  const sourceOffset = new Map<string, number>()
+  const targetOffset = new Map<string, number>()
+  for (const link of layoutLinks) {
+    const sNode = layoutNodeMap.get(link.source)!
+    const tNode = layoutNodeMap.get(link.target)!
+
+    const sOff = sourceOffset.get(link.source) ?? 0
+    const tOff = targetOffset.get(link.target) ?? 0
+
+    link.sourceY = sNode.y + sOff
+    link.targetY = tNode.y + tOff
+
+    sourceOffset.set(link.source, sOff + link.sourceHeight)
+    targetOffset.set(link.target, tOff + link.targetHeight)
   }
 
   return {
@@ -297,6 +347,13 @@ function NodeRect({
   const labelX = labelOnRight ? node.x + NODE_WIDTH + 6 : node.x - 6
   const textAnchor = labelOnRight ? 'start' : 'end'
 
+  const nodeH = Math.max(node.height, 2)
+
+  // Spent fill bar: fills from bottom upward
+  const hasSpent = node.spent != null && node.spent > 0 && node.value > 0
+  const spentRatio = hasSpent ? Math.min(node.spent! / node.value, 1.0) : 0
+  const spentHeight = spentRatio * nodeH
+
   return (
     <g
       className={`cursor-pointer transition-opacity duration-200 ${isHighlighted ? 'opacity-100' : 'opacity-80'}`}
@@ -308,10 +365,35 @@ function NodeRect({
         x={node.x}
         y={node.y}
         width={NODE_WIDTH}
-        height={Math.max(node.height, 2)}
+        height={nodeH}
         rx={3}
         fill={`url(#${gradientId})`}
       />
+      {/* Spent fill overlay (bottom-up) */}
+      {hasSpent && spentHeight > 0 && (
+        <rect
+          x={node.x}
+          y={node.y + nodeH - spentHeight}
+          width={NODE_WIDTH}
+          height={spentHeight}
+          rx={3}
+          fill={darken(node.color, 0.2)}
+          opacity={0.6}
+        />
+      )}
+      {/* Overspent red border */}
+      {node.overspent && (
+        <rect
+          x={node.x - 1.5}
+          y={node.y - 1.5}
+          width={NODE_WIDTH + 3}
+          height={nodeH + 3}
+          rx={4}
+          fill="none"
+          stroke="#ef4444"
+          strokeWidth={1.5}
+        />
+      )}
       {node.height > 12 && (
         <>
           <text
@@ -328,7 +410,7 @@ function NodeRect({
             textAnchor={textAnchor}
             className="fill-zinc-400 text-[9px]"
           >
-            {formatCurrency(node.value)}
+            {node.secondaryLabel ?? formatCurrency(node.value)}
           </text>
         </>
       )}
@@ -406,7 +488,7 @@ function EuroCoin({
   )
 }
 
-export function SankeyDiagram({ nodes, links, height = 350, onNodeClick }: SankeyDiagramProps) {
+export function SankeyDiagram({ nodes, links, height: fixedHeight, aspectRatio = 2.5, onNodeClick, showAnimatedCoins = true }: SankeyDiagramProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(800)
   const [hoveredNode, setHoveredNode] = useState<string | null>(null)
@@ -424,6 +506,9 @@ export function SankeyDiagram({ nodes, links, height = 350, onNodeClick }: Sanke
     setContainerWidth(el.clientWidth)
     return () => observer.disconnect()
   }, [])
+
+  // Derive height from width via aspect ratio, or use fixed height if provided
+  const height = fixedHeight ?? Math.round(containerWidth / aspectRatio)
 
   const { layoutNodes, layoutLinks } = useMemo(
     () => computeLayout(nodes, links, containerWidth, height),
@@ -575,18 +660,20 @@ export function SankeyDiagram({ nodes, links, height = 350, onNodeClick }: Sanke
         </g>
 
         {/* Animated euro coins — rolling through income → group → subcategory */}
-        <g>
-          {euroCoins.map((coin, i) => (
-            <EuroCoin
-              key={i}
-              pathData={coin.pathData}
-              delay={coin.delay}
-              duration={coin.duration}
-              size={coin.size}
-              color={coin.color}
-            />
-          ))}
-        </g>
+        {showAnimatedCoins && (
+          <g>
+            {euroCoins.map((coin, i) => (
+              <EuroCoin
+                key={i}
+                pathData={coin.pathData}
+                delay={coin.delay}
+                duration={coin.duration}
+                size={coin.size}
+                color={coin.color}
+              />
+            ))}
+          </g>
+        )}
       </svg>
 
       {/* Tooltip */}

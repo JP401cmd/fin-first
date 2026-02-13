@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, Plus, X, Pencil, Save,
-  List, GitFork, Fingerprint, PieChart,
+  List, GitFork, Fingerprint, PieChart, Workflow,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getDefaultBudgets, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
@@ -15,6 +15,7 @@ import { shouldAlert } from '@/components/app/budget-alert'
 import { BudgetTree } from '@/components/app/budget-tree'
 import { BudgetBlob } from '@/components/app/budget-blob'
 import { BudgetDonut } from '@/components/app/budget-donut'
+import { BudgetSankey } from '@/components/app/budget-sankey'
 
 function ProgressBar({ spent, limit, budgetType = 'expense' }: { spent: number; limit: number; budgetType?: BudgetType }) {
   const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0
@@ -41,9 +42,9 @@ export default function BudgetsPage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null)
   const [modalStep, setModalStep] = useState<'detail' | 'edit'>('detail')
-  const [viewMode, setViewMode] = useState<'list' | 'tree' | 'blob' | 'donut'>(() => {
+  const [viewMode, setViewMode] = useState<'list' | 'tree' | 'blob' | 'donut' | 'sankey'>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('budgets-view-mode') as 'list' | 'tree' | 'blob' | 'donut') || 'tree'
+      return (localStorage.getItem('budgets-view-mode') as 'list' | 'tree' | 'blob' | 'donut' | 'sankey') || 'tree'
     }
     return 'tree'
   })
@@ -233,7 +234,7 @@ export default function BudgetsPage() {
     setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))
   }
 
-  function toggleViewMode(mode: 'list' | 'tree' | 'blob' | 'donut') {
+  function toggleViewMode(mode: 'list' | 'tree' | 'blob' | 'donut' | 'sankey') {
     setViewMode(mode)
     localStorage.setItem('budgets-view-mode', mode)
   }
@@ -277,6 +278,7 @@ export default function BudgetsPage() {
   const incomeBudgets = budgets.filter((b) => b.budget_type === 'income')
   const expenseBudgets = budgets.filter((b) => b.budget_type === 'expense')
   const savingsBudgets = budgets.filter((b) => b.budget_type === 'savings')
+  const debtBudgets = budgets.filter((b) => b.budget_type === 'debt')
 
   const totalIncome = incomeBudgets.reduce((sum, b) => sum + getParentEffectiveLimit(b), 0)
   const totalIncomeActual = incomeBudgets.reduce((sum, b) => sum + getParentSpent(b), 0)
@@ -284,6 +286,8 @@ export default function BudgetsPage() {
   const totalExpenseSpent = expenseBudgets.reduce((sum, b) => sum + getParentSpent(b), 0)
   const totalSavingsBudget = savingsBudgets.reduce((sum, b) => sum + getParentEffectiveLimit(b), 0)
   const totalSavingsActual = savingsBudgets.reduce((sum, b) => sum + getParentSpent(b), 0)
+  const totalDebtBudget = debtBudgets.reduce((sum, b) => sum + getParentEffectiveLimit(b), 0)
+  const totalDebtActual = debtBudgets.reduce((sum, b) => sum + getParentSpent(b), 0)
 
   const monthLabel = monthDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
 
@@ -409,22 +413,27 @@ export default function BudgetsPage() {
           </button>
         </div>
 
-        {/* Totals split: Income / Expenses / Savings */}
-        <div className="grid grid-cols-3 gap-4 text-center">
+        {/* Totals split: Income / Expenses / Savings / Debt — budget limits as primary */}
+        <div className="grid grid-cols-2 gap-4 text-center sm:grid-cols-4">
           <div>
             <p className="text-xs font-medium text-emerald-600 uppercase">Inkomen</p>
-            <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalIncomeActual)}</p>
-            <p className="text-xs text-zinc-400">van {formatCurrency(totalIncome)}</p>
+            <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalIncome)}</p>
+            <p className="text-xs text-zinc-400">{formatCurrency(totalIncomeActual)} ontvangen</p>
           </div>
           <div>
             <p className="text-xs font-medium text-amber-600 uppercase">Uitgaven</p>
-            <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalExpenseSpent)}</p>
-            <p className="text-xs text-zinc-400">van {formatCurrency(totalExpenseBudget)}</p>
+            <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalExpenseBudget)}</p>
+            <p className="text-xs text-zinc-400">{formatCurrency(totalExpenseSpent)} besteed</p>
           </div>
           <div>
             <p className="text-xs font-medium text-blue-600 uppercase">Sparen</p>
-            <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalSavingsActual)}</p>
-            <p className="text-xs text-zinc-400">van {formatCurrency(totalSavingsBudget)}</p>
+            <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalSavingsBudget)}</p>
+            <p className="text-xs text-zinc-400">{formatCurrency(totalSavingsActual)} gespaard</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-red-600 uppercase">Schulden</p>
+            <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalDebtBudget)}</p>
+            <p className="text-xs text-zinc-400">{formatCurrency(totalDebtActual)} afgelost</p>
           </div>
         </div>
       </section>
@@ -476,6 +485,17 @@ export default function BudgetsPage() {
             <PieChart className="h-3.5 w-3.5" />
             Donut
           </button>
+          <button
+            onClick={() => toggleViewMode('sankey')}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              viewMode === 'sankey'
+                ? 'bg-zinc-900 text-white'
+                : 'text-zinc-500 hover:text-zinc-700'
+            }`}
+          >
+            <Workflow className="h-3.5 w-3.5" />
+            Stroom
+          </button>
         </div>
 
         <Link
@@ -492,7 +512,8 @@ export default function BudgetsPage() {
         <>
           {renderBudgetGroup('Inkomen', incomeBudgets, 'income', totalIncome, totalIncomeActual)}
           {renderBudgetGroup('Uitgaven', expenseBudgets, 'expense', totalExpenseBudget, totalExpenseSpent)}
-          {renderBudgetGroup('Sparen & Schulden', savingsBudgets, 'savings', totalSavingsBudget, totalSavingsActual)}
+          {renderBudgetGroup('Sparen', savingsBudgets, 'savings', totalSavingsBudget, totalSavingsActual)}
+          {renderBudgetGroup('Schulden', debtBudgets, 'debt', totalDebtBudget, totalDebtActual)}
         </>
       ) : viewMode === 'tree' ? (
         <>
@@ -520,7 +541,7 @@ export default function BudgetsPage() {
           )}
           {savingsBudgets.length > 0 && (
             <div className="mt-8">
-              <h3 className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">Sparen & Schulden</h3>
+              <h3 className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">Sparen</h3>
               <BudgetTree
                 groups={savingsBudgets}
                 spending={spending}
@@ -529,16 +550,37 @@ export default function BudgetsPage() {
               />
             </div>
           )}
+          {debtBudgets.length > 0 && (
+            <div className="mt-8">
+              <h3 className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">Schulden</h3>
+              <BudgetTree
+                groups={debtBudgets}
+                spending={spending}
+                budgetType="debt"
+                onNavigate={(id) => openBudgetModal(id)}
+              />
+            </div>
+          )}
         </>
       ) : viewMode === 'blob' ? (
         <BudgetBlob
-          groups={[...incomeBudgets, ...expenseBudgets, ...savingsBudgets]}
+          groups={[...incomeBudgets, ...expenseBudgets, ...savingsBudgets, ...debtBudgets]}
           spending={spending}
+          onNavigate={(id) => openBudgetModal(id)}
+        />
+      ) : viewMode === 'sankey' ? (
+        <BudgetSankey
+          groups={[...incomeBudgets, ...expenseBudgets, ...savingsBudgets, ...debtBudgets]}
+          spending={spending}
+          getEffectiveLimit={getEffectiveLimit}
+          getParentEffectiveLimit={getParentEffectiveLimit}
+          getSpent={getSpent}
+          getParentSpent={getParentSpent}
           onNavigate={(id) => openBudgetModal(id)}
         />
       ) : (
         <BudgetDonut
-          groups={[...incomeBudgets, ...expenseBudgets, ...savingsBudgets]}
+          groups={[...incomeBudgets, ...expenseBudgets, ...savingsBudgets, ...debtBudgets]}
           spending={spending}
           onNavigate={(id) => openBudgetModal(id)}
         />
@@ -1038,10 +1080,11 @@ function BudgetEditModal({
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-zinc-600">Type</label>
-              <select value={budgetType} onChange={(e) => setBudgetType(e.target.value as 'income' | 'savings' | 'expense')} className={inputCls}>
+              <select value={budgetType} onChange={(e) => setBudgetType(e.target.value as 'income' | 'savings' | 'expense' | 'debt')} className={inputCls}>
                 <option value="expense">Uitgave</option>
                 <option value="income">Inkomen</option>
                 <option value="savings">Sparen</option>
+                <option value="debt">Schuld</option>
               </select>
             </div>
             <div>

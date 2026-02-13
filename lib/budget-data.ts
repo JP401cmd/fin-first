@@ -14,7 +14,7 @@ export type Budget = {
   icon: string
   description: string | null
   default_limit: number
-  budget_type: 'income' | 'expense' | 'savings'
+  budget_type: 'income' | 'expense' | 'savings' | 'debt'
   interval: 'monthly' | 'quarterly' | 'yearly'
   rollover_type: 'reset' | 'carry-over' | 'invest-sweep'
   limit_type: 'soft' | 'hard'
@@ -64,6 +64,7 @@ export const BUDGET_SLUGS = {
   SPAREN_SCHULDEN: 'sparen-schulden',
   SPAREN_NOODBUFFER: 'sparen-noodbuffer',
   INVESTEREN_FIRE: 'investeren-fire',
+  SCHULDEN_AFLOSSINGEN_PARENT: 'schulden-aflossingen-parent',
   SCHULDEN_AFLOSSINGEN: 'schulden-aflossingen',
   EXTRA_AFLOSSING_HYPOTHEEK: 'extra-aflossing-hypotheek',
 } as const
@@ -86,7 +87,7 @@ type SeedBudget = {
   icon: string
   description: string
   default_limit: number
-  budget_type: 'income' | 'expense' | 'savings'
+  budget_type: 'income' | 'expense' | 'savings' | 'debt'
   is_essential: boolean
   priority_score: number
   sort_order: number
@@ -188,11 +189,11 @@ export function getDefaultBudgets(): SeedBudget[] {
       ],
     },
     {
-      name: 'Sparen, schulden & buffer',
+      name: 'Sparen & investeren',
       slug: S.SPAREN_SCHULDEN,
       icon: 'PiggyBank',
-      description: 'Vermogensopbouw en schulden',
-      default_limit: 260,
+      description: 'Vermogensopbouw en buffer',
+      default_limit: 180,
       budget_type: 'savings',
       is_essential: true,
       priority_score: 4,
@@ -200,6 +201,19 @@ export function getDefaultBudgets(): SeedBudget[] {
       children: [
         { name: 'Sparen & noodbuffer', slug: S.SPAREN_NOODBUFFER, icon: 'Vault', description: 'Noodfonds en spaargeld', default_limit: 100 },
         { name: 'Investeren / FIRE / pensioen', slug: S.INVESTEREN_FIRE, icon: 'TrendingUp', description: 'Beleggingen en pensioenopbouw', default_limit: 80 },
+      ],
+    },
+    {
+      name: 'Schulden & aflossingen',
+      slug: S.SCHULDEN_AFLOSSINGEN_PARENT,
+      icon: 'CreditCard',
+      description: 'Schulden aflossen en hypotheek',
+      default_limit: 80,
+      budget_type: 'debt',
+      is_essential: true,
+      priority_score: 4,
+      sort_order: 6,
+      children: [
         { name: 'Schulden & aflossingen', slug: S.SCHULDEN_AFLOSSINGEN, icon: 'CreditCard', description: 'Leningen en schulden aflossen', default_limit: 60 },
         { name: 'Extra aflossing hypotheek', slug: S.EXTRA_AFLOSSING_HYPOTHEEK, icon: 'HomeIcon', description: 'Vrijwillige extra hypotheekaflossing', default_limit: 20 },
       ],

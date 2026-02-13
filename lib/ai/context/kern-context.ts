@@ -84,5 +84,22 @@ export async function buildKernContext(supabase: SupabaseClient): Promise<string
     }
   }
 
+  // Debt summary
+  const debtParents = parents.filter((b) => b.budget_type === 'debt')
+  for (const debtParent of debtParents) {
+    const debtChildren = children.filter((c) => c.parent_id === debtParent.id)
+    const debtLines: string[] = []
+    for (const child of debtChildren) {
+      const spent = spendingByBudget[child.id] ?? 0
+      const limit = Number(child.default_limit)
+      const pct = limit > 0 ? Math.round((spent / limit) * 100) : 0
+      debtLines.push(`${child.name}: ${formatCurrency(spent)} afgelost van ${formatCurrency(limit)} doel (${pct}%)`)
+    }
+    if (debtLines.length > 0) {
+      budgetLines.push('')
+      budgetLines.push(...debtLines)
+    }
+  }
+
   return section('BUDGETTEN DEZE MAAND', budgetLines.join('\n'))
 }

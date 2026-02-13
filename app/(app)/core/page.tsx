@@ -134,7 +134,7 @@ export default function CorePage() {
 
       // Fetch budget alert data
       const [budgetResult, spendingResult, snapshotResult] = await Promise.all([
-        supabase.from('budgets').select('*').neq('budget_type', 'income'),
+        supabase.from('budgets').select('*'),
         supabase.from('transactions').select('budget_id, amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('net_worth_snapshots').select('*').order('snapshot_date', { ascending: true }).limit(24),
       ])
@@ -158,7 +158,10 @@ export default function CorePage() {
               : Number(b.default_limit)
             return { budget: b as Budget, spent, limit }
           })
-          .filter(({ spent, limit, budget }) => shouldAlert(spent, limit, Number(budget.alert_threshold)))
+          .filter(({ spent, limit, budget }) => {
+            const bt = (budget.budget_type ?? 'expense') as 'income' | 'expense' | 'savings' | 'debt'
+            return shouldAlert(spent, limit, Number(budget.alert_threshold), bt)
+          })
           .slice(0, 5)
         setAlertBudgets(triggered)
       }
@@ -363,6 +366,7 @@ export default function CorePage() {
                 spent={spent}
                 limit={limit}
                 threshold={Number(budget.alert_threshold)}
+                budgetType={(budget.budget_type ?? 'expense') as 'income' | 'expense' | 'savings' | 'debt'}
                 onNavigate={(id) => router.push(`/core/budgets?budget=${id}`)}
               />
             ))}

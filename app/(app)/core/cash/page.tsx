@@ -260,9 +260,14 @@ export default function CashPage() {
   const sankeyData = useMemo(() => {
     if (transactions.length === 0 || budgetGroups.length === 0) return null
 
-    const incomeColors = ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0']
-    const expenseColors = ['#f59e0b', '#fbbf24', '#fcd34d', '#fde68a']
-    const savingsColors = ['#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe']
+    // Metallic greens for income
+    const incomeColors = ['#4a8c6f', '#5a9e7a', '#6aae88', '#7dbd98']
+    // Amber/gold (De Kern) for expenses
+    const expenseColors = ['#D4A843', '#ddb85a', '#e6c872', '#efd88a']
+    // Purple (De Horizon) for savings
+    const savingsColors = ['#8B5CB8', '#9e74c6', '#b18cd4', '#c4a4e2']
+    // Red for debt
+    const debtColors = ['#ef4444', '#f87171', '#fca5a5', '#fecaca']
 
     // Sum transactions per budget_id
     const spendingByBudget: Record<string, number> = {}
@@ -287,6 +292,7 @@ export default function CashPage() {
     const incomeGroups = budgetGroups.filter((g) => g.parent.budget_type === 'income')
     const expenseGroups = budgetGroups.filter((g) => g.parent.budget_type === 'expense')
     const savingsGroups = budgetGroups.filter((g) => g.parent.budget_type === 'savings')
+    const debtGroups = budgetGroups.filter((g) => g.parent.budget_type === 'debt')
 
     // Income source nodes (col 0)
     let incomeIdx = 0
@@ -330,8 +336,8 @@ export default function CashPage() {
       })
     }
 
-    // Column 1: expense/savings parent groups
-    for (const group of [...expenseGroups, ...savingsGroups]) {
+    // Column 1: expense/savings/debt parent groups
+    for (const group of [...expenseGroups, ...savingsGroups, ...debtGroups]) {
       const childValues = group.children.reduce(
         (sum, c) => sum + (spendingByBudget[c.id] ?? 0), 0
       )
@@ -339,9 +345,9 @@ export default function CashPage() {
       const total = childValues + parentDirect
       if (total <= 0) continue
 
-      const isSavings = group.parent.budget_type === 'savings'
-      const colorSet = isSavings ? savingsColors : expenseColors
-      const colIdx = isSavings ? savingsGroups.indexOf(group) : expenseGroups.indexOf(group)
+      const budgetType = group.parent.budget_type
+      const colorSet = budgetType === 'savings' ? savingsColors : budgetType === 'debt' ? debtColors : expenseColors
+      const colIdx = budgetType === 'savings' ? savingsGroups.indexOf(group) : budgetType === 'debt' ? debtGroups.indexOf(group) : expenseGroups.indexOf(group)
 
       nodes.push({
         id: `grp-${group.parent.id}`,
@@ -364,9 +370,9 @@ export default function CashPage() {
 
     // Column 2: subcategories
     let expIdx = 0
-    for (const group of [...expenseGroups, ...savingsGroups]) {
-      const isSavings = group.parent.budget_type === 'savings'
-      const colorSet = isSavings ? savingsColors : expenseColors
+    for (const group of [...expenseGroups, ...savingsGroups, ...debtGroups]) {
+      const budgetType = group.parent.budget_type
+      const colorSet = budgetType === 'savings' ? savingsColors : budgetType === 'debt' ? debtColors : expenseColors
 
       for (const child of group.children) {
         const value = spendingByBudget[child.id] ?? 0
@@ -409,7 +415,7 @@ export default function CashPage() {
     }
 
     // Links: groups → subcategories
-    for (const group of [...expenseGroups, ...savingsGroups]) {
+    for (const group of [...expenseGroups, ...savingsGroups, ...debtGroups]) {
       const grpNodeId = `grp-${group.parent.id}`
       const grpNode = nodes.find((n) => n.id === grpNodeId)
       if (!grpNode) continue
@@ -419,12 +425,13 @@ export default function CashPage() {
         const subNode = nodes.find((n) => n.id === subNodeId)
         if (!subNode) continue
 
-        const isSavings = group.parent.budget_type === 'savings'
+        const budgetType = group.parent.budget_type
+        const linkColor = budgetType === 'savings' ? savingsColors[0] : budgetType === 'debt' ? debtColors[0] : expenseColors[0]
         links.push({
           source: grpNodeId,
           target: subNodeId,
           value: subNode.value,
-          color: isSavings ? savingsColors[0] : expenseColors[0],
+          color: linkColor,
         })
       }
     }
@@ -774,11 +781,10 @@ export default function CashPage() {
           </button>
 
           {showSankey && (
-            <div className="relative mt-2 overflow-hidden rounded-xl border border-zinc-200 bg-white px-2 py-4">
+            <div className="relative mt-2 overflow-hidden rounded-xl border border-zinc-200 bg-white">
               <SankeyDiagram
                 nodes={sankeyData.nodes}
                 links={sankeyData.links}
-                height={380}
                 onNodeClick={handleSankeyNodeClick}
               />
             </div>

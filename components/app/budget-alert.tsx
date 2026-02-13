@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { AlertTriangle, X } from 'lucide-react'
-import { formatCurrency } from '@/components/app/budget-shared'
+import { AlertTriangle, TrendingDown, Info, X } from 'lucide-react'
+import { formatCurrency, type BudgetType } from '@/components/app/budget-shared'
 
 type BudgetAlertProps = {
   budgetName: string
@@ -10,6 +10,7 @@ type BudgetAlertProps = {
   spent: number
   limit: number
   threshold: number // 0-100
+  budgetType?: BudgetType
   onNavigate?: (budgetId: string) => void
 }
 
@@ -19,30 +20,50 @@ export function BudgetAlert({
   spent,
   limit,
   threshold,
+  budgetType = 'expense',
   onNavigate,
 }: BudgetAlertProps) {
   const [dismissed, setDismissed] = useState(false)
   if (dismissed) return null
 
+  // Income: no alerts
+  if (budgetType === 'income') return null
+
   const pct = limit > 0 ? (spent / limit) * 100 : 0
 
-  // Determine alert level
-  let level: 'warning' | 'danger' | 'critical'
+  let level: 'warning' | 'danger' | 'critical' | 'info'
   let message: string
   let colorClasses: string
+  let IconComponent: typeof AlertTriangle
 
-  if (pct >= 120) {
-    level = 'critical'
-    message = `Flink over budget — ${Math.round(pct)}% besteed`
-    colorClasses = 'border-red-300 bg-red-50 text-red-800'
-  } else if (pct >= 100) {
-    level = 'danger'
-    message = `Budget overschreden — ${Math.round(pct)}% besteed`
+  if (budgetType === 'savings') {
+    // Savings: alert when UNDER target (too little saved)
+    level = 'info'
+    message = `Je spaart minder dan gepland — ${Math.round(pct)}% van je doel bereikt`
+    colorClasses = 'border-blue-200 bg-blue-50 text-blue-800'
+    IconComponent = TrendingDown
+  } else if (budgetType === 'debt') {
+    // Debt: alert when UNDER target (too little repaid)
+    level = 'info'
+    message = `Aflossing loopt achter — ${Math.round(pct)}% van je maandelijkse doel`
     colorClasses = 'border-red-200 bg-red-50 text-red-700'
+    IconComponent = Info
   } else {
-    level = 'warning'
-    message = `Je nadert je limiet — ${Math.round(pct)}% besteed`
-    colorClasses = 'border-amber-200 bg-amber-50 text-amber-800'
+    // Expense: alert when OVER threshold (spending too much)
+    IconComponent = AlertTriangle
+    if (pct >= 120) {
+      level = 'critical'
+      message = `Flink over budget — ${Math.round(pct)}% besteed`
+      colorClasses = 'border-red-300 bg-red-50 text-red-800'
+    } else if (pct >= 100) {
+      level = 'danger'
+      message = `Budget overschreden — ${Math.round(pct)}% besteed`
+      colorClasses = 'border-red-200 bg-red-50 text-red-700'
+    } else {
+      level = 'warning'
+      message = `Je nadert je limiet — ${Math.round(pct)}% besteed`
+      colorClasses = 'border-amber-200 bg-amber-50 text-amber-800'
+    }
   }
 
   return (
@@ -51,7 +72,8 @@ export function BudgetAlert({
         level === 'critical' ? 'animate-pulse' : ''
       }`}
     >
-      <AlertTriangle className={`h-4 w-4 shrink-0 ${
+      <IconComponent className={`h-4 w-4 shrink-0 ${
+        budgetType === 'savings' ? 'text-blue-500' :
         level === 'warning' ? 'text-amber-500' : 'text-red-500'
       }`} />
       <div
@@ -75,8 +97,21 @@ export function BudgetAlert({
 
 /**
  * Check if a budget should trigger an alert.
+ * For expenses: alert when spent >= threshold% of limit (spending too much)
+ * For savings/debt: alert when spent < threshold% of limit (too little saved/repaid)
+ * For income: never alert
  */
-export function shouldAlert(spent: number, limit: number, threshold: number): boolean {
+export function shouldAlert(spent: number, limit: number, threshold: number, budgetType: BudgetType = 'expense'): boolean {
   if (limit <= 0 || threshold <= 0) return false
-  return (spent / limit) * 100 >= threshold
+  if (budgetType === 'income') return false
+
+  const pct = (spent / limit) * 100
+
+  if (budgetType === 'savings' || budgetType === 'debt') {
+    // Alert when under target
+    return pct < threshold
+  }
+
+  // Expense: alert when over threshold
+  return pct >= threshold
 }

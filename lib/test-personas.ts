@@ -110,7 +110,7 @@ export interface PersonaBudget {
   icon: string
   description: string
   default_limit: number
-  budget_type: 'income' | 'expense' | 'savings'
+  budget_type: 'income' | 'expense' | 'savings' | 'debt'
   is_essential: boolean
   priority_score: number
   sort_order: number
@@ -257,11 +257,17 @@ function makeBudgets(overrides: Record<string, number>): PersonaBudget[] {
       ],
     },
     {
-      name: 'Sparen, schulden & buffer', slug: S.SPAREN_SCHULDEN, icon: 'PiggyBank', description: 'Vermogensopbouw en schulden',
-      default_limit: overrides[S.SPAREN_SCHULDEN] ?? 260, budget_type: 'savings', is_essential: true, priority_score: 4, sort_order: 5,
+      name: 'Sparen & investeren', slug: S.SPAREN_SCHULDEN, icon: 'PiggyBank', description: 'Vermogensopbouw en buffer',
+      default_limit: overrides[S.SPAREN_SCHULDEN] ?? 180, budget_type: 'savings', is_essential: true, priority_score: 4, sort_order: 5,
       children: [
         { name: 'Sparen & noodbuffer', slug: S.SPAREN_NOODBUFFER, icon: 'Vault', description: 'Noodfonds en spaargeld', default_limit: overrides[S.SPAREN_NOODBUFFER] ?? 100 },
         { name: 'Investeren / FIRE / pensioen', slug: S.INVESTEREN_FIRE, icon: 'TrendingUp', description: 'Beleggingen en pensioenopbouw', default_limit: overrides[S.INVESTEREN_FIRE] ?? 80 },
+      ],
+    },
+    {
+      name: 'Schulden & aflossingen', slug: S.SCHULDEN_AFLOSSINGEN_PARENT, icon: 'CreditCard', description: 'Schulden aflossen en hypotheek',
+      default_limit: overrides[S.SCHULDEN_AFLOSSINGEN_PARENT] ?? 60, budget_type: 'debt', is_essential: true, priority_score: 4, sort_order: 6,
+      children: [
         { name: 'Schulden & aflossingen', slug: S.SCHULDEN_AFLOSSINGEN, icon: 'CreditCard', description: 'Leningen en schulden aflossen', default_limit: overrides[S.SCHULDEN_AFLOSSINGEN] ?? 60 },
         { name: 'Extra aflossing hypotheek', slug: S.EXTRA_AFLOSSING_HYPOTHEEK, icon: 'HomeIcon', description: 'Vrijwillige extra hypotheekaflossing', default_limit: overrides[S.EXTRA_AFLOSSING_HYPOTHEEK] ?? 0 },
       ],
@@ -424,8 +430,8 @@ const roosData: PersonaData = {
     [S.AUTO_ONDERHOUD]: 50, [S.FIETS_DEELVERVOER]: 20,
     [S.LEUKE_DINGEN]: 555, [S.UIT_ETEN_HORECA]: 195, [S.VRIJE_TIJD_SPORT]: 100,
     [S.VAKANTIE]: 150, [S.KLEDING_OVERIGE]: 110,
-    [S.SPAREN_SCHULDEN]: 325, [S.SPAREN_NOODBUFFER]: 0, [S.INVESTEREN_FIRE]: 0,
-    [S.SCHULDEN_AFLOSSINGEN]: 325, [S.EXTRA_AFLOSSING_HYPOTHEEK]: 0,
+    [S.SPAREN_SCHULDEN]: 0, [S.SPAREN_NOODBUFFER]: 0, [S.INVESTEREN_FIRE]: 0,
+    [S.SCHULDEN_AFLOSSINGEN_PARENT]: 325, [S.SCHULDEN_AFLOSSINGEN]: 325, [S.EXTRA_AFLOSSING_HYPOTHEEK]: 0,
   }),
   transactions: rooseTransactions,
   goals: [
@@ -570,8 +576,8 @@ const daanData: PersonaData = {
     [S.AUTO_ONDERHOUD]: 0, [S.FIETS_DEELVERVOER]: 20,
     [S.LEUKE_DINGEN]: 200, [S.UIT_ETEN_HORECA]: 60, [S.VRIJE_TIJD_SPORT]: 50,
     [S.VAKANTIE]: 60, [S.KLEDING_OVERIGE]: 30,
-    [S.SPAREN_SCHULDEN]: 800, [S.SPAREN_NOODBUFFER]: 500, [S.INVESTEREN_FIRE]: 200,
-    [S.SCHULDEN_AFLOSSINGEN]: 100, [S.EXTRA_AFLOSSING_HYPOTHEEK]: 0,
+    [S.SPAREN_SCHULDEN]: 700, [S.SPAREN_NOODBUFFER]: 500, [S.INVESTEREN_FIRE]: 200,
+    [S.SCHULDEN_AFLOSSINGEN_PARENT]: 100, [S.SCHULDEN_AFLOSSINGEN]: 100, [S.EXTRA_AFLOSSING_HYPOTHEEK]: 0,
   }),
   transactions: daanTransactions,
   goals: [
@@ -711,8 +717,8 @@ const lisaData: PersonaData = {
     [S.AUTO_ONDERHOUD]: 50, [S.FIETS_DEELVERVOER]: 20,
     [S.LEUKE_DINGEN]: 300, [S.UIT_ETEN_HORECA]: 80, [S.VRIJE_TIJD_SPORT]: 55,
     [S.VAKANTIE]: 120, [S.KLEDING_OVERIGE]: 45,
-    [S.SPAREN_SCHULDEN]: 650, [S.SPAREN_NOODBUFFER]: 200, [S.INVESTEREN_FIRE]: 400,
-    [S.SCHULDEN_AFLOSSINGEN]: 0, [S.EXTRA_AFLOSSING_HYPOTHEEK]: 50,
+    [S.SPAREN_SCHULDEN]: 600, [S.SPAREN_NOODBUFFER]: 200, [S.INVESTEREN_FIRE]: 400,
+    [S.SCHULDEN_AFLOSSINGEN_PARENT]: 50, [S.SCHULDEN_AFLOSSINGEN]: 0, [S.EXTRA_AFLOSSING_HYPOTHEEK]: 50,
   }),
   transactions: lisaTransactions,
   goals: [
@@ -860,7 +866,7 @@ const willemData: PersonaData = {
     [S.LEUKE_DINGEN]: 400, [S.UIT_ETEN_HORECA]: 120, [S.VRIJE_TIJD_SPORT]: 80,
     [S.VAKANTIE]: 150, [S.KLEDING_OVERIGE]: 50,
     [S.SPAREN_SCHULDEN]: 3000, [S.SPAREN_NOODBUFFER]: 500, [S.INVESTEREN_FIRE]: 2500,
-    [S.SCHULDEN_AFLOSSINGEN]: 0, [S.EXTRA_AFLOSSING_HYPOTHEEK]: 0,
+    [S.SCHULDEN_AFLOSSINGEN_PARENT]: 0, [S.SCHULDEN_AFLOSSINGEN]: 0, [S.EXTRA_AFLOSSING_HYPOTHEEK]: 0,
   }),
   transactions: willemTransactions,
   goals: [

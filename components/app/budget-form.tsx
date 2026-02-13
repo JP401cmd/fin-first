@@ -340,6 +340,7 @@ export function BudgetForm({
               <option value="expense">Uitgave</option>
               <option value="income">Inkomen</option>
               <option value="savings">Sparen</option>
+              <option value="debt">Schuld</option>
             </select>
           </div>
 
