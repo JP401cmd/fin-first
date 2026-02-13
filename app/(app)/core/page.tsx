@@ -12,7 +12,7 @@ import type { Budget } from '@/lib/budget-data'
 import type { NetWorthSnapshot } from '@/lib/net-worth-data'
 import {
   Calendar, TrendingUp, Sun, Star, Wallet, ShoppingCart,
-  PiggyBank, Building2, ArrowRight, Info, Camera,
+  PiggyBank, Building2, ArrowRight, Info, Camera, Download,
 } from 'lucide-react'
 
 export default function CorePage() {
@@ -459,15 +459,30 @@ export default function CorePage() {
         </section>
       )}
 
+      {/* === Snapshot Comparison === */}
+      {snapshots.length >= 2 && (
+        <SnapshotComparison snapshots={snapshots} />
+      )}
+
       {/* === Financiële Kerngetallen === */}
       <section className="mt-10">
-        <div className="mb-5">
-          <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-            Financiële Kerngetallen
-          </h2>
-          <p className="mt-1 text-sm text-zinc-500">
-            Gebaseerd op je werkelijke transacties en budgetinstellingen.
-          </p>
+        <div className="mb-5 flex items-end justify-between">
+          <div>
+            <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+              Financiële Kerngetallen
+            </h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              Gebaseerd op je werkelijke transacties en budgetinstellingen.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <ExportButton type="transactions" label="Transacties" />
+            <ExportButton type="budgets" label="Budgetten" />
+            <ExportButton type="net_worth" label="Vermogen" />
+            <ExportButton type="assets" label="Assets" />
+            <ExportButton type="debts" label="Schulden" />
+            <ExportButton type="goals" label="Doelen" />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -549,6 +564,86 @@ function QuickLink({
       </div>
       <ArrowRight className="h-4 w-4 shrink-0 text-zinc-300 group-hover:text-amber-500" />
     </Link>
+  )
+}
+
+function ExportButton({ type, label }: { type: string; label: string }) {
+  return (
+    <a
+      href={`/api/export?type=${type}`}
+      download
+      className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs font-medium text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700"
+    >
+      <Download className="h-3 w-3" />
+      {label}
+    </a>
+  )
+}
+
+function SnapshotComparison({ snapshots }: { snapshots: NetWorthSnapshot[] }) {
+  if (snapshots.length < 2) return null
+
+  const latest = snapshots[snapshots.length - 1]
+  const previous = snapshots[snapshots.length - 2]
+
+  const netDelta = Number(latest.net_worth) - Number(previous.net_worth)
+  const assetDelta = Number(latest.total_assets) - Number(previous.total_assets)
+  const debtDelta = Number(latest.total_debts) - Number(previous.total_debts)
+
+  const latestDate = new Date(latest.snapshot_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
+  const previousDate = new Date(previous.snapshot_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
+
+  function DeltaValue({ value, invert }: { value: number; invert?: boolean }) {
+    const isPositive = invert ? value < 0 : value > 0
+    const color = value === 0 ? 'text-zinc-500' : isPositive ? 'text-emerald-600' : 'text-red-500'
+    const prefix = value > 0 ? '+' : ''
+    return (
+      <span className={`text-lg font-bold ${color}`}>
+        {prefix}{formatCurrency(value)}
+      </span>
+    )
+  }
+
+  return (
+    <section className="mt-8">
+      <div className="mb-4">
+        <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          Vergelijking snapshots
+        </h2>
+        <p className="mt-1 text-xs text-zinc-500">
+          {previousDate} vs {latestDate}
+        </p>
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+          <p className="text-sm font-medium text-zinc-500">Netto vermogen</p>
+          <DeltaValue value={netDelta} />
+          <div className="mt-1 flex gap-3 text-xs text-zinc-400">
+            <span>{formatCurrency(Number(previous.net_worth))}</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+            <span className="font-medium text-zinc-600">{formatCurrency(Number(latest.net_worth))}</span>
+          </div>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+          <p className="text-sm font-medium text-zinc-500">Assets</p>
+          <DeltaValue value={assetDelta} />
+          <div className="mt-1 flex gap-3 text-xs text-zinc-400">
+            <span>{formatCurrency(Number(previous.total_assets))}</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+            <span className="font-medium text-zinc-600">{formatCurrency(Number(latest.total_assets))}</span>
+          </div>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+          <p className="text-sm font-medium text-zinc-500">Schulden</p>
+          <DeltaValue value={debtDelta} invert />
+          <div className="mt-1 flex gap-3 text-xs text-zinc-400">
+            <span>{formatCurrency(Number(previous.total_debts))}</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+            <span className="font-medium text-zinc-600">{formatCurrency(Number(latest.total_debts))}</span>
+          </div>
+        </div>
+      </div>
+    </section>
   )
 }
 

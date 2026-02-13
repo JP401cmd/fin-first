@@ -13,7 +13,7 @@ import { parseCSV, getCSVHeaders, getCSVPreview } from '@/lib/parsers/csv'
 import { parseOFX } from '@/lib/parsers/ofx'
 import { detectFormat, CSV_PRESETS, type CSVPreset } from '@/lib/parsers/index'
 import type { ParsedTransaction } from '@/lib/parsers/shared'
-import { categorizeTransaction } from '@/lib/parsers/categorize'
+import { categorizeTransaction, type CategoryCorrection } from '@/lib/parsers/categorize'
 import type { Budget } from '@/lib/budget-data'
 
 type Account = {
@@ -59,14 +59,16 @@ export default function ImportPage() {
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
   const [csvPreview, setCsvPreview] = useState<string[][]>([])
   const [showColumnMapping, setShowColumnMapping] = useState(false)
+  const [corrections, setCorrections] = useState<CategoryCorrection[]>([])
 
   useEffect(() => {
     async function init() {
       const supabase = createClient()
 
-      const [accountsRes, budgetsRes] = await Promise.all([
+      const [accountsRes, budgetsRes, correctionsRes] = await Promise.all([
         supabase.from('bank_accounts').select('id, name, iban').eq('is_active', true).order('sort_order'),
         supabase.from('budgets').select('*').order('sort_order'),
+        supabase.from('category_corrections').select('match_field, match_value, budget_id'),
       ])
 
       if (accountsRes.data) {
@@ -85,6 +87,10 @@ export default function ImportPage() {
           parent: p,
           children: children.filter((c) => c.parent_id === p.id),
         })))
+      }
+
+      if (correctionsRes.data) {
+        setCorrections(correctionsRes.data as CategoryCorrection[])
       }
 
       setLoading(false)
@@ -147,7 +153,7 @@ export default function ImportPage() {
 
       // Auto-categorize
       const importRows: ImportRow[] = parsed.map((tx) => {
-        const cat = categorizeTransaction(tx.description, tx.counterparty_name, tx.amount, budgets)
+        const cat = categorizeTransaction(tx.description, tx.counterparty_name, tx.amount, budgets, corrections)
         return {
           ...tx,
           budget_id: cat.budget_id,
@@ -183,7 +189,7 @@ export default function ImportPage() {
       }
 
       const importRows: ImportRow[] = parsed.map((tx) => {
-        const cat = categorizeTransaction(tx.description, tx.counterparty_name, tx.amount, budgets)
+        const cat = categorizeTransaction(tx.description, tx.counterparty_name, tx.amount, budgets, corrections)
         return {
           ...tx,
           budget_id: cat.budget_id,
@@ -226,6 +232,7 @@ export default function ImportPage() {
   }
 
   function updateRowBudget(index: number, budgetId: string) {
+    const row = rows[index]
     setRows((prev) => prev.map((r, i) => {
       if (i !== index) return r
       const budget = budgets.find((b) => b.id === budgetId)
@@ -236,6 +243,31 @@ export default function ImportPage() {
         confidence: budgetId ? 1.0 : 0,
       }
     }))
+
+    // Save correction for future imports (fire-and-forget)
+    if (budgetId && row) {
+      const matchField = row.counterparty_name ? 'counterparty_name' : 'description'
+      const matchValue = row.counterparty_name || row.description
+      if (matchValue) {
+        void (async () => {
+          const supabase = createClient()
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) return
+          // Delete existing correction for this field+value, then insert new one
+          await supabase.from('category_corrections')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('match_field', matchField)
+            .ilike('match_value', matchValue)
+          await supabase.from('category_corrections')
+            .insert({ user_id: user.id, match_field: matchField, match_value: matchValue, budget_id: budgetId })
+          setCorrections(prev => {
+            const filtered = prev.filter(c => !(c.match_field === matchField && c.match_value.toLowerCase() === matchValue.toLowerCase()))
+            return [...filtered, { match_field: matchField as 'counterparty_name' | 'description', match_value: matchValue, budget_id: budgetId }]
+          })
+        })()
+      }
+    }
   }
 
   function toggleSkip(index: number) {
@@ -451,55 +483,107 @@ export default function ImportPage() {
               </div>
 
               {csvPreset.id === 'custom' && csvHeaders.length > 0 && (
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Datum kolom</label>
-                    <select
-                      value={csvPreset.dateColumn}
-                      onChange={(e) => setCsvPreset(prev => ({ ...prev, dateColumn: parseInt(e.target.value) }))}
-                      className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-amber-500"
-                    >
-                      {csvHeaders.map((h, i) => (
-                        <option key={i} value={i}>{h || `Kolom ${i + 1}`}</option>
-                      ))}
-                    </select>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-zinc-600">Datum kolom</label>
+                      <select
+                        value={csvPreset.dateColumn}
+                        onChange={(e) => setCsvPreset(prev => ({ ...prev, dateColumn: parseInt(e.target.value) }))}
+                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-amber-500"
+                      >
+                        {csvHeaders.map((h, i) => (
+                          <option key={i} value={i}>{h || `Kolom ${i + 1}`}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-zinc-600">Bedrag kolom</label>
+                      <select
+                        value={csvPreset.amountColumn}
+                        onChange={(e) => setCsvPreset(prev => ({ ...prev, amountColumn: parseInt(e.target.value) }))}
+                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-amber-500"
+                      >
+                        {csvHeaders.map((h, i) => (
+                          <option key={i} value={i}>{h || `Kolom ${i + 1}`}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-zinc-600">Beschrijving kolom</label>
+                      <select
+                        value={csvPreset.descriptionColumn}
+                        onChange={(e) => setCsvPreset(prev => ({ ...prev, descriptionColumn: parseInt(e.target.value) }))}
+                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-amber-500"
+                      >
+                        {csvHeaders.map((h, i) => (
+                          <option key={i} value={i}>{h || `Kolom ${i + 1}`}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-zinc-600">Datum formaat</label>
+                      <select
+                        value={csvPreset.dateFormat}
+                        onChange={(e) => setCsvPreset(prev => ({ ...prev, dateFormat: e.target.value }))}
+                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-amber-500"
+                      >
+                        <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                        <option value="YYYYMMDD">YYYYMMDD</option>
+                        <option value="DD-MM-YYYY">DD-MM-YYYY</option>
+                        <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Bedrag kolom</label>
-                    <select
-                      value={csvPreset.amountColumn}
-                      onChange={(e) => setCsvPreset(prev => ({ ...prev, amountColumn: parseInt(e.target.value) }))}
-                      className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-amber-500"
-                    >
-                      {csvHeaders.map((h, i) => (
-                        <option key={i} value={i}>{h || `Kolom ${i + 1}`}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Beschrijving kolom</label>
-                    <select
-                      value={csvPreset.descriptionColumn}
-                      onChange={(e) => setCsvPreset(prev => ({ ...prev, descriptionColumn: parseInt(e.target.value) }))}
-                      className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-amber-500"
-                    >
-                      {csvHeaders.map((h, i) => (
-                        <option key={i} value={i}>{h || `Kolom ${i + 1}`}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Datum formaat</label>
-                    <select
-                      value={csvPreset.dateFormat}
-                      onChange={(e) => setCsvPreset(prev => ({ ...prev, dateFormat: e.target.value }))}
-                      className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-amber-500"
-                    >
-                      <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                      <option value="YYYYMMDD">YYYYMMDD</option>
-                      <option value="DD-MM-YYYY">DD-MM-YYYY</option>
-                      <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                    </select>
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-zinc-600">Tegenpartij kolom</label>
+                      <select
+                        value={csvPreset.counterpartyColumn ?? -1}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value)
+                          setCsvPreset(prev => ({ ...prev, counterpartyColumn: v === -1 ? null : v }))
+                        }}
+                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-amber-500"
+                      >
+                        <option value={-1}>-- Niet beschikbaar --</option>
+                        {csvHeaders.map((h, i) => (
+                          <option key={i} value={i}>{h || `Kolom ${i + 1}`}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-zinc-600">IBAN kolom</label>
+                      <select
+                        value={csvPreset.ibanColumn ?? -1}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value)
+                          setCsvPreset(prev => ({ ...prev, ibanColumn: v === -1 ? null : v }))
+                        }}
+                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-amber-500"
+                      >
+                        <option value={-1}>-- Niet beschikbaar --</option>
+                        {csvHeaders.map((h, i) => (
+                          <option key={i} value={i}>{h || `Kolom ${i + 1}`}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-zinc-600">Referentie kolom</label>
+                      <select
+                        value={csvPreset.referenceColumn ?? -1}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value)
+                          setCsvPreset(prev => ({ ...prev, referenceColumn: v === -1 ? null : v }))
+                        }}
+                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-amber-500"
+                      >
+                        <option value={-1}>-- Niet beschikbaar --</option>
+                        {csvHeaders.map((h, i) => (
+                          <option key={i} value={i}>{h || `Kolom ${i + 1}`}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
               )}
@@ -515,9 +599,12 @@ export default function ImportPage() {
                           {csvHeaders.map((h, i) => (
                             <th key={i} className="px-3 py-1.5 text-left font-medium text-zinc-500">
                               {h || `Kolom ${i + 1}`}
-                              {i === csvPreset.dateColumn && <span className="ml-1 text-amber-500">📅</span>}
-                              {i === csvPreset.amountColumn && <span className="ml-1 text-amber-500">💰</span>}
-                              {i === csvPreset.descriptionColumn && <span className="ml-1 text-amber-500">📝</span>}
+                              {i === csvPreset.dateColumn && <span className="ml-1 text-amber-500">[D]</span>}
+                              {i === csvPreset.amountColumn && <span className="ml-1 text-amber-500">[B]</span>}
+                              {i === csvPreset.descriptionColumn && <span className="ml-1 text-amber-500">[O]</span>}
+                              {i === csvPreset.counterpartyColumn && <span className="ml-1 text-teal-500">[T]</span>}
+                              {i === csvPreset.ibanColumn && <span className="ml-1 text-teal-500">[I]</span>}
+                              {i === csvPreset.referenceColumn && <span className="ml-1 text-teal-500">[R]</span>}
                             </th>
                           ))}
                         </tr>
@@ -529,7 +616,9 @@ export default function ImportPage() {
                               <td key={ci} className={`max-w-[150px] truncate px-3 py-1.5 ${
                                 ci === csvPreset.dateColumn || ci === csvPreset.amountColumn || ci === csvPreset.descriptionColumn
                                   ? 'bg-amber-50/50 font-medium text-zinc-900'
-                                  : 'text-zinc-600'
+                                  : ci === csvPreset.counterpartyColumn || ci === csvPreset.ibanColumn || ci === csvPreset.referenceColumn
+                                    ? 'bg-teal-50/50 font-medium text-zinc-900'
+                                    : 'text-zinc-600'
                               }`}>
                                 {cell}
                               </td>

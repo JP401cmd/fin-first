@@ -2,14 +2,22 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { computeCoreData } from '@/lib/mock-data'
 import { section, formatCurrency, formatFreedomTime, formatPercentage } from './formatter'
 
+const TEMPORAL_LABELS: Record<number, string> = {
+  1: 'De Levensgenieter (level 1) — Comfort > Snelheid',
+  2: 'De Reiziger (level 2) — Spaart wat overblijft, ervaringen eerst',
+  3: 'De Architect (level 3) — Optimaliseert bewust, gulden middenweg',
+  4: 'De Stoïcijn (level 4) — Snelheid > Comfort, streng en doelgericht',
+  5: 'De Essentialist (level 5) — Minimalistisch voor maximale snelheid',
+}
+
 /**
  * Shared context available to all domains:
  * profile overview, net worth, freedom calculation.
  * Uses real Supabase data.
  */
 export async function buildSharedContext(supabase: SupabaseClient): Promise<string> {
-  // Fetch assets and debts from Supabase
-  const [assetsResult, debtsResult, transactionsResult] = await Promise.all([
+  // Fetch assets, debts, transactions, and user profile
+  const [assetsResult, debtsResult, transactionsResult, profileResult] = await Promise.all([
     supabase
       .from('assets')
       .select('current_value')
@@ -23,11 +31,20 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
       .select('amount, is_income, date')
       .gte('date', getMonthsAgoDate(3))
       .order('date', { ascending: false }),
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return { data: null }
+      return supabase
+        .from('profiles')
+        .select('full_name, temporal_balance, household_type, date_of_birth')
+        .eq('id', user.id)
+        .single()
+    }),
   ])
 
   const assets = assetsResult.data ?? []
   const debts = debtsResult.data ?? []
   const transactions = transactionsResult.data ?? []
+  const profile = profileResult.data
 
   const totalAssets = assets.reduce((s, a) => s + Number(a.current_value), 0)
   const totalDebts = debts.reduce((s, d) => s + Number(d.current_balance), 0)
@@ -49,6 +66,22 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     return section('FINANCIEEL OVERZICHT', 'Nog geen financiële data beschikbaar. Vraag de gebruiker om assets, schulden of transacties toe te voegen.')
   }
 
+  // Build identity section from profile
+  let identitySection = ''
+  if (profile) {
+    const temporal = TEMPORAL_LABELS[profile.temporal_balance ?? 3] ?? TEMPORAL_LABELS[3]
+    const age = profile.date_of_birth
+      ? Math.floor((Date.now() - new Date(profile.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+      : null
+    const identityLines = [
+      profile.full_name ? `Naam: ${profile.full_name}` : null,
+      age ? `Leeftijd: ${age} jaar` : null,
+      `Huishoudtype: ${profile.household_type ?? 'solo'}`,
+      `Temporal Balance: ${temporal}`,
+    ].filter(Boolean) as string[]
+    identitySection = section('GEBRUIKERSPROFIEL', identityLines.join('\n')) + '\n'
+  }
+
   const core = computeCoreData(monthlyIncome, monthlyExpenses, totalAssets, totalDebts)
 
   const lines = [
@@ -65,7 +98,7 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     `Dagelijkse uitgaven: ${formatCurrency(Math.round(core.yearlyExpenses / 365))}`,
   ]
 
-  return section('FINANCIEEL OVERZICHT', lines.join('\n'))
+  return identitySection + section('FINANCIEEL OVERZICHT', lines.join('\n'))
 }
 
 /** Get a date string N months ago in YYYY-MM-DD format */

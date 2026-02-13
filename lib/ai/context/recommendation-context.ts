@@ -129,17 +129,29 @@ export async function buildRecommendationContext(supabase: SupabaseClient): Prom
   const { data: feedback } = await supabase
     .from('recommendation_feedback')
     .select('recommendation_type, related_budget_slug, reason, feedback_type')
-    .in('feedback_type', ['rejected', 'action_rejected'])
     .order('created_at', { ascending: false })
-    .limit(20)
+    .limit(30)
 
   if (feedback && feedback.length > 0) {
-    const feedbackLines = feedback.map(f => {
-      const slug = f.related_budget_slug ? ` (${f.related_budget_slug})` : ''
-      const reason = f.reason ? ` — reden: "${f.reason}"` : ''
-      return `${f.recommendation_type}${slug}: ${f.feedback_type}${reason}`
-    })
-    parts.push(section('EERDER AFGEWEZEN (vermijd vergelijkbaar)', bulletList(feedbackLines)))
+    const rejected = feedback.filter(f => f.feedback_type === 'rejected' || f.feedback_type === 'action_rejected')
+    const accepted = feedback.filter(f => f.feedback_type === 'accepted' || f.feedback_type === 'action_completed')
+
+    if (rejected.length > 0) {
+      const rejectedLines = rejected.map(f => {
+        const slug = f.related_budget_slug ? ` (${f.related_budget_slug})` : ''
+        const reason = f.reason ? ` — reden: "${f.reason}"` : ''
+        return `${f.recommendation_type}${slug}: ${f.feedback_type}${reason}`
+      })
+      parts.push(section('EERDER AFGEWEZEN (vermijd vergelijkbaar)', bulletList(rejectedLines)))
+    }
+
+    if (accepted.length > 0) {
+      const acceptedLines = accepted.map(f => {
+        const slug = f.related_budget_slug ? ` (${f.related_budget_slug})` : ''
+        return `${f.recommendation_type}${slug}: ${f.feedback_type}`
+      })
+      parts.push(section('EERDER GEACCEPTEERD (meer van dit type)', bulletList(acceptedLines)))
+    }
   }
 
   // Existing pending/accepted recommendations — avoid duplicates

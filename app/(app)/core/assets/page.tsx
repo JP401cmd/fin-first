@@ -599,6 +599,56 @@ function AssetDetailModal({
           {valuations && valuations.length > 0 && (
             <div>
               <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">Waardehistorie</p>
+
+              {/* Sparkline chart */}
+              {valuations.length >= 2 && (() => {
+                const sorted = [...valuations].sort((a, b) => a.valuation_date.localeCompare(b.valuation_date))
+                const values = sorted.map(v => Number(v.value))
+                const min = Math.min(...values)
+                const max = Math.max(...values)
+                const range = max - min || 1
+                const W = 240
+                const H = 48
+                const PAD = 4
+                const points = values.map((v, i) => {
+                  const x = PAD + (i / (values.length - 1)) * (W - PAD * 2)
+                  const y = H - PAD - ((v - min) / range) * (H - PAD * 2)
+                  return `${x},${y}`
+                })
+                const trend = values[values.length - 1] >= values[0]
+                return (
+                  <div className="mb-3 rounded-lg bg-zinc-50 p-2">
+                    <svg viewBox={`0 0 ${W} ${H}`} className="h-12 w-full" preserveAspectRatio="none">
+                      <polyline
+                        points={points.join(' ')}
+                        fill="none"
+                        stroke={trend ? '#059669' : '#dc2626'}
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      {values.map((v, i) => {
+                        const x = PAD + (i / (values.length - 1)) * (W - PAD * 2)
+                        const y = H - PAD - ((v - min) / range) * (H - PAD * 2)
+                        return (
+                          <circle
+                            key={i}
+                            cx={x}
+                            cy={y}
+                            r="3"
+                            fill={i === values.length - 1 ? (trend ? '#059669' : '#dc2626') : '#a1a1aa'}
+                          />
+                        )
+                      })}
+                    </svg>
+                    <div className="mt-1 flex justify-between text-[10px] text-zinc-400">
+                      <span>{new Date(sorted[0].valuation_date).toLocaleDateString('nl-NL', { month: 'short', year: '2-digit' })}</span>
+                      <span>{new Date(sorted[sorted.length - 1].valuation_date).toLocaleDateString('nl-NL', { month: 'short', year: '2-digit' })}</span>
+                    </div>
+                  </div>
+                )
+              })()}
+
               <div className="space-y-1">
                 {valuations.slice(0, 5).map((v) => {
                   const prev = valuations.find((vv) => vv.valuation_date < v.valuation_date)

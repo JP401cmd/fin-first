@@ -165,6 +165,7 @@ export function GoalDetailModal({
                         }}
                         isConfirmingDelete={confirmDelete === goal.id}
                         onCancelDelete={() => setConfirmDelete(null)}
+                        onContributionAdded={() => { loadData(); onGoalsChanged() }}
                       />
                     ))}
                   </div>
@@ -198,6 +199,7 @@ export function GoalDetailModal({
                           }}
                           isConfirmingDelete={confirmDelete === goal.id}
                           onCancelDelete={() => setConfirmDelete(null)}
+                          onContributionAdded={() => { loadData(); onGoalsChanged() }}
                         />
                       ))}
                     </div>
@@ -230,6 +232,13 @@ export function GoalDetailModal({
   )
 }
 
+type GoalContribution = {
+  id: string
+  amount: number
+  date: string
+  notes: string | null
+}
+
 function GoalCard({
   goal,
   onEdit,
@@ -237,6 +246,7 @@ function GoalCard({
   onDelete,
   isConfirmingDelete,
   onCancelDelete,
+  onContributionAdded,
 }: {
   goal: Goal
   onEdit: () => void
@@ -244,11 +254,62 @@ function GoalCard({
   onDelete: () => void
   isConfirmingDelete: boolean
   onCancelDelete: () => void
+  onContributionAdded: () => void
 }) {
   const { current, target, pct, onTrack, eta } = computeGoalProgress(goal)
   const colors = getGoalColorClasses(goal.color)
   const typeLabel = GOAL_TYPE_LABELS[goal.goal_type as GoalType] ?? goal.goal_type
   const isFreedm = goal.goal_type === 'freedom_days'
+  const isLinked = !!(goal.linked_asset_id || goal.linked_debt_id)
+
+  const [showContrib, setShowContrib] = useState(false)
+  const [contributions, setContributions] = useState<GoalContribution[]>([])
+  const [contribAmount, setContribAmount] = useState('')
+  const [contribNotes, setContribNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function loadContributions() {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('goal_contributions')
+      .select('id, amount, date, notes')
+      .eq('goal_id', goal.id)
+      .order('date', { ascending: false })
+      .limit(10)
+    setContributions((data ?? []) as GoalContribution[])
+  }
+
+  async function addContribution() {
+    const amount = parseFloat(contribAmount)
+    if (!amount || amount <= 0) return
+    setSaving(true)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setSaving(false); return }
+
+    await supabase.from('goal_contributions').insert({
+      user_id: user.id,
+      goal_id: goal.id,
+      amount,
+      date: new Date().toISOString().split('T')[0],
+      notes: contribNotes.trim() || null,
+    })
+
+    // Update goal current_value
+    await supabase
+      .from('goals')
+      .update({
+        current_value: Number(goal.current_value) + amount,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', goal.id)
+
+    setContribAmount('')
+    setContribNotes('')
+    setSaving(false)
+    loadContributions()
+    onContributionAdded()
+  }
 
   return (
     <div
@@ -317,7 +378,7 @@ function GoalCard({
           </div>
 
           {/* Linked entity info */}
-          {(goal.linked_asset_id || goal.linked_debt_id) && (
+          {isLinked && (
             <p className="mt-1.5 text-[10px] text-zinc-400">
               Gekoppeld · waarde wordt automatisch bijgewerkt
             </p>
@@ -351,6 +412,68 @@ function GoalCard({
           )}
         </div>
       </div>
+
+      {/* Contribution section — only for non-linked, non-completed goals */}
+      {!isLinked && !goal.is_completed && (
+        <div className="border-t border-zinc-100 px-4 py-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              if (!showContrib) loadContributions()
+              setShowContrib(v => !v)
+            }}
+            className="flex items-center gap-1 text-[10px] font-medium text-teal-600 hover:text-teal-700"
+          >
+            <Plus className="h-3 w-3" />
+            Bijdrage registreren
+            {showContrib ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </button>
+
+          {showContrib && (
+            <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  placeholder="Bedrag"
+                  value={contribAmount}
+                  onChange={(e) => setContribAmount(e.target.value)}
+                  className="w-28 rounded-lg border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-teal-500"
+                  min="0"
+                  step="0.01"
+                />
+                <input
+                  type="text"
+                  placeholder="Notitie (optioneel)"
+                  value={contribNotes}
+                  onChange={(e) => setContribNotes(e.target.value)}
+                  className="flex-1 rounded-lg border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-teal-500"
+                />
+                <button
+                  onClick={addContribution}
+                  disabled={saving || !contribAmount}
+                  className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-teal-700 disabled:opacity-50"
+                >
+                  {saving ? '...' : '+'}
+                </button>
+              </div>
+
+              {contributions.length > 0 && (
+                <div className="max-h-24 space-y-1 overflow-y-auto">
+                  {contributions.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between rounded px-1 py-0.5 text-[10px] hover:bg-zinc-50">
+                      <span className="text-zinc-500">
+                        {new Date(c.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                        {c.notes && <span className="ml-1 text-zinc-400">· {c.notes}</span>}
+                      </span>
+                      <span className="font-medium text-emerald-600">+{formatCurrency(Number(c.amount))}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

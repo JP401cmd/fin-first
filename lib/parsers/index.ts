@@ -41,6 +41,8 @@ export type CSVPreset = {
   amountColumn: number
   descriptionColumn: number
   counterpartyColumn: number | null
+  ibanColumn: number | null
+  referenceColumn: number | null
   dateFormat: string
   hasHeader: boolean
   amountIsNegative?: boolean // some banks use separate columns for debit/credit
@@ -57,6 +59,8 @@ export const CSV_PRESETS: CSVPreset[] = [
     amountColumn: 6,
     descriptionColumn: 8,
     counterpartyColumn: 1,
+    ibanColumn: 3,
+    referenceColumn: null,
     dateFormat: 'YYYYMMDD',
     hasHeader: true,
   },
@@ -68,6 +72,8 @@ export const CSV_PRESETS: CSVPreset[] = [
     amountColumn: 6,
     descriptionColumn: 19,
     counterpartyColumn: 9,
+    ibanColumn: 8,
+    referenceColumn: 16,
     dateFormat: 'YYYY-MM-DD',
     hasHeader: true,
   },
@@ -79,6 +85,8 @@ export const CSV_PRESETS: CSVPreset[] = [
     amountColumn: 6,
     descriptionColumn: 7,
     counterpartyColumn: null,
+    ibanColumn: null,
+    referenceColumn: null,
     dateFormat: 'YYYYMMDD',
     hasHeader: true,
   },
@@ -90,6 +98,8 @@ export const CSV_PRESETS: CSVPreset[] = [
     amountColumn: 1,
     descriptionColumn: 2,
     counterpartyColumn: null,
+    ibanColumn: null,
+    referenceColumn: null,
     dateFormat: 'YYYY-MM-DD',
     hasHeader: true,
   },

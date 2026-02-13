@@ -4,7 +4,7 @@ import type { LifeEvent, LifeEventImpact } from '@/lib/horizon-data'
 import type { Action } from '@/lib/recommendation-data'
 import {
   Calendar, Globe, Baby, Hammer, GraduationCap, Briefcase,
-  Clock, Sunset, Home, Heart,
+  Clock, Sunset, Home, Heart, Truck, Car, Gift, Zap,
 } from 'lucide-react'
 
 export const EVENT_ICONS: Record<string, React.ReactNode> = {
@@ -19,6 +19,10 @@ export const EVENT_ICONS: Record<string, React.ReactNode> = {
   Sunset: <Sunset className="h-4 w-4" />,
   Home: <Home className="h-4 w-4" />,
   Heart: <Heart className="h-4 w-4" />,
+  Truck: <Truck className="h-4 w-4" />,
+  Car: <Car className="h-4 w-4" />,
+  Gift: <Gift className="h-4 w-4" />,
+  Zap: <Zap className="h-4 w-4" />,
 }
 
 // Logarithmic position: maps months-from-now to 0..1 range

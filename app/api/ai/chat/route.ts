@@ -1,6 +1,6 @@
 import { streamText, convertToModelMessages, createUIMessageStreamResponse, stepCountIs, type UIMessage } from 'ai'
 import { createClient } from '@/lib/supabase/server'
-import { getModel } from '@/lib/ai/config'
+import { getModel, AIConfigError } from '@/lib/ai/config'
 import { buildSystemPrompt, type AIDomain } from '@/lib/ai/dna'
 import { buildContext } from '@/lib/ai/context/builder'
 import { getTools } from '@/lib/ai/tools'
@@ -21,14 +21,24 @@ export async function POST(req: Request) {
   const validDomains: AIDomain[] = ['kern', 'wil', 'horizon']
   const safeDomain = validDomains.includes(domain) ? domain : 'kern'
 
+  let model
+  try {
+    model = await getModel(supabase)
+  } catch (err) {
+    if (err instanceof AIConfigError) {
+      return Response.json({ error: err.message }, { status: 422 })
+    }
+    return Response.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
+  }
+
   const systemPrompt = await buildSystemPrompt(safeDomain, supabase)
   const context = await buildContext(supabase)
-  const tools = getTools(safeDomain)
+  const tools = getTools(safeDomain, supabase)
 
   const modelMessages = await convertToModelMessages(messages)
 
   const result = streamText({
-    model: await getModel(supabase),
+    model,
     system: systemPrompt + '\n\n' + context,
     messages: modelMessages,
     tools,

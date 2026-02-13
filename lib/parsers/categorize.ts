@@ -63,7 +63,18 @@ const RULES: CategoryRule[] = [
 ]
 
 /**
+ * A user correction that overrides rule-based categorization.
+ * Loaded from the `category_corrections` table during import.
+ */
+export type CategoryCorrection = {
+  match_field: 'counterparty_name' | 'description'
+  match_value: string
+  budget_id: string
+}
+
+/**
  * Categorize a transaction based on its description and counterparty.
+ * Checks user corrections first (highest priority), then falls back to rules.
  *
  * @returns budget_id and confidence, or null if no match found.
  */
@@ -72,18 +83,35 @@ export function categorizeTransaction(
   counterparty: string | null,
   amount: number,
   budgets: Budget[],
+  corrections?: CategoryCorrection[],
 ): { budget_id: string | null; confidence: number; budgetName: string | null } {
   const searchText = `${description} ${counterparty ?? ''}`.toLowerCase()
   const isIncome = amount > 0
 
-  // Build a slug-to-budget map
+  // Build a slug-to-budget map and id-to-budget map
   const slugMap = new Map<string, Budget>()
+  const idMap = new Map<string, Budget>()
   for (const b of budgets) {
-    if (b.slug) {
-      slugMap.set(b.slug, b)
+    if (b.slug) slugMap.set(b.slug, b)
+    if (b.id) idMap.set(b.id, b)
+  }
+
+  // Priority 1: Check user corrections (exact match on counterparty or description)
+  if (corrections && corrections.length > 0) {
+    for (const c of corrections) {
+      const needle = c.match_value.toLowerCase()
+      if (c.match_field === 'counterparty_name' && counterparty && counterparty.toLowerCase() === needle) {
+        const budget = idMap.get(c.budget_id)
+        return { budget_id: c.budget_id, confidence: 1.0, budgetName: budget?.name ?? null }
+      }
+      if (c.match_field === 'description' && description.toLowerCase().includes(needle)) {
+        const budget = idMap.get(c.budget_id)
+        return { budget_id: c.budget_id, confidence: 0.95, budgetName: budget?.name ?? null }
+      }
     }
   }
 
+  // Priority 2: Rule-based matching
   let bestMatch: { budgetSlug: string; confidence: number } | null = null
 
   for (const rule of RULES) {

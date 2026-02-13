@@ -82,8 +82,46 @@ const chronologyLevels: ChronologyLevel[] = [
   { level: 6, name: 'Timeless', focus: 'Infinity', metaphor: 'Meer tijd dan je op kunt maken. Je bouwt aan de tijdlijnen van anderen.', phase: 4 },
 ]
 
-// Hardcoded current sovereignty level (later computed from financial data)
-const CURRENT_SOVEREIGNTY_LEVEL = 1
+/**
+ * Compute sovereignty level from financial data.
+ * Levels range from -2 (Time Deficit) to 6 (Timeless).
+ */
+function computeSovereigntyLevel(
+  netWorth: number,
+  monthlyExpenses: number,
+  freedomPercentage: number,
+  hasConsumerDebt: boolean,
+): number {
+  if (monthlyExpenses <= 0) return 0
+
+  const monthsCovered = netWorth / monthlyExpenses
+
+  // Negative net worth
+  if (netWorth < 0) {
+    return hasConsumerDebt ? -2 : -1
+  }
+
+  // Around zero (less than 1 month covered)
+  if (monthsCovered < 1) return 0
+
+  // Positive but less than 3 months (no emergency fund yet)
+  if (monthsCovered < 3) return 1
+
+  // Emergency fund built (3-6 months)
+  if (monthsCovered < 6 || freedomPercentage < 10) return 2
+
+  // Investments growing, freedom 10-25%
+  if (freedomPercentage < 25) return 3
+
+  // Coast FIRE territory, freedom 25-75%
+  if (freedomPercentage < 75) return 4
+
+  // Near independence, freedom 75-100%
+  if (freedomPercentage < 100) return 5
+
+  // Full financial independence
+  return 6
+}
 
 // ── Phase color helpers ──────────────────────────────────────────────
 
@@ -107,6 +145,9 @@ export default function IdentityPage() {
   const [country, setCountry] = useState('NL')
   const [householdType, setHouseholdType] = useState<HouseholdType>('solo')
   const [temporalBalance, setTemporalBalance] = useState(3)
+
+  // Financial state for sovereignty level
+  const [sovereigntyLevel, setSovereigntyLevel] = useState(0)
 
   // UI state
   const [loading, setLoading] = useState(true)
@@ -132,6 +173,37 @@ export default function IdentityPage() {
         setHouseholdType(data.household_type ?? 'solo')
         setTemporalBalance(data.temporal_balance ?? 3)
       }
+
+      // Fetch financial data for sovereignty level calculation
+      const threeMonthsAgo = new Date()
+      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+      const dateStr = threeMonthsAgo.toISOString().split('T')[0]
+
+      const [assetsRes, debtsRes, txRes] = await Promise.all([
+        supabase.from('assets').select('current_value').eq('is_active', true),
+        supabase.from('debts').select('current_balance, debt_type').eq('is_active', true),
+        supabase.from('transactions').select('amount, is_income').gte('date', dateStr),
+      ])
+
+      const totalAssets = (assetsRes.data ?? []).reduce((s, a) => s + Number(a.current_value), 0)
+      const debts = debtsRes.data ?? []
+      const totalDebts = debts.reduce((s, d) => s + Number(d.current_balance), 0)
+      const netWorth = totalAssets - totalDebts
+
+      const expenses = (txRes.data ?? [])
+        .filter(t => !t.is_income)
+        .reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
+      const months = Math.max(1, 3)
+      const monthlyExpenses = expenses / months
+
+      const yearlyExpenses = monthlyExpenses * 12
+      const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / 0.04 : 0
+      const freedomPct = fireTarget > 0 ? (netWorth / fireTarget) * 100 : 0
+
+      const consumerDebtTypes = ['personal_loan', 'credit_card', 'revolving_credit', 'payment_plan', 'car_loan']
+      const hasConsumerDebt = debts.some(d => consumerDebtTypes.includes(d.debt_type) && Number(d.current_balance) > 0)
+
+      setSovereigntyLevel(computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPct, hasConsumerDebt))
       setLoading(false)
     }
     loadProfile()
@@ -357,9 +429,77 @@ export default function IdentityPage() {
         <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
           The Chronology Scale
         </h2>
-        <p className="mt-1 mb-8 text-sm text-zinc-500">
+        <p className="mt-1 mb-6 text-sm text-zinc-500">
           Jouw positie op de reis naar financiele soevereiniteit.
         </p>
+
+        {/* Progress overview bar */}
+        <div className="mb-6 rounded-xl bg-zinc-50 p-4">
+          <div className="mb-2 flex items-center justify-between text-xs text-zinc-500">
+            <span>Lvl {chronologyLevels[0].level}: {chronologyLevels[0].name}</span>
+            <span>Lvl {chronologyLevels[chronologyLevels.length - 1].level}: {chronologyLevels[chronologyLevels.length - 1].name}</span>
+          </div>
+          <div className="relative h-3 w-full overflow-hidden rounded-full bg-zinc-200">
+            {/* Phase segments */}
+            {chronologyPhases.map((phase, pi) => {
+              const levels = chronologyLevels.filter(l => l.phase === phase.phase)
+              const startIdx = chronologyLevels.indexOf(levels[0])
+              const endIdx = chronologyLevels.indexOf(levels[levels.length - 1])
+              const left = (startIdx / (chronologyLevels.length - 1)) * 100
+              const width = ((endIdx - startIdx) / (chronologyLevels.length - 1)) * 100
+              const activeIdx = chronologyLevels.findIndex(l => l.level === sovereigntyLevel)
+              const isReached = activeIdx >= startIdx
+              const colors = phaseColors[phase.color]
+              return (
+                <div
+                  key={pi}
+                  className={`absolute top-0 h-full transition-opacity ${isReached ? colors.activeDot : 'bg-zinc-300'}`}
+                  style={{ left: `${left}%`, width: `${width + (pi < chronologyPhases.length - 1 ? 0.5 : 0)}%`, opacity: isReached ? 1 : 0.3 }}
+                />
+              )
+            })}
+            {/* Current position indicator */}
+            {(() => {
+              const idx = chronologyLevels.findIndex(l => l.level === sovereigntyLevel)
+              const pct = idx >= 0 ? (idx / (chronologyLevels.length - 1)) * 100 : 0
+              return (
+                <div
+                  className="absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-zinc-900 shadow-md"
+                  style={{ left: `${pct}%` }}
+                />
+              )
+            })()}
+          </div>
+          <div className="mt-2 flex justify-between">
+            {chronologyPhases.map((phase) => {
+              const colors = phaseColors[phase.color]
+              return (
+                <span key={phase.phase} className={`text-[10px] font-medium ${colors.text}`}>
+                  {phase.name}
+                </span>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Next milestone card */}
+        {(() => {
+          const nextLevel = chronologyLevels.find(l => l.level === sovereigntyLevel + 1)
+          if (!nextLevel) return null
+          const nextPhase = chronologyPhases.find(p => p.phase === nextLevel.phase)
+          const colors = nextPhase ? phaseColors[nextPhase.color] : phaseColors.teal
+          return (
+            <div className={`mb-6 rounded-xl border p-4 ${colors.badge}`}>
+              <p className="text-xs font-bold uppercase">Volgende mijlpaal</p>
+              <p className="mt-1 text-sm font-semibold">
+                Lvl {nextLevel.level}: {nextLevel.name}
+              </p>
+              <p className="mt-0.5 text-xs opacity-80">
+                Focus: {nextLevel.focus} &mdash; {nextLevel.metaphor}
+              </p>
+            </div>
+          )
+        })()}
 
         <div className="space-y-2">
           {chronologyPhases.map((phase) => {
@@ -380,9 +520,9 @@ export default function IdentityPage() {
                 {/* Levels in this phase */}
                 <div className="ml-3 border-l-2 border-zinc-100 pl-6 pb-6">
                   {levels.map((lvl) => {
-                    const isActive = lvl.level === CURRENT_SOVEREIGNTY_LEVEL
-                    const isPast = lvl.level < CURRENT_SOVEREIGNTY_LEVEL
-                    const isFuture = lvl.level > CURRENT_SOVEREIGNTY_LEVEL
+                    const isActive = lvl.level === sovereigntyLevel
+                    const isPast = lvl.level < sovereigntyLevel
+                    const isFuture = lvl.level > sovereigntyLevel
 
                     return (
                       <div

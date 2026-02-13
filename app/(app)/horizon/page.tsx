@@ -154,7 +154,7 @@ export default function HorizonPage() {
     setFormName(catalog?.label ?? '')
     setFormCost(catalog?.defaultCost ?? 0)
     setFormMonthlyCost(catalog?.defaultMonthlyCost ?? 0)
-    setFormMonthlyIncome(0)
+    setFormMonthlyIncome(catalog?.defaultMonthlyIncome ?? 0)
     setFormDuration(catalog?.defaultDuration ?? 0)
     setFormAge(currentAge ? currentAge + 5 : '')
     setEditingEvent(null)
@@ -678,6 +678,13 @@ export default function HorizonPage() {
             </div>
 
             <div className="space-y-4">
+              {/* Template tip */}
+              {LIFE_EVENT_CATALOG[formType]?.tip && !editingEvent && (
+                <div className="rounded-lg bg-purple-50 p-3 text-xs text-purple-700">
+                  <span className="font-medium">Tip:</span> {LIFE_EVENT_CATALOG[formType].tip}
+                </div>
+              )}
+
               <div>
                 <label className="text-xs font-medium text-zinc-500">Naam</label>
                 <input

@@ -95,6 +95,8 @@ export async function parseCSV(
     const amountStr = fields[preset.amountColumn] ?? ''
     const description = fields[preset.descriptionColumn] ?? ''
     const counterparty = preset.counterpartyColumn != null ? (fields[preset.counterpartyColumn] ?? null) : null
+    const iban = preset.ibanColumn != null ? (fields[preset.ibanColumn] ?? null) : null
+    const reference = preset.referenceColumn != null ? (fields[preset.referenceColumn] ?? null) : null
 
     if (!dateStr || (!amountStr && !preset.debitColumn)) continue
 
@@ -118,8 +120,8 @@ export async function parseCSV(
       amount,
       description: cleanDescription,
       counterparty_name: counterparty?.trim() || null,
-      counterparty_iban: null,
-      reference: null,
+      counterparty_iban: iban?.trim() || null,
+      reference: reference?.trim() || null,
       transaction_type: null,
       import_hash: hash,
     })

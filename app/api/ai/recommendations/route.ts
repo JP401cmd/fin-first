@@ -1,7 +1,7 @@
 import { generateObject } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { getModel } from '@/lib/ai/config'
+import { getModel, AIConfigError } from '@/lib/ai/config'
 import { RECOMMENDATIONS_SYSTEM_PROMPT } from '@/lib/ai/dna/recommendations'
 import { buildRecommendationContext } from '@/lib/ai/context/recommendation-context'
 
@@ -41,7 +41,16 @@ export async function POST() {
   }
 
   const context = await buildRecommendationContext(supabase)
-  const model = await getModel(supabase)
+
+  let model
+  try {
+    model = await getModel(supabase)
+  } catch (err) {
+    if (err instanceof AIConfigError) {
+      return Response.json({ error: err.message }, { status: 422 })
+    }
+    return Response.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
+  }
   const generationId = crypto.randomUUID()
 
   let object: z.infer<typeof recommendationSchema>

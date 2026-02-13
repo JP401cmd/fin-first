@@ -102,6 +102,23 @@ export default function WillPage() {
     const allActions = (actionsRes.data ?? []) as KpiData['allActions']
     const allPendingRecs = (pendingRecsRes.data ?? []) as KpiData['allPendingRecs']
     const goals = (activeGoalsRes.data ?? []) as Goal[]
+    const loadedAssets = (assetsRes.data ?? []) as { id: string; name: string; current_value: number }[]
+    const loadedDebts = (debtsRes.data ?? []) as { id: string; name: string; current_balance: number }[]
+
+    // Auto-link: override current_value from linked asset/debt
+    for (const goal of goals) {
+      if (goal.linked_asset_id) {
+        const asset = loadedAssets.find(a => a.id === goal.linked_asset_id)
+        if (asset) goal.current_value = Number(asset.current_value)
+      } else if (goal.linked_debt_id) {
+        const debt = loadedDebts.find(d => d.id === goal.linked_debt_id)
+        if (debt) {
+          // For debt payoff: progress = original target - remaining balance
+          goal.current_value = Math.max(0, Number(goal.target_value) - Number(debt.current_balance))
+        }
+      }
+    }
+
     const goalProgresses = goals.map(g => computeGoalProgress(g))
 
     setKpi({
@@ -117,8 +134,8 @@ export default function WillPage() {
 
     setRecommendations((recsForListRes.data as Recommendation[]) ?? [])
     setActions((actionsForBoardRes.data as Action[]) ?? [])
-    setGoalAssets((assetsRes.data ?? []) as { id: string; name: string; current_value: number }[])
-    setGoalDebts((debtsRes.data ?? []) as { id: string; name: string; current_balance: number }[])
+    setGoalAssets(loadedAssets)
+    setGoalDebts(loadedDebts)
     setLoading(false)
   }, [])
 

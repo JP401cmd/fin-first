@@ -10,7 +10,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { getDefaultBudgets, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
 import { BudgetIcon, formatCurrency, getTypeColors, iconMap, iconOptions, type BudgetType } from '@/components/app/budget-shared'
-import { type BudgetRollover, formatPeriod, getCarriedAmount } from '@/lib/budget-rollover'
+import { type BudgetRollover, formatPeriod, getCarriedAmount, getPreviousPeriod, computeRollover } from '@/lib/budget-rollover'
 import { shouldAlert } from '@/components/app/budget-alert'
 import { BudgetTree } from '@/components/app/budget-tree'
 import { BudgetBlob } from '@/components/app/budget-blob'
@@ -89,13 +89,75 @@ export default function BudgetsPage() {
       .from('budget_rollovers')
       .select('*')
       .eq('period', currentPeriod)
-    if (rolloverData) setRollovers(rolloverData as BudgetRollover[])
 
     // Fetch budget amount overrides
     const { data: amountsData } = await supabase
       .from('budget_amounts')
       .select('*')
     if (amountsData) setBudgetAmounts(amountsData as { id: string; budget_id: string; effective_from: string; amount: number }[])
+
+    // Auto-compute rollovers if none exist for the current period
+    if (!rolloverData || rolloverData.length === 0) {
+      const prevPeriod = getPreviousPeriod(currentPeriod)
+      const prevMonthDate = new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1)
+      const prevStart = prevMonthDate.toISOString().split('T')[0]
+      const prevEnd = monthDate.toISOString().split('T')[0]
+
+      // Fetch previous month rollovers and spending
+      const [prevRolloversRes, prevTxRes, budgetsForRolloverRes] = await Promise.all([
+        supabase.from('budget_rollovers').select('*').eq('period', prevPeriod),
+        supabase.from('transactions').select('budget_id, amount').gte('date', prevStart).lt('date', prevEnd),
+        supabase.from('budgets').select('id, default_limit, rollover_type, parent_id').not('parent_id', 'is', null),
+      ])
+
+      const prevRollovers = (prevRolloversRes.data ?? []) as BudgetRollover[]
+      const prevTx = prevTxRes.data ?? []
+      const childBudgets = budgetsForRolloverRes.data ?? []
+
+      // Calculate previous month spending per budget
+      const prevSpending: Record<string, number> = {}
+      for (const t of prevTx) {
+        if (t.budget_id) {
+          prevSpending[t.budget_id] = (prevSpending[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
+        }
+      }
+
+      // Only compute rollovers if there was spending data in the previous month
+      if (prevTx.length > 0) {
+        const newRollovers: { budget_id: string; period: string; carried_amount: number; rollover_type: string }[] = []
+
+        for (const budget of childBudgets) {
+          if (budget.rollover_type === 'reset') continue
+          const prevCarry = getCarriedAmount(prevRollovers, prevPeriod)
+          const { carry } = computeRollover(
+            Number(budget.default_limit),
+            prevSpending[budget.id] ?? 0,
+            prevCarry,
+            budget.rollover_type ?? 'reset',
+          )
+          if (carry > 0) {
+            newRollovers.push({
+              budget_id: budget.id,
+              period: currentPeriod,
+              carried_amount: carry,
+              rollover_type: budget.rollover_type ?? 'reset',
+            })
+          }
+        }
+
+        if (newRollovers.length > 0) {
+          await supabase.from('budget_rollovers').insert(newRollovers)
+          const { data: freshRollovers } = await supabase
+            .from('budget_rollovers')
+            .select('*')
+            .eq('period', currentPeriod)
+          setRollovers((freshRollovers ?? []) as BudgetRollover[])
+          return
+        }
+      }
+    }
+
+    setRollovers((rolloverData ?? []) as BudgetRollover[])
   }, [monthStart, monthEnd, monthDate])
 
   const loadBudgets = useCallback(async () => {
@@ -676,8 +738,9 @@ function BudgetDetailModal({
   const budgetIds = isParent ? children.map(c => c.id) : [budget.id]
   const budgetTx = transactions.filter(t => budgetIds.includes(t.budget_id))
 
-  // 12-month spending history (fetched on mount)
+  // 12-month spending history + limit changes (fetched on mount)
   const [history, setHistory] = useState<{ month: string; label: string; spent: number; limit: number }[]>([])
+  const [limitHistory, setLimitHistory] = useState<{ date: string; amount: number }[]>([])
   useEffect(() => {
     async function loadHistory() {
       const supabase = createClient()
@@ -702,6 +765,12 @@ function BudgetDetailModal({
         .from('budget_amounts')
         .select('budget_id, effective_from, amount')
         .in('budget_id', budgetIds)
+
+      // Build limit change timeline
+      const changes = (amountData ?? [])
+        .sort((a, b) => a.effective_from.localeCompare(b.effective_from))
+        .map(a => ({ date: a.effective_from, amount: Number(a.amount) }))
+      setLimitHistory(changes)
 
       const result = months.map(m => {
         const monthTx = (txData ?? []).filter(t => t.date >= m.start && t.date < m.end && budgetIds.includes(t.budget_id))
@@ -883,6 +952,34 @@ function BudgetDetailModal({
                     {/* Tooltip */}
                     <div className="pointer-events-none absolute -top-10 z-10 rounded bg-zinc-800 px-2 py-1 text-[10px] text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
                       {formatCurrency(h.spent)} / {formatCurrency(h.limit)}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Limit change history */}
+        {limitHistory.length > 1 && (
+          <div className="border-t border-zinc-100 px-6 py-4">
+            <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">Limiet wijzigingen</p>
+            <div className="space-y-1.5">
+              {limitHistory.map((change, i) => {
+                const prev = i > 0 ? limitHistory[i - 1].amount : null
+                const delta = prev != null ? change.amount - prev : null
+                return (
+                  <div key={i} className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-zinc-50">
+                    <span className="text-xs text-zinc-500">
+                      {new Date(change.date).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-zinc-700">{formatCurrency(change.amount)}</span>
+                      {delta != null && delta !== 0 && (
+                        <span className={`text-[10px] font-medium ${delta > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                          {delta > 0 ? '+' : ''}{formatCurrency(delta)}
+                        </span>
+                      )}
                     </div>
                   </div>
                 )
