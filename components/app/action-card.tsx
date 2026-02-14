@@ -50,7 +50,7 @@ export function ActionCard({ action, onStatusChange, onUpdate }: ActionCardProps
           {/* Left: title + badges */}
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <h4 className="truncate text-sm font-medium text-zinc-900">{action.title}</h4>
-            <span className={`shrink-0 rounded-full px-1.5 py-px text-[10px] font-medium ${sourceBadge}`}>
+            <span className={`shrink-0 rounded-full px-1.5 py-px text-xs font-medium ${sourceBadge}`}>
               {ACTION_SOURCE_LABELS[action.source]}
             </span>
           </div>
@@ -59,17 +59,17 @@ export function ActionCard({ action, onStatusChange, onUpdate }: ActionCardProps
           <div className="flex shrink-0 items-center gap-2">
             {/* Compact meta */}
             {action.freedom_days_impact != null && action.freedom_days_impact > 0 && (
-              <span className="hidden sm:inline-flex rounded-full bg-teal-50 px-2 py-px text-[11px] font-medium text-teal-700">
+              <span className="hidden sm:inline-flex rounded-full bg-teal-50 px-2 py-px text-xs font-medium text-teal-700">
                 {Math.round(action.freedom_days_impact)}d
               </span>
             )}
             {action.due_date && action.status === 'open' && (
-              <span className="hidden sm:inline text-[11px] text-zinc-400">
+              <span className="hidden sm:inline text-xs text-zinc-400">
                 {new Date(action.due_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
               </span>
             )}
             {action.status === 'postponed' && action.postponed_until && (
-              <span className="hidden sm:inline-flex items-center text-[11px] text-amber-600">
+              <span className="hidden sm:inline-flex items-center text-xs text-amber-600">
                 <Clock className="mr-0.5 h-3 w-3" />
                 {new Date(action.postponed_until).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
               </span>
@@ -88,7 +88,7 @@ export function ActionCard({ action, onStatusChange, onUpdate }: ActionCardProps
                   onClick={() => handleStatus('completed')}
                   disabled={isLoading}
                   title="Afronden"
-                  className="rounded p-1 text-emerald-500 transition-colors hover:bg-emerald-50 disabled:opacity-50"
+                  className="touch-target rounded text-emerald-500 transition-colors hover:bg-emerald-50 disabled:opacity-50"
                 >
                   <Check className="h-3.5 w-3.5" />
                 </button>
@@ -97,7 +97,7 @@ export function ActionCard({ action, onStatusChange, onUpdate }: ActionCardProps
                   onClick={() => setShowPostpone(true)}
                   disabled={isLoading}
                   title="Uitstellen"
-                  className="rounded p-1 text-amber-500 transition-colors hover:bg-amber-50 disabled:opacity-50"
+                  className="touch-target rounded text-amber-500 transition-colors hover:bg-amber-50 disabled:opacity-50"
                 >
                   <Clock className="h-3.5 w-3.5" />
                 </button>
@@ -106,7 +106,7 @@ export function ActionCard({ action, onStatusChange, onUpdate }: ActionCardProps
                   onClick={() => setShowReject(true)}
                   disabled={isLoading}
                   title="Afwijzen"
-                  className="rounded p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-red-500 disabled:opacity-50"
+                  className="touch-target rounded text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-red-500 disabled:opacity-50"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -120,7 +120,7 @@ export function ActionCard({ action, onStatusChange, onUpdate }: ActionCardProps
                   onClick={() => handleStatus('open')}
                   disabled={isLoading}
                   title="Heropenen"
-                  className="rounded p-1 text-teal-500 transition-colors hover:bg-teal-50 disabled:opacity-50"
+                  className="touch-target rounded text-teal-500 transition-colors hover:bg-teal-50 disabled:opacity-50"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                 </button>

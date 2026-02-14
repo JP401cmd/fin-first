@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { PERSONAS, PERSONA_KEYS, type PersonaKey, type PersonaMeta } from '@/lib/test-personas'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { PHASES } from '@/lib/feature-phases'
+import { useMobilePreview, DEVICE_PRESETS } from '@/components/app/beheer/mobile-preview-provider'
 
 const TABLE_LABELS: Record<string, string> = {
   profiles: 'Profiel',
@@ -38,6 +39,7 @@ type SeedEvent = SeedStep | SeedSummary | { error: string }
 export default function BeheerTestdataPage() {
   const router = useRouter()
   const featureAccess = useFeatureAccess()
+  const mobilePreview = useMobilePreview()
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   // Phase transition test state
@@ -410,6 +412,58 @@ export default function BeheerTestdataPage() {
             Zet last_known_phase op NULL zodat de activatieknop weer verschijnt.
           </p>
         </div>
+      </div>
+
+      {/* Mobile Preview */}
+      <div className="rounded-xl border border-zinc-200 bg-white p-6">
+        <h3 className="text-lg font-semibold text-zinc-900">Mobile Preview</h3>
+        <p className="mt-1 text-sm text-zinc-500">
+          Bekijk de app in een telefoon-frame om de mobile layout te testen op desktop.
+        </p>
+
+        <div className="mt-4 flex items-center gap-4">
+          <button
+            onClick={() => mobilePreview.setEnabled(!mobilePreview.enabled)}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+              mobilePreview.enabled ? 'bg-amber-500' : 'bg-zinc-300'
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                mobilePreview.enabled ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+          <span className="text-sm font-medium text-zinc-700">
+            {mobilePreview.enabled ? 'Actief' : 'Uit'}
+          </span>
+        </div>
+
+        <div className="mt-4">
+          <p className="text-sm font-medium text-zinc-700 mb-2">Device</p>
+          <div className="flex flex-wrap gap-2">
+            {DEVICE_PRESETS.map(d => (
+              <button
+                key={d.name}
+                onClick={() => mobilePreview.setDevice(d)}
+                className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                  mobilePreview.device.name === d.name
+                    ? 'border-amber-400 bg-amber-50 text-amber-700'
+                    : 'border-zinc-200 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50'
+                }`}
+              >
+                {d.name}
+                <span className="ml-1 text-xs text-zinc-400">{d.width}&times;{d.height}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {mobilePreview.enabled && (
+          <p className="mt-4 text-xs text-amber-600">
+            Preview is actief. Navigeer naar een pagina (bijv. /core) om de mobile weergave te testen.
+          </p>
+        )}
       </div>
     </div>
   )

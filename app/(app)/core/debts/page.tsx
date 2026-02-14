@@ -1036,7 +1036,7 @@ function DebtForm({
                       className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
                     >
                       <option value="">-</option>
-                      {userAssets.filter((a) => a.asset_type === 'real_estate').map((a) => (
+                      {userAssets.filter((a) => a.asset_type === 'eigen_huis' || a.asset_type === 'real_estate').map((a) => (
                         <option key={a.id} value={a.id}>{a.name}</option>
                       ))}
                     </select>

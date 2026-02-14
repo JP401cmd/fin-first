@@ -155,7 +155,7 @@ export default function BelastingPage() {
     <FeatureGate featureId="box3_belasting" fallback="locked">
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* === A. Hero Banner === */}
-      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-950 via-amber-900 to-amber-950 p-8 text-white sm:p-10">
+      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-950 via-amber-900 to-amber-950 p-5 text-white sm:p-8 md:p-10">
         <div className="pointer-events-none absolute -top-24 right-1/4 h-64 w-64 rounded-full bg-amber-500/10 blur-3xl" />
 
         <div className="relative">
@@ -199,7 +199,7 @@ export default function BelastingPage() {
           </div>
 
           <div className="mb-3">
-            <span className="text-5xl font-bold tracking-tight sm:text-6xl">
+            <span className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl lg:text-6xl">
               {formatCurrency(result.belasting)}
             </span>
           </div>

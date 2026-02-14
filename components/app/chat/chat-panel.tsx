@@ -143,21 +143,21 @@ function ActionSuggestionCard({
             <span className="text-xs font-semibold text-zinc-800">{data.title}</span>
           </div>
           {added ? (
-            <span className="flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+            <span className="flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-700">
               <Check className="h-3 w-3" /> Toegevoegd
             </span>
           ) : loading ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin text-teal-500" />
           ) : (
-            <span className="rounded-full bg-teal-100 px-1.5 py-0.5 text-[10px] font-medium text-teal-700">
+            <span className="rounded-full bg-teal-100 px-1.5 py-0.5 text-xs font-medium text-teal-700">
               + Toevoegen
             </span>
           )}
         </div>
         {data.description && (
-          <p className="mt-1 text-[11px] leading-snug text-zinc-500">{data.description}</p>
+          <p className="mt-1 text-xs leading-snug text-zinc-500">{data.description}</p>
         )}
-        <div className="mt-1.5 flex items-center gap-3 text-[11px] text-zinc-500">
+        <div className="mt-1.5 flex items-center gap-3 text-xs text-zinc-500">
           <span className="font-medium text-teal-600">
             +{data.freedom_days_impact} {data.freedom_days_impact === 1 ? 'dag' : 'dagen'} vrijheid
           </span>
@@ -367,7 +367,7 @@ export function ChatPanel() {
     return (
       <button
         onClick={toggle}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-teal-600 text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
+        className="fixed bottom-[calc(var(--bottom-nav-height)+1.5rem)] right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-teal-600 text-white shadow-lg transition-transform hover:scale-105 active:scale-95 md:bottom-6"
         aria-label="Open chat"
       >
         <FinnAvatar size={36} />
@@ -392,7 +392,7 @@ export function ChatPanel() {
               <span className="ml-1 text-xs text-zinc-400">Financieel assistent</span>
             </div>
           </div>
-          <button onClick={close} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+          <button onClick={close} className="touch-target rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -465,7 +465,7 @@ export function ChatPanel() {
         </div>
 
         {/* Input */}
-        <div className="border-t border-zinc-100 px-3 py-3">
+        <div className="border-t border-zinc-100 px-3 py-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
           <div className="flex items-end gap-2">
             <textarea
               ref={inputRef}
@@ -480,7 +480,7 @@ export function ChatPanel() {
               type="button"
               onClick={submit}
               disabled={isStreaming || !input.trim()}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-600 text-white transition-colors hover:bg-teal-700 disabled:bg-zinc-300 disabled:text-zinc-500"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal-600 text-white transition-colors hover:bg-teal-700 disabled:bg-zinc-300 disabled:text-zinc-500"
             >
               <Send className="h-4 w-4" />
             </button>

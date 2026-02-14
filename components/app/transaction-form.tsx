@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { X, Save, Trash2, Repeat } from 'lucide-react'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
 import type { Budget } from '@/lib/budget-data'
 import { FREQUENCY_LABELS } from '@/lib/recurring-data'
@@ -174,21 +175,7 @@ export function TransactionForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-zinc-900">
-            {isEdit ? 'Transactie bewerken' : 'Nieuwe transactie'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
+    <BottomSheet open={true} onClose={onClose} title={isEdit ? 'Transactie bewerken' : 'Nieuwe transactie'}>
         <form onSubmit={handleSubmit} className="p-6">
           {error && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -452,7 +439,6 @@ export function TransactionForm({
             </div>
           </div>
         </form>
-      </div>
-    </div>
+    </BottomSheet>
   )
 }

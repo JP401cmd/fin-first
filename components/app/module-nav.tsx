@@ -42,27 +42,30 @@ export function ModuleNav({ config }: { config: ModuleNavConfig }) {
   return (
     <div className={`sticky top-[var(--header-height)] z-40 border-b bg-white ${styles.border}`}>
       <div className="mx-auto max-w-6xl px-6">
-        <nav
-          className="scrollbar-none -mb-px flex gap-1 overflow-x-auto"
-          aria-label={`${config.module} navigatie`}
-        >
-          {visibleItems.map((item) => {
-            const active = isActive(pathname, item.href, config.basePath)
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`whitespace-nowrap border-b-2 px-3 py-3 text-sm font-medium transition-colors ${
-                  active
-                    ? styles.active
-                    : `border-transparent text-zinc-500 ${styles.hover}`
-                }`}
-              >
-                {item.label}
-              </Link>
-            )
-          })}
-        </nav>
+        <div className="relative">
+          <nav
+            className="scrollbar-none -mb-px flex gap-1 overflow-x-auto scroll-smooth"
+            aria-label={`${config.module} navigatie`}
+          >
+            {visibleItems.map((item) => {
+              const active = isActive(pathname, item.href, config.basePath)
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`whitespace-nowrap border-b-2 px-3 py-3.5 text-sm font-medium transition-colors ${
+                    active
+                      ? styles.active
+                      : `border-transparent text-zinc-500 ${styles.hover}`
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              )
+            })}
+          </nav>
+          <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-white md:hidden" />
+        </div>
       </div>
     </div>
   )

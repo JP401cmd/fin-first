@@ -25,6 +25,7 @@ import {
   AlertTriangle, Calendar, BarChart3, Clock, FlaskConical, Landmark,
   Plus, X, Trash2, Edit3, Zap, Target,
 } from 'lucide-react'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import { FeatureGate } from '@/components/app/feature-gate'
 
 type ActiveModal = null | 'projections' | 'scenarios' | 'simulations' | 'withdrawal'
@@ -243,7 +244,7 @@ export default function HorizonPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* === 1. Hero === */}
-      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-950 via-purple-900 to-purple-950 p-8 text-white sm:p-10">
+      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-950 via-purple-900 to-purple-950 p-5 text-white sm:p-8 md:p-10">
         <div className="pointer-events-none absolute -top-24 right-1/4 h-64 w-64 rounded-full bg-purple-500/10 blur-3xl" />
 
         <div className="relative">
@@ -257,14 +258,14 @@ export default function HorizonPage() {
           <div className="mb-6">
             {fire.fireAge !== null ? (
               <>
-                <span className="text-6xl font-bold tracking-tight sm:text-7xl">
+                <span className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
                   {Math.round(fire.fireAge)}
                 </span>
                 <span className="ml-3 text-lg text-purple-200/70">jaar -- verwachte FIRE leeftijd</span>
               </>
             ) : (
               <>
-                <span className="text-5xl font-bold tracking-tight sm:text-6xl">
+                <span className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl lg:text-6xl">
                   {fire.freedomPercentage.toFixed(1)}%
                 </span>
                 <span className="ml-3 text-lg text-purple-200/70">vrijheid bereikt</span>
@@ -286,7 +287,7 @@ export default function HorizonPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-3">
             <div>
               <p className="text-xs font-medium text-purple-300/60 uppercase">Aftellen</p>
               <p className="mt-1 text-2xl font-bold">
@@ -681,18 +682,8 @@ export default function HorizonPage() {
 
       {/* === Event Form Modal === */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="mx-4 w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-zinc-900">
-                {editingEvent ? 'Evenement bewerken' : 'Nieuw evenement'}
-              </h3>
-              <button onClick={() => { setShowForm(false); setEditingEvent(null) }} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
+        <BottomSheet open={true} onClose={() => { setShowForm(false); setEditingEvent(null) }} title={editingEvent ? 'Evenement bewerken' : 'Nieuw evenement'}>
+            <div className="space-y-4 p-6">
               {/* Template tip */}
               {LIFE_EVENT_CATALOG[formType]?.tip && !editingEvent && (
                 <div className="rounded-lg bg-purple-50 p-3 text-xs text-purple-700">
@@ -760,8 +751,7 @@ export default function HorizonPage() {
                 {editingEvent ? 'Opslaan' : 'Toevoegen'}
               </button>
             </div>
-          </div>
-        </div>
+        </BottomSheet>
       )}
 
       {/* === Deep-dive Modals === */}
@@ -780,10 +770,18 @@ export default function HorizonPage() {
 // ── Helper components ────────────────────────────────────────
 
 function KpiTooltip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
   return (
     <div className="group relative">
-      <Info className="h-4 w-4 cursor-help text-zinc-300 transition-colors group-hover:text-purple-500" />
-      <div className="pointer-events-none absolute right-0 z-10 mt-1 w-56 rounded-lg border border-zinc-200 bg-white p-3 text-xs leading-relaxed text-zinc-600 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        onBlur={() => setOpen(false)}
+        className="touch-target"
+      >
+        <Info className={`h-4 w-4 cursor-help transition-colors ${open ? 'text-purple-500' : 'text-zinc-300'} group-hover:text-purple-500`} />
+      </button>
+      <div className={`absolute right-0 z-10 mt-1 w-56 rounded-lg border border-zinc-200 bg-white p-3 text-xs leading-relaxed text-zinc-600 shadow-lg transition-opacity ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}>
         {text}
       </div>
     </div>

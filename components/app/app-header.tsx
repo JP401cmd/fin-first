@@ -26,7 +26,7 @@ const hoverClasses: Record<string, string> = {
 export function AppHeader({ email, role }: { email: string; role?: string }) {
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+
   const { needsActivation } = useFeatureAccess()
 
   const navItems = allNavItems.filter(item => !item.requiresActivation || !needsActivation)
@@ -100,46 +100,8 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
               </div>
             )}
           </div>
-
-          <button
-            onClick={() => setMobileNavOpen(!mobileNavOpen)}
-            className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 md:hidden"
-            aria-label="Menu"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              {mobileNavOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-              )}
-            </svg>
-          </button>
         </div>
       </div>
-
-      {mobileNavOpen && (
-        <nav className="border-t border-zinc-100 bg-white px-6 py-3 md:hidden">
-          <div className="flex flex-col gap-1">
-            {navItems.map((item) => {
-              const isActive = pathname.startsWith(item.href)
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileNavOpen(false)}
-                  className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                    isActive
-                      ? `${activeClasses[item.color]} bg-zinc-50`
-                      : `text-zinc-600 ${hoverClasses[item.color]}`
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              )
-            })}
-          </div>
-        </nav>
-      )}
     </header>
   )
 }

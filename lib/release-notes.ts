@@ -44,6 +44,49 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'fin_prod_0.3',
+    date: '2026-02-14',
+    title: 'Mobile preview met echte viewport & PWA-basis',
+    sections: [
+      {
+        module: 'Beheer',
+        color: 'rose',
+        items: [
+          {
+            title: 'iframe-gebaseerde mobile preview',
+            description: 'De mobile preview gebruikt nu een iframe in plaats van een smalle div. Hierdoor reageren CSS media queries (md:, sm:) op de iframe-viewport — de preview toont nu daadwerkelijk de mobile layout met BottomNav, verborgen desktop-nav en mobile spacing.',
+          },
+          {
+            title: 'Navigatie in preview-toolbar',
+            description: 'Nieuwe routeknoppen (Dashboard, Kern, Wil, Horizon) in de preview-toolbar om snel tussen pagina\'s te wisselen zonder de preview te verlaten.',
+          },
+          {
+            title: 'Responsive phone bezel',
+            description: 'De phone bezel schaalt nu dynamisch mee bij venstergrootte-wijzigingen via een resize listener, in plaats van eenmalige berekening bij render.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'PWA manifest',
+            description: 'Nieuw manifest.json voor Progressive Web App ondersteuning — installeerbaar op mobiele apparaten met app-icoon en standalone modus.',
+          },
+          {
+            title: 'BottomNav component',
+            description: 'Nieuwe mobiele navigatiebalk (md:hidden) met iconen voor Dashboard, Kern, Wil en Horizon — zichtbaar op kleine schermen en in de mobile preview.',
+          },
+          {
+            title: 'Bottom sheet component',
+            description: 'Herbruikbaar bottom-sheet component voor mobiele modals met swipe-to-dismiss en backdrop.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: 'fin_prod_0.2',
     date: '2026-02-13',
     title: 'Onboarding, fase-systeem & activatieflow',

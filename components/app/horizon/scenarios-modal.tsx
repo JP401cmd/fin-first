@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { X } from 'lucide-react'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
   computeScenarios, computeResilienceScore,
   MARKET_WEATHER, type MarketWeather, type HorizonInput,
@@ -35,23 +36,7 @@ export function ScenariosModal({ input, open, onClose }: Props) {
   const fireTarget = (input.monthlyExpenses * 12) / 0.04
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-xl"
-        style={{ maxHeight: '90vh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
-          <div>
-            <h2 className="text-lg font-bold text-zinc-900">Toekomstpaden</h2>
-            <p className="text-sm text-zinc-500">Drie scenario&apos;s: wat als je drifted, doorgaat, of optimaliseert?</p>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
+    <BottomSheet open={true} onClose={onClose} title="Toekomstpaden">
         <div className="space-y-6 px-6 py-6">
           {/* Diverging paths chart */}
           <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
@@ -166,8 +151,7 @@ export function ScenariosModal({ input, open, onClose }: Props) {
             </section>
           )}
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   )
 }
 
@@ -212,12 +196,7 @@ function ScenarioDetailModal({
   const yearlyPoints = scenario.months.filter((m, i) => m.month % 60 === 0 || i === scenario.months.length - 1).slice(0, 9)
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl"
-        style={{ maxHeight: '90vh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
+    <BottomSheet open={true} onClose={onClose}>
         <div className={`flex items-center justify-between border-b ${c.border} ${c.bg} px-6 py-4`}>
           <div>
             <h2 className="text-lg font-semibold text-zinc-900">{scenario.label}</h2>
@@ -285,8 +264,7 @@ function ScenarioDetailModal({
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   )
 }
 

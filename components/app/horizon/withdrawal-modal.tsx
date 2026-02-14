@@ -8,6 +8,7 @@ import {
   type HorizonInput, type WithdrawalStrategy, type WithdrawalResult, type WithdrawalYear,
 } from '@/lib/horizon-data'
 import { X, ChevronDown, ChevronUp, Info } from 'lucide-react'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 
 const STRATEGY_INFO: Record<WithdrawalStrategy, { label: string; description: string }> = {
   classic: {
@@ -79,25 +80,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
   if (!open || !result) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-xl"
-        style={{ maxHeight: '90vh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
-          <div>
-            <h2 className="text-lg font-bold text-zinc-900">Opnamestrategie</h2>
-            <p className="text-sm text-zinc-500">
-              Plan hoe je je vermogen veilig opneemt na FIRE
-            </p>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
+    <BottomSheet open={true} onClose={onClose} title="Opnamestrategie">
         <div className="space-y-6 px-6 py-6">
           {/* Strategy tabs */}
           <section>
@@ -242,8 +225,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
             )}
           </section>
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   )
 }
 

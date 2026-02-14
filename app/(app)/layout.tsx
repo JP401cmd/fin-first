@@ -4,6 +4,9 @@ import { AppHeader } from '@/components/app/app-header'
 import { ChatProvider } from '@/components/app/chat/chat-provider'
 import { ChatPanel } from '@/components/app/chat/chat-panel'
 import { FeatureAccessProvider } from '@/components/app/feature-access-provider'
+import { BottomNav } from '@/components/app/bottom-nav'
+import { MobilePreviewProvider } from '@/components/app/beheer/mobile-preview-provider'
+import { MobilePreviewFrame } from '@/components/app/beheer/mobile-preview-frame'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
 import { PHASES } from '@/lib/feature-phases'
 
@@ -63,14 +66,19 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50">
-      <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
-      <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation}>
-        <main>{children}</main>
-        <ChatProvider>
-          <ChatPanel />
-        </ChatProvider>
-      </FeatureAccessProvider>
-    </div>
+    <MobilePreviewProvider>
+      <MobilePreviewFrame>
+        <div className="min-h-screen bg-zinc-50">
+          <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
+          <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation}>
+            <main className="pb-20 md:pb-0">{children}</main>
+            <BottomNav />
+            <ChatProvider>
+              <ChatPanel />
+            </ChatProvider>
+          </FeatureAccessProvider>
+        </div>
+      </MobilePreviewFrame>
+    </MobilePreviewProvider>
   )
 }

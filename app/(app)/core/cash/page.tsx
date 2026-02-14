@@ -13,7 +13,6 @@ import { getDefaultBudgets, type Budget, type BudgetWithChildren } from '@/lib/b
 import { TransactionForm } from '@/components/app/transaction-form'
 import { BudgetIcon, formatCurrency as formatCurrencyShort, formatCurrencyDecimals as formatCurrency, getTypeColors } from '@/components/app/budget-shared'
 import { SankeyDiagram, type SankeyNode, type SankeyLink } from '@/components/app/sankey-diagram'
-import { FeatureGate } from '@/components/app/feature-gate'
 import { type RecurringTransaction, FREQUENCY_LABELS, getExpectedMonthlyTotal, getNextOccurrence, formatSchedule } from '@/lib/recurring-data'
 
 type Transaction = {
@@ -440,38 +439,6 @@ export default function CashPage() {
     return { nodes, links }
   }, [transactions, budgetGroups])
 
-  // Budget spending summary (for table under Sankey)
-  const budgetSummary = useMemo(() => {
-    const spendMap: Record<string, number> = {}
-    for (const tx of transactions) {
-      if (tx.budget_id) {
-        spendMap[tx.budget_id] = (spendMap[tx.budget_id] ?? 0) + Math.abs(Number(tx.amount))
-      }
-    }
-
-    return budgetGroups
-      .map((g) => {
-        const children = g.children
-        const limit = children.length > 0
-          ? children.reduce((s, c) => s + Number(c.default_limit), 0)
-          : Number(g.parent.default_limit)
-        const spent = children.length > 0
-          ? children.reduce((s, c) => s + (spendMap[c.id] ?? 0), 0)
-          : (spendMap[g.parent.id] ?? 0)
-        return {
-          id: g.parent.id,
-          name: g.parent.name,
-          icon: g.parent.icon,
-          budgetType: g.parent.budget_type as string,
-          limit,
-          spent,
-          pct: limit > 0 ? Math.round((spent / limit) * 100) : 0,
-          isOver: spent > limit && limit > 0,
-        }
-      })
-      .filter((s) => s.limit > 0)
-  }, [transactions, budgetGroups])
-
   // Map sankey node IDs back to budget IDs for navigation
   function handleSankeyNodeClick(nodeId: string) {
     const match = nodeId.match(/^(?:sub|grp|inc)-(.+)$/)
@@ -799,7 +766,6 @@ export default function CashPage() {
       )}
 
       {/* Sankey flow diagram */}
-      <FeatureGate featureId="cashflow_sankey">
       {sankeyData && sankeyData.nodes.length > 0 && (
         <section className="mt-6">
           <button
@@ -823,61 +789,6 @@ export default function CashPage() {
               />
             </div>
           )}
-        </section>
-      )}
-      </FeatureGate>
-
-      {/* Budget overview table */}
-      {budgetSummary.length > 0 && (
-        <section className="mt-4">
-          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-            {budgetSummary.map((s, idx) => {
-              const barPct = Math.min(s.pct, 100)
-              const typeColor = s.budgetType === 'savings' ? 'bg-purple-500' :
-                s.budgetType === 'debt' ? 'bg-red-500' :
-                s.budgetType === 'income' ? 'bg-emerald-500' : 'bg-amber-500'
-              const trackColor = s.budgetType === 'savings' ? 'bg-purple-100' :
-                s.budgetType === 'debt' ? 'bg-red-100' :
-                s.budgetType === 'income' ? 'bg-emerald-100' : 'bg-amber-100'
-
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => router.push(`/core/budgets?budget=${s.id}`)}
-                  className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-zinc-50 ${
-                    idx < budgetSummary.length - 1 ? 'border-b border-zinc-100' : ''
-                  }`}
-                >
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-50">
-                    <BudgetIcon name={s.icon} className="h-4 w-4 text-zinc-500" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between">
-                      <span className="truncate text-sm font-medium text-zinc-900">{s.name}</span>
-                      <span className={`ml-2 shrink-0 text-xs font-bold ${s.isOver ? 'text-red-600' : 'text-zinc-600'}`}>
-                        {s.pct}%
-                      </span>
-                    </div>
-                    <div className="mt-1.5 flex items-center gap-3">
-                      <div className={`h-1.5 flex-1 overflow-hidden rounded-full ${trackColor}`}>
-                        <div
-                          className={`h-full rounded-full transition-all ${s.isOver ? 'bg-red-500' : typeColor}`}
-                          style={{ width: `${barPct}%` }}
-                        />
-                      </div>
-                      <span className="shrink-0 text-xs text-zinc-500">
-                        <span className={s.isOver ? 'font-semibold text-red-600' : ''}>
-                          {formatCurrencyShort(s.spent)}
-                        </span>
-                        {' / '}
-                        {formatCurrencyShort(s.limit)}
-                      </span>
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
         </section>
       )}
 

@@ -9,6 +9,7 @@ const tabs = [
   { label: 'Release Notes', href: '/beheer/releases' },
   { label: 'Meldingen', href: '/beheer/meldingen' },
   { label: 'Features', href: '/beheer/features' },
+  { label: 'Mobile Preview', href: '/beheer/testdata#mobile-preview' },
 ] as const
 
 export function BeheerNav() {
@@ -17,7 +18,8 @@ export function BeheerNav() {
   return (
     <nav className="flex gap-1 overflow-x-auto border-b border-zinc-200">
       {tabs.map((tab) => {
-        const isActive = pathname === tab.href
+        const basePath = tab.href.split('#')[0]
+        const isActive = tab.href.includes('#') ? false : pathname === basePath
         return (
           <Link
             key={tab.href}

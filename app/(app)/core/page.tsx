@@ -272,7 +272,7 @@ export default function CorePage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* === Freedom Timeline Hero === */}
-      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-950 via-amber-900 to-amber-950 p-8 text-white sm:p-10">
+      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-950 via-amber-900 to-amber-950 p-5 text-white sm:p-8 md:p-10">
         <div className="pointer-events-none absolute -top-24 right-1/4 h-64 w-64 rounded-full bg-amber-500/10 blur-3xl" />
 
         <div className="relative">
@@ -284,7 +284,7 @@ export default function CorePage() {
           </div>
 
           <div className="mb-6">
-            <span className="text-6xl font-bold tracking-tight sm:text-7xl">
+            <span className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
               {data.freedomPercentage.toFixed(1)}%
             </span>
             <span className="ml-3 text-lg text-amber-200/70">vrijheid bereikt</span>
@@ -304,7 +304,7 @@ export default function CorePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-3">
             <div>
               <p className="text-xs font-medium text-amber-300/60 uppercase">Vrijheidstijd</p>
               <p className="mt-1 text-2xl font-bold">
@@ -569,10 +569,18 @@ export default function CorePage() {
 }
 
 function KpiTooltip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
   return (
     <div className="group relative">
-      <Info className="h-4 w-4 cursor-help text-zinc-300 transition-colors group-hover:text-amber-500" />
-      <div className="pointer-events-none absolute right-0 z-10 mt-1 w-56 rounded-lg border border-zinc-200 bg-white p-3 text-xs leading-relaxed text-zinc-600 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        onBlur={() => setOpen(false)}
+        className="touch-target"
+      >
+        <Info className={`h-4 w-4 cursor-help transition-colors ${open ? 'text-amber-500' : 'text-zinc-300'} group-hover:text-amber-500`} />
+      </button>
+      <div className={`absolute right-0 z-10 mt-1 w-56 rounded-lg border border-zinc-200 bg-white p-3 text-xs leading-relaxed text-zinc-600 shadow-lg transition-opacity ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}>
         {text}
       </div>
     </div>

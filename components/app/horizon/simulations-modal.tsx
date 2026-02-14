@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { X } from 'lucide-react'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
   runMonteCarlo, ageAtDate,
   type HorizonInput, type MonteCarloResult,
@@ -58,44 +59,21 @@ export function SimulationsModal({ input, open, onClose }: Props) {
 
   if (computing || !mc) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-        <div
-          className="w-full max-w-4xl rounded-2xl bg-white p-12 shadow-xl"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex flex-col items-center justify-center py-10">
+      <BottomSheet open={true} onClose={onClose}>
+          <div className="flex flex-col items-center justify-center p-12 py-10">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
             <p className="mt-4 text-sm text-zinc-500">
               Monte Carlo simulaties berekenen (1.000 paden)...
             </p>
           </div>
-        </div>
-      </div>
+      </BottomSheet>
     )
   }
 
   const fireTarget = (input.monthlyExpenses * 12) / 0.04
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-xl"
-        style={{ maxHeight: '90vh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
-          <div>
-            <h2 className="text-lg font-bold text-zinc-900">Monte Carlo Simulaties</h2>
-            <p className="text-sm text-zinc-500">
-              1.000 gesimuleerde toekomsten op basis van historische marktvolatiliteit
-            </p>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
+    <BottomSheet open={true} onClose={onClose} title="Monte Carlo Simulaties">
         <div className="space-y-6 px-6 py-6">
           {/* Confidence summary */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -224,8 +202,7 @@ export function SimulationsModal({ input, open, onClose }: Props) {
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   )
 }
 
@@ -395,12 +372,7 @@ function SimulationDetailModal({
   const sampleYears = [5, 10, 15, 20, 25, 30, 35, 40].filter((y) => y <= mc.years)
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl"
-        style={{ maxHeight: '90vh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
+    <BottomSheet open={true} onClose={onClose}>
         <div className="flex items-center justify-between border-b border-purple-200 bg-purple-50 px-6 py-4">
           <h2 className="text-lg font-semibold text-zinc-900">{titles[metric]}</h2>
           <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
@@ -501,7 +473,6 @@ function SimulationDetailModal({
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   )
 }

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { X, Check, Clock, ArrowRight, Sparkles, Pencil, ArrowLeft } from 'lucide-react'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { PostponeForm } from '@/components/app/postpone-form'
 import type { Recommendation } from '@/lib/recommendation-data'
@@ -105,12 +106,7 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl"
-        style={{ maxHeight: '90vh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
+    <BottomSheet open={true} onClose={onClose}>
         {step === 'detail' && (
           <>
             {/* Header */}
@@ -128,7 +124,7 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
                   </div>
                 )}
               </div>
-              <button type="button" onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+              <button type="button" onClick={onClose} className="touch-target rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -286,7 +282,7 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
             {/* Header */}
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-zinc-900">Acties plannen</h2>
-              <button type="button" onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+              <button type="button" onClick={onClose} className="touch-target rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -425,7 +421,6 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </BottomSheet>
   )
 }

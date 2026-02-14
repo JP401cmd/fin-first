@@ -8,6 +8,7 @@ import {
   type HorizonInput, type FireProjection, type FireRange, type ProjectionMonth,
 } from '@/lib/horizon-data'
 import { X, ChevronDown, ChevronUp } from 'lucide-react'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import { FeatureGate } from '@/components/app/feature-gate'
 
 type Props = {
@@ -56,23 +57,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
   if (!open || !fire || !range) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-xl"
-        style={{ maxHeight: '90vh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
-          <div>
-            <h2 className="text-lg font-bold text-zinc-900">FIRE Voorspelling</h2>
-            <p className="text-sm text-zinc-500">Wanneer bereik je financiele vrijheid?</p>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
+    <BottomSheet open={true} onClose={onClose} title="FIRE Voorspelling">
         <div className="space-y-6 px-6 py-6">
           {/* Range display */}
           <section className="rounded-2xl border border-purple-200 bg-purple-50 p-6">
@@ -211,8 +196,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
             </div>
           </section>
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   )
 }
 

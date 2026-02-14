@@ -49,7 +49,7 @@ export function ActivationButton({ data }: { data: FeatureAccessData }) {
       {/* FAB — positioned left of chat FAB */}
       <button
         onClick={() => setShowModal(true)}
-        className="group fixed bottom-6 right-[88px] z-50 flex h-14 w-14 items-center justify-center rounded-full bg-purple-600 text-white shadow-lg transition-transform hover:scale-105 active:scale-95 animate-pulse"
+        className="group fixed bottom-[calc(var(--bottom-nav-height)+1.5rem)] right-[88px] z-50 flex h-14 w-14 items-center justify-center rounded-full bg-purple-600 text-white shadow-lg transition-transform hover:scale-105 active:scale-95 animate-pulse md:bottom-6"
         title="Bekijk je startpositie en activeer je routekaart"
       >
         <Sparkles className="h-6 w-6" />

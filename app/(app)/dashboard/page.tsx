@@ -107,7 +107,7 @@ export default async function DashboardPage() {
         {/* De Kern */}
         <Link
           href="/core"
-          className="group rounded-2xl border border-amber-200 bg-white p-6 transition-all hover:border-amber-300 hover:shadow-lg hover:shadow-amber-50"
+          className="group rounded-2xl border border-amber-200 bg-white p-6 transition-all hover:border-amber-300 hover:shadow-lg hover:shadow-amber-50 active:scale-[0.98] transition-transform"
         >
           <div className="mb-4 flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50">
@@ -159,7 +159,7 @@ export default async function DashboardPage() {
         {activated && (
           <Link
             href="/will"
-            className="group rounded-2xl border border-teal-200 bg-white p-6 transition-all hover:border-teal-300 hover:shadow-lg hover:shadow-teal-50"
+            className="group rounded-2xl border border-teal-200 bg-white p-6 transition-all hover:border-teal-300 hover:shadow-lg hover:shadow-teal-50 active:scale-[0.98] transition-transform"
           >
             <div className="mb-4 flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-50">
@@ -212,7 +212,7 @@ export default async function DashboardPage() {
         {activated && (
           <Link
             href="/horizon"
-            className="group rounded-2xl border border-purple-200 bg-white p-6 transition-all hover:border-purple-300 hover:shadow-lg hover:shadow-purple-50"
+            className="group rounded-2xl border border-purple-200 bg-white p-6 transition-all hover:border-purple-300 hover:shadow-lg hover:shadow-purple-50 active:scale-[0.98] transition-transform"
           >
             <div className="mb-4 flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50">
