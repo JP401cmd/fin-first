@@ -44,6 +44,63 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'fin_prod_0.4',
+    date: '2026-02-14',
+    title: 'Configureerbare parameters & database migraties in git',
+    sections: [
+      {
+        module: 'De Horizon',
+        color: 'purple',
+        items: [
+          {
+            title: 'SWR en inflatie doorverbonden in projecties',
+            description: 'De SWR- en inflatiesliders in de FIRE-projectiemodal werden niet doorgegeven aan de berekening. Nu veranderen de FIRE-datum, het doelvermogen en de projectiegrafiek direct mee wanneer je deze parameters aanpast.',
+          },
+          {
+            title: 'Monte Carlo simulatie-instellingen',
+            description: 'Nieuw inklapbaar instellingenpaneel in de simulatiemodal. Kies het aantal simulaties (100-5.000) en de projectiehorizon (10-60 jaar) via sliders. Dynamische tekst toont het ingestelde aantal paden.',
+          },
+          {
+            title: 'Vangrails-strategie configureerbaar',
+            description: 'Bij de Guyton-Klinger opnamestrategie zijn nu vier parameters instelbaar: vloer (50-100%), plafond (100-150%), verhogingsstap (+5-20%) en verlagingsstap (-5-20%). Verschijnt als inklapbare sectie wanneer de vangrails-strategie actief is.',
+          },
+          {
+            title: 'Bucket-strategie configureerbaar',
+            description: 'Bij de bucket-opnamestrategie stel je de allocatie in (cash/obligaties/aandelen met auto-balancering), het obligatierendement (1-6%) en de cash buffer (1-5 jaar). Drie-koloms allocatieweergave toont de verdeling in real-time.',
+          },
+          {
+            title: 'Inflatiecorrectie in FIRE-berekening',
+            description: 'De FIRE-projectie gebruikt nu het reele rendement (nominaal gecorrigeerd voor inflatie) in plaats van alleen het nominale rendement. Dit geeft een realistischere schatting van de FIRE-datum.',
+          },
+        ],
+      },
+      {
+        module: 'De Kern',
+        color: 'amber',
+        items: [
+          {
+            title: 'Test-IBAN verwijderd',
+            description: 'De hardcoded testrekening (NL91ABNA0417164300) wordt niet meer automatisch aangemaakt. Bij eerste bezoek opent direct het rekeningformulier zodat je je eigen gegevens invoert.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Database migraties in git',
+            description: 'Supabase CLI toegevoegd als devDependency met 5 npm scripts: db:pull, db:push, db:diff, db:new en db:status. Migratiebestanden worden nu bijgehouden in supabase/migrations/ zodat het schema reproduceerbaar is vanuit code.',
+          },
+          {
+            title: 'Berekeningslaag uitgebreid',
+            description: 'Alle Horizon-functies (computeFireProjection, computeFireRange, projectForward, runMonteCarlo, computeWithdrawal) accepteren nu optionele configuratieparameters. GuardrailsConfig en BucketConfig types toegevoegd met standaardwaarden identiek aan de vorige hardcoded waarden.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: 'fin_prod_0.3',
     date: '2026-02-14',
     title: 'Mobile preview met echte viewport & PWA-basis',

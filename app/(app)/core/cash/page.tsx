@@ -8,7 +8,6 @@ import {
   Wallet, Tag, Settings2, Trash2, X, Building2, Repeat, Calendar,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { getTestTransactions } from '@/lib/transaction-data'
 import { getDefaultBudgets, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
 import { TransactionForm } from '@/components/app/transaction-form'
 import { BudgetIcon, formatCurrency as formatCurrencyShort, formatCurrencyDecimals as formatCurrency, getTypeColors } from '@/components/app/budget-shared'
@@ -127,7 +126,9 @@ export default function CashPage() {
         // Guard: double-check to prevent race conditions
         const { count } = await supabase.from('bank_accounts').select('id', { count: 'exact', head: true })
         if (count && count > 0) { await loadAccounts(); return }
-        await seedData(supabase)
+        // No accounts exist — show account creation form
+        setLoading(false)
+        setShowAccountForm(true)
         return
       }
 
@@ -143,65 +144,6 @@ export default function CashPage() {
     }
   }, [loadTransactions])
 
-  async function seedData(supabase: ReturnType<typeof createClient>) {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    // Create main account
-    const { data: accountData, error: accountError } = await supabase
-      .from('bank_accounts')
-      .insert({
-        user_id: user.id,
-        name: 'Hoofdrekening',
-        iban: 'NL91ABNA0417164300',
-        bank_name: 'ABN AMRO',
-        account_type: 'checking',
-        balance: 4250.00,
-      })
-      .select('id')
-      .single()
-
-    if (accountError || !accountData) {
-      console.error('Error creating account:', accountError)
-      setLoading(false)
-      return
-    }
-
-    // Load budgets to map slugs to IDs
-    const { data: budgetData } = await supabase
-      .from('budgets')
-      .select('id, slug')
-
-    const slugMap = new Map<string, string>()
-    if (budgetData) {
-      for (const b of budgetData) {
-        if (b.slug) slugMap.set(b.slug, b.id)
-      }
-    }
-
-    // Seed test transactions
-    const testTxs = getTestTransactions()
-    const rows = testTxs.map((tx) => ({
-      user_id: user.id,
-      account_id: accountData.id,
-      date: tx.date,
-      amount: tx.amount,
-      description: tx.description,
-      counterparty_name: tx.counterparty_name,
-      counterparty_iban: tx.counterparty_iban,
-      budget_id: slugMap.get(tx.budgetSlug) ?? null,
-      is_income: tx.is_income,
-      category_source: 'import' as const,
-    }))
-
-    // Insert in batches of 50
-    for (let i = 0; i < rows.length; i += 50) {
-      await supabase.from('transactions').insert(rows.slice(i, i + 50))
-    }
-
-    // Reload
-    await loadAccounts()
-  }
 
   useEffect(() => {
     loadBudgets()

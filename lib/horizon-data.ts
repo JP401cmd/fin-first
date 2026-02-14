@@ -82,6 +82,34 @@ export interface MonteCarloResult {
 
 export type WithdrawalStrategy = 'classic' | 'variable' | 'guardrails' | 'bucket'
 
+export interface GuardrailsConfig {
+  floor: number       // 0-1, default 0.80
+  ceiling: number     // 1+, default 1.20
+  raiseStep: number   // 0-1, default 0.10
+  cutStep: number     // 0-1, default 0.10
+}
+
+export interface BucketConfig {
+  cashPct: number      // 0-1, default 0.15
+  bondPct: number      // 0-1, default 0.30
+  bondReturn: number   // annual decimal, default 0.03
+  cashBufferYears: number // default 3
+}
+
+export const DEFAULT_GUARDRAILS: GuardrailsConfig = {
+  floor: 0.80,
+  ceiling: 1.20,
+  raiseStep: 0.10,
+  cutStep: 0.10,
+}
+
+export const DEFAULT_BUCKET: BucketConfig = {
+  cashPct: 0.15,
+  bondPct: 0.30,
+  bondReturn: 0.03,
+  cashBufferYears: 3,
+}
+
 export interface WithdrawalYear {
   age: number
   year: number
@@ -385,23 +413,28 @@ class SeededRandom {
 export function computeFireProjection(
   input: HorizonInput,
   annualReturn: number = DEFAULT_RETURN,
+  swrOverride?: number,
+  inflationOverride?: number,
 ): FireProjection {
   const { totalAssets, totalDebts, monthlyIncome, monthlyExpenses, monthlyContributions, yearlyMustExpenses, dateOfBirth } = input
+  const swr = swrOverride ?? SWR
+  const inflationRate = inflationOverride ?? INFLATION
   const netWorth = totalAssets - totalDebts
   const yearlyExpenses = monthlyExpenses * 12
-  const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / SWR : 0
+  const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / swr : 0
   const freedomPercentage = fireTarget > 0 ? Math.min((netWorth / fireTarget) * 100, 100) : 0
   const monthlySavings = monthlyIncome - monthlyExpenses
   const savingsRate = monthlyIncome > 0 ? (monthlySavings / monthlyIncome) * 100 : 0
-  const monthlyPassiveIncome = (netWorth * SWR) / 12
+  const monthlyPassiveIncome = (netWorth * swr) / 12
 
   // Freedom time
   const freedomMonthsTotal = yearlyExpenses > 0 ? (netWorth / yearlyExpenses) * 12 : 0
   const freedomYears = Math.floor(Math.max(0, freedomMonthsTotal) / 12)
   const freedomMonths = Math.floor(Math.max(0, freedomMonthsTotal) % 12)
 
-  // FIRE date calculation
-  const monthlyReturn = annualReturn / 12
+  // FIRE date calculation (inflation-adjusted real return)
+  const realReturn = (1 + annualReturn) / (1 + inflationRate) - 1
+  const monthlyReturn = realReturn / 12
   let projected = netWorth
   let months = 0
   let fireDate = ''
@@ -458,11 +491,15 @@ export function computeFireProjection(
 /**
  * Compute optimistic / expected / pessimistic FIRE projections.
  */
-export function computeFireRange(input: HorizonInput): FireRange {
+export function computeFireRange(
+  input: HorizonInput,
+  swrOverride?: number,
+  inflationOverride?: number,
+): FireRange {
   return {
-    optimistic: computeFireProjection(input, 0.09),
-    expected: computeFireProjection(input, 0.07),
-    pessimistic: computeFireProjection(input, 0.04),
+    optimistic: computeFireProjection(input, 0.09, swrOverride, inflationOverride),
+    expected: computeFireProjection(input, 0.07, swrOverride, inflationOverride),
+    pessimistic: computeFireProjection(input, 0.04, swrOverride, inflationOverride),
   }
 }
 
@@ -473,8 +510,10 @@ export function projectForward(
   input: HorizonInput,
   months: number,
   annualReturn: number = DEFAULT_RETURN,
+  swrOverride?: number,
 ): ProjectionMonth[] {
   const { totalAssets, totalDebts, monthlyIncome, monthlyExpenses, dateOfBirth } = input
+  const swr = swrOverride ?? SWR
   const monthlyReturn = annualReturn / 12
   const monthlySavings = monthlyIncome - monthlyExpenses
   let netWorth = totalAssets - totalDebts
@@ -486,7 +525,7 @@ export function projectForward(
     const date = new Date(now)
     date.setMonth(date.getMonth() + m)
     const age = currentAge !== null ? currentAge + m / 12 : null
-    const passiveIncome = (netWorth * SWR) / 12
+    const passiveIncome = (netWorth * swr) / 12
 
     result.push({
       month: m,
@@ -589,12 +628,16 @@ export function runMonteCarlo(
   input: HorizonInput,
   sims: number = 1000,
   years: number = 40,
+  swrOverride?: number,
+  volatilityOverride?: number,
 ): MonteCarloResult {
   const { totalAssets, totalDebts, monthlyIncome, monthlyExpenses, dateOfBirth } = input
+  const swr = swrOverride ?? SWR
+  const volatility = volatilityOverride ?? DEFAULT_VOLATILITY
   const netWorth = totalAssets - totalDebts
   const monthlySavings = monthlyIncome - monthlyExpenses
   const yearlyExpenses = monthlyExpenses * 12
-  const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / SWR : 0
+  const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / swr : 0
   const currentAge = dateOfBirth ? ageAtDate(dateOfBirth) : null
 
   // Each simulation: year-by-year net worth
@@ -609,7 +652,7 @@ export function runMonteCarlo(
     let fired = false
 
     for (let y = 1; y <= years; y++) {
-      const annualReturn = rng.normal(DEFAULT_RETURN, DEFAULT_VOLATILITY)
+      const annualReturn = rng.normal(DEFAULT_RETURN, volatility)
       nw = nw * (1 + annualReturn) + monthlySavings * 12
       nw = Math.max(0, nw)
       path.push(Math.round(nw))
@@ -671,11 +714,17 @@ export function computeWithdrawal(
   strategy: WithdrawalStrategy,
   yearlyExpenses: number,
   annualReturn: number = DEFAULT_RETURN,
+  guardrailsConfig?: Partial<GuardrailsConfig>,
+  bucketConfig?: Partial<BucketConfig>,
 ): WithdrawalResult {
   const totalYears = targetAge - retirementAge
   if (totalYears <= 0) {
     return { strategy, monthlyWithdrawal: 0, yearlySustainable: 0, successYears: 0, totalYears: 0, schedule: [], depleted: false }
   }
+
+  const gr = { ...DEFAULT_GUARDRAILS, ...guardrailsConfig }
+  const bk = { ...DEFAULT_BUCKET, ...bucketConfig }
+  const stockPct = 1 - bk.cashPct - bk.bondPct
 
   const schedule: WithdrawalYear[] = []
   let balance = startPortfolio
@@ -687,13 +736,13 @@ export function computeWithdrawal(
   let currentWithdrawal = baseWithdrawal
 
   // Bucket strategy pools
-  let cashBucket = strategy === 'bucket' ? startPortfolio * 0.15 : 0
-  let bondBucket = strategy === 'bucket' ? startPortfolio * 0.30 : 0
-  let stockBucket = strategy === 'bucket' ? startPortfolio * 0.55 : 0
+  let cashBucket = strategy === 'bucket' ? startPortfolio * bk.cashPct : 0
+  let bondBucket = strategy === 'bucket' ? startPortfolio * bk.bondPct : 0
+  let stockBucket = strategy === 'bucket' ? startPortfolio * stockPct : 0
 
   // Guardrails
-  const guardrailFloor = baseWithdrawal * 0.80
-  const guardrailCeiling = baseWithdrawal * 1.20
+  const guardrailFloor = baseWithdrawal * gr.floor
+  const guardrailCeiling = baseWithdrawal * gr.ceiling
 
   for (let y = 0; y < totalYears; y++) {
     const age = retirementAge + y
@@ -719,9 +768,9 @@ export function computeWithdrawal(
         const prevBalance = schedule[y - 1]?.startBalance || startPortfolio
         const returnPct = prevBalance > 0 ? (balance - prevBalance + schedule[y-1]?.withdrawal - schedule[y-1]?.aowIncome) / prevBalance : 0
         if (returnPct > 0.20) {
-          currentWithdrawal = Math.min(currentWithdrawal * 1.10, guardrailCeiling)
+          currentWithdrawal = Math.min(currentWithdrawal * (1 + gr.raiseStep), guardrailCeiling)
         } else if (returnPct < -0.20) {
-          currentWithdrawal = Math.max(currentWithdrawal * 0.90, guardrailFloor)
+          currentWithdrawal = Math.max(currentWithdrawal * (1 - gr.cutStep), guardrailFloor)
         }
         currentWithdrawal = currentWithdrawal * (1 + INFLATION)
       }
@@ -741,11 +790,11 @@ export function computeWithdrawal(
       stockBucket -= fromStocks
 
       // Grow buckets
-      bondBucket *= (1 + 0.03)
+      bondBucket *= (1 + bk.bondReturn)
       stockBucket *= (1 + annualReturn)
 
       // Rebalance: refill cash from stocks
-      const targetCash = yearlyExpenses * 3
+      const targetCash = yearlyExpenses * bk.cashBufferYears
       if (cashBucket < targetCash && stockBucket > targetCash) {
         const refill = Math.min(targetCash - cashBucket, stockBucket * 0.1)
         cashBucket += refill
@@ -775,7 +824,7 @@ export function computeWithdrawal(
         startBalance: Math.round(cashBucket + bondBucket + stockBucket + withdrawal),
         withdrawal: Math.round(withdrawal),
         aowIncome: Math.round(aowIncome),
-        growth: Math.round(bondBucket * 0.03 + stockBucket * annualReturn),
+        growth: Math.round(bondBucket * bk.bondReturn + stockBucket * annualReturn),
         endBalance: Math.round(Math.max(0, cashBucket + bondBucket + stockBucket)),
       })
     }

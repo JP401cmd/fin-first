@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { formatCurrency } from '@/components/app/budget-shared'
-import { X } from 'lucide-react'
+import { X, ChevronDown, ChevronUp } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
   runMonteCarlo, ageAtDate,
@@ -20,6 +20,9 @@ export function SimulationsModal({ input, open, onClose }: Props) {
   const [computing, setComputing] = useState(false)
   const [hoveredYear, setHoveredYear] = useState<number | null>(null)
   const [selectedMetric, setSelectedMetric] = useState<'fire_prob' | 'p50' | 'p10' | null>(null)
+  const [simCount, setSimCount] = useState(1000)
+  const [projYears, setProjYears] = useState(40)
+  const [showSettings, setShowSettings] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -27,16 +30,16 @@ export function SimulationsModal({ input, open, onClose }: Props) {
 
     setComputing(true)
     setTimeout(() => {
-      const result = runMonteCarlo(input, 1000, 40)
+      const result = runMonteCarlo(input, simCount, projYears)
       setMc(result)
       setComputing(false)
     }, 50)
-  }, [open, input, mc])
+  }, [open, input, mc, simCount, projYears])
 
-  // Reset mc when input changes
+  // Reset mc when input or settings change
   useEffect(() => {
     setMc(null)
-  }, [input])
+  }, [input, simCount, projYears])
 
   const currentAge = input.dateOfBirth ? ageAtDate(input.dateOfBirth) : null
 
@@ -63,7 +66,7 @@ export function SimulationsModal({ input, open, onClose }: Props) {
           <div className="flex flex-col items-center justify-center p-12 py-10">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
             <p className="mt-4 text-sm text-zinc-500">
-              Monte Carlo simulaties berekenen (1.000 paden)...
+              Monte Carlo simulaties berekenen ({simCount.toLocaleString('nl-NL')} paden)...
             </p>
           </div>
       </BottomSheet>
@@ -75,6 +78,44 @@ export function SimulationsModal({ input, open, onClose }: Props) {
   return (
     <BottomSheet open={true} onClose={onClose} title="Monte Carlo Simulaties">
         <div className="space-y-6 px-6 py-6">
+          {/* Settings */}
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="flex items-center gap-1 text-xs font-medium text-purple-600 hover:text-purple-700"
+          >
+            Instellingen
+            {showSettings ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </button>
+
+          {showSettings && (
+            <div className="rounded-xl border border-zinc-200 bg-white p-6">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs font-medium text-zinc-500">Simulaties: {simCount.toLocaleString('nl-NL')}</label>
+                  <input
+                    type="range" min={100} max={5000} step={100} value={simCount}
+                    onChange={e => setSimCount(Number(e.target.value))}
+                    className="mt-1 w-full accent-purple-600"
+                  />
+                  <div className="flex justify-between text-[10px] text-zinc-400">
+                    <span>100</span><span>5.000</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-zinc-500">Projectiehorizon: {projYears} jaar</label>
+                  <input
+                    type="range" min={10} max={60} step={5} value={projYears}
+                    onChange={e => setProjYears(Number(e.target.value))}
+                    className="mt-1 w-full accent-purple-600"
+                  />
+                  <div className="flex justify-between text-[10px] text-zinc-400">
+                    <span>10 jaar</span><span>60 jaar</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Confidence summary */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div
@@ -86,7 +127,7 @@ export function SimulationsModal({ input, open, onClose }: Props) {
                 {Math.round(mc.fireProb * 100)}%
               </p>
               <p className="mt-1 text-sm text-zinc-500">
-                van {mc.simulations} simulaties
+                van {mc.simulations.toLocaleString('nl-NL')} simulaties
               </p>
             </div>
             <div
@@ -133,7 +174,7 @@ export function SimulationsModal({ input, open, onClose }: Props) {
                 Cone of Freedom
               </h2>
               <p className="mt-1 text-sm text-zinc-500">
-                Spreiding van vermogensgroei over 40 jaar (P10-P90 band)
+                Spreiding van vermogensgroei over {mc.years} jaar (P10-P90 band)
               </p>
             </div>
             <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
@@ -185,7 +226,7 @@ export function SimulationsModal({ input, open, onClose }: Props) {
                   Verdeling FIRE-leeftijden
                 </h2>
                 <p className="mt-1 text-sm text-zinc-500">
-                  Hoe vaak elke FIRE-leeftijd voorkomt in {mc.simulations} simulaties
+                  Hoe vaak elke FIRE-leeftijd voorkomt in {mc.simulations.toLocaleString('nl-NL')} simulaties
                 </p>
               </div>
               <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">

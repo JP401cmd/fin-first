@@ -5,7 +5,9 @@ import { formatCurrency } from '@/components/app/budget-shared'
 import {
   computeWithdrawal, computeFireProjection, ageAtDate,
   NL_AOW_AGE, NL_AOW_MONTHLY,
+  DEFAULT_GUARDRAILS, DEFAULT_BUCKET,
   type HorizonInput, type WithdrawalStrategy, type WithdrawalResult, type WithdrawalYear,
+  type GuardrailsConfig, type BucketConfig,
 } from '@/lib/horizon-data'
 import { X, ChevronDown, ChevronUp, Info } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -41,6 +43,20 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
   const [targetAge, setTargetAge] = useState(95)
   const [result, setResult] = useState<WithdrawalResult | null>(null)
   const [showTable, setShowTable] = useState(false)
+  const [showStrategySettings, setShowStrategySettings] = useState(false)
+
+  // Guardrails config
+  const [grFloor, setGrFloor] = useState(DEFAULT_GUARDRAILS.floor * 100)
+  const [grCeiling, setGrCeiling] = useState(DEFAULT_GUARDRAILS.ceiling * 100)
+  const [grRaise, setGrRaise] = useState(DEFAULT_GUARDRAILS.raiseStep * 100)
+  const [grCut, setGrCut] = useState(DEFAULT_GUARDRAILS.cutStep * 100)
+
+  // Bucket config
+  const [bkCash, setBkCash] = useState(DEFAULT_BUCKET.cashPct * 100)
+  const [bkBond, setBkBond] = useState(DEFAULT_BUCKET.bondPct * 100)
+  const [bkBondReturn, setBkBondReturn] = useState(DEFAULT_BUCKET.bondReturn * 100)
+  const [bkCashYears, setBkCashYears] = useState(DEFAULT_BUCKET.cashBufferYears)
+  const bkStock = 100 - bkCash - bkBond
 
   // Set retirement age based on FIRE projection on first open
   useEffect(() => {
@@ -67,15 +83,31 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
 
     const yearlyExpenses = input.monthlyExpenses * 12
 
+    const guardrails: GuardrailsConfig = {
+      floor: grFloor / 100,
+      ceiling: grCeiling / 100,
+      raiseStep: grRaise / 100,
+      cutStep: grCut / 100,
+    }
+    const bucket: BucketConfig = {
+      cashPct: bkCash / 100,
+      bondPct: bkBond / 100,
+      bondReturn: bkBondReturn / 100,
+      cashBufferYears: bkCashYears,
+    }
+
     const res = computeWithdrawal(
       Math.max(0, projectedPortfolio),
       retirementAge,
       targetAge,
       strategy,
       yearlyExpenses,
+      undefined,
+      guardrails,
+      bucket,
     )
     setResult(res)
-  }, [input, strategy, retirementAge, targetAge, open])
+  }, [input, strategy, retirementAge, targetAge, open, grFloor, grCeiling, grRaise, grCut, bkCash, bkBond, bkBondReturn, bkCashYears])
 
   if (!open || !result) return null
 
@@ -129,6 +161,138 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
               </div>
             </div>
           </section>
+
+          {/* Strategy-specific settings */}
+          {(strategy === 'guardrails' || strategy === 'bucket') && (
+            <section>
+              <button
+                onClick={() => setShowStrategySettings(!showStrategySettings)}
+                className="flex items-center gap-1 text-xs font-medium text-purple-600 hover:text-purple-700"
+              >
+                Strategie-instellingen
+                {showStrategySettings ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </button>
+
+              {showStrategySettings && strategy === 'guardrails' && (
+                <div className="mt-3 rounded-xl border border-zinc-200 bg-white p-6">
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    <div>
+                      <label className="text-xs font-medium text-zinc-500">Vloer: {grFloor}%</label>
+                      <input
+                        type="range" min={50} max={100} step={5} value={grFloor}
+                        onChange={e => setGrFloor(Number(e.target.value))}
+                        className="mt-1 w-full accent-purple-600"
+                      />
+                      <div className="flex justify-between text-[10px] text-zinc-400">
+                        <span>50%</span><span>100%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-zinc-500">Plafond: {grCeiling}%</label>
+                      <input
+                        type="range" min={100} max={150} step={5} value={grCeiling}
+                        onChange={e => setGrCeiling(Number(e.target.value))}
+                        className="mt-1 w-full accent-purple-600"
+                      />
+                      <div className="flex justify-between text-[10px] text-zinc-400">
+                        <span>100%</span><span>150%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-zinc-500">Verhoging: +{grRaise}%</label>
+                      <input
+                        type="range" min={5} max={20} step={1} value={grRaise}
+                        onChange={e => setGrRaise(Number(e.target.value))}
+                        className="mt-1 w-full accent-purple-600"
+                      />
+                      <div className="flex justify-between text-[10px] text-zinc-400">
+                        <span>5%</span><span>20%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-zinc-500">Verlaging: -{grCut}%</label>
+                      <input
+                        type="range" min={5} max={20} step={1} value={grCut}
+                        onChange={e => setGrCut(Number(e.target.value))}
+                        className="mt-1 w-full accent-purple-600"
+                      />
+                      <div className="flex justify-between text-[10px] text-zinc-400">
+                        <span>5%</span><span>20%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {showStrategySettings && strategy === 'bucket' && (
+                <div className="mt-3 rounded-xl border border-zinc-200 bg-white p-6">
+                  <div className="mb-4">
+                    <p className="text-xs font-medium text-zinc-500">Allocatie</p>
+                    <div className="mt-2 grid grid-cols-3 gap-3">
+                      <div className="rounded-lg bg-zinc-50 p-3 text-center">
+                        <p className="text-xs text-zinc-500">Cash</p>
+                        <p className="text-lg font-bold text-zinc-900">{bkCash}%</p>
+                      </div>
+                      <div className="rounded-lg bg-zinc-50 p-3 text-center">
+                        <p className="text-xs text-zinc-500">Obligaties</p>
+                        <p className="text-lg font-bold text-zinc-900">{bkBond}%</p>
+                      </div>
+                      <div className="rounded-lg bg-purple-50 p-3 text-center">
+                        <p className="text-xs text-purple-600">Aandelen</p>
+                        <p className="text-lg font-bold text-zinc-900">{bkStock}%</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    <div>
+                      <label className="text-xs font-medium text-zinc-500">Cash: {bkCash}%</label>
+                      <input
+                        type="range" min={5} max={30} step={5} value={bkCash}
+                        onChange={e => {
+                          const v = Number(e.target.value)
+                          if (v + bkBond <= 95) setBkCash(v)
+                        }}
+                        className="mt-1 w-full accent-purple-600"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-zinc-500">Obligaties: {bkBond}%</label>
+                      <input
+                        type="range" min={10} max={50} step={5} value={bkBond}
+                        onChange={e => {
+                          const v = Number(e.target.value)
+                          if (bkCash + v <= 95) setBkBond(v)
+                        }}
+                        className="mt-1 w-full accent-purple-600"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-zinc-500">Obligatierendement: {bkBondReturn}%</label>
+                      <input
+                        type="range" min={1} max={6} step={0.5} value={bkBondReturn}
+                        onChange={e => setBkBondReturn(Number(e.target.value))}
+                        className="mt-1 w-full accent-purple-600"
+                      />
+                      <div className="flex justify-between text-[10px] text-zinc-400">
+                        <span>1%</span><span>6%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-zinc-500">Cash buffer: {bkCashYears} jaar</label>
+                      <input
+                        type="range" min={1} max={5} step={1} value={bkCashYears}
+                        onChange={e => setBkCashYears(Number(e.target.value))}
+                        className="mt-1 w-full accent-purple-600"
+                      />
+                      <div className="flex justify-between text-[10px] text-zinc-400">
+                        <span>1 jaar</span><span>5 jaar</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
 
           {/* Results */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

@@ -40,10 +40,15 @@ TriFinity is a personal finance freedom navigator built with Next.js 16 (App Rou
 ## Commands
 
 ```bash
-npm run dev      # Start dev server (localhost:3000)
-npm run build    # Production build
-npm start        # Start production server
-npm run lint     # ESLint
+npm run dev        # Start dev server (localhost:3000)
+npm run build      # Production build
+npm start          # Start production server
+npm run lint       # ESLint
+npm run db:pull    # Pull remote DB migrations
+npm run db:push    # Push local migrations to remote DB
+npm run db:diff    # Diff local schema vs remote
+npm run db:new     # Create a new blank migration file
+npm run db:status  # List migration status (local vs remote)
 ```
 
 ## Architecture
@@ -80,6 +85,9 @@ lib/supabase/           # Supabase client helpers
   server.ts             # Server client with cookie handling
   proxy.ts              # Middleware session refresh
 proxy.ts                # Root Next.js middleware — protects routes, refreshes sessions
+supabase/               # Supabase CLI project directory
+  config.toml           # Local Supabase config
+  migrations/           # SQL migration files (tracked in git)
 ```
 
 ## Auth Pattern
@@ -97,6 +105,35 @@ Supabase email/password auth with `@supabase/ssr` for cookie-based sessions.
 NEXT_PUBLIC_SUPABASE_URL=<supabase-project-url>
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<supabase-anon-key>
 ```
+
+## Database Migrations
+
+Migrations are managed via the Supabase CLI. The supabase/migrations/ directory contains timestamped SQL files that represent the database schema.
+
+### First-time setup
+
+```bash
+npx supabase login              # Authenticate CLI (opens browser)
+npx supabase link --project-ref pnnuqwdcgoympgddrvze  # Link to remote project
+npm run db:pull                 # Download all remote migrations
+```
+
+### Workflow
+
+1. **Pull existing schema** (first time or to sync): npm run db:pull
+2. **Create a new migration** after making changes:
+   - Dashboard changes: npm run db:pull to capture them
+   - Writing SQL locally: npm run db:new NAME to create a blank migration, then edit the file
+   - Local schema changes to diff: npm run db:diff to auto-generate migration SQL
+3. **Push migrations to remote**: npm run db:push
+4. **Check status**: npm run db:status to see which migrations have been applied
+
+### Rules
+
+- Never edit an already-applied migration, always create a new one
+- Commit all migration files to git
+- Migration filenames follow the pattern YYYYMMDDHHMMSS_name.sql
+- The supabase/ directory is tracked in git (except .temp/ which is gitignored)
 
 ## Conventions
 

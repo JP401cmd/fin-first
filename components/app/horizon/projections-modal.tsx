@@ -45,12 +45,14 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
     }
 
     const r = returnRate / 100
-    const f = computeFireProjection(effectiveInput, r)
+    const s = swr / 100
+    const inf = inflation / 100
+    const f = computeFireProjection(effectiveInput, r, s, inf)
     setFire(f)
     setRange({
-      optimistic: computeFireProjection(effectiveInput, Math.min(r + 0.02, 0.12)),
+      optimistic: computeFireProjection(effectiveInput, Math.min(r + 0.02, 0.12), s, inf),
       expected: f,
-      pessimistic: computeFireProjection(effectiveInput, Math.max(r - 0.03, 0.02)),
+      pessimistic: computeFireProjection(effectiveInput, Math.max(r - 0.03, 0.02), s, inf),
     })
   }, [input, extraMonthly, workDays, swr, returnRate, inflation, open])
 
@@ -192,7 +194,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
               </p>
             </div>
             <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
-              <ThreeLineChart input={input} returnRate={returnRate} extraMonthly={extraMonthly} workDays={workDays} fireTarget={fire.fireTarget} />
+              <ThreeLineChart input={input} returnRate={returnRate} extraMonthly={extraMonthly} workDays={workDays} fireTarget={fire.fireTarget} swr={swr} />
             </div>
           </section>
         </div>
@@ -201,9 +203,9 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
 }
 
 function ThreeLineChart({
-  input, returnRate, extraMonthly, workDays, fireTarget,
+  input, returnRate, extraMonthly, workDays, fireTarget, swr,
 }: {
-  input: HorizonInput; returnRate: number; extraMonthly: number; workDays: number; fireTarget: number
+  input: HorizonInput; returnRate: number; extraMonthly: number; workDays: number; fireTarget: number; swr: number
 }) {
   const incomeMultiplier = workDays / 5
   const adjusted: HorizonInput = {
@@ -212,9 +214,10 @@ function ThreeLineChart({
   }
 
   const r = returnRate / 100
-  const optimistic = projectForward(adjusted, 480, Math.min(r + 0.02, 0.12))
-  const expected = projectForward(adjusted, 480, r)
-  const pessimistic = projectForward(adjusted, 480, Math.max(r - 0.03, 0.02))
+  const s = swr / 100
+  const optimistic = projectForward(adjusted, 480, Math.min(r + 0.02, 0.12), s)
+  const expected = projectForward(adjusted, 480, r, s)
+  const pessimistic = projectForward(adjusted, 480, Math.max(r - 0.03, 0.02), s)
 
   // Sample every 12 months
   const sample = (data: ProjectionMonth[]) => data.filter((_, i) => i % 12 === 0 || i === data.length - 1)
