@@ -155,12 +155,11 @@ export default async function DashboardPage() {
           </div>
         </Link>
 
-        {/* De Wil — hidden until activation */}
-        {activated && (
-          <Link
-            href="/will"
-            className="group rounded-2xl border border-teal-200 bg-white p-6 transition-all hover:border-teal-300 hover:shadow-lg hover:shadow-teal-50 active:scale-[0.98] transition-transform"
-          >
+        {/* De Wil */}
+        <Link
+          href="/will"
+          className={`group rounded-2xl border border-teal-200 bg-white p-6 transition-all hover:border-teal-300 hover:shadow-lg hover:shadow-teal-50 active:scale-[0.98] transition-transform ${!activated ? 'opacity-75' : ''}`}
+        >
             <div className="mb-4 flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-50">
                 <FinnAvatar size={36} />
@@ -205,15 +204,13 @@ export default async function DashboardPage() {
             <div className="mt-5 flex items-center gap-1 text-xs font-medium text-teal-600 opacity-0 transition-opacity group-hover:opacity-100">
               Bekijken <ArrowRight className="h-3 w-3" />
             </div>
-          </Link>
-        )}
+        </Link>
 
-        {/* De Horizon — hidden until activation */}
-        {activated && (
-          <Link
-            href="/horizon"
-            className="group rounded-2xl border border-purple-200 bg-white p-6 transition-all hover:border-purple-300 hover:shadow-lg hover:shadow-purple-50 active:scale-[0.98] transition-transform"
-          >
+        {/* De Horizon */}
+        <Link
+          href="/horizon"
+          className={`group rounded-2xl border border-purple-200 bg-white p-6 transition-all hover:border-purple-300 hover:shadow-lg hover:shadow-purple-50 active:scale-[0.98] transition-transform ${!activated ? 'opacity-75' : ''}`}
+        >
             <div className="mb-4 flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50">
                 <FfinAvatar size={36} />
@@ -260,8 +257,7 @@ export default async function DashboardPage() {
             <div className="mt-5 flex items-center gap-1 text-xs font-medium text-purple-600 opacity-0 transition-opacity group-hover:opacity-100">
               Bekijken <ArrowRight className="h-3 w-3" />
             </div>
-          </Link>
-        )}
+        </Link>
       </div>
 
       {/* Freedom indicator */}

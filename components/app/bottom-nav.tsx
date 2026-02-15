@@ -27,20 +27,22 @@ export function BottomNav() {
   const pathname = usePathname()
   const { needsActivation } = useFeatureAccess()
 
-  const visibleTabs = tabs.filter(tab => !tab.requiresActivation || !needsActivation)
+  // Always show all tabs for discoverability
+  const visibleTabs = tabs
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200 bg-white/80 backdrop-blur-md safe-bottom md:hidden">
       <div className="flex items-center justify-around" style={{ height: 'var(--bottom-nav-height)' }}>
         {visibleTabs.map((tab) => {
           const isActive = pathname.startsWith(tab.href)
+          const isLocked = tab.requiresActivation && needsActivation
           const Icon = tab.icon
           return (
             <Link
               key={tab.href}
               href={tab.href}
               className={`tap-highlight relative flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium transition-colors ${
-                isActive ? activeColors[tab.color] : 'text-zinc-400'
+                isActive ? activeColors[tab.color] : isLocked ? 'text-zinc-300' : 'text-zinc-400'
               }`}
             >
               {isActive && (

@@ -6,18 +6,21 @@ import { usePathname } from 'next/navigation'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 
 const allNavItems = [
+  { label: 'Dashboard', href: '/dashboard', color: 'zinc', requiresActivation: false },
   { label: 'De Kern', href: '/core', color: 'amber', requiresActivation: false },
   { label: 'De Wil', href: '/will', color: 'teal', requiresActivation: true },
   { label: 'De Horizon', href: '/horizon', color: 'purple', requiresActivation: true },
 ] as const
 
 const activeClasses: Record<string, string> = {
+  zinc: 'text-zinc-900 border-zinc-500',
   amber: 'text-amber-600 border-amber-500',
   teal: 'text-teal-600 border-teal-500',
   purple: 'text-purple-600 border-purple-500',
 }
 
 const hoverClasses: Record<string, string> = {
+  zinc: 'hover:text-zinc-900',
   amber: 'hover:text-amber-600',
   teal: 'hover:text-teal-600',
   purple: 'hover:text-purple-600',
@@ -29,7 +32,8 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
 
   const { needsActivation } = useFeatureAccess()
 
-  const navItems = allNavItems.filter(item => !item.requiresActivation || !needsActivation)
+  // Always show all nav items in desktop nav for discoverability
+  const navItems = allNavItems
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white">
@@ -42,6 +46,7 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
           <nav className="hidden items-center gap-1 md:flex">
             {navItems.map((item) => {
               const isActive = pathname.startsWith(item.href)
+              const isLocked = item.requiresActivation && needsActivation
               return (
                 <Link
                   key={item.href}
@@ -49,7 +54,9 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
                   className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     isActive
                       ? `${activeClasses[item.color]} bg-zinc-50`
-                      : `text-zinc-600 ${hoverClasses[item.color]}`
+                      : isLocked
+                        ? 'text-zinc-400 hover:text-zinc-500'
+                        : `text-zinc-600 ${hoverClasses[item.color]}`
                   }`}
                 >
                   {item.label}
