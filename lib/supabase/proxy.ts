@@ -47,6 +47,7 @@ export async function updateSession(request: NextRequest) {
     '/test-breadcrumb',
     '/test-snapshots',
     '/test-holdings',
+    '/api/session-info',
   ]
 
   // Protected route prefixes that require authentication
