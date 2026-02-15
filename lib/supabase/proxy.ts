@@ -38,6 +38,7 @@ export async function updateSession(request: NextRequest) {
     '/signup',
     '/forgot-password',
     '/reset-password',
+    '/api/health',
   ]
 
   const { pathname } = request.nextUrl
