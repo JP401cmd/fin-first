@@ -12,7 +12,7 @@ import type { Budget } from '@/lib/budget-data'
 import type { NetWorthSnapshot } from '@/lib/net-worth-data'
 import {
   Calendar, TrendingUp, Sun, Star, Wallet, ShoppingCart,
-  PiggyBank, Building2, ArrowRight, Info, Camera, Download,
+  PiggyBank, Building2, ArrowRight, Info, Camera, Download, ChevronDown, Receipt,
 } from 'lucide-react'
 import { FeatureGate } from '@/components/app/feature-gate'
 
@@ -452,6 +452,16 @@ export default function CorePage() {
           subtitle="totale waarde"
           accent
         />
+        <FeatureGate featureId="box3_belasting">
+          <QuickLink
+            href="/core/belasting"
+            icon={<Receipt className="h-5 w-5 text-amber-600" />}
+            title="Box 3 Belasting"
+            value="Berekenen"
+            subtitle="vermogensrendementsheffing"
+            accent={false}
+          />
+        </FeatureGate>
       </section>
 
       {/* === Net Worth Chart === */}
@@ -523,14 +533,7 @@ export default function CorePage() {
             </p>
           </div>
           <FeatureGate featureId="data_export">
-          <div className="flex gap-2">
-            <ExportButton type="transactions" label="Transacties" />
-            <ExportButton type="budgets" label="Budgetten" />
-            <ExportButton type="net_worth" label="Vermogen" />
-            <ExportButton type="assets" label="Assets" />
-            <ExportButton type="debts" label="Schulden" />
-            <ExportButton type="goals" label="Doelen" />
-          </div>
+            <ExportDropdown />
           </FeatureGate>
         </div>
 
@@ -624,16 +627,48 @@ function QuickLink({
   )
 }
 
-function ExportButton({ type, label }: { type: string; label: string }) {
+const EXPORT_OPTIONS = [
+  { type: 'transactions', label: 'Transacties' },
+  { type: 'budgets', label: 'Budgetten' },
+  { type: 'net_worth', label: 'Vermogen' },
+  { type: 'assets', label: 'Assets' },
+  { type: 'debts', label: 'Schulden' },
+  { type: 'goals', label: 'Doelen' },
+]
+
+function ExportDropdown() {
+  const [open, setOpen] = useState(false)
+
   return (
-    <a
-      href={`/api/export?type=${type}`}
-      download
-      className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs font-medium text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700"
-    >
-      <Download className="h-3 w-3" />
-      {label}
-    </a>
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700"
+      >
+        <Download className="h-3.5 w-3.5" />
+        Export
+        <ChevronDown className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+            {EXPORT_OPTIONS.map(({ type, label }) => (
+              <a
+                key={type}
+                href={`/api/export?type=${type}`}
+                download
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+              >
+                <Download className="h-3.5 w-3.5 text-zinc-400" />
+                {label}
+              </a>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 
