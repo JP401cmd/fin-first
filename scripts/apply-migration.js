@@ -2,56 +2,83 @@
 /**
  * Database Migration Script
  *
- * This script applies the migration SQL to create new tables in Supabase.
- * Run: node scripts/apply-migration.js
+ * Applies migration SQL to Supabase using direct PostgreSQL connection.
+ * Run: DB_PASSWORD=your_db_password node scripts/apply-migration.js
+ *   or: node scripts/apply-migration.js your_db_password
  *
- * Requires SUPABASE_SERVICE_ROLE_KEY environment variable.
- * Get it from: Supabase Dashboard > Settings > API > service_role key
+ * Get DB password from: Supabase Dashboard > Settings > Database > Connection string
  */
 
 var fs = require('fs');
-var https = require('https');
 var path = require('path');
 
-var SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://pnnuqwdcgoympgddrvze.supabase.co';
-var SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+async function applyMigration() {
+  var postgres = (await import('postgres')).default;
+  var projectRef = 'pnnuqwdcgoympgddrvze';
+  var dbPassword = process.env.DB_PASSWORD || process.argv[2];
 
-if (!SERVICE_ROLE_KEY) {
-  console.error('ERROR: SUPABASE_SERVICE_ROLE_KEY is required');
-  console.error('Get it from: Supabase Dashboard > Settings > API > service_role key');
-  console.error('Run: SUPABASE_SERVICE_ROLE_KEY=your_key node scripts/apply-migration.js');
-  process.exit(1);
+  if (!dbPassword) {
+    console.error('ERROR: DB_PASSWORD environment variable or argument required');
+    console.error('Usage: DB_PASSWORD=your_password node scripts/apply-migration.js');
+    console.error('   or: node scripts/apply-migration.js your_password');
+    console.error('Get password from: Supabase Dashboard > Settings > Database');
+    process.exit(1);
+  }
+
+  var connectionString = 'postgresql://postgres.' + projectRef + ':' + dbPassword + '@aws-0-eu-central-1.pooler.supabase.com:6543/postgres';
+
+  console.log('Connecting to Supabase PostgreSQL...');
+  var sql = postgres(connectionString, {
+    ssl: 'require',
+    connection: { application_name: 'fin-migration' }
+  });
+
+  try {
+    var result = await sql`SELECT current_database(), current_user`;
+    console.log('Connected:', result[0]);
+
+    var migrationPath = path.join(__dirname, '..', 'supabase', 'migrations', '20260215000001_create_new_tables.sql');
+    var migrationSQL = fs.readFileSync(migrationPath, 'utf-8');
+
+    var statements = migrationSQL
+      .split(';')
+      .map(function(s) { return s.trim(); })
+      .filter(function(s) { return s.length > 0 && !s.startsWith('--'); });
+
+    console.log('Executing ' + statements.length + ' SQL statements...');
+
+    for (var i = 0; i < statements.length; i++) {
+      var stmt = statements[i];
+      var preview = stmt.substring(0, 80).replace(/\n/g, ' ');
+      try {
+        await sql.unsafe(stmt);
+        console.log('[' + (i + 1) + '/' + statements.length + '] OK: ' + preview + '...');
+      } catch (err) {
+        if (err.message.includes('already exists')) {
+          console.log('[' + (i + 1) + '/' + statements.length + '] SKIP (exists): ' + preview + '...');
+        } else {
+          console.error('[' + (i + 1) + '/' + statements.length + '] ERROR: ' + preview + '...');
+          console.error('  ' + err.message);
+        }
+      }
+    }
+
+    console.log('\nVerifying tables...');
+    var tables = await sql`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+      ORDER BY table_name
+    `;
+    console.log('Public tables:', tables.map(function(t) { return t.table_name; }).join(', '));
+
+    console.log('\nMigration complete!');
+  } catch (err) {
+    console.error('Migration failed:', err.message);
+    process.exit(1);
+  } finally {
+    await sql.end();
+  }
 }
 
-var migrationPath = path.join(__dirname, '..', 'supabase', 'migrations', '20260215000001_create_new_tables.sql');
-var sql = fs.readFileSync(migrationPath, 'utf8');
-
-// Split SQL into individual statements
-var statements = sql
-  .split(';')
-  .map(function(s) { return s.trim(); })
-  .filter(function(s) { return s.length > 0 && !s.startsWith('--'); });
-
-console.log('Found', statements.length, 'SQL statements to execute');
-console.log('Applying migration...\n');
-
-// Execute via Supabase SQL endpoint
-var url = new URL(SUPABASE_URL + '/rest/v1/rpc/');
-var data = JSON.stringify({ query: sql });
-
-var options = {
-  hostname: url.hostname,
-  port: 443,
-  path: '/rest/v1/',
-  method: 'POST',
-  headers: {
-    'apikey': SERVICE_ROLE_KEY,
-    'Authorization': 'Bearer ' + SERVICE_ROLE_KEY,
-    'Content-Type': 'application/json',
-  }
-};
-
-console.log('Note: This script requires the Supabase SQL endpoint.');
-console.log('For best results, use the Supabase Dashboard SQL Editor to run:');
-console.log('  supabase/migrations/20260215000001_create_new_tables.sql');
-console.log('\nOr use: npx supabase db push --linked');
+applyMigration();
