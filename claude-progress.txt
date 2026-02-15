@@ -1,3 +1,45 @@
+## Session 2026-02-15 (15) - Features #2 (skipped), #16, #17
+
+### Feature #2: Database schema applied correctly - SKIPPED
+- Still blocked: All Supabase MCP tools (apply_migration, execute_sql, list_tables) require user permission not granted
+- No service role key, no DB password, no Supabase CLI access available
+- Confirmed via REST API: all 7 required tables still missing (badges, user_badges, user_streaks, user_feature_visits, holdings, holding_transactions, next_step_completions)
+- net_worth_snapshots still missing new columns (freedom_percentage, fire_age, sovereignty_level, savings_rate, resilience_score)
+- Migration SQL ready at supabase/migrations/20260215000001_create_new_tables.sql
+- Feature skipped to end of queue (priority 277)
+
+### Feature #16: User login with invalid credentials shows error - PASSING
+- Navigated to /login page in browser
+- Filled email "test@example.com" and password "wrongpassword123"
+- Submitted form via "Inloggen" button
+- Error message "Invalid login credentials" displayed in red text
+- Page stays on /login (no redirect = no session created)
+- Supabase Auth returns 400 status for invalid credentials (expected)
+- Screenshot verified: clean error display below password field
+- No mock data patterns found
+- Zero JS errors (400 from Supabase Auth is expected for bad credentials)
+
+### Feature #17: User logout clears session completely - PASSING
+- Logout page at app/logout/page.tsx: server component calls supabase.auth.signOut() then redirect('/')
+- "Uitloggen" link in app-header.tsx navigates to /logout
+- Verified in browser: /logout redirects to / (landing page)
+- After logout, /dashboard redirects to /login?redirectTo=%2Fdashboard (no active session)
+- No localStorage auth usage in codebase (cookie-based auth only via @supabase/ssr)
+- signOut() clears auth cookies through server client's setAll() callback
+- Proxy middleware getClaims() returns null after signOut (confirmed by redirect behavior)
+- No mock data patterns found
+
+### Current Status
+- 42+/265 features passing (plus #16 and #17 from this session)
+- Feature #2 skipped (still blocked by Supabase DDL access)
+
+### Notes for Next Session
+- Turbopack on Windows: always rm -rf .next before starting, use turbopackFileSystemCacheForDev: false
+- Dev server port: use high ports (3040+) to avoid zombie process collisions
+- Supabase email rate limit (429) still prevents creating new confirmed test users
+- To unblock Feature #2: grant Supabase MCP tool permissions OR provide service role key/DB password
+- scripts/check-new-tables.js updated to also verify net_worth_snapshots columns
+
 ## Session 2026-02-15 (14) - Feature #48
 
 ### Feature #48: Breadcrumb navigation shows correct hierarchy - PASSING
