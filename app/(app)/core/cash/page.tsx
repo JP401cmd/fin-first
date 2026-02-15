@@ -738,7 +738,9 @@ export default function CashPage() {
       <section className="mt-6">
         {sortedDates.length === 0 ? (
           <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
-            <p className="text-sm text-zinc-500">Geen transacties in deze maand.</p>
+            <Wallet className="mx-auto h-8 w-8 text-zinc-300" />
+            <p className="mt-2 text-sm font-medium text-zinc-600">Geen transacties gevonden</p>
+            <p className="mt-1 text-xs text-zinc-400">Er zijn geen transacties in {monthLabel}. Voeg een transactie toe of importeer je bankafschriften.</p>
           </div>
         ) : (
           <div className="space-y-4">

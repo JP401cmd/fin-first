@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
-  Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2,
+  Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2, BarChart3,
 } from 'lucide-react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import {
@@ -216,13 +217,22 @@ export default function AssetsPage() {
               {activeAssets.length} actieve asset{activeAssets.length !== 1 ? 's' : ''}
             </p>
           </div>
-          <button
-            onClick={() => { setEditAsset(null); setShowForm(true) }}
-            className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
-          >
-            <Plus className="h-4 w-4" />
-            Asset toevoegen
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/core/assets/holdings"
+              className="inline-flex items-center gap-2 rounded-lg border border-amber-200 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Holdings
+            </Link>
+            <button
+              onClick={() => { setEditAsset(null); setShowForm(true) }}
+              className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+            >
+              <Plus className="h-4 w-4" />
+              Asset toevoegen
+            </button>
+          </div>
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -312,6 +322,13 @@ export default function AssetsPage() {
 
       {/* Asset list */}
       <section className="mt-6 space-y-2">
+        {assets.length === 0 && (
+          <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
+            <TrendingUp className="mx-auto h-8 w-8 text-amber-400" />
+            <p className="mt-2 text-sm font-medium text-zinc-600">Geen assets geregistreerd</p>
+            <p className="mt-1 text-xs text-zinc-400">Voeg een asset toe om je vermogen te volgen.</p>
+          </div>
+        )}
         {assets.map((asset) => {
           const value = Number(asset.current_value)
           const purchase = Number(asset.purchase_value)
