@@ -43,14 +43,33 @@ export async function updateSession(request: NextRequest) {
     '/api/dev-login',
   ]
 
+  // Protected route prefixes that require authentication
+  const protectedPrefixes = [
+    '/dashboard',
+    '/core',
+    '/will',
+    '/horizon',
+    '/identity',
+    '/beheer',
+    '/onboarding',
+    '/api/',
+  ]
+
   const { pathname } = request.nextUrl
 
   const isPublicPath =
     publicPaths.includes(pathname) || pathname.startsWith('/auth/')
 
-  if (!user && !isPublicPath) {
+  const isProtectedPath = protectedPrefixes.some(prefix =>
+    pathname === prefix || pathname.startsWith(prefix + '/')
+  )
+
+  // Only redirect to login for known protected routes
+  // Unknown routes pass through so Next.js can show the 404 page
+  if (!user && !isPublicPath && isProtectedPath) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    url.searchParams.set('redirectTo', pathname)
     return NextResponse.redirect(url)
   }
 
