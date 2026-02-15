@@ -40,6 +40,7 @@ export async function updateSession(request: NextRequest) {
     '/reset-password',
     '/api/health',
     '/api/schema-check',
+    '/api/dev-login',
   ]
 
   const { pathname } = request.nextUrl
