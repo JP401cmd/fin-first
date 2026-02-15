@@ -44,6 +44,133 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'fin_prod_0.5',
+    date: '2026-02-15',
+    title: 'Beveiliging, gamificatie & data-integriteit',
+    sections: [
+      {
+        module: 'De Kern',
+        color: 'amber',
+        items: [
+          {
+            title: 'Wachtwoord-reset volledig in het Nederlands',
+            description: 'Wachtwoord vergeten- en resetpagina\'s vertaald naar het Nederlands. Succesmelding met automatische redirect naar dashboard, wachtwoordvalidatie en "Terug naar inloggen" link.',
+          },
+          {
+            title: 'Budget-transactie kruiscontrole',
+            description: 'Nieuw /api/verify-budget-spending endpoint voor server-side verificatie dat budgetbestedingen overeenkomen met de werkelijke transactiesommen per categorie.',
+          },
+          {
+            title: 'Netto-vermogen snapshots API',
+            description: 'GET/POST /api/snapshots endpoint dat verrijkte snapshots retourneert met freedom_percentage en net_worth_matches verificatieveld. Snapshots worden berekend op basis van echte asset- en schulddata.',
+          },
+          {
+            title: 'Automatische waarderingen',
+            description: 'Bij elke wijziging van een asset- of schuldwaarde wordt automatisch een valuatie-record aangemaakt. Nieuwe /api/valuations endpoint voor het opvragen van waardehistorie.',
+          },
+          {
+            title: 'Holdings verwijderen geverifieerd',
+            description: 'CRUD-operaties voor holdings bevestigd met correcte user-scoping en database-verwijdering.',
+          },
+          {
+            title: 'Lege-staat berichten',
+            description: 'Informatieve lege-staat berichten voor de assets- en cashpagina wanneer er nog geen data is ingevoerd.',
+          },
+          {
+            title: 'Box 3 link en Escape-toets',
+            description: 'Box 3 Belasting-link toegevoegd aan het De Kern-overzicht. BottomSheet modals sluiten nu ook met de Escape-toets.',
+          },
+        ],
+      },
+      {
+        module: 'De Wil',
+        color: 'teal',
+        items: [
+          {
+            title: 'Data-aware volgende stappen',
+            description: 'De next-steps API bevraagt nu 7 database-tabellen parallel (transacties, budgetten, assets, schulden, snapshots, profielen, doelen) en sluit reeds voltooide stappen automatisch uit.',
+          },
+          {
+            title: 'Dynamische AI-persoonlijkheid per module',
+            description: 'ChatPanel detecteert de huidige module via het pad en past avatar, kleuren, begroeting en placeholder aan: FHIN (kern/amber), Will (wil/teal), FFIN (horizon/paars). Elk module heeft een apart chatgesprek.',
+          },
+        ],
+      },
+      {
+        module: 'Identiteit',
+        color: 'blue',
+        items: [
+          {
+            title: 'Badge-systeem',
+            description: '30 badges verdeeld over 8 categorieën met API endpoint en detailmodal op de Identity-pagina. Badges worden verdiend op basis van app-gebruik en financiële mijlpalen.',
+          },
+          {
+            title: 'Login-streak tracking',
+            description: 'Dagelijkse check-in via /api/streaks/checkin houdt je huidige en langste streak bij. Streak wordt gereset na een gemiste dag en opgehoogd bij opeenvolgende logins.',
+          },
+          {
+            title: 'Feature-bezoeken bijhouden',
+            description: 'Feature-bezoeken worden gesynchroniseerd naar de database via /api/feature-visits met dual opslag (localStorage + Supabase) voor snelle weergave en persistentie.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'User-scoped API-routes (RLS)',
+            description: 'Alle API-endpoints (transacties, budgetten, vermogen, assets, schulden, doelen, aanbevelingen, acties) bevatten nu user_id-filtering zodat gebruikers alleen hun eigen data kunnen benaderen.',
+          },
+          {
+            title: 'Admin-endpoint bescherming',
+            description: 'Dubbele-slash bug in proxy path-matching opgelost. /beheer en admin API\'s zijn nu correct afgeschermd: ongeauthenticeerd geeft redirect naar /login, niet-admin geeft redirect naar /dashboard of 403.',
+          },
+          {
+            title: 'JWT-sessie en token-rotatie',
+            description: 'Sessie-expiry bevestigd op 3600 seconden met refresh-token rotatie en 10 seconden hergebruikinterval. Nieuw /api/session-info endpoint voor JWT-inspectie.',
+          },
+          {
+            title: 'Route-bescherming en 404-pagina\'s',
+            description: 'Custom 404-pagina\'s voor onbekende routes. Ongeauthenticeerde gebruikers worden doorgestuurd naar /login met post-login redirect terug naar de oorspronkelijke pagina.',
+          },
+          {
+            title: 'Breadcrumb-navigatie',
+            description: 'Correcte hiërarchie voor alle core-subpagina\'s (De Kern > Budgetten, De Kern > Cash > Importeren). Alle oudersegmenten zijn klikbare links.',
+          },
+          {
+            title: 'Alle navigatie-items zichtbaar',
+            description: 'Navigatie toont nu alle items ongeacht sovereignty level, zodat gebruikers functies kunnen ontdekken. Vergrendelde items tonen een slot-icoon.',
+          },
+          {
+            title: 'Vergrendelde functies footer',
+            description: '"X meer functies beschikbaar" footer onderaan elke modulepagina met BottomSheet-overzicht van vergrendelde functies gegroepeerd per ontgrendelingsfase.',
+          },
+          {
+            title: 'LockedFeatureCard verbeterd',
+            description: 'Vergrendelde functiekaarten tonen nu een fase-badge en mini-voortgangsbalk die aangeeft hoe dicht de gebruiker bij ontgrendeling is.',
+          },
+          {
+            title: 'Fase-overgang modal CTA',
+            description: 'De call-to-action in de fase-overgangmodal navigeert naar de meest relevante pagina op basis van nieuw ontgrendelde functies.',
+          },
+          {
+            title: 'Landing page en auth-redirect',
+            description: 'Landingspagina geverifieerd voor ongeauthenticeerde bezoekers. Ingelogde gebruikers worden automatisch doorgestuurd naar het dashboard.',
+          },
+          {
+            title: 'Geen mock data',
+            description: 'Alle API-routes bevestigd op echte Supabase-data. Geen hardcoded testdata meer in productie-endpoints.',
+          },
+          {
+            title: 'Turbopack Windows-fix',
+            description: 'Cache-corruptie in Turbopack op Windows opgelost met aangepaste dev-scripts en cache-management.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: 'fin_prod_0.4',
     date: '2026-02-14',
     title: 'Configureerbare parameters & database migraties in git',
