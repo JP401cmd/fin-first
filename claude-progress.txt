@@ -1,3 +1,47 @@
+## Session 2026-02-15 (16) - Features #58, #59, #60
+
+### Feature #58: Freedom time calculations use real daily expenses - PASSING
+- Comprehensive code trace of all 3 pages: dashboard (server), core (client), horizon (client)
+- Dashboard: fetches transactions from Supabase, computes monthlyExpenses, calculates freedomPct, freedomYears/Months
+- Core page: fetches 9 parallel Supabase queries, passes real data to computeCoreData() which computes daysWonPerMonth, freeDaysPerYear, freedomYears/Months
+- Horizon page: fetches real data, passes to computeFireProjection() for freedom time
+- lib/mock-data.ts is a MISNOMER - contains only pure computation function computeCoreData(), no actual mock data
+- getMockSpending/getMockHistory in lib/budget-data.ts are dead code (not imported by any app code)
+- Zero mock data patterns (globalThis, devStore, mockDb, etc.) in app/, lib/, components/ directories
+- AI tool freedomCalcTool has optional monthlyExpenses with €2510 default, but this is only for AI chat, not the main UI
+
+### Feature #59: FIRE age calculation uses real financial data - PASSING
+- Dashboard: computeFireProjection(horizonInput) with all params from real Supabase data
+- Horizon page: same computation with real data + FIRE range (optimistic/expected/pessimistic)
+- HorizonInput: totalAssets, totalDebts, monthlyIncome, monthlyExpenses from transactions, monthlyContributions from assets, dateOfBirth from profiles
+- FIRE formula: compound growth projection with 7% return until net worth >= yearlyExpenses/0.04
+- fireAge = currentAge + projectedMonths/12 where currentAge from ageAtDate(dateOfBirth)
+- No hardcoded financial values in computation logic
+
+### Feature #60: Sovereignty level computed from real criteria - PASSING
+- Dashboard: computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPct, hasConsumerDebt) with all from real data
+- Identity page: fetches assets, debts, transactions from Supabase, computes all parameters from real data
+- consumerDebtTypes = ['personal_loan', 'credit_card', 'revolving_credit', 'payment_plan', 'car_loan']
+- Levels -2 to 6 based on monthsCovered, freedomPercentage thresholds
+- Chronology scale on identity page shows 9 levels across 4 phases with progress bars
+- All parameters verified from real Supabase queries (no hardcoded fallbacks)
+
+### Changes Made
+- No code changes needed - these were Real Data Verification features
+- proxy.ts: Already had `proxy` export from previous session (was `middleware` before)
+
+### Current Status
+- 3 features completed this session (#58, #59, #60)
+- Total: ~43/265 features passing
+- Dev server running on port 3082
+- Supabase email rate limit still blocks user creation for browser testing
+
+### Notes for Next Session
+- All calculation code verified to use real Supabase data
+- lib/mock-data.ts should be renamed to lib/core-calculations.ts to avoid confusion (misleading name)
+- getMockSpending/getMockHistory are dead code in lib/budget-data.ts
+- Landing page (/) returning 404 on fresh Turbopack build - may be a routing issue with proxy.ts
+
 ## Session 2026-02-15 (15) - Features #2 (skipped), #16, #17
 
 ### Feature #2: Database schema applied correctly - SKIPPED
