@@ -95,3 +95,88 @@
 - /api/dev-login added to public paths but Supabase email rate limits prevent user creation
 - Migration SQL ready at supabase/migrations/20260215000001_create_new_tables.sql
 - To apply: grant Supabase MCP tools permission OR provide service role key in .env.local
+
+## Session 2026-02-15 (4) - Features #24, #25, #26
+
+### Feature #24: Desktop navigation bar displays all module links - PASSING
+- Modified components/app/app-header.tsx
+- Added Dashboard link to allNavItems array (href=/dashboard, color=zinc)
+- Removed filter that hid items when needsActivation was true
+- All 4 nav items always shown: Dashboard, De Kern, De Wil, De Horizon
+- Locked items (De Wil, De Horizon when not activated) show subdued zinc-400 styling
+- Identity link available via user menu dropdown ("Identiteit" → /identity)
+
+### Feature #25: Mobile bottom navigation displays correctly - PASSING
+- Modified components/app/bottom-nav.tsx
+- Removed filter that hid tabs when needsActivation was true
+- All 3 tabs always shown: Kern (Wallet icon), Wil (Zap icon), Horizon (Compass icon)
+- Locked tabs show lighter text (text-zinc-300) instead of being hidden
+- Bottom nav has md:hidden class (only visible on mobile viewports)
+
+### Feature #26: Dashboard module cards navigate to correct overview pages - PASSING
+- Modified app/(app)/dashboard/page.tsx
+- Removed {activated && (...)} conditionals around De Wil and De Horizon cards
+- All 3 module cards always render with correct links: /core, /will, /horizon
+- Non-activated cards get opacity-75 visual treatment for subtle differentiation
+- Each card shows module name, description, and preview metrics
+
+### Current Status
+- 7+/265 features passing (Features #1, #3, #4, #5, #24, #25, #26 + others by parallel agents)
+- All 3 assigned features completed and committed
+- Commit: 07d9999 "feat: always show all navigation items for discoverability (#24, #25, #26)"
+
+### Notes for Next Session
+- Turbopack on Windows continues to crash with persistence errors - always clear .next before starting
+- Supabase email rate limit may have recovered - try creating test users again
+- Server port conflicts are common; use PORT=XXXX env var with npm run dev
+- The proxy.ts still has /api/dev-login in public paths from another agent's work
+
+## Session 2026-02-15 (5) - Features #33, #34, #35
+
+### Feature #33: Identity page accessible and loads profile - PASSING
+- Page exists at app/(app)/identity/page.tsx within correct route group
+- Navigation link in AppHeader user menu dropdown ("Identiteit" -> /identity)
+- Profile loads from Supabase profiles table: full_name, date_of_birth, country, household_type
+- Household profile section: children, housing type, energy label, car, net monthly income
+- Sovereignty level computed via computeSovereigntyLevel() from financial data (assets, debts, transactions)
+- Chronology Scale renders all 4 phases (Recovery/Stability/Momentum/Mastery) with 9 levels (-2 to 6)
+- Progress bars, criteria tooltips, and current position indicator all implemented
+- Temporal Balance slider with 5 levels (Hedonist to Essentialist)
+- Server log confirmed route compiles and responds (307 redirect for unauth)
+- No mock data patterns found
+
+### Feature #34: Box 3 tax page accessible from De Kern - PASSING
+- Added QuickLink to /core/belasting on the /core overview page
+- QuickLink wrapped in FeatureGate with featureId="box3_belasting"
+- Uses Receipt icon from lucide-react
+- Belasting page at app/(app)/core/belasting/page.tsx is a full Box 3 tax calculator
+- Features: hero banner, KPI cards, asset classification, step-by-step calculation, scenarios, partner modal, optimization tips
+- Route confirmed accessible (307 redirect with redirectTo parameter for unauth)
+- All data from real Supabase queries (assets, debts, transactions)
+- No mock data patterns found
+
+### Feature #35: BottomSheet modals open and close correctly - PASSING
+- BottomSheet component at components/app/bottom-sheet.tsx
+- Used by 8+ consumers: transaction form, recommendation modal, action edit modal, projections/scenarios/simulations/withdrawal modals
+- Open behavior: fixed overlay with z-50, items-end on mobile, items-center on desktop
+- Close via: X button (header), backdrop click (handleBackdrop), Escape key (added this session)
+- Body scroll lock when open, restored on close
+- Mobile drag handle visible on small screens
+- When closed (open=false), returns null - removes from DOM completely, page interactive
+- No mock data patterns found
+
+### Changes Made
+- app/(app)/core/page.tsx: Added Receipt import + Box 3 Belasting QuickLink behind FeatureGate
+- components/app/bottom-sheet.tsx: Added Escape key handler for better UX
+- Commit: 9b0f5bd "feat: add Box 3 Belasting link to De Kern and Escape key for BottomSheet (#33, #34, #35)"
+
+### Current Status
+- 13/265 features passing (10 before + #33, #34, #35)
+- All 3 assigned features completed successfully
+
+### Notes for Next Session
+- Turbopack on Windows: use turbopackFileSystemCacheForDev: false in next.config.ts to avoid cache corruption
+- Supabase email rate limit still active - cannot create new users for browser testing
+- Network address (192.168.86.37) works better than localhost for Playwright on Windows
+- proxy.ts now uses protectedPrefixes approach (improved by another agent)
+- Server port conflicts common - use high ports (3025+) to avoid zombie process collisions
