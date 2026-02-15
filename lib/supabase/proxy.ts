@@ -41,6 +41,7 @@ export async function updateSession(request: NextRequest) {
     '/api/health',
     '/api/schema-check',
     '/api/dev-login',
+    '/test-phase-modal',
   ]
 
   // Protected route prefixes that require authentication
@@ -75,6 +76,13 @@ export async function updateSession(request: NextRequest) {
   // Only redirect to login for known protected routes
   // Unknown routes pass through so Next.js can show the 404 page
   if (!user && !isPublicPath && isProtectedPath) {
+    // API routes should return 401 JSON instead of redirecting to login
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { error: 'Niet ingelogd' },
+        { status: 401 }
+      )
+    }
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     url.searchParams.set('redirectTo', pathname)
