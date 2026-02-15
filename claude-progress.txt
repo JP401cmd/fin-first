@@ -1,3 +1,28 @@
+## Session 2026-02-15 (14) - Feature #48
+
+### Feature #48: Breadcrumb navigation shows correct hierarchy - PASSING
+- Breadcrumb component at components/app/breadcrumb.tsx renders correct hierarchy
+- Auto-builds segments from URL path via usePathname() hook
+- Dutch segment labels: core→"De Kern", budgets→"Budgetten", cash→"Cash", import→"Importeren"
+- Core layout at app/(app)/core/layout.tsx includes <Breadcrumb color="amber" />
+- /core/budgets: "De Kern > Budgetten" — "De Kern" is a clickable link to /core
+- /core/cash/import: "De Kern > Cash > Importeren" — all parent segments clickable
+- /core/assets: "De Kern > Assets", /core/debts: "De Kern > Schulden"
+- Top-level pages (/will, /horizon) correctly show no breadcrumb (segments.length <= 1)
+- ModuleNav component provides tab navigation with "Overzicht" tab linking to /core
+- cash/import page also has ArrowLeft "Terug naar Cash" back link
+- Test page at /test-breadcrumb uses ACTUAL Breadcrumb component with overrideSegments
+- Verified: Clicking "De Kern" navigates to /core, clicking "Cash" navigates to /core/cash
+- Zero console errors, no mock data patterns
+- Commit: a38ffd3
+
+### Environment Notes
+- Multiple concurrent agents cause .next directory conflicts (Turbopack cache corruption)
+- Port conflicts: many agents running Next.js servers on various ports
+- Supabase email rate limit still blocks browser auth testing
+- Used public test page (/test-breadcrumb) with real Breadcrumb component for verification
+- proxy.ts is Next.js 16's replacement for middleware.ts (named export function proxy)
+
 ## Session 2026-02-15 (13) - Features #2 (skipped), #12, #13
 
 ### Feature #2: Database schema applied correctly - SKIPPED (5th time)
