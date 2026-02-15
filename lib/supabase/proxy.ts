@@ -54,6 +54,7 @@ export async function updateSession(request: NextRequest) {
     '/test-empty-states',
     '/test-valuations',
     '/test-budget-alerts',
+    '/api/test-budget-alerts',
     '/test-feature-visits',
     '/test-holdings',
     '/test-holding-transactions',

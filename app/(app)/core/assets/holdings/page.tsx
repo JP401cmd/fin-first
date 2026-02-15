@@ -1,0 +1,961 @@
+'use client'
+
+import { useEffect, useState, useCallback } from 'react'
+import { Plus, Trash2, X, TrendingUp, ArrowLeft, Loader2, Briefcase, Edit3, Receipt, ArrowUpRight, ArrowDownRight, DollarSign } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { formatCurrency } from '@/components/app/budget-shared'
+import Link from 'next/link'
+
+type Holding = {
+  id: string
+  user_id: string
+  asset_id: string | null
+  ticker: string | null
+  isin: string | null
+  name: string
+  units: number
+  avg_purchase_price: number
+  current_price: number | null
+  last_price_update: string | null
+  purchase_date: string | null
+  notes: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  // Extra fields from assets fallback
+  asset_type?: string
+  institution?: string
+  expected_return?: number
+  monthly_contribution?: number
+}
+
+export default function HoldingsPage() {
+  const [holdings, setHoldings] = useState<Holding[]>([])
+  const [totalValue, setTotalValue] = useState(0)
+  const [totalCost, setTotalCost] = useState(0)
+  const [source, setSource] = useState<string>('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [editHolding, setEditHolding] = useState<Holding | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [txHolding, setTxHolding] = useState<Holding | null>(null)
+
+  const loadHoldings = useCallback(async () => {
+    try {
+      setError(null)
+      const res = await fetch('/api/holdings')
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`)
+      }
+      const data = await res.json()
+      setHoldings(data.holdings || [])
+      setTotalValue(data.total_value || 0)
+      setTotalCost(data.total_cost || 0)
+      setSource(data.source || '')
+    } catch (err) {
+      setError('Kon holdings niet laden. Probeer het opnieuw.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadHoldings()
+  }, [loadHoldings])
+
+  async function handleDelete(id: string) {
+    try {
+      const res = await fetch(`/api/holdings?id=${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Verwijderen mislukt')
+      setHoldings((prev) => prev.filter((h) => h.id !== id))
+      setDeleteConfirm(null)
+    } catch {
+      setError('Kon holding niet verwijderen')
+    }
+  }
+
+  const totalReturn = totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-6xl px-6 py-12">
+        <div className="flex items-center justify-center py-20">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mx-auto max-w-6xl px-6 py-8">
+      {/* Header */}
+      <section className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <Link
+            href="/core/assets"
+            className="inline-flex items-center gap-1 text-sm text-amber-600 hover:text-amber-700"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Assets
+          </Link>
+        </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-zinc-900">Holdings</h1>
+            <p className="mt-1 text-sm text-zinc-500">
+              {holdings.length} actieve holding{holdings.length !== 1 ? 's' : ''} in je portfolio
+            </p>
+          </div>
+          <button
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+          >
+            <Plus className="h-4 w-4" />
+            Holding toevoegen
+          </button>
+        </div>
+
+        {/* KPI Stats */}
+        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
+          <div>
+            <p className="text-xs font-medium text-zinc-500 uppercase">Totale waarde</p>
+            <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalValue)}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-zinc-500 uppercase">Totale kostprijs</p>
+            <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalCost)}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-zinc-500 uppercase">Rendement</p>
+            {totalCost > 0 ? (
+              <p className={`mt-1 text-xl font-bold ${totalReturn >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {totalReturn >= 0 ? '+' : ''}{totalReturn.toFixed(1)}%
+                <span className="ml-1 text-sm font-medium">
+                  ({totalReturn >= 0 ? '+' : ''}{formatCurrency(totalValue - totalCost)})
+                </span>
+              </p>
+            ) : (
+              <p className="mt-1 text-xl font-bold text-zinc-400">-</p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Error */}
+      {error && (
+        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4">
+          <p className="text-sm text-red-700">{error}</p>
+          <button
+            onClick={() => { setError(null); setLoading(true); loadHoldings() }}
+            className="mt-2 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+          >
+            Opnieuw proberen
+          </button>
+        </div>
+      )}
+
+      {/* Holdings list */}
+      <section className="mt-6 space-y-2">
+        {holdings.length === 0 && !loading && (
+          <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center">
+            <Briefcase className="mx-auto h-10 w-10 text-zinc-300" />
+            <p className="mt-3 text-sm font-medium text-zinc-600">Nog geen holdings</p>
+            <p className="mt-1 text-xs text-zinc-400">
+              Voeg je eerste holding toe om je portfolio te volgen.
+            </p>
+            <button
+              onClick={() => setShowForm(true)}
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+            >
+              <Plus className="h-4 w-4" />
+              Eerste holding toevoegen
+            </button>
+          </div>
+        )}
+
+        {holdings.map((holding) => {
+          const price = holding.current_price ?? holding.avg_purchase_price
+          const value = price * holding.units
+          const cost = holding.avg_purchase_price * holding.units
+          const returnPct = cost > 0 ? ((value - cost) / cost) * 100 : 0
+
+          return (
+            <div
+              key={holding.id}
+              className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 transition-colors hover:border-amber-200 hover:bg-amber-50/30"
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-50">
+                <TrendingUp className="h-4 w-4 text-amber-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-zinc-900">{holding.name}</p>
+                <p className="truncate text-xs text-zinc-500">
+                  {holding.ticker && <span className="font-medium text-amber-600">{holding.ticker}</span>}
+                  {holding.ticker && holding.units > 0 && ' · '}
+                  {holding.units > 0 && `${holding.units} eenheden`}
+                  {holding.institution && ` · ${holding.institution}`}
+                  {holding.purchase_date && ` · ${new Date(holding.purchase_date).toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' })}`}
+                </p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-sm font-semibold text-zinc-900">{formatCurrency(value)}</p>
+                {cost > 0 && (
+                  <p className={`text-xs font-medium ${returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}%
+                  </p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  onClick={() => setTxHolding(holding)}
+                  className="rounded-lg p-1.5 text-zinc-400 hover:bg-emerald-50 hover:text-emerald-600"
+                  title="Transactie registreren"
+                >
+                  <Receipt className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setEditHolding(holding)}
+                  className="rounded-lg p-1.5 text-zinc-400 hover:bg-amber-50 hover:text-amber-600"
+                  title="Bewerken"
+                >
+                  <Edit3 className="h-4 w-4" />
+                </button>
+                {deleteConfirm === holding.id ? (
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => handleDelete(holding.id)}
+                      className="rounded-lg bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700"
+                    >
+                      Ja
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirm(null)}
+                      className="rounded-lg border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                    >
+                      Nee
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setDeleteConfirm(holding.id)}
+                    className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600"
+                    title="Verwijderen"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </section>
+
+      {/* New holding form modal */}
+      {showForm && (
+        <HoldingForm
+          onClose={() => setShowForm(false)}
+          onSaved={() => {
+            setShowForm(false)
+            setLoading(true)
+            loadHoldings()
+          }}
+        />
+      )}
+
+      {/* Edit holding form modal */}
+      {editHolding && (
+        <HoldingEditForm
+          holding={editHolding}
+          onClose={() => setEditHolding(null)}
+          onSaved={() => {
+            setEditHolding(null)
+            setLoading(true)
+            loadHoldings()
+          }}
+        />
+      )}
+
+      {/* Transaction form modal */}
+      {txHolding && (
+        <HoldingTransactionForm
+          holding={txHolding}
+          onClose={() => setTxHolding(null)}
+          onSaved={() => {
+            setTxHolding(null)
+            setLoading(true)
+            loadHoldings()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Holding form modal ─────────────────────────────────────────
+
+function HoldingForm({
+  onClose,
+  onSaved,
+}: {
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [name, setName] = useState('')
+  const [ticker, setTicker] = useState('')
+  const [units, setUnits] = useState('1')
+  const [avgPrice, setAvgPrice] = useState('')
+  const [currentPrice, setCurrentPrice] = useState('')
+  const [purchaseDate, setPurchaseDate] = useState('')
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSave() {
+    if (!name) return
+    setSaving(true)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/holdings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          ticker: ticker || null,
+          units: Number(units) || 1,
+          avg_purchase_price: Number(avgPrice) || 0,
+          current_price: currentPrice ? Number(currentPrice) : null,
+          purchase_date: purchaseDate || null,
+          notes: notes || null,
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Kon holding niet opslaan')
+      }
+
+      onSaved()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Onbekende fout')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-bold text-zinc-900">Nieuwe holding</h3>
+          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
+            <p className="text-xs text-red-600">{error}</p>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">Naam *</label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                placeholder="VWRL ETF"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">Ticker / ISIN</label>
+              <input
+                value={ticker}
+                onChange={(e) => setTicker(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                placeholder="VWRL"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">Aantal eenheden</label>
+              <input
+                type="number"
+                step="0.001"
+                value={units}
+                onChange={(e) => setUnits(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">Gem. aankoopprijs</label>
+              <input
+                type="number"
+                step="0.01"
+                value={avgPrice}
+                onChange={(e) => setAvgPrice(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">Huidige prijs</label>
+              <input
+                type="number"
+                step="0.01"
+                value={currentPrice}
+                onChange={(e) => setCurrentPrice(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">Aankoopdatum</label>
+              <input
+                type="date"
+                value={purchaseDate}
+                onChange={(e) => setPurchaseDate(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-zinc-600">Notities (optioneel)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+          >
+            Annuleren
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !name}
+            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+          >
+            {saving ? 'Opslaan...' : 'Toevoegen'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Holding edit form modal ────────────────────────────────────
+
+function HoldingEditForm({
+  holding,
+  onClose,
+  onSaved,
+}: {
+  holding: Holding
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [name, setName] = useState(holding.name)
+  const [ticker, setTicker] = useState(holding.ticker || '')
+  const [units, setUnits] = useState(String(holding.units))
+  const [avgPrice, setAvgPrice] = useState(String(holding.avg_purchase_price))
+  const [currentPrice, setCurrentPrice] = useState(String(holding.current_price ?? ''))
+  const [notes, setNotes] = useState(holding.notes || '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const newValue = (Number(currentPrice) || Number(avgPrice) || 0) * (Number(units) || 1)
+  const oldValue = (holding.current_price ?? holding.avg_purchase_price) * holding.units
+
+  async function handleSave() {
+    if (!name) return
+    setSaving(true)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/holdings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: holding.id,
+          name,
+          ticker: ticker || null,
+          units: Number(units) || 1,
+          avg_purchase_price: Number(avgPrice) || 0,
+          current_price: currentPrice ? Number(currentPrice) : null,
+          notes: notes || null,
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Kon holding niet bijwerken')
+      }
+
+      onSaved()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Onbekende fout')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-bold text-zinc-900">Holding bewerken</h3>
+          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
+            <p className="text-xs text-red-600">{error}</p>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">Naam *</label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">Ticker / ISIN</label>
+              <input
+                value={ticker}
+                onChange={(e) => setTicker(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">Aantal eenheden</label>
+              <input
+                type="number"
+                step="0.001"
+                value={units}
+                onChange={(e) => setUnits(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">Gem. aankoopprijs</label>
+              <input
+                type="number"
+                step="0.01"
+                value={avgPrice}
+                onChange={(e) => setAvgPrice(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">Huidige prijs</label>
+              <input
+                type="number"
+                step="0.01"
+                value={currentPrice}
+                onChange={(e) => setCurrentPrice(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Live value preview */}
+          <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-amber-700">Portfolio waarde (deze holding)</span>
+              <span className="text-sm font-bold text-zinc-900">{formatCurrency(newValue)}</span>
+            </div>
+            {newValue !== oldValue && (
+              <p className={`mt-1 text-xs font-medium ${newValue >= oldValue ? 'text-emerald-600' : 'text-red-600'}`}>
+                {newValue >= oldValue ? '+' : ''}{formatCurrency(newValue - oldValue)} t.o.v. huidige waarde
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-zinc-600">Notities (optioneel)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+          >
+            Annuleren
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !name}
+            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+          >
+            {saving ? 'Bijwerken...' : 'Bijwerken'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Holding transaction form modal ─────────────────────────────
+
+type HoldingTransaction = {
+  id: string
+  holding_id: string
+  type: 'buy' | 'sell' | 'dividend'
+  units: number
+  price_per_unit: number
+  total_amount: number
+  date: string
+  notes: string | null
+  created_at: string
+}
+
+function HoldingTransactionForm({
+  holding,
+  onClose,
+  onSaved,
+}: {
+  holding: Holding
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [txType, setTxType] = useState<'buy' | 'sell' | 'dividend'>('buy')
+  const [units, setUnits] = useState('')
+  const [pricePerUnit, setPricePerUnit] = useState(
+    String(holding.current_price ?? holding.avg_purchase_price ?? '')
+  )
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [transactions, setTransactions] = useState<HoldingTransaction[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(true)
+  const [tab, setTab] = useState<'new' | 'history'>('new')
+
+  // Load transaction history on mount
+  useEffect(() => {
+    async function loadHistory() {
+      try {
+        const res = await fetch(`/api/holding-transactions?holding_id=${holding.id}`)
+        if (res.ok) {
+          const data = await res.json()
+          setTransactions(data.transactions || [])
+        }
+      } catch {
+        // Silently fail — history is informational
+      } finally {
+        setLoadingHistory(false)
+      }
+    }
+    loadHistory()
+  }, [holding.id])
+
+  const totalAmount = (Number(units) || 0) * (Number(pricePerUnit) || 0)
+
+  // Preview: what the holding will look like after the transaction
+  const currentUnits = holding.units
+  const currentAvg = holding.avg_purchase_price
+  let previewUnits = currentUnits
+  let previewAvg = currentAvg
+
+  if (txType === 'buy' && Number(units) > 0) {
+    previewUnits = currentUnits + Number(units)
+    previewAvg = previewUnits > 0
+      ? (currentUnits * currentAvg + Number(units) * Number(pricePerUnit)) / previewUnits
+      : Number(pricePerUnit)
+  } else if (txType === 'sell' && Number(units) > 0) {
+    previewUnits = Math.max(0, currentUnits - Number(units))
+  }
+
+  async function handleSave() {
+    if (!units || !pricePerUnit || !date) return
+    setSaving(true)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/holding-transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          holding_id: holding.id,
+          type: txType,
+          units: Number(units),
+          price_per_unit: Number(pricePerUnit),
+          date,
+          notes: notes || null,
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Kon transactie niet opslaan')
+      }
+
+      onSaved()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Onbekende fout')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const typeConfig = {
+    buy: { label: 'Koop', icon: ArrowDownRight, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', ring: 'ring-emerald-500' },
+    sell: { label: 'Verkoop', icon: ArrowUpRight, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', ring: 'ring-red-500' },
+    dividend: { label: 'Dividend', icon: DollarSign, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', ring: 'ring-amber-500' },
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-zinc-100 px-6 pt-5 pb-3">
+          <div>
+            <h3 className="text-lg font-bold text-zinc-900">Transactie registreren</h3>
+            <p className="text-xs text-zinc-500">{holding.name} {holding.ticker ? `(${holding.ticker})` : ''}</p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-zinc-100 px-6">
+          <button
+            onClick={() => setTab('new')}
+            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'new' ? 'border-amber-500 text-amber-700' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}
+          >
+            Nieuwe transactie
+          </button>
+          <button
+            onClick={() => setTab('history')}
+            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'history' ? 'border-amber-500 text-amber-700' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}
+          >
+            Geschiedenis {transactions.length > 0 && `(${transactions.length})`}
+          </button>
+        </div>
+
+        {/* Tab content */}
+        <div className="px-6 py-4">
+          {tab === 'new' && (
+            <>
+              {error && (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
+                  <p className="text-xs text-red-600">{error}</p>
+                </div>
+              )}
+
+              {/* Transaction type selector */}
+              <div className="mb-4">
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Type transactie</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['buy', 'sell', 'dividend'] as const).map((t) => {
+                    const cfg = typeConfig[t]
+                    const Icon = cfg.icon
+                    return (
+                      <button
+                        key={t}
+                        onClick={() => setTxType(t)}
+                        className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-all ${
+                          txType === t
+                            ? `${cfg.bg} ${cfg.border} ${cfg.color} ring-1 ${cfg.ring}`
+                            : 'border-zinc-200 text-zinc-500 hover:bg-zinc-50'
+                        }`}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        {cfg.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Fields */}
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600">
+                      {txType === 'dividend' ? 'Bedrag per eenheid' : 'Aantal eenheden'} *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.001"
+                      value={units}
+                      onChange={(e) => setUnits(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                      placeholder={txType === 'dividend' ? '1' : '10'}
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600">Prijs per eenheid *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={pricePerUnit}
+                      onChange={(e) => setPricePerUnit(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                      placeholder="50.00"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600">Datum *</label>
+                    <input
+                      type="date"
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600">Totaal bedrag</label>
+                    <div className="flex items-center rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2 text-sm font-medium text-zinc-700">
+                      {formatCurrency(totalAmount)}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-zinc-600">Notities (optioneel)</label>
+                  <input
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                    placeholder="Maandelijkse aankoop..."
+                  />
+                </div>
+              </div>
+
+              {/* Preview: holding after transaction */}
+              {Number(units) > 0 && txType !== 'dividend' && (
+                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                  <p className="text-xs font-medium text-amber-700 mb-1">Na transactie:</p>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-zinc-600">
+                      {currentUnits} <span className="text-zinc-400">→</span> {previewUnits.toFixed(3)} eenheden
+                    </span>
+                    <span className="font-medium text-zinc-900">
+                      Gem. prijs: {formatCurrency(previewAvg)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  onClick={onClose}
+                  className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+                >
+                  Annuleren
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving || !units || !pricePerUnit || !date}
+                  className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${
+                    txType === 'buy' ? 'bg-emerald-600 hover:bg-emerald-700' :
+                    txType === 'sell' ? 'bg-red-600 hover:bg-red-700' :
+                    'bg-amber-600 hover:bg-amber-700'
+                  }`}
+                >
+                  {saving ? 'Opslaan...' : `${typeConfig[txType].label} registreren`}
+                </button>
+              </div>
+            </>
+          )}
+
+          {tab === 'history' && (
+            <div className="max-h-80 overflow-y-auto">
+              {loadingHistory && (
+                <div className="flex items-center justify-center py-8">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+                </div>
+              )}
+
+              {!loadingHistory && transactions.length === 0 && (
+                <div className="py-8 text-center">
+                  <Receipt className="mx-auto h-8 w-8 text-zinc-300" />
+                  <p className="mt-2 text-sm text-zinc-500">Nog geen transacties geregistreerd</p>
+                </div>
+              )}
+
+              {!loadingHistory && transactions.length > 0 && (
+                <div className="space-y-2">
+                  {transactions.map((tx) => {
+                    const cfg = typeConfig[tx.type] || typeConfig.buy
+                    const Icon = cfg.icon
+                    return (
+                      <div key={tx.id} className="flex items-center gap-3 rounded-lg border border-zinc-100 p-2.5">
+                        <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${cfg.bg}`}>
+                          <Icon className={`h-3.5 w-3.5 ${cfg.color}`} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-zinc-900">
+                            {cfg.label}: {tx.units} eenhe{tx.units === 1 ? 'id' : 'den'} @ {formatCurrency(tx.price_per_unit)}
+                          </p>
+                          <p className="text-xs text-zinc-400">
+                            {new Date(tx.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            {tx.notes && ` — ${tx.notes}`}
+                          </p>
+                        </div>
+                        <span className={`shrink-0 text-xs font-semibold ${cfg.color}`}>
+                          {tx.type === 'sell' ? '-' : '+'}{formatCurrency(tx.total_amount)}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
