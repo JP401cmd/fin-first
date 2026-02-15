@@ -985,6 +985,20 @@ function AssetForm({
 
     if (isEdit && asset) {
       await supabase.from('assets').update(row).eq('id', asset.id)
+
+      // Auto-track valuation when current_value changes
+      const newValue = Number(currentValue) || 0
+      const oldValue = Number(asset.current_value)
+      if (newValue !== oldValue && newValue > 0) {
+        await supabase.from('valuations').upsert({
+          user_id: user.id,
+          entity_type: 'asset',
+          entity_id: asset.id,
+          valuation_date: new Date().toISOString().split('T')[0],
+          value: newValue,
+          notes: `Waarde bijgewerkt van ${oldValue} naar ${newValue}`,
+        }, { onConflict: 'entity_id,valuation_date' })
+      }
     } else {
       await supabase.from('assets').insert(row)
     }

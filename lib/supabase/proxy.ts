@@ -52,6 +52,7 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-budget-spending',
     '/test-budget-verify',
     '/test-empty-states',
+    '/test-valuations',
     '/test-feature-visits',
   ]
 

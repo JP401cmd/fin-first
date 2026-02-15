@@ -826,6 +826,20 @@ function DebtForm({
 
     if (isEdit && debt) {
       await supabase.from('debts').update(row).eq('id', debt.id)
+
+      // Auto-track valuation when current_balance changes
+      const newBalance = Number(currentBalance) || 0
+      const oldBalance = Number(debt.current_balance)
+      if (newBalance !== oldBalance && newBalance > 0) {
+        await supabase.from('valuations').upsert({
+          user_id: user.id,
+          entity_type: 'debt',
+          entity_id: debt.id,
+          valuation_date: new Date().toISOString().split('T')[0],
+          value: newBalance,
+          notes: `Saldo bijgewerkt van ${oldBalance} naar ${newBalance}`,
+        }, { onConflict: 'entity_id,valuation_date' })
+      }
     } else {
       await supabase.from('debts').insert(row)
     }
