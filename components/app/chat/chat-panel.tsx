@@ -3,12 +3,90 @@
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useChatContext } from './chat-provider'
-import { FinnAvatar } from '@/components/app/avatars'
+import { FhinAvatar, FinnAvatar, FfinAvatar } from '@/components/app/avatars'
 import { ActionEditModal } from '@/components/app/action-edit-modal'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { X, Send, Loader2, Zap, Check } from 'lucide-react'
+import type { AIDomain } from '@/lib/ai/dna/types'
+
+/* ── Domain config per module ─────────────────────────────────────── */
+
+type DomainConfig = {
+  domain: AIDomain
+  name: string
+  subtitle: string
+  placeholder: string
+  greeting: string
+  greetingDescription: string
+  fabBg: string
+  fabAvatar: (size: number) => React.ReactNode
+  headerColor: string
+  bubbleBg: string
+  accentColor: string
+  sendBg: string
+  sendHoverBg: string
+}
+
+const DOMAIN_CONFIGS: Record<AIDomain, DomainConfig> = {
+  kern: {
+    domain: 'kern',
+    name: 'FHIN',
+    subtitle: 'Financieel bewaker',
+    placeholder: 'Vraag FHIN iets over je financien...',
+    greeting: 'Hoi, ik ben FHIN',
+    greetingDescription: 'Ik bewaar je financiele waarheid — vermogen, budgetten, transacties en vrijheidstijd.',
+    fabBg: 'bg-amber-600',
+    fabAvatar: (size: number) => <FhinAvatar size={size} />,
+    headerColor: 'text-amber-600',
+    bubbleBg: 'bg-amber-50',
+    accentColor: 'text-amber-600',
+    sendBg: 'bg-amber-600',
+    sendHoverBg: 'hover:bg-amber-700',
+  },
+  wil: {
+    domain: 'wil',
+    name: 'Will',
+    subtitle: 'Financieel assistent',
+    placeholder: 'Vraag Will iets...',
+    greeting: 'Hoi, ik ben Will',
+    greetingDescription: 'Ik help je met al je financiele vragen — van budgetten tot FIRE-projecties.',
+    fabBg: 'bg-teal-600',
+    fabAvatar: (size: number) => <FinnAvatar size={size} />,
+    headerColor: 'text-teal-600',
+    bubbleBg: 'bg-teal-50',
+    accentColor: 'text-teal-600',
+    sendBg: 'bg-teal-600',
+    sendHoverBg: 'hover:bg-teal-700',
+  },
+  horizon: {
+    domain: 'horizon',
+    name: 'FFIN',
+    subtitle: 'Strateeg van De Horizon',
+    placeholder: 'Vraag FFIN iets over je toekomst...',
+    greeting: 'Hoi, ik ben FFIN',
+    greetingDescription: 'Ik analyseer je pad naar financiele vrijheid — projecties, scenario\'s en simulaties.',
+    fabBg: 'bg-purple-600',
+    fabAvatar: (size: number) => <FfinAvatar size={size} />,
+    headerColor: 'text-purple-600',
+    bubbleBg: 'bg-purple-50',
+    accentColor: 'text-purple-600',
+    sendBg: 'bg-purple-600',
+    sendHoverBg: 'hover:bg-purple-700',
+  },
+}
+
+/**
+ * Determine the AI domain based on the current route.
+ */
+function routeToDomain(pathname: string): AIDomain {
+  if (pathname.startsWith('/core')) return 'kern'
+  if (pathname.startsWith('/will')) return 'wil'
+  if (pathname.startsWith('/horizon')) return 'horizon'
+  // Default to 'wil' for dashboard and other pages
+  return 'wil'
+}
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -175,9 +253,14 @@ function ActionSuggestionCard({
 export function ChatPanel() {
   const { isOpen, close, toggle } = useChatContext()
   const router = useRouter()
+  const pathname = usePathname()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [input, setInput] = useState('')
+
+  // Determine domain from current route
+  const domain = routeToDomain(pathname)
+  const config = DOMAIN_CONFIGS[domain]
 
   // Track which suggestions have been added (by toolInvocationId)
   const [addedActions, setAddedActions] = useState<Set<string>>(new Set())
@@ -187,12 +270,12 @@ export function ChatPanel() {
   const [editAction, setEditAction] = useState<Action | null>(null)
 
   const transport = useMemo(
-    () => new DefaultChatTransport({ api: '/api/ai/chat', body: { domain: 'wil' } }),
-    [],
+    () => new DefaultChatTransport({ api: '/api/ai/chat', body: { domain } }),
+    [domain],
   )
 
   const { messages, sendMessage, status } = useChat({
-    id: 'chat-will',
+    id: `chat-${domain}`,
     transport,
   })
 
@@ -367,10 +450,10 @@ export function ChatPanel() {
     return (
       <button
         onClick={toggle}
-        className="fixed bottom-[calc(var(--bottom-nav-height)+1.5rem)] right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-teal-600 text-white shadow-lg transition-transform hover:scale-105 active:scale-95 md:bottom-6"
-        aria-label="Open chat"
+        className={`fixed bottom-[calc(var(--bottom-nav-height)+1.5rem)] right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full ${config.fabBg} text-white shadow-lg transition-transform hover:scale-105 active:scale-95 md:bottom-6`}
+        aria-label={`Open chat met ${config.name}`}
       >
-        <FinnAvatar size={36} />
+        {config.fabAvatar(36)}
       </button>
     )
   }
@@ -386,10 +469,10 @@ export function ChatPanel() {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
           <div className="flex items-center gap-2">
-            <FinnAvatar size={32} />
+            {config.fabAvatar(32)}
             <div>
-              <span className="text-sm font-semibold text-teal-600">Will</span>
-              <span className="ml-1 text-xs text-zinc-400">Financieel assistent</span>
+              <span className={`text-sm font-semibold ${config.headerColor}`}>{config.name}</span>
+              <span className="ml-1 text-xs text-zinc-400">{config.subtitle}</span>
             </div>
           </div>
           <button onClick={close} className="touch-target rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
@@ -401,12 +484,12 @@ export function ChatPanel() {
         <div className="flex-1 overflow-y-auto px-4 py-3">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <FinnAvatar size={64} />
-              <p className="mt-3 text-sm font-medium text-teal-600">
-                Hoi, ik ben Will
+              {config.fabAvatar(64)}
+              <p className={`mt-3 text-sm font-medium ${config.accentColor}`}>
+                {config.greeting}
               </p>
               <p className="mt-1 max-w-[260px] text-xs text-zinc-400">
-                Ik help je met al je financiële vragen — van budgetten tot FIRE-projecties.
+                {config.greetingDescription}
               </p>
             </div>
           )}
@@ -441,9 +524,9 @@ export function ChatPanel() {
             return (
               <div key={msg.id} className="mb-3 flex justify-start">
                 <div className="mr-2 mt-1 shrink-0">
-                  <FinnAvatar size={24} />
+                  {config.fabAvatar(24)}
                 </div>
-                <div className="max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed bg-teal-50 text-zinc-700">
+                <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${config.bubbleBg} text-zinc-700`}>
                   {renderAssistantMessage(parts)}
                 </div>
               </div>
@@ -453,10 +536,10 @@ export function ChatPanel() {
           {isStreaming && (messages.length === 0 || messages[messages.length - 1]?.role === 'user') && (
             <div className="mb-3 flex justify-start">
               <div className="mr-2 mt-1 shrink-0">
-                <FinnAvatar size={24} />
+                {config.fabAvatar(24)}
               </div>
-              <div className="rounded-2xl px-3 py-2 bg-teal-50">
-                <Loader2 className="h-4 w-4 animate-spin text-teal-600" />
+              <div className={`rounded-2xl px-3 py-2 ${config.bubbleBg}`}>
+                <Loader2 className={`h-4 w-4 animate-spin ${config.accentColor}`} />
               </div>
             </div>
           )}
@@ -472,7 +555,7 @@ export function ChatPanel() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKeyDown}
-              placeholder="Vraag Will iets..."
+              placeholder={config.placeholder}
               rows={1}
               className="max-h-24 flex-1 resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-300 focus:ring-1 focus:ring-zinc-200"
             />
@@ -480,7 +563,7 @@ export function ChatPanel() {
               type="button"
               onClick={submit}
               disabled={isStreaming || !input.trim()}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal-600 text-white transition-colors hover:bg-teal-700 disabled:bg-zinc-300 disabled:text-zinc-500"
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${config.sendBg} text-white transition-colors ${config.sendHoverBg} disabled:bg-zinc-300 disabled:text-zinc-500`}
             >
               <Send className="h-4 w-4" />
             </button>

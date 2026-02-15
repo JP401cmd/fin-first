@@ -42,6 +42,8 @@ export async function updateSession(request: NextRequest) {
     '/api/schema-check',
     '/api/dev-login',
     '/test-phase-modal',
+    '/test-chat',
+    '/test-locked-features',
   ]
 
   // Protected route prefixes that require authentication
