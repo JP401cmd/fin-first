@@ -39,6 +39,7 @@ export async function updateSession(request: NextRequest) {
     '/forgot-password',
     '/reset-password',
     '/api/health',
+    '/api/schema-check',
   ]
 
   const { pathname } = request.nextUrl
