@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
+import { BadgeGrid } from '@/components/app/badge-grid'
 
 // ── Temporal Balance levels ──────────────────────────────────────────
 
@@ -185,6 +186,11 @@ export default function IdentityPage() {
   const [sovereigntyLevel, setSovereigntyLevel] = useState(0)
   const [financialData, setFinancialData] = useState({ netWorth: 0, monthsCovered: 0, freedomPct: 0, hasConsumerDebt: false })
 
+  // Demo user state
+  const [isDemoUser, setIsDemoUser] = useState(false)
+  const [showSwitchDialog, setShowSwitchDialog] = useState(false)
+  const [switching, setSwitching] = useState(false)
+
   // UI state
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -216,6 +222,7 @@ export default function IdentityPage() {
         setEnergyLabel(data.energy_label ?? null)
         setHasCar(data.has_car ?? false)
         setNetMonthlyIncome(data.net_monthly_income ? String(data.net_monthly_income) : '')
+        setIsDemoUser(data.is_demo_user ?? false)
       }
 
       // Fetch financial data for sovereignty level calculation
@@ -331,6 +338,71 @@ export default function IdentityPage() {
           Wie ben je en hoe sta je in het leven? Deze instellingen vormen je persoonlijke profiel.
         </p>
       </div>
+
+      {/* ── Demo user banner ──────────────────────────────────────── */}
+      {isDemoUser && (
+        <section className="mb-6 rounded-2xl border-2 border-teal-200 bg-teal-50/50 p-6">
+          <div className="flex items-start gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-100">
+              <svg className="h-5 w-5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-teal-800">
+                Je verkent de app met voorbeelddata
+              </h3>
+              <p className="mt-1 text-sm text-teal-700">
+                Klaar om je eigen gegevens in te voeren? Je demo data wordt gewist en je doorloopt de onboarding met je eigen informatie.
+              </p>
+              <button
+                onClick={() => setShowSwitchDialog(true)}
+                disabled={switching}
+                className="mt-3 rounded-lg bg-teal-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-700 disabled:opacity-50"
+              >
+                {switching ? 'Bezig...' : 'Eigen data invoeren'}
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Switch from demo dialog */}
+      {showSwitchDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-zinc-900">Overstappen naar eigen data?</h3>
+            <p className="mt-2 text-sm text-zinc-600">
+              Alle demo data wordt gewist. Je doorloopt de onboarding opnieuw met je eigen informatie.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setShowSwitchDialog(false)}
+                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+              >
+                Annuleren
+              </button>
+              <button
+                onClick={async () => {
+                  setShowSwitchDialog(false)
+                  setSwitching(true)
+                  try {
+                    const res = await fetch('/api/onboarding/reset', { method: 'POST' })
+                    if (!res.ok) throw new Error('Reset failed')
+                    router.push('/onboarding')
+                  } catch {
+                    setSwitching(false)
+                    setSaveMessage({ type: 'error', text: 'Overstappen mislukt. Probeer opnieuw.' })
+                  }
+                }}
+                className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 transition-colors"
+              >
+                Overstappen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── A. Persoonlijke Gegevens ─────────────────────────────────── */}
       <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
@@ -858,22 +930,7 @@ export default function IdentityPage() {
           Verdien badges naarmate je groeit op je reis naar financiele vrijheid.
         </p>
 
-        <div className="flex items-center gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div
-              key={i}
-              className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-dashed border-zinc-200 bg-zinc-50"
-            >
-              <svg className="h-6 w-6 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 01-.982-3.172M9.497 14.25a7.454 7.454 0 00.981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 007.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M7.73 9.728a6.726 6.726 0 002.748 1.35m8.272-6.842V4.5c0 2.108-.966 3.99-2.48 5.228m2.48-5.492a46.32 46.32 0 012.916.52 6.003 6.003 0 01-5.395 4.972m0 0a6.726 6.726 0 01-2.749 1.35m0 0a6.772 6.772 0 01-3.044 0" />
-              </svg>
-            </div>
-          ))}
-        </div>
-
-        <p className="mt-4 text-sm text-zinc-400">
-          Badges worden binnenkort ontgrendeld.
-        </p>
+        <BadgeGrid />
       </section>
 
       {/* ── E. Gegevens resetten ──────────────────────────────────── */}

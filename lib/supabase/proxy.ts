@@ -64,6 +64,14 @@ export async function updateSession(request: NextRequest) {
     pathname === prefix || pathname.startsWith(prefix + '/')
   )
 
+  // Redirect authenticated users away from public auth pages to dashboard
+  const authPages = ['/', '/login', '/signup', '/forgot-password', '/reset-password']
+  if (user && authPages.includes(pathname)) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/dashboard'
+    return NextResponse.redirect(url)
+  }
+
   // Only redirect to login for known protected routes
   // Unknown routes pass through so Next.js can show the 404 page
   if (!user && !isPublicPath && isProtectedPath) {
