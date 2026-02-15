@@ -47,6 +47,7 @@ export async function updateSession(request: NextRequest) {
     '/test-breadcrumb',
     '/test-snapshots',
     '/test-holdings',
+    '/test-streaks',
     '/api/session-info',
   ]
 
