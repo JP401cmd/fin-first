@@ -53,7 +53,9 @@ export async function updateSession(request: NextRequest) {
     '/test-budget-verify',
     '/test-empty-states',
     '/test-valuations',
+    '/test-budget-alerts',
     '/test-feature-visits',
+    '/test-holdings',
   ]
 
   // Protected route prefixes that require authentication
