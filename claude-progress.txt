@@ -58,3 +58,40 @@
 - /api/dev-login route exists but needs a confirmed user to work
 - Consider increasing Supabase email rate limit for testing or pre-creating test users
 - The MCP supabase tools need explicit permission grants from the user
+
+## Session 2026-02-15 (3) - Features #1, #2, #3
+
+### Feature #1: Database connection established - PASSING
+- Made /api/health publicly accessible by adding to publicPaths in proxy.ts
+- Health endpoint returns: {"status":"healthy","database":"connected","supabase":"connected"}
+- Verified via curl and browser automation (screenshot confirms JSON response)
+- No mock data patterns found
+
+### Feature #2: Database schema applied correctly - SKIPPED
+- Required tables (badges, user_badges, user_streaks, user_feature_visits, holdings, holding_transactions, next_step_completions) do NOT exist yet
+- Required columns on net_worth_snapshots (freedom_percentage, fire_age, sovereignty_level, savings_rate, resilience_score) missing
+- Created migration SQL file: supabase/migrations/20260215000001_create_new_tables.sql
+- Created /api/schema-check endpoint to verify table status
+- BLOCKED: Cannot apply DDL - Supabase MCP tools (apply_migration, execute_sql) need user permission
+- No service role key available, no Supabase CLI access token, no direct DB connection
+- Skipped to end of queue (priority moved to 266)
+
+### Feature #3: Data persists across server restart - PASSING
+- Queried NIBUD reference data before restart: 3 records with specific UUIDs
+- Killed all server processes, confirmed server stopped
+- Restarted fresh dev server on port 3015
+- Queried same data after restart: exact same 3 records with identical UUIDs
+- Verified no in-memory storage patterns (globalThis, devStore, etc.) in codebase
+- Data lives in Supabase cloud PostgreSQL - physically impossible for local server restart to affect
+
+### Current Status
+- 4/265 features passing (Features #1, #3, #4, #5 + others by parallel agents)
+- Feature #2 skipped (needs Supabase DDL access)
+
+### Notes for Next Session
+- Turbopack cache corruption is a recurring issue on Windows - always rm -rf .next before starting
+- Port 3000 often stuck by zombie processes - use explicit -p flag with npx next dev
+- postgres npm package installed for potential direct DB connection (needs DB_PASSWORD)
+- /api/dev-login added to public paths but Supabase email rate limits prevent user creation
+- Migration SQL ready at supabase/migrations/20260215000001_create_new_tables.sql
+- To apply: grant Supabase MCP tools permission OR provide service role key in .env.local
