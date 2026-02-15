@@ -51,6 +51,7 @@ export async function updateSession(request: NextRequest) {
     '/api/session-info',
     '/api/verify-budget-spending',
     '/test-budget-verify',
+    '/test-empty-states',
   ]
 
   // Protected route prefixes that require authentication
