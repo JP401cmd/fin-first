@@ -44,6 +44,9 @@ export async function updateSession(request: NextRequest) {
     '/test-phase-modal',
     '/test-chat',
     '/test-locked-features',
+    '/test-breadcrumb',
+    '/test-snapshots',
+    '/test-holdings',
   ]
 
   // Protected route prefixes that require authentication
@@ -64,7 +67,7 @@ export async function updateSession(request: NextRequest) {
     publicPaths.includes(pathname) || pathname.startsWith('/auth/')
 
   const isProtectedPath = protectedPrefixes.some(prefix =>
-    pathname === prefix || pathname.startsWith(prefix + '/')
+    pathname === prefix || pathname.startsWith(prefix.endsWith('/') ? prefix : prefix + '/')
   )
 
   // Redirect authenticated users away from public auth pages to dashboard
