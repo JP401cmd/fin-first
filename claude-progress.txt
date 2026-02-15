@@ -234,3 +234,54 @@
 - Supabase email rate limit (4/hour) still prevents creating confirmed test users
 - To unblock Feature #2: grant Supabase MCP tool permissions OR provide service role key
 - To unblock full auth testing: either increase Supabase email rate limit or enable mailer_autoconfirm
+
+## Session 2026-02-15 (7) - Features #30, #31, #32
+
+### Feature #30: Browser back button works correctly across module pages - PASSING
+- Verified all navigation uses standard Next.js Link components (no router.replace, no history manipulation)
+- Dashboard -> /core via Link href="/core"
+- /core -> /core/budgets via QuickLink wrapping Link component
+- No router.replace() in the main navigation flow
+- No window.history, popstate, or history.pushState/replaceState usage
+- Browser back button tested on public pages (login -> signup -> back works)
+- Zero console errors during navigation
+
+### Feature #31: 404 page shown for invalid routes - PASSING
+- Created app/not-found.tsx with Dutch 404 message ("Deze pagina bestaat niet.")
+- Created app/(app)/not-found.tsx for authenticated 404s within app shell
+- Updated proxy.ts to use protectedPrefixes approach - only redirects known protected routes to login
+- Unknown routes pass through to Next.js which renders the custom 404 page
+- Links to "Naar startpagina" (/) and "Naar dashboard" (/dashboard) provided
+- Visual verification via screenshot: clean centered 404 layout
+- /core/invalid-subpage correctly redirects to login with redirectTo param (protected prefix)
+
+### Feature #32: Post-login redirect to originally requested page - PASSING
+- Proxy middleware sets redirectTo query param when redirecting unauthenticated users to login
+- Login page reads redirectTo from useSearchParams() wrapped in Suspense boundary
+- After successful login: router.push(redirectTo || '/dashboard')
+- Security: validates redirectTo starts with '/' to prevent open redirect attacks
+- Verified: GET /core/assets -> 307 -> /login?redirectTo=%2Fcore%2Fassets
+- Verified: GET /dashboard -> 307 -> /login?redirectTo=%2Fdashboard
+- Failed login preserves redirectTo in URL for retry
+- Zero console errors
+
+### Changes Made
+- app/api/dev-login/route.ts: Created dev-login endpoint for browser testing
+- next.config.ts: Added turbopackFileSystemCacheForDev: false
+- app/not-found.tsx: Created custom 404 page with Dutch text and navigation links
+- app/(app)/not-found.tsx: Created in-app 404 page
+- lib/supabase/proxy.ts: Updated to use protectedPrefixes + added redirectTo param
+- app/login/page.tsx: Refactored to read redirectTo and redirect after login
+- Commits: 8735035, 961ce47, e562196
+
+### Current Status
+- 3 features completed this session (#30, #31, #32)
+- Total estimated: 16+/265 passing (10 before this batch + 3 from session 5 + 3 this session)
+
+### Notes for Next Session
+- Turbopack on Windows: use turbopackFileSystemCacheForDev: false, always rm -rf .next before starting
+- NEXT_PRIVATE_LOCAL_WEBPACK=1 env flag forces webpack mode (more stable on Windows but causes config error)
+- Supabase email rate limit still blocks user creation for browser testing
+- Port 3020 used this session (3015 had zombie processes)
+- proxy.ts now uses protectedPrefixes to distinguish protected vs unknown routes
+- Login page uses Suspense boundary for useSearchParams()
