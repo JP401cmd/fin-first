@@ -1,3 +1,47 @@
+## Session 2026-02-15 (8) - Features #2 (skipped), #6, #7
+
+### Feature #2: Database schema applied correctly - SKIPPED (3rd time)
+- Supabase MCP tools (list_tables, execute_sql, apply_migration) all require user permission
+- No service role key, no DB password, no Supabase CLI access token available
+- Migration SQL file ready at supabase/migrations/20260215000001_create_new_tables.sql
+- Feature skipped to end of queue (priority 268)
+- BLOCKER: Need Supabase MCP tool permissions or service role key
+
+### Feature #6: Unauthenticated user cannot access /dashboard - PASSING
+- Started dev server on port 3045
+- Tested via curl: GET /dashboard returns 307 redirect to /login?redirectTo=%2Fdashboard
+- Browser verification: Playwright navigated to /dashboard, redirected to login page
+- Screenshot confirms clean login page with no financial data visible
+- Server-side 307 redirect means dashboard HTML never renders (no flash of content)
+- Zero console errors
+- No mock data patterns found
+
+### Feature #7: Unauthenticated user cannot access /core - PASSING
+- All /core routes tested via curl and Playwright browser:
+  - /core -> 307 -> /login?redirectTo=%2Fcore
+  - /core/budgets -> 307 -> /login?redirectTo=%2Fcore%2Fbudgets
+  - /core/cash -> 307 -> /login?redirectTo=%2Fcore%2Fcash
+  - /core/assets -> 307 -> /login?redirectTo=%2Fcore%2Fassets
+- Browser screenshots confirm clean login page, no financial data visible
+- Zero console errors
+- No mock data patterns found
+
+### How Auth Protection Works
+- proxy.ts (Next.js 16 middleware file) uses Supabase getClaims() to check auth
+- protectedPrefixes array includes /dashboard, /core, /will, /horizon, /identity, /beheer, /onboarding, /api/
+- Unauthenticated requests to protected routes get 307 redirect to /login with redirectTo param
+- Redirect is server-side so no client-side content flash occurs
+
+### Current Status
+- Features #6 and #7 marked passing
+- Feature #2 skipped (Supabase MCP tool permissions needed)
+- Total: 20/265 features passing (18 before + #6 + #7)
+
+### Notes for Next Session
+- Supabase MCP tools consistently blocked across all sessions - need user to grant permission
+- Dev server port 3045 used this session
+- No code changes needed for auth features - proxy.ts already handles everything correctly
+
 ## Session 2026-02-15 - Features #4 and #5
 
 ### Feature #4: No mock data patterns in codebase - PASSING
