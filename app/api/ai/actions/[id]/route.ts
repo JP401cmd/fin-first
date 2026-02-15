@@ -26,11 +26,12 @@ export async function PATCH(
     scheduled_week?: string | null
   }
 
-  // Fetch action first
+  // Fetch action first (scoped to current user for RLS)
   const { data: action, error: fetchError } = await supabase
     .from('actions')
     .select('*, recommendation:recommendations(id, recommendation_type, related_budget_slug, freedom_days_per_year)')
     .eq('id', id)
+    .eq('user_id', user.id)
     .single()
 
   if (fetchError || !action) {
@@ -54,6 +55,7 @@ export async function PATCH(
       .from('actions')
       .update(updates)
       .eq('id', id)
+      .eq('user_id', user.id)
       .select()
       .single()
 
@@ -74,6 +76,7 @@ export async function PATCH(
         updated_at: now,
       })
       .eq('id', id)
+      .eq('user_id', user.id)
 
     if (error) {
       return Response.json({ error: error.message }, { status: 500 })
@@ -112,6 +115,7 @@ export async function PATCH(
         updated_at: now,
       })
       .eq('id', id)
+      .eq('user_id', user.id)
 
     if (error) {
       return Response.json({ error: error.message }, { status: 500 })
@@ -130,6 +134,7 @@ export async function PATCH(
         updated_at: now,
       })
       .eq('id', id)
+      .eq('user_id', user.id)
 
     if (error) {
       return Response.json({ error: error.message }, { status: 500 })
@@ -161,6 +166,7 @@ export async function PATCH(
         updated_at: now,
       })
       .eq('id', id)
+      .eq('user_id', user.id)
 
     if (error) {
       return Response.json({ error: error.message }, { status: 500 })

@@ -26,9 +26,9 @@ export async function POST() {
   const dateStr = threeMonthsAgo.toISOString().split('T')[0]
 
   const [assetsRes, debtsRes, txRes, matrixRes] = await Promise.all([
-    supabase.from('assets').select('current_value').eq('is_active', true),
-    supabase.from('debts').select('current_balance, debt_type').eq('is_active', true),
-    supabase.from('transactions').select('amount, is_income').gte('date', dateStr),
+    supabase.from('assets').select('current_value').eq('user_id', user.id).eq('is_active', true),
+    supabase.from('debts').select('current_balance, debt_type').eq('user_id', user.id).eq('is_active', true),
+    supabase.from('transactions').select('amount, is_income').eq('user_id', user.id).gte('date', dateStr),
     supabase.from('app_settings').select('value').eq('key', 'feature_phase_matrix').single(),
   ])
 

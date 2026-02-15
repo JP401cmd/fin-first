@@ -27,11 +27,12 @@ export async function PATCH(
     }>
   }
 
-  // Fetch the recommendation first
+  // Fetch the recommendation first (scoped to current user for RLS)
   const { data: recommendation, error: fetchError } = await supabase
     .from('recommendations')
     .select('*')
     .eq('id', id)
+    .eq('user_id', user.id)
     .single()
 
   if (fetchError || !recommendation) {
@@ -41,11 +42,12 @@ export async function PATCH(
   const now = new Date().toISOString()
 
   if (body.action === 'accept') {
-    // Update recommendation status
+    // Update recommendation status (user-scoped)
     const { error: updateError } = await supabase
       .from('recommendations')
       .update({ status: 'accepted', decided_at: now, updated_at: now })
       .eq('id', id)
+      .eq('user_id', user.id)
 
     if (updateError) {
       return Response.json({ error: updateError.message }, { status: 500 })
@@ -100,6 +102,7 @@ export async function PATCH(
         updated_at: now,
       })
       .eq('id', id)
+      .eq('user_id', user.id)
 
     if (updateError) {
       return Response.json({ error: updateError.message }, { status: 500 })
@@ -129,6 +132,7 @@ export async function PATCH(
         updated_at: now,
       })
       .eq('id', id)
+      .eq('user_id', user.id)
 
     if (updateError) {
       return Response.json({ error: updateError.message }, { status: 500 })

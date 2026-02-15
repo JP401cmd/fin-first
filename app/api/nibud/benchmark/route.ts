@@ -54,10 +54,12 @@ export async function GET() {
     supabase
       .from('budgets')
       .select('id, slug, budget_type')
+      .eq('user_id', user.id)
       .order('sort_order'),
     supabase
       .from('transactions')
       .select('budget_id, amount, is_income')
+      .eq('user_id', user.id)
       .gte('date', dateStr),
   ])
 
