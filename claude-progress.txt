@@ -1,3 +1,58 @@
+## Session 2026-02-15 (10) - Features #2 (skipped), #10, #11
+
+### Feature #2: Database schema applied correctly - SKIPPED (4th time)
+- Supabase MCP tools (list_tables, execute_sql, apply_migration, deploy_edge_function) all blocked
+- No service role key, no DB password, no Supabase CLI access token available
+- Tried npx supabase CLI (v2.76.8) - needs access token not available
+- Migration SQL file ready at supabase/migrations/20260215000001_create_new_tables.sql
+- BLOCKER: Genuine external dependency - cannot apply DDL without admin credentials
+
+### Feature #10: Unauthenticated user cannot access API endpoints - PASSING
+- All 5 required endpoints tested with curl and browser (Playwright):
+  - GET /api/badges → 401 {"error":"Niet ingelogd"}
+  - GET /api/holdings → 401 {"error":"Niet ingelogd"}
+  - GET /api/streaks → 401 {"error":"Niet ingelogd"}
+  - POST /api/badges/evaluate → 401 {"error":"Niet ingelogd"}
+  - GET /api/next-steps → 401 {"error":"Niet ingelogd"}
+- Two-layer protection: proxy middleware (line 79-84) + individual route auth checks
+- Public endpoints (health, schema-check, dev-login) correctly return 200
+- Zero console errors, no mock data patterns
+
+### Feature #11: User can only see own financial data (RLS) - PASSING
+- Comprehensive security audit of ALL API routes completed
+- CRITICAL FIX: GET /api/export had NO user_id filtering on 6 data queries (data breach vulnerability)
+  - Added .eq('user_id', user.id) to transactions, budgets, net_worth, assets, debts, goals queries
+- HIGH FIX: PATCH /api/ai/recommendations/[id] missing ownership check
+  - Added .eq('user_id', user.id) to fetch + all update queries
+- HIGH FIX: PATCH /api/ai/actions/[id] missing ownership check
+  - Added .eq('user_id', user.id) to fetch + all 5 update queries
+- MEDIUM FIX: POST /api/activate had unscoped asset/debt/transaction queries
+  - Added .eq('user_id', user.id) to 3 queries
+- MEDIUM FIX: GET /api/nibud/benchmark had unscoped budget/transaction queries
+  - Added .eq('user_id', user.id) to 2 queries
+- All new API routes (badges, holdings, streaks, evaluate, next-steps) already properly scoped
+- Supabase client uses anon key + session cookies = RLS enforced at DB level
+- Migration file has proper RLS policies (auth.uid() = user_id) on all 7 new tables
+- No mock data patterns found
+
+### Changes Made
+- app/api/export/route.ts: Added user_id scoping to all 6 data export queries
+- app/api/ai/recommendations/[id]/route.ts: Added user_id ownership check to fetch + 3 updates
+- app/api/ai/actions/[id]/route.ts: Added user_id ownership check to fetch + 5 updates
+- app/api/activate/route.ts: Added user_id scoping to 3 financial data queries
+- app/api/nibud/benchmark/route.ts: Added user_id scoping to 2 queries
+- Commit: 22781f5
+
+### Current Status
+- 2 features completed this session (#10, #11), 1 skipped (#2)
+- Total: ~30/265 features passing
+
+### Notes for Next Session
+- Feature #2 (DB schema) still blocked - needs Supabase admin access
+- Security audit found and fixed 5 data exposure vulnerabilities
+- All API routes now have defense-in-depth: proxy middleware + route-level auth + explicit user_id scoping
+- Dev server running on port 3050
+
 ## Session 2026-02-15 (9) - Features #36, #37, #38
 
 ### Feature #36: Landing page renders for unauthenticated visitors - PASSING
