@@ -19,6 +19,8 @@ export default async function AppLayout({
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
+    // The proxy middleware normally handles auth redirects with redirectTo param.
+    // This is a fallback for edge cases (e.g., session expiry between proxy and layout).
     redirect('/login')
   }
 
