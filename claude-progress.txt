@@ -1,3 +1,26 @@
+## Session 2026-02-16 (latest) - Feature #2 Database Schema - SKIPPED (3rd time)
+
+### Feature #2: Database schema applied correctly - SKIPPED (BLOCKED)
+- BLOCKER: Supabase MCP server (https://mcp.supabase.com/mcp?project_ref=pnnuqwdcgoympgddrvze) returns HTTP 401
+- The MCP HTTP endpoint requires OAuth authentication that must be set up interactively by the user
+- All Supabase MCP tools (apply_migration, execute_sql, list_tables, list_migrations, get_project_url) return "permissions not granted"
+- Despite being listed in .claude/settings.local.json allowed permissions, the MCP server itself is unauthorized
+- No service_role_key or DB_PASSWORD available in .env.local (only anon key exists)
+- Verified via REST API: all 7 required tables MISSING (badges, user_badges, user_streaks, user_feature_visits, holdings, holding_transactions, next_step_completions)
+- Verified via REST API: net_worth_snapshots missing columns (freedom_percentage, fire_age, sovereignty_level, savings_rate, resilience_score)
+- Migration SQL ready at: supabase/migrations/20260215000001_create_new_tables.sql
+- API endpoint ready at: app/api/apply-migration/route.ts (needs db_password, service_role_key, or access_token)
+- Verification script at: scripts/verify-schema.mjs (confirms 0/7 tables exist)
+- TO UNBLOCK: User must either:
+  1. Authenticate the Supabase MCP server via OAuth (re-run `claude mcp add` for supabase), OR
+  2. Provide DB_PASSWORD or SUPABASE_SERVICE_ROLE_KEY in .env.local, OR
+  3. Run the migration SQL manually in Supabase Dashboard SQL Editor
+- Feature skipped to priority 296 (skipped 3 times total: sessions 2026-02-15(6), 2026-02-16, and now)
+
+### Current Status
+- 93/265 features passing
+- Feature #2 skipped again due to Supabase MCP OAuth blocker
+
 ## Session 2026-02-16 - Feature #96 Portfolio Allocation View - PASSING
 
 ### Feature #96: Portfolio allocation view updates with holdings changes - PASSING
