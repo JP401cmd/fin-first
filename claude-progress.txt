@@ -1,3 +1,35 @@
+## Session 2026-02-16 - Feature #123
+
+### Feature #123: Discover carousel shows unvisited features from database - PASSING
+- DiscoverCarousel component at components/app/discover-carousel.tsx already fully implemented
+- Component queries /api/feature-visits (GET) to fetch visited features from user_feature_visits table
+- Records visits via /api/feature-visits (POST) when a carousel item is clicked
+- Merges localStorage (instant) + database API (async) for fast UX with persistence
+- Sorts unvisited features first, visited items shown faded with opacity-60
+- Click handler: markFeatureVisitedLocal() + recordVisitToApi() + setVisited() state update
+- Used on all 3 module pages: /core, /will, /horizon
+- user_feature_visits table exists in Supabase with RLS policies (SELECT, INSERT, UPDATE)
+- API requires authentication: returns 401 for unauthenticated requests
+- Verification: 11/11 tests passing via /api/verify-discover-carousel
+- Visual verification via Playwright: all green checkmarks visible
+- Zero console errors, zero mock data patterns
+- Commit: 47d45fc
+
+### Changes Made
+- app/api/verify-discover-carousel/route.ts: Created 11-test verification endpoint
+- app/test-discover-carousel/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+
+### Current Status
+- 117/265 features passing (116 before + #123)
+- Feature #123 completed and committed
+
+### Notes for Next Session
+- Turbopack on Windows: always rm -rf .next before starting fresh server
+- DiscoverCarousel architecture: localStorage for instant UX, API for persistence
+- No confirmed test users available for full authenticated flow testing
+- Port 3000 used this session
+
 ## Session 2026-02-16 - Feature #119
 
 ### Feature #119: Streak indicator shows real streak count - PASSING
