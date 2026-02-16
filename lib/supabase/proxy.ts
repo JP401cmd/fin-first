@@ -160,6 +160,9 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-resilience-score',
     '/test-goal-progress-bar',
     '/api/verify-goal-progress-bar',
+    '/test-collapsible-persistence',
+    '/test-feature-visit-persistence',
+    '/api/verify-feature-visit-persistence',
   ]
 
   // Protected route prefixes that require authentication
