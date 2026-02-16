@@ -1,3 +1,35 @@
+## Session 2026-02-16 - Feature #149
+
+### Feature #149: Direct URL to /identity loads profile data - PASSING
+- Identity page at app/(app)/identity/page.tsx is a full client component (1010 lines)
+- Data flow on direct URL access:
+  1. Proxy middleware checks auth → /identity in protectedPrefixes → redirects unauthenticated to /login?redirectTo=/identity
+  2. App layout verifies auth via getUser() → fallback redirect to /login
+  3. Identity page loads profile from Supabase profiles table (full_name, date_of_birth, household_type, temporal_balance, etc.)
+  4. Fetches assets, debts, transactions for sovereignty level computation via computeSovereigntyLevel()
+  5. Renders Chronology Scale with current position ("Huidige positie") and next milestone ("Volgende mijlpaal")
+  6. BadgeEvaluator (force={true}) evaluates badges; BadgeGrid renders "Prestaties & Badges" section
+- 12/12 API verification tests passing at /api/verify-direct-identity
+- Visual verification via Playwright: test page shows all 12 green checkmarks
+- Zero console errors on fresh page load
+- No mock data patterns found (grep clean)
+- Unauthenticated access correctly returns 307 redirect to /login?redirectTo=%2Fidentity
+
+### Changes Made
+- app/api/verify-direct-identity/route.ts: Created 12-test verification endpoint
+- app/test-direct-identity/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: 5bd9c11
+
+### Current Status
+- 141/265 features passing (140 before + #149)
+- Feature #149 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- Identity page has extensive profile management: personal details, household profile, temporal balance, chronology scale, badges, freedom card
+- No new functionality needed — page already fully implemented with Supabase data loading
+
 ## Session 2026-02-16 - Feature #145
 
 ### Feature #145: Malformed holding ID in URL handled gracefully - PASSING
