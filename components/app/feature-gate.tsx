@@ -147,24 +147,29 @@ export function LockedFeatureCard({ featureId, currentPhase }: { featureId: stri
  * 8 seconds, then the children render normally without the spotlight.
  */
 export function NewFeatureSpotlight({ featureId, children }: { featureId: string; children: ReactNode }) {
-  const [showSpotlight, setShowSpotlight] = useState(true)
+  const [showSpotlight, setShowSpotlight] = useState(false)
 
   useEffect(() => {
-    // Check if this feature was already "seen" after the phase transition
+    // Check if this feature spotlight was already "seen" (persisted in localStorage)
     try {
       const key = `spotlight_seen_${featureId}`
-      if (sessionStorage.getItem(key)) {
-        setShowSpotlight(false)
+      if (localStorage.getItem(key)) {
+        // Already seen — never show again
         return
       }
-      // Auto-dismiss after 8 seconds and mark as seen
+      // First time seeing this feature — show spotlight
+      setShowSpotlight(true)
+      // Immediately mark as seen in localStorage so it never shows again
+      localStorage.setItem(key, '1')
+
+      // Auto-dismiss the visual spotlight after 8 seconds
       const timer = setTimeout(() => {
         setShowSpotlight(false)
-        sessionStorage.setItem(key, '1')
       }, 8000)
       return () => clearTimeout(timer)
     } catch {
-      // sessionStorage not available
+      // localStorage not available — show briefly then dismiss
+      setShowSpotlight(true)
       const timer = setTimeout(() => setShowSpotlight(false), 8000)
       return () => clearTimeout(timer)
     }

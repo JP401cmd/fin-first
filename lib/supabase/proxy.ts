@@ -163,6 +163,16 @@ export async function updateSession(request: NextRequest) {
     '/test-collapsible-persistence',
     '/test-feature-visit-persistence',
     '/api/verify-feature-visit-persistence',
+    '/test-back-button',
+    '/api/verify-back-button',
+    '/test-dismissed-next-step',
+    '/api/verify-dismissed-next-step',
+    '/test-chat-history',
+    '/api/verify-chat-history',
+    '/test-holding-edit-preservation',
+    '/api/verify-holding-edit-preservation',
+    '/test-spotlight-persistence',
+    '/api/verify-spotlight-persistence',
   ]
 
   // Protected route prefixes that require authentication
