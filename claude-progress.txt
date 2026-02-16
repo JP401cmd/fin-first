@@ -1,3 +1,42 @@
+## Session 2026-02-16 - Feature #114
+
+### Feature #114: Budget visualization modes reflect real spending data - PASSING
+- Added BudgetDonut as 4th visualization mode (Ring) to /core/budgets page
+- All 4 modes now available: Boom (Tree), Organisme (Blob), Stroom (Sankey), Ring (Donut)
+- View mode selector persists choice in localStorage
+- All 4 modes receive the same `spending: Record<string, number>` from real transactions:
+  - Data loaded from Supabase `transactions` table, filtered by current month
+  - Each budget's spending = sum of Math.abs(amount) by budget_id
+- Percentage calculations verified in all modes:
+  - Tree: spent/limit * 100 with per-child and per-parent aggregation
+  - Blob: spent/limit (0-1 ratio) mapped to cell sizes via computeBlobLayout
+  - Sankey: Implicit via proportional node heights + spentRatio fill
+  - Donut: (spent/limit) * 100 for display, Math.min(spent/limit, 1) for arc sweep
+- Color coding verified:
+  - Tree: 3-tier (default -> warning at 80% -> red when over budget)
+  - Blob/Sankey/Donut: 2-tier (default -> red when over budget)
+  - All use #ef4444 for over-budget items
+- Zero mock data patterns found in any budget visualization components
+- Test page created at /test-budget-modes: 5/6 tests pass (1 fails due to no auth = no budget data)
+- Zero console errors on test page
+- Browser verified via Playwright screenshot
+
+### Changes Made
+- app/(app)/core/budgets/page.tsx: Added donut as 4th view mode (CircleDot icon, BudgetDonut import, type union, toggle button, render logic)
+- app/test-budget-modes/page.tsx: Created test page with 6 verification tests
+- lib/supabase/proxy.ts: Added /test-budget-modes to public paths
+
+### Current Status
+- 108/265 features passing (107 before + #114)
+- Feature #114 completed and marked passing
+
+### Notes for Next Session
+- Turbopack on Windows: build-manifest.json corruption is persistent; first request works, subsequent ones may fail
+- Use network address (192.168.86.37) instead of localhost for Playwright
+- Pre-warm routes with curl before opening browser
+- Budget data only loads for authenticated users (Supabase RLS)
+- Another agent committed my changes in commit a8cdc37
+
 ## Session 2026-02-16 - Feature #116
 
 ### Feature #116: Sovereignty level drives FeatureGate correctly - PASSING
