@@ -7,6 +7,7 @@ import { FeatureAccessProvider } from '@/components/app/feature-access-provider'
 import { BottomNav } from '@/components/app/bottom-nav'
 import { MobilePreviewProvider } from '@/components/app/beheer/mobile-preview-provider'
 import { MobilePreviewFrame } from '@/components/app/beheer/mobile-preview-frame'
+import { ToastProvider } from '@/components/app/toast-provider'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
 import { PHASES } from '@/lib/feature-phases'
 
@@ -70,16 +71,18 @@ export default async function AppLayout({
   return (
     <MobilePreviewProvider>
       <MobilePreviewFrame>
-        <div className="min-h-screen bg-zinc-50">
-          <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
-          <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation}>
-            <main className="pb-20 md:pb-0">{children}</main>
-            <BottomNav />
-            <ChatProvider>
-              <ChatPanel />
-            </ChatProvider>
-          </FeatureAccessProvider>
-        </div>
+        <ToastProvider>
+          <div className="min-h-screen bg-zinc-50">
+            <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
+            <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation}>
+              <main className="pb-20 md:pb-0">{children}</main>
+              <BottomNav />
+              <ChatProvider>
+                <ChatPanel />
+              </ChatProvider>
+            </FeatureAccessProvider>
+          </div>
+        </ToastProvider>
       </MobilePreviewFrame>
     </MobilePreviewProvider>
   )

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { BadgeGrid } from '@/components/app/badge-grid'
+import { BadgeEvaluator } from '@/components/app/badge-evaluator'
 
 // ── Temporal Balance levels ──────────────────────────────────────────
 
@@ -922,6 +923,7 @@ export default function IdentityPage() {
       </section>
 
       {/* ── D. Prestaties & Badges ───────────────────────────────────── */}
+      <BadgeEvaluator force={true} />
       <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
         <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
           Prestaties & Badges

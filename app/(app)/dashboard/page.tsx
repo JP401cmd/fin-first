@@ -2,6 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { computeFireProjection, type HorizonInput } from '@/lib/horizon-data'
 import { formatCurrency } from '@/lib/format'
 import { FhinAvatar, FinnAvatar, FfinAvatar } from '@/components/app/avatars'
+import { JouwPadWidget } from '@/components/app/jouw-pad-widget'
+import { BadgeEvaluator } from '@/components/app/badge-evaluator'
+import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import Link from 'next/link'
 import {
   ArrowRight, Wallet, Zap, Compass,
@@ -26,7 +29,7 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('current_value, monthly_contribution').eq('is_active', true),
-    supabase.from('debts').select('current_balance').eq('is_active', true),
+    supabase.from('debts').select('current_balance, debt_type').eq('is_active', true),
     supabase.from('profiles').select('date_of_birth, last_known_phase').single(),
     supabase.from('budgets').select('id, default_limit, interval').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
     supabase.from('actions').select('id, status, freedom_days_impact').in('status', ['open', 'completed']),
@@ -90,8 +93,19 @@ export default async function DashboardPage() {
 
   const activated = profileResult.data?.last_known_phase !== null
 
+  // Sovereignty level calculation for Jouw Pad widget
+  const hasConsumerDebt = (debtsResult.data ?? []).some(d => {
+    const dt = (d as { debt_type?: string }).debt_type
+    return dt === 'credit_card' || dt === 'personal_loan' || dt === 'consumer'
+  })
+  const sovereigntyLevel = computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPct, hasConsumerDebt)
+  const currentPhaseId = levelToPhaseId(sovereigntyLevel)
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-10">
+      {/* Badge evaluation on dashboard load */}
+      <BadgeEvaluator />
+
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-zinc-900">
@@ -289,6 +303,15 @@ export default async function DashboardPage() {
               : `Verwacht FIRE-moment: ${fireProjResult.fireDate}`
           }
         </p>
+      </section>
+
+      {/* Jouw Pad widget */}
+      <section className="mt-6">
+        <JouwPadWidget
+          level={sovereigntyLevel}
+          phase={currentPhaseId}
+          freedomPct={freedomPct}
+        />
       </section>
     </div>
   )
