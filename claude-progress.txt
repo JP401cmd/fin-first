@@ -1,3 +1,25 @@
+## Session 2026-02-16 - Feature #105
+
+### Feature #105: AI chat handles API timeout gracefully - PASSING
+- Server-side: AbortController with 60s timeout (AI_TIMEOUT_MS = 60_000) in app/api/ai/chat/route.ts
+  - Detects timeout via DOMException with name='AbortError'
+  - Returns 504 with Dutch message: "Het AI-antwoord duurde te lang..."
+  - Returns 500 for other stream errors
+  - Context build errors caught with separate try/catch
+  - Client disconnect also aborts via req.signal
+- Client-side: Error banner in components/app/chat/chat-panel.tsx
+  - getErrorMessage() detects 5 error types: timeout, unauthorized, API key, network, generic
+  - Error banner with AlertTriangle icon, retry and dismiss buttons
+  - Chat history preserved during error state
+- Test page at /test-chat-timeout: 8/8 automated tests passing
+- Test API at /api/ai/chat-test-timeout with timeout/error/success modes
+- No mock data patterns found
+- Verified via Playwright: 8/8 tests passing with visual confirmation
+- Commit: 8375278
+
+### Current Status
+- 98/265 features passing (97 before + #105)
+
 ## Session 2026-02-16 (latest) - Feature #103
 
 ### Feature #103: Empty badge evaluation returns appropriate message - PASSING
