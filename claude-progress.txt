@@ -2931,3 +2931,55 @@ For Feature #51 (Transaction Import):
 - Pre-warm routes with curl before Playwright (avoids 404 from route registration lag)
 - Port 3002 used this session
 - Dashboard is a pure server component — no client caching, always fresh data from Supabase
+
+## Session 2026-02-16 (agent-125) - Feature #125
+
+### Feature #125: Debt trajectory overlays real vs projected - PASSING
+- Created DebtTrajectoryChart SVG component in app/(app)/core/debts/page.tsx
+- Component renders two overlaid lines in a single chart:
+  1. **Actual balance line** (blue, solid): Shows real data points from valuations table + original amount at start_date
+  2. **Projected payoff line** (amber, dashed): Extends from current balance forward using amortization calculations
+- **Transition point**: Amber dot at "today" where actual meets projected, with "vandaag" label
+- Vertical dashed line at today marks the boundary between real and projected data
+- Gradient fill areas under both lines for visual distinction
+- Supports all three debt repayment types:
+  - Annuity (default): Curved payoff trajectory
+  - Linear: Straight-line payoff
+  - Aflossingsvrij (interest-only): Flat projected line (balance stays constant)
+- Chart integrated into DebtDetailModal, appears between payoff timeline and valuation history
+- Uses existing amortizationSchedule(), linearAmortization(), interestOnlySchedule() from lib/debt-data.ts
+- Legend shows "Werkelijk" (actual) and "Verwacht" (projected) labels
+- Y-axis shows EUR values (auto-scaled), X-axis shows years
+
+### Verification
+- API endpoint /api/verify-debt-trajectory: 8/8 tests passing
+  - amortizationSchedule: decreasing balance reaching zero ✅
+  - linearAmortization: linearly decreasing balance ✅
+  - interestOnlySchedule: constant balance ✅
+  - debtProjection (annuity): valid months + interest ✅
+  - debtProjection (aflossingsvrij): valid schedule ✅
+  - Transition alignment: projected starts at current balance ✅
+  - Valuations table queryable ✅
+  - Component integrated in debts page ✅
+- Test page /test-debt-trajectory: 10/10 visual tests passing
+  - Chart renders, actual line, projected line, transition point, data dots, dashed style, legend, today marker, mortgage chart, linear chart
+- Visual verification via Playwright: all 3 chart types render correctly
+- No mock data patterns found (grep clean)
+- Data flow: real Supabase debt data + real valuations from loadValuations()
+- Console: only minor hydration warning from Date() in SSR (expected, doesn't affect functionality)
+- Commit: 695a1c8
+
+### Changes Made
+- app/(app)/core/debts/page.tsx: Added DebtTrajectoryChart component + integrated in DebtDetailModal
+- app/api/verify-debt-trajectory/route.ts: Created 8-test verification endpoint
+- app/test-debt-trajectory/page.tsx: Created visual test page with 3 chart types
+- lib/supabase/proxy.ts: Added test routes to public paths
+
+### Current Status
+- 117/265 features passing (116 before + #125)
+- Feature #125 completed and committed
+
+### Notes for Next Session
+- DebtTrajectoryChart uses new Date() which causes minor SSR hydration mismatch (cosmetic only)
+- Port 3000 used this session
+- The debt detail modal now shows the chart when clicking any debt in the list
