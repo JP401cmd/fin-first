@@ -93,6 +93,7 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-onboarding-reset',
     '/test-rec-workflow',
     '/api/test-rec-workflow',
+    '/test-fire-scenarios',
   ]
 
   // Protected route prefixes that require authentication
