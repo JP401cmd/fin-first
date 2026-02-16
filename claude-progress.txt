@@ -1,3 +1,53 @@
+## Session 2026-02-16 (23) - Feature #99 Network Error Import Handling
+
+### Feature #99: Network failure during transaction import shows error - PASSING
+
+**Implementation:**
+- Added `isNetworkFailure()` utility function (outside component) that detects:
+  - TypeError with "Failed to fetch", "NetworkError", "Network request failed", "Load failed"
+  - DOMException with AbortError
+  - Supabase errors containing "fetch", "network", "timeout", "econnrefused", "enotfound"
+- Enhanced `handleImport()` with:
+  - try-catch around each batch insert to catch network-level exceptions
+  - Batch progress tracking via `importedBatchIndex` state
+  - Visual progress bar showing X of Y transacties during import
+  - Resume from last successful batch on retry (prevents duplicate imports)
+  - Partial import notification: "X van Y transacties zijn al geïmporteerd"
+- Enhanced `checkDuplicates()` with network error handling and try-catch
+- Enhanced `loadInitialData()` (was useEffect init) with:
+  - Extracted to useCallback for retry support
+  - Network error detection on initial page load
+  - Retry button on loading error state
+- Updated error UI:
+  - Network errors: orange banner with WifiOff icon (distinct from red regular errors)
+  - "Opnieuw proberen" retry button with RefreshCw icon
+  - Context-aware retry: retries correct step (init load, duplicate check, or batch import)
+  - Progress bar on error showing how much was already imported
+
+**Verification:**
+- 15/15 code verification tests passing via /api/verify-network-error-import
+- Visual verification via /test-network-error-import showing all green
+- Import page compiles and serves correctly (HTTP 200)
+- No mock data patterns found (grep clean)
+- Zero JS console errors (only WebSocket HMR warnings, expected)
+
+### Changes Made
+- app/(app)/core/cash/import/page.tsx: Major network error handling overhaul
+- app/api/verify-network-error-import/route.ts: Verification API (15 tests)
+- app/test-network-error-import/page.tsx: Visual test page
+- lib/supabase/proxy.ts: Added test paths to public paths
+- Commit: d75826e "feat: add network error handling and retry for transaction import (#99)"
+
+### Current Status
+- 93/265 features passing (92 before + #99)
+- Feature #99 completed and committed
+
+### Notes for Next Session
+- Turbopack on Windows: always rm -rf .next before starting
+- Server running on port 3000 this session
+- No confirmed test users exist for browser auth testing
+- The import page is client-side only (no API route) - all parsing and DB writes via Supabase client
+
 ## Session 2026-02-16 (22) - Feature #2 Database Schema - SKIPPED (External Blocker)
 
 ### Feature #2: Database schema applied correctly - SKIPPED
