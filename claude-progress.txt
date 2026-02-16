@@ -1,3 +1,36 @@
+## Session 2026-02-16 - Feature #112
+
+### Feature #112: Large file upload shows progress and size limit - PASSING
+- Added file size validation to handleFileSelect in app/(app)/core/cash/import/page.tsx
+- MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 (10 MB limit)
+- When file exceeds limit:
+  - Shows clear Dutch error: 'Het bestand "X" is te groot (Y MB). De maximale bestandsgrootte is 10 MB.'
+  - Includes both actual file size and max allowed size in the message
+  - Resets file input so user can retry with a different file
+  - Does NOT start the parsing process (returns early before reading file content)
+- Upload area now shows "Maximale bestandsgrootte: 10 MB" text below format info
+- Drag-and-drop also covered (handleDrop triggers handleFileSelect via synthetic event)
+- Test page at /test-file-size-limit with 6 tests:
+  1. File size limit constant is defined (10 MB)
+  2. Oversized file shows clear error message
+  3. Error message includes file size limit
+  4. Error message includes actual file size
+  5. Small file is accepted (no error)
+  6. Upload area shows max file size info
+- All 6 tests passing, 0 console errors
+- No mock data patterns found
+- Verified via Playwright with real 11 MB and 0.2 KB test files
+
+### Changes Made
+- app/(app)/core/cash/import/page.tsx: Added MAX_FILE_SIZE_BYTES/LABEL constants, file size validation at start of handleFileSelect, "Maximale bestandsgrootte" text in upload area
+- app/test-file-size-limit/page.tsx: Created test page for file size validation
+- lib/supabase/proxy.ts: Added /test-file-size-limit to public paths
+- Commit: 407e1b9 "feat: add file size limit validation to bank file import (#112)"
+
+### Current Status
+- 106/265 features passing (105 before + #112)
+- Feature #112 completed and committed
+
 ## Session 2026-02-16 - Feature #109
 
 ### Feature #109: Invalid onboarding data shows helpful errors - PASSING
@@ -2524,3 +2557,42 @@ For Feature #51 (Transaction Import):
 - Webpack mode (without --turbopack) also has build-manifest.json issues on cold start
 - Pre-warm routes with curl before Playwright to avoid middleware-manifest.json errors
 - Port 3006 used this session
+
+## Session 2026-02-16 (3) - Feature #113
+
+### Feature #113: Dashboard KPI cards show real-time Supabase data - PASSING
+- Dashboard page at app/(app)/dashboard/page.tsx is an async server component (pure SSR)
+- Creates Supabase client via createClient() and runs 10 parallel queries via Promise.all():
+  - transactions (monthly income/expenses)
+  - assets (current_value, monthly_contribution)
+  - debts (current_balance, debt_type)
+  - profiles (date_of_birth, last_known_phase)
+  - budgets x3 (essential, all top-level, children)
+  - actions (status, freedom_days_impact)
+  - life_events (active count)
+  - recommendations (latest pending)
+- De Kern preview metrics: Net worth (totalAssets - totalDebts), Freedom % (netWorth / fireTarget * 100), Budget count
+- De Wil preview metrics: Open actions count, Freedom days potential (sum of freedom_days_impact), Latest recommendation title
+- De Horizon preview metrics: FIRE age (computeFireProjection), Countdown (years + months), Life events count
+- No client-side state (no 'use client', no useState, no useEffect) — every page visit re-executes all queries
+- No hardcoded financial values, no mock data patterns
+- RLS enforced: insert without auth blocked by row-level security policy
+- Verification: 8/8 tests passing via /api/verify-dashboard-kpis and /test-dashboard-kpis
+- Visual verification via Playwright screenshot: all 8 green checkmarks visible
+- Zero mock data patterns found (grep clean)
+- Commit: 0dafefc "feat: verify dashboard KPI cards show real-time Supabase data (#113)"
+
+### Changes Made
+- app/api/verify-dashboard-kpis/route.ts: Created 8-test verification endpoint
+- app/test-dashboard-kpis/page.tsx: Created visual test page for feature verification
+- lib/supabase/proxy.ts: Added test routes to public paths
+
+### Current Status
+- 106/265 features passing (105 before + #113)
+- Feature #113 completed and committed
+
+### Notes for Next Session
+- Turbopack on Windows: always rm -rf .next before starting fresh server
+- Pre-warm routes with curl before Playwright (avoids 404 from route registration lag)
+- Port 3002 used this session
+- Dashboard is a pure server component — no client caching, always fresh data from Supabase
