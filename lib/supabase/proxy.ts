@@ -148,6 +148,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-discover-carousel',
     '/test-debt-trajectory',
     '/api/verify-debt-trajectory',
+    '/test-ai-recommendations',
+    '/api/verify-ai-recommendations',
   ]
 
   // Protected route prefixes that require authentication
