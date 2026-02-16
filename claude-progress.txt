@@ -1,3 +1,33 @@
+## Session 2026-02-16 - Feature #140
+
+### Feature #140: Dismissed next step persists across sessions - PASSING
+- **Root cause**: NextStepSection component initialized dismissedKeys as empty Set() — never loaded previously dismissed steps from database
+- **Fix**: Added useEffect to NextStepSection that fetches /api/next-steps on mount and initializes dismissedKeys from dismissed_steps array
+- **Loading state**: Added `loaded` state flag to prevent flash of dismissed content before database query completes (renders null while loading)
+- **Full persistence flow**:
+  1. User clicks X on a next step suggestion → local state updated immediately + POST /api/next-steps/dismiss stores dismissal in next_step_completions table
+  2. On component mount (page load, navigation, login) → useEffect fetches GET /api/next-steps → response includes dismissed_steps array → merges into local state
+  3. Dismissed steps filtered out from visible suggestions
+  4. Works across sessions because database is source of truth
+- **Database**: next_step_completions table with UNIQUE(user_id, step_key) constraint, upsert behavior
+- **API**: POST /api/next-steps/dismiss (upserts dismissed=true), GET /api/next-steps (returns dismissed_steps array)
+- **Auth**: Dismiss API requires authentication (401 for unauthenticated), RLS enforces user isolation
+- **Verification**: 8/8 tests passing via /api/verify-dismissed-next-step
+- **Browser verification**: Dismiss workflow tested — dismissing all 3 Kern steps shows "Alles bij!" empty state
+- **Console**: Zero errors on test pages
+- **Mock data**: Zero mock data patterns found (grep clean)
+
+### Changes Made
+- components/app/next-step-card.tsx: Added useEffect to load dismissed keys from /api/next-steps on mount, added loading state
+- app/api/verify-dismissed-next-step/route.ts: Created 8-test verification endpoint
+- app/test-dismiss-persist/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added /test-dismiss-persist to public paths
+- Commit: ffee551
+
+### Current Status
+- 134/265 features passing (133 before + #140)
+- Feature #140 completed and committed
+
 ## Session 2026-02-16 - Feature #142
 
 ### Feature #142: Direct access to /core/assets loads correctly when authenticated - PASSING
