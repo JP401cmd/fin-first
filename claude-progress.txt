@@ -1,3 +1,59 @@
+## Session 2026-02-16 (21) - Feature #94 FIRE Scenario Comparison Workflow - PASSING
+
+### Feature #94: FIRE scenario comparison workflow - PASSING
+
+**What was implemented:**
+1. Updated `computeScenarios()` in `lib/horizon-data.ts` to accept market weather parameter and use weather-specific return rates for scenario calculations
+2. Added debt payoff strategy comparison section to `ScenariosModal` in `components/app/horizon/scenarios-modal.tsx`:
+   - Snowball vs Avalanche vs Current strategy comparison cards
+   - Interactive extra monthly payment slider (€0-€1,000)
+   - "BESTE" badge on optimal strategy
+   - Savings summary showing interest/time saved
+   - Payoff balance comparison chart (SVG) with 3 lines
+   - Strategy detail view showing payoff order for each debt
+3. Updated `app/(app)/horizon/page.tsx` to load full debt records and pass to ScenariosModal
+4. Created test page at `/test-fire-scenarios` with 10 automated tests
+
+**Verification (10/10 tests passing):**
+1. ✓ Default FIRE projection: age 51, target €930k, 14.5% freedom, 40.4% savings rate
+2. ✓ FIRE range: optimistic 49, expected 51, pessimistic 58
+3. ✓ Parameter adjustment: +€1000/mnd income → FIRE age 51→48 (3 years earlier)
+4. ✓ Three scenario paths: Drifter 66j, Current 49j, Optimizer 45j
+5. ✓ Market weather: Normal €7.7M vs Bear €126k (40yr net worth) — bear makes FIRE unreachable
+6. ✓ Snowball vs Avalanche differ: €3,889 vs €3,772 interest (€117 difference)
+7. ✓ Snowball targets smallest balance first: Autolening payoff month 14 (vs 25 in avalanche)
+8. ✓ Avalanche minimizes total interest: saves €117 vs snowball
+9. ✓ Visual projection data differs with parameter changes
+10. ✓ Optimized strategy beats current payoff: 43 vs 46 months
+
+**Browser verification:**
+- Interactive sliders update FIRE age/savings rate in real-time
+- Scenarios modal renders diverging paths chart correctly
+- Market weather buttons recalculate all scenarios (verified bear market → "Nooit / 67+")
+- Debt strategy comparison shows 3 cards with detailed metrics
+- Payoff comparison chart renders correctly
+- Zero console errors, zero warnings
+- No mock data patterns in production code
+
+**Files changed:**
+- lib/horizon-data.ts: Added `weather` parameter to `computeScenarios()`
+- components/app/horizon/scenarios-modal.tsx: Added debt strategy comparison UI (DebtStrategyComparison, StrategyCard, StrategyDetail, PayoffComparisonChart components)
+- app/(app)/horizon/page.tsx: Load full debt records, pass to ScenariosModal
+- app/test-fire-scenarios/page.tsx: Test page with 10 automated tests
+- lib/supabase/proxy.ts: Added /test-fire-scenarios to public paths
+
+**Commit:** 3da7963
+
+### Current Status
+- Feature #94 marked passing
+- 86+/265 features passing
+
+### Notes for Next Session
+- Turbopack on Windows: always rm -rf .next before starting to avoid stale cache 404s
+- Supabase email rate limit still blocks authenticated browser testing
+- Market weather parameter now properly propagates to scenario calculations
+- Debt comparison section only shows when debts exist (graceful fallback)
+
 ## Session 2026-02-16 (20) - Feature #93 Recommendation to Action to Freedom Days Workflow - PASSING
 
 ### Feature #93: Recommendation to action to freedom days workflow - PASSING
