@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 
 // Migration SQL statements - each must be executed individually
 const MIGRATION_STATEMENTS = [
@@ -131,96 +132,144 @@ const MIGRATION_STATEMENTS = [
 
 export async function POST(request: NextRequest) {
   try {
-    // Require either admin auth or a db_password in body
     const body = await request.json()
-    const { db_password } = body
+    const { db_password, service_role_key, access_token } = body
 
-    if (!db_password) {
-      return NextResponse.json(
-        { error: 'db_password is required in request body' },
-        { status: 400 }
-      )
+    if (!db_password && !service_role_key && !access_token) {
+      return NextResponse.json({
+        error: 'Provide one of: db_password, service_role_key, or access_token',
+        usage: {
+          option1: 'curl -X POST http://localhost:PORT/api/apply-migration -H "Content-Type: application/json" -d \'{"db_password":"YOUR_DB_PASSWORD"}\'',
+          option2: 'curl -X POST http://localhost:PORT/api/apply-migration -H "Content-Type: application/json" -d \'{"service_role_key":"YOUR_SERVICE_ROLE_KEY"}\'',
+          option3: 'curl -X POST http://localhost:PORT/api/apply-migration -H "Content-Type: application/json" -d \'{"access_token":"YOUR_SUPABASE_ACCESS_TOKEN"}\'',
+          where_to_find: {
+            db_password: 'Supabase Dashboard > Settings > Database > Connection string',
+            service_role_key: 'Supabase Dashboard > Settings > API > service_role key',
+            access_token: 'https://supabase.com/dashboard/account/tokens',
+          }
+        }
+      }, { status: 400 })
     }
 
-    // Use postgres npm package for direct DDL execution
     const ref = 'pnnuqwdcgoympgddrvze'
-    const connectionString = `postgresql://postgres.${ref}:${encodeURIComponent(db_password)}@aws-0-eu-central-1.pooler.supabase.com:5432/postgres`
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 
-    const postgres = (await import('postgres')).default
-    const sql = postgres(connectionString, {
-      ssl: 'require',
-      connect_timeout: 10,
-      idle_timeout: 5,
-    })
+    // Method 1: Direct PostgreSQL connection with db_password
+    if (db_password) {
+      const connectionString = `postgresql://postgres.${ref}:${encodeURIComponent(db_password)}@aws-0-eu-central-1.pooler.supabase.com:5432/postgres`
+      const postgres = (await import('postgres')).default
+      const sql = postgres(connectionString, {
+        ssl: 'require',
+        connect_timeout: 10,
+        idle_timeout: 5,
+      })
 
-    // Test connection
-    const testResult = await sql`SELECT current_database(), current_user`
-    const dbInfo = testResult[0]
+      const testResult = await sql`SELECT current_database(), current_user`
+      const dbInfo = testResult[0]
 
-    // Execute each migration statement
-    const results: Array<{ statement: string; status: 'ok' | 'skip' | 'error'; message?: string }> = []
-
-    for (const stmt of MIGRATION_STATEMENTS) {
-      const preview = stmt.substring(0, 80).replace(/\n/g, ' ').trim()
-      try {
-        await sql.unsafe(stmt)
-        results.push({ statement: preview, status: 'ok' })
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err)
-        if (message.includes('already exists')) {
-          results.push({ statement: preview, status: 'skip', message: 'Already exists' })
-        } else {
-          results.push({ statement: preview, status: 'error', message })
+      const results: Array<{ statement: string; status: 'ok' | 'skip' | 'error'; message?: string }> = []
+      for (const stmt of MIGRATION_STATEMENTS) {
+        const preview = stmt.substring(0, 80).replace(/\n/g, ' ').trim()
+        try {
+          await sql.unsafe(stmt)
+          results.push({ statement: preview, status: 'ok' })
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err)
+          if (message.includes('already exists')) {
+            results.push({ statement: preview, status: 'skip', message: 'Already exists' })
+          } else {
+            results.push({ statement: preview, status: 'error', message })
+          }
         }
       }
+
+      const verifyResult = await sql`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name`
+      const tables = verifyResult.map((r: { table_name: string }) => r.table_name)
+      const columnsResult = await sql`SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'net_worth_snapshots' ORDER BY ordinal_position`
+      await sql.end()
+
+      return NextResponse.json({
+        status: 'success',
+        method: 'direct_postgres',
+        connection: dbInfo,
+        summary: { total: results.length, success: results.filter(r => r.status === 'ok').length, skipped: results.filter(r => r.status === 'skip').length, errors: results.filter(r => r.status === 'error').length },
+        results,
+        tables,
+        net_worth_snapshots_columns: columnsResult.map((r: { column_name: string; data_type: string }) => ({ name: r.column_name, type: r.data_type })),
+      })
     }
 
-    // Verify tables
-    const verifyResult = await sql`
-      SELECT table_name
-      FROM information_schema.tables
-      WHERE table_schema = 'public'
-      ORDER BY table_name
-    `
-    const tables = verifyResult.map((r: { table_name: string }) => r.table_name)
+    // Method 2: Supabase Management API with access_token
+    if (access_token) {
+      const fullSQL = MIGRATION_STATEMENTS.join(';\n\n') + ';'
+      const response = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: fullSQL }),
+      })
 
-    // Verify net_worth_snapshots columns
-    const columnsResult = await sql`
-      SELECT column_name, data_type
-      FROM information_schema.columns
-      WHERE table_schema = 'public'
-        AND table_name = 'net_worth_snapshots'
-      ORDER BY ordinal_position
-    `
+      const text = await response.text()
+      if (!response.ok) {
+        return NextResponse.json({ status: 'error', method: 'management_api', error: text }, { status: response.status })
+      }
 
-    await sql.end()
+      return NextResponse.json({ status: 'success', method: 'management_api', response: text })
+    }
 
-    const successCount = results.filter(r => r.status === 'ok').length
-    const skipCount = results.filter(r => r.status === 'skip').length
-    const errorCount = results.filter(r => r.status === 'error').length
+    // Method 3: Service role key - use rpc or admin endpoints
+    if (service_role_key) {
+      // The service role key bypasses RLS but still can't do DDL via PostgREST.
+      // However, we can try creating an admin client and using the pg-meta endpoint.
+      const response = await fetch(`${supabaseUrl}/pg/query`, {
+        method: 'POST',
+        headers: {
+          'apikey': service_role_key,
+          'Authorization': `Bearer ${service_role_key}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: MIGRATION_STATEMENTS.join(';\n\n') + ';' }),
+      })
 
-    return NextResponse.json({
-      status: 'success',
-      connection: dbInfo,
-      summary: {
-        total: results.length,
-        success: successCount,
-        skipped: skipCount,
-        errors: errorCount,
-      },
-      results,
-      tables,
-      net_worth_snapshots_columns: columnsResult.map((r: { column_name: string; data_type: string }) => ({
-        name: r.column_name,
-        type: r.data_type,
-      })),
-    })
+      if (response.ok) {
+        const data = await response.json()
+        return NextResponse.json({ status: 'success', method: 'service_role_pg', data })
+      }
+
+      // Fallback: try each statement individually
+      const results: Array<{ statement: string; status: string; message?: string }> = []
+      for (const stmt of MIGRATION_STATEMENTS) {
+        const preview = stmt.substring(0, 80).replace(/\n/g, ' ').trim()
+        try {
+          const r = await fetch(`${supabaseUrl}/rest/v1/rpc/`, {
+            method: 'POST',
+            headers: {
+              'apikey': service_role_key,
+              'Authorization': `Bearer ${service_role_key}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query: stmt }),
+          })
+          results.push({ statement: preview, status: r.ok ? 'ok' : 'error', message: r.ok ? undefined : await r.text() })
+        } catch (err) {
+          results.push({ statement: preview, status: 'error', message: err instanceof Error ? err.message : String(err) })
+        }
+      }
+
+      return NextResponse.json({
+        status: 'partial',
+        method: 'service_role_rpc',
+        note: 'Service role key cannot execute DDL via PostgREST. Use db_password or access_token instead, or apply migration SQL manually via Supabase Dashboard SQL Editor.',
+        results,
+      })
+    }
+
+    return NextResponse.json({ error: 'Unexpected state' }, { status: 500 })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    return NextResponse.json(
-      { status: 'error', error: message },
-      { status: 500 }
-    )
+    return NextResponse.json({ status: 'error', error: message }, { status: 500 })
   }
 }
 
