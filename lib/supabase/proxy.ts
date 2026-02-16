@@ -201,6 +201,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-bookmark-belasting',
     '/test-onboarding-redirect',
     '/api/verify-onboarding-redirect',
+    '/test-holding-double-click',
+    '/api/verify-holding-double-click',
   ]
 
   // Protected route prefixes that require authentication
