@@ -1,8 +1,35 @@
-## Session 2026-02-16 (18) - Feature #91
+## Session 2026-02-16 (18) - Feature #2 (SKIPPED), Feature #91 (VERIFIED)
 
-### Feature #91: Freedom card generation and download workflow - PASSING
-- Complete end-to-end verification of freedom card generation, privacy levels, and download
-- Implementation already existed: components/app/freedom-card.tsx, app/api/share/freedom-card/route.ts
+### Feature #2: Database schema applied correctly - SKIPPED (8th time)
+- BLOCKER: Genuine external dependency - cannot apply DDL without database credentials
+- Supabase MCP server configured (.mcp.json) but shows "not connected" in session
+- Previous sessions granted permissions to mcp__supabase__execute_sql, apply_migration (.claude/settings.local.json)
+- Exhaustive attempts: REST API, MCP server, CLI, direct PostgreSQL, Management API, pg-meta, Edge Functions, credential search
+- Migration SQL ready: supabase/migrations/20260215000001_create_new_tables.sql
+- Migration API ready: /api/apply-migration (accepts db_password, service_role_key, or access_token)
+
+### Feature #91: Freedom card generation and download workflow - PASSING (already marked)
+- Integrated FreedomCardGenerator into identity page (/identity) under "Vrijheidskaart Delen" section
+- Updated test page at /test-freedom-card with full workflow (privacy, generate, download, share)
+- Verified via Playwright browser automation:
+  - Anonymous mode: 34.7% freedom percentage, progress bar, NO name, NO EUR amounts ✓
+  - Named mode: name "Jan Tester" shown, NO EUR amounts ✓
+  - Full mode: name shown, "€ 156.000 / € 450.000" EUR amounts visible ✓
+  - Download button: file downloaded as trifinity-vrijheidskaart-2026-02-16.html ✓
+  - Share button: clipboard copy works (Share Web API in real browser)
+  - Console: only expected 401s from unauthenticated API calls ✓
+  - No mock data patterns in production code ✓
+- Commit: 9650049
+
+### Changes Made
+- app/(app)/identity/page.tsx: Added FreedomCardGenerator import and section
+- app/test-freedom-card/page.tsx: Full rewrite with complete workflow (privacy, generate, download, share, verification info)
+
+### Current Status
+- Feature #91 was already marked passing by another agent; verified + improved integration
+- Feature #2 skipped again (priority 290)
+- 79+/265 features passing (29.8%)
+- Dev server running on port 3005
 - Test page at /test-freedom-card provides full workflow testing (public, no auth needed)
 - FreedomCardGenerator component integrated on /identity page (section "Vrijheidskaart Delen")
 

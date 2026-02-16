@@ -2,85 +2,129 @@
 
 import { useState, useEffect } from 'react'
 
-type StreakData = {
-  streaks: Array<{
-    id: string
-    user_id: string
-    streak_type: string
-    current_count: number
-    longest_count: number
-    last_activity_date: string | null
-    started_at: string
-    updated_at: string
-  }>
-  login_streak: {
-    current_count: number
-    longest_count: number
-    last_activity_date: string | null
-  }
-  source: string
-  message?: string
+type StepResult = {
+  step: string
+  date: string
+  week: { year: number; week: number }
+  action: string
+  current_count: number
+  longest_count: number
+  pass: boolean
+  expected: string
 }
 
-type CheckinResult = {
-  streak?: {
-    id: string
-    streak_type: string
+type TestResult = {
+  all_pass: boolean
+  steps: StepResult[]
+  summary: {
+    total: number
+    passed: number
+    failed: number
+  }
+}
+
+type VerificationResult = {
+  all_pass: boolean
+  verification: Record<string, boolean>
+  final_streak: {
     current_count: number
     longest_count: number
-    last_activity_date: string
+    last_activity_date: string | null
   }
-  action?: string
-  message?: string
-  error?: string
-  table_missing?: boolean
-  previous_count?: number
+}
+
+/**
+ * Get ISO week info for display.
+ */
+function getISOWeekInfo(dateStr: string): { year: number; week: number } {
+  const d = new Date(Date.UTC(
+    parseInt(dateStr.slice(0, 4)),
+    parseInt(dateStr.slice(5, 7)) - 1,
+    parseInt(dateStr.slice(8, 10))
+  ))
+  const dayNum = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  const weekNum = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+  return { year: d.getUTCFullYear(), week: weekNum }
 }
 
 export default function TestStreaksPage() {
-  const [streakData, setStreakData] = useState<StreakData | null>(null)
-  const [checkinResult, setCheckinResult] = useState<CheckinResult | null>(null)
+  const [testResult, setTestResult] = useState<TestResult | null>(null)
+  const [verification, setVerification] = useState<VerificationResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [authCheck, setAuthCheck] = useState<{ getStatus: number; postStatus: number } | null>(null)
 
-  async function loadStreaks() {
+  const today = new Date().toISOString().split('T')[0]
+  const todayWeek = getISOWeekInfo(today)
+
+  async function loadVerification() {
     setError(null)
     try {
-      const res = await fetch('/api/streaks')
+      const res = await fetch('/api/test-streaks')
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error || 'Failed to load streaks')
+        setError(data.error || 'Failed to load verification')
         return
       }
-      setStreakData(data)
+      setVerification(data)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Load failed')
     }
   }
 
-  async function doCheckin() {
+  async function runFullTest() {
     setLoading(true)
-    setCheckinResult(null)
+    setError(null)
+    setTestResult(null)
     try {
-      const res = await fetch('/api/streaks/checkin', { method: 'POST' })
+      const res = await fetch('/api/test-streaks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
       const data = await res.json()
-      setCheckinResult(data)
-      // Reload streaks after checkin
-      await loadStreaks()
+      if (!res.ok) {
+        setError(data.error || 'Test failed')
+        return
+      }
+      setTestResult(data)
+      // Also refresh verification
+      await loadVerification()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Checkin failed')
+      setError(e instanceof Error ? e.message : 'Test failed')
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { loadStreaks() }, [])
+  async function verifyAuthProtection() {
+    setLoading(true)
+    try {
+      const getRes = await fetch('/api/streaks')
+      const postRes = await fetch('/api/streaks/checkin', { method: 'POST' })
+      setAuthCheck({
+        getStatus: getRes.status,
+        postStatus: postRes.status,
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Auth check failed')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const today = new Date().toISOString().split('T')[0]
+  useEffect(() => {
+    loadVerification()
+  }, [])
 
   return (
     <div className="mx-auto max-w-4xl p-8">
-      <h1 className="text-2xl font-bold mb-6">Test: Streak Tracking (Feature #56)</h1>
+      <h1 className="text-2xl font-bold mb-2">Test: Weekly Streak Tracking (Feature #89)</h1>
+      <p className="text-zinc-500 mb-6">
+        Today: {today} (ISO Week {todayWeek.week}, {todayWeek.year})
+      </p>
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
@@ -88,92 +132,154 @@ export default function TestStreaksPage() {
         </div>
       )}
 
-      {/* Step 1: Check-in */}
-      <section className="mb-8">
-        <h2 className="text-lg font-semibold mb-3">Step 1 & 2: Login Check-in</h2>
-        <button
-          onClick={doCheckin}
-          disabled={loading}
-          className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 disabled:opacity-50"
-        >
-          {loading ? 'Checking in...' : 'POST /api/streaks/checkin'}
-        </button>
-        {checkinResult && (
-          <div className="mt-3 bg-white border rounded-lg p-4">
-            <p><strong>Action:</strong> {checkinResult.action || 'N/A'}</p>
-            <p><strong>Message:</strong> {checkinResult.message || checkinResult.error || 'N/A'}</p>
-            {checkinResult.table_missing && (
-              <p className="text-yellow-600 mt-2">
-                The user_streaks table does not exist yet. Migration needs to be applied.
+      {/* Quick Verification */}
+      {verification && (
+        <div className={`rounded-lg p-4 mb-6 ${
+          verification.all_pass
+            ? 'bg-green-50 border border-green-200'
+            : 'bg-red-50 border border-red-200'
+        }`}>
+          <p className={`font-bold text-lg mb-2 ${verification.all_pass ? 'text-green-700' : 'text-red-700'}`}>
+            {verification.all_pass ? '✅ ALL STREAK LOGIC VERIFIED' : '❌ SOME CHECKS FAILED'}
+          </p>
+          <div className="space-y-1 text-sm">
+            {Object.entries(verification.verification).map(([key, pass]) => (
+              <p key={key} className={pass ? 'text-green-600' : 'text-red-600'}>
+                {pass ? '✅' : '❌'} {key}
               </p>
-            )}
-            {checkinResult.streak && (
-              <div className="mt-2 space-y-1 text-sm">
-                <p>Current Count: <strong>{checkinResult.streak.current_count}</strong></p>
-                <p>Longest Count: <strong>{checkinResult.streak.longest_count}</strong></p>
-                <p>Last Activity: <strong>{checkinResult.streak.last_activity_date}</strong></p>
-              </div>
-            )}
-            {checkinResult.previous_count !== undefined && (
-              <p className="text-sm mt-1">Previous count: {checkinResult.previous_count}</p>
-            )}
-            <pre className="mt-3 bg-zinc-50 border rounded-lg p-3 text-xs overflow-auto max-h-48">
-              {JSON.stringify(checkinResult, null, 2)}
-            </pre>
+            ))}
           </div>
-        )}
+          <div className="mt-3 text-xs text-zinc-500">
+            Final streak: count={verification.final_streak.current_count},
+            longest={verification.final_streak.longest_count},
+            last={verification.final_streak.last_activity_date}
+          </div>
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <section className="mb-8 space-y-3">
+        <h2 className="text-lg font-semibold mb-3">Actions</h2>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={runFullTest}
+            disabled={loading}
+            className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 disabled:opacity-50"
+            data-testid="run-full-test"
+          >
+            {loading ? 'Running...' : '🧪 Run Full Test Suite'}
+          </button>
+
+          <button
+            onClick={verifyAuthProtection}
+            disabled={loading}
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50"
+          >
+            🔒 Verify Auth Protection
+          </button>
+
+          <button
+            onClick={loadVerification}
+            disabled={loading}
+            className="bg-zinc-200 text-zinc-700 px-4 py-2 rounded-lg hover:bg-zinc-300 disabled:opacity-50"
+          >
+            Refresh
+          </button>
+        </div>
       </section>
 
-      {/* Step 3-6: Streak Verification */}
+      {/* Auth Protection Check */}
+      {authCheck && (
+        <section className="mb-8">
+          <h2 className="text-lg font-semibold mb-3">Auth Protection</h2>
+          <div className="bg-white border rounded-lg p-4 space-y-2 text-sm">
+            <p className={authCheck.getStatus === 401 ? 'text-green-600' : 'text-red-600'}>
+              {authCheck.getStatus === 401 ? '✅' : '❌'}
+              {' '}GET /api/streaks → {authCheck.getStatus} (expect 401)
+            </p>
+            <p className={authCheck.postStatus === 401 ? 'text-green-600' : 'text-red-600'}>
+              {authCheck.postStatus === 401 ? '✅' : '❌'}
+              {' '}POST /api/streaks/checkin → {authCheck.postStatus} (expect 401)
+            </p>
+          </div>
+        </section>
+      )}
+
+      {/* Full Test Results */}
+      {testResult && (
+        <section className="mb-8">
+          <h2 className="text-lg font-semibold mb-3">
+            Test Suite Results ({testResult.summary.passed}/{testResult.summary.total} passed)
+          </h2>
+
+          {/* Summary Banner */}
+          <div className={`rounded-lg p-4 mb-4 ${
+            testResult.all_pass
+              ? 'bg-green-50 border border-green-200'
+              : 'bg-red-50 border border-red-200'
+          }`}>
+            <p className={`font-bold ${testResult.all_pass ? 'text-green-700' : 'text-red-700'}`}>
+              {testResult.all_pass ? '✅ ALL TESTS PASSED' : `❌ ${testResult.summary.failed} TEST(S) FAILED`}
+            </p>
+          </div>
+
+          {/* Individual Steps */}
+          <div className="space-y-3">
+            {testResult.steps.map((step, i) => (
+              <div
+                key={i}
+                className={`border rounded-lg p-4 ${
+                  step.pass
+                    ? 'bg-green-50 border-green-200'
+                    : 'bg-red-50 border-red-200'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-medium">
+                    {step.pass ? '✅' : '❌'} {step.step}
+                  </span>
+                  <span className="text-xs text-zinc-500">
+                    {typeof step.week === 'object' ? `W${step.week.week}/${step.week.year}` : ''}
+                  </span>
+                </div>
+                <p className="text-sm text-zinc-600">{step.date}</p>
+                <div className="mt-2 text-xs grid grid-cols-2 gap-2">
+                  <span>Action: <strong>{step.action}</strong></span>
+                  <span>Expected: {step.expected}</span>
+                  <span>Count: <strong>{step.current_count}</strong></span>
+                  <span>Longest: <strong>{step.longest_count}</strong></span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Implementation Details */}
       <section className="mb-8">
-        <h2 className="text-lg font-semibold mb-3">Steps 3-6: Streak Verification</h2>
-        {streakData ? (
-          <div className="space-y-4">
-            <div className="bg-white border rounded-lg p-4">
-              <p><strong>Source:</strong> {streakData.source}</p>
-              {streakData.message && <p className="text-sm text-zinc-500">{streakData.message}</p>}
-              <p><strong>Total streak records:</strong> {streakData.streaks.length}</p>
-            </div>
-
-            <div className="bg-white border rounded-lg p-4">
-              <h3 className="font-medium mb-2">Login Streak</h3>
-              <div className="space-y-1 text-sm">
-                <p className={streakData.login_streak.current_count > 0 ? 'text-green-600' : 'text-zinc-500'}>
-                  {streakData.login_streak.current_count > 0 ? '✅' : '⚪'}
-                  {' '}Step 3: current_count = {streakData.login_streak.current_count}
-                </p>
-                <p className={streakData.login_streak.last_activity_date ? 'text-green-600' : 'text-zinc-500'}>
-                  {streakData.login_streak.last_activity_date ? '✅' : '⚪'}
-                  {' '}Step 5: last_activity_date = {streakData.login_streak.last_activity_date || 'null'}
-                  {streakData.login_streak.last_activity_date === today && ' (today ✓)'}
-                </p>
-                <p className={streakData.login_streak.longest_count > 0 ? 'text-green-600' : 'text-zinc-500'}>
-                  {streakData.login_streak.longest_count > 0 ? '✅' : '⚪'}
-                  {' '}Step 6: longest_count = {streakData.login_streak.longest_count}
-                </p>
-              </div>
-            </div>
-
-            {streakData.streaks.length > 0 && (
-              <div className="bg-white border rounded-lg p-4">
-                <h3 className="font-medium mb-2">All Streaks</h3>
-                {streakData.streaks.map((s, i) => (
-                  <div key={s.id || i} className="border-t pt-2 mt-2 first:border-t-0 first:pt-0 first:mt-0">
-                    <p className="font-medium">{s.streak_type}</p>
-                    <p className="text-sm">Current: {s.current_count} | Longest: {s.longest_count} | Last: {s.last_activity_date}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <p className="text-zinc-500">Loading...</p>
-        )}
+        <h2 className="text-lg font-semibold mb-3">Implementation Details</h2>
+        <div className="bg-zinc-50 border rounded-lg p-4 text-sm space-y-2">
+          <p><strong>Streak type:</strong> Weekly (per spec &ldquo;Weekstreak&rdquo;)</p>
+          <p><strong>Logic:</strong> ISO 8601 week comparison for consecutive week detection</p>
+          <p><strong>Endpoints:</strong></p>
+          <ul className="list-disc ml-6 space-y-1">
+            <li>GET /api/streaks — Get user streaks (auth required)</li>
+            <li>POST /api/streaks/checkin — Record check-in (auth required)</li>
+            <li>POST /api/streaks/checkin?date=YYYY-MM-DD — Simulate date</li>
+          </ul>
+          <p><strong>Auth:</strong> Both endpoints return 401 for unauthenticated requests</p>
+          <p><strong>Storage:</strong> user_streaks table → app_settings fallback</p>
+          <p><strong>Tests cover:</strong></p>
+          <ul className="list-disc ml-6 space-y-1">
+            <li>First check-in creates streak at count=1</li>
+            <li>Same-week check-in is idempotent (no change)</li>
+            <li>Consecutive week increments count</li>
+            <li>longest_count updates when current exceeds it</li>
+            <li>Gap of 2+ weeks resets count to 1 (longest preserved)</li>
+            <li>Year boundary handling (Dec → Jan)</li>
+          </ul>
+        </div>
       </section>
-
-      <button onClick={loadStreaks} className="text-sm text-zinc-500 underline">
-        Refresh data
-      </button>
     </div>
   )
 }
