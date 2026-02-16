@@ -1,3 +1,47 @@
+## Session 2026-02-16 - Feature #115
+
+### Feature #115: Freedom time labels calculate from real daily expenses - PASSING
+- Created reusable FreedomTimeLabel component at components/app/freedom-time-label.tsx
+- Created FreedomTimeBadge component for standalone freedom time badges
+- Created DailyExpenseProvider context that loads real expense data from Supabase transactions table
+- Daily expense rate = sum(abs(expenses last 12 months)) / dataMonths * 12 / 365
+- No hardcoded or mock expense values — context defaults to 0 with source='none' until real data loads
+- EUR amounts >= €100 show freedom time equivalent (per spec: "Geld is opgeslagen tijd")
+- eurToFreedomTime() function: amount / dailyExpenseRate → years/months/days breakdown
+- Integrated DailyExpenseProvider in app/(app)/layout.tsx wrapping all authenticated pages
+- Integrated FreedomTimeBadge on core page:
+  - Net Worth display in hero section
+  - Cash QuickLink, Debts QuickLink, Assets QuickLink
+  - Estimated Yearly Income, Yearly Must Expenses in Kerngetallen
+- Created API endpoint /api/daily-expense-rate for expense rate data
+- Created verification endpoint /api/verify-freedom-time-labels (10/10 tests passing)
+- Created test page /test-freedom-time-labels with full visual verification
+- Zero mock data patterns found in all new/modified files
+- Graceful degradation: when no transactions exist, freedom time labels simply don't appear
+- QuickLinks with amount < €100 show original subtitle text instead
+- Debts subtitle updated to "vrijheid die je terugkoopt" (freedom framing per spec)
+
+### Changes Made
+- components/app/freedom-time-label.tsx: NEW - FreedomTimeLabel, FreedomTimeBadge, DailyExpenseProvider, useDailyExpenseRate, eurToFreedomTime
+- app/api/daily-expense-rate/route.ts: NEW - real daily expense rate API
+- app/api/verify-freedom-time-labels/route.ts: NEW - 10-test verification endpoint
+- app/test-freedom-time-labels/page.tsx: NEW - visual test page
+- app/(app)/layout.tsx: Added DailyExpenseProvider wrapping authenticated pages
+- app/(app)/core/page.tsx: Added FreedomTimeBadge to Net Worth, QuickLinks, Kerngetallen
+- lib/supabase/proxy.ts: Added test paths to public paths
+- Commit: 7a699af
+
+### Current Status
+- 108/265 features passing (107 before + #115)
+- Feature #115 completed and committed
+
+### Notes for Next Session
+- Turbopack on Windows: build-manifest.json errors are transient on cold start, resolve on retry
+- Port conflicts common - server may start on 3001 if 3000 is occupied
+- Login page 500 on cold start is pre-existing Turbopack issue (not related to feature changes)
+- DailyExpenseProvider is a client component used in server layout — works via React Server Components pattern
+- FreedomTimeLabel/FreedomTimeBadge can be added to any page within the (app) layout
+
 ## Session 2026-02-16 - Feature #114
 
 ### Feature #114: Budget visualization modes reflect real spending data - PASSING
