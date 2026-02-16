@@ -1,3 +1,85 @@
+## Session 2026-02-16 - Feature #108
+
+### Feature #108: Session expiry shows re-login prompt - PASSING
+- Created SessionMonitor component (components/app/session-monitor.tsx):
+  - Listens to Supabase onAuthStateChange for SIGNED_OUT events
+  - Periodic session check every 60 seconds with proactive token refresh
+  - Intercepts 401 API responses via global fetch wrapper
+  - Shows friendly modal dialog with inline re-login form (no page navigation, no data loss)
+  - After re-login: reloads current page to refresh server components
+  - Fallback: "Naar inlogpagina" link preserves current path via redirectTo param
+  - All UI text in Dutch ("Sessie verlopen", "Opnieuw inloggen", etc.)
+  - Password visibility toggle, loading state, success animation
+  - Supports intentional sign-out detection (trifinity:signout event)
+- Updated app/(app)/layout.tsx:
+  - Imported and added <SessionMonitor /> inside ToastProvider
+  - Renders on all authenticated pages
+- Updated lib/supabase/proxy.ts:
+  - API 401 responses now include sessionExpired boolean flag + X-Session-Expired header
+  - Page redirects include expired=1 query param when session cookies were present
+- Updated app/login/page.tsx:
+  - Shows amber "Je sessie is verlopen" banner when ?expired=1 param present
+  - Preserves redirectTo for post-login redirect
+- Test page at /test-session-expiry with 7/7 automated tests passing
+- Verification API at /api/verify-session-expiry with 6 test endpoints
+- Zero console errors, zero mock data patterns
+- Visual verification: login page banner shows friendly Dutch text
+
+### Changes Made
+- components/app/session-monitor.tsx: Created SessionMonitor with auth state detection + re-login modal
+- app/(app)/layout.tsx: Added SessionMonitor import and rendering
+- lib/supabase/proxy.ts: Added sessionExpired flag and expired param to redirects (committed by concurrent agent)
+- app/login/page.tsx: Added session expired banner
+- app/test-session-expiry/page.tsx: Created test page with 7 automated tests
+- app/api/verify-session-expiry/route.ts: Created verification API endpoint
+- Commit: 505c571 "feat: add session expiry re-login prompt with inline auth (#108)"
+
+### Current Status
+- Feature #108 completed and marked passing
+- 102/265 features passing
+
+## Session 2026-02-16 - Feature #110
+
+### Feature #110: Freedom card generation handles missing data gracefully - PASSING
+- API route (app/api/share/freedom-card/route.ts):
+  - Added top-level try/catch to prevent 500 errors
+  - Switched from Promise.all to Promise.allSettled for graceful degradation
+  - Returns null for freedomPercentage when no expense data available
+  - Returns null for savingsRate when no transaction data available
+  - Returns 'Nog geen data' for fireCountdown.label when FIRE can't be computed
+  - Added dataAvailability metadata to response
+  - Returns proper 500 error with Dutch message on unexpected errors
+- Component (components/app/freedom-card.tsx):
+  - Updated FreedomCardData interface to allow null for freedomPercentage, savingsRate, netWorth, fireTarget
+  - FreedomCardVisual shows "N/B" (niet beschikbaar) for null freedom percentage
+  - Shows "N/B" for null savings rate, null FIRE countdown, null freedom time
+  - Shows hint text "Voeg transacties toe om je vrijheidspercentage te berekenen" when data unavailable
+  - Progress bar shows 0% width when data unavailable (no errors)
+  - Updated share text generation to handle null values
+- Test page (app/test-freedom-card/page.tsx):
+  - Added "Test: Ontbrekende Data" section with toggle button
+  - Test 1: Completely empty data (new user) - all metrics show N/B
+  - Test 2: Partial data (assets but no transactions) - name shown, metrics show N/B
+  - Updated share text to handle null freedom percentage
+- Verified via Playwright browser automation:
+  - Normal card generates correctly (34.7%, +12 days, 14j 3mnd, 29%)
+  - Missing data card shows N/B for all unavailable metrics
+  - Partial data card shows name + N/B for unavailable metrics
+  - Zero JavaScript errors in console
+  - No mock data patterns in production code
+- Commit: 3b9b82a
+
+### Current Status
+- 103/265 features passing (102 before + #110)
+- Feature #110 completed and marked passing
+
+### Notes for Next Session
+- Turbopack on Windows: always rm -rf .next before starting
+- Pre-warm routes with curl before Playwright
+- Port 3000 used this session
+- The FreedomCardGenerator component on the identity page (/identity) uses the real API
+  which requires authentication - tested via test page with sample data
+
 ## Session 2026-02-16 - Feature #107
 
 ### Feature #107: Negative amounts handled in financial forms - PASSING
