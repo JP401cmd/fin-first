@@ -114,7 +114,7 @@ export default function TestOnboardingReset() {
           {[
             { label: 'Reset API endpoint exists', detail: 'POST /api/onboarding/reset route handler at app/api/onboarding/reset/route.ts', pass: true },
             { label: 'Requires authentication', detail: 'Returns 401 Unauthorized for unauthenticated requests (middleware + handler check)', pass: true },
-            { label: 'Deletes all financial data', detail: 'deleteAllUserData() clears 15 tables in 3 FK-safe batches: leaf → mid → parent', pass: true },
+            { label: 'Deletes all financial data', detail: 'deleteAllUserData() clears 17 tables in 4 FK-safe batches: deepest leaf → leaf → mid → parent', pass: true },
             { label: 'Resets profile to minimal', detail: 'onboarding_completed=false, is_demo_user=false, household_type=solo, temporal_balance=3, clears name/DOB/income', pass: true },
             { label: 'Enables fresh onboarding', detail: 'Setting onboarding_completed=false triggers redirect to /onboarding on next dashboard visit', pass: true },
             { label: 'UI trigger: Identity page', detail: '"Alles wissen" button with confirmation dialog calls reset then redirects to /onboarding', pass: true },
@@ -158,7 +158,9 @@ export default function TestOnboardingReset() {
   │     └── 401 if no user
   │
   ├── 2. deleteAllUserData(supabase, user.id)
-  │     ├── Batch 1 (leaf): recommendation_feedback, budget_rollovers,
+  │     ├── Batch 1a (deepest leaf): goal_contributions,
+  │     │   category_corrections
+  │     ├── Batch 1b (leaf): recommendation_feedback, budget_rollovers,
   │     │   recurring_transactions, valuations, net_worth_snapshots,
   │     │   life_events, goals
   │     ├── Batch 2 (mid): actions, transactions, budget_amounts

@@ -38,7 +38,11 @@ async function deleteTable(supabase: SupabaseClient, table: string, userId: stri
 
 /**
  * Delete all user data from all financial tables.
- * Uses 3 batched parallel deletes respecting FK constraints.
+ * Uses 4 batched parallel deletes respecting FK constraints:
+ * 1a) deepest leaves (goal_contributions, category_corrections)
+ * 1b) leaf tables (goals, snapshots, events, etc.)
+ * 2) mid-level (actions, transactions, budget_amounts)
+ * 3) parent tables (recommendations, debts, assets, bank_accounts, budgets)
  */
 export async function deleteAllUserData(
   supabase: SupabaseClient,
@@ -47,8 +51,18 @@ export async function deleteAllUserData(
 ): Promise<Record<string, number>> {
   const summary: Record<string, number> = {}
 
-  // Batch 1: leaf tables (no FK dependencies to other user tables)
-  const batch1Results = await Promise.all([
+  // Batch 1a: deepest leaf tables (FK to goals, budgets)
+  const batch1aResults = await Promise.all([
+    deleteTable(supabase, 'goal_contributions', userId),
+    deleteTable(supabase, 'category_corrections', userId),
+  ])
+  const batch1aTables = ['goal_contributions', 'category_corrections']
+  for (let i = 0; i < batch1aTables.length; i++) {
+    summary[batch1aTables[i]] = batch1aResults[i]
+  }
+
+  // Batch 1b: leaf tables (no FK dependencies to other user tables)
+  const batch1bResults = await Promise.all([
     deleteTable(supabase, 'recommendation_feedback', userId),
     deleteTable(supabase, 'budget_rollovers', userId),
     deleteTable(supabase, 'recurring_transactions', userId),
@@ -57,11 +71,12 @@ export async function deleteAllUserData(
     deleteTable(supabase, 'life_events', userId),
     deleteTable(supabase, 'goals', userId),
   ])
-  const batch1Tables = ['recommendation_feedback', 'budget_rollovers', 'recurring_transactions', 'valuations', 'net_worth_snapshots', 'life_events', 'goals']
-  for (let i = 0; i < batch1Tables.length; i++) {
-    summary[batch1Tables[i]] = batch1Results[i]
+  const batch1bTables = ['recommendation_feedback', 'budget_rollovers', 'recurring_transactions', 'valuations', 'net_worth_snapshots', 'life_events', 'goals']
+  for (let i = 0; i < batch1bTables.length; i++) {
+    summary[batch1bTables[i]] = batch1bResults[i]
   }
-  onProgress?.('Basisgegevens verwijderen...', 'batch1', 'delete', batch1Results.reduce((a, b) => a + b, 0))
+  onProgress?.('Basisgegevens verwijderen...', 'batch1', 'delete',
+    batch1aResults.reduce((a, b) => a + b, 0) + batch1bResults.reduce((a, b) => a + b, 0))
 
   // Batch 2: mid-level (FK to recommendations, budgets)
   const batch2Results = await Promise.all([

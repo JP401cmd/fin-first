@@ -46,7 +46,7 @@ export async function GET() {
     results['reset_api_route_exists'] = { pass: false, detail: `Error: ${e instanceof Error ? e.message : String(e)}` }
   }
 
-  // Test 3: deleteAllUserData function handles all 15 tables in 3 batches
+  // Test 3: deleteAllUserData function handles all 17 tables in 4 batches
   total++
   try {
     // We verify by calling with a non-existent user ID — should succeed with 0 deletions
@@ -54,8 +54,9 @@ export async function GET() {
     const fakeUserId = '00000000-0000-0000-0000-000000000000'
     const summary = await deleteAllUserData(supabase, fakeUserId)
 
-    // Verify all 15 tables are represented
+    // Verify all 17 tables are represented (15 original + goal_contributions + category_corrections)
     const expectedTables = [
+      'goal_contributions', 'category_corrections',
       'recommendation_feedback', 'budget_rollovers', 'recurring_transactions',
       'valuations', 'net_worth_snapshots', 'life_events', 'goals',
       'actions', 'transactions', 'budget_amounts',
@@ -67,7 +68,7 @@ export async function GET() {
     if (missingTables.length === 0) {
       results['delete_all_tables_covered'] = {
         pass: true,
-        detail: `deleteAllUserData covers all 15 financial tables: ${coveredTables.join(', ')}`
+        detail: `deleteAllUserData covers all ${expectedTables.length} financial tables: ${coveredTables.join(', ')}`
       }
       passing++
     } else {
@@ -80,20 +81,22 @@ export async function GET() {
     results['delete_all_tables_covered'] = { pass: false, detail: `Error calling deleteAllUserData: ${e instanceof Error ? e.message : String(e)}` }
   }
 
-  // Test 4: deleteAllUserData respects FK batch ordering (leaf → mid → parent)
+  // Test 4: deleteAllUserData respects FK batch ordering (deepest leaf → leaf → mid → parent)
   total++
   try {
-    // Verify the function uses 3-batch approach by examining what it returned
-    // Batch 1 (leaf): recommendation_feedback, budget_rollovers, recurring_transactions, valuations, net_worth_snapshots, life_events, goals
+    // Verify the function uses 4-batch approach by examining what it returned
+    // Batch 1a (deepest leaf): goal_contributions, category_corrections
+    // Batch 1b (leaf): recommendation_feedback, budget_rollovers, recurring_transactions, valuations, net_worth_snapshots, life_events, goals
     // Batch 2 (mid): actions, transactions, budget_amounts
     // Batch 3 (parent): recommendations, debts, assets, bank_accounts, budgets
-    const batch1 = ['recommendation_feedback', 'budget_rollovers', 'recurring_transactions', 'valuations', 'net_worth_snapshots', 'life_events', 'goals']
+    const batch1a = ['goal_contributions', 'category_corrections']
+    const batch1b = ['recommendation_feedback', 'budget_rollovers', 'recurring_transactions', 'valuations', 'net_worth_snapshots', 'life_events', 'goals']
     const batch2 = ['actions', 'transactions', 'budget_amounts']
     const batch3 = ['recommendations', 'debts', 'assets', 'bank_accounts', 'budgets']
 
     results['delete_batch_ordering'] = {
       pass: true,
-      detail: `3-batch FK-safe ordering: Batch 1 (${batch1.length} leaf tables) → Batch 2 (${batch2.length} mid tables) → Batch 3 (${batch3.length} parent tables)`
+      detail: `4-batch FK-safe ordering: Batch 1a (${batch1a.length} deepest leaves) → Batch 1b (${batch1b.length} leaf tables) → Batch 2 (${batch2.length} mid tables) → Batch 3 (${batch3.length} parent tables)`
     }
     passing++
   } catch (e) {
