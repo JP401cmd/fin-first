@@ -1,3 +1,29 @@
+## Session 2026-02-17 - Feature #154
+
+### Feature #154: Double submit on onboarding step does not duplicate data - PASSING
+- Added 4-layer double-submit protection to onboarding flow:
+  1. **Client guard**: `handleSaveOwnData()` checks `if (saving) return` at start
+  2. **Client guard**: `handlePersonaSeed()` checks `if (saving || state.step === 'seeding') return`
+  3. **Disabled buttons**: OnboardingExtras receives `saving` prop, disables both buttons with visual feedback (opacity-50, cursor-not-allowed, loading text)
+  4. **Server idempotency**: `/api/onboarding/save-own-data` checks `onboarding_completed` before inserting, returns `{success: true, alreadyCompleted: true}` if already done
+- Seed route already had server-side protection (returns 403 if onboarding_completed)
+- 10/10 verification tests passing at /api/verify-onboarding-double-submit
+- Zero console errors
+- No mock data patterns found in onboarding code
+
+### Changes Made
+- app/(onboarding)/onboarding/page.tsx: Added saving guard to handleSaveOwnData and handlePersonaSeed, passed saving prop to OnboardingExtras
+- components/onboarding/onboarding-extras.tsx: Added saving prop, disabled buttons when saving, loading text on save button
+- app/api/onboarding/save-own-data/route.ts: Added onboarding_completed idempotency check before all inserts
+- app/api/verify-onboarding-double-submit/route.ts: Created 10-test verification endpoint
+- app/test-onboarding-double-submit/page.tsx: Created visual test page with architecture explanation
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: fe6d5ad
+
+### Current Status
+- Feature #154 completed and marked passing
+- Port 3000 used this session
+
 ## Session 2026-02-17 - Feature #153
 
 ### Feature #153: Rapid delete clicks on holding only deletes once - PASSING
