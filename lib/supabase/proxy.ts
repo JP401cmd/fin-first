@@ -138,6 +138,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-streak-indicator',
     '/test-next-step-engine',
     '/api/verify-next-step-engine',
+    '/test-sparkline',
+    '/api/verify-sparkline',
   ]
 
   // Protected route prefixes that require authentication
