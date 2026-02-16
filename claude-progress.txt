@@ -1,4 +1,40 @@
-## Session 2026-02-16 (latest) - Feature #101
+## Session 2026-02-16 (latest) - Feature #102
+
+### Feature #102: API 500 errors show user-friendly message - PASSING
+- Created app/error.tsx: Global error boundary for unhandled React errors
+  - Shows "Er ging iets mis" with descriptive Dutch text
+  - "Opnieuw proberen" (retry) button calls reset() to re-render
+  - "Naar startpagina" link navigates to /
+  - Shows error.digest code if available
+  - NO stack trace or technical details exposed
+- Created app/(app)/error.tsx: Error boundary for authenticated app pages
+  - Same user-friendly UI within the app layout
+  - "Naar dashboard" link instead of "Naar startpagina"
+- API error handling verified:
+  - Standard 500 JSON: returns {error: "friendly message"} - ✅
+  - 500 with technical details: response has stack/detail fields but user-facing error only shows the "error" field - ✅
+  - Unhandled throw: error boundary catches and shows friendly UI - ✅
+- Test infrastructure:
+  - /api/test-500 route with ?type=json|details|throw variants
+  - /test-500-error test page with automated tests (2/2 passing)
+  - /test-500-error/render-error for direct error boundary testing
+- Browser verification:
+  - Test 1 (API JSON error): ✅ Shows "Er is een serverfout opgetreden" with retry/back buttons
+  - Test 2 (No stack trace): ✅ Error message contains no technical details (stack=true, detail=true hidden)
+  - Test 3 (Render error): ✅ Error boundary catches, shows friendly page, retry works
+  - "Opnieuw proberen" button successfully re-renders the page
+- Commit: 86795b3
+
+### Current Status
+- Feature #102 completed and committed
+- 94/265 features passing (93 before + #102)
+
+### Notes for Next Session
+- Error boundaries now exist for both root and app layouts
+- API routes return JSON error objects; client shows only the "error" field
+- The "1 Issue" / "2 Issues" badge at bottom is Next.js dev tools (dev only, not shown in production)
+
+## Session 2026-02-16 - Feature #101
 
 ### Feature #101: Invalid file format rejected during import - PASSING
 - Enhanced error handling in import page (app/(app)/core/cash/import/page.tsx):
