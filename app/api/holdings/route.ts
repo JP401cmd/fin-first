@@ -132,12 +132,38 @@ export async function GET() {
  *
  * Expected body: { name, ticker?, isin?, units?, avg_purchase_price?, current_price?, purchase_date?, notes?, asset_type? }
  */
+// In-memory idempotency cache: maps idempotency key → { response, timestamp }
+// Keys expire after 5 minutes to prevent unbounded memory growth.
+const idempotencyCache = new Map<string, { response: { body: Record<string, unknown>; status: number }; timestamp: number }>()
+const IDEMPOTENCY_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+function cleanExpiredIdempotencyKeys() {
+  const now = Date.now()
+  for (const [key, entry] of idempotencyCache.entries()) {
+    if (now - entry.timestamp > IDEMPOTENCY_TTL_MS) {
+      idempotencyCache.delete(key)
+    }
+  }
+}
+
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  }
+
+  // Idempotency key check: if the same key is submitted twice,
+  // return the cached response instead of creating a duplicate holding
+  const idempotencyKey = request.headers.get('X-Idempotency-Key')
+  if (idempotencyKey) {
+    const cacheKey = `${user.id}:${idempotencyKey}`
+    cleanExpiredIdempotencyKeys()
+    const cached = idempotencyCache.get(cacheKey)
+    if (cached) {
+      return NextResponse.json(cached.response.body, { status: cached.response.status })
+    }
   }
 
   try {
@@ -266,7 +292,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
 
-      return NextResponse.json({ holding, source: 'holdings_table' }, { status: 201 })
+      const responseBody = { holding, source: 'holdings_table' }
+      // Cache the successful response for idempotency
+      if (idempotencyKey) {
+        const cacheKey = `${user.id}:${idempotencyKey}`
+        idempotencyCache.set(cacheKey, { response: { body: responseBody, status: 201 }, timestamp: Date.now() })
+      }
+      return NextResponse.json(responseBody, { status: 201 })
     }
 
     // Fallback: create an asset in the assets table
@@ -337,7 +369,13 @@ export async function POST(request: NextRequest) {
       updated_at: asset.created_at,
     }
 
-    return NextResponse.json({ holding, source: 'assets_fallback' }, { status: 201 })
+    const responseBody = { holding, source: 'assets_fallback' }
+    // Cache the successful response for idempotency
+    if (idempotencyKey) {
+      const cacheKey = `${user.id}:${idempotencyKey}`
+      idempotencyCache.set(cacheKey, { response: { body: responseBody, status: 201 }, timestamp: Date.now() })
+    }
+    return NextResponse.json(responseBody, { status: 201 })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Onbekende fout'
     return NextResponse.json({ error: message }, { status: 500 })

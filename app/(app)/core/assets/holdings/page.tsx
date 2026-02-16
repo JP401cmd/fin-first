@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Plus, Trash2, X, TrendingUp, ArrowLeft, Loader2, Briefcase, Edit3, Receipt, ArrowUpRight, ArrowDownRight, DollarSign, PieChart, RefreshCw, AlertTriangle, Clock, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/components/app/budget-shared'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 type Holding = {
   id: string
@@ -30,6 +31,7 @@ type Holding = {
 }
 
 export default function HoldingsPage() {
+  const router = useRouter()
   const [holdings, setHoldings] = useState<Holding[]>([])
   const [totalValue, setTotalValue] = useState(0)
   const [totalCost, setTotalCost] = useState(0)
@@ -43,6 +45,8 @@ export default function HoldingsPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [refreshResult, setRefreshResult] = useState<{ message: string; type: 'success' | 'warning' | 'error' } | null>(null)
   const [overrideHolding, setOverrideHolding] = useState<Holding | null>(null)
+  // Track whether a form was recently submitted to prevent re-submission on back navigation
+  const formSubmittedRef = useRef(false)
 
   const loadHoldings = useCallback(async () => {
     try {
@@ -66,6 +70,54 @@ export default function HoldingsPage() {
   useEffect(() => {
     loadHoldings()
   }, [loadHoldings])
+
+  // Push a history entry when a modal opens so the back button closes the modal
+  // instead of navigating away. After form submission, replace the entry to
+  // prevent the back button from re-opening the (now stale) form.
+  useEffect(() => {
+    const modalOpen = showForm || editHolding !== null || txHolding !== null
+    if (modalOpen) {
+      // Push a new history entry for the open modal
+      window.history.pushState({ holdingsModal: true }, '')
+    }
+
+    function onPopState(e: PopStateEvent) {
+      // When user presses back while a modal is open, close the modal
+      // instead of navigating away. This prevents re-submission.
+      if (showForm) {
+        setShowForm(false)
+        return
+      }
+      if (editHolding) {
+        setEditHolding(null)
+        return
+      }
+      if (txHolding) {
+        setTxHolding(null)
+        return
+      }
+    }
+
+    window.addEventListener('popstate', onPopState)
+    return () => {
+      window.removeEventListener('popstate', onPopState)
+    }
+  }, [showForm, editHolding, txHolding])
+
+  // On mount, check if we arrived here via back-button after a form submission
+  // and prevent re-opening the form
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.history.state?.formSubmitted) {
+      // Clear the flag so subsequent visits work normally
+      window.history.replaceState(
+        { ...window.history.state, formSubmitted: false },
+        ''
+      )
+      // Make sure no form is shown
+      setShowForm(false)
+      formSubmittedRef.current = true
+    }
+  }, [])
 
   async function handleDelete(id: string) {
     try {
@@ -794,14 +846,17 @@ function HoldingForm({
   const [purchaseDate, setPurchaseDate] = useState('')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [duplicateWarning, setDuplicateWarning] = useState<{
     message: string
     existing: { id: string; name: string; ticker: string }[]
   } | null>(null)
+  // Idempotency key to prevent duplicate submissions on back-button / re-render
+  const idempotencyKeyRef = useRef<string>(crypto.randomUUID())
 
   async function handleSave(forceDuplicate = false) {
-    if (!name) return
+    if (!name || submitted) return
     setSaving(true)
     setError(null)
     if (!forceDuplicate) setDuplicateWarning(null)
@@ -809,7 +864,10 @@ function HoldingForm({
     try {
       const res = await fetch('/api/holdings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Idempotency-Key': idempotencyKeyRef.current,
+        },
         body: JSON.stringify({
           name,
           ticker: ticker || null,
@@ -835,6 +893,18 @@ function HoldingForm({
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error || 'Kon holding niet opslaan')
+      }
+
+      // Mark as submitted to prevent re-submission
+      setSubmitted(true)
+
+      // Replace current history entry so back-button doesn't return to
+      // a state that could re-trigger the form submission
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(
+          { ...window.history.state, formSubmitted: true },
+          ''
+        )
       }
 
       onSaved()
@@ -991,11 +1061,12 @@ function HoldingForm({
             Annuleren
           </button>
           <button
-            onClick={handleSave}
-            disabled={saving || !name}
+            onClick={() => handleSave()}
+            disabled={saving || submitted || !name}
             className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+            data-testid="holding-submit-btn"
           >
-            {saving ? 'Opslaan...' : 'Toevoegen'}
+            {submitted ? 'Opgeslagen ✓' : saving ? 'Opslaan...' : 'Toevoegen'}
           </button>
         </div>
       </div>
@@ -1014,18 +1085,108 @@ function HoldingEditForm({
   onClose: () => void
   onSaved: () => void
 }) {
-  const [name, setName] = useState(holding.name)
-  const [ticker, setTicker] = useState(holding.ticker || '')
-  const [units, setUnits] = useState(String(holding.units))
-  const [avgPrice, setAvgPrice] = useState(String(holding.avg_purchase_price))
-  const [currentPrice, setCurrentPrice] = useState(String(holding.current_price ?? ''))
-  const [notes, setNotes] = useState(holding.notes || '')
+  // LocalStorage key for draft state
+  const draftKey = `holding-edit-draft-${holding.id}`
+
+  // Load draft from localStorage if it exists (recover after accidental refresh)
+  const loadDraft = useCallback(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(draftKey) : null
+      if (raw) {
+        const draft = JSON.parse(raw)
+        // Only use draft if it's for the same holding version
+        if (draft.holdingId === holding.id) {
+          return draft
+        }
+      }
+    } catch { /* ignore parse errors */ }
+    return null
+  }, [draftKey, holding.id])
+
+  const draft = loadDraft()
+
+  const [name, setName] = useState(draft?.name ?? holding.name)
+  const [ticker, setTicker] = useState(draft?.ticker ?? (holding.ticker || ''))
+  const [units, setUnits] = useState(draft?.units ?? String(holding.units))
+  const [avgPrice, setAvgPrice] = useState(draft?.avgPrice ?? String(holding.avg_purchase_price))
+  const [currentPrice, setCurrentPrice] = useState(draft?.currentPrice ?? String(holding.current_price ?? ''))
+  const [notes, setNotes] = useState(draft?.notes ?? (holding.notes || ''))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showDraftNotice, setShowDraftNotice] = useState(!!draft)
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false)
   const [conflictData, setConflictData] = useState<{
     message: string
     server_state: Record<string, unknown>
   } | null>(null)
+
+  // Track dirty state (form values differ from original holding)
+  const isDirty = useMemo(() => {
+    return (
+      name !== holding.name ||
+      ticker !== (holding.ticker || '') ||
+      units !== String(holding.units) ||
+      avgPrice !== String(holding.avg_purchase_price) ||
+      currentPrice !== String(holding.current_price ?? '') ||
+      notes !== (holding.notes || '')
+    )
+  }, [name, ticker, units, avgPrice, currentPrice, notes, holding])
+
+  // Auto-save draft to localStorage when form is dirty
+  useEffect(() => {
+    if (isDirty) {
+      try {
+        localStorage.setItem(draftKey, JSON.stringify({
+          holdingId: holding.id,
+          name, ticker, units, avgPrice, currentPrice, notes,
+          savedAt: new Date().toISOString(),
+        }))
+      } catch { /* ignore storage errors */ }
+    } else {
+      // Clean up draft when form matches original
+      try { localStorage.removeItem(draftKey) } catch { /* ignore */ }
+    }
+  }, [isDirty, draftKey, holding.id, name, ticker, units, avgPrice, currentPrice, notes])
+
+  // Warn on page refresh/close when form has unsaved changes
+  useEffect(() => {
+    if (!isDirty) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      // Modern browsers ignore custom messages, but returning a string is required for some
+      e.returnValue = 'Je hebt onopgeslagen wijzigingen. Weet je zeker dat je wilt vernieuwen?'
+      return e.returnValue
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isDirty])
+
+  // Handle close with unsaved changes confirmation
+  function handleClose() {
+    if (isDirty) {
+      setShowCloseConfirm(true)
+    } else {
+      cleanupAndClose()
+    }
+  }
+
+  // Discard draft and close
+  function cleanupAndClose() {
+    try { localStorage.removeItem(draftKey) } catch { /* ignore */ }
+    onClose()
+  }
+
+  // Discard recovered draft and reset to original holding values
+  function discardDraft() {
+    setName(holding.name)
+    setTicker(holding.ticker || '')
+    setUnits(String(holding.units))
+    setAvgPrice(String(holding.avg_purchase_price))
+    setCurrentPrice(String(holding.current_price ?? ''))
+    setNotes(holding.notes || '')
+    setShowDraftNotice(false)
+    try { localStorage.removeItem(draftKey) } catch { /* ignore */ }
+  }
 
   const newValue = (Number(currentPrice) || Number(avgPrice) || 0) * (Number(units) || 1)
   const oldValue = (holding.current_price ?? holding.avg_purchase_price) * holding.units
@@ -1076,6 +1237,8 @@ function HoldingEditForm({
         throw new Error(data.error || 'Kon holding niet bijwerken')
       }
 
+      // Clear draft on successful save
+      try { localStorage.removeItem(draftKey) } catch { /* ignore */ }
       onSaved()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Onbekende fout')
@@ -1099,7 +1262,7 @@ function HoldingEditForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={handleClose}>
       <div
         className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
@@ -1107,10 +1270,80 @@ function HoldingEditForm({
       >
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-bold text-zinc-900">Holding bewerken</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+          <button onClick={handleClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600" data-testid="holding-edit-close-btn">
             <X className="h-5 w-5" />
           </button>
         </div>
+
+        {/* Unsaved changes close confirmation */}
+        {showCloseConfirm && (
+          <div className="mb-4 rounded-lg border border-orange-300 bg-orange-50 p-3" data-testid="unsaved-changes-warning">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-600" />
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-orange-800">Onopgeslagen wijzigingen</p>
+                <p className="mt-1 text-xs text-orange-700">
+                  Je hebt wijzigingen die nog niet zijn opgeslagen. Wil je deze verwijderen of verder bewerken?
+                </p>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={cleanupAndClose}
+                    className="rounded-md bg-orange-600 px-3 py-1 text-xs font-medium text-white hover:bg-orange-700"
+                    data-testid="discard-changes-btn"
+                  >
+                    Wijzigingen verwijderen
+                  </button>
+                  <button
+                    onClick={() => setShowCloseConfirm(false)}
+                    className="rounded-md border border-orange-300 px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
+                    data-testid="keep-editing-btn"
+                  >
+                    Verder bewerken
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Draft recovered notice (after page refresh) */}
+        {showDraftNotice && (
+          <div className="mb-4 rounded-lg border border-blue-300 bg-blue-50 p-3" data-testid="draft-recovered-notice">
+            <div className="flex items-start gap-2">
+              <RefreshCw className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-blue-800">Concept hersteld</p>
+                <p className="mt-1 text-xs text-blue-700">
+                  Je onopgeslagen wijzigingen zijn hersteld na het vernieuwen van de pagina.
+                </p>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={() => setShowDraftNotice(false)}
+                    className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
+                    data-testid="accept-draft-btn"
+                  >
+                    Doorgaan met concept
+                  </button>
+                  <button
+                    onClick={discardDraft}
+                    className="rounded-md border border-blue-300 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                    data-testid="discard-draft-btn"
+                  >
+                    Origineel laden
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Unsaved changes indicator */}
+        {isDirty && !showCloseConfirm && !showDraftNotice && (
+          <div className="mb-3 flex items-center gap-1.5 rounded-md bg-amber-50 px-3 py-1.5 border border-amber-200" data-testid="dirty-indicator">
+            <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-[11px] font-medium text-amber-700">Onopgeslagen wijzigingen</span>
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
@@ -1237,7 +1470,7 @@ function HoldingEditForm({
 
         <div className="mt-5 flex justify-end gap-2">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
           >
             Annuleren
