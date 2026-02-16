@@ -1,3 +1,47 @@
+## Session 2026-02-16 - Feature #145
+
+### Feature #145: Malformed holding ID in URL handled gracefully - PASSING
+- Created dynamic [id] routes for both /holdings/[id] and /core/assets/holdings/[id]
+- /holdings/[id] always calls notFound() since holdings live under /core/assets/holdings
+- /core/assets/holdings/[id] validates UUID format, then checks Supabase for existing holding
+- Invalid UUIDs, non-UUID strings, numeric IDs, and XSS attempts all return proper 404
+- Custom not-found.tsx pages with Dutch messages:
+  - "Holding niet gevonden" heading
+  - "Deze holding bestaat niet, is verwijderd, of het opgegeven ID is ongeldig"
+  - Navigation links: "Naar dashboard" and "Naar holdings"
+- 8/8 API verification tests passing:
+  1. /holdings/invalid-uuid-here returns 404 ✅
+  2. /holdings/not-a-uuid shows 404 content ✅
+  3. /holdings/12345 returns 404 ✅
+  4. /holdings/<script> (XSS) returns 404 ✅
+  5. /core/assets/holdings/invalid-uuid-here handled gracefully (307 redirect to login) ✅
+  6. 404 page includes navigation links ✅
+  7. No 500 server error on invalid ID ✅
+  8. /holdings/ (no ID) does not crash ✅
+- Visual verification via Playwright: 404 page renders correctly with heading, message, and buttons
+- Navigation works from 404 page (Naar dashboard → login redirect, Naar holdings → login redirect)
+- Zero JS console errors (only expected 404 resource status)
+- No mock data patterns found
+
+### Changes Made
+- app/holdings/[id]/page.tsx: Top-level /holdings/[id] route that calls notFound()
+- app/holdings/[id]/not-found.tsx: Custom 404 page for top-level holdings
+- app/(app)/core/assets/holdings/[id]/page.tsx: UUID-validated holding detail page with DB lookup
+- app/(app)/core/assets/holdings/[id]/not-found.tsx: Custom 404 page for app-scoped holdings
+- app/api/verify-malformed-holding-id/route.ts: 8-test verification endpoint
+- app/test-malformed-holding-id/page.tsx: Visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: f22b4d9
+
+### Current Status
+- 138/265 features passing (137 before + #145)
+- Feature #145 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- Holdings are managed via modals on /core/assets/holdings, not individual detail pages
+- The [id] route validates UUID format and checks both holdings and assets tables
+
 ## Session 2026-02-16 - Feature #147
 
 ### Feature #147: Direct access to /beheer as non-admin redirects - PASSING
