@@ -1,3 +1,35 @@
+## Session 2026-02-16 - Feature #136
+
+### Feature #136: Holding edit form preserves data on refresh - PASSING
+- HoldingEditForm component (lines 1008-1418 in holdings/page.tsx) has full draft preservation
+- isDirty state tracking via useMemo compares all form fields to original holding data
+- beforeunload event listener warns user on page refresh when form has unsaved changes
+- Auto-save draft to localStorage (key: `holding-edit-draft-${holding.id}`) when form is dirty
+- Draft recovery on mount via loadDraft() function — pre-fills form with saved draft values
+- Blue "Concept hersteld" notice shown when draft is recovered with:
+  - "Doorgaan met concept" button to keep recovered changes
+  - "Origineel laden" button to discard draft and load original holding values
+- Orange close confirmation dialog when closing modal with unsaved changes:
+  - "Wijzigingen verwijderen" to discard and close
+  - "Verder bewerken" to continue editing
+- Pulsing amber "Onopgeslagen wijzigingen" indicator when form is dirty
+- Draft cleanup: removed from localStorage on successful save or when values match original
+- Optimistic concurrency control via expected_updated_at for multi-session conflict detection
+- 12/12 API verification tests passing
+- No mock data patterns found (grep clean)
+- Console: only HMR/RSC dev server noise, no application errors
+- Test page: /test-holding-edit-preservation
+- Verification API: /api/verify-holding-edit-preservation
+
+### Current Status
+- 129/265 features passing (128 before + #136)
+- Feature #136 completed and verified
+
+### Notes for Next Session
+- Port 3000 used this session
+- Holdings edit form is a comprehensive modal component with draft recovery, conflict detection, and live preview
+- localStorage-based draft preservation doesn't need server restart test (client-side only)
+
 ## Session 2026-02-16 - Feature #133
 
 ### Feature #133: Feature visit tracking persists across sessions - PASSING
