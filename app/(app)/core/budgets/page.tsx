@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, Plus, X, Pencil, Save,
-  GitFork, Fingerprint, Workflow,
+  GitFork, Fingerprint, Workflow, CircleDot,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getDefaultBudgets, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
@@ -15,6 +15,7 @@ import { type BudgetRollover, formatPeriod, getCarriedAmount, getPreviousPeriod,
 import { BudgetTree } from '@/components/app/budget-tree'
 import { BudgetBlob } from '@/components/app/budget-blob'
 import { BudgetSankey } from '@/components/app/budget-sankey'
+import { BudgetDonut } from '@/components/app/budget-donut'
 import { BudgetAlert, shouldAlert } from '@/components/app/budget-alert'
 
 export default function BudgetsPage() {
@@ -25,10 +26,10 @@ export default function BudgetsPage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null)
   const [modalStep, setModalStep] = useState<'detail' | 'edit'>('detail')
-  const [viewMode, setViewMode] = useState<'tree' | 'blob' | 'sankey'>(() => {
+  const [viewMode, setViewMode] = useState<'tree' | 'blob' | 'sankey' | 'donut'>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('budgets-view-mode')
-      if (stored === 'tree' || stored === 'blob' || stored === 'sankey') return stored
+      if (stored === 'tree' || stored === 'blob' || stored === 'sankey' || stored === 'donut') return stored
     }
     return 'tree'
   })
@@ -281,7 +282,7 @@ export default function BudgetsPage() {
     setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))
   }
 
-  function toggleViewMode(mode: 'tree' | 'blob' | 'sankey') {
+  function toggleViewMode(mode: 'tree' | 'blob' | 'sankey' | 'donut') {
     setViewMode(mode)
     localStorage.setItem('budgets-view-mode', mode)
   }
@@ -490,6 +491,17 @@ export default function BudgetsPage() {
             <Workflow className="h-3.5 w-3.5" />
             Stroom
           </button>
+          <button
+            onClick={() => toggleViewMode('donut')}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              viewMode === 'donut'
+                ? 'bg-zinc-900 text-white'
+                : 'text-zinc-500 hover:text-zinc-700'
+            }`}
+          >
+            <CircleDot className="h-3.5 w-3.5" />
+            Ring
+          </button>
         </div>
 
         <Link
@@ -555,7 +567,7 @@ export default function BudgetsPage() {
           spending={spending}
           onNavigate={(id) => openBudgetModal(id)}
         />
-      ) : (
+      ) : viewMode === 'sankey' ? (
         <>
           <BudgetSankey
             groups={[...incomeBudgets, ...expenseBudgets, ...savingsBudgets, ...debtBudgets]}
@@ -574,6 +586,12 @@ export default function BudgetsPage() {
             onNavigate={(id) => openBudgetModal(id)}
           />
         </>
+      ) : (
+        <BudgetDonut
+          groups={[...incomeBudgets, ...expenseBudgets, ...savingsBudgets, ...debtBudgets]}
+          spending={spending}
+          onNavigate={(id) => openBudgetModal(id)}
+        />
       )}
 
       {/* Budget detail modal */}

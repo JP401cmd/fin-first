@@ -1,3 +1,57 @@
+## Session 2026-02-16 - Feature #116
+
+### Feature #116: Sovereignty level drives FeatureGate correctly - PASSING
+- Verified end-to-end that FeatureGate component receives real sovereignty level from backend
+- Created /api/verify-feature-gating API endpoint with 10 verification tests:
+  - Sovereignty level valid (-2 to 6)
+  - Phase matches sovereignty level
+  - Feature access map has all 19 defined features
+  - Feature access matches matrix for current phase
+  - Backend computation uses real Supabase data
+  - Profile has last_known_phase stored
+  - Recovery phase feature gating correct
+  - Mastery-only feature correctly gated
+  - Pure function computeSovereigntyLevel passes all 9 test cases
+  - computeFeatureAccess returns complete data structure
+- Created /test-sovereignty-gating public test page with:
+  - 9 scenario buttons (Recovery level -2 to Mastery level 6)
+  - Live FeatureGate components that change when scenario changes
+  - Verification tests that validate level/phase/feature access
+  - Summary counts (accessible vs locked)
+- Created /(app)/verify-feature-gating in-app page (behind auth) showing:
+  - Real sovereignty data from backend via useFeatureAccess() hook
+  - API test results from /api/verify-feature-gating
+  - Context provider verification
+  - Feature matrix with current phase highlighted
+  - Live FeatureGate demo grouped by expected state
+- Browser automation testing results:
+  - Recovery (Level -2): 3 accessible, 16 locked ✓
+  - Stability (Level 1): 11 accessible, 8 locked ✓
+  - Mastery (Level 6): 17 accessible, 2 locked ✓
+  - Phase-specific features correctly gated (withdrawal_strategie only in mastery, etc.)
+  - FeatureGate fallback="locked" shows LockedFeatureCard with unlock phase badge
+  - FeatureGate fallback="hidden" makes features invisible
+  - Scenario switching instantly updates all FeatureGate components
+- Architecture verified:
+  - app/(app)/layout.tsx fetches real assets/debts/transactions from Supabase
+  - computeFeatureAccess() computes level from real financial data
+  - FeatureAccessProvider wraps app with context
+  - FeatureGate uses useFeatureAccess() to show/hide/lock
+  - Phase transition detection compares last_known_phase with computed phase
+- Zero console errors
+- No mock data patterns found
+- Commit: 829ab1a
+
+### Current Status
+- Feature #116 completed and marked passing
+- 108/265 features passing (107 before + #116)
+
+### Notes for Next Session
+- Turbopack on Windows continues to have lock file issues; rm -rf .next before starting
+- Port conflicts common; use high ports (4444+)
+- Supabase email rate limit still blocks creating test users for authenticated testing
+- Server running on port 4444
+
 ## Session 2026-02-16 - Feature #112
 
 ### Feature #112: Large file upload shows progress and size limit - PASSING
