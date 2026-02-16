@@ -1,3 +1,30 @@
+## Session 2026-02-17 - Feature #162
+
+### Feature #162: Deleting user data does not affect other users - PASSING
+- Verified that deleteAllUserData() in lib/seed-persona.ts scopes ALL deletes by user_id
+- The deleteTable() helper always uses .eq('user_id', userId) for all 17 financial tables
+- Reset endpoint (POST /api/onboarding/reset) extracts user.id from authenticated session
+- Reset endpoint returns 401 for unauthenticated requests (middleware + route-level check)
+- Profile update uses .eq('id', user.id) to only reset own profile
+- Supabase RLS enforces auth.uid() = user_id as second layer of protection
+- Functional test: deleteAllUserData with fake UUID returns 0 deletions across all 17 tables
+- 10/10 verification tests passing
+- Zero console errors, no mock data patterns
+
+### Changes Made
+- app/api/verify-user-reset-isolation/route.ts: Created 10-test verification endpoint
+- app/test-user-reset-isolation/page.tsx: Created visual test page with architecture overview
+- lib/supabase/proxy.ts: Added test routes to public paths
+
+### Current Status
+- 155/265 features passing (154 before + #162)
+- Feature #162 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- Two-layer data isolation: application code (.eq user_id) + database RLS (auth.uid())
+- The reset flow is architecturally incapable of affecting other users' data
+
 ## Session 2026-02-17 - Feature #161
 
 ### Feature #161: Deleting holding removes its transactions - PASSING
