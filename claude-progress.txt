@@ -1,3 +1,40 @@
+## Session 2026-02-16 - Feature #111
+
+### Feature #111: Concurrent edit conflict handled for holdings - PASSING
+- Implemented optimistic concurrency control for holdings PATCH endpoint
+- Backend changes (app/api/holdings/route.ts):
+  - PATCH endpoint now accepts optional `expected_updated_at` parameter
+  - Before updating, reads current row's `updated_at` and compares to client's expected value
+  - If timestamps differ (another session modified the row), returns 409 Conflict
+  - 409 response includes `server_state` with current values for conflict resolution
+  - Always bumps `updated_at` on write to enable future conflict checks
+  - Without `expected_updated_at`, uses last-write-wins (backward compatible)
+  - Assets fallback mode documented as last-write-wins only
+- Frontend changes (app/(app)/core/assets/holdings/page.tsx):
+  - HoldingEditForm sends `expected_updated_at: holding.updated_at` in PATCH requests
+  - On 409 conflict: shows amber warning banner with "Bewerkingsconflict" heading
+  - Shows server's current values (name, units, price) for comparison
+  - Two resolution options:
+    1. "Serverwaarden laden" — reloads form fields with server's current values
+    2. "Toch overschrijven" — force-saves without expected_updated_at check
+  - `data-testid="conflict-warning"`, `conflict-reload-btn`, `conflict-overwrite-btn`
+- Verification endpoint: /api/verify-concurrent-edit (4/4 tests passing)
+  - Tests: auth requirement, optimistic concurrency code, frontend handling, authenticated simulation
+- Test page: /test-concurrent-edit — visual confirmation of all tests
+- No mock data patterns found in modified files
+- Zero console errors
+- All changes committed in 3b9b82a (picked up by parallel agent commit)
+
+### Current Status
+- 103/265 features passing (102 before + #111)
+- Feature #111 completed and marked passing
+
+### Notes for Next Session
+- Holdings PATCH now supports optimistic locking via expected_updated_at
+- Conflict resolution UI provides "reload server values" and "force overwrite" options
+- Assets fallback mode (when holdings table doesn't exist) remains last-write-wins
+- Changes were committed as part of 3b9b82a by another parallel agent
+
 ## Session 2026-02-16 - Feature #108
 
 ### Feature #108: Session expiry shows re-login prompt - PASSING
