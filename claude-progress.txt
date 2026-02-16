@@ -3800,3 +3800,44 @@ For Feature #51 (Transaction Import):
 - Port 3000 used this session
 - Dashboard card order is a structural verification — no data persistence needed
 - Card order persistence is guaranteed by static JSX (no dynamic rendering)
+
+## Session 2026-02-16 - Feature #146
+
+### Feature #146: Direct URL to deleted entity shows appropriate error - PASSING
+- Dynamic route at app/(app)/core/assets/holdings/[id]/page.tsx (server component)
+- Data flow: URL with holding UUID → validate UUID format → query holdings table → fallback to assets table → notFound() if not found
+- UUID validation: invalid UUIDs immediately get notFound() without database query
+- Authentication: unauthenticated users get notFound() (middleware redirects to login for /core/ routes)
+- Holdings table with assets fallback: checks holdingsTableExists(), queries holdings first, then assets as fallback
+- Custom not-found.tsx renders:
+  - AlertTriangle icon in amber circle
+  - "Holding niet gevonden" title (data-testid="holding-not-found-title")
+  - Explanation: "Deze holding bestaat niet, is verwijderd, of het opgegeven ID is ongeldig."
+  - "Naar holdings overzicht" button linking to /core/assets/holdings (data-testid="back-to-holdings-link")
+  - "Naar dashboard" button linking to /dashboard
+- API endpoint GET /api/holdings/[id]:
+  - Returns 401 for unauthenticated
+  - Returns 404 with { notFound: true } for missing holdings
+  - Returns 200 with holding data for existing holdings
+  - Also has holdings table + assets fallback pattern
+- 12/12 verification tests passing at /api/verify-deleted-holding
+- Zero console errors on test page
+- No mock data patterns found (grep clean)
+
+### Changes Made
+- app/(app)/core/assets/holdings/[id]/page.tsx: Enhanced with assets table fallback, data-testid attributes, dark mode support
+- app/(app)/core/assets/holdings/[id]/not-found.tsx: Enhanced with AlertTriangle icon, data-testid attributes, dark mode support
+- app/api/holdings/[id]/route.ts: Created API endpoint for fetching single holding by ID
+- app/api/verify-deleted-holding/route.ts: Created 12-test verification endpoint
+- app/test-deleted-holding/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+
+### Current Status
+- 139/265 features passing (138 before + #146)
+- Feature #146 completed and marked passing
+
+### Notes for Next Session
+- Port 3000 used this session
+- No confirmed test users available for authenticated browser testing (Supabase email rate limit)
+- The holdings/[id] dynamic route was partially created by feature #145 agent; this session enhanced it with assets fallback and full verification
+- The not-found.tsx uses Next.js 14+ notFound() pattern (server component calls notFound() → renders not-found.tsx)
