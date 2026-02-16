@@ -141,25 +141,37 @@ export function NextStepEmptyCard({ moduleColor }: { moduleColor?: 'amber' | 'te
  */
 export function NextStepSection({ steps, moduleColor }: { steps: NextStepSuggestion[]; moduleColor?: 'amber' | 'teal' | 'purple' }) {
   const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set())
+  const [completedKeys, setCompletedKeys] = useState<Set<string>>(new Set())
   const [dismissingKeys, setDismissingKeys] = useState<Set<string>>(new Set())
   const [loaded, setLoaded] = useState(false)
 
-  // Load previously dismissed keys from database on mount
+  // Load previously dismissed AND completed keys from database on mount
   useEffect(() => {
     let cancelled = false
-    async function loadDismissed() {
+    async function loadDismissedAndCompleted() {
       try {
         const res = await fetch('/api/next-steps')
         if (res.ok) {
           const data = await res.json()
-          if (!cancelled && Array.isArray(data.dismissed_steps) && data.dismissed_steps.length > 0) {
-            setDismissedKeys(prev => {
-              const merged = new Set(prev)
-              for (const key of data.dismissed_steps) {
-                merged.add(key)
-              }
-              return merged
-            })
+          if (!cancelled) {
+            if (Array.isArray(data.dismissed_steps) && data.dismissed_steps.length > 0) {
+              setDismissedKeys(prev => {
+                const merged = new Set(prev)
+                for (const key of data.dismissed_steps) {
+                  merged.add(key)
+                }
+                return merged
+              })
+            }
+            if (Array.isArray(data.completed_steps) && data.completed_steps.length > 0) {
+              setCompletedKeys(prev => {
+                const merged = new Set(prev)
+                for (const key of data.completed_steps) {
+                  merged.add(key)
+                }
+                return merged
+              })
+            }
           }
         }
       } catch {
@@ -168,7 +180,7 @@ export function NextStepSection({ steps, moduleColor }: { steps: NextStepSuggest
         if (!cancelled) setLoaded(true)
       }
     }
-    loadDismissed()
+    loadDismissedAndCompleted()
     return () => { cancelled = true }
   }, [])
 
@@ -203,7 +215,10 @@ export function NextStepSection({ steps, moduleColor }: { steps: NextStepSuggest
     }
   }, [dismissedKeys, dismissingKeys])
 
-  const visibleSteps = steps.filter(s => !dismissedKeys.has(s.key || s.title))
+  const visibleSteps = steps.filter(s => {
+    const key = s.key || s.title
+    return !dismissedKeys.has(key) && !completedKeys.has(key)
+  })
   const currentStep = visibleSteps.length > 0 ? visibleSteps[0] : null
 
   // While loading dismissed state, show nothing to avoid flash of dismissed content

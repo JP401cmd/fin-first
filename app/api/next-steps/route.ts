@@ -112,7 +112,10 @@ export async function GET() {
       }
     }
 
-    // Build step list based on actual data state
+    // Build step list based on actual data state AND explicit completions from DB
+    // A step is "completed" if either:
+    // 1. The real data state shows it's done (e.g., hasTransactions for import_transactions)
+    // 2. The user explicitly marked it as completed via POST /api/next-steps/complete
     const steps = [
       {
         key: 'import_transactions',
@@ -122,7 +125,7 @@ export async function GET() {
         priority: 1,
         href: '/core/cash/import',
         icon: 'receipt',
-        completed: hasTransactions,
+        completed: hasTransactions || completedByDb.has('import_transactions'),
         dismissed: dismissedKeys.has('import_transactions'),
       },
       {
@@ -133,7 +136,7 @@ export async function GET() {
         priority: 2,
         href: '/core/budgets',
         icon: 'cart',
-        completed: hasBudgets,
+        completed: hasBudgets || completedByDb.has('set_budgets'),
         dismissed: dismissedKeys.has('set_budgets'),
       },
       {
@@ -144,7 +147,7 @@ export async function GET() {
         priority: 3,
         href: '/core/assets',
         icon: 'piggybank',
-        completed: hasAssets,
+        completed: hasAssets || completedByDb.has('add_assets'),
         dismissed: dismissedKeys.has('add_assets'),
       },
       {
@@ -155,7 +158,7 @@ export async function GET() {
         priority: 4,
         href: '/core/debts',
         icon: 'building',
-        completed: hasDebts,
+        completed: hasDebts || completedByDb.has('register_debts'),
         dismissed: dismissedKeys.has('register_debts'),
       },
       {
@@ -166,7 +169,7 @@ export async function GET() {
         priority: 5,
         href: '/identity',
         icon: 'target',
-        completed: profileComplete,
+        completed: profileComplete || completedByDb.has('complete_profile'),
         dismissed: dismissedKeys.has('complete_profile'),
       },
       {
@@ -177,7 +180,7 @@ export async function GET() {
         priority: 6,
         href: '/core',
         icon: 'chart',
-        completed: hasSnapshots,
+        completed: hasSnapshots || completedByDb.has('create_snapshot'),
         dismissed: dismissedKeys.has('create_snapshot'),
       },
       {
@@ -188,7 +191,7 @@ export async function GET() {
         priority: 7,
         href: '/will',
         icon: 'target',
-        completed: hasGoals,
+        completed: hasGoals || completedByDb.has('set_goals'),
         dismissed: dismissedKeys.has('set_goals'),
       },
     ]
