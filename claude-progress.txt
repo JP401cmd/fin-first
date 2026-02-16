@@ -1,3 +1,36 @@
+## Session 2026-02-17 - Feature #168
+
+### Feature #168: Debt payoff removes debt from active calculations - PASSING
+- When a debt balance reaches 0 (via ValuationModal revalue or DebtForm edit), `is_active` is set to `false`
+- Badge evaluation (`/api/badges/evaluate`) now filters debts by `is_active !== false && current_balance > 0` for Schuldenvrij badge
+- Badge evaluation also includes `is_active` field in its debt query and only counts active debts for `totalDebt` calculation
+- The debts page `activeDebts` filter already uses `d.is_active && Number(d.current_balance) > 0`
+- `simulatePayoff()` in `lib/debt-data.ts` already filters by `d.is_active && Number(d.current_balance) > 0`
+- `debtProjection()` returns 0 months/0 interest when balance <= 0
+- All key API routes (snapshots, AI contexts, FIRE calculations) already filter debts by `is_active = true`
+- Valuation history now records "Schuld afgelost!" note when balance reaches 0 via DebtForm edit
+- 10/10 verification tests passing at `/api/verify-debt-payoff-removal`
+- Zero console errors
+- No mock data patterns found
+
+### Changes Made
+- app/(app)/core/debts/page.tsx: ValuationModal sets is_active=false when debt balance=0; DebtForm edit sets is_active=false when balance=0; valuation tracking for zero-balance payoff
+- app/api/badges/evaluate/route.ts: Debt query includes is_active field; debt_free badge checks activeDebts filter; totalDebt only counts active debts
+- app/api/verify-debt-payoff-removal/route.ts: Created 10-test verification endpoint
+- app/test-debt-payoff-removal/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: 425be7e
+
+### Current Status
+- 161/265 features passing (160 before + #168)
+- Feature #168 completed and marked passing
+
+### Notes for Next Session
+- Port 3000 used this session
+- Debt payoff is a two-part mechanism: (1) set current_balance=0, (2) set is_active=false
+- The existing codebase already had is_active filtering in most places; main gaps were ValuationModal, DebtForm edit, and badge evaluation
+- Supabase email rate limit still blocks creating confirmed test users for authenticated browser testing
+
 ## Session 2026-02-17 - Feature #167
 
 ### Feature #167: Asset deletion updates net worth calculation - PASSING
