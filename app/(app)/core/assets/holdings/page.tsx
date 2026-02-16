@@ -881,10 +881,15 @@ function HoldingForm({
 }) {
   const [name, setName] = useState('')
   const [ticker, setTicker] = useState('')
-  const [units, setUnits] = useState('1')
+  const [units, setUnits] = useState('')
   const [avgPrice, setAvgPrice] = useState('')
   const [currentPrice, setCurrentPrice] = useState('')
-  const [purchaseDate, setPurchaseDate] = useState('')
+  const [currency] = useState('EUR')
+  const [isActive] = useState(true)
+  const [purchaseDate, setPurchaseDate] = useState(() => {
+    const today = new Date()
+    return today.toISOString().split('T')[0]
+  })
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -912,10 +917,12 @@ function HoldingForm({
         body: JSON.stringify({
           name,
           ticker: ticker || null,
-          units: Number(units) || 1,
+          units: units ? Number(units) : 0,
           avg_purchase_price: Number(avgPrice) || 0,
           current_price: currentPrice ? Number(currentPrice) : null,
           purchase_date: purchaseDate || null,
+          currency,
+          is_active: isActive,
           notes: notes || null,
           force_duplicate: forceDuplicate,
         }),
@@ -1045,6 +1052,8 @@ function HoldingForm({
                 value={units}
                 onChange={(e) => setUnits(e.target.value)}
                 className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                placeholder="0"
+                data-testid="holding-units-input"
               />
             </div>
             <div>
@@ -1071,7 +1080,7 @@ function HoldingForm({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-zinc-600">Aankoopdatum</label>
               <input
@@ -1079,7 +1088,27 @@ function HoldingForm({
                 value={purchaseDate}
                 onChange={(e) => setPurchaseDate(e.target.value)}
                 className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                data-testid="holding-purchase-date-input"
               />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">Valuta</label>
+              <div
+                className="flex items-center rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600"
+                data-testid="holding-currency-display"
+              >
+                {currency}
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">Status</label>
+              <div
+                className="flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600"
+                data-testid="holding-is-active-display"
+              >
+                <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                Actief
+              </div>
             </div>
           </div>
 

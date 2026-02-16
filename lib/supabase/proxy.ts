@@ -243,6 +243,10 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-holding-defaults',
     '/test-budget-defaults',
     '/api/verify-budget-defaults',
+    '/test-data-reset-full',
+    '/api/verify-data-reset-full',
+    '/test-privacy-default',
+    '/api/verify-privacy-default',
   ]
 
   // Protected route prefixes that require authentication

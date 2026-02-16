@@ -342,7 +342,7 @@ export function BudgetForm({
   const SelectedIcon = iconMap[form.icon] ?? iconMap['Circle']
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto max-w-3xl px-6 py-8">
+    <form onSubmit={handleSubmit} className="mx-auto max-w-3xl px-6 py-8" data-testid="budget-form">
       {/* Back */}
       <div className="mb-6">
         <a
@@ -479,6 +479,7 @@ export function BudgetForm({
               className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
               placeholder={needsAutoParent ? 'bijv. Streaming' : 'bijv. Boodschappen'}
               required
+              data-testid="budget-name-input"
             />
             {needsAutoParent && (
               <p className="mt-1 text-xs text-zinc-400">
@@ -548,6 +549,7 @@ export function BudgetForm({
               value={form.budget_type}
               onChange={(e) => update('budget_type', e.target.value)}
               className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+              data-testid="budget-type-select"
             >
               <option value="expense">Uitgave</option>
               <option value="income">Inkomen</option>
@@ -570,6 +572,7 @@ export function BudgetForm({
               onChange={(e) => update('default_limit', e.target.value)}
               className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
               placeholder="0"
+              data-testid="budget-limit-input"
             />
           </div>
 
@@ -583,6 +586,7 @@ export function BudgetForm({
               value={form.interval}
               onChange={(e) => update('interval', e.target.value)}
               className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+              data-testid="budget-interval-select"
             >
               <option value="monthly">Maandelijks</option>
               <option value="quarterly">Per kwartaal</option>
@@ -600,6 +604,7 @@ export function BudgetForm({
               value={form.rollover_type}
               onChange={(e) => update('rollover_type', e.target.value)}
               className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+              data-testid="budget-rollover-select"
             >
               <option value="reset">Reset</option>
               <option value="carry-over">Doorschuiven</option>
@@ -626,6 +631,7 @@ export function BudgetForm({
                 value={form.limit_type}
                 onChange={(e) => update('limit_type', e.target.value)}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                data-testid="budget-limit-type-select"
               >
                 <option value="soft">Zacht (waarschuwing)</option>
                 <option value="hard">Hard (blokkering)</option>
@@ -646,6 +652,7 @@ export function BudgetForm({
                 onChange={(e) => update('max_single_transaction_amount', e.target.value)}
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
                 placeholder="0 = geen limiet"
+                data-testid="budget-max-transaction-input"
               />
             </div>
           </div>
@@ -663,6 +670,7 @@ export function BudgetForm({
               value={form.alert_threshold}
               onChange={(e) => update('alert_threshold', parseInt(e.target.value))}
               className="w-full accent-amber-500"
+              data-testid="budget-alert-threshold"
             />
             <div className="mt-1 flex justify-between text-xs text-zinc-400">
               <span>0%</span>
@@ -763,6 +771,7 @@ export function BudgetForm({
             value={form.parent_id}
             onChange={(e) => update('parent_id', e.target.value)}
             className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+            data-testid="budget-parent-select"
           >
             <option value="">Nieuwe categorie aanmaken</option>
             {parentBudgets
@@ -794,6 +803,7 @@ export function BudgetForm({
           type="submit"
           disabled={saving}
           className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-5 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+          data-testid="budget-submit-btn"
         >
           <Save className="h-4 w-4" />
           {saving ? 'Opslaan...' : 'Opslaan'}
