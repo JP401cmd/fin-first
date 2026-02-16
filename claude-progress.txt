@@ -1,3 +1,44 @@
+## Session 2026-02-16 (3) - Feature #77
+
+### Feature #77: Box 3 tax calculations use real asset values - PASSING
+- Comprehensive verification that Box 3 belasting page uses real Supabase data
+- Code analysis confirmed complete data flow:
+  1. belasting/page.tsx calls supabase.from('assets').select('*').eq('is_active', true)
+  2. Same for debts: supabase.from('debts').select('*').eq('is_active', true)
+  3. Daily expenses from real transactions table
+  4. All data passed directly to calculateBox3() with no mock injection
+  5. calculateBox3() uses asset.current_value and debt.current_balance from DB
+- Created /api/verify-box3 endpoint for server-side calculation verification
+- Created /test-box3-verification page with detailed step-by-step breakdown
+- Ran standalone calculation verification (scripts/verify-box3-calc.js):
+  - Test 1: €100k savings → €208.70 tax ✓
+  - Test 2: Mixed portfolio (savings + investments) → correct forfaitaire rendementen ✓
+  - Test 3: Eigen huis correctly excluded from Box 3 ✓
+  - Test 4: Changing asset value changes tax (€808.25 → €1090.28) ✓
+- Mock data grep: zero matches for globalThis, devStore, mockData etc in Box 3 files
+- Browser verification:
+  - Test page renders correctly at /test-box3-verification
+  - API returns dataSource: "supabase_database", calculationMatches: true
+  - 0 assets/debts without auth confirms RLS enforcement (no mock data)
+  - Zero console errors
+- Commit: 318895e
+
+### Changes Made
+- app/api/verify-box3/route.ts: New API endpoint for Box 3 calculation verification
+- app/test-box3-verification/page.tsx: New test page with calculation breakdown
+- scripts/verify-box3-calc.js: Standalone calculation verification script
+
+### Current Status
+- 1 feature completed this session (#77)
+- Total: ~73/265 features passing (72 before + #77)
+- Dev server was running on port 3165
+
+### Notes for Next Session
+- Supabase email rate limit still blocks creating confirmed test users
+- Box 3 calculation engine is correct and uses real DB data
+- Test page /test-box3-verification available for future verification
+- Turbopack on Windows continues to have intermittent issues - always rm -rf .next before starting
+
 ## Session 2026-02-16 (2) - Features #2 (skipped), #20, #21
 
 ### Feature #2: Database schema applied correctly - SKIPPED (6th time)
