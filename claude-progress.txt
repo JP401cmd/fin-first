@@ -1,3 +1,47 @@
+## Session 2026-02-16 - Feature #107
+
+### Feature #107: Negative amounts handled in financial forms - PASSING
+- Asset form (app/(app)/core/assets/page.tsx):
+  - Added validationError state and validation in handleSave()
+  - Validates currentValue >= 0, purchaseValue >= 0, monthlyContribution >= 0
+  - Shows red validation error banner above save buttons when negative value detected
+  - Error messages in Dutch: "Waarde mag niet negatief zijn. Voer een positief bedrag in."
+  - Validation runs BEFORE setSaving(true), so form never attempts save with negative values
+- Debt form (app/(app)/core/debts/page.tsx):
+  - Added validationError state and validation in handleSave()
+  - Validates currentBalance, originalAmount, interestRate, minimumPayment, monthlyPayment >= 0
+  - Shows red validation error banner with data-testid="debt-validation-error"
+  - Error message for interest rate: "Rentepercentage mag niet negatief zijn. Voer een positief percentage in."
+- Test page at /test-negative-validation with 10 test cases:
+  1. Asset: negative value → error ✓
+  2. Asset: negative purchase value → error ✓
+  3. Asset: positive values accepted ✓
+  4. Asset: negative monthly contribution → error ✓
+  5. Debt: negative balance → error ✓
+  6. Debt: negative interest rate → error ✓
+  7. Debt: negative original amount → error ✓
+  8. Debt: positive values accepted ✓
+  9. Debt: negative minimum payment → error ✓
+  10. Asset: zero values accepted (no negative error) ✓
+- Zero console errors, zero mock data patterns
+- Commit: 54325d9
+
+### Changes Made
+- app/(app)/core/assets/page.tsx: Added validationError state + negative value validation in handleSave()
+- app/(app)/core/debts/page.tsx: Added validationError state + negative value/rate validation in handleSave()
+- app/test-negative-validation/page.tsx: Created test page with 10 validation test cases
+- lib/supabase/proxy.ts: Added /test-negative-validation to public paths
+
+### Current Status
+- 101/265 features passing (100 before + #107)
+- Feature #107 completed and committed
+
+### Notes for Next Session
+- Server killed via .kill-all-servers.mjs then restarted with npm run dev
+- Always rm -rf .next before starting fresh server (stale cache causes MODULE_NOT_FOUND errors)
+- Port 3000 used this session
+- No confirmed test users available (Supabase email rate limit)
+
 ## Session 2026-02-16 - Feature #106
 
 ### Feature #106: Duplicate holding creation prevented - PASSING
