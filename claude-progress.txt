@@ -1,4 +1,31 @@
-## Session 2026-02-16 (latest) - Feature #102
+## Session 2026-02-16 (latest) - Feature #2
+
+### Feature #2: Database schema applied correctly - PASSING
+- Previously skipped 3+ times due to Supabase MCP tool permissions not being granted
+- Migration was applied by someone between sessions - all 7 new tables now exist in Supabase
+- Enhanced /api/schema-check endpoint from basic table existence check to comprehensive 91-point verification:
+  1. **Tables (7/7)**: badges, user_badges, user_streaks, user_feature_visits, holdings, holding_transactions, next_step_completions
+  2. **Table columns (63/63)**: Every column for every new table verified against app_spec.txt definitions
+  3. **net_worth_snapshots ALTER columns (5/5)**: freedom_percentage, fire_age, sovereignty_level, savings_rate, resilience_score
+  4. **Foreign key columns (9/9)**: user_id→auth.users, badge_id→badges, asset_id→assets, holding_id→holdings
+  5. **Unique constraint columns (4/4)**: user_badges(user_id,badge_id), user_feature_visits(user_id,feature_slug), next_step_completions(user_id,step_key), badges(slug)
+  6. **RLS enabled (7/7)**: All new tables have RLS policies active
+- Verified via curl: /api/schema-check returns {"status":"PASS","summary":"91/91 checks passing"}
+- Verified via Playwright browser: screenshot shows complete PASS result
+- Zero console errors
+- No mock data patterns found
+- Commit: 04790cb
+
+### Current Status
+- 98/265 features passing (97 before + #2)
+- Feature #2 finally resolved after being blocked for 8+ sessions
+
+### Notes for Next Session
+- Turbopack on Windows: use NEXT_PRIVATE_LOCAL_WEBPACK=1 env flag for stability
+- Always rm -rf .next before starting dev server
+- schema-check endpoint now serves as comprehensive DB verification tool
+
+## Session 2026-02-16 (previous) - Feature #102
 
 ### Feature #102: API 500 errors show user-friendly message - PASSING
 - Created app/error.tsx: Global error boundary for unhandled React errors
