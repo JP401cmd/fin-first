@@ -1,3 +1,28 @@
+## Session 2026-02-17 - Feature #156
+
+### Feature #156: Double dismiss on next step does not cause error - PASSING
+- Enhanced NextStepSection component with multi-layer double-dismiss protection:
+  1. **dismissingKeys state**: Tracks keys currently being dismissed to prevent concurrent API calls
+  2. **Guard check**: handleDismiss checks both `dismissedKeys.has(key)` and `dismissingKeys.has(key)` before proceeding
+  3. **Button disabled state**: NextStepCard accepts `dismissDisabled` prop to visually disable and functionally block the dismiss button
+  4. **Cursor feedback**: Disabled button shows `opacity-50 cursor-not-allowed` styling
+  5. **API idempotency**: Dismiss API uses upsert with `onConflict: 'user_id,step_key'` so duplicate calls are harmless
+  6. **Silent error handling**: try/catch blocks around API calls prevent any thrown errors
+- 8/8 verification tests passing at /api/verify-double-dismiss
+- Browser automation verified: dismiss button works, card transitions to next step, 0 JS errors
+- Mock data grep: zero hits for globalThis, devStore, mockData etc.
+
+### Changes Made
+- components/app/next-step-card.tsx: Added dismissingKeys state, guard checks, dismissDisabled prop
+- app/api/verify-double-dismiss/route.ts: Created 8-test verification endpoint
+- app/test-double-dismiss/page.tsx: Created interactive test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: 1953e9c
+
+### Current Status
+- 148/265 features passing (147 before + #156)
+- Feature #156 completed and marked passing
+
 ## Session 2026-02-17 - Feature #157
 
 ### Feature #157: Streak checkin twice on same day is idempotent - PASSING
