@@ -180,6 +180,11 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-budget-form-state',
     '/test-dashboard-card-order',
     '/api/verify-dashboard-card-order',
+    '/test-dismiss-persist',
+    '/api/verify-direct-access-assets',
+    '/test-direct-access-assets',
+    '/test-direct-budgets',
+    '/api/verify-direct-budgets',
   ]
 
   // Protected route prefixes that require authentication

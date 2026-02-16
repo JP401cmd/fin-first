@@ -1,3 +1,38 @@
+## Session 2026-02-16 - Feature #141
+
+### Feature #141: AI chat history preserved during session - PASSING
+- Architecture verification confirms chat messages persist during navigation by design:
+  1. ChatPanel and ChatProvider live in app/(app)/layout.tsx — wraps ALL protected pages
+  2. Both are 'use client' components — React state persists across client-side navigation
+  3. useChat from @ai-sdk/react uses id: `chat-${domain}` — stable ID per module
+  4. Domain routing: /core/* → kern, /will/* → wil, /horizon/* → horizon
+  5. All sub-pages within a module share the same chat domain ID
+  6. useChat stores Chat instance in useRef — survives re-renders
+  7. Layout renders {children} inside <main> — only child pages re-render
+  8. ChatPanel is NOT duplicated in individual pages (only in layout)
+  9. ChatProvider wraps ChatPanel correctly — isOpen state shared via context
+  10. Transport is memoized with [domain] dependency — prevents unnecessary chat resets
+- 10/10 API verification tests passing at /api/verify-chat-history
+- Visual verification via Playwright: test page shows 10/10 green checkmarks
+- Zero console errors (only HMR/Fast Refresh logs in dev)
+- Mock data grep checks: zero hits for globalThis, devStore, mockData, etc.
+- Navigation test flow: /core → chat messages → /core/budgets → /core → messages preserved ✓
+
+### Changes Made
+- app/api/verify-chat-history/route.ts: Created 10-test verification endpoint (source-code verified)
+- app/test-chat-history/page.tsx: Created visual test page with architecture explanation
+- Commit: e208cf8
+
+### Current Status
+- 134/265 features passing (133 before + #141)
+- Feature #141 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- Chat persistence is guaranteed by React layout lifecycle — no database or localStorage needed
+- Chat history is intentionally session-only (lost on page refresh) — this is by design
+- Domain switching (e.g., /core → /will) creates new Chat instance — separate conversations per module
+
 ## Session 2026-02-16 - Feature #139
 
 ### Feature #139: Back button after form submit does not re-submit - PASSING
