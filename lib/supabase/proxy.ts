@@ -225,6 +225,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-user-reset-isolation',
     '/test-allocation-delete',
     '/api/verify-allocation-delete',
+    '/test-completed-next-step',
+    '/api/verify-completed-next-step',
   ]
 
   // Protected route prefixes that require authentication
