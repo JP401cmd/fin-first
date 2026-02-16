@@ -1,3 +1,48 @@
+## Session 2026-02-16 - Feature #135
+
+### Feature #135: Budget form state survives accidental navigation - PASSING
+- BudgetForm (components/app/budget-form.tsx): Added full unsaved changes protection
+  - isDirty tracking via useMemo comparing all 14 form fields to initial values
+  - beforeunload event listener when form is dirty (page refresh protection)
+  - localStorage draft auto-save when dirty, cleanup when clean or after save
+  - Draft recovery on mount with blue notice (accept/discard options)
+  - Navigation interception for "Terug naar budgetten" back link and "Annuleren" button
+  - Orange unsaved changes warning dialog with "Wijzigingen verwijderen" and "Verder bewerken"
+  - Amber dirty indicator with pulsing dot
+- BudgetEditModal (app/(app)/core/budgets/page.tsx): Added unsaved changes protection
+  - isDirty tracking via useMemo comparing all modal fields to original budget
+  - beforeunload event listener when dirty
+  - Close confirmation dialog when attempting to close/cancel with unsaved changes
+  - Amber dirty indicator visible in modal
+- 18/18 API verification tests passing
+- Browser automation testing verified all 6 feature steps:
+  1. Navigate to budget edit form ✅
+  2. Fill in fields → dirty indicator appears ✅
+  3. Attempt navigation → warning shown, navigation blocked ✅
+  4. Cancel navigation → form data intact ✅
+  5. Confirm navigation → navigates away, changes lost ✅
+  6. Both back link and cancel button intercepted ✅
+- Zero JS console errors
+- No mock data patterns found
+
+### Changes Made
+- components/app/budget-form.tsx: Added isDirty, beforeunload, localStorage draft, navigation warning
+- app/(app)/core/budgets/page.tsx: Added isDirty, beforeunload, close confirmation to BudgetEditModal
+- app/api/verify-budget-form-state/route.ts: Created 18-test verification endpoint
+- app/test-budget-form-state/page.tsx: Created test results page
+- app/test-budget-form-state/interactive/page.tsx: Created interactive testing page
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: 5f605f5
+
+### Current Status
+- 127/265 features passing (126 before + #135)
+- Feature #135 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- Pattern follows HoldingEditForm (holdings/page.tsx) as reference implementation
+- Both BudgetForm (full-page) and BudgetEditModal (modal) now have protection
+
 ## Session 2026-02-16 - Feature #136
 
 ### Feature #136: Holding edit form preserves data on refresh - PASSING
