@@ -1,3 +1,38 @@
+## Session 2026-02-17 - Feature #159
+
+### Feature #159: Submit button disabled during holding save operation - PASSING
+- HoldingForm component in app/(app)/core/assets/holdings/page.tsx
+- Submit button behavior verified with 12/12 static code checks:
+  1. HoldingForm component exists ✅
+  2. saving state variable exists (useState(false)) ✅
+  3. submitted state variable exists (useState(false)) ✅
+  4. setSaving(true) called on submit ✅
+  5. setSaving(false) in finally block ✅
+  6. Button disabled during save (disabled={saving || submitted || !name}) ✅
+  7. Button shows loading text (Opslaan...) ✅
+  8. Button shows success text (Opgeslagen ✓) ✅
+  9. Submit button has data-testid ✅
+  10. setSubmitted(true) after successful save ✅
+  11. Guard prevents re-entry when submitted ✅
+  12. Button has disabled styling (disabled:opacity-50) ✅
+- Interactive demo tested via browser: idle → saving → submitted flow works
+- No mock data patterns found in production code
+- Zero application console errors (only transient HMR 404 during dev compilation)
+
+### Changes Made
+- app/api/verify-holding-submit-btn/route.ts: Created 12-test verification endpoint
+- app/test-holding-submit-btn/page.tsx: Created visual test page with interactive demo
+- lib/supabase/proxy.ts: Added test routes to public paths
+
+### Current Status
+- 151/265 features passing (150 before + #159)
+- Feature #159 completed and committed (f9d02ca)
+
+### Notes for Next Session
+- Port 3000 used this session
+- Holding form has comprehensive double-submit protection: saving state + submitted state + guard clause + idempotency key
+- The submit button also has duplicate ticker detection (409 Conflict handling)
+
 ## Session 2026-02-17 - Feature #155
 
 ### Feature #155: Badge evaluation triggered twice returns same result - PASSING
