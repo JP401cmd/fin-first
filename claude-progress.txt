@@ -1,3 +1,38 @@
+## Session 2026-02-16 - Feature #109
+
+### Feature #109: Invalid onboarding data shows helpful errors - PASSING
+- Enhanced OnboardingIdentity component with comprehensive field-level validation
+- Validation rules implemented:
+  - Full name: required, minimum 2 characters
+  - Date of birth: required, not in future, age between 16-120
+  - Net monthly income: required, must be positive, max €1,000,000
+  - Number of children (gezin only): minimum 1, maximum 20
+- UX patterns:
+  - On-blur: field-level errors appear when user leaves a field (touched state)
+  - On submit: all errors shown simultaneously with summary banner
+  - Red border highlights on invalid fields
+  - Specific Dutch error messages (e.g., "Naam is verplicht", "Geboortedatum kan niet in de toekomst liggen")
+  - aria-invalid and role="alert" for accessibility
+  - Summary error banner: "Vul alle verplichte velden correct in om door te gaan"
+  - Button no longer disabled - clicking "Volgende" with errors shows all error messages
+- Test page at /test-onboarding-validation for isolated testing
+- Files modified:
+  - components/onboarding/onboarding-identity.tsx: Added getFieldErrors(), touched/submitted state, error display
+  - app/test-onboarding-validation/page.tsx: Created test page
+  - lib/supabase/proxy.ts: Added /test-onboarding-validation to public paths
+- Verified via Playwright:
+  - Empty form submit: 3 field errors + summary banner
+  - Short name ("A"): "Naam moet minimaal 2 tekens bevatten"
+  - Future date (2030-01-01): "Geboortedatum kan niet in de toekomst liggen"
+  - Zero income: "Inkomen moet hoger dan €0 zijn"
+  - Valid data proceeds to next step
+  - On-blur shows error for individual fields
+  - Zero console errors
+- Zero mock data patterns
+
+### Current Status
+- 102/265 features passing (101 before + #109)
+
 ## Session 2026-02-16 - Feature #111
 
 ### Feature #111: Concurrent edit conflict handled for holdings - PASSING
