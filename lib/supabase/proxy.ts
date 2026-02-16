@@ -209,6 +209,10 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-badge-idempotency',
     '/test-onboarding-double-submit',
     '/api/verify-onboarding-double-submit',
+    '/test-double-dismiss',
+    '/api/verify-double-dismiss',
+    '/test-streak-idempotent',
+    '/api/verify-streak-idempotent',
   ]
 
   // Protected route prefixes that require authentication
