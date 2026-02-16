@@ -84,6 +84,8 @@ export async function updateSession(request: NextRequest) {
     '/test-bank-import',
     '/test-next-step-dismiss',
     '/test-badges',
+    '/test-buy-transaction',
+    '/test-sell-transaction',
   ]
 
   // Protected route prefixes that require authentication
