@@ -1,3 +1,35 @@
+## Session 2026-02-17 - Feature #153
+
+### Feature #153: Rapid delete clicks on holding only deletes once - PASSING
+- Added `deleting` state variable (`useState<string | null>(null)`) to holdings page
+- `handleDelete` now has early return guard: `if (deleting) return`
+- `setDeleting(id)` called before fetch, `setDeleting(null)` in finally block
+- Confirm "Ja" button gets `disabled={deleting === holding.id}` during active deletion
+- Visual feedback: button text changes to "..." during deletion
+- "Nee" cancel button also disabled during active deletion to prevent state corruption
+- API DELETE endpoint already idempotent: Supabase `.delete().eq()` returns success for 0-row matches
+- Optimistic UI: holding removed from list immediately via `setHoldings(prev => prev.filter(...))`
+- Two-step confirmation (Trash icon → Ja/Nee buttons) prevents accidental deletes
+- 10/10 source-code verification checks passing at /api/verify-holding-rapid-delete
+- Zero console errors
+- No mock data patterns found
+
+### Changes Made
+- app/(app)/core/assets/holdings/page.tsx: Added `deleting` state, early return guard, disabled buttons, loading text
+- app/api/verify-holding-rapid-delete/route.ts: Created 10-test verification endpoint
+- app/test-holding-rapid-delete/page.tsx: Created visual test page with interactive demo
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: c3275b1
+
+### Current Status
+- Feature #153 completed and committed
+- 147/265 features passing (146 before + #153)
+
+### Notes for Next Session
+- Port 3000 used this session
+- Holdings delete protection uses state-level locking (not server-side idempotency key like create)
+- API endpoint is naturally idempotent — Supabase DELETE with eq filter returns success for 0 rows
+
 ## Session 2026-02-17 - Feature #152
 
 ### Feature #152: Double-click on holding create button does not create duplicates - PASSING
