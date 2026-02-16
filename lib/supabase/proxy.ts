@@ -217,6 +217,10 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-duplicate-import',
     '/test-holding-submit-btn',
     '/api/verify-holding-submit-btn',
+    '/test-cascade-delete',
+    '/api/verify-cascade-delete',
+    '/test-holding-cascade-delete',
+    '/api/verify-holding-cascade-delete',
   ]
 
   // Protected route prefixes that require authentication
