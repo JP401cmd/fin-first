@@ -1,3 +1,37 @@
+## Session 2026-02-16 - Feature #120
+
+### Feature #120: Next step engine queries real data completeness - PASSING
+- Verified /api/next-steps route queries 8 real Supabase tables in parallel via Promise.all():
+  - transactions, budgets, assets, debts, net_worth_snapshots, profiles, goals, next_step_completions
+- Data state: hasTransactions, hasBudgets, hasAssets, hasDebts, hasSnapshots, hasGoals, profileComplete
+- All derived from actual database queries (supabase.from('table').select('id').limit(1))
+- No transactions → first suggestion is import_transactions (priority 1)
+- Steps evolve dynamically: import → budgets → assets → debts → profile → snapshots → goals
+- Module pages use computeAll*Steps() functions with live Supabase data:
+  - /core → computeAllKernSteps(realData) from live asset/debt/transaction/budget queries
+  - /will → computeAllWilSteps(realData) from live action/recommendation/goal queries
+  - /horizon → computeAllHorizonSteps(realData) from live FIRE projection/event queries
+- Dismiss/complete tracking via next_step_completions table with RLS
+- 10/10 verification tests passing via /api/verify-next-step-engine
+- Visual verification via Playwright screenshot: all green checkmarks
+- Zero console errors, zero mock data patterns
+- All data from Supabase PostgreSQL (persistent, not in-memory)
+
+### Changes Made
+- app/api/verify-next-step-engine/route.ts: Created 10-test verification endpoint
+- app/test-next-step-engine/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: bd7450f "feat: verify next step engine queries real data completeness (#120)"
+
+### Current Status
+- 112/265 features passing (111 before + #120)
+- Feature #120 completed and committed
+
+### Notes for Next Session
+- Turbopack on Windows: always rm -rf .next before starting fresh server; concurrent .next access causes MODULE_NOT_FOUND
+- Other agents may grab port 3000; use unique ports (3120, etc.) to avoid conflicts
+- Server lock file issues: kill all servers before starting fresh (node .kill-all-servers.mjs)
+
 ## Session 2026-02-16 - Feature #115
 
 ### Feature #115: Freedom time labels calculate from real daily expenses - PASSING
