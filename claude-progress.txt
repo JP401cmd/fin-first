@@ -1725,3 +1725,40 @@ For Feature #51 (Transaction Import):
 - Port 3020 used this session (3015 had zombie processes)
 - proxy.ts now uses protectedPrefixes to distinguish protected vs unknown routes
 - Login page uses Suspense boundary for useSearchParams()
+
+## Session 2026-02-16 - Feature #92
+
+### Feature #92: Data reset via onboarding clears all user data - PASSING
+- POST /api/onboarding/reset endpoint exists at app/api/onboarding/reset/route.ts
+- Requires authentication: returns 401 for unauthenticated requests (middleware + handler check)
+- Calls deleteAllUserData(supabase, user.id) which deletes from 17 tables in 4 FK-safe batches:
+  - Batch 1a (deepest leaf): goal_contributions, category_corrections
+  - Batch 1b (leaf): recommendation_feedback, budget_rollovers, recurring_transactions, valuations, net_worth_snapshots, life_events, goals
+  - Batch 2 (mid): actions, transactions, budget_amounts
+  - Batch 3 (parent): recommendations, debts, assets, bank_accounts, budgets
+- Resets profile to minimal state: onboarding_completed=false, is_demo_user=false, full_name=null, date_of_birth=null, household_type='solo', temporal_balance=3, net_monthly_income=null, number_of_children=0, children_ages=[]
+- Setting onboarding_completed=false enables fresh onboarding (onboarding page redirects to dashboard when true, shows flow when false)
+- UI triggers: Identity page "Alles wissen" button with confirmation dialog, Beheer testdata page "Bevestigen" button
+- Both UI triggers call POST /api/onboarding/reset then router.push('/onboarding')
+- Returns { success: true } on success, { error: message } (500) on failure
+- Verified via /api/verify-onboarding-reset: 10/10 tests passing
+- Verified via /test-onboarding-reset: visual confirmation of all tests passing
+- Zero mock data patterns found
+- Console: only expected 401 from auth test (not a real error)
+
+### Changes Made
+- app/api/verify-onboarding-reset/route.ts: Created verification API with 10 tests
+- app/test-onboarding-reset/page.tsx: Created test page with visual results
+- lib/supabase/proxy.ts: Added test paths to public paths
+- Commit: 6d97247 "feat: verify data reset via onboarding clears all user data (#92)"
+
+### Current Status
+- 84/265 features passing (83 before + #92)
+- Feature #92 completed and committed
+
+### Notes for Next Session
+- Turbopack on Windows: always rm -rf .next before starting; use turbopackFileSystemCacheForDev: false
+- Pre-warm routes with curl before opening Playwright (avoids middleware-manifest.json errors)
+- Supabase email rate limit still blocks creating test users (429 on signup)
+- No confirmed test users exist in Supabase — all email/password combos return invalid credentials
+- Port 3001 used this session

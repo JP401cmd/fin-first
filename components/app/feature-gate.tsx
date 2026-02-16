@@ -1,7 +1,7 @@
 'use client'
 
-import type { ReactNode } from 'react'
-import { Lock } from 'lucide-react'
+import { useState, useEffect, type ReactNode } from 'react'
+import { Lock, Sparkles } from 'lucide-react'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { FEATURES, PHASES, DEFAULT_MATRIX } from '@/lib/feature-phases'
 
@@ -42,10 +42,15 @@ const PHASE_BAR_COLORS: Record<string, string> = {
 }
 
 export function FeatureGate({ featureId, fallback = 'hidden', children }: FeatureGateProps) {
-  const { features, phase: currentPhase } = useFeatureAccess()
+  const { features, phase: currentPhase, newlyUnlockedFeatures } = useFeatureAccess()
 
   // Fail-open: features not in the map are shown
   if (features[featureId] !== false) {
+    // Wrap in spotlight animation if this feature was just unlocked by a phase transition
+    const isNewlyUnlocked = newlyUnlockedFeatures.includes(featureId)
+    if (isNewlyUnlocked) {
+      return <NewFeatureSpotlight featureId={featureId}>{children}</NewFeatureSpotlight>
+    }
     return <>{children}</>
   }
 
@@ -129,6 +134,65 @@ export function LockedFeatureCard({ featureId, currentPhase }: { featureId: stri
             />
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * NewFeatureSpotlight — wraps a newly unlocked feature with a
+ * highlight animation on first visit after phase transition.
+ *
+ * Shows a subtle pulsing border + "Nieuw" badge that fades after
+ * 8 seconds, then the children render normally without the spotlight.
+ */
+export function NewFeatureSpotlight({ featureId, children }: { featureId: string; children: ReactNode }) {
+  const [showSpotlight, setShowSpotlight] = useState(true)
+
+  useEffect(() => {
+    // Check if this feature was already "seen" after the phase transition
+    try {
+      const key = `spotlight_seen_${featureId}`
+      if (sessionStorage.getItem(key)) {
+        setShowSpotlight(false)
+        return
+      }
+      // Auto-dismiss after 8 seconds and mark as seen
+      const timer = setTimeout(() => {
+        setShowSpotlight(false)
+        sessionStorage.setItem(key, '1')
+      }, 8000)
+      return () => clearTimeout(timer)
+    } catch {
+      // sessionStorage not available
+      const timer = setTimeout(() => setShowSpotlight(false), 8000)
+      return () => clearTimeout(timer)
+    }
+  }, [featureId])
+
+  if (!showSpotlight) {
+    return <>{children}</>
+  }
+
+  return (
+    <div
+      className="relative"
+      data-testid={`new-feature-spotlight-${featureId}`}
+    >
+      {/* Spotlight ring — animated subtle glow */}
+      <div className="absolute -inset-0.5 rounded-xl bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400 opacity-30 blur-sm animate-pulse pointer-events-none" />
+
+      {/* "Nieuw" badge */}
+      <div className="absolute -top-2 -right-2 z-10">
+        <span className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-md">
+          <Sparkles className="h-3 w-3" />
+          Nieuw
+        </span>
+      </div>
+
+      {/* The actual feature content, slightly elevated */}
+      <div className="relative rounded-xl ring-2 ring-blue-300/50">
+        {children}
       </div>
     </div>
   )
