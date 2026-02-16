@@ -1,3 +1,33 @@
+## Session 2026-02-16 - Feature #139
+
+### Feature #139: Back button after form submit does not re-submit - PASSING
+- Added multi-layered back-button protection to the holdings form:
+  1. **Idempotency key**: Each HoldingForm instance generates a crypto.randomUUID(), sent as X-Idempotency-Key header
+  2. **Server-side cache**: Holdings API POST caches responses by idempotency key (5-min TTL), returns cached result on retry
+  3. **Submitted state flag**: Form tracks `submitted` boolean to disable button and prevent handleSave from running again
+  4. **History management**: HoldingsPage pushes history entry when modal opens; popstate listener closes modal on back button
+  5. **FormSubmitted marker**: After successful save, history.replaceState marks formSubmitted=true; checked on mount to prevent re-open
+- No HTML <form> element used - all submissions via fetch() onClick handler (no browser POST caching)
+- 8/8 verification tests passing via /api/verify-back-button
+- Zero console errors on test page
+- No mock data patterns found in modified files
+
+### Changes Made
+- app/(app)/core/assets/holdings/page.tsx: Added useRouter, useRef imports; popstate listener for modal close; idempotency key ref; submitted state flag; history.replaceState after save; formSubmitted check on mount
+- app/api/holdings/route.ts: Added in-memory idempotency cache with 5-min TTL; X-Idempotency-Key header check; cached response return for duplicate keys
+- app/api/verify-back-button/route.ts: Updated 8-test verification endpoint for new architecture
+- app/test-back-button/page.tsx: Updated visual test page with architecture summary
+- Commit: b802b4d
+
+### Current Status
+- 131/265 features passing (130 before + #139)
+- Feature #139 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- Holdings form uses modal pattern (no URL-based submission) - naturally resistant to back-button re-submit
+- Added defense-in-depth: idempotency key + submitted flag + popstate handler + formSubmitted history marker
+
 ## Session 2026-02-16 - Feature #135
 
 ### Feature #135: Budget form state survives accidental navigation - PASSING
