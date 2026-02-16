@@ -213,6 +213,10 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-double-dismiss',
     '/test-streak-idempotent',
     '/api/verify-streak-idempotent',
+    '/test-duplicate-import',
+    '/api/verify-duplicate-import',
+    '/test-holding-submit-btn',
+    '/api/verify-holding-submit-btn',
   ]
 
   // Protected route prefixes that require authentication
