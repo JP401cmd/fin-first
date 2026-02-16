@@ -1,3 +1,44 @@
+## Session 2026-02-16 - Feature #96 Portfolio Allocation View - PASSING
+
+### Feature #96: Portfolio allocation view updates with holdings changes - PASSING
+- Added HoldingsAllocationPie SVG donut chart component to holdings page (app/(app)/core/assets/holdings/page.tsx)
+- Chart renders each holding as proportional segment using stroke-dasharray math
+- useMemo on holdings state ensures allocation data recomputes on add/edit/delete
+- Color palette with 12 distinct colors assigned to holdings
+- Legend shows name, ticker, percentage, and EUR value for each holding
+- Holdings sorted by value descending (largest slice first)
+- Zero-value holdings filtered out of chart
+- Center of donut displays total portfolio value and holding count
+- Verified via /test-portfolio-allocation test page with 6 automated tests (all pass):
+  1. Allocation data computed from holdings
+  2. Total value equals sum of holdings
+  3. Percentages sum to 100%
+  4. Holdings sorted by value (largest first)
+  5. Each holding gets a unique color
+  6. Donut segment dasharray sums to circumference
+- Rebalancing verified: adding €30,000 holding to €10,010 portfolio correctly rebalances all percentages
+  - Before: VWRL 47.5%, Emerging Markets 28.0%, iShares 24.6%
+  - After: Large Cap 75.0%, VWRL 11.9%, Emerging Markets 7.0%, iShares 6.1%
+- Zero console errors
+- Zero mock data patterns
+- Commit: 6f68422
+
+### Changes Made
+- app/(app)/core/assets/holdings/page.tsx: Added useMemo import, PieChart icon import, allocationData computed state, portfolio allocation chart section, HOLDING_COLORS constant, HoldingsAllocationPie component
+- app/test-portfolio-allocation/page.tsx: Created test page with interactive chart and 6 verification tests
+- lib/supabase/proxy.ts: Added /test-portfolio-allocation and /test-f96 to public paths
+
+### Current Status
+- 93/265 features passing (92 before + #96)
+- Feature #96 completed and committed
+
+### Notes for Next Session
+- Turbopack on Windows still has severe issues with new routes (MODULE_NOT_FOUND, build-manifest.json errors)
+- Use webpack mode (npx next dev -p PORT without --turbopack) for reliable route discovery
+- Network address (192.168.86.37) sometimes works better than localhost
+- Pre-warm routes with curl before opening Playwright
+- Port conflicts common; use high ports (3400+)
+
 ## Session 2026-02-16 (24) - Feature #2 Database Schema (SKIPPED - External Blocker)
 
 ### Feature #2: Database schema applied correctly - SKIPPED (EXTERNAL BLOCKER)

@@ -120,7 +120,8 @@ export async function parseCSV(
     }
 
     const date = parseDate(dateStr, preset.dateFormat)
-    if (!date || date.length !== 10) continue
+    // Validate date is in YYYY-MM-DD format (not just length 10)
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue
 
     const cleanDescription = description.replace(/\s+/g, ' ').trim() || 'Geen omschrijving'
     const hash = await computeHash(date, amount, cleanDescription)
