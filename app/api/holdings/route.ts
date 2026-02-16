@@ -193,6 +193,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Asset type moet een string zijn' }, { status: 400 })
     }
 
+    // Check if user wants to force-create despite duplicate warning
+    const forceDuplicate = body.force_duplicate === true
+
     const hasTable = await holdingsTableExists(supabase)
 
     if (hasTable) {
@@ -207,6 +210,38 @@ export async function POST(request: NextRequest) {
           .limit(1)
           .single()
         assetId = investmentAsset?.id || null
+      }
+
+      // Check for duplicate ticker within the same asset (if ticker is provided)
+      if (ticker && typeof ticker === 'string' && ticker.trim().length > 0 && !forceDuplicate) {
+        const tickerNorm = ticker.trim().toUpperCase()
+
+        // Build query: same user, same ticker, active holdings
+        let dupeQuery = supabase
+          .from('holdings')
+          .select('id, name, ticker, asset_id')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .ilike('ticker', tickerNorm)
+
+        // If we have an asset_id, also check within the same asset
+        if (assetId) {
+          dupeQuery = dupeQuery.eq('asset_id', assetId)
+        }
+
+        const { data: duplicates } = await dupeQuery
+
+        if (duplicates && duplicates.length > 0) {
+          return NextResponse.json({
+            warning: true,
+            message: `Er bestaat al een actieve holding met ticker "${tickerNorm}"${assetId ? ' voor dit vermogensobject' : ''}. Wil je toch doorgaan?`,
+            existing_holdings: duplicates.map((d) => ({
+              id: d.id,
+              name: d.name,
+              ticker: d.ticker,
+            })),
+          }, { status: 409 })
+        }
       }
 
       const { data: holding, error } = await supabase
@@ -235,6 +270,29 @@ export async function POST(request: NextRequest) {
     }
 
     // Fallback: create an asset in the assets table
+    // Check for duplicate ticker in assets fallback (if ticker is provided)
+    if (ticker && typeof ticker === 'string' && ticker.trim().length > 0 && !forceDuplicate) {
+      const tickerNorm = ticker.trim().toUpperCase()
+      const { data: dupeAssets } = await supabase
+        .from('assets')
+        .select('id, name, ticker_symbol')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .ilike('ticker_symbol', tickerNorm)
+
+      if (dupeAssets && dupeAssets.length > 0) {
+        return NextResponse.json({
+          warning: true,
+          message: `Er bestaat al een actieve holding met ticker "${tickerNorm}". Wil je toch doorgaan?`,
+          existing_holdings: dupeAssets.map((a) => ({
+            id: a.id,
+            name: a.name,
+            ticker: a.ticker_symbol,
+          })),
+        }, { status: 409 })
+      }
+    }
+
     const assetTypeToUse = asset_type || 'investment'
     const currentVal = Number(current_price) || Number(avg_purchase_price) || 0
     const purchaseVal = Number(avg_purchase_price) || currentVal
@@ -289,9 +347,14 @@ export async function POST(request: NextRequest) {
 /**
  * PATCH /api/holdings — Update a holding (e.g. current price).
  *
- * Expected body: { id, current_price?, units?, avg_purchase_price?, name?, ticker?, notes? }
+ * Expected body: { id, current_price?, units?, avg_purchase_price?, name?, ticker?, notes?, expected_updated_at? }
  * When current_price changes and the holding has a linked asset_id, the asset's current_value
  * is recalculated as (current_price * units) to keep asset and holding in sync.
+ *
+ * Optimistic concurrency control:
+ * If `expected_updated_at` is provided, the server checks if the row's updated_at matches.
+ * If another edit happened since the client loaded the data, a 409 Conflict is returned
+ * with the current server state so the client can resolve the conflict.
  */
 export async function PATCH(request: NextRequest) {
   const supabase = await createClient()
@@ -330,6 +393,39 @@ export async function PATCH(request: NextRequest) {
     const hasTable = await holdingsTableExists(supabase)
 
     if (hasTable) {
+      // --- Optimistic concurrency check ---
+      // If the client sent expected_updated_at, verify the row hasn't changed since
+      const expectedUpdatedAt = body.expected_updated_at as string | undefined
+      if (expectedUpdatedAt) {
+        const { data: currentRow, error: fetchError } = await supabase
+          .from('holdings')
+          .select('updated_at, name, units, avg_purchase_price, current_price, ticker, notes')
+          .eq('id', id)
+          .eq('user_id', user.id)
+          .single()
+
+        if (fetchError) {
+          return NextResponse.json({ error: fetchError.message }, { status: 500 })
+        }
+
+        if (currentRow) {
+          // Compare timestamps — normalize both to millisecond precision
+          const serverTime = new Date(currentRow.updated_at).getTime()
+          const clientTime = new Date(expectedUpdatedAt).getTime()
+
+          if (serverTime !== clientTime) {
+            return NextResponse.json({
+              error: 'conflict',
+              message: 'Deze holding is ondertussen door een andere sessie gewijzigd. Herlaad de gegevens en probeer opnieuw.',
+              conflict: true,
+              server_state: currentRow,
+              server_updated_at: currentRow.updated_at,
+              client_updated_at: expectedUpdatedAt,
+            }, { status: 409 })
+          }
+        }
+      }
+
       // Build update object with only provided fields
       const updates: Record<string, unknown> = {}
       if (body.current_price !== undefined) updates.current_price = Number(body.current_price)
@@ -339,6 +435,8 @@ export async function PATCH(request: NextRequest) {
       if (body.ticker !== undefined) updates.ticker = body.ticker || null
       if (body.notes !== undefined) updates.notes = body.notes || null
       if (body.current_price !== undefined) updates.last_price_update = new Date().toISOString()
+      // Always bump updated_at on write so future conflict checks work
+      updates.updated_at = new Date().toISOString()
 
       const { data: holding, error } = await supabase
         .from('holdings')
@@ -366,6 +464,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Fallback: update asset in the assets table
+    // (Assets fallback does not have optimistic locking — last write wins)
     const updates: Record<string, unknown> = {}
     if (body.current_price !== undefined) {
       const units = body.units || 1

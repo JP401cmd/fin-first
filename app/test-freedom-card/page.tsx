@@ -22,6 +22,8 @@ export default function TestFreedomCardPage() {
   const [shared, setShared] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
+  const [showMissingDataTest, setShowMissingDataTest] = useState(false)
+
   // Sample card data for each privacy level
   const sampleCards: Record<string, FreedomCardData> = {
     anonymous: {
@@ -54,6 +56,43 @@ export default function TestFreedomCardPage() {
       displayName: 'Jan Tester',
       netWorth: 156000,
       fireTarget: 450000,
+    },
+  }
+
+  // Missing data card: simulates a user with no financial data
+  const missingDataCard: FreedomCardData = {
+    privacyLevel: 'anonymous',
+    freedomPercentage: null,
+    freedomDaysWon: 0,
+    fireCountdown: { years: 0, months: 0, days: 0, label: 'Nog geen data' },
+    freedomTime: { years: 0, months: 0 },
+    savingsRate: null,
+    generatedAt: new Date().toISOString(),
+    dataAvailability: {
+      hasTransactions: false,
+      hasAssets: false,
+      hasDebts: false,
+      hasExpenses: false,
+      canCalculateFire: false,
+    },
+  }
+
+  // Partial data card: simulates a user with some assets but no expenses/transactions
+  const partialDataCard: FreedomCardData = {
+    privacyLevel: 'named',
+    freedomPercentage: null,
+    freedomDaysWon: 0,
+    fireCountdown: { years: 0, months: 0, days: 0, label: 'Nog geen data' },
+    freedomTime: { years: 0, months: 0 },
+    savingsRate: null,
+    generatedAt: new Date().toISOString(),
+    displayName: 'Test Gebruiker',
+    dataAvailability: {
+      hasTransactions: false,
+      hasAssets: true,
+      hasDebts: false,
+      hasExpenses: false,
+      canCalculateFire: false,
     },
   }
 
@@ -136,7 +175,9 @@ export default function TestFreedomCardPage() {
   const shareCard = useCallback(async () => {
     if (!cardData) return
 
-    const shareText = `Mijn financiele vrijheid: ${cardData.freedomPercentage}% | ${cardData.freedomDaysWon} vrijheidsdagen gewonnen | FIRE countdown: ${cardData.fireCountdown.label} #TriFinity`
+    const freedomPctText = cardData.freedomPercentage != null ? `${cardData.freedomPercentage}%` : 'N/B'
+    const countdownLabelText = cardData.fireCountdown?.label || 'N/B'
+    const shareText = `Mijn financiele vrijheid: ${freedomPctText} | ${cardData.freedomDaysWon} vrijheidsdagen gewonnen | FIRE countdown: ${countdownLabelText} #TriFinity`
 
     if (navigator.share) {
       try {
@@ -238,7 +279,7 @@ export default function TestFreedomCardPage() {
             <p className="font-semibold text-zinc-700 mb-2">Verificatie:</p>
             <ul className="space-y-1">
               <li>✓ Privacy niveau: <span className="font-medium text-teal-600">{cardData.privacyLevel}</span></li>
-              <li>✓ Vrijheidspercentage: <span className="font-medium">{cardData.freedomPercentage}%</span></li>
+              <li>✓ Vrijheidspercentage: <span className="font-medium">{cardData.freedomPercentage != null ? `${cardData.freedomPercentage}%` : 'N/B (geen data)'}</span></li>
               <li>✓ Voortgangsbalk: zichtbaar in de kaart</li>
               <li>{cardData.privacyLevel === 'anonymous' ? '✓' : '○'} Geen naam getoond: {cardData.privacyLevel === 'anonymous' ? 'correct (anoniem)' : `naam getoond: "${cardData.displayName}"`}</li>
               <li>{cardData.privacyLevel !== 'full' ? '✓' : '○'} Geen EUR bedragen: {cardData.privacyLevel !== 'full' ? 'correct (verborgen)' : `bedragen getoond: netto vermogen en FIRE doel`}</li>
@@ -248,6 +289,64 @@ export default function TestFreedomCardPage() {
           </div>
         </div>
       )}
+
+      {/* Missing data test section */}
+      <div className="mt-10 border-t border-zinc-200 pt-8">
+        <h2 className="mb-2 text-xl font-bold text-zinc-900">
+          Test: Ontbrekende Data
+        </h2>
+        <p className="mb-4 text-sm text-zinc-500">
+          Verificatie dat de kaart correct omgaat met ontbrekende/minimale gegevens.
+          Metrics die niet berekend kunnen worden moeten N/B tonen, geen fouten.
+        </p>
+
+        <button
+          onClick={() => setShowMissingDataTest(!showMissingDataTest)}
+          className="mb-6 rounded-xl border border-zinc-200 bg-white px-6 py-3 font-semibold text-zinc-700 transition-all hover:bg-zinc-50"
+        >
+          {showMissingDataTest ? 'Verberg test' : 'Toon ontbrekende data test'}
+        </button>
+
+        {showMissingDataTest && (
+          <div className="space-y-8">
+            {/* Test 1: Completely empty data */}
+            <div>
+              <h3 className="mb-3 text-sm font-semibold text-zinc-700">
+                Test 1: Geen data (nieuwe gebruiker)
+              </h3>
+              <FreedomCardVisual data={missingDataCard} />
+              <div className="mt-3 rounded-lg bg-green-50 p-3 text-xs text-green-700" data-testid="missing-data-check">
+                <p className="font-semibold mb-1">Verwacht gedrag:</p>
+                <ul className="space-y-0.5">
+                  <li id="check-freedom-pct">✓ Vrijheidspercentage toont &quot;N/B&quot; i.p.v. &quot;0.0%&quot;</li>
+                  <li id="check-countdown">✓ FIRE countdown toont &quot;N/B&quot; i.p.v. lege tekst</li>
+                  <li id="check-freedom-time">✓ Vrijheidstijd toont &quot;N/B&quot; i.p.v. &quot;0 maanden&quot;</li>
+                  <li id="check-savings-rate">✓ Spaarquote toont &quot;N/B&quot; i.p.v. &quot;0%&quot;</li>
+                  <li id="check-days-won">✓ Dagen gewonnen toont &quot;0&quot; (correct, geen acties)</li>
+                  <li id="check-no-errors">✓ Geen JavaScript fouten</li>
+                  <li id="check-hint">✓ Hint tekst toont &quot;Voeg transacties toe...&quot;</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Test 2: Partial data (has assets, no transactions) */}
+            <div>
+              <h3 className="mb-3 text-sm font-semibold text-zinc-700">
+                Test 2: Gedeeltelijke data (bezittingen maar geen transacties)
+              </h3>
+              <FreedomCardVisual data={partialDataCard} />
+              <div className="mt-3 rounded-lg bg-green-50 p-3 text-xs text-green-700" data-testid="partial-data-check">
+                <p className="font-semibold mb-1">Verwacht gedrag:</p>
+                <ul className="space-y-0.5">
+                  <li>✓ Naam &quot;Test Gebruiker&quot; wordt getoond</li>
+                  <li>✓ Vrijheidspercentage toont &quot;N/B&quot; (geen uitgaven = geen FIRE target)</li>
+                  <li>✓ Kaart genereert zonder fouten</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

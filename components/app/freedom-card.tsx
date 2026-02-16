@@ -5,7 +5,7 @@ import { Download, Share2, Shield, Clock, Target, TrendingUp } from 'lucide-reac
 
 export interface FreedomCardData {
   privacyLevel: 'anonymous' | 'named' | 'full'
-  freedomPercentage: number
+  freedomPercentage: number | null
   freedomDaysWon: number
   fireCountdown: {
     years: number
@@ -17,11 +17,18 @@ export interface FreedomCardData {
     years: number
     months: number
   }
-  savingsRate: number
+  savingsRate: number | null
   generatedAt: string
   displayName?: string
-  netWorth?: number
-  fireTarget?: number
+  netWorth?: number | null
+  fireTarget?: number | null
+  dataAvailability?: {
+    hasTransactions: boolean
+    hasAssets: boolean
+    hasDebts: boolean
+    hasExpenses: boolean
+    canCalculateFire: boolean
+  }
 }
 
 function formatCurrencyNL(value: number): string {
@@ -36,21 +43,40 @@ function formatCurrencyNL(value: number): string {
 function FreedomCardVisual({ data }: { data: FreedomCardData }) {
   const { fireCountdown, freedomTime, freedomPercentage, freedomDaysWon, savingsRate, privacyLevel, displayName, netWorth, fireTarget } = data
 
-  const countdownText = fireCountdown.label === 'Bereikt!'
-    ? 'Bereikt!'
-    : fireCountdown.label === 'Niet haalbaar'
-      ? 'Nog niet berekend'
-      : fireCountdown.years > 0
-        ? `${fireCountdown.years}j ${fireCountdown.months}mnd`
-        : fireCountdown.months > 0
-          ? `${fireCountdown.months} maanden`
-          : '-'
+  // Handle null/missing freedomPercentage gracefully
+  const hasFreedomPct = freedomPercentage != null
+  const freedomPctDisplay = hasFreedomPct ? freedomPercentage : 0
 
-  const freedomTimeText = freedomTime.years > 0
-    ? `${freedomTime.years}j ${freedomTime.months}mnd`
-    : freedomTime.months > 0
-      ? `${freedomTime.months} maanden`
-      : '0 maanden'
+  // Determine countdown text with graceful fallback for missing data
+  const countdownLabel = fireCountdown?.label || ''
+  const countdownText = countdownLabel === 'Bereikt!'
+    ? 'Bereikt!'
+    : countdownLabel === 'Niet haalbaar'
+      ? 'Niet haalbaar'
+      : countdownLabel === 'Nog geen data'
+        ? 'N/B'
+        : (fireCountdown?.years ?? 0) > 0
+          ? `${fireCountdown.years}j ${fireCountdown.months}mnd`
+          : (fireCountdown?.months ?? 0) > 0
+            ? `${fireCountdown.months} maanden`
+            : countdownLabel === ''
+              ? 'N/B'
+              : '-'
+
+  // Freedom time with graceful fallback
+  const fYears = freedomTime?.years ?? 0
+  const fMonths = freedomTime?.months ?? 0
+  const freedomTimeText = fYears > 0
+    ? `${fYears}j ${fMonths}mnd`
+    : fMonths > 0
+      ? `${fMonths} maanden`
+      : hasFreedomPct ? '0 maanden' : 'N/B'
+
+  // Savings rate with null handling
+  const hasSavingsRate = savingsRate != null
+  const savingsRateDisplay = hasSavingsRate
+    ? (savingsRate > 0 ? `${savingsRate.toFixed(0)}%` : '0%')
+    : 'N/B'
 
   return (
     <div
@@ -85,19 +111,24 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
       <div className="relative mb-6">
         <div className="flex items-end gap-2">
           <span className="text-5xl font-bold tracking-tight">
-            {freedomPercentage.toFixed(1)}%
+            {hasFreedomPct ? `${freedomPctDisplay.toFixed(1)}%` : 'N/B'}
           </span>
           <span className="mb-1 text-sm text-zinc-400">financiele vrijheid</span>
         </div>
         <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-zinc-700/60">
           <div
             className="h-full rounded-full bg-gradient-to-r from-amber-400 via-teal-400 to-purple-500 transition-all duration-1000"
-            style={{ width: `${Math.min(freedomPercentage, 100)}%` }}
+            style={{ width: `${hasFreedomPct ? Math.min(freedomPctDisplay, 100) : 0}%` }}
           />
         </div>
-        {privacyLevel === 'full' && netWorth != null && fireTarget != null && (
+        {privacyLevel === 'full' && netWorth != null && fireTarget != null && fireTarget > 0 && (
           <p className="mt-1.5 text-xs text-zinc-500">
             {formatCurrencyNL(netWorth)} / {formatCurrencyNL(fireTarget)}
+          </p>
+        )}
+        {!hasFreedomPct && (
+          <p className="mt-1.5 text-xs text-zinc-500">
+            Voeg transacties toe om je vrijheidspercentage te berekenen
           </p>
         )}
       </div>
@@ -144,7 +175,7 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
             <span className="text-[10px] font-medium text-zinc-400 uppercase">Spaarquote</span>
           </div>
           <p className="text-xl font-bold text-emerald-400">
-            {savingsRate > 0 ? `${savingsRate.toFixed(0)}%` : '0%'}
+            {savingsRateDisplay}
           </p>
         </div>
       </div>
@@ -246,7 +277,9 @@ export function FreedomCardGenerator() {
   const shareCard = useCallback(async () => {
     if (!cardData) return
 
-    const shareText = `Mijn financiele vrijheid: ${cardData.freedomPercentage}% | ${cardData.freedomDaysWon} vrijheidsdagen gewonnen | FIRE countdown: ${cardData.fireCountdown.label} #TriFinity`
+    const freedomPctText = cardData.freedomPercentage != null ? `${cardData.freedomPercentage}%` : 'N/B'
+    const countdownLabelText = cardData.fireCountdown?.label || 'N/B'
+    const shareText = `Mijn financiele vrijheid: ${freedomPctText} | ${cardData.freedomDaysWon} vrijheidsdagen gewonnen | FIRE countdown: ${countdownLabelText} #TriFinity`
 
     if (navigator.share) {
       try {
