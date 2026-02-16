@@ -86,6 +86,9 @@ export async function updateSession(request: NextRequest) {
     '/test-badges',
     '/test-buy-transaction',
     '/test-sell-transaction',
+    '/test-phase-transition',
+    '/api/verify-phase-transition',
+    '/api/test-streaks',
   ]
 
   // Protected route prefixes that require authentication
