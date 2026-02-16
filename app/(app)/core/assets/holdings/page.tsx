@@ -41,6 +41,7 @@ export default function HoldingsPage() {
   const [showForm, setShowForm] = useState(false)
   const [editHolding, setEditHolding] = useState<Holding | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
   const [txHolding, setTxHolding] = useState<Holding | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshResult, setRefreshResult] = useState<{ message: string; type: 'success' | 'warning' | 'error' } | null>(null)
@@ -120,6 +121,9 @@ export default function HoldingsPage() {
   }, [])
 
   async function handleDelete(id: string) {
+    // Prevent rapid double-clicks from triggering multiple delete operations
+    if (deleting) return
+    setDeleting(id)
     try {
       const res = await fetch(`/api/holdings?id=${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Verwijderen mislukt')
@@ -127,6 +131,8 @@ export default function HoldingsPage() {
       setDeleteConfirm(null)
     } catch {
       setError('Kon holding niet verwijderen')
+    } finally {
+      setDeleting(null)
     }
   }
 
@@ -499,13 +505,16 @@ export default function HoldingsPage() {
                   <div className="flex gap-1">
                     <button
                       onClick={() => handleDelete(holding.id)}
-                      className="rounded-lg bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700"
+                      disabled={deleting === holding.id}
+                      className="rounded-lg bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      data-testid={`delete-confirm-${holding.id}`}
                     >
-                      Ja
+                      {deleting === holding.id ? '...' : 'Ja'}
                     </button>
                     <button
                       onClick={() => setDeleteConfirm(null)}
-                      className="rounded-lg border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                      disabled={deleting === holding.id}
+                      className="rounded-lg border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Nee
                     </button>
@@ -515,6 +524,7 @@ export default function HoldingsPage() {
                     onClick={() => setDeleteConfirm(holding.id)}
                     className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600"
                     title="Verwijderen"
+                    data-testid={`delete-trigger-${holding.id}`}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
