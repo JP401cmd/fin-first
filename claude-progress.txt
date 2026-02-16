@@ -1,3 +1,38 @@
+## Session 2026-02-16 (22) - Feature #2 Database Schema - SKIPPED (External Blocker)
+
+### Feature #2: Database schema applied correctly - SKIPPED
+
+**Blocker:** Supabase MCP tools require OAuth permission grant that has not been completed.
+
+All 7 required tables are MISSING from the database:
+- badges, user_badges, user_streaks, user_feature_visits, holdings, holding_transactions, next_step_completions
+
+All 5 new columns on net_worth_snapshots are MISSING:
+- freedom_percentage, fire_age, sovereignty_level, savings_rate, resilience_score
+
+**Why this cannot be resolved by the coding agent:**
+1. No service_role_key, DB password, or Supabase access_token available in .env.local
+2. Supabase CLI not linked (no access token for `supabase db push`)
+3. ALL Supabase MCP tools (apply_migration, execute_sql, list_tables, get_project_url) return "permissions not granted" - requires user to complete OAuth flow
+4. Anon key cannot execute DDL via PostgREST (only data operations with RLS)
+5. No existing RPC functions in the database that could help
+
+**What exists (ready for when DDL access is available):**
+- Migration SQL: supabase/migrations/20260215000001_create_new_tables.sql (complete, correct)
+- API endpoint: /api/apply-migration (POST with db_password, service_role_key, or access_token)
+- Check scripts: scripts/check-tables-detailed.js, scripts/check-rpc-functions.mjs
+- Full migration with RLS policies, constraints, foreign keys all defined
+
+**To unblock:**
+- Option A: Grant Supabase MCP OAuth permissions when prompted in Claude Code
+- Option B: Set SUPABASE_ACCESS_TOKEN env var and run `npx supabase link && npx supabase db push`
+- Option C: Run the SQL from supabase/migrations/20260215000001_create_new_tables.sql in Supabase Dashboard SQL Editor
+- Option D: POST to /api/apply-migration with {"db_password": "..."} or {"access_token": "..."}
+
+### Current Status
+- 92/265 features passing (no change)
+- Feature #2 skipped to end of queue (priority 294)
+
 ## Session 2026-02-16 (21) - Feature #94 FIRE Scenario Comparison Workflow - PASSING
 
 ### Feature #94: FIRE scenario comparison workflow - PASSING
