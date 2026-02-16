@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { Plus, Trash2, X, TrendingUp, ArrowLeft, Loader2, Briefcase, Edit3, Receipt, ArrowUpRight, ArrowDownRight, DollarSign } from 'lucide-react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
+import { Plus, Trash2, X, TrendingUp, ArrowLeft, Loader2, Briefcase, Edit3, Receipt, ArrowUpRight, ArrowDownRight, DollarSign, PieChart } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/components/app/budget-shared'
 import Link from 'next/link'
@@ -77,6 +77,19 @@ export default function HoldingsPage() {
 
   const totalReturn = totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0
 
+  // Compute allocation data for donut chart — each holding as a slice
+  const allocationData = useMemo(() => {
+    if (holdings.length === 0) return []
+    return holdings
+      .map((h) => {
+        const price = h.current_price ?? h.avg_purchase_price
+        const value = price * h.units
+        return { id: h.id, name: h.name, ticker: h.ticker, value }
+      })
+      .filter((h) => h.value > 0)
+      .sort((a, b) => b.value - a.value)
+  }, [holdings])
+
   if (loading) {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
@@ -141,6 +154,38 @@ export default function HoldingsPage() {
           </div>
         </div>
       </section>
+
+      {/* Portfolio allocation chart */}
+      {allocationData.length > 0 && (
+        <section className="mt-6 rounded-2xl border border-zinc-200 bg-white p-6" data-testid="portfolio-allocation">
+          <div className="flex items-center gap-2 mb-4">
+            <PieChart className="h-4 w-4 text-amber-600" />
+            <h2 className="text-sm font-semibold text-zinc-700">Portfolio verdeling</h2>
+          </div>
+          <div className="flex items-center gap-6">
+            <HoldingsAllocationPie holdings={allocationData} total={totalValue} />
+            <div className="flex-1 space-y-1.5 max-h-48 overflow-y-auto">
+              {allocationData.map((h, i) => {
+                const pct = totalValue > 0 ? (h.value / totalValue) * 100 : 0
+                return (
+                  <div key={h.id} className="flex items-center gap-2">
+                    <span
+                      className="inline-block h-3 w-3 rounded-sm shrink-0"
+                      style={{ backgroundColor: HOLDING_COLORS[i % HOLDING_COLORS.length] }}
+                    />
+                    <span className="flex-1 text-xs text-zinc-600 truncate">
+                      {h.name}
+                      {h.ticker && <span className="ml-1 text-zinc-400">({h.ticker})</span>}
+                    </span>
+                    <span className="text-xs font-medium text-zinc-900 shrink-0">{pct.toFixed(1)}%</span>
+                    <span className="text-xs text-zinc-400 shrink-0">{formatCurrency(h.value)}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Error */}
       {error && (
@@ -289,6 +334,101 @@ export default function HoldingsPage() {
         />
       )}
     </div>
+  )
+}
+
+// ── Holding colors for allocation chart ─────────────────────────
+
+const HOLDING_COLORS = [
+  '#3b82f6', // blue
+  '#10b981', // emerald
+  '#f59e0b', // amber
+  '#8b5cf6', // violet
+  '#f97316', // orange
+  '#ec4899', // pink
+  '#06b6d4', // cyan
+  '#6366f1', // indigo
+  '#84cc16', // lime
+  '#d946ef', // fuchsia
+  '#14b8a6', // teal
+  '#e11d48', // rose
+]
+
+// ── Holdings allocation donut chart (SVG) ─────────────────────
+
+function HoldingsAllocationPie({
+  holdings,
+  total,
+}: {
+  holdings: { id: string; name: string; ticker: string | null; value: number }[]
+  total: number
+}) {
+  const size = 140
+  const cx = size / 2
+  const cy = size / 2
+  const r = 50
+  const strokeWidth = 24
+
+  const segments = holdings.map((h, i) => ({
+    id: h.id,
+    name: h.name,
+    pct: total > 0 ? h.value / total : 0,
+    color: HOLDING_COLORS[i % HOLDING_COLORS.length],
+  }))
+
+  const circumference = 2 * Math.PI * r
+  let offset = 0
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      className="shrink-0"
+      data-testid="allocation-donut"
+    >
+      {/* Background ring for empty state */}
+      {segments.length === 0 && (
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke="#e4e4e7"
+          strokeWidth={strokeWidth}
+        />
+      )}
+      {segments.map((seg) => {
+        const dash = seg.pct * circumference
+        const gap = circumference - dash
+        const currentOffset = offset
+        offset += dash
+
+        return (
+          <circle
+            key={seg.id}
+            cx={cx}
+            cy={cy}
+            r={r}
+            fill="none"
+            stroke={seg.color}
+            strokeWidth={strokeWidth}
+            strokeDasharray={`${dash} ${gap}`}
+            strokeDashoffset={-currentOffset}
+            transform={`rotate(-90 ${cx} ${cy})`}
+          />
+        )
+      })}
+      <text x={cx} y={cy - 6} textAnchor="middle" fontSize="11" fontWeight="700" fill="#18181b">
+        {formatCurrency(total)}
+      </text>
+      <text x={cx} y={cy + 8} textAnchor="middle" fontSize="8" fill="#a1a1aa">
+        totaal
+      </text>
+      <text x={cx} y={cy + 18} textAnchor="middle" fontSize="8" fill="#a1a1aa">
+        {holdings.length} holding{holdings.length !== 1 ? 's' : ''}
+      </text>
+    </svg>
   )
 }
 
@@ -926,31 +1066,56 @@ function HoldingTransactionForm({
               )}
 
               {!loadingHistory && transactions.length > 0 && (
-                <div className="space-y-2">
-                  {transactions.map((tx) => {
-                    const cfg = typeConfig[tx.type] || typeConfig.buy
-                    const Icon = cfg.icon
-                    return (
-                      <div key={tx.id} className="flex items-center gap-3 rounded-lg border border-zinc-100 p-2.5">
-                        <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${cfg.bg}`}>
-                          <Icon className={`h-3.5 w-3.5 ${cfg.color}`} />
+                <>
+                  {/* Dividend income summary */}
+                  {(() => {
+                    const dividendTxs = transactions.filter(tx => tx.type === 'dividend')
+                    const totalDividendIncome = dividendTxs.reduce((sum, tx) => sum + tx.total_amount, 0)
+                    if (dividendTxs.length > 0) {
+                      return (
+                        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50/50 p-3" data-testid="dividend-summary">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <DollarSign className="h-4 w-4 text-amber-600" />
+                              <span className="text-xs font-medium text-amber-700">Totaal dividend inkomen</span>
+                            </div>
+                            <span className="text-sm font-bold text-amber-700" data-testid="total-dividend-income">
+                              {formatCurrency(totalDividendIncome)}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-amber-600/70">{dividendTxs.length} dividend uitkering{dividendTxs.length !== 1 ? 'en' : ''}</p>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium text-zinc-900">
-                            {cfg.label}: {tx.units} eenhe{tx.units === 1 ? 'id' : 'den'} @ {formatCurrency(tx.price_per_unit)}
-                          </p>
-                          <p className="text-xs text-zinc-400">
-                            {new Date(tx.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
-                            {tx.notes && ` — ${tx.notes}`}
-                          </p>
+                      )
+                    }
+                    return null
+                  })()}
+
+                  <div className="space-y-2">
+                    {transactions.map((tx) => {
+                      const cfg = typeConfig[tx.type] || typeConfig.buy
+                      const Icon = cfg.icon
+                      return (
+                        <div key={tx.id} className="flex items-center gap-3 rounded-lg border border-zinc-100 p-2.5">
+                          <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${cfg.bg}`}>
+                            <Icon className={`h-3.5 w-3.5 ${cfg.color}`} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-medium text-zinc-900">
+                              {cfg.label}: {tx.units} eenhe{tx.units === 1 ? 'id' : 'den'} @ {formatCurrency(tx.price_per_unit)}
+                            </p>
+                            <p className="text-xs text-zinc-400">
+                              {new Date(tx.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              {tx.notes && ` — ${tx.notes}`}
+                            </p>
+                          </div>
+                          <span className={`shrink-0 text-xs font-semibold ${cfg.color}`}>
+                            {tx.type === 'sell' ? '-' : '+'}{formatCurrency(tx.total_amount)}
+                          </span>
                         </div>
-                        <span className={`shrink-0 text-xs font-semibold ${cfg.color}`}>
-                          {tx.type === 'sell' ? '-' : '+'}{formatCurrency(tx.total_amount)}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
+                      )
+                    })}
+                  </div>
+                </>
               )}
             </div>
           )}

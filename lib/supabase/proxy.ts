@@ -99,6 +99,10 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-network-error-import',
     '/test-import-validation',
     '/test-portfolio-allocation',
+    '/test-f96',
+    '/test-500-error',
+    '/test-500-error/render-error',
+    '/api/test-500',
   ]
 
   // Protected route prefixes that require authentication
