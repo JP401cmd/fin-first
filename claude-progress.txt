@@ -1,3 +1,31 @@
+## Session 2026-02-16 (24) - Feature #2 Database Schema (SKIPPED - External Blocker)
+
+### Feature #2: Database schema applied correctly - SKIPPED (EXTERNAL BLOCKER)
+- Feature requires DDL operations (CREATE TABLE, ALTER TABLE) on Supabase PostgreSQL
+- 7 new tables needed: badges, user_badges, user_streaks, user_feature_visits, holdings, holding_transactions, next_step_completions
+- 5 new columns needed on net_worth_snapshots: freedom_percentage, fire_age, sovereignty_level, savings_rate, resilience_score
+- Verified via REST API: all 7 tables return 404, all 5 columns return 400
+- Migration SQL exists at supabase/migrations/20260215000001_create_new_tables.sql
+- API endpoint exists at /api/apply-migration (POST with db_password, service_role_key, or access_token)
+
+### BLOCKER: No elevated database credentials available
+- Supabase MCP tools (execute_sql, apply_migration, list_tables) all require user permission grant - not yet approved
+- No DB_PASSWORD in environment
+- No SUPABASE_SERVICE_ROLE_KEY in environment
+- No Supabase access_token available
+- Anon key cannot execute DDL via PostgREST (only DML through RLS)
+- This has been the same blocker since session 2026-02-15 (6)
+
+### To resolve: Grant Supabase MCP tool permissions OR provide one of:
+1. Supabase MCP OAuth approval (most straightforward)
+2. DB password (Supabase Dashboard > Settings > Database)
+3. Service role key (Supabase Dashboard > Settings > API)
+4. Supabase access token (supabase.com/dashboard/account/tokens)
+
+### Current Status
+- 93/265 features passing (no change)
+- Feature #2 skipped to end of queue (priority 295)
+
 ## Session 2026-02-16 (23) - Feature #99 Network Error Import Handling
 
 ### Feature #99: Network failure during transaction import shows error - PASSING
