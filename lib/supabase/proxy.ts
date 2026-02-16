@@ -191,6 +191,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-malformed-holding-id',
     '/test-beheer-redirect',
     '/api/verify-beheer-admin-redirect',
+    '/test-deleted-holding',
+    '/api/verify-deleted-holding',
   ]
 
   // Protected route prefixes that require authentication
