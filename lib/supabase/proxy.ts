@@ -221,6 +221,10 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-cascade-delete',
     '/test-holding-cascade-delete',
     '/api/verify-holding-cascade-delete',
+    '/test-user-reset-isolation',
+    '/api/verify-user-reset-isolation',
+    '/test-allocation-delete',
+    '/api/verify-allocation-delete',
   ]
 
   // Protected route prefixes that require authentication
