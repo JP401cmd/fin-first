@@ -173,6 +173,13 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-holding-edit-preservation',
     '/test-spotlight-persistence',
     '/api/verify-spotlight-persistence',
+    '/test-multi-tab',
+    '/api/verify-multi-tab',
+    '/test-budget-form-state',
+    '/test-budget-form-state/interactive',
+    '/api/verify-budget-form-state',
+    '/test-dashboard-card-order',
+    '/api/verify-dashboard-card-order',
   ]
 
   // Protected route prefixes that require authentication
