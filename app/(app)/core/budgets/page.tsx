@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, Plus, X, Pencil, Save,
-  GitFork, Fingerprint, Workflow, CircleDot,
+  GitFork, Fingerprint, Workflow, CircleDot, AlertTriangle,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getDefaultBudgets, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
@@ -1099,6 +1099,56 @@ function BudgetEditModal({
   const [isInflationIndexed, setIsInflationIndexed] = useState(budget.is_inflation_indexed ?? false)
   const [saving, setSaving] = useState(false)
   const [showIcons, setShowIcons] = useState(false)
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false)
+
+  // Track dirty state
+  const isDirty = useMemo(() => {
+    return (
+      name !== budget.name ||
+      icon !== budget.icon ||
+      description !== (budget.description ?? '') ||
+      defaultLimit !== String(budget.default_limit) ||
+      budgetType !== (budget.budget_type ?? 'expense') ||
+      interval !== (budget.interval ?? 'monthly') ||
+      rolloverType !== (budget.rollover_type ?? 'reset') ||
+      limitType !== (budget.limit_type ?? 'soft') ||
+      alertThreshold !== (budget.alert_threshold ?? 80) ||
+      maxSingleAmount !== String(budget.max_single_transaction_amount ?? 0) ||
+      isEssential !== (budget.is_essential ?? false) ||
+      priorityScore !== (budget.priority_score ?? 3) ||
+      isInflationIndexed !== (budget.is_inflation_indexed ?? false)
+    )
+  }, [name, icon, description, defaultLimit, budgetType, interval, rolloverType, limitType, alertThreshold, maxSingleAmount, isEssential, priorityScore, isInflationIndexed, budget])
+
+  // beforeunload warning for page refresh
+  useEffect(() => {
+    if (!isDirty) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = 'Je hebt onopgeslagen wijzigingen. Weet je zeker dat je wilt vernieuwen?'
+      return e.returnValue
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isDirty])
+
+  // Handle close with unsaved changes confirmation
+  function handleClose() {
+    if (isDirty) {
+      setShowCloseConfirm(true)
+    } else {
+      onClose()
+    }
+  }
+
+  function confirmClose() {
+    setShowCloseConfirm(false)
+    onClose()
+  }
+
+  function cancelClose() {
+    setShowCloseConfirm(false)
+  }
 
   // Effective month for limit changes
   const now = new Date()
@@ -1186,7 +1236,7 @@ function BudgetEditModal({
   const inputCls = 'w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={handleClose}>
       <div
         className="w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl"
         style={{ maxHeight: '90vh' }}
@@ -1194,12 +1244,52 @@ function BudgetEditModal({
       >
         <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
           <h2 className="text-lg font-semibold text-zinc-900">Budget bewerken</h2>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+          <button onClick={handleClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <div className="space-y-4 px-6 py-4">
+          {/* Unsaved changes close confirmation */}
+          {showCloseConfirm && (
+            <div className="rounded-lg border border-orange-300 bg-orange-50 p-3" data-testid="modal-unsaved-changes-warning">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-600" />
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-orange-800">Onopgeslagen wijzigingen</p>
+                  <p className="mt-1 text-xs text-orange-700">
+                    Je hebt wijzigingen die nog niet zijn opgeslagen. Wil je deze verwijderen of verder bewerken?
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={confirmClose}
+                      className="rounded-md bg-orange-600 px-3 py-1 text-xs font-medium text-white hover:bg-orange-700"
+                      data-testid="modal-confirm-close-btn"
+                    >
+                      Wijzigingen verwijderen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelClose}
+                      className="rounded-md border border-orange-300 px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
+                      data-testid="modal-cancel-close-btn"
+                    >
+                      Verder bewerken
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Dirty indicator */}
+          {isDirty && !showCloseConfirm && (
+            <div className="flex items-center gap-1.5 rounded-md bg-amber-50 px-3 py-1.5 border border-amber-200" data-testid="modal-dirty-indicator">
+              <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+              <span className="text-[11px] font-medium text-amber-700">Onopgeslagen wijzigingen</span>
+            </div>
+          )}
           {/* Name + Icon */}
           <div className="flex gap-3">
             <button
@@ -1375,7 +1465,7 @@ function BudgetEditModal({
         </div>
 
         <div className="flex justify-end gap-2 border-t border-zinc-200 px-6 py-4">
-          <button onClick={onClose} className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50">
+          <button onClick={handleClose} className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50">
             Annuleren
           </button>
           <button

@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ArrowLeft, Save, AlertTriangle, RefreshCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Budget } from '@/lib/budget-data'
 import { iconMap, iconOptions } from '@/components/app/budget-shared'
@@ -55,6 +55,141 @@ export function BudgetForm({
   })
 
   const needsAutoParent = !budget && !form.parent_id
+
+  // --- Draft / dirty-state management ---
+  const draftKey = budget ? `budget-edit-draft-${budget.id}` : 'budget-new-draft'
+
+  // Load draft from localStorage on mount
+  const loadDraft = useCallback(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(draftKey) : null
+      if (raw) {
+        const draft = JSON.parse(raw)
+        if (budget ? draft.budgetId === budget.id : draft.isNew) {
+          return draft
+        }
+      }
+    } catch { /* ignore parse errors */ }
+    return null
+  }, [draftKey, budget])
+
+  // Recover draft on mount
+  const [draftRecovered, setDraftRecovered] = useState(false)
+  useEffect(() => {
+    const draft = loadDraft()
+    if (draft?.formData) {
+      setForm(draft.formData)
+      if (draft.categoryName !== undefined) setCategoryName(draft.categoryName)
+      setDraftRecovered(true)
+    }
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const [showDraftNotice, setShowDraftNotice] = useState(false)
+  // Show draft notice after mount if draft was recovered
+  useEffect(() => {
+    if (draftRecovered) setShowDraftNotice(true)
+  }, [draftRecovered])
+
+  const [showNavWarning, setShowNavWarning] = useState(false)
+  const [pendingNavHref, setPendingNavHref] = useState<string | null>(null)
+
+  // Build initial form values for comparison
+  const initialForm = useMemo<FormData>(() => ({
+    name: budget?.name ?? '',
+    icon: budget?.icon ?? 'Circle',
+    description: budget?.description ?? '',
+    default_limit: budget ? String(budget.default_limit) : '',
+    budget_type: budget?.budget_type ?? 'expense',
+    interval: budget?.interval ?? 'monthly',
+    rollover_type: budget?.rollover_type ?? 'reset',
+    limit_type: budget?.limit_type ?? 'soft',
+    alert_threshold: budget?.alert_threshold ?? 80,
+    max_single_transaction_amount: budget ? String(budget.max_single_transaction_amount) : '0',
+    is_essential: budget?.is_essential ?? false,
+    priority_score: budget?.priority_score ?? 3,
+    is_inflation_indexed: budget?.is_inflation_indexed ?? false,
+    parent_id: budget?.parent_id ?? '',
+  }), [budget])
+
+  const isDirty = useMemo(() => {
+    return (
+      form.name !== initialForm.name ||
+      form.icon !== initialForm.icon ||
+      form.description !== initialForm.description ||
+      form.default_limit !== initialForm.default_limit ||
+      form.budget_type !== initialForm.budget_type ||
+      form.interval !== initialForm.interval ||
+      form.rollover_type !== initialForm.rollover_type ||
+      form.limit_type !== initialForm.limit_type ||
+      form.alert_threshold !== initialForm.alert_threshold ||
+      form.max_single_transaction_amount !== initialForm.max_single_transaction_amount ||
+      form.is_essential !== initialForm.is_essential ||
+      form.priority_score !== initialForm.priority_score ||
+      form.is_inflation_indexed !== initialForm.is_inflation_indexed ||
+      form.parent_id !== initialForm.parent_id ||
+      (needsAutoParent && categoryName.trim() !== '')
+    )
+  }, [form, initialForm, needsAutoParent, categoryName])
+
+  // Auto-save draft to localStorage when dirty
+  useEffect(() => {
+    if (isDirty) {
+      try {
+        localStorage.setItem(draftKey, JSON.stringify({
+          budgetId: budget?.id ?? null,
+          isNew: !budget,
+          formData: form,
+          categoryName,
+          savedAt: new Date().toISOString(),
+        }))
+      } catch { /* ignore storage errors */ }
+    } else {
+      try { localStorage.removeItem(draftKey) } catch { /* ignore */ }
+    }
+  }, [isDirty, draftKey, budget, form, categoryName])
+
+  // beforeunload warning
+  useEffect(() => {
+    if (!isDirty) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = 'Je hebt onopgeslagen wijzigingen. Weet je zeker dat je wilt vernieuwen?'
+      return e.returnValue
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isDirty])
+
+  // Navigation interception for internal links
+  function handleNavClick(e: React.MouseEvent, href: string) {
+    if (isDirty) {
+      e.preventDefault()
+      setPendingNavHref(href)
+      setShowNavWarning(true)
+    }
+  }
+
+  function confirmNavigation() {
+    try { localStorage.removeItem(draftKey) } catch { /* ignore */ }
+    setShowNavWarning(false)
+    if (pendingNavHref) {
+      router.push(pendingNavHref)
+    }
+  }
+
+  function cancelNavigation() {
+    setShowNavWarning(false)
+    setPendingNavHref(null)
+  }
+
+  function discardDraft() {
+    setForm(initialForm)
+    setCategoryName('')
+    setShowDraftNotice(false)
+    try { localStorage.removeItem(draftKey) } catch { /* ignore */ }
+  }
 
   function update<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -199,6 +334,8 @@ export function BudgetForm({
       }
     }
 
+    // Clear draft on successful save
+    try { localStorage.removeItem(draftKey) } catch { /* ignore */ }
     router.push('/core/budgets')
   }
 
@@ -208,18 +345,93 @@ export function BudgetForm({
     <form onSubmit={handleSubmit} className="mx-auto max-w-3xl px-6 py-8">
       {/* Back */}
       <div className="mb-6">
-        <Link
+        <a
           href="/core/budgets"
+          onClick={(e) => handleNavClick(e, '/core/budgets')}
           className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-700"
         >
           <ArrowLeft className="h-4 w-4" />
           Terug naar budgetten
-        </Link>
+        </a>
       </div>
 
       <h1 className="mb-8 text-2xl font-bold text-zinc-900">
         {budget ? 'Budget bewerken' : 'Nieuw budget'}
       </h1>
+
+      {/* Unsaved changes navigation warning */}
+      {showNavWarning && (
+        <div className="mb-6 rounded-lg border border-orange-300 bg-orange-50 p-4" data-testid="unsaved-changes-warning">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-orange-600" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-orange-800">Onopgeslagen wijzigingen</p>
+              <p className="mt-1 text-sm text-orange-700">
+                Je hebt wijzigingen die nog niet zijn opgeslagen. Wil je deze verwijderen of verder bewerken?
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={confirmNavigation}
+                  className="rounded-md bg-orange-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-700"
+                  data-testid="confirm-nav-btn"
+                >
+                  Wijzigingen verwijderen
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelNavigation}
+                  className="rounded-md border border-orange-300 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-100"
+                  data-testid="cancel-nav-btn"
+                >
+                  Verder bewerken
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Draft recovered notice */}
+      {showDraftNotice && (
+        <div className="mb-6 rounded-lg border border-blue-300 bg-blue-50 p-4" data-testid="draft-recovered-notice">
+          <div className="flex items-start gap-3">
+            <RefreshCw className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-blue-800">Concept hersteld</p>
+              <p className="mt-1 text-sm text-blue-700">
+                Er is een eerder bewaard concept gevonden. Je kunt doorgaan of het origineel laden.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDraftNotice(false)}
+                  className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                  data-testid="accept-draft-btn"
+                >
+                  Doorgaan met concept
+                </button>
+                <button
+                  type="button"
+                  onClick={discardDraft}
+                  className="rounded-md border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                  data-testid="discard-draft-btn"
+                >
+                  Origineel laden
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dirty indicator */}
+      {isDirty && !showNavWarning && !showDraftNotice && (
+        <div className="mb-4 flex items-center gap-1.5 rounded-md bg-amber-50 px-3 py-1.5 border border-amber-200" data-testid="dirty-indicator">
+          <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+          <span className="text-xs font-medium text-amber-700">Onopgeslagen wijzigingen</span>
+        </div>
+      )}
 
       {error && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -571,12 +783,13 @@ export function BudgetForm({
 
       {/* Submit */}
       <div className="flex items-center justify-end gap-3 border-t border-zinc-200 pt-6">
-        <Link
+        <a
           href="/core/budgets"
+          onClick={(e) => handleNavClick(e, '/core/budgets')}
           className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
         >
           Annuleren
-        </Link>
+        </a>
         <button
           type="submit"
           disabled={saving}
