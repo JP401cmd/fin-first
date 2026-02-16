@@ -6,9 +6,14 @@ import { computeSovereigntyLevel } from '@/lib/feature-phases'
 const SWR = 0.04
 
 /**
- * GET /api/snapshots
- * Returns all net worth snapshots for the authenticated user,
- * enriched with computed freedom_percentage based on real asset/debt data.
+ * GET /api/snapshots/auto
+ *
+ * Automatic monthly snapshot endpoint. Creates a snapshot for the authenticated
+ * user if one hasn't been created this month yet. Designed to be called by:
+ * - External cron service (e.g., Supabase Edge Functions, Vercel Cron)
+ * - Client-side on dashboard load (idempotent — safe to call multiple times)
+ *
+ * Returns: { created: boolean, snapshot: {...}, metrics: {...} }
  */
 export async function GET() {
   const supabase = await createClient()
@@ -18,78 +23,29 @@ export async function GET() {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
-  // Fetch snapshots
-  const { data: snapshots, error } = await supabase
-    .from('net_worth_snapshots')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('snapshot_date', { ascending: true })
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  // Fetch current expenses to compute freedom_percentage for each snapshot
   const now = new Date()
-  const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split('T')[0]
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
-
-  const { data: expenses } = await supabase
-    .from('transactions')
-    .select('amount')
-    .eq('user_id', user.id)
-    .lt('amount', 0)
-    .gte('date', twelveMonthsAgo)
-    .lt('date', monthEnd)
-
-  const yearlyExpenses = Math.abs((expenses ?? []).reduce((s, t) => s + Number(t.amount), 0))
-  const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / SWR : 0
-
-  // Enrich snapshots with computed freedom_percentage
-  const enriched = (snapshots ?? []).map(s => {
-    const netWorth = Number(s.net_worth)
-    const totalAssets = Number(s.total_assets)
-    const totalDebts = Number(s.total_debts)
-    const computedNetWorth = totalAssets - totalDebts
-    const freedom_percentage = fireTarget > 0
-      ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0)
-      : 0
-
-    return {
-      ...s,
-      net_worth_matches: Math.abs(netWorth - computedNetWorth) < 0.01,
-      freedom_percentage: Math.round(freedom_percentage * 10) / 10,
-      fire_target: fireTarget,
-      yearly_expenses: yearlyExpenses,
-    }
-  })
-
-  return NextResponse.json({
-    snapshots: enriched,
-    count: enriched.length,
-    fire_target: fireTarget,
-    yearly_expenses: yearlyExpenses,
-  })
-}
-
-/**
- * POST /api/snapshots
- * Creates a new net worth snapshot from real calculated asset/debt data.
- * Captures all key metrics: net_worth, freedom_percentage, fire_age,
- * sovereignty_level, savings_rate, resilience_score.
- */
-export async function POST() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
-  }
-
-  // Fetch real asset, debt, transaction, and profile data in parallel
-  const now = new Date()
-  const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split('T')[0]
+  const today = now.toISOString().split('T')[0]
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+
+  // Check if a snapshot already exists this month
+  const { data: existingSnapshots } = await supabase
+    .from('net_worth_snapshots')
+    .select('id, snapshot_date, net_worth, total_assets, total_debts, freedom_percentage, fire_age, sovereignty_level, savings_rate, resilience_score')
+    .eq('user_id', user.id)
+    .gte('snapshot_date', monthStart)
+    .order('snapshot_date', { ascending: false })
+    .limit(1)
+
+  if (existingSnapshots && existingSnapshots.length > 0) {
+    return NextResponse.json({
+      created: false,
+      message: 'Snapshot al aangemaakt deze maand',
+      snapshot: existingSnapshots[0],
+    })
+  }
+
+  // Fetch all required data in parallel
+  const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split('T')[0]
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
 
   const [assetsResult, debtsResult, expensesResult, incomeResult, profileResult, budgetsResult] = await Promise.all([
@@ -131,11 +87,10 @@ export async function POST() {
       .is('parent_id', null),
   ])
 
-  if (assetsResult.error) {
-    return NextResponse.json({ error: assetsResult.error.message }, { status: 500 })
-  }
-  if (debtsResult.error) {
-    return NextResponse.json({ error: debtsResult.error.message }, { status: 500 })
+  if (assetsResult.error || debtsResult.error) {
+    return NextResponse.json({
+      error: (assetsResult.error || debtsResult.error)?.message,
+    }, { status: 500 })
   }
 
   const assets = assetsResult.data ?? []
@@ -152,7 +107,6 @@ export async function POST() {
   const monthlyIncome = income.reduce((s, t) => s + Number(t.amount), 0)
   const monthlyContributions = assets.reduce((s, a) => s + Number(a.monthly_contribution || 0), 0)
 
-  // Essential budgets for yearly "must" expenses
   const yearlyMustExpenses = (budgetsResult.data ?? []).reduce((s, b) => {
     const limit = Number(b.default_limit) || 0
     return s + (b.interval === 'yearly' ? limit : limit * 12)
@@ -163,7 +117,7 @@ export async function POST() {
     ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0)
     : 0
 
-  // Compute FIRE projection (includes fire_age, savings_rate)
+  // Compute FIRE projection
   const dateOfBirth = profileResult.data?.date_of_birth ?? null
   const horizonInput: HorizonInput = {
     totalAssets,
@@ -184,9 +138,7 @@ export async function POST() {
   // Compute resilience score
   const resilience = computeResilienceScore(horizonInput)
 
-  const today = new Date().toISOString().split('T')[0]
-
-  // Build snapshot row with all metrics
+  // Build snapshot row
   const snapshotRow: Record<string, unknown> = {
     user_id: user.id,
     snapshot_date: today,
@@ -195,8 +147,6 @@ export async function POST() {
     net_worth: netWorth,
   }
 
-  // Add extended metrics (columns may not exist if migration #2 hasn't been applied)
-  // We try to include them; if the upsert fails due to missing columns, retry without
   const extendedFields: Record<string, unknown> = {
     freedom_percentage: Math.round(freedomPercentage * 10) / 10,
     fire_age: fireProjection.fireAge !== null ? Math.round(fireProjection.fireAge * 10) / 10 : null,
@@ -205,9 +155,9 @@ export async function POST() {
     resilience_score: resilience.total,
   }
 
-  // Try upsert with extended fields first
+  // Try upsert with extended fields; fall back to basic if columns don't exist
   let snapshot: Record<string, unknown> | null = null
-  let upsertError: string | null = null
+  let warning: string | undefined
 
   const { data: fullSnapshot, error: fullError } = await supabase
     .from('net_worth_snapshots')
@@ -216,7 +166,6 @@ export async function POST() {
     .single()
 
   if (fullError) {
-    // Retry without extended fields (columns might not exist yet)
     const { data: basicSnapshot, error: basicError } = await supabase
       .from('net_worth_snapshots')
       .upsert(snapshotRow, { onConflict: 'user_id,snapshot_date' })
@@ -227,38 +176,28 @@ export async function POST() {
       return NextResponse.json({ error: basicError.message }, { status: 500 })
     }
     snapshot = basicSnapshot
-    upsertError = 'Extended columns not available (migration pending). Basic snapshot saved.'
+    warning = 'Extended columns not available (migration pending). Basic snapshot saved.'
   } else {
     snapshot = fullSnapshot
   }
 
   return NextResponse.json({
+    created: true,
     snapshot: {
       ...snapshot,
-      // Always include computed values in response even if not saved to DB
       freedom_percentage: Math.round(freedomPercentage * 10) / 10,
       fire_age: fireProjection.fireAge !== null ? Math.round(fireProjection.fireAge * 10) / 10 : null,
       sovereignty_level: sovereigntyLevel,
       savings_rate: Math.round(fireProjection.savingsRate * 10) / 10,
       resilience_score: resilience.total,
+    },
+    metrics: {
       fire_target: fireTarget,
       yearly_expenses: yearlyExpenses,
-      net_worth_verified: netWorth === totalAssets - totalDebts,
-    },
-    calculation: {
-      total_assets: totalAssets,
-      total_debts: totalDebts,
-      net_worth: netWorth,
-      formula: 'net_worth = total_assets - total_debts',
-      freedom_percentage: Math.round(freedomPercentage * 10) / 10,
-      fire_target: fireTarget,
-      swr: SWR,
-      fire_age: fireProjection.fireAge,
-      sovereignty_level: sovereigntyLevel,
-      savings_rate: Math.round(fireProjection.savingsRate * 10) / 10,
-      resilience_score: resilience.total,
+      monthly_income: monthlyIncome,
+      monthly_expenses: monthlyExpenses,
       resilience_breakdown: resilience.breakdown,
     },
-    ...(upsertError ? { warning: upsertError } : {}),
+    ...(warning ? { warning } : {}),
   })
 }
