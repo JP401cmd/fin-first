@@ -6,6 +6,7 @@ import { JouwPadWidget } from '@/components/app/jouw-pad-widget'
 import { BadgeEvaluator } from '@/components/app/badge-evaluator'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import Link from 'next/link'
+import { StreakIndicator } from '@/components/app/streak-indicator'
 import {
   ArrowRight, Wallet, Zap, Compass,
   TrendingUp, Target, Clock, Shield,
@@ -108,9 +109,12 @@ export default async function DashboardPage() {
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-zinc-900">
-          Welkom terug, {displayName}
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-zinc-900">
+            Welkom terug, {displayName}
+          </h1>
+          <StreakIndicator />
+        </div>
         <p className="mt-1 text-sm text-zinc-500">
           TriFinity helpt je bewust omgaan met je opgeslagen levensenergie.
         </p>

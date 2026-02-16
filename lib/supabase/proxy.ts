@@ -140,6 +140,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-next-step-engine',
     '/test-sparkline',
     '/api/verify-sparkline',
+    '/test-fire-inputs',
+    '/api/verify-fire-inputs',
   ]
 
   // Protected route prefixes that require authentication
