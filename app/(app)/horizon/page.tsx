@@ -14,6 +14,7 @@ import {
   type LifeEvent, type LifeEventImpact,
 } from '@/lib/horizon-data'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
+import type { Debt } from '@/lib/debt-data'
 import { ActionCard } from '@/components/app/action-card'
 import { LogTimeline, EVENT_ICONS } from '@/components/app/horizon/log-timeline'
 import { ProjectionsModal } from '@/components/app/horizon/projections-modal'
@@ -42,6 +43,7 @@ export default function HorizonPage() {
   const [events, setEvents] = useState<LifeEvent[]>([])
   const [impacts, setImpacts] = useState<LifeEventImpact[]>([])
   const [actions, setActions] = useState<Action[]>([])
+  const [debts, setDebts] = useState<Debt[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeModal, setActiveModal] = useState<ActiveModal>(null)
@@ -66,7 +68,7 @@ export default function HorizonPage() {
       const oneYearFromNow = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()).toISOString().split('T')[0]
       const today = now.toISOString().split('T')[0]
 
-      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, actionsResult, childBudgetsResult] = await Promise.all([
+      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, actionsResult, childBudgetsResult, fullDebtsResult] = await Promise.all([
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution').eq('is_active', true),
         supabase.from('debts').select('current_balance').eq('is_active', true),
@@ -82,6 +84,7 @@ export default function HorizonPage() {
           .lte('scheduled_week', oneYearFromNow)
           .order('scheduled_week', { ascending: true }),
         supabase.from('budgets').select('id, parent_id, default_limit').not('parent_id', 'is', null),
+        supabase.from('debts').select('*').eq('is_active', true),
       ])
 
       let monthlyIncome = 0
@@ -124,6 +127,7 @@ export default function HorizonPage() {
       const loadedEvents = (eventsResult.data ?? []) as LifeEvent[]
       setEvents(loadedEvents)
       setActions((actionsResult.data ?? []) as Action[])
+      setDebts((fullDebtsResult.data ?? []) as Debt[])
 
       const cumImpacts = computeCumulativeImpacts(horizonInput, loadedEvents)
       setImpacts(cumImpacts)
@@ -779,7 +783,7 @@ export default function HorizonPage() {
       {input && (
         <>
           <ProjectionsModal input={input} open={activeModal === 'projections'} onClose={() => setActiveModal(null)} />
-          <ScenariosModal input={input} open={activeModal === 'scenarios'} onClose={() => setActiveModal(null)} />
+          <ScenariosModal input={input} debts={debts} open={activeModal === 'scenarios'} onClose={() => setActiveModal(null)} />
           <SimulationsModal input={input} open={activeModal === 'simulations'} onClose={() => setActiveModal(null)} />
           <WithdrawalModal input={input} open={activeModal === 'withdrawal'} onClose={() => setActiveModal(null)} />
         </>

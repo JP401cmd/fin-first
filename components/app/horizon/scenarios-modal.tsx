@@ -2,21 +2,26 @@
 
 import { useEffect, useState } from 'react'
 import { formatCurrency } from '@/components/app/budget-shared'
-import { X } from 'lucide-react'
+import { X, ArrowDown, ArrowUp, TrendingDown } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
   computeScenarios, computeResilienceScore,
   MARKET_WEATHER, type MarketWeather, type HorizonInput,
   type ScenarioPath, type ResilienceScore,
 } from '@/lib/horizon-data'
+import {
+  simulatePayoff, payoffSummary,
+  type Debt, type PayoffStrategy, type StrategyMonth,
+} from '@/lib/debt-data'
 
 type Props = {
   input: HorizonInput
+  debts?: Debt[]
   open: boolean
   onClose: () => void
 }
 
-export function ScenariosModal({ input, open, onClose }: Props) {
+export function ScenariosModal({ input, debts = [], open, onClose }: Props) {
   const [scenarios, setScenarios] = useState<ScenarioPath[]>([])
   const [resilience, setResilience] = useState<ResilienceScore | null>(null)
   const [weather, setWeather] = useState<MarketWeather>('normal')
@@ -24,7 +29,7 @@ export function ScenariosModal({ input, open, onClose }: Props) {
 
   useEffect(() => {
     if (!open) return
-    setScenarios(computeScenarios(input, 40))
+    setScenarios(computeScenarios(input, 40, weather))
     setResilience(computeResilienceScore(input))
   }, [input, weather, open])
 
@@ -149,6 +154,11 @@ export function ScenariosModal({ input, open, onClose }: Props) {
                 </div>
               </div>
             </section>
+          )}
+
+          {/* Debt payoff strategy comparison: Snowball vs Avalanche */}
+          {debts.length > 0 && (
+            <DebtStrategyComparison debts={debts} />
           )}
         </div>
     </BottomSheet>
@@ -356,6 +366,330 @@ function DivergingPathsChart({ scenarios, fireTarget }: { scenarios: ScenarioPat
           <text x={PAD + i * 120 + 20} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>{s.label}</text>
         </g>
       ))}
+    </svg>
+  )
+}
+
+// ── Debt Strategy Comparison ────────────────────────────────
+
+function DebtStrategyComparison({ debts }: { debts: Debt[] }) {
+  const [extraMonthly, setExtraMonthly] = useState(100)
+  const [selectedStrategy, setSelectedStrategy] = useState<PayoffStrategy | null>(null)
+
+  const activeDebts = debts.filter(d => d.is_active && Number(d.current_balance) > 0)
+  if (activeDebts.length === 0) return null
+
+  const snowballMonths = simulatePayoff(activeDebts, 'snowball', extraMonthly)
+  const avalancheMonths = simulatePayoff(activeDebts, 'avalanche', extraMonthly)
+  const currentMonths = simulatePayoff(activeDebts, 'current', 0)
+
+  const snowballSummary = payoffSummary(snowballMonths)
+  const avalancheSummary = payoffSummary(avalancheMonths)
+  const currentSummary = payoffSummary(currentMonths)
+
+  const bestStrategy = avalancheSummary.totalInterest <= snowballSummary.totalInterest ? 'avalanche' : 'snowball'
+  const interestSaved = Math.abs(currentSummary.totalInterest - (bestStrategy === 'avalanche' ? avalancheSummary.totalInterest : snowballSummary.totalInterest))
+  const monthsSaved = currentSummary.totalMonths - (bestStrategy === 'avalanche' ? avalancheSummary.totalMonths : snowballSummary.totalMonths)
+
+  return (
+    <section>
+      <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+        <TrendingDown className="mr-1.5 inline h-3.5 w-3.5 text-purple-500" />
+        Aflossingsstrategieën vergelijken
+      </h2>
+      <p className="mb-4 text-sm text-zinc-500">
+        Vergelijk snowball (kleinste schuld eerst) vs. avalanche (hoogste rente eerst) om je FIRE-datum te versnellen.
+      </p>
+
+      {/* Extra monthly payment slider */}
+      <div className="mb-4 rounded-xl border border-zinc-200 bg-white p-4">
+        <label className="text-xs font-medium text-zinc-500">
+          Extra maandelijkse aflossing: {formatCurrency(extraMonthly)}
+        </label>
+        <input
+          type="range"
+          min={0}
+          max={1000}
+          step={25}
+          value={extraMonthly}
+          onChange={(e) => setExtraMonthly(Number(e.target.value))}
+          className="mt-2 w-full accent-purple-600"
+        />
+        <div className="flex justify-between text-[10px] text-zinc-400">
+          <span>{formatCurrency(0)}</span>
+          <span>{formatCurrency(1000)}</span>
+        </div>
+      </div>
+
+      {/* Strategy comparison cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StrategyCard
+          title="Snowball"
+          subtitle="Kleinste schuld eerst"
+          color="blue"
+          icon={<ArrowDown className="h-4 w-4" />}
+          months={snowballSummary.totalMonths}
+          totalInterest={snowballSummary.totalInterest}
+          totalPaid={snowballSummary.totalPaid}
+          isBest={bestStrategy === 'snowball'}
+          onClick={() => setSelectedStrategy(selectedStrategy === 'snowball' ? null : 'snowball')}
+          isSelected={selectedStrategy === 'snowball'}
+        />
+        <StrategyCard
+          title="Avalanche"
+          subtitle="Hoogste rente eerst"
+          color="green"
+          icon={<ArrowUp className="h-4 w-4" />}
+          months={avalancheSummary.totalMonths}
+          totalInterest={avalancheSummary.totalInterest}
+          totalPaid={avalancheSummary.totalPaid}
+          isBest={bestStrategy === 'avalanche'}
+          onClick={() => setSelectedStrategy(selectedStrategy === 'avalanche' ? null : 'avalanche')}
+          isSelected={selectedStrategy === 'avalanche'}
+        />
+        <StrategyCard
+          title="Huidige Aflossing"
+          subtitle="Zonder aanpassing"
+          color="gray"
+          icon={<TrendingDown className="h-4 w-4" />}
+          months={currentSummary.totalMonths}
+          totalInterest={currentSummary.totalInterest}
+          totalPaid={currentSummary.totalPaid}
+          isBest={false}
+          onClick={() => setSelectedStrategy(selectedStrategy === 'current' ? null : 'current')}
+          isSelected={selectedStrategy === 'current'}
+        />
+      </div>
+
+      {/* Savings summary */}
+      {interestSaved > 0 && (
+        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center">
+          <p className="text-sm font-medium text-emerald-700">
+            Met de {bestStrategy === 'avalanche' ? 'avalanche' : 'snowball'}-strategie bespaar je{' '}
+            <span className="font-bold">{formatCurrency(interestSaved)}</span> aan rente
+            {monthsSaved > 0 && (
+              <> en ben je <span className="font-bold">{monthsSaved} maanden</span> eerder schuldenvrij</>
+            )}
+          </p>
+          <p className="mt-1 text-xs text-emerald-600">
+            Dit versnelt je pad naar financiële vrijheid
+          </p>
+        </div>
+      )}
+
+      {/* Payoff balance chart */}
+      <div className="mt-4 overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
+        <PayoffComparisonChart
+          snowball={snowballMonths}
+          avalanche={avalancheMonths}
+          current={currentMonths}
+        />
+      </div>
+
+      {/* Detail view for selected strategy */}
+      {selectedStrategy && (
+        <StrategyDetail
+          strategy={selectedStrategy}
+          months={selectedStrategy === 'snowball' ? snowballMonths : selectedStrategy === 'avalanche' ? avalancheMonths : currentMonths}
+          debts={activeDebts}
+        />
+      )}
+    </section>
+  )
+}
+
+function StrategyCard({
+  title, subtitle, color, icon, months, totalInterest, totalPaid, isBest, onClick, isSelected,
+}: {
+  title: string; subtitle: string; color: 'blue' | 'green' | 'gray'; icon: React.ReactNode
+  months: number; totalInterest: number; totalPaid: number; isBest: boolean
+  onClick: () => void; isSelected: boolean
+}) {
+  const borderClass = isSelected
+    ? (color === 'blue' ? 'border-blue-400 ring-2 ring-blue-200' : color === 'green' ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-zinc-400 ring-2 ring-zinc-200')
+    : (color === 'blue' ? 'border-blue-200' : color === 'green' ? 'border-emerald-200' : 'border-zinc-200')
+  const bgClass = color === 'blue' ? 'bg-blue-50' : color === 'green' ? 'bg-emerald-50' : 'bg-zinc-50'
+  const textClass = color === 'blue' ? 'text-blue-600' : color === 'green' ? 'text-emerald-600' : 'text-zinc-600'
+
+  return (
+    <div
+      className={`cursor-pointer rounded-xl border ${borderClass} ${bgClass} p-5 transition-all hover:shadow-sm`}
+      onClick={onClick}
+    >
+      <div className="flex items-center gap-2">
+        <span className={textClass}>{icon}</span>
+        <p className={`text-xs font-semibold uppercase ${textClass}`}>{title}</p>
+        {isBest && (
+          <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">
+            BESTE
+          </span>
+        )}
+      </div>
+      <p className="mt-0.5 text-xs text-zinc-500">{subtitle}</p>
+      <p className="mt-3 text-2xl font-bold text-zinc-900">
+        {months > 0 ? `${Math.ceil(months / 12)} jaar` : '-'}
+      </p>
+      <p className="mt-1 text-xs text-zinc-500">
+        {months > 0 ? `${months} maanden` : 'Geen schulden'}
+      </p>
+      <div className="mt-3 space-y-1">
+        <div className="flex justify-between text-xs">
+          <span className="text-zinc-500">Totale rente</span>
+          <span className="font-medium text-red-600">{formatCurrency(totalInterest)}</span>
+        </div>
+        <div className="flex justify-between text-xs">
+          <span className="text-zinc-500">Totaal betaald</span>
+          <span className="font-medium text-zinc-700">{formatCurrency(totalPaid)}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StrategyDetail({
+  strategy, months, debts,
+}: {
+  strategy: PayoffStrategy; months: StrategyMonth[]; debts: Debt[]
+}) {
+  const title = strategy === 'snowball' ? 'Snowball' : strategy === 'avalanche' ? 'Avalanche' : 'Huidige Aflossing'
+  const description = strategy === 'snowball'
+    ? 'Betaal eerst de kleinste schuld af voor snelle motivatiewinst, dan de volgende.'
+    : strategy === 'avalanche'
+    ? 'Betaal eerst de schuld met de hoogste rente af om de totale rentekosten te minimaliseren.'
+    : 'Huidige aflossingsschema zonder extra betalingen.'
+
+  // Show payoff order — find when each debt reaches 0
+  const payoffOrder = debts.map(debt => {
+    const payoffMonth = months.find(m => {
+      const debtEntry = m.debts.find(d => d.id === debt.id)
+      return debtEntry && debtEntry.balance <= 0.01
+    })
+    return {
+      name: debt.name,
+      balance: Number(debt.current_balance),
+      rate: Number(debt.interest_rate),
+      payoffMonth: payoffMonth?.month ?? null,
+    }
+  }).sort((a, b) => (a.payoffMonth ?? 999) - (b.payoffMonth ?? 999))
+
+  return (
+    <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-5">
+      <h3 className="text-sm font-semibold text-zinc-800">{title}-strategie detail</h3>
+      <p className="mt-1 text-xs text-zinc-500">{description}</p>
+
+      <div className="mt-4">
+        <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">Aflosvolgorde</p>
+        <div className="space-y-2">
+          {payoffOrder.map((debt, i) => (
+            <div key={debt.name} className="flex items-center gap-3">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-purple-100 text-xs font-bold text-purple-700">
+                {i + 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-zinc-800">{debt.name}</p>
+                <p className="text-xs text-zinc-400">
+                  {formatCurrency(debt.balance)} · {debt.rate}% rente
+                </p>
+              </div>
+              <span className="shrink-0 text-xs font-medium text-zinc-600">
+                {debt.payoffMonth !== null ? `${debt.payoffMonth} mnd` : 'Aflossingsvrij'}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PayoffComparisonChart({
+  snowball, avalanche, current,
+}: {
+  snowball: StrategyMonth[]; avalanche: StrategyMonth[]; current: StrategyMonth[]
+}) {
+  const maxMonths = Math.max(snowball.length, avalanche.length, current.length, 1)
+  if (maxMonths <= 1) return null
+
+  const W = 600
+  const H = 220
+  const PAD = 50
+
+  // Sample every 3 months for smoother rendering
+  const sampleInterval = Math.max(1, Math.floor(maxMonths / 80))
+  const sampleData = (data: StrategyMonth[]) =>
+    data.filter((_, i) => i % sampleInterval === 0 || i === data.length - 1)
+
+  const snowS = sampleData(snowball)
+  const avaS = sampleData(avalanche)
+  const curS = sampleData(current)
+
+  const allBalances = [
+    ...snowS.map(m => m.totalBalance),
+    ...avaS.map(m => m.totalBalance),
+    ...curS.map(m => m.totalBalance),
+  ]
+  const maxBal = Math.max(...allBalances, 1)
+
+  function x(month: number) { return PAD + (month / maxMonths) * (W - PAD * 2) }
+  function y(balance: number) { return H - PAD - (balance / maxBal) * (H - PAD * 2) }
+
+  function linePath(data: StrategyMonth[]) {
+    return data.map((m, i) => `${i === 0 ? 'M' : 'L'}${x(m.month).toFixed(1)},${y(m.totalBalance).toFixed(1)}`).join(' ')
+  }
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 240 }}>
+      {/* Grid */}
+      {[0.25, 0.5, 0.75].map(pct => {
+        const yPos = H - PAD - pct * (H - PAD * 2)
+        const val = maxBal * pct
+        return (
+          <g key={pct}>
+            <line x1={PAD} y1={yPos} x2={W - PAD} y2={yPos} stroke="#e4e4e7" strokeDasharray="4" />
+            <text x={PAD - 4} y={yPos + 3} textAnchor="end" className="fill-zinc-400" style={{ fontSize: 9 }}>
+              {val >= 1000000 ? `${(val/1000000).toFixed(1)}M` : val >= 1000 ? `${(val/1000).toFixed(0)}k` : val.toFixed(0)}
+            </text>
+          </g>
+        )
+      })}
+
+      {/* Zero line */}
+      <line x1={PAD} y1={H - PAD} x2={W - PAD} y2={H - PAD} stroke="#e4e4e7" />
+
+      {/* Lines */}
+      {curS.length > 1 && (
+        <path d={linePath(curS)} fill="none" stroke="#a1a1aa" strokeWidth="1.5" strokeDasharray="4" />
+      )}
+      {snowS.length > 1 && (
+        <path d={linePath(snowS)} fill="none" stroke="#3b82f6" strokeWidth="2" />
+      )}
+      {avaS.length > 1 && (
+        <path d={linePath(avaS)} fill="none" stroke="#10b981" strokeWidth="2" />
+      )}
+
+      {/* X-axis labels */}
+      {[0, 0.25, 0.5, 0.75, 1].map(pct => {
+        const month = Math.round(maxMonths * pct)
+        const years = Math.round(month / 12)
+        return (
+          <text key={pct} x={x(month)} y={H - 8} textAnchor="middle" className="fill-zinc-400" style={{ fontSize: 9 }}>
+            {years}j
+          </text>
+        )
+      })}
+
+      {/* Legend */}
+      <line x1={PAD} y1={12} x2={PAD + 16} y2={12} stroke="#3b82f6" strokeWidth="2" />
+      <text x={PAD + 20} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Snowball</text>
+      <line x1={PAD + 100} y1={12} x2={PAD + 116} y2={12} stroke="#10b981" strokeWidth="2" />
+      <text x={PAD + 120} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Avalanche</text>
+      <line x1={PAD + 200} y1={12} x2={PAD + 216} y2={12} stroke="#a1a1aa" strokeWidth="1.5" strokeDasharray="4" />
+      <text x={PAD + 220} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Huidig</text>
+
+      {/* Y-axis label */}
+      <text x={8} y={H / 2} transform={`rotate(-90, 8, ${H / 2})`} textAnchor="middle" className="fill-zinc-400" style={{ fontSize: 9 }}>
+        Resterende schuld
+      </text>
     </svg>
   )
 }

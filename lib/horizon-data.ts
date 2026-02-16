@@ -548,10 +548,12 @@ export function projectForward(
 
 /**
  * Three diverging scenario paths: Drifter, Current, Optimizer.
+ * Optionally accepts a market weather key to adjust return rates.
  */
 export function computeScenarios(
   input: HorizonInput,
   maxYears: number = 40,
+  weather: MarketWeather = 'normal',
 ): ScenarioPath[] {
   const months = maxYears * 12
   const { totalAssets, totalDebts, monthlyIncome, monthlyExpenses, dateOfBirth } = input
@@ -560,6 +562,7 @@ export function computeScenarios(
   const currentAge = dateOfBirth ? ageAtDate(dateOfBirth) : null
   const yearlyExpenses = monthlyExpenses * 12
   const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / SWR : 0
+  const weatherReturn = MARKET_WEATHER[weather].return
 
   function simulate(
     name: string,
@@ -573,7 +576,7 @@ export function computeScenarios(
     let nw = netWorth
     let mExpenses = monthlyExpenses * expenseMultiplier
     let mSavings = (monthlyIncome - mExpenses) * contributionMultiplier
-    const monthlyReturn = DEFAULT_RETURN / 12
+    const monthlyReturn = weatherReturn / 12
     const pts: ProjectionMonth[] = []
     let fireMonth: number | null = null
     let fireAge: number | null = null
