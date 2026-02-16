@@ -14,8 +14,8 @@ export default function TestFreedomCardPage() {
   const [apiError, setApiError] = useState<string | null>(null)
   const [apiLoading, setApiLoading] = useState(false)
 
-  // Sample data to demonstrate the card visually
-  const sampleData: Record<string, FreedomCardData> = {
+  // Preview cards to demonstrate the card visually
+  const previewCards: Record<string, FreedomCardData> = {
     anonymous: {
       privacyLevel: 'anonymous',
       freedomPercentage: 34.7,
@@ -100,9 +100,9 @@ export default function TestFreedomCardPage() {
         {/* Sample data card */}
         <div>
           <h3 className="mb-3 text-sm font-semibold text-zinc-700">
-            Sample Data Card ({privacyLevel})
+            Preview Card ({privacyLevel})
           </h3>
-          <FreedomCardVisual data={sampleData[privacyLevel]} />
+          <FreedomCardVisual data={previewCards[privacyLevel]} />
         </div>
 
         {/* API data card */}
