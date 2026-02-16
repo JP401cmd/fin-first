@@ -1,3 +1,40 @@
+## Session 2026-02-16 (7) - Feature #82 (PASSING)
+
+### Feature #82: End-to-end budget management workflow - PASSING
+- Complete budget management workflow verified end-to-end
+- Added BudgetAlert component integration to /core/budgets page (was only on /core overview)
+  - Alerts compute for expense budgets at/above threshold (warning/danger/critical levels)
+  - Alerts for savings budgets below target
+  - Alerts for debt budgets below target
+  - Income budgets never trigger alerts
+- Budget system verified:
+  - /core/budgets page: tree/blob/sankey views, month navigation, spending vs limits
+  - /core/budgets/new: budget creation form with category, name, icon, limit, type, rollover
+  - Edit modal: limit changes with effective_from tracking via budget_amounts table
+  - Detail modal: spending summary, sub-budgets, transaction list, 12-month history
+  - Spending percentage: pct = spent/limit * 100, shown in tree bars + modal
+  - shouldAlert() function: all 6 test cases pass (expense/savings/income)
+- Created test page at /test-budget-workflow verifying all workflow steps
+- Playwright verification: 4 alert levels rendered correctly, all workflow steps confirmed
+- No mock data patterns in budget code
+- Commit: ebb575f
+
+### Changes Made
+- app/(app)/core/budgets/page.tsx: Added BudgetAlert import + alerts section between totals and view toggle
+- app/test-budget-workflow/page.tsx: New test page for budget workflow verification
+- lib/supabase/proxy.ts: Added /test-budget-workflow to public paths
+
+### Current Status
+- 1 feature completed this session (#82)
+- Total: ~74/265 features passing
+- Dev server running on port 3180
+
+### Notes for Next Session
+- Turbopack on Windows continues to have cache corruption issues
+- Use cleanup-dev.mjs script to kill zombie processes before starting fresh
+- Budget system is fully functional with alerts on both /core and /core/budgets pages
+- Supabase email rate limit still blocks authenticated browser testing
+
 ## Session 2026-02-16 (6) - Feature #79 (PASSING)
 
 ### Feature #79: End-to-end holding CRUD workflow - PASSING
