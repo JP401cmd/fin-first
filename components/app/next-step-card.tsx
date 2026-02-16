@@ -64,15 +64,16 @@ const MODULE_STYLES = {
 interface NextStepCardProps {
   step: NextStepSuggestion
   onDismiss?: (step: NextStepSuggestion) => void
+  dismissDisabled?: boolean
 }
 
-export function NextStepCard({ step, onDismiss }: NextStepCardProps) {
+export function NextStepCard({ step, onDismiss, dismissDisabled }: NextStepCardProps) {
   const color = step.moduleColor ?? 'amber'
   const styles = MODULE_STYLES[color]
   const IconComponent = ICON_MAP[step.icon ?? 'lightbulb']
 
   return (
-    <div className={`group relative flex items-center gap-4 rounded-xl border ${styles.border} ${styles.bg} p-4 transition-all ${styles.hoverBorder} hover:shadow-md ${styles.hoverShadow}`}>
+    <div data-testid="next-step-card" data-step-key={step.key || step.title} className={`group relative flex items-center gap-4 rounded-xl border ${styles.border} ${styles.bg} p-4 transition-all ${styles.hoverBorder} hover:shadow-md ${styles.hoverShadow}`}>
       <Link href={step.href} className="absolute inset-0 z-0 rounded-xl" aria-label={step.title} />
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${styles.iconBg}`}>
         <IconComponent className={`h-5 w-5 ${styles.iconText}`} />
@@ -90,12 +91,16 @@ export function NextStepCard({ step, onDismiss }: NextStepCardProps) {
         {onDismiss && (
           <button
             type="button"
+            data-testid="dismiss-next-step"
+            disabled={dismissDisabled}
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              onDismiss(step)
+              if (!dismissDisabled) {
+                onDismiss(step)
+              }
             }}
-            className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors ${styles.dismissHover}`}
+            className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors ${styles.dismissHover} ${dismissDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             title="Negeren"
             aria-label="Suggestie negeren"
           >
@@ -136,6 +141,7 @@ export function NextStepEmptyCard({ moduleColor }: { moduleColor?: 'amber' | 'te
  */
 export function NextStepSection({ steps, moduleColor }: { steps: NextStepSuggestion[]; moduleColor?: 'amber' | 'teal' | 'purple' }) {
   const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set())
+  const [dismissingKeys, setDismissingKeys] = useState<Set<string>>(new Set())
   const [loaded, setLoaded] = useState(false)
 
   // Load previously dismissed keys from database on mount
@@ -168,6 +174,15 @@ export function NextStepSection({ steps, moduleColor }: { steps: NextStepSuggest
 
   const handleDismiss = useCallback(async (step: NextStepSuggestion) => {
     const key = step.key || step.title
+
+    // Guard: if already dismissed or currently dismissing, silently ignore (double-click safety)
+    if (dismissedKeys.has(key) || dismissingKeys.has(key)) {
+      return
+    }
+
+    // Mark as dismissing to prevent concurrent double-clicks
+    setDismissingKeys(prev => new Set([...prev, key]))
+    // Immediately update UI (optimistic)
     setDismissedKeys(prev => new Set([...prev, key]))
 
     // Persist dismiss to API (best-effort — if it fails, the dismiss still works in the UI session)
@@ -179,8 +194,14 @@ export function NextStepSection({ steps, moduleColor }: { steps: NextStepSuggest
       })
     } catch {
       // Silent fail — UI already updated
+    } finally {
+      setDismissingKeys(prev => {
+        const next = new Set(prev)
+        next.delete(key)
+        return next
+      })
     }
-  }, [])
+  }, [dismissedKeys, dismissingKeys])
 
   const visibleSteps = steps.filter(s => !dismissedKeys.has(s.key || s.title))
   const currentStep = visibleSteps.length > 0 ? visibleSteps[0] : null
@@ -194,7 +215,7 @@ export function NextStepSection({ steps, moduleColor }: { steps: NextStepSuggest
     return <NextStepEmptyCard moduleColor={moduleColor} />
   }
 
-  return <NextStepCard step={currentStep} onDismiss={handleDismiss} />
+  return <NextStepCard step={currentStep} onDismiss={handleDismiss} dismissDisabled={dismissingKeys.has(currentStep.key || currentStep.title)} />
 }
 
 /**
