@@ -65,6 +65,15 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-data-isolation',
     '/test-box3-verification',
     '/api/verify-box3',
+    '/test-feature-gating',
+    '/test-goal-progress',
+    '/api/goals',
+    '/test-holding-crud',
+    '/test-asset-crud',
+    '/test-debt-crud',
+    '/test-holding-price-update',
+    '/api/verify-csv-export',
+    '/test-csv-export',
   ]
 
   // Protected route prefixes that require authentication
