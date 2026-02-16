@@ -129,6 +129,9 @@ export async function updateSession(request: NextRequest) {
     '/test-freedom-time-labels',
     '/api/verify-freedom-time-labels',
     '/api/daily-expense-rate',
+    '/api/badges/verify',
+    '/api/badges/seed',
+    '/test-badge-grid',
   ]
 
   // Protected route prefixes that require authentication
