@@ -2084,3 +2084,35 @@ For Feature #51 (Transaction Import):
 - Supabase email rate limit still blocks creating test users (429 on signup)
 - No confirmed test users exist in Supabase — all email/password combos return invalid credentials
 - Port 3001 used this session
+
+## Session 2026-02-16 (2) - Feature #100
+
+### Feature #100: Loading states shown during data fetching - PASSING
+- Assets page (/core/assets) loading state verified:
+  - loading state initialized to true (line 33)
+  - Amber border-spin spinner rendered when loading===true (lines 186-193)
+  - setLoading(false) in finally block of loadAssets() (line 86)
+  - Spinner replaced by full asset portfolio content when data loads
+  - Error state shows red box with "Opnieuw proberen" retry button (lines 196-207)
+- Budgets page (/core/budgets) loading state verified:
+  - Identical pattern: loading=true initial (line 24), spinner (lines 341-348)
+  - setLoading(false) in finally block of loadBudgets() (line 178)
+  - Spinner replaced by budget tree/blob/sankey visualizations
+  - Error state with retry button (lines 351-361)
+- Holdings page also has identical loading pattern (verified as bonus)
+- Test page at /test-loading-states demonstrates exact loading pattern from real pages
+- Test page verified via Playwright screenshot: all 4 checks passing
+- SSR HTML output confirms spinner divs with animate-spin class in initial render
+- Zero mock data patterns found in assets, budgets, and holdings pages
+- Zero console errors on accessible pages
+
+### Current Status
+- 93/265 features passing (92 before + #100)
+- Feature #100 completed and marked passing
+
+### Notes for Next Session
+- Turbopack on Windows: newly created test pages may show 404 in browser (route registration lag)
+  Workaround: restart server or wait for route manifest to update
+- Webpack mode (without --turbopack) also has build-manifest.json issues on cold start
+- Pre-warm routes with curl before Playwright to avoid middleware-manifest.json errors
+- Port 3006 used this session
