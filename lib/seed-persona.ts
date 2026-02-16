@@ -51,6 +51,27 @@ export async function deleteAllUserData(
 ): Promise<Record<string, number>> {
   const summary: Record<string, number> = {}
 
+  // Batch 0: tables with no FK to other user tables (user_badges, user_streaks, user_feature_visits, next_step_completions)
+  // Also holding_transactions (FK to holdings) must be deleted before holdings
+  const batch0Results = await Promise.all([
+    deleteTable(supabase, 'holding_transactions', userId),
+    deleteTable(supabase, 'user_badges', userId),
+    deleteTable(supabase, 'user_streaks', userId),
+    deleteTable(supabase, 'user_feature_visits', userId),
+    deleteTable(supabase, 'next_step_completions', userId),
+  ])
+  const batch0Tables = ['holding_transactions', 'user_badges', 'user_streaks', 'user_feature_visits', 'next_step_completions']
+  for (let i = 0; i < batch0Tables.length; i++) {
+    summary[batch0Tables[i]] = batch0Results[i]
+  }
+
+  // Batch 0b: holdings (FK to assets, must be deleted before assets)
+  const holdingsResult = await deleteTable(supabase, 'holdings', userId)
+  summary.holdings = holdingsResult
+
+  onProgress?.('Gebruikersdata verwijderen...', 'batch0', 'delete',
+    batch0Results.reduce((a, b) => a + b, 0) + holdingsResult)
+
   // Batch 1a: deepest leaf tables (FK to goals, budgets)
   const batch1aResults = await Promise.all([
     deleteTable(supabase, 'goal_contributions', userId),
