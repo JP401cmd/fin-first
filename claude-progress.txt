@@ -1,3 +1,32 @@
+## Session 2026-02-16 (agent-128-s3) - Feature #128
+
+### Feature #128: Portfolio allocation donut uses real holding composition - PASSING
+- HoldingsAllocationPie SVG component renders donut chart with strokeDasharray segments
+- allocationData computed via useMemo from holdings state: maps holdings to {id, name, ticker, value=price*units}
+- Filters zero-value holdings, sorts by value descending (largest first)
+- Frontend loads holdings via fetch('/api/holdings') which queries real Supabase holdings table
+- API filters by user_id and is_active=true with RLS enforcement
+- API computes total_value from (current_price ?? avg_purchase_price) * units
+- Legend shows color swatch, name, ticker, percentage (value/total*100), and EUR value
+- Donut center shows total value and holding count
+- Verification: 14/14 API tests passing, 6/6 visual tests passing
+- Rebalancing verified: adding €30,000 holding rebalanced chart (75% dominant, others proportionally reduced)
+- Zero console errors, zero mock data patterns
+- Auth required for real holdings page (redirects to login), security working correctly
+
+### Changes Made
+- No code changes needed - feature was fully implemented in previous sessions
+- Verification confirmed via browser automation and API testing
+
+### Current Status
+- 126/265 features passing (125 before + #128)
+- Feature #128 completed and marked passing
+
+### Notes for Next Session
+- Port 3000 used this session
+- Holdings page requires authentication to view real data
+- Test page at /test-portfolio-allocation demonstrates donut chart interactively
+
 ## Session 2026-02-16 (agent-129) - Feature #129
 
 ### Feature #129: Box 3 tax optimization reflects real calculations - PASSING
