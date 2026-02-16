@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { BadgeGrid } from '@/components/app/badge-grid'
 import { BadgeEvaluator } from '@/components/app/badge-evaluator'
+import { FreedomCardGenerator } from '@/components/app/freedom-card'
 
 // ── Temporal Balance levels ──────────────────────────────────────────
 
@@ -935,7 +936,20 @@ export default function IdentityPage() {
         <BadgeGrid />
       </section>
 
-      {/* ── E. Gegevens resetten ──────────────────────────────────── */}
+      {/* ── E. Vrijheidskaart (Share) ──────────────────────────────── */}
+      <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
+        <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          Vrijheidskaart Delen
+        </h2>
+        <p className="mt-1 mb-6 text-sm text-zinc-500">
+          Genereer een deelbare kaart met je vrijheidsvoortgang. Kies je privacyniveau
+          om te bepalen welke informatie zichtbaar is.
+        </p>
+
+        <FreedomCardGenerator />
+      </section>
+
+      {/* ── F. Gegevens resetten ──────────────────────────────────── */}
       <section className="mb-10 rounded-2xl border border-red-200 bg-white p-6 sm:p-8">
         <h2 className="text-xs font-semibold tracking-[0.15em] text-red-400 uppercase">
           Gegevens Resetten
