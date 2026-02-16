@@ -20,6 +20,10 @@ import {
 } from 'lucide-react'
 import { NibudBenchmarkSection } from '@/components/app/will/nibud-benchmark'
 import { FeatureGate } from '@/components/app/feature-gate'
+import { CollapsibleSection } from '@/components/app/collapsible-section'
+import { DiscoverCarousel } from '@/components/app/discover-carousel'
+import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
+import { NextStepSection, computeAllWilSteps } from '@/components/app/next-step-card'
 
 type KpiData = {
   completedActions: { id: string; status: string; freedom_days_impact: number; source: string; completed_at: string | null; due_date: string | null; created_at: string; recommendation: { recommendation_type: string }[] | null }[]
@@ -314,6 +318,19 @@ export default function WillPage() {
         </div>
       </section>
 
+      {/* === Next Step Card === */}
+      <section className="mt-6">
+        <NextStepSection
+          steps={computeAllWilSteps({
+            pendingRecommendations: allPendingRecs.length,
+            openActions: openActions.length,
+            goalCount: totalGoalCount,
+            hasCompletedActions: completedActions.length > 0,
+          })}
+          moduleColor="teal"
+        />
+      </section>
+
       {/* === 2. KPI Stat Cards === */}
       <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-zinc-200 bg-white p-5">
@@ -424,7 +441,7 @@ export default function WillPage() {
       </section>
 
       {/* === 5. Budget Gezondheidscheck (NIBUD) — compact card + modal === */}
-      <FeatureGate featureId="nibud_benchmark">
+      <FeatureGate featureId="nibud_benchmark" fallback="locked">
         <section id="section-gezondheidscheck" className="mt-8 scroll-mt-8">
           <NibudBenchmarkSection />
         </section>
@@ -444,7 +461,7 @@ export default function WillPage() {
       </section>
 
       {/* === 6. Doelen (compact + modal) === */}
-      <FeatureGate featureId="doelen_systeem">
+      <FeatureGate featureId="doelen_systeem" fallback="locked">
       <section id="section-doelen" className="mt-10 scroll-mt-8">
         <div className="mb-5 flex items-center justify-between">
           <div>
@@ -497,38 +514,34 @@ export default function WillPage() {
       </section>
       </FeatureGate>
 
-      {/* === 7. Beslissingspatronen === */}
-      <FeatureGate featureId="beslissingspatronen">
+      {/* === 7. Beslissingspatronen (Collapsible Deep-Dive) === */}
+      <FeatureGate featureId="beslissingspatronen" fallback="locked">
       <section className="mt-10">
-        <div className="mb-5">
-          <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-            Beslissingspatronen
-          </h2>
-          <p className="mt-1 text-sm text-zinc-500">
-            Vrijheidsdagen gewonnen per type actie
-          </p>
-        </div>
-
-        {impactEntries.length > 0 ? (
-          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
+        <CollapsibleSection
+          storageKey="wil_beslissingspatronen"
+          title="Beslissingspatronen"
+          summary={impactEntries.length > 0 ? `${impactEntries.length} categorie${impactEntries.length !== 1 ? 'en' : ''} — vrijheidsdagen per type actie` : 'Nog geen acties afgerond'}
+          icon={<Flame className="h-5 w-5 text-teal-600" />}
+        >
+          {impactEntries.length > 0 ? (
             <ImpactChart entries={impactEntries} maxImpact={maxImpact} getBarColor={getBarColor} getTypeLabel={getTypeLabel} />
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
-            <p className="text-sm text-zinc-500">
-              Nog geen acties afgerond. Scroll naar de{' '}
-              <button onClick={() => scrollToSection('section-suggesties')} className="font-medium text-teal-600 hover:underline">
-                suggesties
-              </button>{' '}
-              om je eerste voorstellen te ontvangen.
-            </p>
-          </div>
-        )}
+          ) : (
+            <div className="py-4 text-center">
+              <p className="text-sm text-zinc-500">
+                Nog geen acties afgerond. Scroll naar de{' '}
+                <button onClick={() => scrollToSection('section-suggesties')} className="font-medium text-teal-600 hover:underline">
+                  suggesties
+                </button>{' '}
+                om je eerste voorstellen te ontvangen.
+              </p>
+            </div>
+          )}
+        </CollapsibleSection>
       </section>
       </FeatureGate>
 
       {/* === Modals === */}
-      <FeatureGate featureId="doelen_systeem">
+      <FeatureGate featureId="doelen_systeem" fallback="locked">
       <GoalDetailModal
         open={showGoalModal}
         onClose={() => setShowGoalModal(false)}
@@ -547,6 +560,12 @@ export default function WillPage() {
         />
       )}
       </FeatureGate>
+
+      {/* === Locked Features Footer === */}
+      <LockedFeaturesFooter module="wil" />
+
+      {/* === Discover Carousel === */}
+      <DiscoverCarousel module="wil" />
     </div>
   )
 }

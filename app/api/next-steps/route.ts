@@ -7,6 +7,8 @@ import { NextResponse } from 'next/server'
  * Returns a prioritized list of actions the user should take next,
  * based on their ACTUAL financial data state (not static defaults).
  *
+ * Also checks for dismissed steps and excludes them from suggestions.
+ *
  * The logic checks real data in the database:
  * - Has the user imported transactions?
  * - Has the user set up budgets?
@@ -16,8 +18,8 @@ import { NextResponse } from 'next/server'
  * - Has the user completed their profile?
  * - Has the user set any goals?
  *
- * Steps that are already completed (based on real data) are removed
- * from the suggestion list, making recommendations dynamic.
+ * Steps that are already completed (based on real data) or dismissed
+ * are removed from the suggestion list, making recommendations dynamic.
  */
 export async function GET() {
   const supabase = await createClient()
@@ -37,6 +39,7 @@ export async function GET() {
       snapshotsResult,
       profileResult,
       goalsResult,
+      dismissedResult,
     ] = await Promise.all([
       supabase
         .from('transactions')
@@ -76,6 +79,11 @@ export async function GET() {
         .select('id')
         .eq('user_id', user.id)
         .limit(1),
+      // Try to fetch dismissed steps (table may not exist yet)
+      supabase
+        .from('next_step_completions')
+        .select('step_key, dismissed')
+        .eq('user_id', user.id),
     ])
 
     // Determine what the user has done based on real data
@@ -91,6 +99,19 @@ export async function GET() {
       profileResult.data?.household_type
     )
 
+    // Build dismissed set from database (if table exists)
+    const dismissedKeys = new Set<string>()
+    const completedByDb = new Set<string>()
+    if (dismissedResult.data && !dismissedResult.error) {
+      for (const row of dismissedResult.data) {
+        if (row.dismissed) {
+          dismissedKeys.add(row.step_key)
+        } else {
+          completedByDb.add(row.step_key)
+        }
+      }
+    }
+
     // Build step list based on actual data state
     const steps = [
       {
@@ -102,6 +123,7 @@ export async function GET() {
         href: '/core/cash/import',
         icon: 'receipt',
         completed: hasTransactions,
+        dismissed: dismissedKeys.has('import_transactions'),
       },
       {
         key: 'set_budgets',
@@ -112,6 +134,7 @@ export async function GET() {
         href: '/core/budgets',
         icon: 'cart',
         completed: hasBudgets,
+        dismissed: dismissedKeys.has('set_budgets'),
       },
       {
         key: 'add_assets',
@@ -122,6 +145,7 @@ export async function GET() {
         href: '/core/assets',
         icon: 'piggybank',
         completed: hasAssets,
+        dismissed: dismissedKeys.has('add_assets'),
       },
       {
         key: 'register_debts',
@@ -132,6 +156,7 @@ export async function GET() {
         href: '/core/debts',
         icon: 'building',
         completed: hasDebts,
+        dismissed: dismissedKeys.has('register_debts'),
       },
       {
         key: 'complete_profile',
@@ -142,6 +167,7 @@ export async function GET() {
         href: '/identity',
         icon: 'target',
         completed: profileComplete,
+        dismissed: dismissedKeys.has('complete_profile'),
       },
       {
         key: 'create_snapshot',
@@ -152,6 +178,7 @@ export async function GET() {
         href: '/core',
         icon: 'chart',
         completed: hasSnapshots,
+        dismissed: dismissedKeys.has('create_snapshot'),
       },
       {
         key: 'set_goals',
@@ -162,12 +189,14 @@ export async function GET() {
         href: '/will',
         icon: 'target',
         completed: hasGoals,
+        dismissed: dismissedKeys.has('set_goals'),
       },
     ]
 
-    // Separate pending and completed
-    const pendingSteps = steps.filter(s => !s.completed)
+    // Separate pending, completed and dismissed
+    const pendingSteps = steps.filter(s => !s.completed && !s.dismissed)
     const completedSteps = steps.filter(s => s.completed)
+    const dismissedSteps = steps.filter(s => s.dismissed && !s.completed)
 
     // Return the first pending step as the primary suggestion
     const nextStep = pendingSteps.length > 0 ? pendingSteps[0] : null
@@ -176,7 +205,9 @@ export async function GET() {
       next_step: nextStep,
       pending_steps: pendingSteps,
       completed_steps: completedSteps.map(s => s.key),
+      dismissed_steps: dismissedSteps.map(s => s.key),
       completed_count: completedSteps.length,
+      dismissed_count: dismissedSteps.length,
       total_steps: steps.length,
       data_state: {
         has_transactions: hasTransactions,
@@ -205,7 +236,9 @@ export async function GET() {
       },
       pending_steps: [],
       completed_steps: [],
+      dismissed_steps: [],
       completed_count: 0,
+      dismissed_count: 0,
       total_steps: 0,
       source: 'fallback',
     }, { status: 500 })

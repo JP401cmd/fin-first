@@ -27,6 +27,9 @@ import {
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { FeatureGate } from '@/components/app/feature-gate'
+import { DiscoverCarousel } from '@/components/app/discover-carousel'
+import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
+import { NextStepSection, computeAllHorizonSteps } from '@/components/app/next-step-card'
 
 type ActiveModal = null | 'projections' | 'scenarios' | 'simulations' | 'withdrawal'
 
@@ -315,6 +318,18 @@ export default function HorizonPage() {
         </div>
       </section>
 
+      {/* === Next Step Card === */}
+      <section className="mt-6">
+        <NextStepSection
+          steps={computeAllHorizonSteps({
+            hasFireProjection: fire.fireAge !== null,
+            eventCount: events.length,
+            freedomPct: fire.freedomPercentage,
+          })}
+          moduleColor="purple"
+        />
+      </section>
+
       {/* === 2. KPI Cards === */}
       <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-zinc-200 bg-white p-5">
@@ -361,7 +376,7 @@ export default function HorizonPage() {
           <p className="mt-1 text-xs text-zinc-400">van FIRE doel</p>
         </div>
 
-        <FeatureGate featureId="veerkracht_score">
+        <FeatureGate featureId="veerkracht_score" fallback="locked">
         <div className="rounded-xl border border-zinc-200 bg-white p-5">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-50">
@@ -413,7 +428,7 @@ export default function HorizonPage() {
 
       {/* === 4. Verken-kaarten (Explore Cards) === */}
       <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <FeatureGate featureId="fire_projecties">
+        <FeatureGate featureId="fire_projecties" fallback="locked">
           <ExploreCard
             onClick={() => setActiveModal('projections')}
             icon={<TrendingUp className="h-5 w-5 text-purple-600" />}
@@ -422,7 +437,7 @@ export default function HorizonPage() {
             subtitle="FIRE voorspelling"
           />
         </FeatureGate>
-        <FeatureGate featureId="fire_scenario_analyse">
+        <FeatureGate featureId="fire_scenario_analyse" fallback="locked">
           <ExploreCard
             onClick={() => setActiveModal('scenarios')}
             icon={<BarChart3 className="h-5 w-5 text-purple-600" />}
@@ -431,7 +446,7 @@ export default function HorizonPage() {
             subtitle="drifter, koers, optimizer"
           />
         </FeatureGate>
-        <FeatureGate featureId="monte_carlo">
+        <FeatureGate featureId="monte_carlo" fallback="locked">
           <ExploreCard
             onClick={() => setActiveModal('simulations')}
             icon={<FlaskConical className="h-5 w-5 text-purple-600" />}
@@ -440,7 +455,7 @@ export default function HorizonPage() {
             subtitle="1.000 simulaties"
           />
         </FeatureGate>
-        <FeatureGate featureId="withdrawal_strategie">
+        <FeatureGate featureId="withdrawal_strategie" fallback="locked">
           <ExploreCard
             onClick={() => setActiveModal('withdrawal')}
             icon={<Landmark className="h-5 w-5 text-purple-600" />}
@@ -452,7 +467,7 @@ export default function HorizonPage() {
       </section>
 
       {/* === 5. Tijdlijn + 6. Levensgebeurtenissen === */}
-      <FeatureGate featureId="levensgebeurtenissen">
+      <FeatureGate featureId="levensgebeurtenissen" fallback="locked">
       <section className="mt-10">
         <div className="mb-5">
           <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
@@ -632,7 +647,7 @@ export default function HorizonPage() {
       )}
 
       {/* === 8. Projectie-chart === */}
-      <FeatureGate featureId="vermogensprojectie_chart">
+      <FeatureGate featureId="vermogensprojectie_chart" fallback="locked">
       <section className="mt-10">
         <div className="mb-5">
           <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
@@ -679,6 +694,12 @@ export default function HorizonPage() {
           </div>
         </div>
       </section>
+
+      {/* === Locked Features Footer === */}
+      <LockedFeaturesFooter module="horizon" />
+
+      {/* === Discover Carousel === */}
+      <DiscoverCarousel module="horizon" />
 
       {/* === Event Form Modal === */}
       {showForm && (

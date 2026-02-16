@@ -15,6 +15,10 @@ import {
   PiggyBank, Building2, ArrowRight, Info, Camera, Download, ChevronDown, Receipt,
 } from 'lucide-react'
 import { FeatureGate } from '@/components/app/feature-gate'
+import { CollapsibleSection } from '@/components/app/collapsible-section'
+import { DiscoverCarousel } from '@/components/app/discover-carousel'
+import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
+import { NextStepSection, computeAllKernSteps } from '@/components/app/next-step-card'
 
 export default function CorePage() {
   const router = useRouter()
@@ -27,6 +31,8 @@ export default function CorePage() {
   const [incomeMonths, setIncomeMonths] = useState(12)
   const [savingsRate12, setSavingsRate12] = useState(0)
   const [savingsRateMonths, setSavingsRateMonths] = useState(12)
+  const [budgetCount, setBudgetCount] = useState(0)
+  const [hasTransactions, setHasTransactions] = useState(false)
 
   const loadData = useCallback(async () => {
     try {
@@ -171,12 +177,19 @@ export default function CorePage() {
       const coreData = computeCoreData(monthlyIncome, monthlyExpenses, totalAssets, totalDebts, extrapolatedIncome, yearlyMustExpenses)
       setData(coreData)
 
+      // Set next step data
+      setHasTransactions((txResult.data?.length ?? 0) > 0)
+
       // Fetch budget alert data
       const [budgetResult, spendingResult, snapshotResult] = await Promise.all([
         supabase.from('budgets').select('*'),
         supabase.from('transactions').select('budget_id, amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('net_worth_snapshots').select('*').order('snapshot_date', { ascending: true }).limit(24),
       ])
+
+      if (budgetResult.data) {
+        setBudgetCount((budgetResult.data as Budget[]).filter(b => !b.parent_id).length)
+      }
 
       if (budgetResult.data && spendingResult.data) {
         const spendMap: Record<string, number> = {}
@@ -330,6 +343,24 @@ export default function CorePage() {
         </div>
       </section>
 
+      {/* === Next Step Card === */}
+      {data && (
+        <section className="mt-6">
+          <NextStepSection
+            steps={computeAllKernSteps({
+              totalAssets: data.totalAssets,
+              totalDebts: data.totalDebts,
+              monthlyIncome: data.monthlyIncome,
+              monthlyExpenses: data.monthlyExpenses,
+              budgetCount,
+              snapshotCount: snapshots.length,
+              hasTransactions,
+            })}
+            moduleColor="amber"
+          />
+        </section>
+      )}
+
       {/* === KPI Stat Cards === */}
       <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-zinc-200 bg-white p-5">
@@ -452,7 +483,7 @@ export default function CorePage() {
           subtitle="totale waarde"
           accent
         />
-        <FeatureGate featureId="box3_belasting">
+        <FeatureGate featureId="box3_belasting" fallback="locked">
           <QuickLink
             href="/core/belasting"
             icon={<Receipt className="h-5 w-5 text-amber-600" />}
@@ -464,60 +495,59 @@ export default function CorePage() {
         </FeatureGate>
       </section>
 
-      {/* === Net Worth Chart === */}
-      <FeatureGate featureId="vermogensverloop">
-      {snapshots.length > 0 && (
-        <section className="mt-10">
-          <div className="mb-5 flex items-center justify-between">
-            <div>
-              <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-                Vermogensverloop
-              </h2>
-              <p className="mt-1 text-sm text-zinc-500">
-                Netto vermogen over tijd
-              </p>
+      {/* === Net Worth Chart (Collapsible Deep-Dive) === */}
+      <FeatureGate featureId="vermogensverloop" fallback="locked">
+      <section className="mt-10">
+        <CollapsibleSection
+          storageKey="kern_vermogensverloop"
+          title="Vermogensverloop"
+          summary={snapshots.length > 0 ? `${snapshots.length} snapshots — netto vermogen over tijd` : 'Maak je eerste snapshot'}
+          icon={<TrendingUp className="h-5 w-5 text-amber-600" />}
+        >
+          {snapshots.length > 0 ? (
+            <>
+              <div className="mb-4 flex items-center justify-end">
+                <button
+                  onClick={createSnapshot}
+                  disabled={snapshotLoading}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
+                >
+                  <Camera className="h-3.5 w-3.5" />
+                  {snapshotLoading ? 'Bezig...' : 'Snapshot nu'}
+                </button>
+              </div>
+              <NetWorthChart snapshots={snapshots} />
+            </>
+          ) : (
+            <div className="text-center py-4">
+              <p className="text-sm text-zinc-500">Nog geen snapshots. Maak je eerste snapshot om je vermogensverloop te zien.</p>
+              <button
+                onClick={createSnapshot}
+                disabled={snapshotLoading}
+                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+              >
+                <Camera className="h-4 w-4" />
+                {snapshotLoading ? 'Bezig...' : 'Eerste snapshot maken'}
+              </button>
             </div>
-            <button
-              onClick={createSnapshot}
-              disabled={snapshotLoading}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
-            >
-              <Camera className="h-3.5 w-3.5" />
-              {snapshotLoading ? 'Bezig...' : 'Snapshot nu'}
-            </button>
-          </div>
-          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
-            <NetWorthChart snapshots={snapshots} />
-          </div>
-        </section>
-      )}
-
-      {snapshots.length === 0 && (
-        <section className="mt-10">
-          <div className="mb-5">
-            <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-              Vermogensverloop
-            </h2>
-          </div>
-          <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
-            <p className="text-sm text-zinc-500">Nog geen snapshots. Maak je eerste snapshot om je vermogensverloop te zien.</p>
-            <button
-              onClick={createSnapshot}
-              disabled={snapshotLoading}
-              className="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
-            >
-              <Camera className="h-4 w-4" />
-              {snapshotLoading ? 'Bezig...' : 'Eerste snapshot maken'}
-            </button>
-          </div>
-        </section>
-      )}
+          )}
+        </CollapsibleSection>
+      </section>
       </FeatureGate>
 
-      {/* === Snapshot Comparison === */}
-      <FeatureGate featureId="snapshot_vergelijking">
+      {/* === Snapshot Comparison (Collapsible Deep-Dive) === */}
+      <FeatureGate featureId="snapshot_vergelijking" fallback="locked">
       {snapshots.length >= 2 && (
-        <SnapshotComparison snapshots={snapshots} />
+        <section className="mt-8">
+          <CollapsibleSection
+            storageKey="kern_snapshot_vergelijking"
+            title="Vergelijking snapshots"
+            summary={`${new Date(snapshots[snapshots.length - 2].snapshot_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })} vs ${new Date(snapshots[snapshots.length - 1].snapshot_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`}
+            icon={<Camera className="h-5 w-5 text-amber-600" />}
+          >
+            <SnapshotComparisonContent snapshots={snapshots} />
+          </CollapsibleSection>
+        </section>
       )}
       </FeatureGate>
 
@@ -532,7 +562,7 @@ export default function CorePage() {
               Gebaseerd op je werkelijke transacties en budgetinstellingen.
             </p>
           </div>
-          <FeatureGate featureId="data_export">
+          <FeatureGate featureId="data_export" fallback="locked">
             <ExportDropdown />
           </FeatureGate>
         </div>
@@ -567,6 +597,12 @@ export default function CorePage() {
           </div>
         </div>
       </section>
+
+      {/* === Locked Features Footer === */}
+      <LockedFeaturesFooter module="kern" />
+
+      {/* === Discover Carousel === */}
+      <DiscoverCarousel module="kern" />
     </div>
   )
 }
@@ -672,7 +708,7 @@ function ExportDropdown() {
   )
 }
 
-function SnapshotComparison({ snapshots }: { snapshots: NetWorthSnapshot[] }) {
+function SnapshotComparisonContent({ snapshots }: { snapshots: NetWorthSnapshot[] }) {
   if (snapshots.length < 2) return null
 
   const latest = snapshots[snapshots.length - 1]
@@ -681,9 +717,6 @@ function SnapshotComparison({ snapshots }: { snapshots: NetWorthSnapshot[] }) {
   const netDelta = Number(latest.net_worth) - Number(previous.net_worth)
   const assetDelta = Number(latest.total_assets) - Number(previous.total_assets)
   const debtDelta = Number(latest.total_debts) - Number(previous.total_debts)
-
-  const latestDate = new Date(latest.snapshot_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
-  const previousDate = new Date(previous.snapshot_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
 
   function DeltaValue({ value, invert }: { value: number; invert?: boolean }) {
     const isPositive = invert ? value < 0 : value > 0
@@ -697,45 +730,35 @@ function SnapshotComparison({ snapshots }: { snapshots: NetWorthSnapshot[] }) {
   }
 
   return (
-    <section className="mt-8">
-      <div className="mb-4">
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-          Vergelijking snapshots
-        </h2>
-        <p className="mt-1 text-xs text-zinc-500">
-          {previousDate} vs {latestDate}
-        </p>
-      </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
-          <p className="text-sm font-medium text-zinc-500">Netto vermogen</p>
-          <DeltaValue value={netDelta} />
-          <div className="mt-1 flex gap-3 text-xs text-zinc-400">
-            <span>{formatCurrency(Number(previous.net_worth))}</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-            <span className="font-medium text-zinc-600">{formatCurrency(Number(latest.net_worth))}</span>
-          </div>
-        </div>
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
-          <p className="text-sm font-medium text-zinc-500">Assets</p>
-          <DeltaValue value={assetDelta} />
-          <div className="mt-1 flex gap-3 text-xs text-zinc-400">
-            <span>{formatCurrency(Number(previous.total_assets))}</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-            <span className="font-medium text-zinc-600">{formatCurrency(Number(latest.total_assets))}</span>
-          </div>
-        </div>
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
-          <p className="text-sm font-medium text-zinc-500">Schulden</p>
-          <DeltaValue value={debtDelta} invert />
-          <div className="mt-1 flex gap-3 text-xs text-zinc-400">
-            <span>{formatCurrency(Number(previous.total_debts))}</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-            <span className="font-medium text-zinc-600">{formatCurrency(Number(latest.total_debts))}</span>
-          </div>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-5">
+        <p className="text-sm font-medium text-zinc-500">Netto vermogen</p>
+        <DeltaValue value={netDelta} />
+        <div className="mt-1 flex gap-3 text-xs text-zinc-400">
+          <span>{formatCurrency(Number(previous.net_worth))}</span>
+          <ArrowRight className="h-3.5 w-3.5" />
+          <span className="font-medium text-zinc-600">{formatCurrency(Number(latest.net_worth))}</span>
         </div>
       </div>
-    </section>
+      <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-5">
+        <p className="text-sm font-medium text-zinc-500">Assets</p>
+        <DeltaValue value={assetDelta} />
+        <div className="mt-1 flex gap-3 text-xs text-zinc-400">
+          <span>{formatCurrency(Number(previous.total_assets))}</span>
+          <ArrowRight className="h-3.5 w-3.5" />
+          <span className="font-medium text-zinc-600">{formatCurrency(Number(latest.total_assets))}</span>
+        </div>
+      </div>
+      <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-5">
+        <p className="text-sm font-medium text-zinc-500">Schulden</p>
+        <DeltaValue value={debtDelta} invert />
+        <div className="mt-1 flex gap-3 text-xs text-zinc-400">
+          <span>{formatCurrency(Number(previous.total_debts))}</span>
+          <ArrowRight className="h-3.5 w-3.5" />
+          <span className="font-medium text-zinc-600">{formatCurrency(Number(latest.total_debts))}</span>
+        </div>
+      </div>
+    </div>
   )
 }
 

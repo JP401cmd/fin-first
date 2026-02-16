@@ -83,6 +83,7 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-onboarding',
     '/test-bank-import',
     '/test-next-step-dismiss',
+    '/test-badges',
   ]
 
   // Protected route prefixes that require authentication
