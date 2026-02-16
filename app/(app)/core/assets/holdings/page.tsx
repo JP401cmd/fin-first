@@ -127,7 +127,20 @@ export default function HoldingsPage() {
     try {
       const res = await fetch(`/api/holdings?id=${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Verwijderen mislukt')
-      setHoldings((prev) => prev.filter((h) => h.id !== id))
+      setHoldings((prev) => {
+        const updated = prev.filter((h) => h.id !== id)
+        // Recalculate totals so allocation chart percentages update correctly
+        const newTotalValue = updated.reduce((sum, h) => {
+          const price = h.current_price ?? h.avg_purchase_price
+          return sum + price * h.units
+        }, 0)
+        const newTotalCost = updated.reduce((sum, h) => {
+          return sum + h.avg_purchase_price * h.units
+        }, 0)
+        setTotalValue(newTotalValue)
+        setTotalCost(newTotalCost)
+        return updated
+      })
       setDeleteConfirm(null)
     } catch {
       setError('Kon holding niet verwijderen')
