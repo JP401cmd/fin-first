@@ -1,3 +1,39 @@
+## Session 2026-02-16 - Feature #151
+
+### Feature #151: Direct access to /onboarding when already onboarded - PASSING
+- Verified existing redirect logic in onboarding page (app/(onboarding)/onboarding/page.tsx):
+  - useEffect on mount queries profiles.onboarding_completed
+  - If true → router.replace('/dashboard') with early return before UI renders
+  - Loading spinner prevents content flash during check
+- Layout (server-side) redirects unauthenticated users to /login
+- Middleware (proxy.ts) protects /onboarding as a protected route prefix
+- Seed API (POST /api/onboarding/seed) returns 403 if already onboarded
+- 12/12 verification tests passing:
+  1. Onboarding page exists ✅
+  2. Page queries onboarding_completed flag ✅
+  3. Page redirects to /dashboard ✅
+  4. Redirect conditional on flag ✅
+  5. Loading state prevents flash ✅
+  6. Layout requires auth ✅
+  7. Seed API prevents re-onboarding (403) ✅
+  8. Middleware protects /onboarding ✅
+  9. Page is client component ✅
+  10. Early return prevents UI render ✅
+  11. Database column exists ✅
+  12. useEffect runs on mount ✅
+- Zero console errors
+- No mock data patterns found
+
+### Changes Made
+- app/api/verify-onboarding-redirect/route.ts: 12-test verification endpoint
+- app/test-onboarding-redirect/page.tsx: Visual test page with results + flow diagram
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: 6b5ccb6
+
+### Current Status
+- Feature #151 completed and marked passing
+- Port 3000 used this session
+
 ## Session 2026-02-16 - Feature #150
 
 ### Feature #150: Bookmarked pages load correctly after session refresh - PASSING
