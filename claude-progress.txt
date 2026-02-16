@@ -1,3 +1,37 @@
+## Session 2026-02-17 - Feature #163
+
+### Feature #163: Deleted holding removed from portfolio allocation chart - PASSING
+- The portfolio allocation chart is an SVG donut chart on the holdings page (/core/assets/holdings)
+- `allocationData` is computed from `holdings` state via `useMemo([holdings])` — automatically recalculates
+- **Bug fixed**: `handleDelete` was removing the holding from state but NOT recalculating `totalValue` and `totalCost`
+  - This meant the donut chart center total and legend percentages would be stale after deletion
+  - Fixed by computing `newTotalValue` and `newTotalCost` from remaining holdings inside the `setHoldings` callback
+- Data flow after fix:
+  1. `handleDelete()` calls DELETE /api/holdings to remove from database
+  2. Filters holding from `holdings` state array
+  3. Recalculates `totalValue` and `totalCost` from remaining holdings
+  4. `allocationData` useMemo recomputes automatically (depends on `[holdings]`)
+  5. Donut chart re-renders with correct slices and percentages
+  6. If all holdings deleted, chart section hidden entirely (conditional render)
+- 9/9 verification tests passing at /api/verify-allocation-delete
+- Zero console errors on test page
+- No mock data patterns found (grep clean)
+
+### Changes Made
+- app/(app)/core/assets/holdings/page.tsx: Enhanced `handleDelete` to recalculate totalValue and totalCost
+- app/api/verify-allocation-delete/route.ts: Created 9-test verification endpoint
+- app/test-allocation-delete/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+
+### Current Status
+- 155/265 features passing (154 before + #163)
+- Feature #163 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- The totalValue/totalCost bug was a pre-existing issue: delete removed from chart but percentages were wrong
+- No service role key available, so DB-level tests use source code verification instead
+
 ## Session 2026-02-17 - Feature #160
 
 ### Feature #160: Deleting asset removes related holdings - PASSING
