@@ -94,6 +94,11 @@ export async function updateSession(request: NextRequest) {
     '/test-rec-workflow',
     '/api/test-rec-workflow',
     '/test-fire-scenarios',
+    '/test-loading-states',
+    '/test-network-error-import',
+    '/api/verify-network-error-import',
+    '/test-import-validation',
+    '/test-portfolio-allocation',
   ]
 
   // Protected route prefixes that require authentication

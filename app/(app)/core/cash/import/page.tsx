@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowLeft, Upload, FileText, Check, AlertTriangle, X,
-  ChevronRight, Loader2,
+  ChevronRight, Loader2, WifiOff, RefreshCw,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { parseMT940 } from '@/lib/parsers/mt940'
@@ -30,6 +30,28 @@ type ImportRow = ParsedTransaction & {
   skipImport: boolean
 }
 
+function isNetworkFailure(err: unknown): boolean {
+  if (err instanceof TypeError && (
+    err.message.includes('Failed to fetch') ||
+    err.message.includes('NetworkError') ||
+    err.message.includes('Network request failed') ||
+    err.message.includes('Load failed')
+  )) {
+    return true
+  }
+  if (err instanceof DOMException && err.name === 'AbortError') {
+    return true
+  }
+  // Supabase client errors with network-related messages
+  if (err && typeof err === 'object' && 'message' in err) {
+    const msg = String((err as { message: string }).message).toLowerCase()
+    if (msg.includes('fetch') || msg.includes('network') || msg.includes('timeout') || msg.includes('econnrefused') || msg.includes('enotfound')) {
+      return true
+    }
+  }
+  return false
+}
+
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('nl-NL', {
     style: 'currency',
@@ -51,6 +73,9 @@ export default function ImportPage() {
   const [loading, setLoading] = useState(true)
   const [parsing, setParsing] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 })
+  const [importedBatchIndex, setImportedBatchIndex] = useState(0)
+  const [isNetworkError, setIsNetworkError] = useState(false)
   const [error, setError] = useState('')
   const [fileName, setFileName] = useState('')
   const [detectedFormat, setDetectedFormat] = useState<'mt940' | 'csv' | 'ofx' | 'unknown'>('mt940')
@@ -61,8 +86,12 @@ export default function ImportPage() {
   const [showColumnMapping, setShowColumnMapping] = useState(false)
   const [corrections, setCorrections] = useState<CategoryCorrection[]>([])
 
-  useEffect(() => {
-    async function init() {
+  const loadInitialData = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    setIsNetworkError(false)
+
+    try {
       const supabase = createClient()
 
       const [accountsRes, budgetsRes, correctionsRes] = await Promise.all([
@@ -70,6 +99,15 @@ export default function ImportPage() {
         supabase.from('budgets').select('*').order('sort_order'),
         supabase.from('category_corrections').select('match_field, match_value, budget_id'),
       ])
+
+      // Check for network errors in any of the responses
+      const anyError = accountsRes.error || budgetsRes.error || correctionsRes.error
+      if (anyError && isNetworkFailure(anyError)) {
+        setError('Kan geen verbinding maken met de server. Controleer je internetverbinding.')
+        setIsNetworkError(true)
+        setLoading(false)
+        return
+      }
 
       if (accountsRes.data) {
         setAccounts(accountsRes.data as Account[])
@@ -94,10 +132,20 @@ export default function ImportPage() {
       }
 
       setLoading(false)
+    } catch (err) {
+      if (isNetworkFailure(err)) {
+        setError('Kan geen verbinding maken met de server. Controleer je internetverbinding.')
+        setIsNetworkError(true)
+      } else {
+        setError('Fout bij het laden van gegevens. Probeer het opnieuw.')
+      }
+      setLoading(false)
     }
-
-    init()
   }, [])
+
+  useEffect(() => {
+    loadInitialData()
+  }, [loadInitialData])
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -112,6 +160,19 @@ export default function ImportPage() {
       setFileContent(content)
       const format = detectFormat(content, file.name)
       setDetectedFormat(format)
+
+      // Get file extension for error messages
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || ''
+
+      if (format === 'unknown') {
+        setError(
+          `Ongeldig bestandsformaat${fileExt ? ` (.${fileExt})` : ''}. ` +
+          'Dit bestand wordt niet herkend als een geldig bankbestand. ' +
+          'Ondersteunde formaten: MT940 (.sta, .mt940), CSV (.csv), OFX (.ofx, .qfx).'
+        )
+        setParsing(false)
+        return
+      }
 
       if (format === 'csv') {
         // For CSV: detect delimiter and show column mapping
@@ -136,13 +197,31 @@ export default function ImportPage() {
 
       let parsed: ParsedTransaction[] = []
       if (format === 'mt940') {
-        parsed = await parseMT940(content)
+        try {
+          parsed = await parseMT940(content)
+        } catch (parseErr) {
+          console.error('MT940 parse error:', parseErr)
+          setError(
+            'Fout bij het verwerken van het MT940-bestand. ' +
+            'Het bestand lijkt beschadigd of heeft een ongeldig formaat. ' +
+            'Controleer of het een geldig MT940-bankafschrift is.'
+          )
+          setParsing(false)
+          return
+        }
       } else if (format === 'ofx') {
-        parsed = await parseOFX(content)
-      } else {
-        setError('Onbekend bestandsformaat. Ondersteunde formaten: MT940 (.sta), CSV (.csv), OFX (.ofx/.qfx)')
-        setParsing(false)
-        return
+        try {
+          parsed = await parseOFX(content)
+        } catch (parseErr) {
+          console.error('OFX parse error:', parseErr)
+          setError(
+            'Fout bij het verwerken van het OFX-bestand. ' +
+            'Het bestand lijkt beschadigd of heeft een ongeldig formaat. ' +
+            'Controleer of het een geldig OFX/QFX-bankafschrift is.'
+          )
+          setParsing(false)
+          return
+        }
       }
 
       if (parsed.length === 0) {
@@ -167,8 +246,12 @@ export default function ImportPage() {
       setRows(importRows)
       setStep(2)
     } catch (err) {
-      setError('Fout bij het verwerken van het bestand. Controleer het formaat.')
-      console.error(err)
+      console.error('File processing error:', err)
+      setError(
+        'Fout bij het verwerken van het bestand. ' +
+        'Het bestand is mogelijk beschadigd of niet in een ondersteund formaat. ' +
+        'Ondersteunde formaten: MT940, CSV, OFX/QFX.'
+      )
     }
 
     setParsing(false)
@@ -183,7 +266,11 @@ export default function ImportPage() {
       const parsed = await parseCSV(fileContent, csvPreset)
 
       if (parsed.length === 0) {
-        setError('Geen transacties gevonden. Controleer de kolom-toewijzingen.')
+        setError(
+          'Geen geldige transacties gevonden in het CSV-bestand. ' +
+          'Het bestand is mogelijk beschadigd of de kolom-toewijzingen kloppen niet. ' +
+          'Controleer of het bestand geldige datum- en bedragkolommen bevat.'
+        )
         setParsing(false)
         return
       }
@@ -203,8 +290,12 @@ export default function ImportPage() {
       setRows(importRows)
       setStep(2)
     } catch (err) {
-      setError('Fout bij het verwerken van het CSV-bestand.')
-      console.error(err)
+      console.error('CSV parse error:', err)
+      setError(
+        'Fout bij het verwerken van het CSV-bestand. ' +
+        'Het bestand lijkt beschadigd of heeft een onverwacht formaat. ' +
+        'Controleer of het een geldig CSV-bestand van je bank is.'
+      )
     }
 
     setParsing(false)
@@ -277,35 +368,88 @@ export default function ImportPage() {
   }
 
   async function checkDuplicates() {
+    setError('')
+    setIsNetworkError(false)
+
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+
+    let user: { id: string } | null = null
+    try {
+      const { data } = await supabase.auth.getUser()
+      user = data.user
+    } catch (err) {
+      if (isNetworkFailure(err)) {
+        setIsNetworkError(true)
+        setError('Geen internetverbinding. Controleer je netwerk en probeer het opnieuw.')
+      } else {
+        setError('Fout bij het controleren van je sessie.')
+      }
+      return
+    }
     if (!user) return
 
     const hashes = rows.map((r) => r.import_hash)
-    const { data: existing } = await supabase
-      .from('transactions')
-      .select('import_hash')
-      .eq('user_id', user.id)
-      .in('import_hash', hashes)
 
-    if (existing) {
-      const existingSet = new Set(existing.map((e) => e.import_hash))
-      setRows((prev) => prev.map((r) => ({
-        ...r,
-        isDuplicate: existingSet.has(r.import_hash),
-        skipImport: existingSet.has(r.import_hash) ? true : r.skipImport,
-      })))
+    try {
+      const { data: existing, error: queryError } = await supabase
+        .from('transactions')
+        .select('import_hash')
+        .eq('user_id', user.id)
+        .in('import_hash', hashes)
+
+      if (queryError) {
+        if (isNetworkFailure(queryError)) {
+          setIsNetworkError(true)
+          setError('Geen internetverbinding. Controleer je netwerk en probeer het opnieuw.')
+        } else {
+          setError(`Fout bij het controleren van duplicaten: ${queryError.message}`)
+        }
+        return
+      }
+
+      if (existing) {
+        const existingSet = new Set(existing.map((e) => e.import_hash))
+        setRows((prev) => prev.map((r) => ({
+          ...r,
+          isDuplicate: existingSet.has(r.import_hash),
+          skipImport: existingSet.has(r.import_hash) ? true : r.skipImport,
+        })))
+      }
+
+      setStep(3)
+    } catch (err) {
+      if (isNetworkFailure(err)) {
+        setIsNetworkError(true)
+        setError('Geen internetverbinding. Controleer je netwerk en probeer het opnieuw.')
+      } else {
+        setError('Onverwachte fout bij het controleren van duplicaten. Probeer het opnieuw.')
+      }
     }
-
-    setStep(3)
   }
 
-  async function handleImport() {
+  async function handleImport(retryFromBatch?: number) {
     setImporting(true)
     setError('')
+    setIsNetworkError(false)
 
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+
+    let user: { id: string } | null = null
+    try {
+      const { data } = await supabase.auth.getUser()
+      user = data.user
+    } catch (err) {
+      if (isNetworkFailure(err)) {
+        setError('Geen internetverbinding. Controleer je netwerk en probeer het opnieuw.')
+        setIsNetworkError(true)
+        setImporting(false)
+        return
+      }
+      setError('Fout bij het controleren van je sessie. Probeer het opnieuw.')
+      setImporting(false)
+      return
+    }
+
     if (!user) {
       setError('Niet ingelogd')
       setImporting(false)
@@ -315,7 +459,7 @@ export default function ImportPage() {
     const toImport = rows.filter((r) => !r.skipImport)
 
     const insertRows = toImport.map((r) => ({
-      user_id: user.id,
+      user_id: user!.id,
       account_id: selectedAccountId,
       date: r.date,
       amount: r.amount,
@@ -330,19 +474,71 @@ export default function ImportPage() {
       transaction_type: r.transaction_type,
     }))
 
-    // Insert in batches
-    for (let i = 0; i < insertRows.length; i += 50) {
-      const { error: insertError } = await supabase
-        .from('transactions')
-        .insert(insertRows.slice(i, i + 50))
+    // Calculate batches
+    const BATCH_SIZE = 50
+    const batches: typeof insertRows[] = []
+    for (let i = 0; i < insertRows.length; i += BATCH_SIZE) {
+      batches.push(insertRows.slice(i, i + BATCH_SIZE))
+    }
 
-      if (insertError) {
-        setError(`Fout bij importeren: ${insertError.message}`)
+    const startBatch = retryFromBatch ?? importedBatchIndex
+    setImportProgress({ current: startBatch * BATCH_SIZE, total: insertRows.length })
+
+    // Insert in batches, resuming from the last successful batch
+    for (let batchIdx = startBatch; batchIdx < batches.length; batchIdx++) {
+      try {
+        const { error: insertError } = await supabase
+          .from('transactions')
+          .insert(batches[batchIdx])
+
+        if (insertError) {
+          // Check if this is a network-related Supabase error
+          if (isNetworkFailure(insertError)) {
+            const imported = batchIdx * BATCH_SIZE
+            setImportedBatchIndex(batchIdx)
+            setImportProgress({ current: imported, total: insertRows.length })
+            setIsNetworkError(true)
+            setError(
+              imported > 0
+                ? `Netwerkfout: ${imported} van ${insertRows.length} transacties zijn al geïmporteerd. Controleer je verbinding en klik "Opnieuw proberen" om de rest te importeren.`
+                : 'Geen internetverbinding. Controleer je netwerk en probeer het opnieuw.'
+            )
+            setImporting(false)
+            return
+          }
+          // Non-network database error
+          setError(`Fout bij importeren: ${insertError.message}`)
+          setImporting(false)
+          return
+        }
+      } catch (err) {
+        // Catch network-level exceptions (fetch failures, timeouts)
+        const imported = batchIdx * BATCH_SIZE
+        setImportedBatchIndex(batchIdx)
+        setImportProgress({ current: imported, total: insertRows.length })
+
+        if (isNetworkFailure(err)) {
+          setIsNetworkError(true)
+          setError(
+            imported > 0
+              ? `Netwerkfout: ${imported} van ${insertRows.length} transacties zijn al geïmporteerd. Controleer je verbinding en klik "Opnieuw proberen" om de rest te importeren.`
+              : 'Geen internetverbinding. Controleer je netwerk en probeer het opnieuw.'
+          )
+        } else {
+          setError(`Onverwachte fout bij importeren. ${imported > 0 ? `${imported} transacties zijn al geïmporteerd.` : ''} Probeer het opnieuw.`)
+        }
         setImporting(false)
         return
       }
+
+      // Update progress after each successful batch
+      const progressCount = Math.min((batchIdx + 1) * BATCH_SIZE, insertRows.length)
+      setImportProgress({ current: progressCount, total: insertRows.length })
+      setImportedBatchIndex(batchIdx + 1)
     }
 
+    // Reset batch tracking on success
+    setImportedBatchIndex(0)
     setStep(4)
     setImporting(false)
   }
@@ -353,11 +549,39 @@ export default function ImportPage() {
   const totalBij = rows.filter((r) => !r.skipImport && r.amount > 0).reduce((s, r) => s + r.amount, 0)
   const totalAf = rows.filter((r) => !r.skipImport && r.amount < 0).reduce((s, r) => s + r.amount, 0)
 
-  if (loading) {
+  if (loading && !error) {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+        </div>
+      </div>
+    )
+  }
+
+  if (loading && error) {
+    return (
+      <div className="mx-auto max-w-6xl px-6 py-12">
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className={`rounded-lg border p-6 text-center ${
+            isNetworkError
+              ? 'border-orange-200 bg-orange-50'
+              : 'border-red-200 bg-red-50'
+          }`}>
+            {isNetworkError && <WifiOff className="mx-auto mb-3 h-8 w-8 text-orange-500" />}
+            <p className={`text-sm ${isNetworkError ? 'text-orange-800' : 'text-red-700'}`}>
+              {error}
+            </p>
+            <button
+              onClick={loadInitialData}
+              className={`mt-4 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white ${
+                isNetworkError ? 'bg-orange-600 hover:bg-orange-700' : 'bg-red-600 hover:bg-red-700'
+              }`}
+            >
+              <RefreshCw className="h-4 w-4" />
+              Opnieuw proberen
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -403,8 +627,51 @@ export default function ImportPage() {
       </div>
 
       {error && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
+        <div className={`mb-6 rounded-lg border p-4 text-sm ${
+          isNetworkError
+            ? 'border-orange-200 bg-orange-50 text-orange-800'
+            : 'border-red-200 bg-red-50 text-red-700'
+        }`}>
+          <div className="flex items-start gap-3">
+            {isNetworkError && <WifiOff className="mt-0.5 h-5 w-5 flex-shrink-0 text-orange-500" />}
+            <div className="flex-1">
+              <p>{error}</p>
+              {isNetworkError && (
+                <button
+                  onClick={() => {
+                    if (step === 3 && importedBatchIndex > 0) {
+                      handleImport(importedBatchIndex)
+                    } else if (step === 3) {
+                      handleImport()
+                    } else if (step === 2) {
+                      checkDuplicates()
+                    } else {
+                      setError('')
+                      setIsNetworkError(false)
+                    }
+                  }}
+                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Opnieuw proberen
+                </button>
+              )}
+            </div>
+          </div>
+          {isNetworkError && importProgress.total > 0 && importProgress.current > 0 && (
+            <div className="mt-3">
+              <div className="flex justify-between text-xs text-orange-600 mb-1">
+                <span>{importProgress.current} van {importProgress.total} geïmporteerd</span>
+                <span>{Math.round((importProgress.current / importProgress.total) * 100)}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-orange-200">
+                <div
+                  className="h-2 rounded-full bg-orange-500 transition-all"
+                  style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -732,7 +999,7 @@ export default function ImportPage() {
               <span className="text-orange-600"><strong>{dupCount}</strong> duplicaten</span>
             </div>
             <button
-              onClick={handleImport}
+              onClick={() => handleImport()}
               disabled={importing || toImportCount === 0}
               className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
             >
@@ -749,6 +1016,21 @@ export default function ImportPage() {
               )}
             </button>
           </div>
+
+          {importing && importProgress.total > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <div className="flex justify-between text-xs text-amber-700 mb-1">
+                <span>Importeren: {importProgress.current} van {importProgress.total} transacties...</span>
+                <span>{Math.round((importProgress.current / importProgress.total) * 100)}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-amber-200">
+                <div
+                  className="h-2 rounded-full bg-amber-500 transition-all"
+                  style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
 
           {dupCount > 0 && (
             <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-700">
