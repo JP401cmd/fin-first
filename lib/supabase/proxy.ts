@@ -195,6 +195,10 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-deleted-holding',
     '/test-direct-identity',
     '/api/verify-direct-identity',
+    '/test-special-chars-url',
+    '/api/verify-special-chars-url',
+    '/test-bookmark-belasting',
+    '/api/verify-bookmark-belasting',
   ]
 
   // Protected route prefixes that require authentication
