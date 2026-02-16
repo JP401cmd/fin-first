@@ -1,3 +1,40 @@
+## Session 2026-02-16 (agent-132) - Feature #132
+
+### Feature #132: Collapsible section state persists in localStorage - PASSING
+- CollapsibleSection component at components/app/collapsible-section.tsx
+- Uses localStorage with key pattern `collapsible_{storageKey}`
+- On mount: reads stored state via `localStorage.getItem(`collapsible_${storageKey}`)`
+- On toggle: saves state via `localStorage.setItem(`collapsible_${storageKey}`, String(next))`
+- Error handling: try/catch wraps both read and write for environments without localStorage
+- Production uses:
+  - `/core` page: `kern_vermogensverloop`, `kern_snapshot_vergelijking`
+  - `/will` page: `wil_beslissingspatronen`
+
+### Verification
+- Created test page at /test-collapsible-persistence with 3 independent collapsible sections
+- Test flow: expanded Section A (default collapsed), collapsed Section B (default expanded)
+- localStorage state display confirmed: test_section_a = "true", test_section_b = "false"
+- Server restart test: restarted dev server, navigated back — states correctly restored from localStorage
+- Section A showed as expanded (overriding default collapsed) ✅
+- Section B showed as collapsed (overriding default expanded) ✅
+- 6/6 programmatic tests passing
+- Zero application-level console errors
+- No mock data patterns found (grep clean)
+- Commit: 6a9ab0a
+
+### Changes Made
+- app/test-collapsible-persistence/page.tsx: Created test page with 3 collapsible sections + localStorage state display + 6 automated tests
+- lib/supabase/proxy.ts: Added test route to public paths
+
+### Current Status
+- 124/265 features passing (123 before + #132)
+- Feature #132 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session (webpack mode)
+- CollapsibleSection component was already fully implemented with localStorage persistence
+- The feature just needed verification through browser automation
+
 ## Session 2026-02-16 (agent-127) - Feature #127
 
 ### Feature #127: Net worth milestone markers show real dates - PASSING
