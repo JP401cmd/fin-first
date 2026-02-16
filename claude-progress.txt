@@ -1,3 +1,53 @@
+## Session 2026-02-16 (agent-127) - Feature #127
+
+### Feature #127: Net worth milestone markers show real dates - PASSING
+- NetWorthChart component at app/(app)/core/page.tsx lines 904-1099
+- SVG chart renders 3 lines (assets, debts, net_worth) with milestone diamond markers
+- getNetWorthMilestones() generates milestones: €0+ ("In de plus"), €10k-€1M, FIRE percentages
+- detectMilestones() scans real snapshot history to find first crossing of each threshold
+- Each milestone's achievedDate comes from crossingSnapshot.snapshot_date (real Supabase data)
+- snapshotNetWorth reflects the actual net_worth value at the crossing point
+- Badge integration: badgeSlug maps to user_badges.earned_at via badgeMap
+- Tooltip shows achievedDate formatted in nl-NL locale (day month year)
+- Milestone summary badges below chart also show real achievedDate
+- FIRE milestone badge slugs: positive_net_worth, fire_10_pct, fire_25_pct, fire_50_pct, fire_100_pct
+- Data flow: core/page.tsx line 189 fetches snapshots from Supabase → line 542 passes to NetWorthChart
+- Lines 229-238 fetch earned badges from badges + user_badges tables
+
+### Verification
+- API endpoint /api/verify-milestone-markers: 12/12 tests passing
+  1. Snapshots table queryable ✅
+  2. Snapshot schema correct (all required columns) ✅
+  3. "In de plus" milestone uses real snapshot date (2025-03-22) ✅
+  4. Amount milestones use correct real snapshot dates (€10k, €25k, €50k) ✅
+  5. snapshotNetWorth reflects real NW at crossing (4000, 14000) ✅
+  6. FIRE milestones use real snapshot dates (10%, 25%) ✅
+  7. Badge earned_at linked to milestone via badgeSlug ✅
+  8. Non-badge milestones have no badgeEarnedAt ✅
+  9. Badge tables accessible for chart integration ✅
+  10. FIRE milestone badge slugs linked in chart milestones ✅
+  11. No milestones from empty snapshots ✅
+  12. Milestone tooltip formats date in nl-NL locale ✅
+- Test page /test-milestone-markers: 12/12 visual tests passing
+- Visual verification via Playwright screenshot: all green checkmarks visible
+- Zero console errors (only React DevTools info + HMR messages)
+- No mock data patterns found (grep clean)
+
+### Changes Made
+- app/api/verify-milestone-markers/route.ts: Enhanced with 12 comprehensive tests
+- app/test-milestone-markers/page.tsx: Visual test page (already existed, no changes needed)
+- Commit: 50f1ea2
+
+### Current Status
+- 123/265 features passing (122 before + #127)
+- Feature #127 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- Turbopack build-manifest.json errors on Windows: restart server or use webpack mode
+- Pre-warm routes with curl before Playwright to avoid 404 from route registration lag
+- Badge seeding via POST /api/badges/seed requires authentication
+
 ## Session 2026-02-16 - Feature #117
 
 ### Feature #117: Badge grid shows database-driven badge status - PASSING
