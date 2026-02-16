@@ -1,3 +1,31 @@
+## Session 2026-02-16 (agent-129) - Feature #129
+
+### Feature #129: Box 3 tax optimization reflects real calculations - PASSING
+- Box 3 calculation engine in lib/box3-data.ts is a pure function — no mock data
+- belasting page loads real assets/debts from Supabase: supabase.from('assets').select('*')
+- calculateBox3() uses Number(asset.current_value) from real DB rows
+- generateBox3Optimizations() uses calculateBox3WithShift() to compute real savings
+- Optimization savings displayed as "vrijheidsdagen" (freedom days) = besparing / dailyExpenses
+- 11/11 verification tests passing via /api/verify-box3-optimization
+  - Data loads from Supabase (no errors)
+  - Tax calculation uses actual asset portfolio values
+  - Savings-only €100k → correct tax (€208.70)
+  - Mixed portfolio €30k savings + €80k investments → correct tax (€875.77)
+  - Eigen huis excluded from Box 3
+  - Shift-to-savings optimization reduces tax (€386.09 savings)
+  - Partner optimization doubles heffingsvrij (€596.68 savings)
+  - Freedom days = besparing / daily expenses (correctly calculated)
+  - Year toggle changes tax (2025: €644.60 vs 2026: €622.92)
+  - Changing asset value changes tax (€50k: €0, €200k: €3012.55)
+  - Official Box 3 parameters are valid
+- Zero console errors
+- No mock data patterns found in production code
+- Commit: bbc5469
+
+### Current Status
+- 126/265 features passing (125 before + #129)
+- Feature #129 completed and committed
+
 ## Session 2026-02-16 (agent-132) - Feature #132
 
 ### Feature #132: Collapsible section state persists in localStorage - PASSING
