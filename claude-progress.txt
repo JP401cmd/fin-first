@@ -1,3 +1,29 @@
+## Session 2026-02-16 - Feature #122
+
+### Feature #122: FIRE projection uses real financial inputs - PASSING
+- Horizon page at app/(app)/horizon/page.tsx is a client component that loads all financial data from Supabase
+- 9 parallel Supabase queries: transactions, assets, debts, profiles, budgets(essential), budgets(children), life_events, actions, full debts
+- HorizonInput computed from real aggregated DB data: monthlyIncome, monthlyExpenses, totalAssets, totalDebts, monthlyContributions, yearlyMustExpenses, dateOfBirth
+- computeFireProjection() in lib/horizon-data.ts is pure computation (no DB dependency), takes HorizonInput
+- FIRE target = (monthlyExpenses × 12) / 0.04 (4% SWR rule)
+- Net worth = totalAssets - totalDebts
+- Month-by-month projection with inflation-adjusted real returns
+- projectForward() generates 360-month chart data for SVG ProjectionChart component
+- Income override mechanism: incomeOverride state, effectiveInput derivation, useEffect recalculation
+- Pencil edit button next to "Maandinkomen", onBlur/onKeyDown handlers update incomeOverride
+- "(aangepast)" label shown when income is overridden, "Reset naar werkelijk" button restores original
+- Created /api/verify-fire-inputs with 10 comprehensive tests - all passing
+- Updated /test-fire-inputs page to match API response format
+- Visual verification: all 10 green checkmarks in browser
+- Zero console errors (0 errors, 0 warnings)
+- Mock data grep: clean - only legitimate "sampleData" function for chart downsampling in scenarios-modal.tsx
+- No hardcoded financial values - all zeros when no user data (proves no fallbacks)
+- Commit: 3fba3ba
+
+### Current Status
+- 117/265 features passing (116 before + #122)
+- Feature #122 completed and committed
+
 ## Session 2026-02-16 - Feature #124
 
 ### Feature #124: Budget spending trend uses real 12-month transaction data - PASSING
