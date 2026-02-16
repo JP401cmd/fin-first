@@ -877,19 +877,27 @@ function DebtForm({
     }
 
     if (isEdit && debt) {
-      await supabase.from('debts').update(row).eq('id', debt.id)
+      // When balance reaches 0, mark debt as paid off
+      const editRow = { ...row } as Record<string, unknown>
+      if ((Number(currentBalance) || 0) <= 0) {
+        editRow.is_active = false
+      }
+      await supabase.from('debts').update(editRow).eq('id', debt.id)
 
       // Auto-track valuation when current_balance changes
       const newBalance = Number(currentBalance) || 0
       const oldBalance = Number(debt.current_balance)
-      if (newBalance !== oldBalance && newBalance > 0) {
+      if (newBalance !== oldBalance) {
+        const valuationNotes = newBalance <= 0
+          ? `Schuld afgelost! Saldo bijgewerkt van ${oldBalance} naar ${newBalance}`
+          : `Saldo bijgewerkt van ${oldBalance} naar ${newBalance}`
         await supabase.from('valuations').upsert({
           user_id: user.id,
           entity_type: 'debt',
           entity_id: debt.id,
           valuation_date: new Date().toISOString().split('T')[0],
           value: newBalance,
-          notes: `Saldo bijgewerkt van ${oldBalance} naar ${newBalance}`,
+          notes: valuationNotes,
         }, { onConflict: 'entity_id,valuation_date' })
       }
     } else {
@@ -1229,7 +1237,15 @@ function ValuationModal({
 
     const table = entityType === 'asset' ? 'assets' : 'debts'
     const column = entityType === 'asset' ? 'current_value' : 'current_balance'
-    await supabase.from(table).update({ [column]: Number(value) }).eq('id', entityId)
+    const newValue = Number(value)
+    const updatePayload: Record<string, unknown> = { [column]: newValue }
+
+    // When a debt balance reaches 0, mark it as paid off (is_active = false)
+    if (entityType === 'debt' && newValue <= 0) {
+      updatePayload.is_active = false
+    }
+
+    await supabase.from(table).update(updatePayload).eq('id', entityId)
 
     setSaving(false)
     onSaved()

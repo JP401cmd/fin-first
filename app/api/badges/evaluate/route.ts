@@ -117,7 +117,7 @@ async function evaluateBadges(
     supabase.from('bank_accounts').select('id, balance').eq('user_id', userId),
     supabase.from('budgets').select('id, name, amount').eq('user_id', userId),
     supabase.from('transactions').select('id, amount, type, date, bank_account_id').eq('user_id', userId),
-    supabase.from('debts').select('id, current_balance, original_amount, name').eq('user_id', userId),
+    supabase.from('debts').select('id, current_balance, original_amount, name, is_active').eq('user_id', userId),
     supabase.from('assets').select('id, current_value, name, type').eq('user_id', userId),
     supabase.from('actions').select('id, status').eq('user_id', userId),
   ])
@@ -170,13 +170,18 @@ async function evaluateBadges(
     0
   )
   const totalDebt = debts.reduce(
-    (sum: number, d: { current_balance?: number }) => sum + (Number(d.current_balance) || 0),
+    (sum: number, d: { current_balance?: number; is_active?: boolean }) =>
+      d.is_active !== false ? sum + (Number(d.current_balance) || 0) : sum,
     0
   )
   const netWorth = totalAssets + totalCash - totalDebt
 
-  // debt_free: No debts
-  if (!existingEarned.has('debt_free') && debts.length === 0) {
+  // debt_free: No active debts (paid-off debts with is_active=false or current_balance=0 don't count)
+  const activeDebts = debts.filter(
+    (d: { is_active?: boolean; current_balance?: number }) =>
+      d.is_active !== false && Number(d.current_balance) > 0
+  )
+  if (!existingEarned.has('debt_free') && activeDebts.length === 0) {
     newlyEarned.push('debt_free')
   }
 
@@ -269,6 +274,7 @@ export async function POST(request: NextRequest) {
         newly_earned: [],
         total_earned: existingBadges.length,
         total_badges: BADGE_DEFINITIONS.length,
+        message: 'Geen nieuwe badges verdiend. Blijf groeien!',
         source,
       })
     }
@@ -303,6 +309,7 @@ export async function POST(request: NextRequest) {
       newly_earned: newlyEarnedDetails,
       total_earned: allBadges.length,
       total_badges: BADGE_DEFINITIONS.length,
+      message: `${newlyEarnedDetails.length} nieuwe badge${newlyEarnedDetails.length === 1 ? '' : 's'} verdiend!`,
       source,
     })
   } catch (err) {
@@ -311,6 +318,7 @@ export async function POST(request: NextRequest) {
       newly_earned: [],
       total_earned: 0,
       total_badges: BADGE_DEFINITIONS.length,
+      message: 'Er ging iets mis bij het evalueren van badges.',
       source: 'definitions',
       error: err instanceof Error ? err.message : 'Unknown error',
     })
