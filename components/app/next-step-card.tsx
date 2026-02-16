@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowRight, X, Lightbulb, Zap, Target, PiggyBank, ShoppingCart, Building2, Receipt, Compass, BarChart3, CheckCircle2 } from 'lucide-react'
 
@@ -136,6 +136,35 @@ export function NextStepEmptyCard({ moduleColor }: { moduleColor?: 'amber' | 'te
  */
 export function NextStepSection({ steps, moduleColor }: { steps: NextStepSuggestion[]; moduleColor?: 'amber' | 'teal' | 'purple' }) {
   const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set())
+  const [loaded, setLoaded] = useState(false)
+
+  // Load previously dismissed keys from database on mount
+  useEffect(() => {
+    let cancelled = false
+    async function loadDismissed() {
+      try {
+        const res = await fetch('/api/next-steps')
+        if (res.ok) {
+          const data = await res.json()
+          if (!cancelled && Array.isArray(data.dismissed_steps) && data.dismissed_steps.length > 0) {
+            setDismissedKeys(prev => {
+              const merged = new Set(prev)
+              for (const key of data.dismissed_steps) {
+                merged.add(key)
+              }
+              return merged
+            })
+          }
+        }
+      } catch {
+        // Silent fail — component still works with session-only dismissals
+      } finally {
+        if (!cancelled) setLoaded(true)
+      }
+    }
+    loadDismissed()
+    return () => { cancelled = true }
+  }, [])
 
   const handleDismiss = useCallback(async (step: NextStepSuggestion) => {
     const key = step.key || step.title
@@ -155,6 +184,11 @@ export function NextStepSection({ steps, moduleColor }: { steps: NextStepSuggest
 
   const visibleSteps = steps.filter(s => !dismissedKeys.has(s.key || s.title))
   const currentStep = visibleSteps.length > 0 ? visibleSteps[0] : null
+
+  // While loading dismissed state, show nothing to avoid flash of dismissed content
+  if (!loaded) {
+    return null
+  }
 
   if (!currentStep) {
     return <NextStepEmptyCard moduleColor={moduleColor} />

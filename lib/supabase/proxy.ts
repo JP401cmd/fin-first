@@ -185,6 +185,8 @@ export async function updateSession(request: NextRequest) {
     '/test-direct-access-assets',
     '/test-direct-budgets',
     '/api/verify-direct-budgets',
+    '/test-unauthenticated-redirect',
+    '/api/verify-unauthenticated-redirect',
   ]
 
   // Protected route prefixes that require authentication
