@@ -76,6 +76,11 @@ export async function updateSession(request: NextRequest) {
     '/test-csv-export',
     '/api/test-schema-validation',
     '/test-user-isolation',
+    '/test-budget-workflow',
+    '/api/apply-migration',
+    '/test-migration',
+    '/test-onboarding-workflow',
+    '/api/verify-onboarding',
   ]
 
   // Protected route prefixes that require authentication

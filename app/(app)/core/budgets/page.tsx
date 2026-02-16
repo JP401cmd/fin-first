@@ -15,6 +15,7 @@ import { type BudgetRollover, formatPeriod, getCarriedAmount, getPreviousPeriod,
 import { BudgetTree } from '@/components/app/budget-tree'
 import { BudgetBlob } from '@/components/app/budget-blob'
 import { BudgetSankey } from '@/components/app/budget-sankey'
+import { BudgetAlert, shouldAlert } from '@/components/app/budget-alert'
 
 export default function BudgetsPage() {
   const searchParams = useSearchParams()
@@ -406,6 +407,52 @@ export default function BudgetsPage() {
           </div>
         </div>
       </section>
+
+      {/* Budget alerts — shown when budgets are nearing or exceeding limit */}
+      {(() => {
+        const alertItems: { budget: Budget; parent: BudgetWithChildren; spent: number; limit: number }[] = []
+        for (const group of [...expenseBudgets, ...savingsBudgets, ...debtBudgets]) {
+          if (group.children.length > 0) {
+            for (const child of group.children) {
+              const childSpent = getSpent(child)
+              const childLimit = getEffectiveLimit(child)
+              const bt = (child.budget_type ?? group.budget_type ?? 'expense') as 'income' | 'expense' | 'savings' | 'debt'
+              if (shouldAlert(childSpent, childLimit, Number(child.alert_threshold ?? 80), bt)) {
+                alertItems.push({ budget: child, parent: group, spent: childSpent, limit: childLimit })
+              }
+            }
+          } else {
+            const groupSpent = getSpent(group)
+            const groupLimit = getEffectiveLimit(group)
+            const bt = (group.budget_type ?? 'expense') as 'income' | 'expense' | 'savings' | 'debt'
+            if (shouldAlert(groupSpent, groupLimit, Number(group.alert_threshold ?? 80), bt)) {
+              alertItems.push({ budget: group, parent: group, spent: groupSpent, limit: groupLimit })
+            }
+          }
+        }
+        if (alertItems.length === 0) return null
+        return (
+          <section className="mt-6">
+            <h3 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+              Aandachtspunten
+            </h3>
+            <div className="space-y-2">
+              {alertItems.map(({ budget, spent, limit }) => (
+                <BudgetAlert
+                  key={budget.id}
+                  budgetName={budget.name}
+                  budgetId={budget.id}
+                  spent={spent}
+                  limit={limit}
+                  threshold={Number(budget.alert_threshold ?? 80)}
+                  budgetType={(budget.budget_type ?? 'expense') as 'income' | 'expense' | 'savings' | 'debt'}
+                  onNavigate={(id) => openBudgetModal(id)}
+                />
+              ))}
+            </div>
+          </section>
+        )
+      })()}
 
       {/* View toggle + New budget button */}
       <div className="mt-6 flex items-center justify-between">
