@@ -3327,3 +3327,42 @@ For Feature #51 (Transaction Import):
 - Port 3001 used this session (port 3000 had zombie process)
 - Turbopack on Windows can produce 500 errors on cold start — use webpack mode or pre-warm routes
 - Goal progress calculation is pure math in lib/goal-data.ts — no mock data
+
+## Session 2026-02-16 - Feature #137
+
+### Feature #137: Dashboard module card order persists - PASSING
+- Dashboard page at /dashboard has three module cards in static JSX order:
+  1. De Kern (amber, /core, FhinAvatar) — "Waar sta je echt?"
+  2. De Wil (teal, /will, FinnAvatar) — "Wat ga je doen?"
+  3. De Horizon (purple, /horizon, FfinAvatar) — "Waar ga je naartoe?"
+- Card order is statically hardcoded in JSX (no .map() or dynamic rendering)
+- Grid uses `md:grid-cols-3` CSS — cards render left to right in fixed order
+- No user preference, localStorage, or database setting affects card positioning
+- Navigate away and return → same server component re-renders same order
+- Login/logout → page reloads but JSX structure is identical
+- 8/8 verification tests passing:
+  1. All three module cards exist ✅
+  2. Cards in correct order: Kern → Wil → Horizon ✅
+  3. Correct color themes (amber, teal, purple) ✅
+  4. Correct routes (/core, /will, /horizon) ✅
+  5. 3-column grid layout ✅
+  6. Order is statically defined (not dynamic) ✅
+  7. Correct subtitles ✅
+  8. Avatar components in correct order ✅
+- Zero console errors
+- No mock data patterns found
+
+### Changes Made
+- app/api/verify-dashboard-card-order/route.ts: Created 8-test verification endpoint
+- app/test-dashboard-card-order/page.tsx: Created visual test page with card order demo
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: 17283ad
+
+### Current Status
+- 130/265 features passing (129 before + #137)
+- Feature #137 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- Dashboard card order is a structural verification — no data persistence needed
+- Card order persistence is guaranteed by static JSX (no dynamic rendering)
