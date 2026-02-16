@@ -8,7 +8,7 @@ import { useChatContext } from './chat-provider'
 import { FhinAvatar, FinnAvatar, FfinAvatar } from '@/components/app/avatars'
 import { ActionEditModal } from '@/components/app/action-edit-modal'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
-import { X, Send, Loader2, Zap, Check } from 'lucide-react'
+import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw } from 'lucide-react'
 import type { AIDomain } from '@/lib/ai/dna/types'
 
 /* ── Domain config per module ─────────────────────────────────────── */
@@ -274,12 +274,13 @@ export function ChatPanel() {
     [domain],
   )
 
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, status, error, clearError, regenerate } = useChat({
     id: `chat-${domain}`,
     transport,
   })
 
   const isStreaming = status === 'streaming' || status === 'submitted'
+  const hasError = status === 'error' || !!error
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -444,6 +445,35 @@ export function ChatPanel() {
     return elements
   }
 
+  /* ── Error helpers ────────────────────────────────────────────── */
+
+  function getErrorMessage(err: Error | undefined): string {
+    if (!err) return 'Er ging iets mis. Probeer het opnieuw.'
+    const msg = err.message?.toLowerCase() ?? ''
+    if (msg.includes('timeout') || msg.includes('duurde te lang') || msg.includes('504')) {
+      return 'Het AI-antwoord duurde te lang. Probeer het opnieuw met een kortere vraag.'
+    }
+    if (msg.includes('unauthorized') || msg.includes('401')) {
+      return 'Je sessie is verlopen. Log opnieuw in.'
+    }
+    if (msg.includes('api key') || msg.includes('422') || msg.includes('niet geconfigureerd')) {
+      return 'De AI is niet geconfigureerd. Controleer de API-sleutel in Admin instellingen.'
+    }
+    if (msg.includes('network') || msg.includes('failed to fetch') || msg.includes('fetch')) {
+      return 'Geen verbinding met de server. Controleer je internetverbinding en probeer het opnieuw.'
+    }
+    return 'Er ging iets mis bij het genereren van een antwoord. Probeer het opnieuw.'
+  }
+
+  const handleRetry = useCallback(() => {
+    clearError()
+    regenerate()
+  }, [clearError, regenerate])
+
+  const handleDismissError = useCallback(() => {
+    clearError()
+  }, [clearError])
+
   /* ── FAB ──────────────────────────────────────────────────────── */
 
   if (!isOpen) {
@@ -540,6 +570,39 @@ export function ChatPanel() {
               </div>
               <div className={`rounded-2xl px-3 py-2 ${config.bubbleBg}`}>
                 <Loader2 className={`h-4 w-4 animate-spin ${config.accentColor}`} />
+              </div>
+            </div>
+          )}
+
+          {/* Error banner with retry */}
+          {hasError && (
+            <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-3" data-testid="chat-error-banner">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-red-800">
+                    {getErrorMessage(error)}
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleRetry}
+                      className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-200"
+                      data-testid="chat-retry-button"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      Opnieuw proberen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDismissError}
+                      className="rounded-lg px-3 py-1.5 text-xs text-red-500 transition-colors hover:bg-red-100"
+                      data-testid="chat-dismiss-error"
+                    >
+                      Sluiten
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
