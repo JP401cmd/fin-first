@@ -1,4 +1,44 @@
-## Session 2026-02-16 (latest) - Feature #2 Database Schema - SKIPPED (3rd time)
+## Session 2026-02-16 (latest) - Feature #101
+
+### Feature #101: Invalid file format rejected during import - PASSING
+- Enhanced error handling in import page (app/(app)/core/cash/import/page.tsx):
+  - Unknown format detection now shows file extension in error message (e.g., "Ongeldig bestandsformaat (.txt)")
+  - MT940 parser errors caught individually with specific error about corrupted MT940 files
+  - OFX parser errors caught individually with specific error about corrupted OFX files
+  - CSV parse failures show helpful message about corrupted files or wrong column mappings
+  - Generic catch-all error mentions supported formats
+- Improved CSV parser date validation (lib/parsers/csv.ts):
+  - Changed from simple length === 10 check to regex pattern /^\d{4}-\d{2}-\d{2}$/
+  - Prevents garbage strings that happen to be 10 chars from being accepted as valid dates
+- Created test page at /test-import-validation with 8 automated tests:
+  1. TXT with random content → "Ongeldig bestandsformaat (.txt)" ✅
+  2. PDF file → "Ongeldig bestandsformaat (.pdf)" ✅
+  3. DOCX file → "Ongeldig bestandsformaat (.docx)" ✅
+  4. Corrupted CSV → "Geen geldige transacties gevonden" with helpful guidance ✅
+  5. TXT with MT940 markers → correctly detected as MT940 ✅
+  6. Empty file → "Ongeldig bestandsformaat" ✅
+  7. Error message mentions supported formats ✅
+  8. Valid CSV → no error (correct!) ✅
+- Zero console errors during testing
+- No mock data patterns found
+- Browser verified: 8/8 tests passing with visual confirmation
+
+### Changes Made
+- app/(app)/core/cash/import/page.tsx: Enhanced error handling for unknown formats, corrupted files
+- lib/parsers/csv.ts: Improved date validation with regex pattern
+- app/test-import-validation/page.tsx: Created test page with 8 automated tests
+- lib/supabase/proxy.ts: Added test route to public paths
+
+### Current Status
+- 93/265 features passing (92 before + #101)
+- Feature #101 completed and marked passing
+
+### Notes for Next Session
+- Turbopack on Windows: always rm -rf .next before starting
+- Autoforge system auto-commits file changes - check git log to avoid duplicate commits
+- Import page error handling is comprehensive: format detection, parser errors, CSV validation
+
+## Session 2026-02-16 - Feature #2 Database Schema - SKIPPED (3rd time)
 
 ### Feature #2: Database schema applied correctly - SKIPPED (BLOCKED)
 - BLOCKER: Supabase MCP server (https://mcp.supabase.com/mcp?project_ref=pnnuqwdcgoympgddrvze) returns HTTP 401
