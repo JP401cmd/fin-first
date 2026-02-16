@@ -147,13 +147,33 @@ export default function ImportPage() {
     loadInitialData()
   }, [loadInitialData])
 
+  // Maximum file size: 10 MB
+  const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
+  const MAX_FILE_SIZE_LABEL = '10 MB'
+
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
 
     setFileName(file.name)
-    setParsing(true)
     setError('')
+
+    // File size validation
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1)
+      setError(
+        `Het bestand "${file.name}" is te groot (${fileSizeMB} MB). ` +
+        `De maximale bestandsgrootte is ${MAX_FILE_SIZE_LABEL}. ` +
+        'Probeer een kleiner bestand te uploaden of splits het bestand op in meerdere delen.'
+      )
+      // Reset the file input so user can try again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      return
+    }
+
+    setParsing(true)
 
     try {
       const content = await file.text()
@@ -722,6 +742,7 @@ export default function ImportPage() {
                   />
                 </label>
                 <p className="mt-3 text-xs text-zinc-400">Ondersteunde formaten: MT940 (.sta, .mt940), CSV (.csv), OFX (.ofx, .qfx)</p>
+                <p className="mt-1 text-xs text-zinc-400">Maximale bestandsgrootte: {MAX_FILE_SIZE_LABEL}</p>
               </>
             )}
           </div>

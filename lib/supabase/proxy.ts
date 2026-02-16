@@ -120,6 +120,9 @@ export async function updateSession(request: NextRequest) {
     '/test-negative-validation',
     '/test-concurrent-edit',
     '/api/verify-concurrent-edit',
+    '/test-file-size-limit',
+    '/test-dashboard-kpis',
+    '/api/verify-dashboard-kpis',
   ]
 
   // Protected route prefixes that require authentication
