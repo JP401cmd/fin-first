@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { NextStepCard, NextStepSection, NextStepEmptyCard, type NextStepSuggestion } from '@/components/app/next-step-card'
 
-const MOCK_STEPS: NextStepSuggestion[] = [
+const FIXTURE_STEPS: NextStepSuggestion[] = [
   {
     key: 'import_transactions',
     title: 'Importeer je transacties',
@@ -81,7 +81,7 @@ export default function TestNextStepDismissPage() {
         <h2 className="text-lg font-semibold mb-3">1. De Kern — NextStepSection (3 steps, dismiss enabled)</h2>
         <p className="text-xs text-zinc-400 mb-2">Click X to dismiss. Next suggestion should appear. After all dismissed, empty state shows.</p>
         <div data-testid="kern-section">
-          <NextStepSection steps={MOCK_STEPS} moduleColor="amber" />
+          <NextStepSection steps={FIXTURE_STEPS} moduleColor="amber" />
         </div>
       </section>
 
