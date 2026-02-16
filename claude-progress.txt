@@ -1,3 +1,33 @@
+## Session 2026-02-16 - Feature #134
+
+### Feature #134: New feature spotlight shows only once per feature - PASSING
+- Changed NewFeatureSpotlight component from sessionStorage to localStorage
+- Key pattern: `spotlight_seen_${featureId}` — persists across browser sessions
+- Initial state set to false (useState(false)) to prevent flash before localStorage check
+- Seen marker written immediately on first show via localStorage.setItem, not after 8s timeout
+- Spotlight still auto-dismisses visually after 8 seconds (setTimeout)
+- Fallback for environments without localStorage: show briefly then dismiss
+- No sessionStorage references remain in the component (regression-proof)
+- 14/14 tests passing: 8 server-side (source analysis) + 6 client-side (localStorage operations)
+- Zero console errors
+- No mock data patterns found
+
+### Changes Made
+- components/app/feature-gate.tsx: Changed NewFeatureSpotlight to use localStorage instead of sessionStorage
+- app/api/verify-spotlight-persistence/route.ts: Created 8-test verification endpoint
+- app/test-spotlight-persistence/page.tsx: Created visual test page with 14 total tests
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: c82608a
+
+### Current Status
+- 126/265 features passing (125 before + #134)
+- Feature #134 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- NewFeatureSpotlight localStorage key format: spotlight_seen_{featureId}
+- The spotlight wrapping is triggered by FeatureGate when featureId is in newlyUnlockedFeatures array
+
 ## Session 2026-02-16 (agent-128-s3) - Feature #128
 
 ### Feature #128: Portfolio allocation donut uses real holding composition - PASSING
