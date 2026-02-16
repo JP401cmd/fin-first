@@ -1,3 +1,35 @@
+## Session 2026-02-16 - Feature #133
+
+### Feature #133: Feature visit tracking persists across sessions - PASSING
+- user_feature_visits table exists in Supabase with correct columns (id, user_id, feature_slug, visit_count, first_visited_at)
+- RLS policies enforce user_id = auth.uid() on SELECT, INSERT, UPDATE
+- GET /api/feature-visits returns visits array with auth check, returns 401 for unauthenticated
+- POST /api/feature-visits with UPSERT logic (create or increment visit_count), validates feature_slug
+- DiscoverCarousel syncs from API on mount via fetchVisitedFromApi(), merges localStorage + database
+- Triple-write on click: handleClick() writes to state + localStorage + API simultaneously
+- Hybrid persistence: localStorage for instant UX, database for cross-session persistence
+- Database records keyed by user_id (UUID) survive logout/login cycles
+- DiscoverCarousel rendered on all 3 module pages: /core, /will, /horizon
+- Visited items shown faded (opacity-60, gray styling), unvisited items shown first with module colors
+- 10/10 verification tests passing via /api/verify-feature-visit-persistence
+- Visual verification via Playwright: all green checkmarks visible, zero console errors
+- Zero mock data patterns found in production code
+- Commit: 8187f68
+
+### Changes Made
+- app/api/verify-feature-visit-persistence/route.ts: Created 10-test verification endpoint
+- app/test-feature-visit-persistence/page.tsx: Created visual test page
+
+### Current Status
+- 126/265 features passing (125 before + #133)
+- Feature #133 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- No authenticated test users available for full browser flow testing (Supabase email rate limit)
+- Feature visit persistence architecture: localStorage (instant) + Supabase database (cross-session)
+- DiscoverCarousel component at components/app/discover-carousel.tsx handles all visit tracking UI
+
 ## Session 2026-02-16 - Feature #134
 
 ### Feature #134: New feature spotlight shows only once per feature - PASSING
