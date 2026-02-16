@@ -1,3 +1,49 @@
+## Session 2026-02-17 - Feature #157
+
+### Feature #157: Streak checkin twice on same day is idempotent - PASSING
+- Existing streak checkin API at `app/api/streaks/checkin/route.ts` already has idempotency built in
+- Key logic in `calculateStreak()` function (lines 54-105):
+  - Gets ISO week for both the checkin date and the last_activity_date
+  - If both are in the same ISO week → returns `action: "already_checked_in"` with unchanged counts
+  - Same day is necessarily same ISO week, so same-day checkins are always idempotent
+- Database path (`handleDbStreak`, lines 169-245):
+  - When `action === 'already_checked_in'`, returns existing streak directly WITHOUT calling `.update()`
+  - No database write occurs for duplicate checkins
+- App_settings fallback path (`handleAppSettingsStreak`, lines 251-347):
+  - When `action === 'already_checked_in'`, returns loginStreak directly WITHOUT calling `.upsert()`
+  - No database write occurs for duplicate checkins
+- 12/12 verification tests passing:
+  1. POST /api/streaks/checkin endpoint exists ✅
+  2. Code has same-week idempotency check ✅
+  3. Same-week checkin returns unchanged current_count ✅
+  4. Same-week checkin returns unchanged longest_count ✅
+  5. Same-week checkin returns action "already_checked_in" ✅
+  6. Database path skips UPDATE for already_checked_in ✅
+  7. App_settings path skips update for already_checked_in ✅
+  8. ISO week idempotency: same day is always same week ✅
+  9. Checkin message for idempotent case is correct ✅
+  10. No database write for idempotent checkin (DB path) ✅
+  11. No database write for idempotent checkin (app_settings path) ✅
+  12. Concurrent same-day checkins are safe ✅
+- Zero console errors on test page
+- No mock data patterns found (grep clean)
+
+### Changes Made
+- app/api/verify-streak-idempotent/route.ts: Created 12-test verification endpoint
+- app/test-streak-idempotent/page.tsx: Created visual test page with live API testing
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: da3b88d
+
+### Current Status
+- 149/265 features passing (148 before + #157)
+- Feature #157 completed and marked passing
+
+### Notes for Next Session
+- Port 3000 used this session
+- Streak system uses weekly (ISO week) granularity, not daily
+- Both DB table and app_settings fallback paths handle idempotency correctly
+- The `?date=YYYY-MM-DD` query param allows testing specific dates without affecting real streaks
+
 ## Session 2026-02-17 - Feature #154
 
 ### Feature #154: Double submit on onboarding step does not duplicate data - PASSING
