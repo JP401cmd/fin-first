@@ -506,6 +506,21 @@ function DebtDetailModal({
 
         {/* Details grid */}
         <div className="space-y-4 px-6 py-4">
+          {/* Payoff timeline highlight */}
+          {debt.repayment_type !== 'aflossingsvrij' && proj.isPayable && proj.monthsToPayoff > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-center" data-testid="payoff-timeline">
+              <p className="text-xs font-medium text-amber-700/60 uppercase">Aflostijd</p>
+              <p className="mt-1 text-2xl font-bold text-amber-700" data-testid="months-to-payoff">
+                {proj.monthsToPayoff} maanden
+              </p>
+              <p className="mt-0.5 text-xs text-amber-600">
+                {proj.payoffDate
+                  ? `Schuldenvrij in ${new Date(proj.payoffDate).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })}`
+                  : ''}
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-lg bg-zinc-50 p-3">
               <p className="text-xs text-zinc-500">Rente</p>
@@ -767,6 +782,7 @@ function DebtForm({
   const [linkedAssetId, setLinkedAssetId] = useState(debt?.linked_asset_id ?? '')
   const [creditLimit, setCreditLimit] = useState(String(debt?.credit_limit ?? ''))
   const [draagkrachtmetingDate, setDraagkrachtmetingDate] = useState(debt?.draagkrachtmeting_date ?? '')
+  const [validationError, setValidationError] = useState<string | null>(null)
 
   const subtypeOptions = DEBT_SUBTYPE_LABELS[debtType]
   const visibleFields = DEBT_TYPE_FIELDS[debtType]
@@ -794,6 +810,36 @@ function DebtForm({
 
   async function handleSave() {
     if (!name || !currentBalance) return
+    setValidationError(null)
+
+    // Validate no negative monetary values or rates
+    const numCurrentBalance = Number(currentBalance)
+    const numOriginalAmount = Number(originalAmount)
+    const numInterestRate = Number(interestRate)
+    const numMinimumPayment = Number(minimumPayment)
+    const numMonthlyPayment = Number(monthlyPayment)
+
+    if (numCurrentBalance < 0) {
+      setValidationError('Huidig saldo mag niet negatief zijn. Voer een positief bedrag in.')
+      return
+    }
+    if (originalAmount && numOriginalAmount < 0) {
+      setValidationError('Oorspronkelijk bedrag mag niet negatief zijn. Voer een positief bedrag in.')
+      return
+    }
+    if (interestRate && numInterestRate < 0) {
+      setValidationError('Rentepercentage mag niet negatief zijn. Voer een positief percentage in.')
+      return
+    }
+    if (minimumPayment && numMinimumPayment < 0) {
+      setValidationError('Minimale betaling mag niet negatief zijn.')
+      return
+    }
+    if (monthlyPayment && numMonthlyPayment < 0) {
+      setValidationError('Werkelijke betaling mag niet negatief zijn.')
+      return
+    }
+
     setSaving(true)
 
     const supabase = createClient()
@@ -1092,6 +1138,12 @@ function DebtForm({
             />
           </div>
         </div>
+
+        {validationError && (
+          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700" data-testid="debt-validation-error">
+            {validationError}
+          </div>
+        )}
 
         <div className="mt-5 flex justify-end gap-2">
           <button

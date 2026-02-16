@@ -885,6 +885,7 @@ function AssetForm({
   const [wozLoading, setWozLoading] = useState(false)
   const [wozResult, setWozResult] = useState<{ peildatum: string; waarde: number }[] | null>(null)
   const [wozError, setWozError] = useState<string | null>(null)
+  const [validationError, setValidationError] = useState<string | null>(null)
 
   const subtypeOptions = ASSET_SUBTYPE_LABELS[assetType]
   const visibleFields = ASSET_TYPE_FIELDS[assetType]
@@ -951,6 +952,26 @@ function AssetForm({
 
   async function handleSave() {
     if (!name || !currentValue) return
+    setValidationError(null)
+
+    // Validate no negative monetary values
+    const numCurrentValue = Number(currentValue)
+    const numPurchaseValue = Number(purchaseValue)
+    const numMonthlyContribution = Number(monthlyContribution)
+
+    if (numCurrentValue < 0) {
+      setValidationError('Waarde mag niet negatief zijn. Voer een positief bedrag in.')
+      return
+    }
+    if (purchaseValue && numPurchaseValue < 0) {
+      setValidationError('Aankoopwaarde mag niet negatief zijn. Voer een positief bedrag in.')
+      return
+    }
+    if (monthlyContribution && numMonthlyContribution < 0) {
+      setValidationError('Maandelijkse inleg mag niet negatief zijn.')
+      return
+    }
+
     setSaving(true)
 
     const supabase = createClient()
@@ -1312,6 +1333,12 @@ function AssetForm({
             />
           </div>
         </div>
+
+        {validationError && (
+          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700" data-testid="asset-validation-error">
+            {validationError}
+          </div>
+        )}
 
         <div className="mt-5 flex justify-end gap-2">
           <button

@@ -114,6 +114,12 @@ export async function updateSession(request: NextRequest) {
     '/test-schema',
     '/api/verify-schema',
     '/test-price-feed',
+    '/test-session-expiry',
+    '/api/verify-session-expiry',
+    '/test-onboarding-validation',
+    '/test-negative-validation',
+    '/test-concurrent-edit',
+    '/api/verify-concurrent-edit',
   ]
 
   // Protected route prefixes that require authentication
@@ -148,16 +154,22 @@ export async function updateSession(request: NextRequest) {
   // Only redirect to login for known protected routes
   // Unknown routes pass through so Next.js can show the 404 page
   if (!user && !isPublicPath && isProtectedPath) {
+    // Check if request had auth cookies (expired session vs never logged in)
+    const hadSession = request.cookies.getAll().some(c => c.name.startsWith('sb-'))
+
     // API routes should return 401 JSON instead of redirecting to login
     if (pathname.startsWith('/api/')) {
       return NextResponse.json(
-        { error: 'Niet ingelogd' },
-        { status: 401 }
+        { error: 'Niet ingelogd', sessionExpired: hadSession },
+        { status: 401, headers: { 'X-Session-Expired': hadSession ? 'true' : 'false' } }
       )
     }
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     url.searchParams.set('redirectTo', pathname)
+    if (hadSession) {
+      url.searchParams.set('expired', '1')
+    }
     return NextResponse.redirect(url)
   }
 
