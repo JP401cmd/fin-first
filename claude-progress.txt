@@ -1,3 +1,39 @@
+## Session 2026-02-16 - Feature #119
+
+### Feature #119: Streak indicator shows real streak count - PASSING
+- Created StreakIndicator client component at components/app/streak-indicator.tsx
+- Fetches from GET /api/streaks (existing endpoint) which reads from user_streaks table with app_settings fallback
+- Displays fire emoji 🔥 with current_count from API data
+- Click button triggers POST /api/streaks/checkin to record weekly check-in
+- Component updates streak state from checkin response via setStreak()
+- Shows feedback message (e.g., "Niet ingelogd" for unauthenticated, streak messages for authenticated)
+- Added to dashboard page header (app/(app)/dashboard/page.tsx) next to "Welkom terug" greeting
+- Dashboard imports StreakIndicator as client component in server component page
+- Auth protection verified: GET /api/streaks returns 401, POST /api/streaks/checkin returns 401
+- 9/9 verification checks passing via /api/verify-streak-indicator
+- Visual verification via Playwright screenshot: 🔥 0 weken button visible, all checks green
+- Checkin button interaction tested: correctly shows "Niet ingelogd" for unauthenticated
+- No mock data patterns found
+- Console errors: only expected 401s from auth protection (not real errors)
+- Commit: 94bedbb "feat: add StreakIndicator component with real streak data (#119)"
+
+### Changes Made
+- components/app/streak-indicator.tsx: New StreakIndicator client component
+- app/(app)/dashboard/page.tsx: Added StreakIndicator import and rendering in header
+- app/api/verify-streak-indicator/route.ts: 9-test verification endpoint
+- app/test-streak-indicator/page.tsx: Visual test page with live component preview
+- lib/supabase/proxy.ts: Added test routes to public paths
+
+### Current Status
+- 112/265 features passing (111 before + #119)
+- Feature #119 completed and committed
+
+### Notes for Next Session
+- Turbopack on Windows: kill ALL zombie servers before starting fresh (use .kill-all-servers.mjs)
+- First page compile must happen before subsequent pages — Turbopack runtime gets corrupted otherwise
+- Port 4000 used this session
+- Server startup: pre-warm first route with curl before Playwright
+
 ## Session 2026-02-16 - Feature #118
 
 ### Feature #118: Holdings list reflects real Supabase holdings data - PASSING
