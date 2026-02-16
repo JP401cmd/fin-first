@@ -19,6 +19,7 @@ import { CollapsibleSection } from '@/components/app/collapsible-section'
 import { DiscoverCarousel } from '@/components/app/discover-carousel'
 import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
 import { NextStepSection, computeAllKernSteps } from '@/components/app/next-step-card'
+import { FreedomTimeLabel, FreedomTimeBadge } from '@/components/app/freedom-time-label'
 
 export default function CorePage() {
   const router = useRouter()
@@ -328,6 +329,7 @@ export default function CorePage() {
             <div>
               <p className="text-xs font-medium text-amber-300/60 uppercase">Netto vermogen</p>
               <p className="mt-1 text-2xl font-bold">{formatCurrency(data.netWorth)}</p>
+              <FreedomTimeBadge amount={data.netWorth} className="mt-1 bg-amber-800/30 text-amber-200/80" />
               <p className="text-sm text-amber-200/50">opgeslagen levensenergie</p>
             </div>
             <div>
@@ -457,6 +459,7 @@ export default function CorePage() {
           value={formatCurrency(data.monthlyIncome - data.monthlyExpenses)}
           subtitle="netto deze maand"
           accent={data.monthlyIncome > data.monthlyExpenses}
+          amount={data.monthlyIncome - data.monthlyExpenses}
         />
         <QuickLink
           href="/core/budgets"
@@ -471,9 +474,10 @@ export default function CorePage() {
           icon={<Building2 className="h-5 w-5 text-red-500" />}
           title="Schulden"
           value={formatCurrency(data.totalDebts)}
-          subtitle="totale schuld"
+          subtitle="vrijheid die je terugkoopt"
           accent={false}
           negative
+          amount={data.totalDebts}
         />
         <QuickLink
           href="/core/assets"
@@ -482,6 +486,7 @@ export default function CorePage() {
           value={formatCurrency(data.totalAssets)}
           subtitle="totale waarde"
           accent
+          amount={data.totalAssets}
         />
         <FeatureGate featureId="box3_belasting" fallback="locked">
           <QuickLink
@@ -577,6 +582,7 @@ export default function CorePage() {
             </div>
             <p className="text-sm font-medium text-zinc-500">Geschat Jaarinkomen</p>
             <p className="mt-1 text-2xl font-bold text-zinc-900">{formatCurrency(data.estimatedYearlyIncome)}</p>
+            <FreedomTimeBadge amount={data.estimatedYearlyIncome} className="mt-1" />
             <p className="mt-1 text-xs text-zinc-400">
               {incomeMonths < 12
                 ? `geextrapoleerd vanuit ${incomeMonths} maand${incomeMonths > 1 ? 'en' : ''}`
@@ -593,6 +599,7 @@ export default function CorePage() {
             </div>
             <p className="text-sm font-medium text-zinc-500">Jaarlijkse Must Uitgaven</p>
             <p className="mt-1 text-2xl font-bold text-zinc-900">{formatCurrency(data.yearlyMustExpenses)}</p>
+            <FreedomTimeBadge amount={data.yearlyMustExpenses} className="mt-1" />
             <p className="mt-1 text-xs text-zinc-400">essentiële kosten per jaar</p>
           </div>
         </div>
@@ -634,6 +641,7 @@ function QuickLink({
   subtitle,
   accent,
   negative,
+  amount,
 }: {
   href: string
   icon: React.ReactNode
@@ -642,6 +650,7 @@ function QuickLink({
   subtitle: string
   accent: boolean
   negative?: boolean
+  amount?: number
 }) {
   return (
     <Link
@@ -656,7 +665,11 @@ function QuickLink({
         <p className={`text-lg font-bold ${negative ? 'text-red-600' : accent ? 'text-emerald-600' : 'text-zinc-900'}`}>
           {value}
         </p>
-        <p className="text-xs text-zinc-400">{subtitle}</p>
+        {amount != null && Math.abs(amount) >= 100 ? (
+          <FreedomTimeBadge amount={amount} className="mt-0.5" />
+        ) : (
+          <p className="text-xs text-zinc-400">{subtitle}</p>
+        )}
       </div>
       <ArrowRight className="h-4 w-4 shrink-0 text-zinc-300 group-hover:text-amber-500" />
     </Link>

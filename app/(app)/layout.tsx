@@ -9,6 +9,7 @@ import { MobilePreviewProvider } from '@/components/app/beheer/mobile-preview-pr
 import { MobilePreviewFrame } from '@/components/app/beheer/mobile-preview-frame'
 import { ToastProvider } from '@/components/app/toast-provider'
 import { SessionMonitor } from '@/components/app/session-monitor'
+import { DailyExpenseProvider } from '@/components/app/freedom-time-label'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
 import { PHASES } from '@/lib/feature-phases'
 
@@ -77,11 +78,13 @@ export default async function AppLayout({
           <div className="min-h-screen bg-zinc-50">
             <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
             <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation}>
-              <main className="pb-20 md:pb-0">{children}</main>
-              <BottomNav />
-              <ChatProvider>
-                <ChatPanel />
-              </ChatProvider>
+              <DailyExpenseProvider>
+                <main className="pb-20 md:pb-0">{children}</main>
+                <BottomNav />
+                <ChatProvider>
+                  <ChatPanel />
+                </ChatProvider>
+              </DailyExpenseProvider>
             </FeatureAccessProvider>
           </div>
         </ToastProvider>
