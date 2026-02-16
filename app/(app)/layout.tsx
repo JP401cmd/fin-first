@@ -8,6 +8,7 @@ import { BottomNav } from '@/components/app/bottom-nav'
 import { MobilePreviewProvider } from '@/components/app/beheer/mobile-preview-provider'
 import { MobilePreviewFrame } from '@/components/app/beheer/mobile-preview-frame'
 import { ToastProvider } from '@/components/app/toast-provider'
+import { SessionMonitor } from '@/components/app/session-monitor'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
 import { PHASES } from '@/lib/feature-phases'
 
@@ -72,6 +73,7 @@ export default async function AppLayout({
     <MobilePreviewProvider>
       <MobilePreviewFrame>
         <ToastProvider>
+          <SessionMonitor />
           <div className="min-h-screen bg-zinc-50">
             <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
             <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation}>

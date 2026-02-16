@@ -13,6 +13,9 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  const isExpired = searchParams.get('expired') === '1'
+  const redirectTo = searchParams.get('redirectTo')
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
@@ -29,7 +32,6 @@ function LoginForm() {
       setLoading(false)
     } else {
       // Redirect to the originally requested page or dashboard
-      const redirectTo = searchParams.get('redirectTo')
       const destination = redirectTo && redirectTo.startsWith('/') ? redirectTo : '/dashboard'
       router.push(destination)
     }
@@ -40,6 +42,17 @@ function LoginForm() {
       <h1 className="mb-6 text-center text-2xl font-bold text-zinc-900">
         Inloggen bij TriFinity
       </h1>
+
+      {isExpired && (
+        <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3" data-testid="session-expired-banner">
+          <p className="text-sm font-medium text-amber-800">
+            Je sessie is verlopen
+          </p>
+          <p className="mt-1 text-xs text-amber-600">
+            Log opnieuw in om verder te gaan{redirectTo ? ' waar je gebleven was' : ''}.
+          </p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
