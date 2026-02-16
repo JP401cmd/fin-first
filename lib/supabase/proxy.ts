@@ -203,6 +203,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-onboarding-redirect',
     '/test-holding-double-click',
     '/api/verify-holding-double-click',
+    '/test-holding-rapid-delete',
+    '/api/verify-holding-rapid-delete',
   ]
 
   // Protected route prefixes that require authentication
