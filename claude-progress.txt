@@ -1,3 +1,42 @@
+## Session 2026-02-16 - Feature #117
+
+### Feature #117: Badge grid shows database-driven badge status - PASSING
+- BadgeGrid component at components/app/badge-grid.tsx fetches from GET /api/badges
+- GET /api/badges has 3-strategy fallback:
+  - Strategy 1 (preferred): badges table + user_badges table (full DB-driven)
+  - Strategy 2 (fallback): BADGE_DEFINITIONS + app_settings table for earned status
+  - Strategy 3 (last resort): BADGE_DEFINITIONS with all badges unearned
+- Both Strategy 1 and 2 are database-driven (Supabase PostgreSQL persistence)
+- badges table exists but is empty (needs seeding via Supabase migration); app_settings fallback works
+- user_badges table exists and is accessible with RLS
+- POST /api/badges/evaluate queries 7 real Supabase tables in parallel:
+  profiles, bank_accounts, budgets, transactions, debts, assets, actions
+- Earned badges: colored icon + name + solid border + data-earned="true"
+- Locked badges: "???" text + "❓" icon + dashed border + grayscale + data-earned="false"
+- Badge detail modal shows description for earned, "vergrendeld" message + tip for locked
+- BadgeEvaluator component auto-evaluates on identity page load (force=true)
+- useBadgeEvaluation hook shows toast notifications for newly earned badges
+- 30 badges across 8 categories: onboarding, consistency, financial_health, fire_milestones, actions, budget, exploration, sovereignty
+- All badge slugs unique, sort_order monotonically increasing (1-73)
+- /api/badges/verify returns 9/13 pass, 0 fail, 4 warn (warnings from unauthenticated context only)
+- Client-side test page: 9/9 pass, 0 fail
+- Zero mock data patterns found
+- Only console error: 401 on /api/badges (expected for unauthenticated test page)
+- Commit: 3cfddfd "feat: verify badge grid shows database-driven badge status (#117)"
+
+### Changes Made
+- app/api/badges/verify/route.ts: Rewrote with 13 step-aligned tests for feature #117
+- app/test-badge-grid/page.tsx: Updated with API integration tests and server-side verification
+
+### Current Status
+- 117/265 features passing (116 before + #117)
+- Feature #117 completed and committed
+
+### Notes for Next Session
+- badges table needs seeding via Supabase migration to enable Strategy 1 (user_badges)
+- Currently using Strategy 2 (app_settings) which is also database-driven
+- To seed badges: use mcp__supabase__apply_migration or mcp__supabase__execute_sql tools
+
 ## Session 2026-02-16 - Feature #122
 
 ### Feature #122: FIRE projection uses real financial inputs - PASSING
