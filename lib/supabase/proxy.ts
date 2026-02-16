@@ -123,6 +123,12 @@ export async function updateSession(request: NextRequest) {
     '/test-file-size-limit',
     '/test-dashboard-kpis',
     '/api/verify-dashboard-kpis',
+    '/test-budget-modes',
+    '/test-sovereignty-gating',
+    '/api/verify-feature-gating',
+    '/test-freedom-time-labels',
+    '/api/verify-freedom-time-labels',
+    '/api/daily-expense-rate',
   ]
 
   // Protected route prefixes that require authentication
