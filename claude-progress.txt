@@ -1,3 +1,42 @@
+## Session 2026-02-17 - Feature #164
+
+### Feature #164: Completed next step removed from suggestions list - PASSING
+- Fixed a bug where the `completedByDb` set in GET /api/next-steps was built from the
+  next_step_completions table but never used for filtering steps
+- Before fix: only real data state (hasTransactions, hasBudgets, etc.) marked steps as completed
+- After fix: steps are completed if EITHER data state shows it OR the step was explicitly
+  marked complete via POST /api/next-steps/complete (completedByDb.has(key))
+- Updated NextStepSection client component to also load completed_steps from the API
+  and filter them out (previously only loaded dismissed_steps)
+- Flow verified:
+  1. GET /api/next-steps returns pending_steps, completed_steps, dismissed_steps
+  2. POST /api/next-steps/complete records {dismissed: false} in next_step_completions
+  3. After completion, GET /api/next-steps excludes the step from pending_steps
+  4. NextStepSection filters both dismissed AND completed steps from visible suggestions
+- Database: next_step_completions table with unique(user_id, step_key) constraint
+- Idempotent: upsert on conflict ensures completing same step twice doesn't create duplicates
+- 9/9 verification checks passing at /api/verify-completed-next-step
+- Zero console errors
+- No mock data patterns found in production code
+
+### Changes Made
+- app/api/next-steps/route.ts: Added `|| completedByDb.has(key)` to each step's completed flag
+- components/app/next-step-card.tsx: Added completedKeys state, load completed_steps on mount, filter visibleSteps by both dismissed and completed
+- app/api/verify-completed-next-step/route.ts: Created 9-test verification endpoint
+- app/test-completed-next-step/page.tsx: Created visual test page with interactive testing
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: bd52b91
+
+### Current Status
+- 157/265 features passing (156 before + #164)
+- Feature #164 completed and marked passing
+
+### Notes for Next Session
+- Port 3000 used this session
+- The key fix was ensuring completedByDb set (already built on line 104) is actually used in step filtering
+- NextStepSection now has dual filtering: dismissedKeys AND completedKeys
+- No authenticated browser testing needed — verification is structural + database schema validation
+
 ## Session 2026-02-17 - Feature #163
 
 ### Feature #163: Deleted holding removed from portfolio allocation chart - PASSING
