@@ -428,21 +428,30 @@ export default function HoldingsPage() {
 
         {holdings.map((holding) => {
           const price = holding.current_price ?? holding.avg_purchase_price
-          const value = price * holding.units
-          const cost = holding.avg_purchase_price * holding.units
+          const value = price * Math.max(0, holding.units)
+          const cost = holding.avg_purchase_price * Math.max(0, holding.units)
           const returnPct = cost > 0 ? ((value - cost) / cost) * 100 : 0
           const stale = isPriceStale(holding)
+          const soldOut = holding.units <= 0
 
           return (
             <div
               key={holding.id}
               className={`flex items-center gap-3 rounded-xl border bg-white p-3 transition-colors hover:border-amber-200 hover:bg-amber-50/30 ${
+                soldOut ? 'border-zinc-300 bg-zinc-50/50 opacity-75' :
                 stale ? 'border-amber-300 bg-amber-50/20' : 'border-zinc-200'
               }`}
               data-testid={`holding-item-${holding.id}`}
+              data-sold-out={soldOut ? 'true' : 'false'}
+              data-units={Math.max(0, holding.units)}
             >
-              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${stale ? 'bg-amber-100' : 'bg-amber-50'}`}>
-                {stale ? (
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                soldOut ? 'bg-zinc-100' :
+                stale ? 'bg-amber-100' : 'bg-amber-50'
+              }`}>
+                {soldOut ? (
+                  <CheckCircle className="h-4 w-4 text-zinc-400" />
+                ) : stale ? (
                   <Clock className="h-4 w-4 text-amber-500" />
                 ) : (
                   <TrendingUp className="h-4 w-4 text-amber-600" />
@@ -450,8 +459,17 @@ export default function HoldingsPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="truncate text-sm font-medium text-zinc-900">{holding.name}</p>
-                  {stale && (
+                  <p className={`truncate text-sm font-medium ${soldOut ? 'text-zinc-500' : 'text-zinc-900'}`}>{holding.name}</p>
+                  {soldOut && (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600"
+                      data-testid="sold-out-indicator"
+                    >
+                      <CheckCircle className="h-2.5 w-2.5" />
+                      Uitverkocht
+                    </span>
+                  )}
+                  {stale && !soldOut && (
                     <span
                       className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
                       title={`Laatste update: ${formatLastUpdate(holding.last_price_update)}`}
@@ -463,9 +481,9 @@ export default function HoldingsPage() {
                   )}
                 </div>
                 <p className="truncate text-xs text-zinc-500">
-                  {holding.ticker && <span className="font-medium text-amber-600">{holding.ticker}</span>}
-                  {holding.ticker && holding.units > 0 && ' · '}
-                  {holding.units > 0 && `${holding.units} eenheden`}
+                  {holding.ticker && <span className={`font-medium ${soldOut ? 'text-zinc-400' : 'text-amber-600'}`}>{holding.ticker}</span>}
+                  {holding.ticker && ' · '}
+                  {soldOut ? <span className="text-zinc-400">0 eenheden</span> : `${holding.units} eenheden`}
                   {holding.institution && ` · ${holding.institution}`}
                   {holding.purchase_date && ` · ${new Date(holding.purchase_date).toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' })}`}
                   {stale && holding.last_price_update && (
@@ -479,11 +497,11 @@ export default function HoldingsPage() {
                 </p>
               </div>
               <div className="shrink-0 text-right">
-                <p className={`text-sm font-semibold ${stale ? 'text-amber-700' : 'text-zinc-900'}`}>
-                  {formatCurrency(value)}
-                  {stale && <span className="text-[10px] font-normal text-amber-500 block">laatste bekende prijs</span>}
+                <p className={`text-sm font-semibold ${soldOut ? 'text-zinc-400' : stale ? 'text-amber-700' : 'text-zinc-900'}`} data-testid={`holding-value-${holding.id}`}>
+                  {formatCurrency(Math.max(0, value))}
+                  {stale && !soldOut && <span className="text-[10px] font-normal text-amber-500 block">laatste bekende prijs</span>}
                 </p>
-                {cost > 0 && (
+                {cost > 0 && !soldOut && (
                   <p className={`text-xs font-medium ${returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                     {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}%
                   </p>
@@ -1568,10 +1586,14 @@ function HoldingTransactionForm({
   const totalAmount = (Number(units) || 0) * (Number(pricePerUnit) || 0)
 
   // Preview: what the holding will look like after the transaction
-  const currentUnits = holding.units
+  const currentUnits = Math.max(0, holding.units)
   const currentAvg = holding.avg_purchase_price
   let previewUnits = currentUnits
   let previewAvg = currentAvg
+
+  // Sell validation: cannot sell more than currently owned
+  const sellExceedsOwned = txType === 'sell' && Number(units) > currentUnits
+  const sellFromZero = txType === 'sell' && currentUnits <= 0
 
   if (txType === 'buy' && Number(units) > 0) {
     previewUnits = currentUnits + Number(units)
@@ -1584,6 +1606,8 @@ function HoldingTransactionForm({
 
   async function handleSave() {
     if (!units || !pricePerUnit || !date) return
+    // Block selling more units than available
+    if (txType === 'sell' && Number(units) > currentUnits) return
     setSaving(true)
     setError(null)
 
@@ -1692,15 +1716,30 @@ function HoldingTransactionForm({
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">
-                      {txType === 'dividend' ? 'Bedrag per eenheid' : 'Aantal eenheden'} *
-                    </label>
+                    <div className="mb-1 flex items-center justify-between">
+                      <label className="block text-xs font-medium text-zinc-600">
+                        {txType === 'dividend' ? 'Bedrag per eenheid' : 'Aantal eenheden'} *
+                      </label>
+                      {txType === 'sell' && currentUnits > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setUnits(String(currentUnits))}
+                          className="text-[10px] font-medium text-red-600 hover:text-red-700"
+                          data-testid="sell-all-btn"
+                        >
+                          Alles verkopen ({currentUnits})
+                        </button>
+                      )}
+                    </div>
                     <input
                       type="number"
                       step="0.001"
+                      max={txType === 'sell' ? currentUnits : undefined}
                       value={units}
                       onChange={(e) => setUnits(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                      className={`w-full rounded-lg border px-3 py-2 text-sm ${
+                        sellExceedsOwned || sellFromZero ? 'border-red-300 bg-red-50/50' : 'border-zinc-200'
+                      }`}
                       placeholder={txType === 'dividend' ? '1' : '10'}
                       autoFocus
                     />
@@ -1747,13 +1786,34 @@ function HoldingTransactionForm({
                 </div>
               </div>
 
+              {/* Sell validation warning */}
+              {sellFromZero && (
+                <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3" data-testid="sell-from-zero-warning">
+                  <p className="text-xs font-medium text-red-700">
+                    <AlertTriangle className="inline h-3 w-3 mr-1" />
+                    Deze holding heeft 0 eenheden. Je kunt niet verkopen.
+                  </p>
+                </div>
+              )}
+              {sellExceedsOwned && !sellFromZero && (
+                <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3" data-testid="sell-exceeds-warning">
+                  <p className="text-xs font-medium text-red-700">
+                    <AlertTriangle className="inline h-3 w-3 mr-1" />
+                    Je hebt maar {currentUnits} eenheden. Je kunt niet meer verkopen dan je bezit.
+                  </p>
+                </div>
+              )}
+
               {/* Preview: holding after transaction */}
-              {Number(units) > 0 && txType !== 'dividend' && (
+              {Number(units) > 0 && txType !== 'dividend' && !sellExceedsOwned && !sellFromZero && (
                 <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
                   <p className="text-xs font-medium text-amber-700 mb-1">Na transactie:</p>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-zinc-600">
                       {currentUnits} <span className="text-zinc-400">→</span> {previewUnits.toFixed(3)} eenheden
+                      {previewUnits === 0 && txType === 'sell' && (
+                        <span className="ml-2 text-xs font-medium text-zinc-500">(volledig uitverkocht)</span>
+                      )}
                     </span>
                     <span className="font-medium text-zinc-900">
                       Gem. prijs: {formatCurrency(previewAvg)}
@@ -1772,7 +1832,7 @@ function HoldingTransactionForm({
                 </button>
                 <button
                   onClick={handleSave}
-                  disabled={saving || !units || !pricePerUnit || !date}
+                  disabled={saving || !units || !pricePerUnit || !date || sellExceedsOwned || sellFromZero}
                   className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${
                     txType === 'buy' ? 'bg-emerald-600 hover:bg-emerald-700' :
                     txType === 'sell' ? 'bg-red-600 hover:bg-red-700' :
