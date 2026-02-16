@@ -107,6 +107,16 @@ export async function parseCSV(
       amount = credit > 0 ? credit : -debit
     } else {
       amount = parseAmount(amountStr)
+      // Handle sign column (e.g. ING "Af Bij" column where "Af" = debit, "Bij" = credit)
+      if (preset.signColumn != null && preset.signDebitValue) {
+        const signValue = (fields[preset.signColumn] ?? '').trim().toLowerCase()
+        const debitValue = preset.signDebitValue.toLowerCase()
+        if (signValue === debitValue) {
+          amount = -Math.abs(amount)
+        } else {
+          amount = Math.abs(amount)
+        }
+      }
     }
 
     const date = parseDate(dateStr, preset.dateFormat)

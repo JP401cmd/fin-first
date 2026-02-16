@@ -4,7 +4,6 @@
  * Runs client-side (mt940js works in the browser).
  */
 
-import MT940 from 'mt940js'
 import { computeHash, type ParsedTransaction } from './shared'
 
 export type { ParsedTransaction } from './shared'
@@ -56,7 +55,10 @@ function extractReference(details: string): string | null {
  * Parse an MT940 file content string into normalized transactions.
  */
 export async function parseMT940(content: string): Promise<ParsedTransaction[]> {
-  const parser = new MT940()
+  // mt940js is a CommonJS module exporting { Parser, Helpers }
+  const mt940js = await import('mt940js')
+  const ParserClass = (mt940js as any).Parser || (mt940js as any).default?.Parser || (mt940js as any).default
+  const parser = new ParserClass()
   const statements = parser.parse(content)
 
   const transactions: ParsedTransaction[] = []

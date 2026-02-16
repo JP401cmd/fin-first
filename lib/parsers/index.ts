@@ -48,6 +48,8 @@ export type CSVPreset = {
   amountIsNegative?: boolean // some banks use separate columns for debit/credit
   debitColumn?: number
   creditColumn?: number
+  signColumn?: number // column that indicates debit/credit (e.g. ING "Af Bij")
+  signDebitValue?: string // value in signColumn that means debit/expense (e.g. "Af")
 }
 
 export const CSV_PRESETS: CSVPreset[] = [
@@ -63,6 +65,8 @@ export const CSV_PRESETS: CSVPreset[] = [
     referenceColumn: null,
     dateFormat: 'YYYYMMDD',
     hasHeader: true,
+    signColumn: 5,
+    signDebitValue: 'Af',
   },
   {
     id: 'rabobank',

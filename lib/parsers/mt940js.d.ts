@@ -14,9 +14,9 @@ declare module 'mt940js' {
     closingBalance: number
   }
 
-  class MT940 {
+  class Parser {
     parse(data: string): MT940Statement[]
   }
 
-  export default MT940
+  export { Parser }
 }
