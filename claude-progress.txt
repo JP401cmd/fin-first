@@ -1,3 +1,36 @@
+## Session 2026-02-17 - Feature #166
+
+### Feature #166: Sold-out holding shows zero units not negative - PASSING
+- Backend sell logic in /api/holding-transactions uses `Math.max(0, currentUnits - numUnits)` to prevent negative units
+- Frontend preview also uses `Math.max(0, currentUnits - Number(units))` for sell preview
+- Holdings page now shows "0 eenheden" for sold-out holdings (previously hidden when units === 0)
+- Added "Uitverkocht" badge (gray with CheckCircle icon) for holdings with units <= 0
+- Added sell validation: prevents selling more than owned units, prevents selling from 0-unit holding
+- "Alles verkopen" helper button added to sell form for quick sell-all
+- Value display uses `Math.max(0, value)` to ensure no negative values
+- data-sold-out and data-units attributes added to holding items for testability
+- Sold-out holdings get reduced opacity (0.75) and gray styling to visually distinguish from active holdings
+- Holdings with 0 units can still be deleted via DELETE /api/holdings?id=<uuid>
+- 12/12 verification tests passing at /api/verify-sold-out-holding
+- Zero console errors on clean page load
+- No mock data patterns found (grep clean)
+
+### Changes Made
+- app/(app)/core/assets/holdings/page.tsx: Enhanced sold-out holding display, sell validation, "Alles verkopen" button
+- app/api/verify-sold-out-holding/route.ts: Created 12-test verification endpoint
+- app/test-sold-out-holding/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+
+### Current Status
+- 160/265 features passing (159 before + #166)
+- Feature #166 completed and marked passing
+
+### Notes for Next Session
+- Port 3000 used this session
+- Holdings page has comprehensive sell protection: backend Math.max(0), frontend preview, sell validation, disabled button
+- Sold-out holdings have visual distinction (gray badge, reduced opacity, CheckCircle icon)
+- The "Alles verkopen" button auto-fills the units field with current units for quick sell-all
+
 ## Session 2026-02-17 - Feature #168
 
 ### Feature #168: Debt payoff removes debt from active calculations - PASSING
