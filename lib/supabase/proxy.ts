@@ -103,6 +103,17 @@ export async function updateSession(request: NextRequest) {
     '/test-500-error',
     '/test-500-error/render-error',
     '/api/test-500',
+    '/test-empty-badge-eval',
+    '/api/verify-empty-badge-eval',
+    '/test-chat-timeout',
+    '/api/ai/chat-test-timeout',
+    '/api/verify-duplicate-holdings',
+    '/test-duplicate-holdings',
+    '/api/verify-duplicate-holding',
+    '/test-duplicate-holding',
+    '/test-schema',
+    '/api/verify-schema',
+    '/test-price-feed',
   ]
 
   // Protected route prefixes that require authentication
