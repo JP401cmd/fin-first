@@ -199,6 +199,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-special-chars-url',
     '/test-bookmark-belasting',
     '/api/verify-bookmark-belasting',
+    '/test-onboarding-redirect',
+    '/api/verify-onboarding-redirect',
   ]
 
   // Protected route prefixes that require authentication
