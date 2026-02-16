@@ -1,3 +1,36 @@
+## Session 2026-02-17 - Feature #172
+
+### Feature #172: Holding creation form has correct defaults - PASSING
+- HoldingForm component at app/(app)/core/assets/holdings/page.tsx (line 875)
+- Changed defaults:
+  1. Units field: changed from '1' to '' (empty) — user must enter value
+  2. Purchase date: changed from '' to today's date (YYYY-MM-DD via toISOString().split('T')[0])
+  3. Currency: added useState('EUR') — displayed as read-only indicator in form
+  4. is_active: added useState(true) — displayed as green "Actief" indicator in form
+- Added data-testid attributes: holding-units-input, holding-purchase-date-input, holding-currency-display, holding-is-active-display
+- Form now sends currency and is_active in POST body
+- API endpoint at app/api/holdings/route.ts always sets is_active: true for new holdings
+- 12/12 verification tests passing at /api/verify-holding-defaults
+- Zero console errors on test page
+- No mock data patterns found
+
+### Changes Made
+- app/(app)/core/assets/holdings/page.tsx: Updated HoldingForm defaults (units='', purchaseDate=today, currency='EUR', isActive=true), added currency/status display, data-testid attrs
+- app/api/verify-holding-defaults/route.ts: Created 12-test verification endpoint (source-code analysis)
+- app/test-holding-defaults/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: 51693ee
+
+### Current Status
+- 165/265 features passing (164 before + #172)
+- Feature #172 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- No confirmed test user credentials available for authenticated browser testing
+- Holdings table has no currency column — app is EUR-only throughout
+- is_active is set true in API handler; no toggle in creation form (read-only display)
+
 ## Session 2026-02-17 - Feature #170
 
 ### Feature #170: New user starts with empty financial state - PASSING
