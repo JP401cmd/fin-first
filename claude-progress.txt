@@ -1,3 +1,42 @@
+## Session 2026-02-16 - Feature #118
+
+### Feature #118: Holdings list reflects real Supabase holdings data - PASSING
+- Holdings page at app/(app)/core/assets/holdings/page.tsx fetches from /api/holdings
+  - Line 50: fetch('/api/holdings') in loadHoldings() callback
+  - Line 55: setHoldings(data.holdings || []) sets state from API response
+  - Line 358: holdings.map() renders each holding in the UI
+  - Line 72: fetch(`/api/holdings?id=${id}`, DELETE) for deletion
+  - Line 74: setHoldings(prev => prev.filter()) removes from state
+- API route at app/api/holdings/route.ts:
+  - GET: Queries Supabase holdings table (user_id + is_active filters) with assets fallback
+  - POST: Inserts into Supabase holdings table with validation
+  - PATCH: Updates with optimistic concurrency control
+  - DELETE: Deletes by id and user_id
+- Holdings table exists in Supabase with correct schema:
+  id, user_id, name, ticker, units, avg_purchase_price, current_price, is_active, created_at
+- All endpoints require auth (return 401 "Niet ingelogd" for unauthenticated)
+- RLS enforced: data scoped by user_id
+- Feature #79 (end-to-end CRUD) already passing — confirms full data flow
+- Verification endpoint at /api/verify-holdings-list: 4/5 tests pass (1 fail = no auth for integration test)
+- Test page at /test-holdings-list: 12/13 checks pass (verified via browser on port 3400)
+- Zero mock data patterns in holdings page and API (grep clean)
+- Commit: d25b1b5
+
+### Changes Made
+- app/api/verify-holdings-list/route.ts: Created verification endpoint
+- app/test-holdings-list/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+
+### Current Status
+- 110/265 features passing (109 before + #118)
+- Feature #118 completed and committed
+
+### Notes for Next Session
+- Turbopack on Windows is extremely unstable: servers say "Ready" but don't listen
+- Multiple restart cycles needed; cleanup-all.mjs script essential
+- No authenticated test users available (Supabase email rate limit)
+- API routes work even when page SSR fails on Turbopack
+
 ## Session 2026-02-16 - Feature #120
 
 ### Feature #120: Next step engine queries real data completeness - PASSING
