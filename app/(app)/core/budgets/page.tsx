@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
-  ChevronLeft, ChevronRight, Plus, X, Pencil, Save,
+  ChevronLeft, ChevronRight, Plus, X, Pencil, Save, Trash2,
   GitFork, Fingerprint, Workflow, CircleDot, AlertTriangle,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -609,6 +609,11 @@ export default function BudgetsPage() {
           onClose={closeBudgetModal}
           onEdit={() => setModalStep('edit')}
           onSelectChild={(id) => openBudgetModal(id)}
+          onDelete={async () => {
+            closeBudgetModal()
+            await loadBudgets()
+            await loadSpending()
+          }}
         />
       )}
 
@@ -769,6 +774,7 @@ function BudgetDetailModal({
   onClose,
   onEdit,
   onSelectChild,
+  onDelete,
 }: {
   budget: Budget
   parent: BudgetWithChildren | null
@@ -782,7 +788,11 @@ function BudgetDetailModal({
   onClose: () => void
   onEdit: () => void
   onSelectChild: (id: string) => void
+  onDelete: () => void
 }) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const budgetType = (budget.budget_type ?? 'expense') as BudgetType
   const colors = getTypeColors(budgetType)
   const children = parent && 'children' in parent ? (parent as BudgetWithChildren).children : []
@@ -1054,6 +1064,62 @@ function BudgetDetailModal({
           </div>
         )}
 
+        {/* Delete confirmation */}
+        {showDeleteConfirm && (
+          <div className="border-t border-red-200 bg-red-50 px-6 py-4" data-testid="budget-delete-confirm">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-red-800">Budget verwijderen?</p>
+                <p className="mt-1 text-xs text-red-700">
+                  {isParent
+                    ? `Dit verwijdert "${budget.name}" en alle ${children.length} subbudgetten. Transacties worden ontkoppeld maar niet verwijderd.`
+                    : `Dit verwijdert "${budget.name}". Transacties worden ontkoppeld maar niet verwijderd.`
+                  }
+                </p>
+                {deleteError && (
+                  <p className="mt-1 text-xs font-medium text-red-600">{deleteError}</p>
+                )}
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={deleting}
+                    onClick={async () => {
+                      setDeleting(true)
+                      setDeleteError(null)
+                      try {
+                        const res = await fetch(`/api/budgets/${budget.id}`, { method: 'DELETE' })
+                        if (!res.ok) {
+                          const data = await res.json()
+                          setDeleteError(data.error || 'Verwijderen mislukt')
+                          setDeleting(false)
+                          return
+                        }
+                        onDelete()
+                      } catch {
+                        setDeleteError('Netwerk fout bij verwijderen')
+                        setDeleting(false)
+                      }
+                    }}
+                    className="rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                    data-testid="budget-delete-confirm-btn"
+                  >
+                    {deleting ? 'Verwijderen...' : 'Definitief verwijderen'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowDeleteConfirm(false); setDeleteError(null) }}
+                    className="rounded-md border border-red-300 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+                    data-testid="budget-delete-cancel-btn"
+                  >
+                    Annuleren
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex gap-2 border-t border-zinc-200 px-6 py-4">
           <button
@@ -1062,6 +1128,14 @@ function BudgetDetailModal({
           >
             <Pencil className="h-3.5 w-3.5" />
             Bewerken
+          </button>
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 hover:border-red-300"
+            data-testid="budget-delete-btn"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Verwijderen
           </button>
         </div>
       </div>

@@ -227,6 +227,16 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-allocation-delete',
     '/test-completed-next-step',
     '/api/verify-completed-next-step',
+    '/test-budget-category-delete',
+    '/api/verify-budget-category-delete',
+    '/test-asset-deletion-networth',
+    '/api/verify-asset-deletion-networth',
+    '/test-sold-out-holding',
+    '/api/verify-sold-out-holding',
+    '/test-debt-payoff-removal',
+    '/api/verify-debt-payoff-removal',
+    '/test-account-deletion-cascade',
+    '/api/verify-account-deletion-cascade',
   ]
 
   // Protected route prefixes that require authentication
