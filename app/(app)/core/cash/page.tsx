@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/client'
 import { getDefaultBudgets, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
 import { TransactionForm } from '@/components/app/transaction-form'
 import { BudgetIcon, formatCurrency as formatCurrencyShort, formatCurrencyDecimals as formatCurrency, getTypeColors } from '@/components/app/budget-shared'
+import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { SankeyDiagram, type SankeyNode, type SankeyLink } from '@/components/app/sankey-diagram'
 import { type RecurringTransaction, FREQUENCY_LABELS, getExpectedMonthlyTotal, getNextOccurrence, formatSchedule } from '@/lib/recurring-data'
 
@@ -198,6 +199,21 @@ export default function CashPage() {
     .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
 
   const netAmount = totalIncome - totalExpenses
+
+  // Daily expenses for freedom-time calculations
+  // Use current month's total expenses / 30 as the daily cost of living
+  const dailyExpenses = totalExpenses > 0 ? totalExpenses / 30 : 0
+
+  // Freedom time for monthly summary cards
+  const incomeFreedomDays = dailyExpenses > 0
+    ? calculateFreedomTime(totalIncome, dailyExpenses)
+    : null
+  const expensesFreedomDays = dailyExpenses > 0
+    ? calculateFreedomTime(totalExpenses, dailyExpenses)
+    : null
+  const netFreedomDays = dailyExpenses > 0
+    ? calculateFreedomTime(Math.abs(netAmount), dailyExpenses)
+    : null
 
   // Apply filters to transactions
   const filteredTransactions = useMemo(() => {
@@ -647,13 +663,18 @@ export default function CashPage() {
       </div>
 
       {/* Monthly overview */}
-      <section className="mt-6 grid grid-cols-3 gap-4">
+      <section className="mt-6 grid grid-cols-3 gap-4" data-testid="monthly-summary">
         <div className="rounded-xl border border-zinc-200 bg-white p-4 text-center">
           <div className="flex items-center justify-center gap-1.5">
             <ArrowDownLeft className="h-4 w-4 text-emerald-500" />
             <p className="text-xs font-medium text-emerald-600 uppercase">Inkomen</p>
           </div>
           <p className="mt-1 text-xl font-bold text-emerald-600">{formatCurrencyShort(totalIncome)}</p>
+          {incomeFreedomDays && (
+            <p className="mt-0.5 text-xs text-emerald-500/70" data-testid="income-freedom-days">
+              {incomeFreedomDays.totalDays.toFixed(1)} dagen vrijheid verdiend
+            </p>
+          )}
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white p-4 text-center">
           <div className="flex items-center justify-center gap-1.5">
@@ -661,12 +682,22 @@ export default function CashPage() {
             <p className="text-xs font-medium text-red-600 uppercase">Uitgaven</p>
           </div>
           <p className="mt-1 text-xl font-bold text-red-600">{formatCurrencyShort(totalExpenses)}</p>
+          {expensesFreedomDays && (
+            <p className="mt-0.5 text-xs text-red-400/70" data-testid="expenses-freedom-days">
+              {expensesFreedomDays.totalDays.toFixed(1)} dagen vrijheid
+            </p>
+          )}
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white p-4 text-center">
           <p className="text-xs font-medium text-zinc-500 uppercase">Netto</p>
           <p className={`mt-1 text-xl font-bold ${netAmount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
             {formatCurrencyShort(netAmount)}
           </p>
+          {netFreedomDays && (
+            <p className={`mt-0.5 text-xs ${netAmount >= 0 ? 'text-emerald-500/70' : 'text-red-400/70'}`} data-testid="net-freedom-days">
+              {netAmount >= 0 ? '+' : '-'}{netFreedomDays.totalDays.toFixed(1)} dagen
+            </p>
+          )}
         </div>
       </section>
 
@@ -939,12 +970,29 @@ export default function CashPage() {
                             </span>
                           )}
 
-                          {/* Amount */}
-                          <span className={`shrink-0 text-sm font-semibold ${
-                            isPositive ? 'text-emerald-600' : 'text-zinc-900'
-                          }`}>
-                            {isPositive ? '+' : ''}{formatCurrency(amount)}
-                          </span>
+                          {/* Amount + freedom time */}
+                          <div className="shrink-0 text-right">
+                            <span className={`text-sm font-semibold ${
+                              isPositive ? 'text-emerald-600' : 'text-zinc-900'
+                            }`}>
+                              {isPositive ? '+' : ''}{formatCurrency(amount)}
+                            </span>
+                            {dailyExpenses > 0 && (
+                              <p className={`text-[10px] leading-tight ${
+                                isPositive ? 'text-emerald-500/60' : 'text-zinc-400'
+                              }`} data-testid="tx-freedom-time">
+                                {(() => {
+                                  const fd = calculateFreedomTime(Math.abs(amount), dailyExpenses)
+                                  const fdStr = fd.totalDays < 1
+                                    ? `${fd.totalDays.toFixed(1)} dagen`
+                                    : formatFreedomTimeString(fd, 'short', true)
+                                  return isPositive
+                                    ? `${fdStr} verdiend`
+                                    : fdStr
+                                })()}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       )
                     })}
