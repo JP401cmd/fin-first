@@ -1,3 +1,48 @@
+## Session 2026-02-17 - Feature #220
+
+### Feature #220: Budget forecast next month prediction - PASSING
+- Implemented complete budget forecast system with all 6 feature steps:
+  1. **Calculate 3-6 month spending average per budget category**: `computeBudgetForecast()` in lib/budget-forecast.ts uses weighted moving average (recent months weighted higher) over 3-6 non-zero months
+  2. **Show predicted next month spend on budget detail**: Forecast section added to BudgetDetailModal showing "Verwachte uitgaven: €X" with purple-themed card
+  3. **Confidence indicator based on spending variance**: Coefficient of variation (CV) maps to high/medium/low confidence with color-coded pills (green/amber/gray) and percentage
+  4. **Alert when predicted spend exceeds budget limit**: Red alert banner with AlertCircle icon when predicted > limit, shows exact overage amount
+  5. **Display contextual message per category**: "Op basis van je patroon geef je volgende maand €420 uit aan boodschappen" format
+  6. **Handle categories with insufficient history**: Shows "Nog niet genoeg uitgavenhistorie" when < 3 non-zero months
+
+#### New Files:
+- **lib/budget-forecast.ts**: Core forecast utility with computeBudgetForecast(), getConfidenceLabel(), getConfidenceColors()
+- **app/api/verify-budget-forecast/route.ts**: 19-test verification endpoint
+- **app/test-budget-forecast/page.tsx**: Visual test page with 6 demo scenarios
+
+#### Modified Files:
+- **app/(app)/core/budgets/page.tsx**: Added forecast section to BudgetDetailModal, imported TrendingUp/AlertCircle/BarChart3 icons and budget-forecast utilities
+- **lib/supabase/proxy.ts**: Added test routes to public paths
+
+#### Verification:
+- 19/19 API verification tests passing at /api/verify-budget-forecast
+- Visual test page renders all 6 scenarios correctly:
+  - High confidence (consistent spending like Boodschappen/Huur)
+  - Low confidence (variable spending like Uit eten)
+  - Exceeds limit alert (Vervoer with rising trend)
+  - Insufficient history (Vakantie with too few months, Nieuw budget with only 2 months)
+- Zero console errors
+- No mock data patterns found
+- Commit: bec56fd
+
+### Current Status
+- 215/265 features passing (214 before + #220)
+- Feature #220 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- Forecast uses existing history data already loaded in BudgetDetailModal (no additional DB queries)
+- Weighted average: weights [1,2,3,4,5,6] for up to 6 months (most recent = highest weight)
+- Confidence thresholds: CV < 0.15 = high, < 0.35 = medium, else low
+- Forecast only shown when history has >= 3 entries (the modal loads 12 months of history)
+- No authenticated browser testing possible (Supabase email rate limit)
+
+---
+
 ## Session 2026-02-17 - Feature #219
 
 ### Feature #219: Resilience score history chart - PASSING
