@@ -1,3 +1,37 @@
+## Session 2026-02-17 - Feature #190
+
+### Feature #190: De Wil unique action and impact lens - PASSING
+- De Wil hero already correctly shows "Vrijheidsdagen gewonnen" as primary metric
+- Verified action-based totalFreedomDaysWon is unique to De Wil:
+  - Core page uses savings-based "Dagen Gewonnen" (daysWonPerMonth) — different calculation
+  - Horizon page has no freedom days won metric at all
+  - Dashboard shows "dagen te winnen" (open potential preview) — different framing
+- All required KPIs verified present:
+  - Voltooide Acties (completed actions with completion ratio)
+  - Open Potentieel (freedom days from pending actions/recommendations)
+  - Beslissnelheid (average days from creation to completion, in hero sub-KPIs)
+  - Wilskrachtscore (A-E grade based on completion ratio)
+  - Doelvoortgang (average goal progress percentage)
+- Consistent teal color theme: 8 teal shades used (teal-50 through teal-950)
+- Hero gradient: from-teal-950 via-teal-900 to-teal-950
+- Progress bar: from-teal-600 via-teal-400 to-teal-300
+
+### Changes Made
+- app/(app)/will/page.tsx: Added data-testid attributes to hero, KPI cards, sub-KPIs
+- app/api/verify-wil-unique-lens/route.ts: Created 12-test verification endpoint
+- app/test-wil-unique-lens/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+
+### Verification
+- 12/12 verification tests passing
+- Zero console errors
+- No mock data patterns found
+- Action-based freedom days confirmed unique to De Wil
+
+### Current Status
+- Feature #190 completed and marked passing
+- Commit: 5337dc6
+
 ## Session 2026-02-17 - Feature #186
 
 ### Feature #186: Consistent philosophical labels throughout app - PASSING
