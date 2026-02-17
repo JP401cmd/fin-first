@@ -1,3 +1,54 @@
+## Session 2026-02-17 - Feature #187
+
+### Feature #187: Dashboard as pure navigation hub with preview metrics - PASSING
+- Redesigned all three dashboard module cards to show PREVIEW metrics only (not full KPIs)
+- Each card now shows a single, focused preview metric that differs from the module's hero metrics
+
+### De Kern Card Preview
+- Changed from: Netto vermogen + Vrijheid % + Budgetten actief (3 separate rows)
+- Changed to: "Vermogensgroei deze maand: +€X (+Y dagen)" (single preview metric)
+- Shows monthly net cash flow (income - expenses) with freedom-day equivalent
+- Uses TrendingUp icon and amber color theme
+- data-testid="kern-preview-metric" and "kern-preview-value"
+
+### De Wil Card Preview
+- Changed from: Open acties + Vrijheid te winnen + Laatste aanbeveling (3 separate rows)
+- Changed to: "X acties open — Y dagen te winnen" (single combined preview)
+- Combines action count with freedom days in one line
+- Uses Zap icon and teal color theme
+- data-testid="wil-preview-metric" and "wil-preview-value"
+
+### De Horizon Card Preview
+- Changed from: Verwachte FIRE-leeftijd + Naar volledige vrijheid + Levensgebeurtenissen (3 rows)
+- Changed to: "Countdown: X jaar, Y maanden" (single countdown preview)
+- Shows "Bereikt!" when FIRE target met, or "-" when no data
+- Uses Compass icon and purple color theme
+- data-testid="horizon-preview-metric" and "horizon-preview-value"
+
+### Verification
+- 12/12 tests passing at /api/verify-dashboard-preview-metrics
+- Zero console errors
+- No mock data patterns found
+- All module card links verified: /core, /will, /horizon
+- Preview metrics verified to differ from each module's hero metrics
+
+### Changes Made
+- app/(app)/dashboard/page.tsx: Replaced 3-row preview metrics on each card with single focused preview metric
+- app/api/verify-dashboard-preview-metrics/route.ts: Created 12-test verification endpoint
+- app/test-dashboard-preview-metrics/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+
+### Current Status
+- 179/265 features passing (178 before + #187)
+- Feature #187 completed and marked passing
+
+### Notes for Next Session
+- Port 3000 used this session
+- Dashboard cards now act as navigation hub with teaser preview metrics
+- Each module card shows one focused metric different from the module's own hero section
+- Removed unused imports: Wallet, Shield, Target, Clock icons
+- Cleaned up unused variables: latestRec, eventCount, budgetCount, netWorthFreedom, netWorthFreedomStr
+
 ## Session 2026-02-17 - Feature #188
 
 ### Feature #188: De Kern unique financial foundation lens - PASSING
