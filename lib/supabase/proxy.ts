@@ -288,6 +288,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-jouw-pad',
     '/test-locked-footer',
     '/api/verify-locked-footer',
+    '/test-feature-roadmap',
+    '/api/verify-feature-roadmap',
   ]
 
   // Protected route prefixes that require authentication

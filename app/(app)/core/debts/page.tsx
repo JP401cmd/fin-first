@@ -28,6 +28,7 @@ import {
 } from '@/lib/debt-data'
 import { type Asset, ASSET_TYPE_LABELS } from '@/lib/asset-data'
 import { FeatureGate } from '@/components/app/feature-gate'
+import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
 
 export default function DebtsPage() {
   const [debts, setDebts] = useState<Debt[]>([])
@@ -479,6 +480,9 @@ export default function DebtsPage() {
           }}
         />
       )}
+
+      {/* Locked features footer for debts sub-page */}
+      <LockedFeaturesFooter module="kern" featureIds={['schulden_aflosplan']} />
 
       {/* New debt form */}
       {showForm && (

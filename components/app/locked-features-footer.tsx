@@ -43,6 +43,8 @@ const MODULE_COLORS: Record<string, { gradient: string; text: string; border: st
 
 interface LockedFeaturesFooterProps {
   module: 'kern' | 'wil' | 'horizon'
+  /** Optional: Override with specific feature IDs for sub-pages that only gate a subset of module features */
+  featureIds?: string[]
 }
 
 /**
@@ -57,12 +59,12 @@ function getUnlockPhase(featureId: string): string | null {
   return null
 }
 
-export function LockedFeaturesFooter({ module }: LockedFeaturesFooterProps) {
+export function LockedFeaturesFooter({ module, featureIds }: LockedFeaturesFooterProps) {
   const { features, phase: currentPhase } = useFeatureAccess()
   const [showPanel, setShowPanel] = useState(false)
 
-  // Get locked features for this module
-  const moduleFeatureIds = MODULE_FEATURES[module] ?? []
+  // Get locked features for this module (or use explicit featureIds for sub-pages)
+  const moduleFeatureIds = featureIds ?? MODULE_FEATURES[module] ?? []
   const lockedFeatures = moduleFeatureIds
     .filter(id => features[id] === false)
     .map(id => {
