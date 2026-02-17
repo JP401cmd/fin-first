@@ -1,3 +1,43 @@
+## Session 2026-02-17 - Feature #194
+
+### Feature #194: New feature spotlight after phase transition - PASSING
+- Enhanced NewFeatureSpotlight component in components/app/feature-gate.tsx
+- System already had: phase transition detection (layout.tsx), newlyUnlockedFeatures (provider),
+  pulse/glow animation, "Nieuw" badge, localStorage seen tracking, auto-dismiss after 8s
+- Added tooltip: "Nieuw! [Feature name] is nu beschikbaar" with:
+  - Feature label lookup via FEATURES.find(f => f.id === featureId)
+  - showTooltip state with 300ms delay after spotlight activation
+  - data-testid={`spotlight-tooltip-${featureId}`} for testing
+  - Dark tooltip with arrow pointing down, blue "Nieuw!" accent text
+  - pointer-events-none to not block interaction
+  - animate-fade-in CSS animation (spotlight-fade-in keyframes in globals.css)
+- Phase transition flow verified end-to-end:
+  1. App layout detects phase change via profiles.last_known_phase vs computed phase
+  2. FeatureAccessProvider computes newlyUnlockedFeatures by matrix comparison
+  3. FeatureGate wraps newly unlocked features in NewFeatureSpotlight
+  4. NewFeatureSpotlight shows pulse/glow ring + "Nieuw" badge + tooltip
+  5. localStorage.setItem(`spotlight_seen_${featureId}`, '1') prevents re-showing
+- 12/12 server-side verification tests + 5/5 client-side localStorage tests = 17/17 total
+- Visual verification: tooltips visible above demo cards on fresh browser (clean localStorage)
+- Zero console errors, no mock data patterns
+
+### Changes Made
+- components/app/feature-gate.tsx: Added tooltip with feature name to NewFeatureSpotlight
+- app/globals.css: Added spotlight-fade-in keyframes and .animate-fade-in class
+- app/api/verify-feature-spotlight/route.ts: Created 12-test verification endpoint
+- app/test-feature-spotlight/page.tsx: Created visual test page with live demo + reset
+- lib/supabase/proxy.ts: Added test routes to public paths
+
+### Current Status
+- 186/265 features passing (185 before + #194)
+- Feature #194 completed and marked passing
+
+### Notes for Next Session
+- Port 3000 used this session
+- Feature-gate.tsx tooltip enhancement was also independently done by feature #192 agent
+- The spotlight system is complete: phase transition → newly unlocked features → spotlight + tooltip → localStorage tracking
+- Tooltips have pointer-events-none so they don't appear in Playwright accessibility snapshots (visual verification needed)
+
 ## Session 2026-02-17 - Feature #196
 
 ### Feature #196: Meer functies beschikbaar footer on gated pages - PASSING
