@@ -1,3 +1,24 @@
+## Session 2026-02-17 - Feature #202
+
+### Feature #202: Consistent section ordering across modules - PASSING
+- Standardized section ordering across all three module overview pages:
+  Hero → NextStep (mt-6) → KPIs (mt-8) → Alerts (mt-8) → Primary Content (mt-10) → Deep Dives (mt-10) → LockedFeaturesFooter → DiscoverCarousel
+- **De Horizon (main fix)**: Alerts were incorrectly placed after Resilience Trend and Projectie-invoer. Moved Alerts directly after KPIs. Swapped Projectie-invoer (Primary Content) before Resilience Trend (Deep Dive). Changed deep-dive spacing from mt-8 to mt-10.
+- **De Kern**: Changed Snapshot Comparison (deep dive) from mt-8 to mt-10. Added data-testid="kern-hero" and data-testid="kern-alerts". Updated section numbering comments.
+- **De Wil**: Added data-testid="wil-alerts". Updated section numbering comments. Was already in correct order.
+- 25/25 verification tests passing at /api/verify-section-ordering
+- No mock data patterns found in source code
+- Zero meaningful console errors (only benign autocomplete warnings and HMR)
+
+### Changes Made
+- app/(app)/horizon/page.tsx: Reordered sections, fixed spacing, added comments
+- app/(app)/core/page.tsx: Fixed deep-dive spacing, added data-testid attrs
+- app/(app)/will/page.tsx: Added data-testid attrs, updated comments
+- app/api/verify-section-ordering/route.ts: New 25-test verification endpoint
+- lib/supabase/proxy.ts: Added /test-section-ordering and /api/verify-section-ordering public paths
+
+---
+
 ## Session 2026-02-17 - Feature #199
 
 ### Feature #199: Mission control card layout for De Kern - PASSING
