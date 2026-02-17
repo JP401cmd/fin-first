@@ -25,6 +25,7 @@ import {
   Hourglass, TrendingUp, Percent, Shield, Info,
   AlertTriangle, Calendar, BarChart3, Clock, FlaskConical, Landmark,
   Plus, X, Trash2, Edit3, Zap, Target,
+  DollarSign, Wallet, PiggyBank, Check, Pencil,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { FeatureGate } from '@/components/app/feature-gate'
@@ -34,12 +35,22 @@ import { NextStepSection, computeAllHorizonSteps } from '@/components/app/next-s
 
 type ActiveModal = null | 'projections' | 'scenarios' | 'simulations' | 'withdrawal'
 
+// Snapshot type for resilience trend data
+type SnapshotForTrend = {
+  snapshot_date: string
+  resilience_score: number | null
+  net_worth: number
+  freedom_percentage: number | null
+}
+
 export default function HorizonPage() {
   const [input, setInput] = useState<HorizonInput | null>(null)
   const [fire, setFire] = useState<FireProjection | null>(null)
   const [range, setRange] = useState<FireRange | null>(null)
   const [projection, setProjection] = useState<ProjectionMonth[]>([])
   const [resilience, setResilience] = useState<ResilienceScore | null>(null)
+  const [snapshotResilience, setSnapshotResilience] = useState<number | null>(null)
+  const [resilienceSnapshots, setResilienceSnapshots] = useState<SnapshotForTrend[]>([])
   const [events, setEvents] = useState<LifeEvent[]>([])
   const [impacts, setImpacts] = useState<LifeEventImpact[]>([])
   const [actions, setActions] = useState<Action[]>([])
@@ -47,6 +58,10 @@ export default function HorizonPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeModal, setActiveModal] = useState<ActiveModal>(null)
+
+  // Income override for what-if analysis
+  const [incomeOverride, setIncomeOverride] = useState<number | null>(null)
+  const [editingIncome, setEditingIncome] = useState(false)
 
   // Event form state
   const [showForm, setShowForm] = useState(false)
@@ -68,7 +83,7 @@ export default function HorizonPage() {
       const oneYearFromNow = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()).toISOString().split('T')[0]
       const today = now.toISOString().split('T')[0]
 
-      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, actionsResult, childBudgetsResult, fullDebtsResult] = await Promise.all([
+      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, actionsResult, childBudgetsResult, fullDebtsResult, snapshotsResult] = await Promise.all([
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution').eq('is_active', true),
         supabase.from('debts').select('current_balance').eq('is_active', true),
@@ -85,6 +100,10 @@ export default function HorizonPage() {
           .order('scheduled_week', { ascending: true }),
         supabase.from('budgets').select('id, parent_id, default_limit').not('parent_id', 'is', null),
         supabase.from('debts').select('*').eq('is_active', true),
+        supabase
+          .from('net_worth_snapshots')
+          .select('snapshot_date, resilience_score, net_worth, freedom_percentage')
+          .order('snapshot_date', { ascending: true }),
       ])
 
       let monthlyIncome = 0
@@ -118,6 +137,19 @@ export default function HorizonPage() {
         monthlyContributions, yearlyMustExpenses, dateOfBirth: dob,
       }
 
+      // Process snapshot data for resilience score
+      const allSnapshots = (snapshotsResult.data ?? []) as SnapshotForTrend[]
+      setResilienceSnapshots(allSnapshots)
+
+      // Use latest snapshot's resilience_score if available
+      const snapshotsWithResilience = allSnapshots.filter(s => s.resilience_score !== null && s.resilience_score !== undefined)
+      if (snapshotsWithResilience.length > 0) {
+        const latestScore = snapshotsWithResilience[snapshotsWithResilience.length - 1].resilience_score
+        setSnapshotResilience(latestScore)
+      } else {
+        setSnapshotResilience(null)
+      }
+
       setInput(horizonInput)
       setFire(computeFireProjection(horizonInput))
       setRange(computeFireRange(horizonInput))
@@ -141,8 +173,28 @@ export default function HorizonPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  const currentAge = input?.dateOfBirth ? ageAtDate(input.dateOfBirth) : null
-  const baseFire = input ? computeFireProjection(input) : null
+  // Compute effective input: base data from DB, with optional income override
+  const effectiveInput: HorizonInput | null = input
+    ? incomeOverride !== null
+      ? { ...input, monthlyIncome: incomeOverride }
+      : input
+    : null
+
+  // Recalculate projections when income override changes
+  useEffect(() => {
+    if (!effectiveInput) return
+    setFire(computeFireProjection(effectiveInput))
+    setRange(computeFireRange(effectiveInput))
+    setProjection(projectForward(effectiveInput, 360))
+    setResilience(computeResilienceScore(effectiveInput))
+    if (events.length > 0) {
+      setImpacts(computeCumulativeImpacts(effectiveInput, events))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incomeOverride])
+
+  const currentAge = effectiveInput?.dateOfBirth ? ageAtDate(effectiveInput.dateOfBirth) : null
+  const baseFire = effectiveInput ? computeFireProjection(effectiveInput) : null
   const totalDelayMonths = impacts.reduce((s, i) => s + i.fireDelayMonths, 0)
   const adjustedFireAge = baseFire?.fireAge != null ? baseFire.fireAge + totalDelayMonths / 12 : null
 
@@ -244,9 +296,9 @@ export default function HorizonPage() {
     )
   }
 
-  const hasNoDob = !input?.dateOfBirth
+  const hasNoDob = !effectiveInput?.dateOfBirth
   const fireNotReachable = fire.fireDate === 'Niet haalbaar'
-  const hasDebt = (input?.totalDebts ?? 0) > 0
+  const hasDebt = (effectiveInput?.totalDebts ?? 0) > 0
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
@@ -381,18 +433,203 @@ export default function HorizonPage() {
         </div>
 
         <FeatureGate featureId="veerkracht_score" fallback="locked">
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="resilience-kpi">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-50">
               <Shield className="h-5 w-5 text-purple-600" />
             </div>
-            <KpiTooltip text="Veerkrachtscore 0-100: hoe goed je bestand bent tegen tegenvallers." />
+            <KpiTooltip text="Veerkrachtscore 0-100: hoe goed je bestand bent tegen tegenvallers. Gebaseerd op je meest recente snapshot." />
           </div>
           <p className="text-sm font-medium text-zinc-500">Veerkracht</p>
-          <p className="mt-1 text-3xl font-bold text-zinc-900">{resilience.total}</p>
-          <p className="mt-1 text-xs text-zinc-400">{resilience.label}</p>
+          <p className="mt-1 text-3xl font-bold text-zinc-900" data-testid="resilience-value">
+            {snapshotResilience !== null ? snapshotResilience : resilience.total}
+          </p>
+          <p className="mt-1 text-xs text-zinc-400" data-testid="resilience-label">
+            {snapshotResilience !== null ? getResilienceLabel(snapshotResilience) : resilience.label}
+          </p>
+          {snapshotResilience !== null && (
+            <p className="mt-0.5 text-[10px] text-purple-400">uit snapshot data</p>
+          )}
         </div>
         </FeatureGate>
+      </section>
+
+      {/* === 2a. Resilience Trend Chart === */}
+      {resilienceSnapshots.filter(s => s.resilience_score !== null).length >= 2 && (
+        <FeatureGate featureId="veerkracht_score" fallback="hidden">
+        <section className="mt-8" data-testid="resilience-trend-section">
+          <div className="mb-3">
+            <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+              <Shield className="mr-1.5 inline h-3.5 w-3.5 text-purple-500" />
+              Veerkracht verloop
+            </h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              Je veerkrachtscore over tijd, gebaseerd op echte snapshot data
+            </p>
+          </div>
+          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
+            <ResilienceTrendChart snapshots={resilienceSnapshots} />
+          </div>
+        </section>
+        </FeatureGate>
+      )}
+
+      {/* === 2b. Projectie-invoer (Financial Inputs Summary) === */}
+      <section className="mt-8" data-testid="fire-inputs">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+              Projectie-invoer
+            </h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              Jouw financiele gegevens die de FIRE-projectie bepalen
+            </p>
+          </div>
+          {incomeOverride !== null && (
+            <button
+              onClick={() => { setIncomeOverride(null); setEditingIncome(false) }}
+              className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-600 hover:bg-purple-100"
+            >
+              Reset naar werkelijk
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Monthly Income - editable */}
+          <div className="rounded-xl border border-zinc-200 bg-white p-4" data-testid="input-income">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50">
+                  <DollarSign className="h-4 w-4 text-emerald-600" />
+                </div>
+                <p className="text-xs font-medium text-zinc-500">Maandinkomen</p>
+              </div>
+              {!editingIncome && (
+                <button
+                  onClick={() => setEditingIncome(true)}
+                  className="rounded p-1 text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600"
+                  title="Inkomen aanpassen"
+                  data-testid="edit-income-btn"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            {editingIncome ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-zinc-400">&euro;</span>
+                <input
+                  type="number"
+                  data-testid="income-input"
+                  defaultValue={Math.round(effectiveInput?.monthlyIncome ?? input?.monthlyIncome ?? 0)}
+                  className="w-full rounded-lg border border-purple-300 bg-purple-50/30 px-2 py-1.5 text-lg font-bold text-zinc-900 focus:border-purple-500 focus:outline-none"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const val = Number((e.target as HTMLInputElement).value)
+                      if (val >= 0) {
+                        setIncomeOverride(val)
+                        setEditingIncome(false)
+                      }
+                    }
+                    if (e.key === 'Escape') {
+                      setEditingIncome(false)
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const val = Number(e.target.value)
+                    if (val >= 0) {
+                      setIncomeOverride(val)
+                    }
+                    setEditingIncome(false)
+                  }}
+                  autoFocus
+                />
+                <button
+                  onClick={() => setEditingIncome(false)}
+                  className="rounded p-1 text-zinc-400 hover:text-zinc-600"
+                >
+                  <Check className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <p className="text-lg font-bold text-zinc-900" data-testid="income-display">
+                {formatCurrency(effectiveInput?.monthlyIncome ?? 0)}
+                {incomeOverride !== null && (
+                  <span className="ml-1.5 text-xs font-normal text-purple-500">(aangepast)</span>
+                )}
+              </p>
+            )}
+            <p className="mt-0.5 text-[10px] text-zinc-400">
+              {incomeOverride !== null
+                ? `Werkelijk: ${formatCurrency(input?.monthlyIncome ?? 0)}`
+                : 'uit transacties deze maand'}
+            </p>
+          </div>
+
+          {/* Monthly Expenses */}
+          <div className="rounded-xl border border-zinc-200 bg-white p-4" data-testid="input-expenses">
+            <div className="mb-2 flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-50">
+                <Wallet className="h-4 w-4 text-red-500" />
+              </div>
+              <p className="text-xs font-medium text-zinc-500">Maanduitgaven</p>
+            </div>
+            <p className="text-lg font-bold text-zinc-900">{formatCurrency(effectiveInput?.monthlyExpenses ?? 0)}</p>
+            <p className="mt-0.5 text-[10px] text-zinc-400">uit transacties deze maand</p>
+          </div>
+
+          {/* Total Assets */}
+          <div className="rounded-xl border border-zinc-200 bg-white p-4" data-testid="input-assets">
+            <div className="mb-2 flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-50">
+                <PiggyBank className="h-4 w-4 text-purple-600" />
+              </div>
+              <p className="text-xs font-medium text-zinc-500">Totaal vermogen</p>
+            </div>
+            <p className="text-lg font-bold text-zinc-900">{formatCurrency(effectiveInput?.totalAssets ?? 0)}</p>
+            <p className="mt-0.5 text-[10px] text-zinc-400">actieve bezittingen</p>
+          </div>
+
+          {/* Total Debts */}
+          <div className="rounded-xl border border-zinc-200 bg-white p-4" data-testid="input-debts">
+            <div className="mb-2 flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50">
+                <TrendingUp className="h-4 w-4 text-amber-600" />
+              </div>
+              <p className="text-xs font-medium text-zinc-500">Totaal schulden</p>
+            </div>
+            <p className="text-lg font-bold text-zinc-900">{formatCurrency(effectiveInput?.totalDebts ?? 0)}</p>
+            <p className="mt-0.5 text-[10px] text-zinc-400">actieve schulden</p>
+          </div>
+
+          {/* Savings Rate - computed from income & expenses */}
+          <div className="rounded-xl border border-zinc-200 bg-white p-4" data-testid="input-savings-rate">
+            <div className="mb-2 flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-50">
+                <Percent className="h-4 w-4 text-teal-600" />
+              </div>
+              <p className="text-xs font-medium text-zinc-500">Spaarquote</p>
+            </div>
+            <p className="text-lg font-bold text-zinc-900" data-testid="savings-rate-display">
+              {fire ? `${fire.savingsRate.toFixed(1)}%` : '0.0%'}
+            </p>
+            <p className="mt-0.5 text-[10px] text-zinc-400">berekend uit inkomen &amp; uitgaven</p>
+          </div>
+
+          {/* Annual Expenses - from budget data */}
+          <div className="rounded-xl border border-zinc-200 bg-white p-4" data-testid="input-annual-expenses">
+            <div className="mb-2 flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-50">
+                <Target className="h-4 w-4 text-rose-500" />
+              </div>
+              <p className="text-xs font-medium text-zinc-500">Jaarlijkse vaste lasten</p>
+            </div>
+            <p className="text-lg font-bold text-zinc-900" data-testid="annual-expenses-display">
+              {formatCurrency(effectiveInput?.yearlyMustExpenses ?? 0)}
+            </p>
+            <p className="mt-0.5 text-[10px] text-zinc-400">uit budget categorieën</p>
+          </div>
+        </div>
       </section>
 
       {/* === 3. Alerts === */}
@@ -422,7 +659,7 @@ export default function HorizonPage() {
               <div className="flex items-center gap-3 rounded-lg border border-purple-200 bg-purple-50/50 p-3">
                 <Info className="h-4 w-4 text-purple-500" />
                 <span className="flex-1 text-sm font-medium text-purple-700">
-                  Je hebt {formatCurrency(input?.totalDebts ?? 0)} aan schulden -- dit vertraagt je FIRE-datum.
+                  Je hebt {formatCurrency(effectiveInput?.totalDebts ?? 0)} aan schulden -- dit vertraagt je FIRE-datum.
                 </span>
               </div>
             )}
@@ -517,7 +754,7 @@ export default function HorizonPage() {
               events={events}
               impacts={impacts}
               actions={actions}
-              dateOfBirth={input?.dateOfBirth ?? null}
+              dateOfBirth={effectiveInput?.dateOfBirth ?? null}
             />
           </div>
         )}
@@ -690,10 +927,10 @@ export default function HorizonPage() {
               {formatCurrency(fire.monthlyPassiveIncome)} / mnd
             </p>
             <p className="mt-1 text-sm text-zinc-400">
-              passief inkomen dekt {fire.monthlyPassiveIncome > 0 && input?.monthlyExpenses
-                ? `${Math.round((fire.monthlyPassiveIncome / input.monthlyExpenses) * 100)}%`
+              passief inkomen dekt {fire.monthlyPassiveIncome > 0 && effectiveInput?.monthlyExpenses
+                ? `${Math.round((fire.monthlyPassiveIncome / effectiveInput.monthlyExpenses) * 100)}%`
                 : '0%'
-              } van je maandelijkse uitgaven ({formatCurrency(input?.monthlyExpenses ?? 0)})
+              } van je maandelijkse uitgaven ({formatCurrency(effectiveInput?.monthlyExpenses ?? 0)})
             </p>
           </div>
         </div>
@@ -780,12 +1017,12 @@ export default function HorizonPage() {
       )}
 
       {/* === Deep-dive Modals === */}
-      {input && (
+      {effectiveInput && (
         <>
-          <ProjectionsModal input={input} open={activeModal === 'projections'} onClose={() => setActiveModal(null)} />
-          <ScenariosModal input={input} debts={debts} open={activeModal === 'scenarios'} onClose={() => setActiveModal(null)} />
-          <SimulationsModal input={input} open={activeModal === 'simulations'} onClose={() => setActiveModal(null)} />
-          <WithdrawalModal input={input} open={activeModal === 'withdrawal'} onClose={() => setActiveModal(null)} />
+          <ProjectionsModal input={effectiveInput} open={activeModal === 'projections'} onClose={() => setActiveModal(null)} />
+          <ScenariosModal input={effectiveInput} debts={debts} open={activeModal === 'scenarios'} onClose={() => setActiveModal(null)} />
+          <SimulationsModal input={effectiveInput} open={activeModal === 'simulations'} onClose={() => setActiveModal(null)} />
+          <WithdrawalModal input={effectiveInput} open={activeModal === 'withdrawal'} onClose={() => setActiveModal(null)} />
         </>
       )}
     </div>
@@ -900,6 +1137,138 @@ function ProjectionChart({ data, fireTarget }: { data: ProjectionMonth[]; fireTa
 
       <circle cx={PAD} cy={12} r="4" fill="#8B5CB8" />
       <text x={PAD + 8} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Netto vermogen</text>
+    </svg>
+  )
+}
+
+// ── Resilience score helper ─────────────────────────────────
+
+function getResilienceLabel(score: number): string {
+  if (score >= 80) return 'Uitstekend'
+  if (score >= 60) return 'Sterk'
+  if (score >= 40) return 'Redelijk'
+  if (score >= 20) return 'Kwetsbaar'
+  return 'Kritiek'
+}
+
+function ResilienceTrendChart({ snapshots }: { snapshots: SnapshotForTrend[] }) {
+  const withScore = snapshots.filter(s => s.resilience_score !== null && s.resilience_score !== undefined)
+  if (withScore.length < 2) return null
+
+  const W = 600
+  const H = 200
+  const PAD = 45
+
+  const scores = withScore.map(s => s.resilience_score as number)
+  const maxVal = 100
+  const minVal = 0
+
+  function x(i: number) { return PAD + (i / (withScore.length - 1)) * (W - PAD * 2) }
+  function y(val: number) { return H - PAD - ((val - minVal) / (maxVal - minVal)) * (H - PAD * 2) }
+
+  const linePath = withScore.map((s, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(s.resilience_score as number).toFixed(1)}`).join(' ')
+  const areaPath = linePath + ` L${x(withScore.length - 1).toFixed(1)},${(H - PAD).toFixed(1)} L${PAD},${(H - PAD).toFixed(1)} Z`
+
+  // Color zones: Kritiek (0-20), Kwetsbaar (20-40), Redelijk (40-60), Sterk (60-80), Uitstekend (80-100)
+  const zones = [
+    { min: 0, max: 20, color: '#fecaca', label: 'Kritiek' },
+    { min: 20, max: 40, color: '#fed7aa', label: 'Kwetsbaar' },
+    { min: 40, max: 60, color: '#fef08a', label: 'Redelijk' },
+    { min: 60, max: 80, color: '#bbf7d0', label: 'Sterk' },
+    { min: 80, max: 100, color: '#a5f3fc', label: 'Uitstekend' },
+  ]
+
+  // Format date label
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr)
+    const months = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
+    return `${months[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`
+  }
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 220 }} data-testid="resilience-trend-chart">
+      {/* Background color zones */}
+      {zones.map(zone => (
+        <rect
+          key={zone.label}
+          x={PAD}
+          y={y(zone.max)}
+          width={W - PAD * 2}
+          height={y(zone.min) - y(zone.max)}
+          fill={zone.color}
+          opacity="0.15"
+        />
+      ))}
+
+      {/* Grid lines at zone boundaries */}
+      {[20, 40, 60, 80].map(val => (
+        <g key={val}>
+          <line x1={PAD} y1={y(val)} x2={W - PAD} y2={y(val)} stroke="#e4e4e7" strokeDasharray="4" />
+          <text x={PAD - 4} y={y(val) + 3} textAnchor="end" className="fill-zinc-400" style={{ fontSize: 9 }}>
+            {val}
+          </text>
+        </g>
+      ))}
+
+      {/* Y-axis labels */}
+      <text x={PAD - 4} y={y(0) + 3} textAnchor="end" className="fill-zinc-400" style={{ fontSize: 9 }}>0</text>
+      <text x={PAD - 4} y={y(100) + 3} textAnchor="end" className="fill-zinc-400" style={{ fontSize: 9 }}>100</text>
+
+      {/* Area fill */}
+      <defs>
+        <linearGradient id="resilienceGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#8B5CB8" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="#8B5CB8" stopOpacity="0.05" />
+        </linearGradient>
+      </defs>
+      <path d={areaPath} fill="url(#resilienceGrad)" />
+
+      {/* Line */}
+      <path d={linePath} fill="none" stroke="#8B5CB8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+      {/* Data points */}
+      {withScore.map((s, i) => (
+        <circle
+          key={i}
+          cx={x(i)}
+          cy={y(s.resilience_score as number)}
+          r="4"
+          fill="#8B5CB8"
+          stroke="white"
+          strokeWidth="2"
+        />
+      ))}
+
+      {/* X-axis date labels */}
+      {withScore.map((s, i) => {
+        // Show every label if few points, otherwise skip some
+        const showEvery = withScore.length <= 6 ? 1 : Math.ceil(withScore.length / 6)
+        if (i % showEvery !== 0 && i !== withScore.length - 1) return null
+        return (
+          <text key={i} x={x(i)} y={H - 8} textAnchor="middle" className="fill-zinc-400" style={{ fontSize: 9 }}>
+            {formatDate(s.snapshot_date)}
+          </text>
+        )
+      })}
+
+      {/* Score value labels on data points */}
+      {withScore.map((s, i) => {
+        const score = s.resilience_score as number
+        const showEvery = withScore.length <= 8 ? 1 : Math.ceil(withScore.length / 8)
+        if (i % showEvery !== 0 && i !== withScore.length - 1) return null
+        return (
+          <text
+            key={`val-${i}`}
+            x={x(i)}
+            y={y(score) - 10}
+            textAnchor="middle"
+            className="fill-purple-700"
+            style={{ fontSize: 10, fontWeight: 600 }}
+          >
+            {score}
+          </text>
+        )
+      })}
     </svg>
   )
 }

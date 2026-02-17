@@ -253,6 +253,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-collapsible-defaults',
     '/test-fire-scenario-defaults',
     '/api/verify-fire-scenario-defaults',
+    '/test-format-with-freedom',
+    '/api/verify-format-with-freedom',
   ]
 
   // Protected route prefixes that require authentication
