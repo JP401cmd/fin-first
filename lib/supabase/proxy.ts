@@ -276,6 +276,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-dashboard-preview-metrics',
     '/api/verify-philosophical-labels',
     '/test-philosophical-labels',
+    '/test-wil-unique-lens',
+    '/api/verify-wil-unique-lens',
   ]
 
   // Protected route prefixes that require authentication
