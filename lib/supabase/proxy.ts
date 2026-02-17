@@ -255,6 +255,10 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-fire-scenario-defaults',
     '/test-format-with-freedom',
     '/api/verify-format-with-freedom',
+    '/test-freedom-subtitles',
+    '/api/verify-freedom-subtitles',
+    '/test-kern-hero',
+    '/api/verify-kern-hero',
   ]
 
   // Protected route prefixes that require authentication

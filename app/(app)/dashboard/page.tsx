@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { computeFireProjection, type HorizonInput } from '@/lib/horizon-data'
-import { formatCurrency } from '@/lib/format'
+import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { FhinAvatar, FinnAvatar, FfinAvatar } from '@/components/app/avatars'
 import { JouwPadWidget } from '@/components/app/jouw-pad-widget'
 import { BadgeEvaluator } from '@/components/app/badge-evaluator'
@@ -92,6 +92,17 @@ export default async function DashboardPage() {
   // We'll just show the count of active top-level budgets
   const budgetCount = allBudgetsResult.data?.length ?? 0
 
+  // Daily expenses for freedom-time calculations
+  const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 0
+
+  // Net worth as freedom time (for De Kern subtitle)
+  const netWorthFreedom = dailyExpenses > 0
+    ? calculateFreedomTime(netWorth, dailyExpenses)
+    : null
+  const netWorthFreedomStr = netWorthFreedom
+    ? formatFreedomTimeString(netWorthFreedom, 'long')
+    : null
+
   const activated = profileResult.data?.last_known_phase !== null
 
   // Sovereignty level calculation for Jouw Pad widget
@@ -142,13 +153,20 @@ export default async function DashboardPage() {
 
           {/* Preview metrics */}
           <div className="space-y-3 border-t border-zinc-100 pt-4">
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                <Wallet className="h-3.5 w-3.5" /> Netto vermogen
-              </span>
-              <span className="text-sm font-semibold text-zinc-900">
-                {formatCurrency(netWorth)}
-              </span>
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-xs text-zinc-400">
+                  <Wallet className="h-3.5 w-3.5" /> Netto vermogen
+                </span>
+                <span className="text-sm font-semibold text-zinc-900">
+                  {formatCurrency(netWorth)}
+                </span>
+              </div>
+              {netWorthFreedomStr && (
+                <p data-testid="kern-freedom-subtitle" className="mt-0.5 text-right text-xs text-amber-600/80">
+                  {netWorthFreedomStr} vrijheid
+                </p>
+              )}
             </div>
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1.5 text-xs text-zinc-400">
@@ -201,13 +219,20 @@ export default async function DashboardPage() {
                   {openActions.length}
                 </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                  <Target className="h-3.5 w-3.5" /> Potentiele vrijheidsdagen
-                </span>
-                <span className="text-sm font-semibold text-teal-600">
-                  {Math.round(totalFreedomDaysOpen)} dagen
-                </span>
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-xs text-zinc-400">
+                    <Target className="h-3.5 w-3.5" /> Vrijheid te winnen
+                  </span>
+                  <span data-testid="wil-freedom-subtitle" className="text-sm font-semibold text-teal-600">
+                    {Math.round(totalFreedomDaysOpen)} {Math.round(totalFreedomDaysOpen) === 1 ? 'dag' : 'dagen'}
+                  </span>
+                </div>
+                {totalFreedomDaysOpen > 0 && (
+                  <p className="mt-0.5 text-right text-xs text-teal-600/70">
+                    via {openActions.length} open {openActions.length === 1 ? 'actie' : 'acties'}
+                  </p>
+                )}
               </div>
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-1.5 text-xs text-zinc-400">
@@ -252,15 +277,29 @@ export default async function DashboardPage() {
                   {fireProjResult.fireAge != null ? `${Math.round(fireProjResult.fireAge)} jaar` : '-'}
                 </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                  <TrendingUp className="h-3.5 w-3.5" /> Countdown
-                </span>
-                <span className="text-sm font-semibold text-purple-600">
-                  {fireProjResult.countdownDays > 0
-                    ? `${fireProjResult.countdownYears}j ${fireProjResult.countdownMonths}mnd`
-                    : fireProjResult.fireDate === 'Bereikt!' ? 'Bereikt!' : '-'}
-                </span>
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-xs text-zinc-400">
+                    <TrendingUp className="h-3.5 w-3.5" /> Naar volledige vrijheid
+                  </span>
+                  <span data-testid="horizon-freedom-subtitle" className="text-sm font-semibold text-purple-600">
+                    {fireProjResult.countdownDays > 0
+                      ? `${fireProjResult.countdownYears}j ${fireProjResult.countdownMonths}mnd`
+                      : fireProjResult.fireDate === 'Bereikt!' ? 'Bereikt!' : '-'}
+                  </span>
+                </div>
+                {fireProjResult.countdownDays > 0 && (
+                  <p className="mt-0.5 text-right text-xs text-purple-600/70">
+                    {fireProjResult.countdownYears > 0
+                      ? `${fireProjResult.countdownYears} jaar naar volledige vrijheid`
+                      : `${fireProjResult.countdownMonths} maanden naar volledige vrijheid`}
+                  </p>
+                )}
+                {fireProjResult.fireDate === 'Bereikt!' && (
+                  <p className="mt-0.5 text-right text-xs text-purple-600/70">
+                    Volledige vrijheid bereikt!
+                  </p>
+                )}
               </div>
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-1.5 text-xs text-zinc-400">

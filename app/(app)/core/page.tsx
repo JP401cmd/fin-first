@@ -12,14 +12,14 @@ import type { Budget } from '@/lib/budget-data'
 import type { NetWorthSnapshot } from '@/lib/net-worth-data'
 import {
   Calendar, TrendingUp, Sun, Star, Wallet, ShoppingCart,
-  PiggyBank, Building2, ArrowRight, Info, Camera, Download, ChevronDown, Receipt,
+  PiggyBank, Building2, ArrowRight, Info, Camera, Download, ChevronDown, Receipt, Flag,
 } from 'lucide-react'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { CollapsibleSection } from '@/components/app/collapsible-section'
 import { DiscoverCarousel } from '@/components/app/discover-carousel'
 import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
 import { NextStepSection, computeAllKernSteps } from '@/components/app/next-step-card'
-import { FreedomTimeLabel, FreedomTimeBadge } from '@/components/app/freedom-time-label'
+import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 
 export default function CorePage() {
   const router = useRouter()
@@ -34,6 +34,7 @@ export default function CorePage() {
   const [savingsRateMonths, setSavingsRateMonths] = useState(12)
   const [budgetCount, setBudgetCount] = useState(0)
   const [hasTransactions, setHasTransactions] = useState(false)
+  const [earnedBadges, setEarnedBadges] = useState<{ slug: string; earned_at: string }[]>([])
 
   const loadData = useCallback(async () => {
     try {
@@ -223,6 +224,23 @@ export default function CorePage() {
         setSnapshots(snapshotResult.data as NetWorthSnapshot[])
       }
 
+      // Fetch earned badges for milestone markers on net worth chart
+      try {
+        const { data: badgesData } = await supabase.from('badges').select('id, slug')
+        const { data: userBadgesData } = await supabase.from('user_badges').select('badge_id, earned_at')
+        if (badgesData && userBadgesData) {
+          const idToSlug = new Map(badgesData.map((b: { id: string; slug: string }) => [b.id, b.slug]))
+          setEarnedBadges(
+            userBadgesData.map((ub: { badge_id: string; earned_at: string }) => ({
+              slug: idToSlug.get(ub.badge_id) ?? '',
+              earned_at: ub.earned_at,
+            })).filter((b: { slug: string }) => b.slug)
+          )
+        }
+      } catch {
+        // Badge fetch is non-critical; chart still works without badges
+      }
+
     } catch (err) {
       console.error('Error loading core data:', err)
       setError('Kon gegevens niet laden. Probeer het opnieuw.')
@@ -320,26 +338,25 @@ export default function CorePage() {
 
           <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-3">
             <div>
-              <p className="text-xs font-medium text-amber-300/60 uppercase">Vrijheidstijd</p>
+              <p className="text-xs font-medium text-amber-300/60 uppercase">Netto vermogen</p>
+              <p className="mt-1 text-2xl font-bold">{formatCurrency(data.netWorth)}</p>
+              <p className="mt-1 text-sm text-amber-200/70" data-testid="net-worth-freedom-subtitle">
+                dat is {data.freedomYears > 0 ? `${data.freedomYears} jaar en ` : ''}{data.freedomMonths} maanden vrijheid
+              </p>
+            </div>
+            <div data-testid="vrijheidstijd-opgebouwd">
+              <p className="text-xs font-medium text-amber-300/60 uppercase">Vrijheidstijd opgebouwd</p>
               <p className="mt-1 text-2xl font-bold">
                 {data.freedomYears}j {data.freedomMonths}mnd
               </p>
-              <p className="text-sm text-amber-200/50">opgebouwde vrijheid</p>
+              <p className="text-sm text-amber-200/50">vrijheid die je bezit</p>
             </div>
             <div>
-              <p className="text-xs font-medium text-amber-300/60 uppercase">Netto vermogen</p>
-              <p className="mt-1 text-2xl font-bold">{formatCurrency(data.netWorth)}</p>
-              <FreedomTimeBadge amount={data.netWorth} className="mt-1 bg-amber-800/30 text-amber-200/80" />
-              <p className="text-sm text-amber-200/50">opgeslagen levensenergie</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-amber-300/60 uppercase">Verwachte FIRE</p>
-              <p className="mt-1 text-2xl font-bold capitalize">{data.expectedFireDate || '-'}</p>
-              {data.yearsToFire > 0 && (
-                <p className="text-sm text-amber-200/50">
-                  (nog {data.yearsToFire}j en {data.monthsToFire}mnd te gaan)
-                </p>
-              )}
+              <p className="text-xs font-medium text-amber-300/60 uppercase">Autonomiescore</p>
+              <p className="mt-1 text-2xl font-bold">{data.autonomyScore}</p>
+              <p className="text-sm text-amber-200/50">
+                {data.freeDaysPerYear > 0 ? `${data.freeDaysPerYear} vrije dagen/jaar` : 'bouw je vrijheid op'}
+              </p>
             </div>
           </div>
         </div>
@@ -521,7 +538,7 @@ export default function CorePage() {
                   {snapshotLoading ? 'Bezig...' : 'Snapshot nu'}
                 </button>
               </div>
-              <NetWorthChart snapshots={snapshots} />
+              <NetWorthChart snapshots={snapshots} fireTarget={data.fireTarget} earnedBadges={earnedBadges} />
             </>
           ) : (
             <div className="text-center py-4">
@@ -775,12 +792,127 @@ function SnapshotComparisonContent({ snapshots }: { snapshots: NetWorthSnapshot[
   )
 }
 
-function NetWorthChart({ snapshots }: { snapshots: NetWorthSnapshot[] }) {
+/**
+ * Milestone definition for net worth chart markers.
+ * Each milestone has a threshold amount, label, and optional badge slug.
+ */
+type NetWorthMilestone = {
+  amount: number
+  label: string
+  icon: string
+  color: string
+  badgeSlug?: string
+}
+
+/**
+ * Detected milestone with the actual date it was achieved.
+ */
+type DetectedMilestone = NetWorthMilestone & {
+  achievedDate: string
+  snapshotNetWorth: number
+  badgeEarnedAt?: string
+}
+
+/**
+ * Get applicable milestones based on the data range.
+ * Includes both absolute amount milestones and FIRE percentage milestones.
+ */
+function getNetWorthMilestones(fireTarget: number): NetWorthMilestone[] {
+  const milestones: NetWorthMilestone[] = [
+    // Crossing zero — positive net worth
+    { amount: 0, label: 'In de plus', icon: '📈', color: '#10b981', badgeSlug: 'positive_net_worth' },
+    // Round number milestones
+    { amount: 10000, label: '€10k', icon: '🎯', color: '#f59e0b' },
+    { amount: 25000, label: '€25k', icon: '⭐', color: '#f59e0b' },
+    { amount: 50000, label: '€50k', icon: '🌟', color: '#f59e0b' },
+    { amount: 100000, label: '€100k', icon: '💎', color: '#8b5cf6' },
+    { amount: 250000, label: '€250k', icon: '🏆', color: '#8b5cf6' },
+    { amount: 500000, label: '€500k', icon: '👑', color: '#8b5cf6' },
+    { amount: 1000000, label: '€1M', icon: '∞', color: '#8b5cf6' },
+  ]
+
+  // Add FIRE percentage milestones if we have a FIRE target
+  if (fireTarget > 0) {
+    milestones.push(
+      { amount: fireTarget * 0.10, label: '10% FIRE', icon: '🌱', color: '#a855f7', badgeSlug: 'fire_10_pct' },
+      { amount: fireTarget * 0.25, label: '25% FIRE', icon: '🌿', color: '#a855f7', badgeSlug: 'fire_25_pct' },
+      { amount: fireTarget * 0.50, label: '50% FIRE', icon: '🌳', color: '#a855f7', badgeSlug: 'fire_50_pct' },
+      { amount: fireTarget * 1.00, label: '100% FIRE', icon: '∞', color: '#a855f7', badgeSlug: 'fire_100_pct' },
+    )
+  }
+
+  return milestones
+}
+
+/**
+ * Detect which milestones were achieved in the snapshot history.
+ * For each milestone, find the first snapshot where net worth crosses the threshold.
+ */
+function detectMilestones(
+  snapshots: NetWorthSnapshot[],
+  fireTarget: number,
+  earnedBadges: { slug: string; earned_at: string }[]
+): DetectedMilestone[] {
+  const milestones = getNetWorthMilestones(fireTarget)
+  const detected: DetectedMilestone[] = []
+  const badgeMap = new Map(earnedBadges.map(b => [b.slug, b.earned_at]))
+
+  for (const milestone of milestones) {
+    // For crossing zero: find first snapshot where net_worth > 0 after being <= 0
+    if (milestone.amount === 0) {
+      const crossingSnapshot = snapshots.find((s, i) => {
+        const nw = Number(s.net_worth)
+        if (nw <= 0) return false
+        // First snapshot or previous was negative/zero
+        if (i === 0) return nw > 0
+        return Number(snapshots[i - 1].net_worth) <= 0
+      })
+      if (crossingSnapshot) {
+        detected.push({
+          ...milestone,
+          achievedDate: crossingSnapshot.snapshot_date,
+          snapshotNetWorth: Number(crossingSnapshot.net_worth),
+          badgeEarnedAt: milestone.badgeSlug ? badgeMap.get(milestone.badgeSlug) : undefined,
+        })
+      }
+      continue
+    }
+
+    // For amount thresholds: find first snapshot where net_worth >= threshold
+    const crossingSnapshot = snapshots.find((s, i) => {
+      const nw = Number(s.net_worth)
+      if (nw < milestone.amount) return false
+      // First snapshot already above or previous was below
+      if (i === 0) return true
+      return Number(snapshots[i - 1].net_worth) < milestone.amount
+    })
+
+    if (crossingSnapshot) {
+      detected.push({
+        ...milestone,
+        achievedDate: crossingSnapshot.snapshot_date,
+        snapshotNetWorth: Number(crossingSnapshot.net_worth),
+        badgeEarnedAt: milestone.badgeSlug ? badgeMap.get(milestone.badgeSlug) : undefined,
+      })
+    }
+  }
+
+  return detected
+}
+
+function NetWorthChart({ snapshots, fireTarget = 0, earnedBadges = [] }: {
+  snapshots: NetWorthSnapshot[]
+  fireTarget?: number
+  earnedBadges?: { slug: string; earned_at: string }[]
+}) {
+  const [hoveredMilestone, setHoveredMilestone] = useState<number | null>(null)
+
   if (snapshots.length === 0) return null
 
   const W = 600
-  const H = 200
+  const H = 240 // Slightly taller to accommodate milestone markers
   const PAD = 40
+  const TOP_PAD = 28 // Extra space for legend
 
   const dates = snapshots.map(s => new Date(s.snapshot_date).getTime())
   const minDate = Math.min(...dates)
@@ -792,53 +924,175 @@ function NetWorthChart({ snapshots }: { snapshots: NetWorthSnapshot[] }) {
   const minVal = Math.min(...allValues, 0)
   const valRange = maxVal - minVal || 1
 
-  function x(date: string) { return PAD + ((new Date(date).getTime() - minDate) / dateRange) * (W - PAD * 2) }
-  function y(val: number) { return H - PAD - ((val - minVal) / valRange) * (H - PAD * 2) }
+  function xPos(date: string) { return PAD + ((new Date(date).getTime() - minDate) / dateRange) * (W - PAD * 2) }
+  function yPos(val: number) { return H - PAD - ((val - minVal) / valRange) * (H - PAD - TOP_PAD) }
 
   function line(key: 'total_assets' | 'total_debts' | 'net_worth') {
-    return snapshots.map((s, i) => `${i === 0 ? 'M' : 'L'}${x(s.snapshot_date).toFixed(1)},${y(Number(s[key])).toFixed(1)}`).join(' ')
+    return snapshots.map((s, i) => `${i === 0 ? 'M' : 'L'}${xPos(s.snapshot_date).toFixed(1)},${yPos(Number(s[key])).toFixed(1)}`).join(' ')
   }
 
+  // Detect milestones
+  const detectedMilestones = detectMilestones(snapshots, fireTarget, earnedBadges)
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 220 }}>
-      {/* Grid lines */}
-      {[0.25, 0.5, 0.75].map(pct => {
-        const yPos = H - PAD - pct * (H - PAD * 2)
-        const val = minVal + pct * valRange
-        return (
-          <g key={pct}>
-            <line x1={PAD} y1={yPos} x2={W - PAD} y2={yPos} stroke="#e4e4e7" strokeDasharray="4" />
-            <text x={PAD - 4} y={yPos + 3} textAnchor="end" className="fill-zinc-400" style={{ fontSize: 9 }}>
-              {val >= 1000 ? `${(val/1000).toFixed(0)}k` : val.toFixed(0)}
-            </text>
-          </g>
-        )
-      })}
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 260 }}>
+        {/* Grid lines */}
+        {[0.25, 0.5, 0.75].map(pct => {
+          const yVal = H - PAD - pct * (H - PAD - TOP_PAD)
+          const val = minVal + pct * valRange
+          return (
+            <g key={pct}>
+              <line x1={PAD} y1={yVal} x2={W - PAD} y2={yVal} stroke="#e4e4e7" strokeDasharray="4" />
+              <text x={PAD - 4} y={yVal + 3} textAnchor="end" className="fill-zinc-400" style={{ fontSize: 9 }}>
+                {val >= 1000 ? `${(val/1000).toFixed(0)}k` : val.toFixed(0)}
+              </text>
+            </g>
+          )
+        })}
 
-      {/* Lines */}
-      <path d={line('total_assets')} fill="none" stroke="#10b981" strokeWidth="2" />
-      <path d={line('total_debts')} fill="none" stroke="#ef4444" strokeWidth="2" />
-      <path d={line('net_worth')} fill="none" stroke="#f59e0b" strokeWidth="2.5" />
+        {/* Lines */}
+        <path d={line('total_assets')} fill="none" stroke="#10b981" strokeWidth="2" />
+        <path d={line('total_debts')} fill="none" stroke="#ef4444" strokeWidth="2" />
+        <path d={line('net_worth')} fill="none" stroke="#f59e0b" strokeWidth="2.5" />
 
-      {/* Dots for net worth */}
-      {snapshots.map((s, i) => (
-        <circle key={i} cx={x(s.snapshot_date)} cy={y(Number(s.net_worth))} r="3" fill="#f59e0b" />
-      ))}
+        {/* Dots for net worth */}
+        {snapshots.map((s, i) => (
+          <circle key={i} cx={xPos(s.snapshot_date)} cy={yPos(Number(s.net_worth))} r="3" fill="#f59e0b" />
+        ))}
 
-      {/* X-axis labels */}
-      {snapshots.filter((_, i) => i % Math.max(1, Math.floor(snapshots.length / 6)) === 0 || i === snapshots.length - 1).map((s, i) => (
-        <text key={i} x={x(s.snapshot_date)} y={H - 8} textAnchor="middle" className="fill-zinc-400" style={{ fontSize: 9 }}>
-          {new Date(s.snapshot_date).toLocaleDateString('nl-NL', { month: 'short' })}
-        </text>
-      ))}
+        {/* === Milestone Markers === */}
+        {detectedMilestones.map((m, i) => {
+          const mx = xPos(m.achievedDate)
+          const my = yPos(m.snapshotNetWorth)
+          const isHovered = hoveredMilestone === i
 
-      {/* Legend */}
-      <circle cx={PAD} cy={12} r="4" fill="#10b981" />
-      <text x={PAD + 8} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Assets</text>
-      <circle cx={PAD + 60} cy={12} r="4" fill="#ef4444" />
-      <text x={PAD + 68} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Schulden</text>
-      <circle cx={PAD + 140} cy={12} r="4" fill="#f59e0b" />
-      <text x={PAD + 148} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Netto</text>
-    </svg>
+          return (
+            <g
+              key={`milestone-${i}`}
+              data-testid={`milestone-marker-${m.label.replace(/[^a-zA-Z0-9]/g, '-')}`}
+              onMouseEnter={() => setHoveredMilestone(i)}
+              onMouseLeave={() => setHoveredMilestone(null)}
+              style={{ cursor: 'pointer' }}
+            >
+              {/* Vertical dashed line from milestone to x-axis */}
+              <line
+                x1={mx} y1={my} x2={mx} y2={H - PAD}
+                stroke={m.color}
+                strokeWidth="1"
+                strokeDasharray="3,3"
+                opacity={isHovered ? 0.8 : 0.4}
+              />
+
+              {/* Diamond marker at the milestone point */}
+              <g transform={`translate(${mx},${my})`}>
+                <polygon
+                  points="0,-7 5,0 0,7 -5,0"
+                  fill={m.color}
+                  stroke="white"
+                  strokeWidth="1.5"
+                  opacity={isHovered ? 1 : 0.85}
+                />
+              </g>
+
+              {/* Flag icon above the diamond */}
+              <text
+                x={mx}
+                y={my - 12}
+                textAnchor="middle"
+                style={{ fontSize: 11 }}
+              >
+                {m.icon}
+              </text>
+
+              {/* Tooltip on hover */}
+              {isHovered && (
+                <g>
+                  {/* Tooltip background */}
+                  <rect
+                    x={Math.min(Math.max(mx - 60, 2), W - 122)}
+                    y={my - 50}
+                    width={120}
+                    height={m.badgeEarnedAt ? 33 : 26}
+                    rx={4}
+                    fill="white"
+                    stroke={m.color}
+                    strokeWidth="1"
+                    filter="drop-shadow(0 1px 3px rgba(0,0,0,0.15))"
+                  />
+                  {/* Milestone label + date */}
+                  <text
+                    x={Math.min(Math.max(mx, 62), W - 62)}
+                    y={my - 37}
+                    textAnchor="middle"
+                    style={{ fontSize: 9, fontWeight: 600 }}
+                    className="fill-zinc-700"
+                  >
+                    {m.label} — {new Date(m.achievedDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </text>
+                  {/* Badge earned info */}
+                  {m.badgeEarnedAt && (
+                    <text
+                      x={Math.min(Math.max(mx, 62), W - 62)}
+                      y={my - 26}
+                      textAnchor="middle"
+                      style={{ fontSize: 8 }}
+                      className="fill-purple-500"
+                    >
+                      🏅 Badge verdiend
+                    </text>
+                  )}
+                </g>
+              )}
+            </g>
+          )
+        })}
+
+        {/* X-axis labels */}
+        {snapshots.filter((_, i) => i % Math.max(1, Math.floor(snapshots.length / 6)) === 0 || i === snapshots.length - 1).map((s, i) => (
+          <text key={i} x={xPos(s.snapshot_date)} y={H - 8} textAnchor="middle" className="fill-zinc-400" style={{ fontSize: 9 }}>
+            {new Date(s.snapshot_date).toLocaleDateString('nl-NL', { month: 'short' })}
+          </text>
+        ))}
+
+        {/* Legend */}
+        <circle cx={PAD} cy={12} r="4" fill="#10b981" />
+        <text x={PAD + 8} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Assets</text>
+        <circle cx={PAD + 60} cy={12} r="4" fill="#ef4444" />
+        <text x={PAD + 68} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Schulden</text>
+        <circle cx={PAD + 140} cy={12} r="4" fill="#f59e0b" />
+        <text x={PAD + 148} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Netto</text>
+        {detectedMilestones.length > 0 && (
+          <>
+            <polygon points={`${PAD + 220},8 ${PAD + 224},12 ${PAD + 220},16 ${PAD + 216},12`} fill="#a855f7" />
+            <text x={PAD + 228} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Mijlpalen</text>
+          </>
+        )}
+      </svg>
+
+      {/* Milestone summary below chart */}
+      {detectedMilestones.length > 0 && (
+        <div className="mt-3 space-y-1">
+          <p className="text-xs font-medium text-zinc-500 mb-1.5">📍 Bereikte mijlpalen</p>
+          <div className="flex flex-wrap gap-2">
+            {detectedMilestones.map((m, i) => (
+              <div
+                key={`ms-${i}`}
+                data-testid={`milestone-badge-${m.label.replace(/[^a-zA-Z0-9]/g, '-')}`}
+                className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs"
+                style={{ borderColor: m.color + '40', backgroundColor: m.color + '10' }}
+              >
+                <span>{m.icon}</span>
+                <span className="font-medium" style={{ color: m.color }}>{m.label}</span>
+                <span className="text-zinc-400">
+                  {new Date(m.achievedDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
+                {m.badgeEarnedAt && <span title="Badge verdiend">🏅</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
