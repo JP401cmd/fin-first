@@ -1,3 +1,42 @@
+## Session 2026-02-17 - Feature #177
+
+### Feature #177: FIRE scenario defaults to current financial parameters - PASSING
+- Horizon page at app/(app)/horizon/page.tsx loads all FIRE parameters from real Supabase data
+- Data flow: 9 parallel Supabase queries → HorizonInput object → computeFireProjection() → UI display
+- Sources:
+  - monthlyIncome: transactions table (positive amounts this month)
+  - monthlyExpenses: transactions table (absolute negative amounts this month)
+  - totalAssets: assets table (sum of current_value where is_active=true)
+  - totalDebts: debts table (sum of current_balance where is_active=true)
+  - yearlyMustExpenses: budgets table (essential expenses, interval-adjusted)
+  - savingsRate: computed as (income - expenses) / income * 100
+  - dateOfBirth: profiles table
+- Added Spaarquote (savings rate) card to FIRE inputs section (data-testid="input-savings-rate")
+- Added Jaarlijkse vaste lasten (annual expenses from budgets) card (data-testid="input-annual-expenses")
+- Grid changed from lg:grid-cols-4 to lg:grid-cols-3 to accommodate 6 cards
+- Income override mechanism: Pencil edit button, Enter/Escape/blur handlers, "Reset naar werkelijk" button
+- No hardcoded defaults: all zeros when no data exists
+- 10/10 verification tests passing at /api/verify-fire-scenario-defaults
+- Zero console errors
+- No mock data patterns found (grep clean)
+
+### Changes Made
+- app/(app)/horizon/page.tsx: Added savings rate and annual expenses cards to FIRE inputs section
+- app/api/verify-fire-scenario-defaults/route.ts: Created 10-test verification endpoint
+- app/test-fire-scenario-defaults/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: 5289d29
+
+### Current Status
+- 169/265 features passing (168 before + #177)
+- Feature #177 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- No confirmed test users available (Supabase email rate limit)
+- The horizon page was missing explicit savings rate and annual expenses displays; now added
+- Previous sessions' changes to horizon page (snapshot resilience, income override) were also committed in same diff
+
 ## Session 2026-02-17 - Feature #176
 
 ### Feature #176: Collapsible sections default to collapsed state - PASSING
