@@ -1,3 +1,58 @@
+## Session 2026-02-17 - Feature #221
+
+### Feature #221: Cash flow forecast 3-6 months - PASSING
+- Implemented complete cash flow forecast system with all 6 feature steps:
+  1. **Identify recurring transactions from history**: API queries recurring_transactions table with is_active filter, calculates monthly impact by frequency (weekly, monthly, quarterly, yearly)
+  2. **Project 3-6 month cash flow based on patterns**: Blends recurring transactions (70%) with actual 3-month spending patterns (30%), fallback to budget limits
+  3. **Create area chart showing projected bank balance**: CashFlowForecastChart SVG component with:
+     - Area fill with gradient (green for positive trend, red for negative)
+     - Solid line for current month, dashed line for projections
+     - "vandaag" transition marker between actual and projected
+     - Data points with hover tooltips
+     - Y-axis with auto-scaled grid lines
+     - X-axis month labels (nl-NL locale)
+     - Chart legend ("Werkelijk" + "Prognose")
+  4. **Alert when projected balance drops below threshold**: Two thresholds:
+     - €500: "Let op: in {maand} zakt je saldo onder €500"
+     - €0: "Let op: in {maand} wordt je saldo negatief"
+     - Red alert boxes with AlertTriangle icon
+     - Red danger zone visualization on chart (pink area below €500)
+  5. **Feature-gated to Stability+ sovereignty level**: Added cashflow_forecast to FEATURES array and DEFAULT_MATRIX (recovery: false, stability+: true)
+  6. **Show on De Kern overview page**: Integrated as CollapsibleSection with storage key "kern_cashflow_forecast", LineChart icon, between budget sparklines and net worth chart
+
+#### New Files:
+- **app/api/cashflow-forecast/route.ts**: GET endpoint, fetches bank_accounts (balances), recurring_transactions, recent transactions (3 months), budgets
+- **components/app/cashflow-forecast-chart.tsx**: CashFlowForecastChart SVG component with ForecastPoint/ForecastAlert types
+- **app/api/verify-cashflow-forecast/route.ts**: 15-test verification endpoint
+- **app/test-cashflow-forecast/page.tsx**: Visual test page with 4 demo scenarios (growing, declining with alerts, stable, empty)
+
+#### Modified Files:
+- **lib/feature-phases.ts**: Added cashflow_forecast to FEATURES and DEFAULT_MATRIX
+- **lib/supabase/proxy.ts**: Added test routes to public paths
+- **app/(app)/core/page.tsx**: Added CashFlowForecastChart import, state variables, data loading via fetch, and CollapsibleSection with FeatureGate
+
+#### Verification:
+- 15/15 API verification tests passing at /api/verify-cashflow-forecast
+- Visual test page at /test-cashflow-forecast with 4 demo scenarios all rendering correctly
+- Zero console errors
+- No mock data patterns found
+- API returns 401 for unauthenticated access
+- Commit: 2cdc786
+
+### Current Status
+- 215/265 features passing (214 before + #221)
+- Feature #221 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- Cash flow forecast uses weighted blending: 70% recurring + 30% actual patterns when both available
+- API endpoint is non-critical (try/catch wrapped in core page data loading)
+- Chart handles 4 scenarios: growing (green), declining (red), stable, empty state
+- Danger zone visible when any projected balance could be below €500
+- Feature gated as cashflow_forecast in Stability+ (matches cashflow_sankey gating)
+
+---
+
 ## Session 2026-02-17 - Feature #220
 
 ### Feature #220: Budget forecast next month prediction - PASSING
