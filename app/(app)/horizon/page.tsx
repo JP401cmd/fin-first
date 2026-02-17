@@ -41,6 +41,7 @@ type SnapshotForTrend = {
   resilience_score: number | null
   net_worth: number
   freedom_percentage: number | null
+  fire_age: number | null
 }
 
 export default function HorizonPage() {
@@ -102,7 +103,7 @@ export default function HorizonPage() {
         supabase.from('debts').select('*').eq('is_active', true),
         supabase
           .from('net_worth_snapshots')
-          .select('snapshot_date, resilience_score, net_worth, freedom_percentage')
+          .select('snapshot_date, resilience_score, net_worth, freedom_percentage, fire_age')
           .order('snapshot_date', { ascending: true }),
       ])
 
@@ -666,6 +667,66 @@ export default function HorizonPage() {
         </section>
         </FeatureGate>
       )}
+
+      {/* === 5b. FIRE Age Trend Chart (Deep Dive) === */}
+      {(() => {
+        const fireAgeSnapshots = resilienceSnapshots.filter(s => s.fire_age !== null && s.fire_age !== undefined)
+        if (fireAgeSnapshots.length < 2) return null
+        const first = fireAgeSnapshots[0]
+        const last = fireAgeSnapshots[fireAgeSnapshots.length - 1]
+        const firstAge = first.fire_age as number
+        const lastAge = last.fire_age as number
+        const diff = Math.round((firstAge - lastAge) * 10) / 10
+        const firstMonth = new Date(first.snapshot_date).toLocaleDateString('nl-NL', { month: 'long' })
+        const lastMonth = new Date(last.snapshot_date).toLocaleDateString('nl-NL', { month: 'long' })
+        const improved = diff > 0
+
+        return (
+          <section className="mt-10" data-testid="fire-age-trend-section">
+            <div className="mb-3">
+              <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+                <Hourglass className="mr-1.5 inline h-3.5 w-3.5 text-purple-500" />
+                Je FIRE-leeftijd over tijd
+              </h2>
+              <p className="mt-1 text-sm text-zinc-500">
+                Hoe je vrijheidsleeftijd zich ontwikkelt — lager is beter
+              </p>
+            </div>
+            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
+              {/* Contextual progress message */}
+              <div className="mb-4 rounded-lg border border-purple-100 bg-purple-50 px-4 py-3" data-testid="fire-age-context-message">
+                <p className="text-sm text-purple-800">
+                  {improved ? (
+                    <>
+                      In <span className="font-semibold">{firstMonth}</span> was je FIRE-leeftijd{' '}
+                      <span className="font-bold">{Math.round(firstAge)}</span>, nu{' '}
+                      <span className="font-bold">{Math.round(lastAge)}</span> —{' '}
+                      <span className="font-semibold text-emerald-700">
+                        je ligt {diff >= 1 ? `${Math.round(diff)} ${Math.round(diff) === 1 ? 'jaar' : 'jaar'}` : `${Math.round(diff * 12)} ${Math.round(diff * 12) === 1 ? 'maand' : 'maanden'}`} voor!
+                      </span>
+                    </>
+                  ) : diff < 0 ? (
+                    <>
+                      In <span className="font-semibold">{firstMonth}</span> was je FIRE-leeftijd{' '}
+                      <span className="font-bold">{Math.round(firstAge)}</span>, nu{' '}
+                      <span className="font-bold">{Math.round(lastAge)}</span> —{' '}
+                      <span className="font-semibold text-amber-700">
+                        {Math.abs(diff) >= 1 ? `${Math.round(Math.abs(diff))} ${Math.round(Math.abs(diff)) === 1 ? 'jaar' : 'jaar'}` : `${Math.round(Math.abs(diff) * 12)} ${Math.round(Math.abs(diff) * 12) === 1 ? 'maand' : 'maanden'}`} verschoven
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      Je FIRE-leeftijd is stabiel gebleven op{' '}
+                      <span className="font-bold">{Math.round(lastAge)} jaar</span>
+                    </>
+                  )}
+                </p>
+              </div>
+              <FireAgeTrendChart snapshots={resilienceSnapshots} />
+            </div>
+          </section>
+        )
+      })()}
 
       {/* === 6. Verken-kaarten (Explore Cards / Primary Content) === */}
       <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -1269,6 +1330,155 @@ function ResilienceTrendChart({ snapshots }: { snapshots: SnapshotForTrend[] }) 
           </text>
         )
       })}
+    </svg>
+  )
+}
+
+// ── FIRE Age Trend Chart ────────────────────────
+
+function FireAgeTrendChart({ snapshots }: { snapshots: SnapshotForTrend[] }) {
+  const withAge = snapshots.filter(s => s.fire_age !== null && s.fire_age !== undefined)
+  if (withAge.length < 2) {
+    return (
+      <div className="py-8 text-center text-sm text-zinc-400" data-testid="fire-age-no-data">
+        Nog niet genoeg snapshots om een trend te tonen. Na je volgende maandelijkse snapshot verschijnt hier je FIRE-leeftijd verloop.
+      </div>
+    )
+  }
+
+  const W = 600
+  const H = 220
+  const PAD = 50
+
+  const ages = withAge.map(s => s.fire_age as number)
+  const minAge = Math.floor(Math.min(...ages) - 2)
+  const maxAge = Math.ceil(Math.max(...ages) + 2)
+  const range = maxAge - minAge || 1
+
+  function x(i: number) { return PAD + (i / (withAge.length - 1)) * (W - PAD * 2) }
+  function y(val: number) { return PAD + ((val - minAge) / range) * (H - PAD * 2) }
+
+  // For FIRE age: higher y = older age (top = old = bad, bottom = young = good)
+  // So we DON'T invert — lower fire age should be at the bottom (good)
+  // Actually, for intuition: lower FIRE age = better, so let's invert: lower age at bottom
+  // Re-think: "lager is beter" means we want to show improvement going DOWN
+  // Standard: y-axis top = high value. For FIRE age, high = bad, so let's keep it natural
+  // The chart shows the fire age value on y-axis, naturally high values at top
+
+  const linePath = withAge.map((s, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(s.fire_age as number).toFixed(1)}`).join(' ')
+  const areaPath = linePath + ` L${x(withAge.length - 1).toFixed(1)},${(H - PAD).toFixed(1)} L${PAD},${(H - PAD).toFixed(1)} Z`
+
+  // Determine trend: is FIRE age decreasing (good) or increasing (bad)?
+  const firstAge = ages[0]
+  const lastAge = ages[ages.length - 1]
+  const improving = lastAge < firstAge
+  const lineColor = improving ? '#059669' : '#dc2626' // green if improving, red if worsening
+  const gradientId = 'fireAgeGrad'
+
+  // Y-axis ticks: evenly spaced ages
+  const tickCount = 5
+  const tickStep = range / (tickCount - 1)
+  const ticks = Array.from({ length: tickCount }, (_, i) => Math.round(minAge + i * tickStep))
+
+  // Format date label
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr)
+    const months = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
+    return `${months[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`
+  }
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 240 }} data-testid="fire-age-trend-chart">
+      {/* Grid lines */}
+      {ticks.map(val => (
+        <g key={val}>
+          <line x1={PAD} y1={y(val)} x2={W - PAD} y2={y(val)} stroke="#e4e4e7" strokeDasharray="4" />
+          <text x={PAD - 6} y={y(val) + 3} textAnchor="end" className="fill-zinc-400" style={{ fontSize: 9 }}>
+            {val}j
+          </text>
+        </g>
+      ))}
+
+      {/* Y-axis title */}
+      <text
+        x={12}
+        y={H / 2}
+        textAnchor="middle"
+        className="fill-zinc-400"
+        style={{ fontSize: 8 }}
+        transform={`rotate(-90, 12, ${H / 2})`}
+      >
+        FIRE-leeftijd
+      </text>
+
+      {/* Area fill */}
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={lineColor} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={lineColor} stopOpacity="0.05" />
+        </linearGradient>
+      </defs>
+      <path d={areaPath} fill={`url(#${gradientId})`} />
+
+      {/* Line */}
+      <path d={linePath} fill="none" stroke={lineColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+      {/* Data points */}
+      {withAge.map((s, i) => (
+        <circle
+          key={i}
+          cx={x(i)}
+          cy={y(s.fire_age as number)}
+          r="4"
+          fill={lineColor}
+          stroke="white"
+          strokeWidth="2"
+        />
+      ))}
+
+      {/* X-axis date labels */}
+      {withAge.map((s, i) => {
+        const showEvery = withAge.length <= 6 ? 1 : Math.ceil(withAge.length / 6)
+        if (i % showEvery !== 0 && i !== withAge.length - 1) return null
+        return (
+          <text key={i} x={x(i)} y={H - 8} textAnchor="middle" className="fill-zinc-400" style={{ fontSize: 9 }}>
+            {formatDate(s.snapshot_date)}
+          </text>
+        )
+      })}
+
+      {/* Age value labels on data points */}
+      {withAge.map((s, i) => {
+        const age = s.fire_age as number
+        const showEvery = withAge.length <= 8 ? 1 : Math.ceil(withAge.length / 8)
+        if (i % showEvery !== 0 && i !== withAge.length - 1) return null
+        return (
+          <text
+            key={`val-${i}`}
+            x={x(i)}
+            y={y(age) - 10}
+            textAnchor="middle"
+            className={improving ? 'fill-emerald-700' : 'fill-red-700'}
+            style={{ fontSize: 10, fontWeight: 600 }}
+          >
+            {Math.round(age * 10) / 10}
+          </text>
+        )
+      })}
+
+      {/* Trend arrow indicator */}
+      {withAge.length >= 2 && (
+        <g>
+          <text
+            x={W - PAD + 5}
+            y={y(lastAge) + 4}
+            className={improving ? 'fill-emerald-600' : 'fill-red-600'}
+            style={{ fontSize: 14, fontWeight: 700 }}
+          >
+            {improving ? '↓' : '↑'}
+          </text>
+        </g>
+      )}
     </svg>
   )
 }
