@@ -1,3 +1,42 @@
+## Session 2026-02-17 - Feature #183
+
+### Feature #183: Freedom-time in asset cards and detail - PASSING
+- Added freedom-time labels to the assets overview page (app/(app)/core/assets/page.tsx)
+- Imported calculateFreedomTime and formatFreedomTimeString from lib/format.ts
+- Added dailyExpenses state, fetched from current month transactions (same pattern as cash/belasting pages)
+- Changes implemented:
+  1. KPI "Totale waarde": Shows "X jaar en Y maanden vrijheid" subtitle (data-testid="total-value-freedom")
+  2. KPI "Rendement (totaal)": Shows "Xm vrijheid gewonnen/verloren" (data-testid="return-freedom")
+  3. KPI "Waarde over X jaar": Shows projected freedom-time subtitle (data-testid="future-value-freedom")
+  4. Individual asset cards: Shows freedom-time in short format (e.g., "3j 11m vrijheid") (data-testid="asset-card-freedom")
+  5. Asset detail modal value: Shows "X jaar en Y maanden vrijheid" below the main value (data-testid="detail-value-freedom")
+  6. Asset detail modal return: Shows "Xm gewonnen/verloren" next to the return percentage (data-testid="detail-return-freedom")
+  7. Donut chart center: Shows freedom years in short format instead of just "totaal" (data-testid="donut-freedom")
+- All labels conditionally render only when dailyExpenses > 0 and amount > 0
+- dailyExpenses passed as prop to AssetDetailModal and AllocationPie components
+- 12/12 source code verification tests passing at /api/verify-asset-freedom-time
+- Visual verification on test page: demo shows correct freedom-time formatting
+- Zero console errors
+- No mock data patterns found
+
+### Changes Made
+- app/(app)/core/assets/page.tsx: Added freedom-time labels to KPIs, asset cards, detail modal, and donut chart
+- app/api/verify-asset-freedom-time/route.ts: Created 12-test verification endpoint
+- app/test-asset-freedom-time/page.tsx: Created visual test page with demos
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: 899eca4
+
+### Current Status
+- 177/265 features passing (176 before + #183)
+- Feature #183 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session (server already running)
+- No authenticated test users available for full browser testing of /core/assets page
+- Freedom-time is calculated from current month's negative transactions divided by 30
+- The assets page uses the same daily expenses calculation pattern as cash and belasting pages
+- All freedom-time labels use amber-600/70 color for value, emerald-500/70 for positive return, red-500/70 for negative
+
 ## Session 2026-02-17 - Feature #185
 
 ### Feature #185: Freedom-time in Box 3 tax displays - PASSING
