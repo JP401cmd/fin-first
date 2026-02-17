@@ -41,7 +41,7 @@ const PHASE_BAR_COLORS: Record<string, string> = {
   amber: 'bg-amber-400',
 }
 
-export function FeatureGate({ featureId, fallback = 'hidden', children }: FeatureGateProps) {
+export function FeatureGate({ featureId, fallback = 'locked', children }: FeatureGateProps) {
   const { features, phase: currentPhase, newlyUnlockedFeatures } = useFeatureAccess()
 
   // Fail-open: features not in the map are shown
@@ -143,11 +143,19 @@ export function LockedFeatureCard({ featureId, currentPhase }: { featureId: stri
  * NewFeatureSpotlight — wraps a newly unlocked feature with a
  * highlight animation on first visit after phase transition.
  *
- * Shows a subtle pulsing border + "Nieuw" badge that fades after
- * 8 seconds, then the children render normally without the spotlight.
+ * Shows a subtle pulsing border + "Nieuw" badge + tooltip with feature name
+ * that fades after 8 seconds, then the children render normally without the spotlight.
+ *
+ * Tooltip: "Nieuw! [Feature name] is nu beschikbaar"
+ * Stored in localStorage per feature so it only shows once.
  */
 export function NewFeatureSpotlight({ featureId, children }: { featureId: string; children: ReactNode }) {
   const [showSpotlight, setShowSpotlight] = useState(false)
+  const [showTooltip, setShowTooltip] = useState(false)
+
+  // Look up the human-readable feature label
+  const featureDef = FEATURES.find(f => f.id === featureId)
+  const featureLabel = featureDef?.label ?? featureId
 
   useEffect(() => {
     // Check if this feature spotlight was already "seen" (persisted in localStorage)
@@ -162,16 +170,30 @@ export function NewFeatureSpotlight({ featureId, children }: { featureId: string
       // Immediately mark as seen in localStorage so it never shows again
       localStorage.setItem(key, '1')
 
+      // Show tooltip after a brief delay (let animation start first)
+      const tooltipTimer = setTimeout(() => setShowTooltip(true), 300)
+
       // Auto-dismiss the visual spotlight after 8 seconds
       const timer = setTimeout(() => {
         setShowSpotlight(false)
+        setShowTooltip(false)
       }, 8000)
-      return () => clearTimeout(timer)
+      return () => {
+        clearTimeout(timer)
+        clearTimeout(tooltipTimer)
+      }
     } catch {
       // localStorage not available — show briefly then dismiss
       setShowSpotlight(true)
-      const timer = setTimeout(() => setShowSpotlight(false), 8000)
-      return () => clearTimeout(timer)
+      const tooltipTimer = setTimeout(() => setShowTooltip(true), 300)
+      const timer = setTimeout(() => {
+        setShowSpotlight(false)
+        setShowTooltip(false)
+      }, 8000)
+      return () => {
+        clearTimeout(timer)
+        clearTimeout(tooltipTimer)
+      }
     }
   }, [featureId])
 
@@ -194,6 +216,21 @@ export function NewFeatureSpotlight({ featureId, children }: { featureId: string
           Nieuw
         </span>
       </div>
+
+      {/* Tooltip: "Nieuw! [Feature name] is nu beschikbaar" */}
+      {showTooltip && (
+        <div
+          className="absolute -top-10 left-1/2 -translate-x-1/2 z-20 whitespace-nowrap pointer-events-none animate-fade-in"
+          data-testid={`spotlight-tooltip-${featureId}`}
+        >
+          <div className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white shadow-lg">
+            <span className="text-blue-300">Nieuw!</span>{' '}
+            {featureLabel} is nu beschikbaar
+          </div>
+          {/* Arrow pointing down */}
+          <div className="mx-auto h-0 w-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-zinc-900" />
+        </div>
+      )}
 
       {/* The actual feature content, slightly elevated */}
       <div className="relative rounded-xl ring-2 ring-blue-300/50">
