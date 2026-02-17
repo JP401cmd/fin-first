@@ -309,6 +309,8 @@ export async function updateSession(request: NextRequest) {
     '/test-badge-schema',
     '/test-badge-showcase',
     '/api/verify-badge-grid',
+    '/test-freedom-days-animation',
+    '/api/verify-freedom-days-animation',
   ]
 
   // Protected route prefixes that require authentication

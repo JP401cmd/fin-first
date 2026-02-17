@@ -98,10 +98,13 @@ function BadgeDetail({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       onClick={onClose}
+      data-testid="badge-detail-overlay"
     >
       <div
         className="mx-4 w-full max-w-sm rounded-xl bg-white p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
+        data-testid="badge-detail-modal"
+        data-badge-slug={badge.slug}
       >
         <div className="flex items-start gap-4">
           <div
@@ -112,7 +115,7 @@ function BadgeDetail({
             {badge.earned ? badge.icon : '❓'}
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-bold text-zinc-900">
+            <h3 className="text-lg font-bold text-zinc-900" data-testid="badge-detail-name">
               {badge.earned ? badge.name : '???'}
             </h3>
             <p className="mt-0.5 text-xs font-medium uppercase tracking-wider text-zinc-400">
@@ -122,19 +125,20 @@ function BadgeDetail({
           <button
             onClick={onClose}
             className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+            data-testid="badge-detail-close"
           >
             ✕
           </button>
         </div>
 
-        <p className="mt-4 text-sm leading-relaxed text-zinc-600">
+        <p className="mt-4 text-sm leading-relaxed text-zinc-600" data-testid="badge-detail-description">
           {badge.earned
             ? badge.description
             : 'Deze badge is nog vergrendeld. Blijf groeien om hem te verdienen!'}
         </p>
 
         {badge.earned && badge.earned_at && (
-          <p className="mt-3 text-xs text-zinc-400">
+          <p className="mt-3 text-xs text-zinc-400" data-testid="badge-detail-date">
             Verdiend op{' '}
             {new Date(badge.earned_at).toLocaleDateString('nl-NL', {
               year: 'numeric',
@@ -142,6 +146,29 @@ function BadgeDetail({
               day: 'numeric',
             })}
           </p>
+        )}
+
+        {!badge.earned && badge.progress !== null && badge.progress !== undefined && (
+          <div className="mt-4" data-testid="badge-detail-progress">
+            <div className="flex items-center justify-between text-xs text-zinc-500">
+              <span>Voortgang</span>
+              <span className="font-semibold">{Math.round((badge.progress ?? 0) * 100)}%</span>
+            </div>
+            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-zinc-100">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  badge.progress >= 0.75 ? 'bg-emerald-400' :
+                  badge.progress >= 0.5 ? 'bg-amber-400' :
+                  badge.progress > 0 ? 'bg-zinc-400' :
+                  'bg-zinc-200'
+                }`}
+                style={{ width: `${Math.round((badge.progress ?? 0) * 100)}%` }}
+              />
+            </div>
+            {badge.progress_label && (
+              <p className="mt-1 text-[11px] text-zinc-400">{badge.progress_label}</p>
+            )}
+          </div>
         )}
 
         {!badge.earned && (
@@ -166,10 +193,15 @@ function BadgeCard({
   onClick: () => void
 }) {
   const colors = colorMap[badge.color] ?? colorMap.zinc
+  const hasProgress = !badge.earned && badge.progress !== null && badge.progress !== undefined && badge.progress > 0
 
   return (
     <button
       onClick={onClick}
+      data-testid={`badge-${badge.slug}`}
+      data-earned={badge.earned ? 'true' : 'false'}
+      data-slug={badge.slug}
+      data-progress={badge.progress ?? undefined}
       className={`group relative flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all hover:shadow-md ${
         badge.earned
           ? `${colors.bgEarned} ${colors.borderEarned}`
@@ -194,8 +226,27 @@ function BadgeCard({
         {badge.earned ? badge.name : '???'}
       </span>
 
+      {/* Progress bar for locked badges with partial progress */}
+      {hasProgress && (
+        <div className="w-full px-1" data-testid={`badge-progress-${badge.slug}`}>
+          <div className="h-1 overflow-hidden rounded-full bg-zinc-200">
+            <div
+              className={`h-full rounded-full transition-all ${
+                badge.progress! >= 0.75 ? 'bg-emerald-400' :
+                badge.progress! >= 0.5 ? 'bg-amber-400' :
+                'bg-zinc-400'
+              }`}
+              style={{ width: `${Math.round((badge.progress ?? 0) * 100)}%` }}
+            />
+          </div>
+          <span className="mt-0.5 block text-center text-[9px] text-zinc-400">
+            {Math.round((badge.progress ?? 0) * 100)}%
+          </span>
+        </div>
+      )}
+
       {/* Locked overlay */}
-      {!badge.earned && (
+      {!badge.earned && !hasProgress && (
         <div className="absolute inset-0 flex items-center justify-center rounded-xl">
           <div className="absolute inset-0 rounded-xl bg-zinc-100/40" />
         </div>
@@ -211,6 +262,7 @@ export function BadgeGrid() {
   const [earnedCount, setEarnedCount] = useState(0)
   const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [dataSource, setDataSource] = useState<string>('loading')
   const [selectedBadge, setSelectedBadge] = useState<BadgeWithStatus | null>(null)
 
   useEffect(() => {
@@ -222,6 +274,7 @@ export function BadgeGrid() {
           setBadges(data.badges)
           setEarnedCount(data.earned_count)
           setTotalCount(data.total_count)
+          setDataSource(data.source ?? 'api')
         } else {
           // Use client-side definitions as fallback
           const fallback: BadgeWithStatus[] = BADGE_DEFINITIONS.map((b) => ({
@@ -231,6 +284,7 @@ export function BadgeGrid() {
           }))
           setBadges(fallback)
           setTotalCount(fallback.length)
+          setDataSource('client_fallback')
         }
       } catch {
         // Fallback
@@ -241,6 +295,7 @@ export function BadgeGrid() {
         }))
         setBadges(fallback)
         setTotalCount(fallback.length)
+        setDataSource('client_fallback')
       } finally {
         setLoading(false)
       }
@@ -260,12 +315,12 @@ export function BadgeGrid() {
   const categories = Array.from(new Set(badges.map((b) => b.category)))
 
   return (
-    <div>
+    <div data-testid="badge-grid" data-source={dataSource} data-earned={earnedCount} data-total={totalCount}>
       {/* Progress summary */}
-      <div className="mb-6 flex items-center gap-4">
+      <div className="mb-6 flex items-center gap-4" data-testid="badge-progress-summary">
         <div className="flex items-center gap-2">
-          <span className="text-2xl font-bold text-zinc-900">{earnedCount}</span>
-          <span className="text-sm text-zinc-500">van {totalCount} verdiend</span>
+          <span className="text-2xl font-bold text-zinc-900" data-testid="badge-earned-count">{earnedCount}</span>
+          <span className="text-sm text-zinc-500" data-testid="badge-total-label">van {totalCount} verdiend</span>
         </div>
         <div className="flex-1">
           <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
