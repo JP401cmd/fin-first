@@ -1,3 +1,98 @@
+## Session 2026-02-17 - Feature #219
+
+### Feature #219: Resilience score history chart - PASSING
+- All 5 feature steps verified and implemented:
+  1. **Store resilience score in monthly snapshots**: Already stored by auto-snapshot, manual snapshot, and cron endpoints via `computeResilienceScore()` → `resilience_score` column in `net_worth_snapshots`
+  2. **Create trend chart**: `ResilienceTrendChart` SVG component with 5 color zones (Kritiek 0-20, Kwetsbaar 20-40, Redelijk 40-60, Sterk 60-80, Uitstekend 80-100), data points, area fill, date labels
+  3. **Display on De Horizon overview page**: Section with `data-testid="resilience-trend-section"`, title "Veerkracht verloop", wrapped in `FeatureGate` with featureId="veerkracht_score"
+  4. **Contextual message about resilience improvement**: NEW `ResilienceContextMessage` component added showing:
+     - Improvement: "Je veerkracht is gestegen van X naar Y in Z maanden — goed bezig!"
+     - Decline: "Je veerkracht is gedaald van X naar Y in Z maanden — bekijk je uitgaven"
+     - Stable: "Je veerkracht is stabiel gebleven op X"
+     - Uses first vs last snapshot comparison with calculated month span
+  5. **Handle missing historical data**: Requires 2+ snapshots with resilience_score, filters null values, returns null when insufficient
+
+### Changes Made
+- app/(app)/horizon/page.tsx: Added ResilienceContextMessage component, integrated into resilience trend section
+- app/api/verify-resilience-history/route.ts: Created 10-test verification endpoint
+- app/test-resilience-history/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: 65e7b2d
+
+### Current Status
+- 213/265 features passing (212 before + #219)
+- Feature #219 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- ResilienceContextMessage reuses same snapshot data as ResilienceTrendChart
+- Context message uses data-testid="resilience-context-message"
+- All resilience chart components are in horizon/page.tsx (not separate files)
+
+---
+
+## Session 2026-02-17 - Feature #217
+
+### Feature #217: Goal progress timeline charts - PASSING
+- Implemented complete goal progress timeline chart system with all 6 feature steps:
+  1. **Track goal current_value changes over time**: buildGoalHistory() constructs timeline from goal_contributions table data + initial/current state
+  2. **Line chart showing progress toward target**: SVG-based line chart with area fill, data points, x/y axis labels
+  3. **Deadline marker overlay**: Vertical dashed amber line with 🏁 flag icon at top
+  4. **On-track/off-track indicator**: PaceMessageBanner with color-coded status (green=ahead, red=behind, teal=on-track)
+  5. **Pace message**: "Op dit tempo bereik je je doel X maanden eerder/later dan de deadline" computed from rate of change
+  6. **Goals without deadline**: Shows estimated completion date instead ("Op dit tempo bereik je je doel over X maanden")
+
+#### New Components/Files:
+- **GoalProgressTimeline** (components/app/will/goal-progress-timeline.tsx): Full SVG chart with:
+  - Line path with area fill below
+  - Target value overlay (dashed purple horizontal line)
+  - Deadline marker (dashed amber vertical line with flag)
+  - Projection line (dashed from last point to target at deadline)
+  - Chart legend (Werkelijke voortgang, Doelwaarde, Deadline, Projectielijn)
+  - PaceMessageBanner with icon and color-coded status
+  - Handles insufficient data (0 and 1 data points)
+- **buildGoalHistory()**: Utility to construct timeline from contributions and current state
+- **computePaceMessage()**: Calculates months ahead/behind schedule
+- **/api/goals/history**: API endpoint fetching history from goal_contributions + valuations for linked goals
+
+#### Integration:
+- GoalDetailModal (goal-detail-modal.tsx): Added expandable "Voortgang over tijd" section per GoalCard
+  - Loads timeline data on-demand when expanded (lazy loading)
+  - Uses BarChart3 icon toggle
+
+#### Verification:
+- 16/16 verification tests passing at /api/verify-goal-timeline
+- Visual test page at /test-goal-timeline with 6 demo scenarios:
+  1. Savings goal with deadline (on schedule)
+  2. Savings goal with deadline (behind schedule)
+  3. Savings goal WITHOUT deadline
+  4. Freedom days goal with deadline (ahead of schedule)
+  5. Goal with no history (1 data point)
+  6. Completed goal
+- Zero console errors
+- No mock data patterns found
+
+### Changes Made
+- components/app/will/goal-progress-timeline.tsx: New GoalProgressTimeline component
+- components/app/will/goal-detail-modal.tsx: Added timeline toggle section in GoalCard
+- app/api/goals/history/route.ts: New API endpoint for goal history
+- app/api/verify-goal-timeline/route.ts: 16-test verification endpoint
+- app/test-goal-timeline/page.tsx: Visual test page with 6 demo scenarios
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: b1b3a5f
+
+### Current Status
+- 211/265 features passing (210 before + #217)
+- Feature #217 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- GoalProgressTimeline uses buildGoalHistory() to construct timelines from goal_contributions
+- No new database table created (uses existing goal_contributions and valuations tables)
+- API has graceful fallback: tries goal_value_history table first, falls back to contributions
+- Timeline chart lazy-loads when user expands the section (not loaded by default)
+- Chart handles all goal types: savings, debt_payoff, net_worth, freedom_days
+
 ## Session 2026-02-17 - Feature #218
 
 ### Feature #218: Net worth milestone markers on chart - PASSING
