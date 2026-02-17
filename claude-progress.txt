@@ -1,3 +1,45 @@
+## Session 2026-02-17 - Feature #195
+
+### Feature #195: Jouw Pad progress widget on Dashboard - PASSING
+- Enhanced existing JouwPadWidget component with criteria checklist for next level progress
+- Widget already existed with: phase/level display, shield icon, progress bar, next level preview
+- Added NEXT_LEVEL_CRITERIA map with check functions for all levels -2 to 5:
+  - Level -2 → -1: "Consumptieve schulden afgelost" (checks hasConsumerDebt)
+  - Level -1 → 0: "Vermogen ≥ €0" (checks netWorth)
+  - Level 0 → 1: "Minimaal 1 maand buffer" (checks monthsCovered)
+  - Level 1 → 2: "Minimaal 3 maanden noodfonds"
+  - Level 2 → 3: "Minimaal 6 maanden buffer" + "Vrijheidspercentage ≥ 10%" (2 criteria)
+  - Level 3 → 4: "Vrijheidspercentage ≥ 25%"
+  - Level 4 → 5: "Vrijheidspercentage ≥ 75%"
+  - Level 5 → 6: "Vrijheidspercentage ≥ 100%"
+- Check/Circle icons: green checkmark (emerald-100 bg) for met, gray circle for unmet
+- Met criteria show strikethrough text
+- Dashboard now passes netWorth, monthsCovered, hasConsumerDebt props to widget
+- data-testid attributes added for: widget, phase, level, level-name, freedom%, progress-bar, criteria, criterion items, next-level
+- Level 6 (Timeless) correctly shows no criteria and no next level preview (max level)
+- 12/12 API verification tests passing at /api/verify-jouw-pad
+- Visual verification: all 8 sovereignty levels rendered correctly with proper criteria
+- Zero console errors (only React DevTools + HMR logs)
+- No mock data patterns found (grep clean)
+
+### Changes Made
+- components/app/jouw-pad-widget.tsx: Added NEXT_LEVEL_CRITERIA, Check/Circle icons, criteria checklist section, data-testid attrs, additional props
+- app/(app)/dashboard/page.tsx: Pass netWorth, monthsCovered, hasConsumerDebt to JouwPadWidget
+- app/api/verify-jouw-pad/route.ts: Created 12-test verification endpoint
+- app/test-jouw-pad/page.tsx: Created visual test page with all 8 sovereignty levels
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: f70024b
+
+### Current Status
+- 187/265 features passing (186 before + #195)
+- Feature #195 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- JouwPadWidget is a client component ('use client') linked to /identity
+- Criteria checklist evaluates real financial data passed from Dashboard (server component)
+- No authenticated browser testing possible (Supabase email rate limit)
+
 ## Session 2026-02-17 - Feature #191
 
 ### Feature #191: Freedom days disambiguation with info tooltips - PASSING
