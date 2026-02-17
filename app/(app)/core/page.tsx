@@ -13,6 +13,7 @@ import type { NetWorthSnapshot } from '@/lib/net-worth-data'
 import {
   Calendar, TrendingUp, Sun, Star, Wallet, ShoppingCart,
   PiggyBank, Building2, ArrowRight, Info, Camera, Download, ChevronDown, Receipt, Flag, BarChart3,
+  CheckCircle2, AlertTriangle, TrendingDown, ArrowUpRight, ArrowDownRight, Minus,
 } from 'lucide-react'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { CollapsibleSection } from '@/components/app/collapsible-section'
@@ -36,6 +37,9 @@ export default function CorePage() {
   const [hasTransactions, setHasTransactions] = useState(false)
   const [earnedBadges, setEarnedBadges] = useState<{ slug: string; earned_at: string }[]>([])
   const [netWorthGrowth, setNetWorthGrowth] = useState<{ amount: number; percentage: number; period: string } | null>(null)
+  const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalCurrent: number; progressPct: number } | null>(null)
+  const [assetGrowthDirection, setAssetGrowthDirection] = useState<'up' | 'down' | 'flat'>('flat')
+  const [overBudgetCount, setOverBudgetCount] = useState(0)
 
   const loadData = useCallback(async () => {
     try {
@@ -183,11 +187,13 @@ export default function CorePage() {
       // Set next step data
       setHasTransactions((txResult.data?.length ?? 0) > 0)
 
-      // Fetch budget alert data
-      const [budgetResult, spendingResult, snapshotResult] = await Promise.all([
+      // Fetch budget alert data + debt progress + asset valuations
+      const [budgetResult, spendingResult, snapshotResult, debtFullResult, assetValuationResult] = await Promise.all([
         supabase.from('budgets').select('*'),
         supabase.from('transactions').select('budget_id, amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('net_worth_snapshots').select('*').order('snapshot_date', { ascending: true }).limit(24),
+        supabase.from('debts').select('current_balance, original_amount').eq('is_active', true),
+        supabase.from('valuations').select('value, valuation_date').eq('entity_type', 'asset').order('valuation_date', { ascending: false }).limit(50),
       ])
 
       if (budgetResult.data) {
@@ -219,6 +225,48 @@ export default function CorePage() {
           })
           .slice(0, 5)
         setAlertBudgets(triggered)
+
+        // Compute over-budget count for mission control card
+        const expenseParents = (budgetResult.data as Budget[])
+          .filter(b => !b.parent_id && (b.budget_type === 'expense'))
+        let overCount = 0
+        for (const b of expenseParents) {
+          const children = (budgetResult.data as Budget[]).filter(c => c.parent_id === b.id)
+          const spent = children.length > 0
+            ? children.reduce((sum, c) => sum + (spendMap[c.id] ?? 0), 0)
+            : (spendMap[b.id] ?? 0)
+          const limit = children.length > 0
+            ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
+            : Number(b.default_limit)
+          if (limit > 0 && spent > limit) overCount++
+        }
+        setOverBudgetCount(overCount)
+      }
+
+      // Compute debt payoff progress
+      if (debtFullResult.data && debtFullResult.data.length > 0) {
+        const totalOriginal = debtFullResult.data.reduce((s, d) => s + Number(d.original_amount || d.current_balance), 0)
+        const totalCurrent = debtFullResult.data.reduce((s, d) => s + Number(d.current_balance), 0)
+        const progressPct = totalOriginal > 0 ? ((totalOriginal - totalCurrent) / totalOriginal) * 100 : 0
+        setDebtProgress({ totalOriginal, totalCurrent, progressPct: Math.max(0, Math.min(100, progressPct)) })
+      }
+
+      // Compute asset growth direction from recent valuations
+      if (assetValuationResult.data && assetValuationResult.data.length >= 2) {
+        const sorted = [...assetValuationResult.data].sort((a, b) => b.valuation_date.localeCompare(a.valuation_date))
+        const latestTotal = Number(sorted[0].value)
+        const previousTotal = Number(sorted[1].value)
+        if (latestTotal > previousTotal * 1.001) setAssetGrowthDirection('up')
+        else if (latestTotal < previousTotal * 0.999) setAssetGrowthDirection('down')
+        else setAssetGrowthDirection('flat')
+      } else if (snapshotResult.data && snapshotResult.data.length >= 2) {
+        // Fallback: use net worth snapshots to infer asset trend
+        const snaps = snapshotResult.data as NetWorthSnapshot[]
+        const latestAssets = Number(snaps[snaps.length - 1].total_assets)
+        const prevAssets = Number(snaps[snaps.length - 2].total_assets)
+        if (latestAssets > prevAssets * 1.001) setAssetGrowthDirection('up')
+        else if (latestAssets < prevAssets * 0.999) setAssetGrowthDirection('down')
+        else setAssetGrowthDirection('flat')
       }
 
       if (snapshotResult.data) {
@@ -336,8 +384,8 @@ export default function CorePage() {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
-      {/* === Freedom Timeline Hero === */}
-      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-950 via-amber-900 to-amber-950 p-5 text-white sm:p-8 md:p-10">
+      {/* === 1. Hero (Gradient) === */}
+      <section data-testid="kern-hero" className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-950 via-amber-900 to-amber-950 p-5 text-white sm:p-8 md:p-10">
         <div className="pointer-events-none absolute -top-24 right-1/4 h-64 w-64 rounded-full bg-amber-500/10 blur-3xl" />
 
         <div className="relative">
@@ -395,7 +443,7 @@ export default function CorePage() {
         </div>
       </section>
 
-      {/* === Next Step Card === */}
+      {/* === 1b. Next Step Card === */}
       {data && (
         <section className="mt-6">
           <NextStepSection
@@ -407,13 +455,14 @@ export default function CorePage() {
               budgetCount,
               snapshotCount: snapshots.length,
               hasTransactions,
+              alertBudgetCount: alertBudgets.length,
             })}
             moduleColor="amber"
           />
         </section>
       )}
 
-      {/* === KPI Stat Cards === */}
+      {/* === 2. KPI Stat Cards (White cards, subtle borders) === */}
       <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5" data-testid="kern-kpi-grid">
         <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-dagen-gewonnen">
           <div className="mb-3 flex items-center justify-between">
@@ -502,9 +551,9 @@ export default function CorePage() {
         </div>
       </section>
 
-      {/* === Budget Alerts === */}
+      {/* === 3. Alerts (Budget Alerts) === */}
       {alertBudgets.length > 0 && (
-        <section className="mt-8">
+        <section className="mt-8" data-testid="kern-alerts">
           <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
             Aandachtspunten
           </h2>
@@ -525,57 +574,108 @@ export default function CorePage() {
         </section>
       )}
 
-      {/* === Quick links to sub-pages === */}
-      <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <QuickLink
-          href="/core/cash"
-          icon={<Wallet className="h-5 w-5 text-amber-600" />}
-          title="Cash"
-          value={formatCurrency(data.monthlyIncome - data.monthlyExpenses)}
-          subtitle="netto deze maand"
-          accent={data.monthlyIncome > data.monthlyExpenses}
-          amount={data.monthlyIncome - data.monthlyExpenses}
-        />
-        <QuickLink
-          href="/core/budgets"
-          icon={<ShoppingCart className="h-5 w-5 text-amber-600" />}
-          title="Budgetten"
-          value={formatCurrency(data.monthlyExpenses)}
-          subtitle="uitgaven deze maand"
-          accent={false}
-        />
-        <QuickLink
-          href="/core/debts"
-          icon={<Building2 className="h-5 w-5 text-red-500" />}
-          title="Schulden"
-          value={formatCurrency(data.totalDebts)}
-          subtitle="vrijheid die je terugkoopt"
-          accent={false}
-          negative
-          amount={data.totalDebts}
-        />
-        <QuickLink
-          href="/core/assets"
-          icon={<PiggyBank className="h-5 w-5 text-emerald-600" />}
-          title="Assets"
-          value={formatCurrency(data.totalAssets)}
-          subtitle="totale waarde"
-          accent
-          amount={data.totalAssets}
-        />
-        <FeatureGate featureId="box3_belasting" fallback="locked">
-          <QuickLink
-            href="/core/belasting"
-            icon={<Receipt className="h-5 w-5 text-amber-600" />}
-            title="Box 3 Belasting"
-            value="Berekenen"
-            subtitle="vermogensrendementsheffing"
-            accent={false}
+      {/* === 4. Mission Control Cards (Primary Content) === */}
+      <section className="mt-8" data-testid="mission-control-section">
+        <h2 className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          Missie Controle
+        </h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Cash Card */}
+          <MissionControlCard
+            href="/core/cash"
+            icon={<Wallet className="h-5 w-5 text-amber-600" />}
+            title="Cash"
+            metric={formatCurrency(data.monthlyIncome - data.monthlyExpenses)}
+            metricColor={data.monthlyIncome >= data.monthlyExpenses ? 'text-emerald-600' : 'text-red-600'}
+            status={data.monthlyIncome >= data.monthlyExpenses ? 'healthy' : 'attention'}
+            statusLabel={data.monthlyIncome >= data.monthlyExpenses ? 'Gezond' : 'Aandacht nodig'}
+            details={[
+              { label: 'Inkomen', value: formatCurrency(data.monthlyIncome), color: 'text-emerald-600' },
+              { label: 'Uitgaven', value: formatCurrency(data.monthlyExpenses), color: 'text-zinc-600' },
+            ]}
+            cta="Bekijk transacties"
+            testId="mission-cash"
           />
+
+          {/* Budgetten Card */}
+          <MissionControlCard
+            href="/core/budgets"
+            icon={<ShoppingCart className="h-5 w-5 text-amber-600" />}
+            title="Budgetten"
+            metric={overBudgetCount > 0 ? `${overBudgetCount} over budget` : 'Op koers'}
+            metricColor={overBudgetCount > 0 ? 'text-red-600' : 'text-emerald-600'}
+            status={overBudgetCount === 0 ? 'healthy' : 'attention'}
+            statusLabel={overBudgetCount === 0 ? 'Alles op schema' : `${overBudgetCount} overschreden`}
+            details={[
+              { label: 'Uitgaven', value: formatCurrency(data.monthlyExpenses), color: 'text-zinc-600' },
+              { label: 'Budgetten', value: `${budgetCount} actief`, color: 'text-zinc-500' },
+            ]}
+            cta="Beheer budgetten"
+            testId="mission-budgetten"
+          />
+
+          {/* Assets Card */}
+          <MissionControlCard
+            href="/core/assets"
+            icon={<PiggyBank className="h-5 w-5 text-emerald-600" />}
+            title="Assets"
+            metric={formatCurrency(data.totalAssets)}
+            metricColor="text-emerald-600"
+            status="healthy"
+            statusLabel={
+              assetGrowthDirection === 'up' ? 'Groeiend' :
+              assetGrowthDirection === 'down' ? 'Dalend' : 'Stabiel'
+            }
+            growthDirection={assetGrowthDirection}
+            details={[
+              { label: 'Totaal', value: formatCurrency(data.totalAssets), color: 'text-emerald-600' },
+              { label: 'Richting', value: assetGrowthDirection === 'up' ? '↑ Omhoog' : assetGrowthDirection === 'down' ? '↓ Omlaag' : '→ Stabiel', color: assetGrowthDirection === 'up' ? 'text-emerald-600' : assetGrowthDirection === 'down' ? 'text-red-500' : 'text-zinc-500' },
+            ]}
+            cta="Bekijk portfolio"
+            testId="mission-assets"
+          />
+
+          {/* Schulden Card */}
+          <MissionControlCard
+            href="/core/debts"
+            icon={<Building2 className="h-5 w-5 text-red-500" />}
+            title="Schulden"
+            metric={data.totalDebts > 0 ? formatCurrency(data.totalDebts) : 'Schuldvrij'}
+            metricColor={data.totalDebts > 0 ? 'text-red-600' : 'text-emerald-600'}
+            status={data.totalDebts === 0 ? 'healthy' : debtProgress && debtProgress.progressPct > 50 ? 'healthy' : 'attention'}
+            statusLabel={data.totalDebts === 0 ? 'Schuldvrij!' : debtProgress ? `${debtProgress.progressPct.toFixed(0)}% afgelost` : 'Vrijheid terugkopen'}
+            debtProgress={debtProgress ?? undefined}
+            details={[
+              { label: 'Openstaand', value: formatCurrency(data.totalDebts), color: 'text-red-600' },
+              { label: 'Afgelost', value: debtProgress ? `${debtProgress.progressPct.toFixed(0)}%` : '—', color: debtProgress && debtProgress.progressPct > 0 ? 'text-emerald-600' : 'text-zinc-400' },
+            ]}
+            cta="Beheer schulden"
+            testId="mission-schulden"
+          />
+        </div>
+
+        {/* Box 3 stays as a separate gated quick link */}
+        <FeatureGate featureId="box3_belasting" fallback="locked">
+          <div className="mt-4">
+            <Link
+              href="/core/belasting"
+              className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition-colors hover:border-amber-200 hover:bg-amber-50/30"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-amber-50">
+                <Receipt className="h-5 w-5 text-amber-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-zinc-500">Box 3 Belasting</p>
+                <p className="text-lg font-bold text-zinc-900">Berekenen</p>
+                <p className="text-xs text-zinc-400">vermogensrendementsheffing</p>
+              </div>
+              <ArrowRight className="h-4 w-4 shrink-0 text-zinc-300 group-hover:text-amber-500" />
+            </Link>
+          </div>
         </FeatureGate>
       </section>
 
-      {/* === Net Worth Chart (Collapsible Deep-Dive) === */}
+      {/* === 5. Net Worth Chart (Deep Dive) === */}
       <FeatureGate featureId="vermogensverloop" fallback="locked">
       <section className="mt-10">
         <CollapsibleSection
@@ -615,10 +715,10 @@ export default function CorePage() {
       </section>
       </FeatureGate>
 
-      {/* === Snapshot Comparison (Collapsible Deep-Dive) === */}
+      {/* === 6. Snapshot Comparison (Deep Dive) === */}
       <FeatureGate featureId="snapshot_vergelijking" fallback="locked">
       {snapshots.length >= 2 && (
-        <section className="mt-8">
+        <section className="mt-10">
           <CollapsibleSection
             storageKey="kern_snapshot_vergelijking"
             title="Vergelijking snapshots"
@@ -631,7 +731,7 @@ export default function CorePage() {
       )}
       </FeatureGate>
 
-      {/* === Financiële Kerngetallen === */}
+      {/* === 7. Financiële Kerngetallen (Deep Dive) === */}
       <section className="mt-10">
         <div className="mb-5 flex items-end justify-between">
           <div>
@@ -680,10 +780,10 @@ export default function CorePage() {
         </div>
       </section>
 
-      {/* === Locked Features Footer === */}
+      {/* === 8. Locked Features Footer === */}
       <LockedFeaturesFooter module="kern" />
 
-      {/* === Discover Carousel === */}
+      {/* === 9. Discover Carousel === */}
       <DiscoverCarousel module="kern" />
     </div>
   )
@@ -709,45 +809,114 @@ function KpiTooltip({ text }: { text: string }) {
   )
 }
 
-function QuickLink({
+function MissionControlCard({
   href,
   icon,
   title,
-  value,
-  subtitle,
-  accent,
-  negative,
-  amount,
+  metric,
+  metricColor,
+  status,
+  statusLabel,
+  details,
+  cta,
+  testId,
+  debtProgress: debtProg,
+  growthDirection,
 }: {
   href: string
   icon: React.ReactNode
   title: string
-  value: string
-  subtitle: string
-  accent: boolean
-  negative?: boolean
-  amount?: number
+  metric: string
+  metricColor: string
+  status: 'healthy' | 'attention'
+  statusLabel: string
+  details: { label: string; value: string; color: string }[]
+  cta: string
+  testId: string
+  debtProgress?: { totalOriginal: number; totalCurrent: number; progressPct: number }
+  growthDirection?: 'up' | 'down' | 'flat'
 }) {
   return (
     <Link
       href={href}
-      className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition-colors hover:border-amber-200 hover:bg-amber-50/30"
+      data-testid={testId}
+      className="group flex flex-col rounded-xl border border-zinc-200 bg-white p-5 transition-all hover:border-amber-200 hover:bg-amber-50/20 hover:shadow-sm"
     >
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-amber-50">
-        {icon}
+      {/* Header: icon + title + status */}
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-amber-50">
+            {icon}
+          </div>
+          <p className="text-sm font-semibold text-zinc-700">{title}</p>
+        </div>
+        <div data-testid={`${testId}-status`} className="flex items-center gap-1">
+          {status === 'healthy' ? (
+            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+          ) : (
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+          )}
+        </div>
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium text-zinc-500">{title}</p>
-        <p className={`text-lg font-bold ${negative ? 'text-red-600' : accent ? 'text-emerald-600' : 'text-zinc-900'}`}>
-          {value}
-        </p>
-        {amount != null && Math.abs(amount) >= 100 ? (
-          <FreedomTimeBadge amount={amount} className="mt-0.5" />
+
+      {/* Key Metric */}
+      <div className="mb-2">
+        <div className="flex items-baseline gap-2">
+          <p className={`text-2xl font-bold ${metricColor}`}>{metric}</p>
+          {growthDirection && (
+            <span className="flex items-center">
+              {growthDirection === 'up' && <ArrowUpRight className="h-4 w-4 text-emerald-500" />}
+              {growthDirection === 'down' && <ArrowDownRight className="h-4 w-4 text-red-500" />}
+              {growthDirection === 'flat' && <Minus className="h-4 w-4 text-zinc-400" />}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Status label */}
+      <div className={`mb-3 inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${
+        status === 'healthy'
+          ? 'bg-emerald-50 text-emerald-700'
+          : 'bg-amber-50 text-amber-700'
+      }`} data-testid={`${testId}-status-label`}>
+        {status === 'healthy' ? (
+          <CheckCircle2 className="h-3 w-3" />
         ) : (
-          <p className="text-xs text-zinc-400">{subtitle}</p>
+          <AlertTriangle className="h-3 w-3" />
         )}
+        {statusLabel}
       </div>
-      <ArrowRight className="h-4 w-4 shrink-0 text-zinc-300 group-hover:text-amber-500" />
+
+      {/* Debt payoff progress bar */}
+      {debtProg && debtProg.totalOriginal > 0 && (
+        <div className="mb-3" data-testid={`${testId}-progress-bar`}>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-500"
+              style={{ width: `${debtProg.progressPct}%` }}
+            />
+          </div>
+          <p className="mt-1 text-[10px] text-zinc-400">
+            {formatCurrency(debtProg.totalOriginal - debtProg.totalCurrent)} afgelost van {formatCurrency(debtProg.totalOriginal)}
+          </p>
+        </div>
+      )}
+
+      {/* Detail lines */}
+      <div className="mt-auto space-y-1 border-t border-zinc-100 pt-3">
+        {details.map((d, i) => (
+          <div key={i} className="flex items-center justify-between text-xs">
+            <span className="text-zinc-400">{d.label}</span>
+            <span className={`font-medium ${d.color}`}>{d.value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* CTA */}
+      <div className="mt-3 flex items-center justify-between">
+        <span className="text-xs font-medium text-amber-600 opacity-0 transition-opacity group-hover:opacity-100">{cta}</span>
+        <ArrowRight className="h-4 w-4 text-zinc-300 transition-colors group-hover:text-amber-500" />
+      </div>
     </Link>
   )
 }

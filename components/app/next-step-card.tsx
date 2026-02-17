@@ -244,12 +244,13 @@ export function computeKernNextStep(data: {
   budgetCount: number
   snapshotCount: number
   hasTransactions: boolean
+  alertBudgetCount?: number
 }): NextStepSuggestion {
-  // Priority order: import transactions > create budgets > track debts > assets > snapshots > belasting
+  // Priority order: import transactions > create budgets > budget alerts > track debts > assets > snapshots > belasting
   if (!data.hasTransactions) {
     return {
       key: 'import_transactions',
-      title: 'Importeer je transacties',
+      title: 'Importeer je eerste bankafschrift',
       description: 'Upload je bankafschriften om inzicht te krijgen in je inkomsten en uitgaven.',
       href: '/core/cash/import',
       icon: 'receipt',
@@ -262,6 +263,19 @@ export function computeKernNextStep(data: {
       key: 'set_budgets',
       title: 'Stel je budgetten in',
       description: 'Maak budgetten aan om grip te krijgen op je uitgaven.',
+      href: '/core/budgets',
+      icon: 'cart',
+      moduleColor: 'amber',
+    }
+  }
+
+  // Budget attention alerts when budgets are over their limit
+  if ((data.alertBudgetCount ?? 0) > 0) {
+    const count = data.alertBudgetCount!
+    return {
+      key: 'budget_attention',
+      title: `${count} budget${count > 1 ? 'ten' : ''} ${count > 1 ? 'hebben' : 'heeft'} aandacht nodig`,
+      description: `${count} van je budgetten ${count > 1 ? 'overschrijden' : 'overschrijdt'} de limiet. Bekijk je uitgaven.`,
       href: '/core/budgets',
       icon: 'cart',
       moduleColor: 'amber',
@@ -282,7 +296,7 @@ export function computeKernNextStep(data: {
   if (data.totalAssets === 0) {
     return {
       key: 'add_assets',
-      title: 'Voeg je assets toe',
+      title: 'Voeg je vermogen toe',
       description: 'Registreer je bezittingen voor een compleet vermogensoverzicht.',
       href: '/core/assets',
       icon: 'piggybank',
@@ -322,13 +336,14 @@ export function computeAllKernSteps(data: {
   budgetCount: number
   snapshotCount: number
   hasTransactions: boolean
+  alertBudgetCount?: number
 }): NextStepSuggestion[] {
   const steps: NextStepSuggestion[] = []
 
   if (!data.hasTransactions) {
     steps.push({
       key: 'import_transactions',
-      title: 'Importeer je transacties',
+      title: 'Importeer je eerste bankafschrift',
       description: 'Upload je bankafschriften om inzicht te krijgen in je inkomsten en uitgaven.',
       href: '/core/cash/import',
       icon: 'receipt',
@@ -341,6 +356,19 @@ export function computeAllKernSteps(data: {
       key: 'set_budgets',
       title: 'Stel je budgetten in',
       description: 'Maak budgetten aan om grip te krijgen op je uitgaven.',
+      href: '/core/budgets',
+      icon: 'cart',
+      moduleColor: 'amber',
+    })
+  }
+
+  // Budget attention alerts when budgets are over their limit
+  if ((data.alertBudgetCount ?? 0) > 0) {
+    const count = data.alertBudgetCount!
+    steps.push({
+      key: 'budget_attention',
+      title: `${count} budget${count > 1 ? 'ten' : ''} ${count > 1 ? 'hebben' : 'heeft'} aandacht nodig`,
+      description: `${count} van je budgetten ${count > 1 ? 'overschrijden' : 'overschrijdt'} de limiet. Bekijk je uitgaven.`,
       href: '/core/budgets',
       icon: 'cart',
       moduleColor: 'amber',
@@ -361,7 +389,7 @@ export function computeAllKernSteps(data: {
   if (data.totalAssets === 0) {
     steps.push({
       key: 'add_assets',
-      title: 'Voeg je assets toe',
+      title: 'Voeg je vermogen toe',
       description: 'Registreer je bezittingen voor een compleet vermogensoverzicht.',
       href: '/core/assets',
       icon: 'piggybank',
@@ -428,7 +456,7 @@ export function computeAllWilSteps(data: {
   if (data.goalCount === 0) {
     steps.push({
       key: 'set_goals',
-      title: 'Stel je eerste doel',
+      title: 'Stel je eerste doel in',
       description: 'Definieer een financieel doel om naartoe te werken.',
       href: '/will',
       icon: 'target',
@@ -526,7 +554,7 @@ export function computeWilNextStep(data: {
   if (data.goalCount === 0) {
     return {
       key: 'set_goals',
-      title: 'Stel je eerste doel',
+      title: 'Stel je eerste doel in',
       description: 'Definieer een financieel doel om naartoe te werken.',
       href: '/will',
       icon: 'target',

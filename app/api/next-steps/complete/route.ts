@@ -10,6 +10,14 @@ const VALID_STEP_KEYS = [
   'complete_profile',
   'create_snapshot',
   'set_goals',
+  'budget_attention',
+  'check_tax',
+  'review_recommendations',
+  'work_on_actions',
+  'check_goals',
+  'calculate_fire',
+  'plan_life_event',
+  'explore_scenarios',
 ]
 
 /**
