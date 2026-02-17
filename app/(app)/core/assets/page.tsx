@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
-  Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2, BarChart3,
+  Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2, BarChart3, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -150,15 +150,32 @@ export default function AssetsPage() {
       .eq('entity_id', assetId)
       .eq('entity_type', 'asset')
       .order('valuation_date', { ascending: false })
-      .limit(20)
     if (data) {
       setValuations((prev) => ({ ...prev, [assetId]: data as Valuation[] }))
     }
   }, [])
 
+  // Load all valuations for sparklines on asset cards
+  const loadAllValuations = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('valuations')
+      .select('*')
+      .eq('entity_type', 'asset')
+      .order('valuation_date', { ascending: true })
+    if (data) {
+      const grouped: Record<string, Valuation[]> = {}
+      for (const v of data as Valuation[]) {
+        if (!grouped[v.entity_id]) grouped[v.entity_id] = []
+        grouped[v.entity_id].push(v)
+      }
+      setValuations(grouped)
+    }
+  }, [])
+
   useEffect(() => {
-    loadAssets()
-  }, [loadAssets])
+    loadAssets().then(() => loadAllValuations())
+  }, [loadAssets, loadAllValuations])
 
   const activeAssets = assets.filter((a) => a.is_active)
   const totalValue = activeAssets.reduce((s, a) => s + Number(a.current_value), 0)
@@ -332,14 +349,15 @@ export default function AssetsPage() {
         </section>
 
         {/* Projection chart */}
-        <section className="rounded-2xl border border-zinc-200 bg-white p-6">
+        <section className="rounded-2xl border border-zinc-200 bg-white p-6" data-testid="portfolio-projection-section">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-zinc-700">Projectie</h2>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1" data-testid="projection-year-buttons">
               {[5, 10, 20, 30].map((y) => (
                 <button
                   key={y}
                   onClick={() => setProjectionYears(y)}
+                  data-testid={`projection-year-${y}`}
                   className={`rounded-md px-2 py-1 text-xs font-medium ${
                     projectionYears === y
                       ? 'bg-amber-100 text-amber-700'
@@ -356,9 +374,22 @@ export default function AssetsPage() {
             <div className="flex items-center gap-1">
               <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
               <span className="text-zinc-500">Verwachte groei:</span>
-              <span className="font-medium text-emerald-600">+{formatCurrency(projectedGrowth)}</span>
+              <span className="font-medium text-emerald-600" data-testid="projected-growth">+{formatCurrency(projectedGrowth)}</span>
             </div>
           </div>
+          {/* Contextual projection message */}
+          {projection.length > 0 && (
+            <p className="mt-3 text-xs text-zinc-500 leading-relaxed" data-testid="projection-context-message">
+              {totalMonthlyContrib > 0
+                ? `Met je huidige inleg van ${formatCurrency(totalMonthlyContrib)}/maand groeit je portfolio naar ${formatCurrency(futureValue)} in ${projectionYears} jaar`
+                : `Zonder extra inleg groeit je portfolio naar ${formatCurrency(futureValue)} in ${projectionYears} jaar`}
+              {dailyExpenses > 0 && futureValue > 0 && (
+                <span className="text-emerald-600 font-medium">
+                  {' — '}dat is {formatFreedomTimeString(calculateFreedomTime(futureValue, dailyExpenses), 'long')} vrijheid
+                </span>
+              )}
+            </p>
+          )}
         </section>
       </div>
 
@@ -400,6 +431,15 @@ export default function AssetsPage() {
                   {asset.institution ? ` \u2022 ${asset.institution}` : ''}
                 </p>
               </div>
+              {/* Mini sparkline for asset card */}
+              {(() => {
+                const assetVals = valuations[asset.id]
+                if (assetVals && assetVals.length >= 2) {
+                  const sorted = [...assetVals].sort((a, b) => a.valuation_date.localeCompare(b.valuation_date))
+                  return <MiniSparkline valuations={sorted} className="hidden sm:block" />
+                }
+                return null
+              })()}
               <div className="shrink-0 text-right">
                 <p className="text-sm font-semibold text-zinc-900">{formatCurrency(value)}</p>
                 {dailyExpenses > 0 && value > 0 && (
@@ -677,77 +717,12 @@ function AssetDetailModal({
 
           {/* Valuation history */}
           {valuations && valuations.length > 0 && (
-            <div>
-              <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">Waardehistorie</p>
-
-              {/* Sparkline chart */}
-              {valuations.length >= 2 && (() => {
-                const sorted = [...valuations].sort((a, b) => a.valuation_date.localeCompare(b.valuation_date))
-                const values = sorted.map(v => Number(v.value))
-                const min = Math.min(...values)
-                const max = Math.max(...values)
-                const range = max - min || 1
-                const W = 240
-                const H = 48
-                const PAD = 4
-                const points = values.map((v, i) => {
-                  const x = PAD + (i / (values.length - 1)) * (W - PAD * 2)
-                  const y = H - PAD - ((v - min) / range) * (H - PAD * 2)
-                  return `${x},${y}`
-                })
-                const trend = values[values.length - 1] >= values[0]
-                return (
-                  <div className="mb-3 rounded-lg bg-zinc-50 p-2">
-                    <svg viewBox={`0 0 ${W} ${H}`} className="h-12 w-full" preserveAspectRatio="none">
-                      <polyline
-                        points={points.join(' ')}
-                        fill="none"
-                        stroke={trend ? '#059669' : '#dc2626'}
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      {values.map((v, i) => {
-                        const x = PAD + (i / (values.length - 1)) * (W - PAD * 2)
-                        const y = H - PAD - ((v - min) / range) * (H - PAD * 2)
-                        return (
-                          <circle
-                            key={i}
-                            cx={x}
-                            cy={y}
-                            r="3"
-                            fill={i === values.length - 1 ? (trend ? '#059669' : '#dc2626') : '#a1a1aa'}
-                          />
-                        )
-                      })}
-                    </svg>
-                    <div className="mt-1 flex justify-between text-[10px] text-zinc-400">
-                      <span>{new Date(sorted[0].valuation_date).toLocaleDateString('nl-NL', { month: 'short', year: '2-digit' })}</span>
-                      <span>{new Date(sorted[sorted.length - 1].valuation_date).toLocaleDateString('nl-NL', { month: 'short', year: '2-digit' })}</span>
-                    </div>
-                  </div>
-                )
-              })()}
-
-              <div className="space-y-1">
-                {valuations.slice(0, 5).map((v) => {
-                  const prev = valuations.find((vv) => vv.valuation_date < v.valuation_date)
-                  const diff = prev ? Number(v.value) - Number(prev.value) : null
-                  return (
-                    <div key={v.id} className="flex items-center gap-3 text-xs">
-                      <span className="w-20 shrink-0 text-zinc-400">
-                        {new Date(v.valuation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
-                      </span>
-                      <span className="font-medium text-zinc-700">{formatCurrency(Number(v.value))}</span>
-                      {diff !== null && (
-                        <span className={`text-[10px] font-medium ${diff >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
-                        </span>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
+            <ValuationTrendSection valuations={valuations} />
+          )}
+          {/* No valuation history message */}
+          {(!valuations || valuations.length === 0) && (
+            <div className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50/50 p-4 text-center" data-testid="no-valuation-history">
+              <p className="text-xs text-zinc-400">Nog geen waardehistorie. Gebruik &ldquo;Herwaarderen&rdquo; om de waarde bij te werken.</p>
             </div>
           )}
         </div>
@@ -785,6 +760,275 @@ function AssetDetailModal({
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Mini sparkline for asset cards ───────────────────────────
+
+function MiniSparkline({
+  valuations,
+  className = '',
+}: {
+  valuations: Valuation[]
+  className?: string
+}) {
+  if (valuations.length < 2) return null
+
+  const values = valuations.map(v => Number(v.value))
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = max - min || 1
+  const W = 64
+  const H = 24
+  const PAD = 2
+
+  const points = values.map((v, i) => {
+    const x = PAD + (i / (values.length - 1)) * (W - PAD * 2)
+    const y = H - PAD - ((v - min) / range) * (H - PAD * 2)
+    return `${x},${y}`
+  })
+
+  const trend = values[values.length - 1] >= values[0]
+  const strokeColor = trend ? '#059669' : '#dc2626'
+
+  // Create gradient fill
+  const fillPoints = [
+    `${PAD},${H - PAD}`,
+    ...points,
+    `${PAD + ((values.length - 1) / (values.length - 1)) * (W - PAD * 2)},${H - PAD}`,
+  ]
+
+  return (
+    <div className={`shrink-0 ${className}`} data-testid="asset-card-sparkline">
+      <svg viewBox={`0 0 ${W} ${H}`} width={64} height={24} preserveAspectRatio="none">
+        <defs>
+          <linearGradient id={`sparkFill-${trend ? 'up' : 'down'}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={strokeColor} stopOpacity="0.2" />
+            <stop offset="100%" stopColor={strokeColor} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        <polygon
+          points={fillPoints.join(' ')}
+          fill={`url(#sparkFill-${trend ? 'up' : 'down'})`}
+        />
+        <polyline
+          points={points.join(' ')}
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {/* Last point dot */}
+        {(() => {
+          const lastIdx = values.length - 1
+          const x = PAD + (lastIdx / (values.length - 1)) * (W - PAD * 2)
+          const y = H - PAD - ((values[lastIdx] - min) / range) * (H - PAD * 2)
+          return <circle cx={x} cy={y} r="2" fill={strokeColor} />
+        })()}
+      </svg>
+    </div>
+  )
+}
+
+// ── Valuation trend section for detail modal ─────────────────
+
+function ValuationTrendSection({ valuations }: { valuations: Valuation[] }) {
+  const [showAll, setShowAll] = useState(false)
+  const INITIAL_SHOW = 10
+
+  const sorted = useMemo(
+    () => [...valuations].sort((a, b) => a.valuation_date.localeCompare(b.valuation_date)),
+    [valuations],
+  )
+
+  // Reverse sorted for history list (newest first)
+  const historyList = useMemo(
+    () => [...valuations].sort((a, b) => b.valuation_date.localeCompare(a.valuation_date)),
+    [valuations],
+  )
+
+  const displayedHistory = showAll ? historyList : historyList.slice(0, INITIAL_SHOW)
+  const hasMore = historyList.length > INITIAL_SHOW
+
+  // Line chart dimensions
+  const W = 380
+  const H = 140
+  const PAD = { top: 10, right: 10, bottom: 25, left: 55 }
+  const chartW = W - PAD.left - PAD.right
+  const chartH = H - PAD.top - PAD.bottom
+
+  const values = sorted.map(v => Number(v.value))
+  const min = Math.min(...values) * 0.95
+  const max = Math.max(...values) * 1.05
+  const range = max - min || 1
+
+  function xPos(i: number) {
+    return PAD.left + (sorted.length === 1 ? chartW / 2 : (i / (sorted.length - 1)) * chartW)
+  }
+  function yPos(val: number) {
+    return PAD.top + chartH - ((val - min) / range) * chartH
+  }
+
+  const trend = values.length >= 2 && values[values.length - 1] >= values[0]
+  const strokeColor = trend ? '#059669' : '#dc2626'
+  const fillColor = trend ? '#059669' : '#dc2626'
+
+  // Chart line path
+  const linePath = sorted.length === 1
+    ? ''
+    : `M ${sorted.map((_, i) => `${xPos(i).toFixed(1)} ${yPos(values[i]).toFixed(1)}`).join(' L ')}`
+
+  // Area fill path
+  const areaPath = sorted.length === 1
+    ? ''
+    : `${linePath} L ${xPos(sorted.length - 1).toFixed(1)} ${(PAD.top + chartH).toFixed(1)} L ${xPos(0).toFixed(1)} ${(PAD.top + chartH).toFixed(1)} Z`
+
+  // Y-axis ticks
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map(t => min + t * range)
+
+  // X-axis labels (show max 5 labels)
+  const labelStep = Math.max(1, Math.floor(sorted.length / 5))
+
+  return (
+    <div data-testid="valuation-trend-section">
+      <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">Waardehistorie ({valuations.length} metingen)</p>
+
+      {/* Line chart */}
+      {sorted.length >= 2 ? (
+        <div className="mb-3 rounded-lg bg-zinc-50 p-3" data-testid="valuation-line-chart">
+          <svg viewBox={`0 0 ${W} ${H}`} className="h-36 w-full" preserveAspectRatio="xMidYMid meet">
+            {/* Grid lines and Y labels */}
+            {yTicks.map((val, i) => (
+              <g key={i}>
+                <line
+                  x1={PAD.left}
+                  y1={yPos(val)}
+                  x2={W - PAD.right}
+                  y2={yPos(val)}
+                  stroke="#e4e4e7"
+                  strokeWidth="0.5"
+                />
+                <text x={PAD.left - 6} y={yPos(val) + 3} textAnchor="end" fontSize="7" fill="#a1a1aa">
+                  {val >= 1000 ? `€${(val / 1000).toFixed(0)}k` : `€${val.toFixed(0)}`}
+                </text>
+              </g>
+            ))}
+
+            {/* Area fill */}
+            <path d={areaPath} fill={fillColor} fillOpacity="0.08" />
+
+            {/* Line */}
+            <path d={linePath} fill="none" stroke={strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+
+            {/* Data points */}
+            {sorted.map((v, i) => (
+              <circle
+                key={v.id}
+                cx={xPos(i)}
+                cy={yPos(values[i])}
+                r={sorted.length <= 20 ? 3 : 2}
+                fill={i === sorted.length - 1 ? strokeColor : '#a1a1aa'}
+                stroke="white"
+                strokeWidth="1"
+              />
+            ))}
+
+            {/* X-axis date labels */}
+            {sorted.filter((_, i) => i % labelStep === 0 || i === sorted.length - 1).map((v, _, arr) => {
+              const idx = sorted.indexOf(v)
+              return (
+                <text
+                  key={v.id}
+                  x={xPos(idx)}
+                  y={H - 4}
+                  textAnchor="middle"
+                  fontSize="7"
+                  fill="#a1a1aa"
+                >
+                  {new Date(v.valuation_date).toLocaleDateString('nl-NL', { month: 'short', year: '2-digit' })}
+                </text>
+              )
+            })}
+          </svg>
+
+          {/* Trend summary */}
+          <div className="mt-1 flex items-center justify-between text-[10px]">
+            <span className="text-zinc-400">
+              {new Date(sorted[0].valuation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
+              {' — '}
+              {new Date(sorted[sorted.length - 1].valuation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
+            </span>
+            {(() => {
+              const first = values[0]
+              const last = values[values.length - 1]
+              const diff = last - first
+              const pct = first > 0 ? ((last - first) / first) * 100 : 0
+              return (
+                <span className={`font-medium ${diff >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {diff >= 0 ? '+' : ''}{formatCurrency(diff)} ({diff >= 0 ? '+' : ''}{pct.toFixed(1)}%)
+                </span>
+              )
+            })()}
+          </div>
+        </div>
+      ) : sorted.length === 1 ? (
+        <div className="mb-3 rounded-lg bg-zinc-50 p-3 text-center" data-testid="valuation-single-point">
+          <p className="text-xs text-zinc-500">
+            {formatCurrency(Number(sorted[0].value))} op{' '}
+            {new Date(sorted[0].valuation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
+          <p className="mt-1 text-[10px] text-zinc-400">Voeg meer waarderingen toe voor een trendgrafiek.</p>
+        </div>
+      ) : null}
+
+      {/* History list — full history, no limit */}
+      <div className="space-y-1" data-testid="valuation-history-list">
+        {displayedHistory.map((v) => {
+          // Find previous valuation in chronological order
+          const chronIdx = sorted.findIndex(s => s.id === v.id)
+          const prev = chronIdx > 0 ? sorted[chronIdx - 1] : null
+          const diff = prev ? Number(v.value) - Number(prev.value) : null
+          return (
+            <div key={v.id} className="flex items-center gap-3 text-xs">
+              <span className="w-24 shrink-0 text-zinc-400">
+                {new Date(v.valuation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: '2-digit' })}
+              </span>
+              <span className="font-medium text-zinc-700">{formatCurrency(Number(v.value))}</span>
+              {diff !== null && (
+                <span className={`text-[10px] font-medium ${diff >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
+                </span>
+              )}
+              {v.notes && (
+                <span className="truncate text-[10px] text-zinc-400">{v.notes}</span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Show more/less button */}
+      {hasMore && (
+        <button
+          onClick={() => setShowAll(!showAll)}
+          className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-50/50"
+          data-testid="valuation-show-more"
+        >
+          {showAll ? (
+            <>
+              <ChevronUp className="h-3.5 w-3.5" />
+              Toon minder
+            </>
+          ) : (
+            <>
+              <ChevronDown className="h-3.5 w-3.5" />
+              Toon alle {historyList.length} waarderingen
+            </>
+          )}
+        </button>
+      )}
     </div>
   )
 }
@@ -895,7 +1139,7 @@ function ProjectionChart({
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map((t) => Math.round(maxVal * t))
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="mt-3 h-auto w-full" preserveAspectRatio="xMidYMid meet">
+    <svg viewBox={`0 0 ${w} ${h}`} className="mt-3 h-auto w-full" preserveAspectRatio="xMidYMid meet" data-testid="projection-area-chart">
       {yTicks.map((val) => (
         <g key={val}>
           <line x1={pad.left} y1={y(val)} x2={w - pad.right} y2={y(val)} stroke="#f4f4f5" strokeWidth="0.5" />

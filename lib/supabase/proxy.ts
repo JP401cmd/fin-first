@@ -148,6 +148,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-discover-carousel',
     '/test-debt-trajectory',
     '/api/verify-debt-trajectory',
+    '/api/verify-debt-payoff-trajectory',
+    '/test-debt-payoff-trajectory',
     '/test-ai-recommendations',
     '/api/verify-ai-recommendations',
     '/test-milestone-markers',
