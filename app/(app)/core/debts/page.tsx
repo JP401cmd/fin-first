@@ -142,6 +142,24 @@ export default function DebtsPage() {
     }
   }, [])
 
+  // Load ALL debt valuations at once (for mini sparklines on cards)
+  const loadAllDebtValuations = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('valuations')
+      .select('*')
+      .eq('entity_type', 'debt')
+      .order('valuation_date', { ascending: true })
+    if (data) {
+      const grouped: Record<string, Valuation[]> = {}
+      for (const v of data as Valuation[]) {
+        if (!grouped[v.entity_id]) grouped[v.entity_id] = []
+        grouped[v.entity_id].push(v)
+      }
+      setValuations(grouped)
+    }
+  }, [])
+
   const loadUserAssets = useCallback(async () => {
     const supabase = createClient()
     const { data } = await supabase.from('assets').select('id, name, asset_type').order('name')
@@ -149,10 +167,10 @@ export default function DebtsPage() {
   }, [])
 
   useEffect(() => {
-    loadDebts()
+    loadDebts().then(() => loadAllDebtValuations())
     loadUserAssets()
     loadExpenses()
-  }, [loadDebts, loadUserAssets, loadExpenses])
+  }, [loadDebts, loadUserAssets, loadExpenses, loadAllDebtValuations])
 
   const activeDebts = debts.filter((d) => d.is_active && Number(d.current_balance) > 0)
   const totalBalance = activeDebts.reduce((s, d) => s + Number(d.current_balance), 0)
@@ -376,19 +394,21 @@ export default function DebtsPage() {
           const original = Number(debt.original_amount)
           const pct = original > 0 ? ((original - balance) / original) * 100 : 0
           const icon = DEBT_TYPE_ICONS[debt.debt_type] ?? 'CircleDot'
+          const debtValuations = valuations[debt.id]
 
           return (
             <div
               key={debt.id}
               className="flex cursor-pointer items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 transition-colors hover:border-amber-200 hover:bg-amber-50/30"
               onClick={() => openDebtModal(debt)}
+              data-testid={`debt-card-${debt.id}`}
             >
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-50">
                 <BudgetIcon name={icon} className="h-4 w-4 text-amber-600" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-zinc-900">{debt.name}</p>
                     <p className="truncate text-xs text-zinc-500">
                       {DEBT_TYPE_LABELS[debt.debt_type]}
@@ -398,7 +418,9 @@ export default function DebtsPage() {
                       {debt.creditor ? ` \u2022 ${debt.creditor}` : ''}
                     </p>
                   </div>
-                  <div className="shrink-0 text-right">
+                  {/* Mini sparkline showing balance trend */}
+                  <DebtMiniSparkline debtId={debt.id} valuations={debtValuations} currentBalance={balance} />
+                  <div className="shrink-0 text-right ml-3">
                     <p className="text-sm font-semibold text-zinc-900">{formatCurrency(balance)}</p>
                     <p className="text-xs text-zinc-400">van {formatCurrency(original)}</p>
                     {dailyExpenses > 0 && balance > 0 && (
@@ -1721,6 +1743,92 @@ function ValuationHistory({
           )
         })}
       </div>
+    </div>
+  )
+}
+
+// ── Mini sparkline for debt cards ─────────────────────────────
+
+function DebtMiniSparkline({
+  debtId,
+  valuations,
+  currentBalance,
+}: {
+  debtId: string
+  valuations: Valuation[] | undefined
+  currentBalance: number
+}) {
+  // Need at least 2 data points to draw a sparkline
+  if (!valuations || valuations.length < 2) return null
+
+  const W = 64
+  const H = 24
+  const PAD = 2
+
+  // Values sorted ascending by date
+  const sorted = [...valuations].sort(
+    (a, b) => new Date(a.valuation_date).getTime() - new Date(b.valuation_date).getTime()
+  )
+  const values = sorted.map(v => Number(v.value))
+
+  // Add current balance as most recent point if different from last valuation
+  const lastVal = values[values.length - 1]
+  if (Math.abs(lastVal - currentBalance) > 0.01) {
+    values.push(currentBalance)
+  }
+
+  if (values.length < 2) return null
+
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = max - min || 1
+
+  const points = values.map((v, i) => {
+    const x = PAD + (i / (values.length - 1)) * (W - PAD * 2)
+    const y = H - PAD - ((v - min) / range) * (H - PAD * 2)
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  })
+
+  // For debts: going DOWN is good (green), going UP is bad (red)
+  const trend = values[values.length - 1] <= values[0]
+  const strokeColor = trend ? '#059669' : '#dc2626' // emerald-600 or red-600
+
+  // Create gradient fill
+  const fillPoints = [
+    `${PAD},${H - PAD}`,
+    ...points,
+    `${(PAD + ((values.length - 1) / (values.length - 1)) * (W - PAD * 2)).toFixed(1)},${H - PAD}`,
+  ]
+
+  return (
+    <div className="shrink-0 hidden sm:block" data-testid={`debt-sparkline-${debtId}`}>
+      <svg viewBox={`0 0 ${W} ${H}`} width={64} height={24} preserveAspectRatio="none">
+        <defs>
+          <linearGradient id={`debtSparkFill-${debtId}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={strokeColor} stopOpacity="0.2" />
+            <stop offset="100%" stopColor={strokeColor} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        <polygon
+          points={fillPoints.join(' ')}
+          fill={`url(#debtSparkFill-${debtId})`}
+        />
+        <polyline
+          points={points.join(' ')}
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {/* Last point dot */}
+        {(() => {
+          const lastIdx = values.length - 1
+          const x = PAD + (lastIdx / (values.length - 1)) * (W - PAD * 2)
+          const y = H - PAD - ((values[lastIdx] - min) / range) * (H - PAD * 2)
+          return <circle cx={x} cy={y} r="2" fill={strokeColor} />
+        })()}
+      </svg>
     </div>
   )
 }
