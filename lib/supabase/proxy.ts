@@ -263,6 +263,12 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-cash-freedom-time',
     '/test-belasting-freedom-time',
     '/api/verify-belasting-freedom-time',
+    '/test-asset-freedom-time',
+    '/api/verify-asset-freedom-time',
+    '/test-budget-freedom-time',
+    '/api/verify-budget-freedom-time',
+    '/test-debt-freedom-time',
+    '/api/verify-debt-freedom-time',
   ]
 
   // Protected route prefixes that require authentication

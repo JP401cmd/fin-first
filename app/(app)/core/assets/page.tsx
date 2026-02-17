@@ -7,6 +7,7 @@ import {
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
+import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import {
   type Asset,
   type AssetType,
@@ -38,6 +39,7 @@ export default function AssetsPage() {
   const [modalStep, setModalStep] = useState<'detail' | 'edit' | 'revalue'>('detail')
   const [projectionYears, setProjectionYears] = useState(10)
   const [valuations, setValuations] = useState<Record<string, Valuation[]>>({})
+  const [dailyExpenses, setDailyExpenses] = useState(0)
   const seedingRef = useRef(false)
 
   function getMortgageForAsset(assetId: string): { name: string; balance: number } | null {
@@ -68,16 +70,35 @@ export default function AssetsPage() {
 
       setAssets(data as Asset[])
 
-      // Load linked mortgages
+      // Load linked mortgages + daily expenses for freedom-time
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        const { data: mortgageData } = await supabase
-          .from('debts')
-          .select('id, name, current_balance, linked_asset_id')
-          .eq('user_id', user.id)
-          .eq('debt_type', 'mortgage')
-          .eq('is_active', true)
-        if (mortgageData) setMortgages(mortgageData as Mortgage[])
+        const now = new Date()
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+
+        const [mortgageResult, txResult] = await Promise.all([
+          supabase
+            .from('debts')
+            .select('id, name, current_balance, linked_asset_id')
+            .eq('user_id', user.id)
+            .eq('debt_type', 'mortgage')
+            .eq('is_active', true),
+          supabase
+            .from('transactions')
+            .select('amount')
+            .gte('date', monthStart)
+            .lt('date', monthEnd),
+        ])
+
+        if (mortgageResult.data) setMortgages(mortgageResult.data as Mortgage[])
+
+        // Calculate daily expenses from current month transactions
+        const monthlyExpenses = (txResult.data ?? []).reduce((sum, t) => {
+          const amt = Number(t.amount)
+          return amt < 0 ? sum + Math.abs(amt) : sum
+        }, 0)
+        setDailyExpenses(monthlyExpenses > 0 ? monthlyExpenses / 30 : 0)
       }
     } catch (err) {
       console.error('Error loading assets:', err)
@@ -239,6 +260,11 @@ export default function AssetsPage() {
           <div>
             <p className="text-xs font-medium text-zinc-500 uppercase">Totale waarde</p>
             <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalValue)}</p>
+            {dailyExpenses > 0 && totalValue > 0 && (
+              <p className="mt-0.5 text-xs text-amber-600/70" data-testid="total-value-freedom">
+                {formatFreedomTimeString(calculateFreedomTime(totalValue, dailyExpenses), 'long')} vrijheid
+              </p>
+            )}
           </div>
           <div>
             <p className="text-xs font-medium text-zinc-500 uppercase">Maandelijkse inleg</p>
@@ -247,9 +273,20 @@ export default function AssetsPage() {
           <div>
             <p className="text-xs font-medium text-zinc-500 uppercase">Rendement (totaal)</p>
             {totalPurchase > 0 ? (
-              <p className={`mt-1 text-xl font-bold ${totalValue >= totalPurchase ? 'text-emerald-600' : 'text-red-600'}`}>
-                {totalValue >= totalPurchase ? '+' : ''}{formatCurrency(totalValue - totalPurchase)}
-              </p>
+              <>
+                <p className={`mt-1 text-xl font-bold ${totalValue >= totalPurchase ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {totalValue >= totalPurchase ? '+' : ''}{formatCurrency(totalValue - totalPurchase)}
+                </p>
+                {dailyExpenses > 0 && Math.abs(totalValue - totalPurchase) > 0 && (
+                  <p className={`mt-0.5 text-xs ${totalValue >= totalPurchase ? 'text-emerald-500/70' : 'text-red-500/70'}`} data-testid="return-freedom">
+                    {(() => {
+                      const fd = calculateFreedomTime(Math.abs(totalValue - totalPurchase), dailyExpenses)
+                      const fdStr = formatFreedomTimeString(fd, 'short', true)
+                      return totalValue >= totalPurchase ? `${fdStr} vrijheid gewonnen` : `${fdStr} vrijheid verloren`
+                    })()}
+                  </p>
+                )}
+              </>
             ) : (
               <p className="mt-1 text-xl font-bold text-zinc-400">-</p>
             )}
@@ -257,6 +294,11 @@ export default function AssetsPage() {
           <div>
             <p className="text-xs font-medium text-zinc-500 uppercase">Waarde over {projectionYears} jaar</p>
             <p className="mt-1 text-xl font-bold text-emerald-600">{formatCurrency(futureValue)}</p>
+            {dailyExpenses > 0 && futureValue > 0 && (
+              <p className="mt-0.5 text-xs text-emerald-500/70" data-testid="future-value-freedom">
+                {formatFreedomTimeString(calculateFreedomTime(futureValue, dailyExpenses), 'long')} vrijheid
+              </p>
+            )}
           </div>
         </div>
       </section>
@@ -267,7 +309,7 @@ export default function AssetsPage() {
         <section className="rounded-2xl border border-zinc-200 bg-white p-6">
           <h2 className="text-sm font-semibold text-zinc-700">Verdeling</h2>
           <div className="mt-4 flex items-center gap-6">
-            <AllocationPie byType={byType} total={totalValue} />
+            <AllocationPie byType={byType} total={totalValue} dailyExpenses={dailyExpenses} />
             <div className="flex-1 space-y-2">
               {(Object.keys(ASSET_TYPE_LABELS) as AssetType[]).map((type) => {
                 const data = byType[type]
@@ -360,6 +402,11 @@ export default function AssetsPage() {
               </div>
               <div className="shrink-0 text-right">
                 <p className="text-sm font-semibold text-zinc-900">{formatCurrency(value)}</p>
+                {dailyExpenses > 0 && value > 0 && (
+                  <p className="text-[10px] text-amber-500/70" data-testid="asset-card-freedom">
+                    {formatFreedomTimeString(calculateFreedomTime(value, dailyExpenses), 'short', true)} vrijheid
+                  </p>
+                )}
                 {purchase > 0 && (
                   <p className={`text-xs font-medium ${returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                     {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}%
@@ -377,6 +424,7 @@ export default function AssetsPage() {
           asset={selectedAsset}
           valuations={valuations[selectedAsset.id]}
           mortgage={getMortgageForAsset(selectedAsset.id)}
+          dailyExpenses={dailyExpenses}
           onClose={closeAssetModal}
           onEdit={() => setModalStep('edit')}
           onRevalue={() => setModalStep('revalue')}
@@ -445,6 +493,7 @@ function AssetDetailModal({
   asset,
   valuations,
   mortgage,
+  dailyExpenses,
   onClose,
   onEdit,
   onRevalue,
@@ -453,6 +502,7 @@ function AssetDetailModal({
   asset: Asset
   valuations: Valuation[] | undefined
   mortgage: { name: string; balance: number } | null
+  dailyExpenses: number
   onClose: () => void
   onEdit: () => void
   onRevalue: () => void
@@ -500,9 +550,22 @@ function AssetDetailModal({
         <div className="border-b border-zinc-100 px-6 py-4 text-center">
           {isEigenHuis && <p className="mb-1 text-xs font-medium text-zinc-500 uppercase">Marktwaarde</p>}
           <p className="text-3xl font-bold text-zinc-900">{formatCurrency(value)}</p>
+          {dailyExpenses > 0 && value > 0 && (
+            <p className="mt-0.5 text-xs text-amber-600/70" data-testid="detail-value-freedom">
+              {formatFreedomTimeString(calculateFreedomTime(value, dailyExpenses), 'long')} vrijheid
+            </p>
+          )}
           {purchase > 0 && (
             <p className={`mt-1 text-sm font-medium ${returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
               {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}% ({returnPct >= 0 ? '+' : ''}{formatCurrency(value - purchase)})
+              {dailyExpenses > 0 && Math.abs(value - purchase) > 0 && (
+                <span className={`ml-1 text-xs ${returnPct >= 0 ? 'text-emerald-500/60' : 'text-red-500/60'}`} data-testid="detail-return-freedom">
+                  — {(() => {
+                    const fd = calculateFreedomTime(Math.abs(value - purchase), dailyExpenses)
+                    return formatFreedomTimeString(fd, 'short', true)
+                  })()} {returnPct >= 0 ? 'gewonnen' : 'verloren'}
+                </span>
+              )}
             </p>
           )}
           {/* Badges */}
@@ -731,9 +794,11 @@ function AssetDetailModal({
 function AllocationPie({
   byType,
   total,
+  dailyExpenses,
 }: {
   byType: Record<AssetType, { assets: Asset[]; total: number }>
   total: number
+  dailyExpenses: number
 }) {
   const size = 120
   const cx = size / 2
@@ -773,12 +838,23 @@ function AllocationPie({
           />
         )
       })}
-      <text x={cx} y={cy - 4} textAnchor="middle" fontSize="11" fontWeight="700" fill="#18181b">
+      <text x={cx} y={dailyExpenses > 0 && total > 0 ? cy - 10 : cy - 4} textAnchor="middle" fontSize="11" fontWeight="700" fill="#18181b">
         {formatCurrency(total)}
       </text>
-      <text x={cx} y={cy + 10} textAnchor="middle" fontSize="8" fill="#a1a1aa">
-        totaal
-      </text>
+      {dailyExpenses > 0 && total > 0 ? (
+        <>
+          <text x={cx} y={cy + 4} textAnchor="middle" fontSize="7" fill="#d97706" data-testid="donut-freedom">
+            {formatFreedomTimeString(calculateFreedomTime(total, dailyExpenses), 'short', false)}
+          </text>
+          <text x={cx} y={cy + 14} textAnchor="middle" fontSize="7" fill="#a1a1aa">
+            vrijheid
+          </text>
+        </>
+      ) : (
+        <text x={cx} y={cy + 10} textAnchor="middle" fontSize="8" fill="#a1a1aa">
+          totaal
+        </text>
+      )}
     </svg>
   )
 }
