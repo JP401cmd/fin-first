@@ -1,3 +1,39 @@
+## Session 2026-02-17 - Feature #191
+
+### Feature #191: Freedom days disambiguation with info tooltips - PASSING
+- Disambiguated freedom days terminology across pages with info tooltips:
+  1. "Gewonnen" (vrijheidsdagen) — De Wil hero: Added HeroTooltip explaining it comes from completed actions
+  2. "Open potentieel" — De Wil hero sub-KPI + KPI card: Added HeroTooltip + enhanced KpiTooltip with "exclusief De Wil"
+  3. "Dagen Gewonnen" — De Kern KPI: Enhanced tooltip with "exclusief De Kern", explains monthly savings
+  4. "Vrije Dagen per Jaar" — De Kern KPI: Enhanced tooltip with "exclusief De Kern", explains passive income
+- Created HeroTooltip component for dark hero backgrounds (teal-900/95 bg, teal-100 text)
+- All tooltips cross-reference the other page's related term for clarity
+- Added aria-label="Meer informatie" and role="tooltip" for accessibility
+- Term exclusivity verified:
+  - "Open potentieel" only on De Wil (not Dashboard, Horizon, or Kern as metric)
+  - "Vrije Dagen per Jaar" only on De Kern (not Dashboard, Horizon, or Wil as metric)
+  - Cross-references in tooltip text are acceptable for disambiguation
+- 12/12 verification tests passing
+- Zero console errors
+- No mock data patterns found
+
+### Changes Made
+- app/(app)/will/page.tsx: Added HeroTooltip component, added tooltips to hero "gewonnen" and "Open potentieel", enhanced KpiTooltip with disambiguation, added aria-label/role
+- app/(app)/core/page.tsx: Enhanced "Dagen Gewonnen" and "Vrije Dagen per Jaar" tooltips with disambiguation text, added aria-label/role
+- app/api/verify-freedom-days-disambiguation/route.ts: Created 12-test verification endpoint
+- app/test-freedom-days-disambiguation/page.tsx: Created visual test page with demo components
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: 21be11b
+
+### Current Status
+- 186/265 features passing (185 before + #191)
+- Feature #191 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- HeroTooltip positioned left-0 (not right-0) to avoid overflow on hero sections
+- Tooltip text contains cross-references to other pages' metrics for disambiguation
+
 ## Session 2026-02-17 - Feature #190
 
 ### Feature #190: De Wil unique action and impact lens - PASSING
