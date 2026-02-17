@@ -1,3 +1,46 @@
+## Session 2026-02-17 - Feature #223
+
+### Feature #223: Debt payoff trajectory chart in UI - PASSING
+- All 6 feature steps implemented and verified:
+  1. **Locate and activate existing debtProjection() function**: Already active — used in DebtDetailModal and by simulatePayoff() for multi-debt strategies
+  2. **Create chart showing projected debt balance decline**: DebtPayoffTrajectoryChart renders per-debt projected decline with SVG area chart
+  3. **Add strategy comparison overlay (snowball vs avalanche)**: Both strategies overlaid on same chart — snowball (blue) and avalanche (red) lines with fill areas
+  4. **Show time difference between strategies**: Displayed below chart with colored dots and month counts for each strategy plus difference
+  5. **Display on /core/debts page**: Integrated into existing Aflosstrategie section, rendered after PayoffChart
+  6. **Show contextual comparison message**: StrategyComparisonMessage component with Dutch text like "Bij avalanche-strategie ben je X maanden eerder schuldenvrij" plus freedom-time context
+
+#### New Components (in debts/page.tsx):
+- **DebtPayoffTrajectoryChart**: SVG dual-strategy overlay chart with snowball/avalanche lines, per-debt thin lines, payoff markers, legends
+- **StrategyComparisonMessage**: Contextual Dutch-language message comparing strategies with month/interest differences and freedom-day context
+
+#### New Files:
+- **app/api/verify-debt-payoff-trajectory/route.ts**: 12-test verification endpoint
+- **app/test-debt-payoff-trajectory/page.tsx**: Visual test page with 3-debt scenarios (creditcard 18.9%, pers. lening 6.5%, studielening 0.46%)
+
+#### Modified Files:
+- **app/(app)/core/debts/page.tsx**: Added snowball/avalanche simulation memos, DebtPayoffTrajectoryChart + StrategyComparisonMessage components
+- **lib/supabase/proxy.ts**: Added test routes to public paths
+
+#### Verification:
+- 12/12 API verification tests passing at /api/verify-debt-payoff-trajectory
+- 14/14 existing trajectory tests still passing at /api/verify-debt-trajectory
+- Visual test page renders charts correctly with two scenarios (no extra / €100 extra per month)
+- Zero console errors
+- No mock data patterns found
+- Commit: 51326dc
+
+### Current Status
+- 217/265 features passing (216 before + #223)
+- Feature #223 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- When debts share similar rates and balances, snowball and avalanche produce identical results (mathematically correct)
+- The comparison message adapts: "Beide strategieën leiden tot hetzelfde resultaat" when same, or specific month/interest savings when different
+- No authenticated browser testing possible (Supabase email rate limit)
+
+---
+
 ## Session 2026-02-17 - Feature #222
 
 ### Feature #222: Asset portfolio projection in UI - PASSING
