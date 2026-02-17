@@ -350,6 +350,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-spending-patterns',
     '/test-holdings-crud-mgmt',
     '/api/verify-holdings-crud-mgmt',
+    '/test-holding-tx-log',
+    '/api/verify-holding-tx-log',
   ]
 
   // Protected route prefixes that require authentication

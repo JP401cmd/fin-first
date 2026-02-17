@@ -1,0 +1,584 @@
+'use client'
+
+import { useEffect, useState, useCallback } from 'react'
+import {
+  ArrowUpRight, ArrowDownRight, DollarSign, Receipt,
+  TrendingUp, TrendingDown, Loader2, AlertTriangle,
+  Plus, ChevronDown, ChevronUp,
+} from 'lucide-react'
+import { formatCurrency } from '@/components/app/budget-shared'
+
+type TransactionWithPnL = {
+  id: string
+  holding_id: string
+  type: 'buy' | 'sell' | 'dividend'
+  units: number
+  price_per_unit: number
+  total_amount: number
+  date: string
+  notes: string | null
+  created_at: string
+  running_units: number
+  running_cost_basis: number
+  running_avg_price: number
+  realized_pnl: number
+  cumulative_realized_pnl: number
+  cumulative_dividends: number
+}
+
+type TransactionSummary = {
+  total_invested: number
+  total_sold: number
+  realized_pnl: number
+  unrealized_pnl: number
+  dividend_income: number
+  total_return: number
+  current_units: number
+  current_avg_price: number
+  current_price: number
+}
+
+type HoldingTransactionLogProps = {
+  holdingId: string
+  holdingName: string
+  holdingTicker?: string | null
+  onTransactionAdded?: () => void
+}
+
+const typeConfig = {
+  buy: {
+    label: 'Koop',
+    icon: ArrowDownRight,
+    color: 'text-emerald-600',
+    bg: 'bg-emerald-50',
+    border: 'border-emerald-200',
+    badgeBg: 'bg-emerald-100',
+    sign: '+',
+  },
+  sell: {
+    label: 'Verkoop',
+    icon: ArrowUpRight,
+    color: 'text-red-600',
+    bg: 'bg-red-50',
+    border: 'border-red-200',
+    badgeBg: 'bg-red-100',
+    sign: '-',
+  },
+  dividend: {
+    label: 'Dividend',
+    icon: DollarSign,
+    color: 'text-amber-600',
+    bg: 'bg-amber-50',
+    border: 'border-amber-200',
+    badgeBg: 'bg-amber-100',
+    sign: '+',
+  },
+}
+
+export default function HoldingTransactionLog({
+  holdingId,
+  holdingName,
+  holdingTicker,
+  onTransactionAdded,
+}: HoldingTransactionLogProps) {
+  const [transactions, setTransactions] = useState<TransactionWithPnL[]>([])
+  const [summary, setSummary] = useState<TransactionSummary | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [expandedTx, setExpandedTx] = useState<string | null>(null)
+  const [showNewTxForm, setShowNewTxForm] = useState(false)
+
+  const loadTransactions = useCallback(async () => {
+    try {
+      setError(null)
+      const res = await fetch(`/api/holdings/${holdingId}/transactions`)
+      if (!res.ok) {
+        if (res.status === 401) throw new Error('Niet ingelogd')
+        throw new Error(`HTTP ${res.status}`)
+      }
+      const data = await res.json()
+      setTransactions(data.transactions || [])
+      setSummary(data.summary || null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Kon transacties niet laden')
+    } finally {
+      setLoading(false)
+    }
+  }, [holdingId])
+
+  useEffect(() => {
+    loadTransactions()
+  }, [loadTransactions])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12" data-testid="transaction-log-loading">
+        <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4" data-testid="transaction-log-error">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-red-500" />
+          <p className="text-sm text-red-700">{error}</p>
+        </div>
+        <button
+          onClick={() => { setLoading(true); loadTransactions() }}
+          className="mt-2 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+        >
+          Opnieuw proberen
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4" data-testid="transaction-log">
+      {/* P&L Summary Cards */}
+      {summary && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" data-testid="pnl-summary">
+          <SummaryCard
+            label="Totaal belegd"
+            value={summary.total_invested}
+            testId="total-invested"
+          />
+          <SummaryCard
+            label="Gerealiseerde W/V"
+            value={summary.realized_pnl}
+            colored
+            testId="realized-pnl"
+          />
+          <SummaryCard
+            label="Ongerealiseerde W/V"
+            value={summary.unrealized_pnl}
+            colored
+            testId="unrealized-pnl"
+          />
+          <SummaryCard
+            label="Dividend inkomen"
+            value={summary.dividend_income}
+            colored
+            testId="dividend-income"
+          />
+          <SummaryCard
+            label="Totaal rendement"
+            value={summary.total_return}
+            colored
+            highlight
+            testId="total-return"
+          />
+        </div>
+      )}
+
+      {/* New transaction button */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-zinc-700">
+          Transactiegeschiedenis
+          {transactions.length > 0 && (
+            <span className="ml-1.5 text-xs font-normal text-zinc-400">
+              ({transactions.length} transactie{transactions.length !== 1 ? 's' : ''})
+            </span>
+          )}
+        </h3>
+        <button
+          onClick={() => setShowNewTxForm(!showNewTxForm)}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700"
+          data-testid="new-transaction-btn"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Transactie toevoegen
+        </button>
+      </div>
+
+      {/* Inline new transaction form */}
+      {showNewTxForm && (
+        <InlineTransactionForm
+          holdingId={holdingId}
+          holdingName={holdingName}
+          currentUnits={summary?.current_units || 0}
+          currentPrice={summary?.current_price || 0}
+          onSaved={() => {
+            setShowNewTxForm(false)
+            setLoading(true)
+            loadTransactions()
+            onTransactionAdded?.()
+          }}
+          onCancel={() => setShowNewTxForm(false)}
+        />
+      )}
+
+      {/* Transaction list */}
+      {transactions.length === 0 ? (
+        <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center" data-testid="no-transactions">
+          <Receipt className="mx-auto h-10 w-10 text-zinc-300" />
+          <p className="mt-3 text-sm font-medium text-zinc-600">Nog geen transacties</p>
+          <p className="mt-1 text-xs text-zinc-400">
+            Registreer je eerste koop-, verkoop- of dividendtransactie.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-1.5" data-testid="transaction-list">
+          {transactions.map((tx) => {
+            const cfg = typeConfig[tx.type] || typeConfig.buy
+            const Icon = cfg.icon
+            const isExpanded = expandedTx === tx.id
+
+            return (
+              <div
+                key={tx.id}
+                className={`rounded-xl border bg-white transition-colors ${isExpanded ? 'border-amber-200' : 'border-zinc-100'}`}
+                data-testid={`transaction-item-${tx.id}`}
+              >
+                {/* Transaction row */}
+                <button
+                  className="flex w-full items-center gap-3 p-3 text-left"
+                  onClick={() => setExpandedTx(isExpanded ? null : tx.id)}
+                >
+                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${cfg.bg}`}>
+                    <Icon className={`h-4 w-4 ${cfg.color}`} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-semibold ${cfg.color}`}>{cfg.label}</span>
+                      <span className="text-xs text-zinc-400">
+                        {new Date(tx.date).toLocaleDateString('nl-NL', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </span>
+                      {tx.notes && (
+                        <span className="truncate text-xs text-zinc-400 italic">
+                          {tx.notes}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-zinc-500">
+                      {tx.units} eenhe{tx.units === 1 ? 'id' : 'den'} @ {formatCurrency(tx.price_per_unit)}
+                    </p>
+                  </div>
+
+                  {/* Transaction amount */}
+                  <div className="shrink-0 text-right">
+                    <p className={`text-sm font-semibold ${cfg.color}`}>
+                      {cfg.sign}{formatCurrency(tx.total_amount)}
+                    </p>
+                    {tx.type === 'sell' && tx.realized_pnl !== 0 && (
+                      <p className={`text-xs font-medium ${tx.realized_pnl >= 0 ? 'text-emerald-600' : 'text-red-600'}`}
+                         data-testid="tx-realized-pnl"
+                      >
+                        W/V: {tx.realized_pnl >= 0 ? '+' : ''}{formatCurrency(tx.realized_pnl)}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Expand indicator */}
+                  <div className="shrink-0">
+                    {isExpanded ? (
+                      <ChevronUp className="h-4 w-4 text-zinc-400" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-zinc-400" />
+                    )}
+                  </div>
+                </button>
+
+                {/* Expanded detail: running P&L */}
+                {isExpanded && (
+                  <div className="border-t border-zinc-100 px-3 py-3" data-testid="tx-detail">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      <MiniStat label="Eenheden na tx" value={tx.running_units.toString()} />
+                      <MiniStat label="Gem. kosten" value={formatCurrency(tx.running_avg_price)} />
+                      <MiniStat label="Kostenbasis" value={formatCurrency(tx.running_cost_basis)} />
+                      {tx.type === 'sell' && (
+                        <MiniStat
+                          label="Gerealiseerde W/V"
+                          value={`${tx.realized_pnl >= 0 ? '+' : ''}${formatCurrency(tx.realized_pnl)}`}
+                          colored={tx.realized_pnl}
+                        />
+                      )}
+                      <MiniStat
+                        label="Cumulatieve W/V"
+                        value={`${tx.cumulative_realized_pnl >= 0 ? '+' : ''}${formatCurrency(tx.cumulative_realized_pnl)}`}
+                        colored={tx.cumulative_realized_pnl}
+                      />
+                      {tx.cumulative_dividends > 0 && (
+                        <MiniStat
+                          label="Cum. dividenden"
+                          value={formatCurrency(tx.cumulative_dividends)}
+                          colored={tx.cumulative_dividends}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Helper components ──────────────────────────────────────────
+
+function SummaryCard({
+  label,
+  value,
+  colored = false,
+  highlight = false,
+  testId,
+}: {
+  label: string
+  value: number
+  colored?: boolean
+  highlight?: boolean
+  testId?: string
+}) {
+  const valueColor = colored
+    ? value > 0
+      ? 'text-emerald-600'
+      : value < 0
+        ? 'text-red-600'
+        : 'text-zinc-600'
+    : 'text-zinc-900'
+
+  return (
+    <div
+      className={`rounded-xl border p-3 ${
+        highlight
+          ? 'border-amber-200 bg-amber-50/50'
+          : 'border-zinc-100 bg-white'
+      }`}
+      data-testid={testId}
+    >
+      <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">{label}</p>
+      <p className={`mt-1 text-sm font-bold ${valueColor}`} data-testid={testId ? `${testId}-value` : undefined}>
+        {colored && value > 0 ? '+' : ''}{formatCurrency(value)}
+      </p>
+    </div>
+  )
+}
+
+function MiniStat({
+  label,
+  value,
+  colored,
+}: {
+  label: string
+  value: string
+  colored?: number
+}) {
+  const color = colored !== undefined
+    ? colored > 0
+      ? 'text-emerald-600'
+      : colored < 0
+        ? 'text-red-600'
+        : 'text-zinc-600'
+    : 'text-zinc-900'
+
+  return (
+    <div>
+      <p className="text-[10px] font-medium text-zinc-500">{label}</p>
+      <p className={`text-xs font-semibold ${color}`}>{value}</p>
+    </div>
+  )
+}
+
+// ── Inline transaction form ────────────────────────────────────
+
+function InlineTransactionForm({
+  holdingId,
+  holdingName,
+  currentUnits,
+  currentPrice,
+  onSaved,
+  onCancel,
+}: {
+  holdingId: string
+  holdingName: string
+  currentUnits: number
+  currentPrice: number
+  onSaved: () => void
+  onCancel: () => void
+}) {
+  const [txType, setTxType] = useState<'buy' | 'sell' | 'dividend'>('buy')
+  const [units, setUnits] = useState('')
+  const [pricePerUnit, setPricePerUnit] = useState(String(currentPrice || ''))
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const totalAmount = (Number(units) || 0) * (Number(pricePerUnit) || 0)
+  const sellExceedsOwned = txType === 'sell' && Number(units) > currentUnits
+  const sellFromZero = txType === 'sell' && currentUnits <= 0
+
+  async function handleSave() {
+    if (!units || !pricePerUnit || !date) return
+    if (txType === 'sell' && (sellExceedsOwned || sellFromZero)) return
+    setSaving(true)
+    setError(null)
+
+    try {
+      const res = await fetch(`/api/holdings/${holdingId}/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: txType,
+          units: Number(units),
+          price_per_unit: Number(pricePerUnit),
+          date,
+          notes: notes || null,
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Kon transactie niet opslaan')
+      }
+
+      onSaved()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Onbekende fout')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50/30 p-4" data-testid="inline-transaction-form">
+      {error && (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-2">
+          <p className="text-xs text-red-600">{error}</p>
+        </div>
+      )}
+
+      {/* Type selector */}
+      <div className="mb-3 grid grid-cols-3 gap-2">
+        {(['buy', 'sell', 'dividend'] as const).map((t) => {
+          const cfg = typeConfig[t]
+          const Icon = cfg.icon
+          return (
+            <button
+              key={t}
+              onClick={() => setTxType(t)}
+              className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all ${
+                txType === t
+                  ? `${cfg.bg} ${cfg.border} ${cfg.color} ring-1 ring-offset-0`
+                  : 'border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50'
+              }`}
+              data-testid={`tx-type-${t}`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {cfg.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Fields */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div>
+          <label className="mb-1 block text-[10px] font-medium text-zinc-500">
+            {txType === 'dividend' ? 'Bedrag per eenheid' : 'Eenheden'} *
+          </label>
+          <div className="relative">
+            <input
+              type="number"
+              step="0.001"
+              value={units}
+              onChange={(e) => setUnits(e.target.value)}
+              className={`w-full rounded-lg border px-2.5 py-1.5 text-sm ${
+                sellExceedsOwned || sellFromZero ? 'border-red-300 bg-red-50/50' : 'border-zinc-200'
+              }`}
+              placeholder="10"
+              autoFocus
+              data-testid="tx-units-input"
+            />
+            {txType === 'sell' && currentUnits > 0 && (
+              <button
+                type="button"
+                onClick={() => setUnits(String(currentUnits))}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-medium text-red-600 hover:text-red-700"
+                data-testid="sell-all-inline-btn"
+              >
+                Alles
+              </button>
+            )}
+          </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-medium text-zinc-500">Prijs *</label>
+          <input
+            type="number"
+            step="0.01"
+            value={pricePerUnit}
+            onChange={(e) => setPricePerUnit(e.target.value)}
+            className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+            placeholder="50.00"
+            data-testid="tx-price-input"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-medium text-zinc-500">Datum *</label>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+            data-testid="tx-date-input"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-medium text-zinc-500">Totaal</label>
+          <div className="flex items-center rounded-lg border border-zinc-100 bg-zinc-50 px-2.5 py-1.5 text-sm font-medium text-zinc-700">
+            {formatCurrency(totalAmount)}
+          </div>
+        </div>
+      </div>
+
+      {/* Sell validation */}
+      {(sellExceedsOwned || sellFromZero) && (
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-red-600">
+          <AlertTriangle className="h-3 w-3" />
+          {sellFromZero
+            ? 'Deze holding heeft 0 eenheden. Je kunt niet verkopen.'
+            : `Je hebt maar ${currentUnits} eenheden. Je kunt niet meer verkopen dan je bezit.`}
+        </div>
+      )}
+
+      {/* Notes + actions */}
+      <div className="mt-3 flex items-center gap-2">
+        <input
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          className="flex-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+          placeholder="Notitie (optioneel)"
+          data-testid="tx-notes-input"
+        />
+        <button
+          onClick={onCancel}
+          className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+        >
+          Annuleren
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={saving || !units || !pricePerUnit || !date || sellExceedsOwned || sellFromZero}
+          className={`rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 ${
+            txType === 'buy' ? 'bg-emerald-600 hover:bg-emerald-700' :
+            txType === 'sell' ? 'bg-red-600 hover:bg-red-700' :
+            'bg-amber-600 hover:bg-amber-700'
+          }`}
+          data-testid="tx-save-btn"
+        >
+          {saving ? 'Opslaan...' : `${typeConfig[txType].label} registreren`}
+        </button>
+      </div>
+    </div>
+  )
+}

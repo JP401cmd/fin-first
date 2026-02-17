@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ArrowLeft, Briefcase } from 'lucide-react'
+import { ArrowLeft, Briefcase, TrendingUp, TrendingDown, DollarSign } from 'lucide-react'
+import HoldingTransactionLogClient from './transaction-log-client'
 
 // UUID v4 regex for validation
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -12,6 +13,10 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 async function holdingsTableExists(supabase: Awaited<ReturnType<typeof createClient>>): Promise<boolean> {
   const { error } = await supabase.from('holdings').select('id').limit(0)
   return !error || !error.message.includes('Could not find')
+}
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(value)
 }
 
 export default async function HoldingDetailPage({
@@ -68,6 +73,9 @@ export default async function HoldingDetailPage({
         ticker: asset.ticker_symbol || null,
         asset_type: asset.asset_type,
         notes: asset.notes,
+        units: 1,
+        avg_purchase_price: Number(asset.purchase_value) || 0,
+        current_price: Number(asset.current_value) || 0,
       }
     }
   }
@@ -79,10 +87,16 @@ export default async function HoldingDetailPage({
 
   const name = holdingData.name as string
   const ticker = holdingData.ticker as string | null
+  const units = Number(holdingData.units) || 0
+  const avgPrice = Number(holdingData.avg_purchase_price) || 0
+  const currentPrice = Number(holdingData.current_price) || avgPrice
+  const holdingValue = currentPrice * units
+  const costBasis = avgPrice * units
+  const returnPct = costBasis > 0 ? ((holdingValue - costBasis) / costBasis) * 100 : 0
+  const returnValue = holdingValue - costBasis
 
-  // If the holding exists, show a detail view with link to the holdings list
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8" data-testid="holding-detail-page">
+    <div className="mx-auto max-w-5xl px-4 py-8" data-testid="holding-detail-page">
       <Link
         href="/core/assets/holdings"
         className="mb-6 inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-800 transition-colors"
@@ -92,25 +106,78 @@ export default async function HoldingDetailPage({
         Terug naar holdings
       </Link>
 
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
+      {/* Holding header with KPIs */}
+      <section className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-6">
         <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/50">
-            <Briefcase className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100">
+            <Briefcase className="h-6 w-6 text-amber-600" />
+          </div>
+          <div className="flex-1">
+            <h1 className="text-xl font-bold text-zinc-900" data-testid="holding-name">{name}</h1>
+            {ticker && (
+              <p className="mt-0.5 text-sm font-medium text-amber-600">{ticker}</p>
+            )}
+          </div>
+          <Link
+            href="/core/assets/holdings"
+            className="rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50"
+          >
+            Alle holdings
+          </Link>
+        </div>
+
+        {/* KPI cards */}
+        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4" data-testid="holding-kpis">
+          <div>
+            <p className="text-[10px] font-medium text-zinc-500 uppercase">Huidige waarde</p>
+            <p className="mt-1 text-lg font-bold text-zinc-900" data-testid="holding-value">
+              {formatCurrency(holdingValue)}
+            </p>
           </div>
           <div>
-            <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100" data-testid="holding-name">{name}</h1>
-            {ticker && (
-              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{ticker}</p>
+            <p className="text-[10px] font-medium text-zinc-500 uppercase">Eenheden</p>
+            <p className="mt-1 text-lg font-bold text-zinc-900" data-testid="holding-units">
+              {units}
+            </p>
+            <p className="text-xs text-zinc-400">
+              @ {formatCurrency(currentPrice)} per eenheid
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] font-medium text-zinc-500 uppercase">Gem. aankoopprijs</p>
+            <p className="mt-1 text-lg font-bold text-zinc-900" data-testid="holding-avg-price">
+              {formatCurrency(avgPrice)}
+            </p>
+            <p className="text-xs text-zinc-400">
+              kostenbasis: {formatCurrency(costBasis)}
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] font-medium text-zinc-500 uppercase">Rendement</p>
+            {costBasis > 0 ? (
+              <>
+                <p className={`mt-1 text-lg font-bold ${returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`} data-testid="holding-return">
+                  {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}%
+                </p>
+                <p className={`text-xs font-medium ${returnValue >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {returnValue >= 0 ? '+' : ''}{formatCurrency(returnValue)}
+                </p>
+              </>
+            ) : (
+              <p className="mt-1 text-lg font-bold text-zinc-400">-</p>
             )}
           </div>
         </div>
-        <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
-          Dit holding wordt beheerd via de{' '}
-          <Link href="/core/assets/holdings" className="text-amber-600 hover:underline">
-            holdings overzichtspagina
-          </Link>.
-        </p>
-      </div>
+      </section>
+
+      {/* Transaction Log Section */}
+      <section className="mt-6" data-testid="transaction-log-section">
+        <HoldingTransactionLogClient
+          holdingId={id}
+          holdingName={name}
+          holdingTicker={ticker}
+        />
+      </section>
     </div>
   )
 }
