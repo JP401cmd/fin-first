@@ -1,3 +1,40 @@
+## Session 2026-02-17 - Feature #212
+
+### Feature #212: 12-month budget spending trend sparklines - PASSING
+- Verified all 6 feature steps are fully implemented in the existing codebase:
+  1. **SparklineChart component**: BudgetSparkline + SparklineWithLabel exported from components/app/budget-sparkline.tsx, uses SVG rendering with linear regression trend detection
+  2. **12-month spending calculation**: Core page builds sparkMonths array and fetches 12 months of transaction data; budget detail modal has loadHistory() with .in('budget_id', budgetIds) filtering
+  3. **Sparkline on budget detail modal**: SparklineWithLabel in "Uitgaventrend" section (testId: budget-detail-sparkline), plus per-child BudgetSparkline components (testId: child-sparkline-{id})
+  4. **Sparkline on De Kern overview**: "Uitgaventrend per categorie" CollapsibleSection (testId: kern-budget-sparklines), SparklineWithLabel per budget category with links to /core/budgets?budget=id
+  5. **Color coding**: Expenses up=red (#dc2626), down=green (#059669); Income up=green, down=red; Flat=zinc-400 (#a1a1aa). Dutch labels: "↑ stijgend", "↓ dalend", "stabiel"
+  6. **Sparse data handling**: Minimum 2 data points required, dashed flat line for no-data (data-trend="none"), core page filters zero-spending categories
+
+#### Verification:
+- Created 27-test verification API at /api/verify-budget-sparklines-212
+- Created visual test page at /test-budget-sparklines-212 with 6 demo sparklines
+- 27/27 tests passing
+- Zero console errors (fixed hydration mismatch in test page by removing Math.random())
+- Zero mock data patterns in sparkline component, budgets page, or core page
+- Browser verified: rising/falling/flat/sparse/empty sparkline demos render correctly with proper colors
+
+### Changes Made
+- app/api/verify-budget-sparklines-212/route.ts: Created 27-test verification endpoint
+- app/test-budget-sparklines-212/page.tsx: Created visual test page with 6 demo sparklines
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: 78bb914
+
+### Current Status
+- 207/265 features passing (206 before + #212)
+- Feature #212 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- BudgetSparkline component uses calculateTrend() with linear regression slope
+- Trend significance threshold is 3% of average value change per month
+- De Kern overview wraps sparklines in CollapsibleSection with storageKey "kern_budget_trends"
+- Budget detail modal loads per-child sparkline data asynchronously on mount
+- No authenticated browser testing possible (Supabase email rate limit)
+
 ## Session 2026-02-17 - Feature #208
 
 ### Feature #208: Streak tracking system - PASSING
