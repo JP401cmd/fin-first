@@ -1,3 +1,57 @@
+## Session 2026-02-17 - Feature #174
+
+### Feature #174: Filter reset button clears all active filters - PASSING
+- Transactions page at app/(app)/core/cash/page.tsx - added complete filter system
+- Three filter types implemented:
+  1. Search filter: matches description, counterparty_name, and notes (case-insensitive)
+  2. Type filter: dropdown to show all/income/expense transactions
+  3. Budget category filter: dropdown to filter by budget category or uncategorized
+- Filter state management:
+  - filterSearch (string, default ''), filterType ('all'|'income'|'expense', default 'all'), filterBudgetId (string, default 'all')
+  - hasActiveFilters computed from any non-default filter value
+  - resetFilters() clears all three to defaults
+  - filteredTransactions useMemo applies all filters to raw transactions
+- Filter UI:
+  - Search input with Search icon and placeholder "Zoek op omschrijving of tegenpartij..."
+  - Type select with "Alle types" / "Inkomen" / "Uitgaven"
+  - Budget category select with all budgets + "Niet gecategoriseerd" option
+  - "Reset filters" button (amber themed, with RotateCcw icon) only visible when filters active
+  - Filter summary "X van Y transacties" shown when filters active
+- Empty state:
+  - Filter-aware: "Geen transacties komen overeen met de huidige filters." when filters active
+  - "Filters wissen" button in empty state to reset
+  - Original message when no filters active
+- Transaction grouping uses filteredTransactions (not raw transactions)
+- data-testid attributes on all filter elements for testing
+- Lucide icons added: Search, Filter, RotateCcw
+- 15/15 API verification tests passing at /api/verify-transaction-filters
+- Browser automation verification:
+  - Search "Netflix" → 1/7 transactions shown ✅
+  - Reset → all 7 restored ✅
+  - Type "Uitgaven" → 5/7 expense transactions ✅
+  - Combined expense + Abonnementen → 2/7 transactions ✅
+  - Reset → all 7 restored, dropdowns back to defaults ✅
+  - Non-existent search → empty state with "Filters wissen" button ✅
+  - "Filters wissen" click → all 7 restored ✅
+- Zero console errors
+- No mock data patterns found (grep clean)
+
+### Changes Made
+- app/(app)/core/cash/page.tsx: Added 3 filter state vars, filteredTransactions memo, filter UI bar, filter-aware empty state
+- app/api/verify-transaction-filters/route.ts: Created 15-test source code verification endpoint
+- app/test-transaction-filters/page.tsx: Created interactive test page with demo filters
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: da259bb
+
+### Current Status
+- Feature #174 completed and marked passing
+
+### Notes for Next Session
+- Port 3000 used this session
+- Transaction filters are purely client-side (filtering already-loaded data from Supabase)
+- No server restart test needed (no data persistence - purely UI state)
+- The cash page already had account selection and month navigation; the new filters work alongside these
+
 ## Session 2026-02-17 - Feature #172
 
 ### Feature #172: Holding creation form has correct defaults - PASSING
