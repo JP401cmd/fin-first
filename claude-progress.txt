@@ -1,3 +1,53 @@
+## Session 2026-02-17 - Feature #207
+
+### Feature #207: Freedom days animation loop - PASSING
+- Created FreedomDaysAnimationProvider component at components/app/freedom-days-animation.tsx
+  - Uses React Context to allow any child component to trigger animations
+  - triggerAnimation(days) creates a floating "+X.X dagen" text
+  - Animation floats upward 25% of viewport and fades out over 2 seconds
+  - Uses CSS transitions (transition-all duration-[2000ms]) for smooth, non-intrusive animation
+  - pointer-events-none overlay doesn't block user interaction
+  - aria-hidden="true" for accessibility
+  - Multiple simultaneous animations supported (each gets unique ID)
+- Integrated with ActionBoard (components/app/action-board.tsx):
+  - useFreedomDaysAnimation() hook imported and used
+  - On action completion (status === 'completed'), checks freedom_days_impact
+  - If > 0, triggers floating animation with the action's freedom days value
+- Updated De Wil hero section (app/(app)/will/page.tsx):
+  - Page wrapped in <FreedomDaysAnimationProvider>
+  - Running total: "+{totalFreedomDaysWon} vrijheidsdagen gewonnen" (already existed)
+  - NEW: Weekly freedom days tracking calculation
+    - Computes Monday of current week as weekStart
+    - Filters completedActions by completed_at >= weekStart
+    - Sums their freedom_days_impact
+  - NEW: Weekly summary badge in hero: "Deze week: +X vrijheidsdagen gewonnen"
+    - Sparkles icon, teal-800/50 pill badge, backdrop-blur-sm
+    - Placed below primary metric, above progress bar
+- 12/12 verification tests passing at /api/verify-freedom-days-animation
+- Browser verified: animation triggers work, log entries appear, overlay visible in DOM
+- Zero console errors
+- No mock data patterns found
+
+### Changes Made
+- components/app/freedom-days-animation.tsx: Created full animation component with provider, context, floating text
+- components/app/action-board.tsx: Added useFreedomDaysAnimation import and trigger on completion
+- app/(app)/will/page.tsx: Wrapped in FreedomDaysAnimationProvider, added weekly tracking
+- app/api/verify-freedom-days-animation/route.ts: Created 12-test verification endpoint
+- app/test-freedom-days-animation/page.tsx: Created visual test page with trigger buttons
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: 10487e2
+
+### Current Status
+- 199/265 features passing (198 before + #207)
+- Feature #207 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- No authenticated browser testing possible (Supabase email rate limit)
+- Animation is CSS-only (no requestAnimationFrame or confetti library)
+- Weekly tracking uses completed_at timestamp comparison, no separate DB table needed
+- The InlineFloatingDays export in the animation component is available for future use in action cards
+
 ## Session 2026-02-17 - Feature #206
 
 ### Feature #206: Badge showcase on Identity page - PASSING
