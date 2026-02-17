@@ -188,9 +188,11 @@ function BadgeDetail({
 function BadgeCard({
   badge,
   onClick,
+  isNewlyEarned,
 }: {
   badge: BadgeWithStatus
   onClick: () => void
+  isNewlyEarned?: boolean
 }) {
   const colors = colorMap[badge.color] ?? colorMap.zinc
   const hasProgress = !badge.earned && badge.progress !== null && badge.progress !== undefined && badge.progress > 0
@@ -202,12 +204,21 @@ function BadgeCard({
       data-earned={badge.earned ? 'true' : 'false'}
       data-slug={badge.slug}
       data-progress={badge.progress ?? undefined}
+      data-newly-earned={isNewlyEarned ? 'true' : undefined}
       className={`group relative flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all hover:shadow-md ${
         badge.earned
           ? `${colors.bgEarned} ${colors.borderEarned}`
           : 'border-dashed border-zinc-200 bg-zinc-50'
-      }`}
+      } ${isNewlyEarned ? 'animate-badge-unlock animate-badge-scale-in' : ''}`}
     >
+      {/* Shimmer overlay for newly earned badges */}
+      {isNewlyEarned && badge.earned && (
+        <div
+          className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none animate-badge-shimmer"
+          data-testid={`badge-shimmer-${badge.slug}`}
+        />
+      )}
+
       {/* Icon */}
       <div
         className={`flex h-12 w-12 items-center justify-center rounded-xl text-2xl transition-transform group-hover:scale-110 ${
@@ -231,7 +242,7 @@ function BadgeCard({
         <div className="w-full px-1" data-testid={`badge-progress-${badge.slug}`}>
           <div className="h-1 overflow-hidden rounded-full bg-zinc-200">
             <div
-              className={`h-full rounded-full transition-all ${
+              className={`h-full rounded-full animate-progress-fill ${
                 badge.progress! >= 0.75 ? 'bg-emerald-400' :
                 badge.progress! >= 0.5 ? 'bg-amber-400' :
                 'bg-zinc-400'
@@ -264,6 +275,7 @@ export function BadgeGrid() {
   const [loading, setLoading] = useState(true)
   const [dataSource, setDataSource] = useState<string>('loading')
   const [selectedBadge, setSelectedBadge] = useState<BadgeWithStatus | null>(null)
+  const [newlyEarnedSlugs, setNewlyEarnedSlugs] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     async function fetchBadges() {
@@ -275,6 +287,24 @@ export function BadgeGrid() {
           setEarnedCount(data.earned_count)
           setTotalCount(data.total_count)
           setDataSource(data.source ?? 'api')
+
+          // Detect newly earned badges (earned within last 5 minutes)
+          const fiveMinAgo = Date.now() - 5 * 60 * 1000
+          const newSlugs = new Set<string>()
+          for (const b of data.badges) {
+            if (b.earned && b.earned_at) {
+              const earnedTime = new Date(b.earned_at).getTime()
+              if (earnedTime > fiveMinAgo) {
+                newSlugs.add(b.slug)
+              }
+            }
+          }
+          setNewlyEarnedSlugs(newSlugs)
+
+          // Clear newly-earned status after animations complete (3 seconds)
+          if (newSlugs.size > 0) {
+            setTimeout(() => setNewlyEarnedSlugs(new Set()), 3000)
+          }
         } else {
           // Use client-side definitions as fallback
           const fallback: BadgeWithStatus[] = BADGE_DEFINITIONS.map((b) => ({
@@ -325,7 +355,8 @@ export function BadgeGrid() {
         <div className="flex-1">
           <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
             <div
-              className="h-full rounded-full bg-amber-400 transition-all"
+              className="h-full rounded-full bg-amber-400 animate-progress-fill"
+              data-testid="badge-overall-progress-bar"
               style={{
                 width: `${totalCount > 0 ? (earnedCount / totalCount) * 100 : 0}%`,
               }}
@@ -356,6 +387,7 @@ export function BadgeGrid() {
                     key={badge.slug}
                     badge={badge}
                     onClick={() => setSelectedBadge(badge)}
+                    isNewlyEarned={newlyEarnedSlugs.has(badge.slug)}
                   />
                 ))}
               </div>

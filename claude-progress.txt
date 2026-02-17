@@ -1,3 +1,46 @@
+## Session 2026-02-17 - Feature #211
+
+### Feature #211: Automatic monthly snapshots - PASSING
+- Implemented dual-mechanism auto-snapshot system:
+  1. Client-side: AutoSnapshotTrigger component in app layout fires GET /api/snapshots/auto on every authenticated page load
+  2. Server-side: GET /api/snapshots/cron for external cron services (Vercel Cron, pg_cron, etc.)
+- Auto-captures all 8 metrics per snapshot:
+  - net_worth (total_assets - total_debts)
+  - total_assets (sum of active assets)
+  - total_debts (sum of active debts)
+  - freedom_percentage ((net_worth / FIRE_target) * 100)
+  - fire_age (via computeFireProjection; null if no DOB)
+  - sovereignty_level (-2 to 6 via computeSovereigntyLevel)
+  - savings_rate (via fire projection)
+  - resilience_score (0-100 via computeResilienceScore)
+- Idempotent: only one snapshot per month per user (checks monthStart before creating)
+- No 24-record cap — unlimited history kept
+- Cron endpoint (/api/snapshots/cron) processes ALL onboarded users via service_role key
+- Protected by CRON_SECRET env var; graceful fallback when not configured
+- 9/9 verification tests passing at /api/verify-auto-snapshots
+- Zero console errors
+- No mock data patterns found
+
+### Changes Made
+- lib/hooks/use-auto-snapshot.ts: Created hook for fire-and-forget auto-snapshot on mount
+- components/app/auto-snapshot-trigger.tsx: Client component wrapper for the hook
+- app/(app)/layout.tsx: Added AutoSnapshotTrigger to app layout
+- app/api/snapshots/cron/route.ts: Created server-side cron endpoint for all-user snapshot creation
+- app/api/verify-auto-snapshots/route.ts: Created 9-test verification endpoint
+- app/test-auto-snapshots/page.tsx: Created visual test page with live API test
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: f6ce99a
+
+### Current Status
+- 203/265 features passing (202 before + #211)
+- Feature #211 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- SUPABASE_SERVICE_ROLE_KEY not in .env.local, so cron endpoint returns helpful error in dev
+- The auto-snapshot is already called by existing /api/snapshots/auto endpoint; client-side trigger is new
+- The cron endpoint is ready for production with proper secret configuration
+
 ## Session 2026-02-17 - Feature #210
 
 ### Feature #210: FreedomTimeLabel reusable component - PASSING
