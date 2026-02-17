@@ -11,13 +11,51 @@ async function holdingsTableExists(supabase: Awaited<ReturnType<typeof createCli
 }
 
 /**
+ * Aggregate all active holdings for a given asset and sync the total to the
+ * parent asset's current_value. This ensures the asset always reflects the
+ * sum of (current_price * units) across all its holdings.
+ */
+async function syncAssetValueFromHoldings(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  assetId: string,
+  userId: string
+): Promise<void> {
+  try {
+    const { data: holdings } = await supabase
+      .from('holdings')
+      .select('units, current_price, avg_purchase_price')
+      .eq('asset_id', assetId)
+      .eq('user_id', userId)
+      .eq('is_active', true)
+
+    if (!holdings) return
+
+    const totalValue = holdings.reduce((sum, h) => {
+      const price = h.current_price ?? h.avg_purchase_price
+      return sum + (price * h.units)
+    }, 0)
+
+    await supabase
+      .from('assets')
+      .update({ current_value: totalValue })
+      .eq('id', assetId)
+      .eq('user_id', userId)
+  } catch {
+    // Non-critical: don't fail the main operation if sync fails
+  }
+}
+
+/**
  * GET /api/holdings — List user's investment holdings.
  *
  * Primary: reads from the dedicated `holdings` table.
  * Fallback: if the holdings table doesn't exist yet, reads investment-type
  * assets from the `assets` table and maps them to a holdings-compatible shape.
+ *
+ * Query params:
+ *   ?asset_id=<uuid> — filter holdings for a specific asset
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -25,16 +63,25 @@ export async function GET() {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
+  const { searchParams } = new URL(request.url)
+  const assetIdFilter = searchParams.get('asset_id')
+
   try {
     const hasTable = await holdingsTableExists(supabase)
 
     if (hasTable) {
-      const { data: holdings, error } = await supabase
+      let query = supabase
         .from('holdings')
         .select('*')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
+
+      if (assetIdFilter) {
+        query = query.eq('asset_id', assetIdFilter)
+      }
+
+      const { data: holdings, error } = await query
 
       if (error) {
         return NextResponse.json({
@@ -292,6 +339,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
 
+      // Sync parent asset's current_value from all holdings
+      if (holding && holding.asset_id) {
+        await syncAssetValueFromHoldings(supabase, holding.asset_id, user.id)
+      }
+
       const responseBody = { holding, source: 'holdings_table' }
       // Cache the successful response for idempotency
       if (idempotencyKey) {
@@ -488,14 +540,9 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
 
-      // Sync linked asset's current_value when price changes
-      if (holding && holding.asset_id && body.current_price !== undefined) {
-        const newAssetValue = Number(holding.current_price) * Number(holding.units)
-        await supabase
-          .from('assets')
-          .update({ current_value: newAssetValue })
-          .eq('id', holding.asset_id)
-          .eq('user_id', user.id)
+      // Sync linked asset's current_value from all holdings (aggregate)
+      if (holding && holding.asset_id && (body.current_price !== undefined || body.units !== undefined)) {
+        await syncAssetValueFromHoldings(supabase, holding.asset_id, user.id)
       }
 
       return NextResponse.json({ holding, source: 'holdings_table' })
@@ -573,6 +620,14 @@ export async function DELETE(request: NextRequest) {
     const hasTable = await holdingsTableExists(supabase)
 
     if (hasTable) {
+      // Fetch asset_id before deleting so we can sync the parent asset afterwards
+      const { data: holdingToDelete } = await supabase
+        .from('holdings')
+        .select('asset_id')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .single()
+
       const { error } = await supabase
         .from('holdings')
         .delete()
@@ -581,6 +636,11 @@ export async function DELETE(request: NextRequest) {
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+
+      // Sync parent asset's current_value after deletion
+      if (holdingToDelete?.asset_id) {
+        await syncAssetValueFromHoldings(supabase, holdingToDelete.asset_id, user.id)
       }
     } else {
       // Fallback: delete from assets table

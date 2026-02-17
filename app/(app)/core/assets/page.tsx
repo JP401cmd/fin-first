@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
-  Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2, BarChart3, ChevronDown, ChevronUp,
+  Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2, BarChart3, ChevronDown, ChevronUp, Briefcase, AlertCircle,
 } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -725,6 +725,11 @@ function AssetDetailModal({
               <p className="text-xs text-zinc-400">Nog geen waardehistorie. Gebruik &ldquo;Herwaarderen&rdquo; om de waarde bij te werken.</p>
             </div>
           )}
+
+          {/* Holdings per asset — shown for investment-like asset types */}
+          {(['investment', 'crypto', 'savings', 'retirement'] as string[]).includes(asset.asset_type) && (
+            <HoldingsList assetId={asset.id} assetName={asset.name} />
+          )}
         </div>
 
         {/* Actions */}
@@ -1028,6 +1033,465 @@ function ValuationTrendSection({ valuations }: { valuations: Valuation[] }) {
             </>
           )}
         </button>
+      )}
+    </div>
+  )
+}
+
+// ── Holdings list for asset detail modal ─────────────────────
+
+type AssetHolding = {
+  id: string
+  user_id: string
+  asset_id: string | null
+  ticker: string | null
+  isin: string | null
+  name: string
+  units: number
+  avg_purchase_price: number
+  current_price: number | null
+  last_price_update: string | null
+  purchase_date: string | null
+  notes: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+function HoldingsList({ assetId, assetName }: { assetId: string; assetName: string }) {
+  const [holdings, setHoldings] = useState<AssetHolding[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [editHolding, setEditHolding] = useState<AssetHolding | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+
+  // Form state
+  const [formName, setFormName] = useState('')
+  const [formTicker, setFormTicker] = useState('')
+  const [formIsin, setFormIsin] = useState('')
+  const [formUnits, setFormUnits] = useState('')
+  const [formAvgPrice, setFormAvgPrice] = useState('')
+  const [formPurchaseDate, setFormPurchaseDate] = useState('')
+
+  const loadHoldings = useCallback(async () => {
+    try {
+      setError(null)
+      const res = await fetch(`/api/holdings?asset_id=${assetId}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      setHoldings(data.holdings || [])
+    } catch {
+      setError('Kon holdings niet laden')
+    } finally {
+      setLoading(false)
+    }
+  }, [assetId])
+
+  useEffect(() => {
+    loadHoldings()
+  }, [loadHoldings])
+
+  function resetForm() {
+    setFormName('')
+    setFormTicker('')
+    setFormIsin('')
+    setFormUnits('')
+    setFormAvgPrice('')
+    setFormPurchaseDate('')
+    setFormError(null)
+  }
+
+  function openEditForm(h: AssetHolding) {
+    setEditHolding(h)
+    setFormName(h.name)
+    setFormTicker(h.ticker || '')
+    setFormIsin(h.isin || '')
+    setFormUnits(String(h.units))
+    setFormAvgPrice(String(h.avg_purchase_price))
+    setFormPurchaseDate(h.purchase_date || '')
+    setFormError(null)
+    setShowForm(true)
+  }
+
+  function openCreateForm() {
+    setEditHolding(null)
+    resetForm()
+    setShowForm(true)
+  }
+
+  async function handleSave() {
+    if (!formName.trim()) {
+      setFormError('Naam is verplicht')
+      return
+    }
+
+    setSaving(true)
+    setFormError(null)
+
+    try {
+      if (editHolding) {
+        // UPDATE
+        const res = await fetch('/api/holdings', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: editHolding.id,
+            name: formName.trim(),
+            ticker: formTicker.trim() || null,
+            units: Number(formUnits) || 1,
+            avg_purchase_price: Number(formAvgPrice) || 0,
+          }),
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.error || `HTTP ${res.status}`)
+        }
+      } else {
+        // CREATE
+        const res = await fetch('/api/holdings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            asset_id: assetId,
+            name: formName.trim(),
+            ticker: formTicker.trim() || null,
+            isin: formIsin.trim() || null,
+            units: Number(formUnits) || 1,
+            avg_purchase_price: Number(formAvgPrice) || 0,
+            current_price: Number(formAvgPrice) || 0,
+            purchase_date: formPurchaseDate || null,
+            force_duplicate: true, // Allow same ticker on different assets
+          }),
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.error || data.message || `HTTP ${res.status}`)
+        }
+      }
+
+      setShowForm(false)
+      setEditHolding(null)
+      resetForm()
+      loadHoldings()
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Opslaan mislukt')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (deleting) return
+    setDeleting(id)
+    try {
+      const res = await fetch(`/api/holdings?id=${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Verwijderen mislukt')
+      setHoldings((prev) => prev.filter((h) => h.id !== id))
+      setDeleteConfirm(null)
+    } catch {
+      setError('Kon holding niet verwijderen')
+    } finally {
+      setDeleting(null)
+    }
+  }
+
+  const totalValue = holdings.reduce((sum, h) => {
+    const price = h.current_price ?? h.avg_purchase_price
+    return sum + price * h.units
+  }, 0)
+
+  const totalCost = holdings.reduce((sum, h) => {
+    return sum + h.avg_purchase_price * h.units
+  }, 0)
+
+  return (
+    <div data-testid="holdings-list-section">
+      {/* Toggle header */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center justify-between rounded-lg bg-amber-50/50 px-3 py-2 text-left hover:bg-amber-50"
+        data-testid="holdings-toggle"
+      >
+        <div className="flex items-center gap-2">
+          <Briefcase className="h-4 w-4 text-amber-600" />
+          <span className="text-xs font-semibold text-zinc-700">
+            Holdings ({loading ? '…' : holdings.length})
+          </span>
+          {!loading && holdings.length > 0 && (
+            <span className="text-xs text-zinc-500">
+              — {formatCurrency(totalValue)}
+            </span>
+          )}
+        </div>
+        {expanded ? (
+          <ChevronUp className="h-4 w-4 text-zinc-400" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-zinc-400" />
+        )}
+      </button>
+
+      {expanded && (
+        <div className="mt-2 space-y-2" data-testid="holdings-list-expanded">
+          {loading && (
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-amber-500" />
+            </div>
+          )}
+
+          {error && (
+            <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">
+              <AlertCircle className="h-3.5 w-3.5" />
+              {error}
+            </div>
+          )}
+
+          {!loading && holdings.length === 0 && !showForm && (
+            <div className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50/50 p-4 text-center" data-testid="no-holdings">
+              <p className="text-xs text-zinc-400">Nog geen holdings voor dit vermogensobject.</p>
+              <button
+                onClick={openCreateForm}
+                className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-amber-600 hover:text-amber-700"
+                data-testid="add-first-holding-btn"
+              >
+                <Plus className="h-3 w-3" />
+                Eerste holding toevoegen
+              </button>
+            </div>
+          )}
+
+          {/* Holdings list */}
+          {!loading && holdings.length > 0 && (
+            <div className="space-y-1.5">
+              {holdings.map((h) => {
+                const price = h.current_price ?? h.avg_purchase_price
+                const value = price * h.units
+                const cost = h.avg_purchase_price * h.units
+                const returnPct = cost > 0 ? ((value - cost) / cost) * 100 : 0
+
+                return (
+                  <div
+                    key={h.id}
+                    className="flex items-center justify-between rounded-lg border border-zinc-100 bg-white px-3 py-2"
+                    data-testid={`holding-item-${h.id}`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-medium text-zinc-900 truncate">{h.name}</span>
+                        {h.ticker && (
+                          <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-mono text-zinc-500">
+                            {h.ticker}
+                          </span>
+                        )}
+                        {h.isin && !h.ticker && (
+                          <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-mono text-zinc-500">
+                            {h.isin}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-0.5 flex items-center gap-2 text-[10px] text-zinc-400">
+                        <span>{h.units} eenheden</span>
+                        <span>·</span>
+                        <span>Gem. {formatCurrency(h.avg_purchase_price)}</span>
+                        {h.purchase_date && (
+                          <>
+                            <span>·</span>
+                            <span>{new Date(h.purchase_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="text-right">
+                        <p className="text-xs font-medium text-zinc-900">{formatCurrency(value)}</p>
+                        <p className={`text-[10px] ${returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}%
+                        </p>
+                      </div>
+                      <div className="flex gap-0.5">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openEditForm(h) }}
+                          className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                          title="Bewerken"
+                          data-testid={`edit-holding-${h.id}`}
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </button>
+                        {deleteConfirm === h.id ? (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDelete(h.id) }}
+                            className="rounded p-1 text-red-600 hover:bg-red-50"
+                            disabled={deleting === h.id}
+                            data-testid={`confirm-delete-holding-${h.id}`}
+                          >
+                            {deleting === h.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <span className="text-[10px] font-medium">Ja</span>
+                            )}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDeleteConfirm(h.id) }}
+                            className="rounded p-1 text-zinc-400 hover:bg-red-50 hover:text-red-600"
+                            title="Verwijderen"
+                            data-testid={`delete-holding-${h.id}`}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Summary row */}
+              <div className="flex items-center justify-between border-t border-zinc-100 pt-1.5 px-3">
+                <span className="text-[10px] font-medium text-zinc-500">Totaal</span>
+                <div className="text-right">
+                  <span className="text-xs font-semibold text-zinc-900">{formatCurrency(totalValue)}</span>
+                  {totalCost > 0 && (
+                    <span className={`ml-1.5 text-[10px] ${totalValue >= totalCost ? 'text-emerald-600' : 'text-red-600'}`}>
+                      ({totalValue >= totalCost ? '+' : ''}{((totalValue - totalCost) / totalCost * 100).toFixed(1)}%)
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Add holding button */}
+              <button
+                onClick={openCreateForm}
+                className="flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-amber-200 py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-50"
+                data-testid="add-holding-btn"
+              >
+                <Plus className="h-3 w-3" />
+                Holding toevoegen
+              </button>
+            </div>
+          )}
+
+          {/* Create / Edit form */}
+          {showForm && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50/30 p-3 space-y-2" data-testid="holding-form">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-semibold text-zinc-700">
+                  {editHolding ? 'Holding bewerken' : 'Nieuwe holding'}
+                </h4>
+                <button
+                  onClick={() => { setShowForm(false); setEditHolding(null); resetForm() }}
+                  className="rounded p-0.5 text-zinc-400 hover:text-zinc-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="col-span-2">
+                  <label className="text-[10px] font-medium text-zinc-500">Naam *</label>
+                  <input
+                    type="text"
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    placeholder="bijv. Vanguard FTSE All-World"
+                    className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                    data-testid="holding-name-input"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium text-zinc-500">Ticker</label>
+                  <input
+                    type="text"
+                    value={formTicker}
+                    onChange={(e) => setFormTicker(e.target.value.toUpperCase())}
+                    placeholder="bijv. VWRL"
+                    className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                    data-testid="holding-ticker-input"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium text-zinc-500">ISIN</label>
+                  <input
+                    type="text"
+                    value={formIsin}
+                    onChange={(e) => setFormIsin(e.target.value.toUpperCase())}
+                    placeholder="bijv. IE00B3RBWM25"
+                    className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                    data-testid="holding-isin-input"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium text-zinc-500">Eenheden</label>
+                  <input
+                    type="number"
+                    value={formUnits}
+                    onChange={(e) => setFormUnits(e.target.value)}
+                    placeholder="bijv. 50"
+                    step="any"
+                    min="0"
+                    className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                    data-testid="holding-units-input"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium text-zinc-500">Gem. aankoopprijs (€)</label>
+                  <input
+                    type="number"
+                    value={formAvgPrice}
+                    onChange={(e) => setFormAvgPrice(e.target.value)}
+                    placeholder="bijv. 80.00"
+                    step="0.01"
+                    min="0"
+                    className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                    data-testid="holding-avg-price-input"
+                  />
+                </div>
+                {!editHolding && (
+                  <div className="col-span-2">
+                    <label className="text-[10px] font-medium text-zinc-500">Aankoopdatum</label>
+                    <input
+                      type="date"
+                      value={formPurchaseDate}
+                      onChange={(e) => setFormPurchaseDate(e.target.value)}
+                      className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                      data-testid="holding-purchase-date-input"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {formError && (
+                <div className="flex items-center gap-1 text-[10px] text-red-600">
+                  <AlertCircle className="h-3 w-3" />
+                  {formError}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  onClick={() => { setShowForm(false); setEditHolding(null); resetForm() }}
+                  className="rounded px-3 py-1 text-xs text-zinc-500 hover:bg-zinc-100"
+                >
+                  Annuleren
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving || !formName.trim()}
+                  className="inline-flex items-center gap-1 rounded bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                  data-testid="holding-save-btn"
+                >
+                  {saving && <Loader2 className="h-3 w-3 animate-spin" />}
+                  {editHolding ? 'Opslaan' : 'Toevoegen'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
