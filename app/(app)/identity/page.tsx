@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { computeSovereigntyLevel } from '@/lib/feature-phases'
+import { computeSovereigntyLevel, FEATURES, PHASES, DEFAULT_MATRIX, levelToPhaseId } from '@/lib/feature-phases'
 import { BadgeGrid } from '@/components/app/badge-grid'
 import { BadgeEvaluator } from '@/components/app/badge-evaluator'
 import { FreedomCardGenerator } from '@/components/app/freedom-card'
@@ -160,6 +160,56 @@ const levelCriteriaMap: Record<number, LevelCriteria> = {
   },
 }
 
+// ── Feature Roadmap helpers ───────────────────────────────────────────
+
+/** Determine the first phase where a feature becomes available */
+function getFeatureUnlockPhase(featureId: string): string | null {
+  const matrix = DEFAULT_MATRIX[featureId]
+  if (!matrix) return null
+  for (const phase of PHASES) {
+    if (matrix[phase.id]) return phase.id
+  }
+  return null
+}
+
+/** Map of feature icons (emoji) by feature id */
+const featureIcons: Record<string, string> = {
+  nibud_benchmark: '📊',
+  box3_belasting: '🏛️',
+  budget_optimalisatie: '💡',
+  schulden_aflosplan: '🔗',
+  asset_allocatie: '📈',
+  fire_projecties: '🔥',
+  monte_carlo: '🎲',
+  levensgebeurtenissen: '🎯',
+  withdrawal_strategie: '💸',
+  veerkracht_score: '🛡️',
+  vermogensprojectie_chart: '📉',
+  fire_scenario_analyse: '🔀',
+  fire_geavanceerde_params: '⚙️',
+  vermogensverloop: '📅',
+  snapshot_vergelijking: '🔍',
+  cashflow_sankey: '🌊',
+  data_export: '📤',
+  doelen_systeem: '🎯',
+  beslissingspatronen: '🧠',
+}
+
+/** Group features by the phase where they first unlock */
+function getFeaturesPerPhase(): Record<string, typeof FEATURES> {
+  const result: Record<string, typeof FEATURES> = {}
+  for (const phase of PHASES) {
+    result[phase.id] = []
+  }
+  for (const feature of FEATURES) {
+    const unlockPhase = getFeatureUnlockPhase(feature.id)
+    if (unlockPhase && result[unlockPhase]) {
+      result[unlockPhase].push(feature)
+    }
+  }
+  return result
+}
+
 // ── Component ────────────────────────────────────────────────────────
 
 type HouseholdType = 'solo' | 'samen' | 'gezin'
@@ -187,6 +237,10 @@ export default function IdentityPage() {
   // Financial state for sovereignty level
   const [sovereigntyLevel, setSovereigntyLevel] = useState(0)
   const [financialData, setFinancialData] = useState({ netWorth: 0, monthsCovered: 0, freedomPct: 0, hasConsumerDebt: false })
+
+  // Feature roadmap
+  const [expandedPhase, setExpandedPhase] = useState<string | null>(null)
+  const featuresPerPhase = getFeaturesPerPhase()
 
   // Demo user state
   const [isDemoUser, setIsDemoUser] = useState(false)
@@ -814,13 +868,21 @@ export default function IdentityPage() {
           )
         })()}
 
-        <div className="space-y-2">
+        <div className="space-y-2" data-testid="chronology-phases">
           {chronologyPhases.map((phase) => {
             const levels = chronologyLevels.filter((l) => l.phase === phase.phase)
             const colors = phaseColors[phase.color]
+            // Find matching PHASES entry for feature lookup
+            const phaseId = PHASES.find(p => p.color === phase.color)?.id ?? ''
+            const phaseFeatures = featuresPerPhase[phaseId] ?? []
+            const currentPhaseId = levelToPhaseId(sovereigntyLevel)
+            const currentPhaseIdx = PHASES.findIndex(p => p.id === currentPhaseId)
+            const thisPhaseIdx = PHASES.findIndex(p => p.id === phaseId)
+            const isPhaseUnlocked = thisPhaseIdx <= currentPhaseIdx
+            const isPhaseExpanded = expandedPhase === phaseId
 
             return (
-              <div key={phase.phase}>
+              <div key={phase.phase} data-testid={`phase-${phaseId}`}>
                 {/* Phase header */}
                 <div className="mb-3 flex items-center gap-2">
                   <span className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ${colors.badge}`}>
@@ -829,6 +891,99 @@ export default function IdentityPage() {
                   <span className="text-sm font-semibold text-zinc-700">{phase.name}</span>
                   <span className="text-xs text-zinc-400">&mdash; {phase.subtitle}</span>
                 </div>
+
+                {/* Feature roadmap icons for this phase */}
+                {phaseFeatures.length > 0 && (
+                  <div className="mb-3 ml-3" data-testid={`feature-roadmap-${phaseId}`}>
+                    <button
+                      onClick={() => setExpandedPhase(isPhaseExpanded ? null : phaseId)}
+                      className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-zinc-500 hover:text-zinc-700 transition-colors"
+                      data-testid={`feature-roadmap-toggle-${phaseId}`}
+                    >
+                      <span className="text-xs">{isPhaseExpanded ? '▼' : '▶'}</span>
+                      <span>{phaseFeatures.length} feature{phaseFeatures.length !== 1 ? 's' : ''} worden ontgrendeld</span>
+                      {isPhaseUnlocked && (
+                        <span className="ml-1 inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 border border-emerald-200">
+                          ✓ Beschikbaar
+                        </span>
+                      )}
+                      {!isPhaseUnlocked && (
+                        <span className="ml-1 inline-flex items-center rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400 border border-zinc-200">
+                          🔒 Vergrendeld
+                        </span>
+                      )}
+                    </button>
+
+                    {/* Feature icon pills (always visible as compact icons) */}
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {phaseFeatures.map((feature) => {
+                        const icon = featureIcons[feature.id] ?? '⚡'
+                        return (
+                          <div
+                            key={feature.id}
+                            className={`group relative inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium border transition-all ${
+                              isPhaseUnlocked
+                                ? `${colors.badge} opacity-100`
+                                : 'bg-zinc-50 text-zinc-400 border-zinc-200 opacity-60'
+                            }`}
+                            data-testid={`feature-pill-${feature.id}`}
+                            data-unlocked={isPhaseUnlocked ? 'true' : 'false'}
+                          >
+                            <span className="text-xs">{icon}</span>
+                            <span className="hidden sm:inline">{feature.label}</span>
+                            {!isPhaseUnlocked && <span className="text-[9px] ml-0.5">🔒</span>}
+                            {/* Tooltip */}
+                            <div className="pointer-events-none absolute left-1/2 bottom-full z-20 mb-2 -translate-x-1/2 w-48 rounded-lg border border-zinc-200 bg-white p-2 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+                              <p className="text-[11px] font-semibold text-zinc-700">{feature.label}</p>
+                              <p className="text-[10px] text-zinc-500">{feature.description}</p>
+                              {isPhaseUnlocked ? (
+                                <p className="mt-1 text-[10px] font-semibold text-emerald-600">✓ Ontgrendeld</p>
+                              ) : (
+                                <p className="mt-1 text-[10px] font-semibold text-zinc-400">🔒 Beschikbaar vanaf {phase.name}</p>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* Expanded feature list */}
+                    {isPhaseExpanded && (
+                      <div className="rounded-lg border border-zinc-100 bg-zinc-50/50 p-3 mb-2" data-testid={`feature-list-${phaseId}`}>
+                        <p className="mb-2 text-[11px] font-semibold text-zinc-500 uppercase tracking-wide">
+                          Features in {phase.name}
+                        </p>
+                        <div className="space-y-1.5">
+                          {phaseFeatures.map((feature) => {
+                            const icon = featureIcons[feature.id] ?? '⚡'
+                            return (
+                              <div
+                                key={feature.id}
+                                className={`flex items-start gap-2 rounded-md p-1.5 ${
+                                  isPhaseUnlocked ? '' : 'opacity-50'
+                                }`}
+                                data-testid={`feature-detail-${feature.id}`}
+                              >
+                                <span className="text-sm shrink-0 mt-0.5">{icon}</span>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-xs font-semibold text-zinc-700">{feature.label}</span>
+                                    {isPhaseUnlocked ? (
+                                      <span className="text-[10px] text-emerald-600 font-medium">✓</span>
+                                    ) : (
+                                      <span className="text-[10px] text-zinc-400">🔒</span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-zinc-500 leading-snug">{feature.description}</p>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Levels in this phase */}
                 <div className="ml-3 border-l-2 border-zinc-100 pl-6 pb-6">
