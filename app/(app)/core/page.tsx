@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { FhinAvatar } from '@/components/app/avatars'
 import { computeCoreData, type CoreData } from '@/lib/mock-data'
 import { createClient } from '@/lib/supabase/client'
-import { formatCurrency } from '@/components/app/budget-shared'
+import { formatCurrency, BudgetIcon } from '@/components/app/budget-shared'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { BudgetAlert, shouldAlert } from '@/components/app/budget-alert'
@@ -13,7 +13,7 @@ import type { NetWorthSnapshot } from '@/lib/net-worth-data'
 import {
   Calendar, TrendingUp, Sun, Star, Wallet, ShoppingCart,
   PiggyBank, Building2, ArrowRight, Info, Camera, Download, ChevronDown, Receipt, Flag, BarChart3,
-  CheckCircle2, AlertTriangle, TrendingDown, ArrowUpRight, ArrowDownRight, Minus,
+  CheckCircle2, AlertTriangle, TrendingDown, ArrowUpRight, ArrowDownRight, Minus, LineChart,
 } from 'lucide-react'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { CollapsibleSection } from '@/components/app/collapsible-section'
@@ -21,6 +21,8 @@ import { DiscoverCarousel } from '@/components/app/discover-carousel'
 import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
 import { NextStepSection, computeAllKernSteps } from '@/components/app/next-step-card'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
+import { SparklineWithLabel, type SparklineDataPoint } from '@/components/app/budget-sparkline'
+import { CashFlowForecastChart, type ForecastPoint, type ForecastAlert } from '@/components/app/cashflow-forecast-chart'
 
 export default function CorePage() {
   const router = useRouter()
@@ -40,6 +42,11 @@ export default function CorePage() {
   const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalCurrent: number; progressPct: number } | null>(null)
   const [assetGrowthDirection, setAssetGrowthDirection] = useState<'up' | 'down' | 'flat'>('flat')
   const [overBudgetCount, setOverBudgetCount] = useState(0)
+  const [budgetSparklines, setBudgetSparklines] = useState<{ id: string; name: string; icon: string; budgetType: string; data: SparklineDataPoint[] }[]>([])
+  const [cashFlowForecast, setCashFlowForecast] = useState<ForecastPoint[]>([])
+  const [cashFlowAlerts, setCashFlowAlerts] = useState<ForecastAlert[]>([])
+  const [cashFlowBalance, setCashFlowBalance] = useState(0)
+  const [cashFlowHasData, setCashFlowHasData] = useState(false)
 
   const loadData = useCallback(async () => {
     try {
@@ -320,6 +327,81 @@ export default function CorePage() {
         }
       } catch {
         // Badge fetch is non-critical; chart still works without badges
+      }
+
+      // Load 12-month budget spending sparklines per parent category
+      try {
+        if (budgetResult.data && budgetResult.data.length > 0) {
+          const allBudgets = budgetResult.data as Budget[]
+          const parentBudgets = allBudgets.filter(b => !b.parent_id)
+          const childBudgets = allBudgets.filter(b => b.parent_id)
+
+          // Build 12-month date ranges
+          const sparkMonths: { month: string; start: string; end: string; label: string }[] = []
+          for (let i = 11; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+            const start = d.toISOString().split('T')[0]
+            const end = new Date(d.getFullYear(), d.getMonth() + 1, 1).toISOString().split('T')[0]
+            const label = d.toLocaleDateString('nl-NL', { month: 'short' })
+            sparkMonths.push({ month: start, start, end, label })
+          }
+
+          // Fetch all transactions for the 12-month range
+          const { data: sparkTxData } = await supabase
+            .from('transactions')
+            .select('budget_id, amount, date')
+            .gte('date', sparkMonths[0].start)
+            .lt('date', sparkMonths[sparkMonths.length - 1].end)
+
+          if (sparkTxData && sparkTxData.length > 0) {
+            const sparklines: { id: string; name: string; icon: string; budgetType: string; data: SparklineDataPoint[] }[] = []
+
+            for (const parent of parentBudgets) {
+              const childIds = childBudgets.filter(c => c.parent_id === parent.id).map(c => c.id)
+              const budgetIds = childIds.length > 0 ? childIds : [parent.id]
+
+              const monthlyData: SparklineDataPoint[] = sparkMonths.map(m => {
+                const monthTx = sparkTxData.filter(t =>
+                  t.date >= m.start && t.date < m.end && budgetIds.includes(t.budget_id)
+                )
+                const monthSpent = monthTx.reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
+                return { month: m.month, label: m.label, spent: monthSpent }
+              })
+
+              // Only include categories that have at least some spending data
+              const hasAnySpending = monthlyData.some(d => d.spent > 0)
+              if (hasAnySpending) {
+                sparklines.push({
+                  id: parent.id,
+                  name: parent.name,
+                  icon: parent.icon,
+                  budgetType: parent.budget_type ?? 'expense',
+                  data: monthlyData,
+                })
+              }
+            }
+
+            setBudgetSparklines(sparklines)
+          }
+        }
+      } catch {
+        // Budget sparklines are non-critical
+      }
+
+      // Load cash flow forecast
+      try {
+        const forecastRes = await fetch('/api/cashflow-forecast')
+        if (forecastRes.ok) {
+          const forecastData = await forecastRes.json()
+          if (forecastData.hasData) {
+            setCashFlowForecast(forecastData.forecast ?? [])
+            setCashFlowAlerts(forecastData.alerts ?? [])
+            setCashFlowBalance(forecastData.currentBalance ?? 0)
+            setCashFlowHasData(true)
+          }
+        }
+      } catch {
+        // Cash flow forecast is non-critical
       }
 
     } catch (err) {
@@ -674,6 +756,66 @@ export default function CorePage() {
           </div>
         </FeatureGate>
       </section>
+
+      {/* === 4b. Budget Category Spending Trends (Sparklines) === */}
+      {budgetSparklines.length > 0 && (
+        <section className="mt-8" data-testid="kern-budget-sparklines">
+          <CollapsibleSection
+            storageKey="kern_budget_trends"
+            title="Uitgaventrend per categorie"
+            summary={`${budgetSparklines.length} categorie${budgetSparklines.length !== 1 ? 'ën' : ''} — 12 maanden`}
+            icon={<BarChart3 className="h-5 w-5 text-amber-600" />}
+          >
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {budgetSparklines.map((cat) => (
+                <Link
+                  key={cat.id}
+                  href={`/core/budgets?budget=${cat.id}`}
+                  className="group flex items-center gap-3 rounded-xl border border-zinc-100 bg-white p-3 transition-all hover:border-amber-200 hover:bg-amber-50/20 hover:shadow-sm"
+                  data-testid={`kern-sparkline-${cat.id}`}
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-50">
+                    <BudgetIcon name={cat.icon} className="h-4 w-4 text-amber-600" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium text-zinc-700">{cat.name}</p>
+                    <p className="text-[10px] text-zinc-400">
+                      {formatCurrency(cat.data[cat.data.length - 1]?.spent ?? 0)} deze maand
+                    </p>
+                  </div>
+                  <SparklineWithLabel
+                    data={cat.data}
+                    width={80}
+                    height={24}
+                    isIncome={cat.budgetType === 'income'}
+                    testId={`kern-sparkline-chart-${cat.id}`}
+                  />
+                </Link>
+              ))}
+            </div>
+          </CollapsibleSection>
+        </section>
+      )}
+
+      {/* === 4c. Cash Flow Forecast (Feature-gated: Stability+) === */}
+      <FeatureGate featureId="cashflow_forecast" fallback="locked">
+        {cashFlowHasData && cashFlowForecast.length >= 2 && (
+          <section className="mt-8" data-testid="cashflow-forecast-section">
+            <CollapsibleSection
+              storageKey="kern_cashflow_forecast"
+              title="Cashflow Prognose"
+              summary={`${cashFlowForecast.length - 1} maanden vooruit — banksaldo projectie`}
+              icon={<LineChart className="h-5 w-5 text-amber-600" />}
+            >
+              <CashFlowForecastChart
+                forecast={cashFlowForecast}
+                alerts={cashFlowAlerts}
+                currentBalance={cashFlowBalance}
+              />
+            </CollapsibleSection>
+          </section>
+        )}
+      </FeatureGate>
 
       {/* === 5. Net Worth Chart (Deep Dive) === */}
       <FeatureGate featureId="vermogensverloop" fallback="locked">
