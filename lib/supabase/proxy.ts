@@ -247,6 +247,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-data-reset-full',
     '/test-privacy-default',
     '/api/verify-privacy-default',
+    '/test-transaction-filters',
+    '/api/verify-transaction-filters',
   ]
 
   // Protected route prefixes that require authentication

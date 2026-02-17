@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Plus, Upload, ArrowUpRight, ArrowDownLeft,
-  Wallet, Tag, Settings2, Trash2, X, Building2, Repeat, Calendar,
+  Wallet, Tag, Settings2, Trash2, X, Building2, Repeat, Calendar, Search, Filter, RotateCcw,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getDefaultBudgets, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
@@ -59,6 +59,19 @@ export default function CashPage() {
   const [editAccount, setEditAccount] = useState<Account | null>(null)
   const [recurrings, setRecurrings] = useState<RecurringTransaction[]>([])
   const [showRecurring, setShowRecurring] = useState(true)
+
+  // Filter state
+  const [filterSearch, setFilterSearch] = useState('')
+  const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all')
+  const [filterBudgetId, setFilterBudgetId] = useState<string>('all')
+
+  const hasActiveFilters = filterSearch !== '' || filterType !== 'all' || filterBudgetId !== 'all'
+
+  function resetFilters() {
+    setFilterSearch('')
+    setFilterType('all')
+    setFilterBudgetId('all')
+  }
 
   const monthStart = monthDate.toISOString().split('T')[0]
   const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1).toISOString().split('T')[0]
@@ -186,8 +199,41 @@ export default function CashPage() {
 
   const netAmount = totalIncome - totalExpenses
 
-  // Group by date
-  const transactionsByDate = transactions.reduce<Record<string, Transaction[]>>((groups, tx) => {
+  // Apply filters to transactions
+  const filteredTransactions = useMemo(() => {
+    let result = transactions
+
+    // Search filter: match description, counterparty name, or notes
+    if (filterSearch.trim()) {
+      const searchLower = filterSearch.trim().toLowerCase()
+      result = result.filter((tx) =>
+        (tx.description && tx.description.toLowerCase().includes(searchLower)) ||
+        (tx.counterparty_name && tx.counterparty_name.toLowerCase().includes(searchLower)) ||
+        (tx.notes && tx.notes.toLowerCase().includes(searchLower))
+      )
+    }
+
+    // Type filter: income or expense
+    if (filterType === 'income') {
+      result = result.filter((tx) => Number(tx.amount) > 0)
+    } else if (filterType === 'expense') {
+      result = result.filter((tx) => Number(tx.amount) < 0)
+    }
+
+    // Budget category filter
+    if (filterBudgetId !== 'all') {
+      if (filterBudgetId === 'uncategorized') {
+        result = result.filter((tx) => !tx.budget_id)
+      } else {
+        result = result.filter((tx) => tx.budget_id === filterBudgetId)
+      }
+    }
+
+    return result
+  }, [transactions, filterSearch, filterType, filterBudgetId])
+
+  // Group filtered transactions by date
+  const transactionsByDate = filteredTransactions.reduce<Record<string, Transaction[]>>((groups, tx) => {
     const date = tx.date
     if (!groups[date]) groups[date] = []
     groups[date].push(tx)
@@ -734,13 +780,97 @@ export default function CashPage() {
         </section>
       )}
 
+      {/* Transaction filters */}
+      <section className="mt-6" data-testid="transaction-filters">
+        <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 sm:flex-row sm:items-center">
+          {/* Search input */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+            <input
+              type="text"
+              value={filterSearch}
+              onChange={(e) => setFilterSearch(e.target.value)}
+              placeholder="Zoek op omschrijving of tegenpartij..."
+              className="w-full rounded-lg border border-zinc-200 py-2 pl-9 pr-3 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+              data-testid="filter-search"
+            />
+          </div>
+
+          {/* Type filter */}
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value as 'all' | 'income' | 'expense')}
+            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+            data-testid="filter-type"
+          >
+            <option value="all">Alle types</option>
+            <option value="income">Inkomen</option>
+            <option value="expense">Uitgaven</option>
+          </select>
+
+          {/* Budget category filter */}
+          <select
+            value={filterBudgetId}
+            onChange={(e) => setFilterBudgetId(e.target.value)}
+            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+            data-testid="filter-budget"
+          >
+            <option value="all">Alle categorieën</option>
+            <option value="uncategorized">Niet gecategoriseerd</option>
+            {budgets
+              .filter((b) => !b.parent_id || Number(b.default_limit) > 0)
+              .map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.parent_id ? `  ${b.name}` : b.name}
+                </option>
+              ))}
+          </select>
+
+          {/* Reset filters button */}
+          {hasActiveFilters && (
+            <button
+              onClick={resetFilters}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 transition-colors"
+              data-testid="filter-reset"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Reset filters
+            </button>
+          )}
+        </div>
+
+        {/* Active filter summary */}
+        {hasActiveFilters && (
+          <div className="mt-2 flex items-center gap-2 text-xs text-zinc-500" data-testid="filter-summary">
+            <Filter className="h-3.5 w-3.5" />
+            <span>
+              {filteredTransactions.length} van {transactions.length} transacties
+            </span>
+          </div>
+        )}
+      </section>
+
       {/* Transaction list */}
-      <section className="mt-6">
+      <section className="mt-6" data-testid="transaction-list">
         {sortedDates.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
+          <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center" data-testid="no-transactions">
             <Wallet className="mx-auto h-8 w-8 text-zinc-300" />
             <p className="mt-2 text-sm font-medium text-zinc-600">Geen transacties gevonden</p>
-            <p className="mt-1 text-xs text-zinc-400">Er zijn geen transacties in {monthLabel}. Voeg een transactie toe of importeer je bankafschriften.</p>
+            {hasActiveFilters ? (
+              <>
+                <p className="mt-1 text-xs text-zinc-400">Geen transacties komen overeen met de huidige filters.</p>
+                <button
+                  onClick={resetFilters}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+                  data-testid="filter-reset-empty"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Filters wissen
+                </button>
+              </>
+            ) : (
+              <p className="mt-1 text-xs text-zinc-400">Er zijn geen transacties in {monthLabel}. Voeg een transactie toe of importeer je bankafschriften.</p>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
