@@ -5371,3 +5371,37 @@ For Feature #51 (Transaction Import):
 - Port 3000 used this session
 - FIRE age is uniquely De Horizon's primary metric — other pages have their own unique primaries
 - The hero already had FIRE age as the big number; changes were primarily adding data-testid and clarifying the label
+
+## Session 2026-02-17 - Feature #192
+
+### Feature #192: FeatureGate default switch from hidden to locked - PASSING
+- Changed FeatureGate default fallback from 'hidden' to 'locked' in components/app/feature-gate.tsx
+- LockedFeatureCard already existed with all required elements:
+  - Feature name (from FEATURES array label)
+  - Feature description (from FEATURES array description)
+  - Unlock phase badge ("Beschikbaar vanaf [Phase]")
+  - Mini progress bar toward unlock level
+  - Dashed border, muted colors (opacity-75), lock icon
+  - Non-clickable div with aria-disabled="true"
+- All 17 FeatureGate usages across main app pages already use explicit fallback="locked"
+- Only 1 intentional hidden exception: veerkracht_score chart in horizon (inner conditional section)
+- 12/12 verification tests passing at /api/verify-locked-default
+- Browser verified: locked cards render correctly, clicking does NOT navigate
+- Zero console errors (only HMR artifacts from dev mode)
+- No mock data patterns found
+
+### Changes Made
+- components/app/feature-gate.tsx: Changed default fallback from 'hidden' to 'locked'
+- app/api/verify-locked-default/route.ts: Created 12-test verification endpoint
+- app/test-locked-default/page.tsx: Created visual test page with LockedFeatureCard demos
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: 26d520b
+
+### Current Status
+- 186/265 features passing (185 before + #192)
+- Feature #192 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- The FeatureGate default was the only code change needed; LockedFeatureCard was already fully built
+- Most app pages already used explicit fallback="locked", so the default change is primarily for new FeatureGate usages
