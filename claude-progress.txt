@@ -1,3 +1,54 @@
+## Session 2026-02-17 - Feature #224
+
+### Feature #224: Net worth growth projection - PASSING
+- Implemented complete 1-5 year net worth growth projection for De Kern overview page
+- All 6 feature steps verified and implemented:
+  1. **Calculate net worth growth trajectory**: `computeNetWorthProjection()` in lib/net-worth-projection.ts uses compound growth model (monthly return + savings)
+  2. **Create projection chart for 1-5 year horizon**: NetWorthProjectionChart SVG component with:
+     - Dashed amber line for growing projections, red for declining
+     - "vandaag" vertical marker
+     - Year markers (1j-5j) on X-axis
+     - Hover tooltips with date and formatted value
+     - Area fill with gradient
+  3. **Show on De Kern overview page**: Integrated as CollapsibleSection with storageKey "kern_nw_projection", TrendingUp icon, between cashflow forecast and net worth chart
+  4. **FIRE target comparison line**: Purple dashed horizontal line with "FIRE" label, 🎯 marker at crossing point, "FIRE in Xj Ym" badge
+  5. **Display contextual message**: Color-coded banner with:
+     - Growing: "Op dit tempo bereik je €X over 5 jaar."
+     - Declining: "Let op: op dit tempo daalt je vermogen naar €X over 5 jaar."
+     - FIRE reached: "Op dit tempo bereik je volledige vrijheid over X jaar en Y maanden."
+  6. **Differentiate from Horizon**: Feature gated as `vermogensprognose_kern` (5-year short-term), separate from Horizon's `vermogensprojectie_chart` (30-year long-term)
+
+#### New Files:
+- **lib/net-worth-projection.ts**: Core projection utility with computeNetWorthProjection(), formatProjectedValue(), getProjectionMessage()
+- **components/app/net-worth-projection-chart.tsx**: NetWorthProjectionChart SVG component with ProjectionBadge sub-component
+- **app/api/verify-nw-projection/route.ts**: 21-test verification endpoint
+- **app/test-nw-projection/page.tsx**: Visual test page with 6 demo scenarios (growing, FIRE near, negative, declining, stable, FIRE reached)
+
+#### Modified Files:
+- **app/(app)/core/page.tsx**: Added NetWorthProjectionChart import, nwProjection state, computeNetWorthProjection call, and CollapsibleSection with FeatureGate
+- **lib/feature-phases.ts**: Added vermogensprognose_kern to FEATURES and DEFAULT_MATRIX (Stability+)
+- **lib/supabase/proxy.ts**: Added test routes to public paths
+
+#### Verification:
+- 21/21 API verification tests passing at /api/verify-nw-projection
+- Visual test page at /test-nw-projection with 6 demo scenarios all rendering correctly
+- Zero console errors (0 errors, 0 warnings)
+- No mock data patterns found
+- Commit: 50878f3
+
+### Current Status
+- 218/265 features passing (217 before + #224)
+- Feature #224 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- Projection uses computeNetWorthProjection() which is computed client-side from existing data (no additional DB queries)
+- Chart shows sampled points (every 3 months) for cleaner rendering
+- Feature gated as vermogensprognose_kern in Stability+ (same level as cashflow_forecast and vermogensverloop)
+- Summary badges show 1yr/3yr/5yr projections with positive/negative delta
+
+---
+
 ## Session 2026-02-17 - Feature #223
 
 ### Feature #223: Debt payoff trajectory chart in UI - PASSING
