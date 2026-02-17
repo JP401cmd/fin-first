@@ -1,3 +1,48 @@
+## Session 2026-02-17 - Feature #181
+
+### Feature #181: Freedom-time in budget displays - PASSING
+- Added `formattedDagen` property to `eurToFreedomTime()` in freedom-time-label.tsx
+  - Uses `toLocaleString('nl-NL')` for Dutch decimal format (e.g., "2,4 dagen")
+  - Scales to maanden/jaar for larger amounts
+- Updated budget tree progress bars (budget-tree.tsx FreedomDaysLabel):
+  - "nog 2,4 dagen deze maand" format with text-sm italic text-zinc-500 styling
+  - Over-budget: "€32 over — 1,1 dagen ingeleverd" in red
+- Updated budget alerts (budget-alert.tsx):
+  - Uses formattedDagen: "€32 over — 1,1 dagen ingeleverd"
+  - Consistent text-sm italic text-zinc-500 styling
+- Updated budget detail modal (budgets/page.tsx):
+  - Limit, Spent, Remaining cards show formattedDagen
+  - Progress bar label: "nog X,X dagen deze maand"
+  - Over-budget bar: "€X over — Y dagen ingeleverd"
+  - Child budget freedom-time remaining/over
+  - Transaction line items show formattedDagen
+- All freedom-time labels use consistent subtle styling: text-sm italic text-zinc-500
+- Created verification endpoint /api/verify-budget-freedom-time (12 tests)
+- Created test page /test-budget-freedom-time
+- 12/12 verification tests passing
+- Zero console errors
+- No mock data patterns found
+
+### Changes Made
+- components/app/freedom-time-label.tsx: Added formattedDagen property with nl-NL locale
+- components/app/budget-tree.tsx: Updated FreedomDaysLabel to use formattedDagen + text-sm styling
+- components/app/budget-alert.tsx: Updated alert freedom-time to use formattedDagen + text-sm styling
+- app/(app)/core/budgets/page.tsx: Updated 7 freedom-time display points in detail modal
+- app/api/verify-budget-freedom-time/route.ts: Created 12-test verification endpoint
+- app/test-budget-freedom-time/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+
+### Current Status
+- 177/265 features passing (176 before + #181)
+- Feature #181 completed and marked passing
+- Note: Changes were committed alongside feature #184 by parallel agent (shared working directory)
+
+### Notes for Next Session
+- Port 3000 used this session
+- No authenticated browser testing (Supabase email rate limit)
+- formattedDagen provides Dutch-locale decimal days for budget displays
+- All budget freedom-time uses useDailyExpenseRate() hook for real transaction data
+
 ## Session 2026-02-17 - Feature #184
 
 ### Feature #184: Freedom-time in debt displays - PASSING
