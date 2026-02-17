@@ -1,3 +1,46 @@
+## Session 2026-02-17 - Feature #200
+
+### Feature #200: Collapsible deep-dive sections - PASSING
+- CollapsibleSection component already fully implemented at components/app/collapsible-section.tsx
+- All three target sections already using CollapsibleSection:
+  1. Vermogensverloop (storageKey="kern_vermogensverloop") on /core page
+  2. Vergelijking snapshots (storageKey="kern_snapshot_vergelijking") on /core page
+  3. Beslissingspatronen (storageKey="wil_beslissingspatronen") on /will page
+
+#### Component Features Verified:
+1. Expand/collapse toggle button with aria-expanded attribute
+2. Default collapsed state (defaultOpen = false)
+3. 1-line summary preview when collapsed (truncated text)
+4. localStorage persistence per section using `collapsible_${storageKey}` keys
+5. Smooth expand/collapse animation (transition-all duration-300 + chevron rotate-180)
+6. Each section has themed icon: TrendingUp (amber), Camera (amber), Flame (teal)
+7. data-testid attributes added on container, toggle button, title, summary, content
+
+#### Browser Verification:
+- All 3 sections render collapsed by default with summary text visible
+- Clicking expands section, chevron rotates up, summary disappears
+- Clicking again collapses with smooth animation
+- localStorage stores expanded state, persists across page reload
+- 16/16 verification tests passing at /api/verify-collapsible-sections
+- Zero console errors
+- No mock data patterns found
+
+### Changes Made
+- components/app/collapsible-section.tsx: Added data-testid and data-collapsed attributes
+- app/api/verify-collapsible-sections/route.ts: Created 16-test verification endpoint
+- app/test-collapsible-sections/page.tsx: Created interactive test page with live demos
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: b7116cd
+
+### Current Status
+- 193/265 features passing (192 before + #200)
+- Feature #200 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- CollapsibleSection was already fully built and applied to all 3 target sections
+- Only enhancement needed was adding data-testid attributes for testability
+
 ## Session 2026-02-17 - Feature #197
 
 ### Feature #197: Feature roadmap view on Identity page - PASSING
