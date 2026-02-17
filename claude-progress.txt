@@ -1,3 +1,100 @@
+## Session 2026-02-17 - Feature #216
+
+### Feature #216: Freedom days monthly trend for De Wil - PASSING
+- Created `FreedomDaysMonthlyTrend` SVG bar chart component at components/app/will/freedom-days-monthly-trend.tsx
+- Extracted `buildMonthlyFreedomData()` utility to lib/freedom-days-trend.ts (shared between client component and server API)
+- Integrated as CollapsibleSection on De Wil overview page (storageKey: wil_freedom_days_trend)
+- Shows 12-month bar chart with freedom days won per month from completed actions
+- Summary badges: "Deze maand: +X dagen | Gemiddeld: +Y dagen | Beste maand: +Z dagen"
+- Current month bar uses darker teal (#0d9488), best month uses medium teal (#14b8a6)
+- Graceful empty state: "Nog geen voltooide acties met vrijheidsdagen"
+- Average calculated from non-zero months only
+- Y-axis with auto-scaled gridlines
+- 16/16 verification tests passing at /api/verify-freedom-days-monthly-trend
+- Zero console errors, no mock data patterns
+- Data comes from existing completedActions already loaded on De Wil page (no additional DB queries)
+
+### Changes Made
+- components/app/will/freedom-days-monthly-trend.tsx: Created FreedomDaysMonthlyTrend SVG bar chart component
+- lib/freedom-days-trend.ts: Extracted buildMonthlyFreedomData utility (server-compatible)
+- app/(app)/will/page.tsx: Added FreedomDaysMonthlyTrend import, BarChart3 icon, and CollapsibleSection integration
+- app/api/verify-freedom-days-monthly-trend/route.ts: Created 16-test verification endpoint
+- app/test-freedom-days-monthly-trend/page.tsx: Created visual test page with 3 demo scenarios
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: a150712
+
+### Current Status
+- 211/265 features passing (210 before + #216)
+- Feature #216 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- The chart reuses completedActions data already fetched by De Wil page - no additional API calls needed
+- buildMonthlyFreedomData is in lib/ (not 'use client') so it can be imported by both client components and server routes
+
+## Session 2026-02-17 - Feature #215
+
+### Feature #215: FIRE-age history tracking and chart - PASSING
+- Implemented FIRE age trend visualization on De Horizon overview page
+- All 6 feature steps implemented and verified:
+
+#### Implementation Details:
+1. **fire_age stored in monthly snapshots**: Already stored by auto-snapshot, manual snapshot, and cron endpoints via `computeFireProjection()` → `fire_age` column in `net_worth_snapshots`
+2. **"Je FIRE-leeftijd over tijd" line chart**: Created `FireAgeTrendChart` SVG component inline in horizon/page.tsx
+   - 600x220 viewBox with 50px padding
+   - Dynamic Y-axis with age labels (e.g., "47j", "52j")
+   - Gradient area fill under line
+   - Data point circles with value labels
+   - Rotated Y-axis title "FIRE-leeftijd"
+   - Trend arrow (↓ for improving, ↑ for worsening)
+3. **Displayed on De Horizon overview page**: Added as section 5b between Resilience Trend and Explore Cards
+   - `data-testid="fire-age-trend-section"` on container
+   - `data-testid="fire-age-trend-chart"` on SVG
+   - Section header with Hourglass icon and "Je FIRE-leeftijd over tijd" title
+   - Subtitle: "Hoe je vrijheidsleeftijd zich ontwikkelt — lager is beter"
+4. **Contextual progress message**: `data-testid="fire-age-context-message"`
+   - Improving: "In [maand] was je FIRE-leeftijd X, nu Y — je ligt Z jaar voor!"
+   - Worsening: "In [maand] was je FIRE-leeftijd X, nu Y — Z jaar/maanden verschoven"
+   - Stable: "Je FIRE-leeftijd is stabiel gebleven op X jaar"
+5. **Color-coded improvements**: Green (#059669) line for improving, Red (#dc2626) for worsening
+   - Trend arrow: ↓ green for improvement, ↑ red for worsening
+   - Value labels: fill-emerald-700 or fill-red-700
+6. **Graceful missing data handling**:
+   - Filters snapshots where fire_age is null
+   - Requires 2+ valid fire_age snapshots
+   - Shows "Nog niet genoeg snapshots" message when < 2
+
+#### Data Flow:
+- Updated SnapshotForTrend type to include `fire_age: number | null`
+- Updated snapshot query to select `fire_age` column
+- Uses existing `resilienceSnapshots` state (which now includes fire_age)
+- Chart rendering is conditional: only shown when 2+ fire_age snapshots exist
+
+#### Verification:
+- 9/9 API verification tests passing at /api/verify-fire-age-trend
+- Browser verified: test page renders correctly, all tests pass visually
+- Zero console errors
+- No mock data patterns found
+- Commit: 6e3fc74
+
+### Changes Made
+- app/(app)/horizon/page.tsx: Added fire_age to SnapshotForTrend type, updated snapshot query, added FireAgeTrendChart component, added chart section with contextual message
+- app/api/verify-fire-age-trend/route.ts: Created 9-test verification endpoint
+- app/test-fire-age-trend/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+
+### Current Status
+- 209/265 features passing (208 before + #215)
+- Feature #215 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- No authenticated browser testing possible (Supabase email rate limit)
+- Fire age chart uses same data source as resilience trend chart (resilienceSnapshots)
+- Chart only visible when user has 2+ monthly snapshots with valid fire_age values
+
+---
+
 ## Session 2026-02-17 - Feature #214
 
 ### Feature #214: Debt balance trajectory visualization - PASSING
