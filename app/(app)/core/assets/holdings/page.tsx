@@ -4,6 +4,9 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Plus, Trash2, X, TrendingUp, ArrowLeft, Loader2, Briefcase, Edit3, Receipt, ArrowUpRight, ArrowDownRight, DollarSign, PieChart, RefreshCw, AlertTriangle, Clock, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/components/app/budget-shared'
+import PortfolioAllocationVisualization, { type HoldingForAllocation } from '@/components/app/portfolio-allocation-chart'
+import { BenchmarkComparisonChart } from '@/components/app/benchmark-comparison-chart'
+import { TIME_PERIODS, type TimePeriod, type ComparisonResult } from '@/lib/benchmark-comparison'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -23,11 +26,25 @@ type Holding = {
   is_active: boolean
   created_at: string
   updated_at: string
+  // Price feed data
+  previous_close?: number | null
+  daily_change_percent?: number | null
+  // Classification fields for portfolio allocation
+  asset_class?: string | null
+  sector?: string | null
+  geography?: string | null
   // Extra fields from assets fallback
   asset_type?: string
   institution?: string
   expected_return?: number
   monthly_contribution?: number
+}
+
+// Per-holding price data from refresh API
+type HoldingPriceUpdate = {
+  id: string
+  dailyChangePercent: number | null
+  previousClose: number | null
 }
 
 export default function HoldingsPage() {
@@ -45,7 +62,12 @@ export default function HoldingsPage() {
   const [txHolding, setTxHolding] = useState<Holding | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshResult, setRefreshResult] = useState<{ message: string; type: 'success' | 'warning' | 'error' } | null>(null)
+  const [benchmarkComparison, setBenchmarkComparison] = useState<ComparisonResult | null>(null)
+  const [benchmarkPeriod, setBenchmarkPeriod] = useState<TimePeriod>(TIME_PERIODS.find(p => p.id === '1y')!)
+  const [benchmarkLoading, setBenchmarkLoading] = useState(false)
   const [overrideHolding, setOverrideHolding] = useState<Holding | null>(null)
+  // Per-holding daily change data from last price refresh
+  const [priceUpdates, setPriceUpdates] = useState<Map<string, HoldingPriceUpdate>>(new Map())
   // Track whether a form was recently submitted to prevent re-submission on back navigation
   const formSubmittedRef = useRef(false)
 
@@ -68,9 +90,37 @@ export default function HoldingsPage() {
     }
   }, [])
 
+  // Load benchmark comparison data
+  const loadBenchmarkComparison = useCallback(async (periodId: string) => {
+    setBenchmarkLoading(true)
+    try {
+      const res = await fetch(`/api/benchmark-comparison?period=${periodId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setBenchmarkComparison(data.comparison || null)
+      }
+    } catch {
+      // Non-critical — silently fail
+    } finally {
+      setBenchmarkLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     loadHoldings()
   }, [loadHoldings])
+
+  // Load benchmark data after holdings are loaded
+  useEffect(() => {
+    if (!loading && holdings.length > 0) {
+      loadBenchmarkComparison(benchmarkPeriod.id)
+    }
+  }, [loading, holdings.length, benchmarkPeriod.id, loadBenchmarkComparison])
+
+  function handleBenchmarkPeriodChange(period: TimePeriod) {
+    setBenchmarkPeriod(period)
+    // Data will reload via the useEffect above
+  }
 
   // Push a history entry when a modal opens so the back button closes the modal
   // instead of navigating away. After form submission, replace the entry to
@@ -174,7 +224,7 @@ export default function HoldingsPage() {
     return date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
   }, [])
 
-  // Refresh all prices
+  // Refresh all prices from Yahoo Finance
   async function handleRefreshPrices() {
     setRefreshing(true)
     setRefreshResult(null)
@@ -192,9 +242,24 @@ export default function HoldingsPage() {
 
       const data = await res.json()
 
+      // Capture daily change data from refresh results
+      if (data.results && Array.isArray(data.results)) {
+        const updates = new Map<string, HoldingPriceUpdate>()
+        for (const r of data.results) {
+          if (r.status === 'updated' && r.dailyChangePercent !== undefined) {
+            updates.set(r.id, {
+              id: r.id,
+              dailyChangePercent: r.dailyChangePercent ?? null,
+              previousClose: r.previousClose ?? null,
+            })
+          }
+        }
+        setPriceUpdates(updates)
+      }
+
       if (data.summary?.updated > 0) {
         setRefreshResult({
-          message: data.message || 'Prijzen bijgewerkt',
+          message: data.message || 'Prijzen bijgewerkt via Yahoo Finance',
           type: 'success',
         })
         // Reload holdings to get new prices
@@ -242,6 +307,25 @@ export default function HoldingsPage() {
       })
       .filter((h) => h.value > 0)
       .sort((a, b) => b.value - a.value)
+  }, [holdings])
+
+  // Compute holdings data for portfolio allocation visualization (with classification)
+  const holdingsForAllocation: HoldingForAllocation[] = useMemo(() => {
+    return holdings
+      .map((h) => {
+        const price = h.current_price ?? h.avg_purchase_price
+        const value = price * Math.max(0, h.units)
+        return {
+          id: h.id,
+          name: h.name,
+          ticker: h.ticker,
+          value,
+          asset_class: h.asset_class || null,
+          sector: h.sector || null,
+          geography: h.geography || null,
+        }
+      })
+      .filter((h) => h.value > 0)
   }, [holdings])
 
   if (loading) {
@@ -362,35 +446,29 @@ export default function HoldingsPage() {
         </div>
       </section>
 
-      {/* Portfolio allocation chart */}
-      {allocationData.length > 0 && (
+      {/* Portfolio allocation visualization — donut chart with sector/geography/asset class views */}
+      {holdingsForAllocation.length > 0 && (
         <section className="mt-6 rounded-2xl border border-zinc-200 bg-white p-6" data-testid="portfolio-allocation">
           <div className="flex items-center gap-2 mb-4">
             <PieChart className="h-4 w-4 text-amber-600" />
             <h2 className="text-sm font-semibold text-zinc-700">Portfolio verdeling</h2>
           </div>
-          <div className="flex items-center gap-6">
-            <HoldingsAllocationPie holdings={allocationData} total={totalValue} />
-            <div className="flex-1 space-y-1.5 max-h-48 overflow-y-auto">
-              {allocationData.map((h, i) => {
-                const pct = totalValue > 0 ? (h.value / totalValue) * 100 : 0
-                return (
-                  <div key={h.id} className="flex items-center gap-2">
-                    <span
-                      className="inline-block h-3 w-3 rounded-sm shrink-0"
-                      style={{ backgroundColor: HOLDING_COLORS[i % HOLDING_COLORS.length] }}
-                    />
-                    <span className="flex-1 text-xs text-zinc-600 truncate">
-                      {h.name}
-                      {h.ticker && <span className="ml-1 text-zinc-400">({h.ticker})</span>}
-                    </span>
-                    <span className="text-xs font-medium text-zinc-900 shrink-0">{pct.toFixed(1)}%</span>
-                    <span className="text-xs text-zinc-400 shrink-0">{formatCurrency(h.value)}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+          <PortfolioAllocationVisualization
+            holdings={holdingsForAllocation}
+            totalValue={totalValue}
+          />
+        </section>
+      )}
+
+      {/* Benchmark comparison */}
+      {holdings.length > 0 && (
+        <section className="mt-6">
+          <BenchmarkComparisonChart
+            comparison={benchmarkComparison}
+            onPeriodChange={handleBenchmarkPeriodChange}
+            activePeriod={benchmarkPeriod}
+            loading={benchmarkLoading}
+          />
         </section>
       )}
 
@@ -433,6 +511,9 @@ export default function HoldingsPage() {
           const returnPct = cost > 0 ? ((value - cost) / cost) * 100 : 0
           const stale = isPriceStale(holding)
           const soldOut = holding.units <= 0
+          // Daily change: prefer DB column, fallback to refresh result
+          const priceUpdate = priceUpdates.get(holding.id)
+          const dailyPct = holding.daily_change_percent ?? priceUpdate?.dailyChangePercent ?? null
 
           return (
             <div
@@ -501,9 +582,19 @@ export default function HoldingsPage() {
                   {formatCurrency(Math.max(0, value))}
                   {stale && !soldOut && <span className="text-[10px] font-normal text-amber-500 block">laatste bekende prijs</span>}
                 </p>
+                {/* Daily change from price feed */}
+                {dailyPct !== null && !soldOut && !stale && (
+                  <p
+                    className={`text-[11px] font-semibold ${dailyPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}
+                    data-testid={`holding-daily-change-${holding.id}`}
+                  >
+                    {dailyPct >= 0 ? '▲' : '▼'} {dailyPct >= 0 ? '+' : ''}{dailyPct.toFixed(2)}% vandaag
+                  </p>
+                )}
+                {/* Total return */}
                 {cost > 0 && !soldOut && (
                   <p className={`text-xs font-medium ${returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}%
+                    {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}% totaal
                   </p>
                 )}
               </div>

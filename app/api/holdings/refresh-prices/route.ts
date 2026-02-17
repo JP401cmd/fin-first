@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { fetchPriceData } from '@/lib/price-feed'
 
 /**
  * POST /api/holdings/refresh-prices — Attempt to refresh prices for holdings.
@@ -81,49 +82,87 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      // Attempt to fetch price from an external API
+      // Attempt to fetch price from Yahoo Finance API
       // This is designed to gracefully handle failures
       try {
-        const price = await fetchTickerPrice(holding.ticker || holding.isin || '')
+        const priceData = await fetchPriceData(holding.ticker || holding.isin || '')
 
-        if (price !== null) {
+        if (priceData !== null) {
           // Successfully got a price — update the holding
+          const updateFields: Record<string, unknown> = {
+            current_price: priceData.price,
+            last_price_update: new Date().toISOString(),
+          }
+
+          // Store previous_close and daily change if available
+          if (priceData.previousClose !== null) {
+            updateFields.previous_close = priceData.previousClose
+          }
+          if (priceData.dailyChangePercent !== null) {
+            updateFields.daily_change_percent = priceData.dailyChangePercent
+          }
+
           const { error: updateError } = await supabase
             .from('holdings')
-            .update({
-              current_price: price,
-              last_price_update: new Date().toISOString(),
-            })
+            .update(updateFields)
             .eq('id', holding.id)
             .eq('user_id', user.id)
 
           if (updateError) {
-            results.push({
-              id: holding.id,
-              ticker: holding.ticker,
-              status: 'error' as const,
-              error: 'Kon prijs niet opslaan',
-              current_price: holding.current_price,
-              last_price_update: holding.last_price_update,
-            })
-          } else {
-            // Also sync linked asset
-            if (holding.id) {
-              const newValue = price * (holding.units || 1)
+            // If the columns don't exist yet, try without them
+            const { error: fallbackError } = await supabase
+              .from('holdings')
+              .update({
+                current_price: priceData.price,
+                last_price_update: new Date().toISOString(),
+              })
+              .eq('id', holding.id)
+              .eq('user_id', user.id)
+
+            if (fallbackError) {
+              results.push({
+                id: holding.id,
+                ticker: holding.ticker,
+                status: 'error' as const,
+                error: 'Kon prijs niet opslaan',
+                current_price: holding.current_price,
+                last_price_update: holding.last_price_update,
+              })
+              continue
+            }
+          }
+
+          // Also sync linked asset value
+          if (holding.id) {
+            const newValue = priceData.price * (holding.units || 1)
+            // Use asset_id if available, otherwise skip
+            const { data: holdingFull } = await supabase
+              .from('holdings')
+              .select('asset_id')
+              .eq('id', holding.id)
+              .single()
+
+            if (holdingFull?.asset_id) {
               await supabase
                 .from('assets')
                 .update({ current_value: newValue })
+                .eq('id', holdingFull.asset_id)
                 .eq('user_id', user.id)
             }
-
-            results.push({
-              id: holding.id,
-              ticker: holding.ticker,
-              status: 'updated' as const,
-              price,
-              last_price_update: new Date().toISOString(),
-            })
           }
+
+          results.push({
+            id: holding.id,
+            ticker: holding.ticker,
+            status: 'updated' as const,
+            price: priceData.price,
+            previousClose: priceData.previousClose,
+            dailyChange: priceData.dailyChange,
+            dailyChangePercent: priceData.dailyChangePercent,
+            currency: priceData.currency,
+            displayName: priceData.displayName,
+            last_price_update: new Date().toISOString(),
+          })
         } else {
           // Price API returned null — price feed unavailable for this ticker
           results.push({
@@ -244,35 +283,5 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-/**
- * Attempt to fetch a ticker price from external market data.
- *
- * This function attempts to get a real-time price. When the external API
- * is unavailable, unreachable, or returns an error, it returns null rather
- * than throwing — allowing the caller to gracefully fall back to the last
- * known price.
- *
- * In production, this would connect to a real market data provider
- * (e.g., Yahoo Finance, Alpha Vantage, IEX Cloud). Currently returns null
- * to simulate "price feed unavailable", which triggers the stale price UX.
- */
-async function fetchTickerPrice(ticker: string): Promise<number | null> {
-  // The price feed is "unavailable" — return null to trigger stale price handling
-  // This simulates the real-world scenario where the external API is down
-  // In a production environment, this would be:
-  //
-  // try {
-  //   const res = await fetch(`https://api.marketdata.com/v1/quote/${encodeURIComponent(ticker)}`, {
-  //     headers: { 'Authorization': `Bearer ${process.env.MARKET_DATA_API_KEY}` },
-  //     signal: AbortSignal.timeout(5000),
-  //   })
-  //   if (!res.ok) return null
-  //   const data = await res.json()
-  //   return data.price ?? null
-  // } catch {
-  //   return null  // Network error, timeout, etc. — gracefully degrade
-  // }
-
-  void ticker // Acknowledge parameter usage
-  return null  // Price feed unavailable — triggers stale price handling
-}
+// fetchTickerPrice is now imported from @/lib/price-feed
+// The real Yahoo Finance integration replaces the previous placeholder

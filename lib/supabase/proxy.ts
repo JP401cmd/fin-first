@@ -99,6 +99,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-network-error-import',
     '/test-import-validation',
     '/test-portfolio-allocation',
+    '/api/verify-portfolio-allocation-viz',
+    '/api/portfolio-allocation',
     '/test-f96',
     '/test-500-error',
     '/test-500-error/render-error',
@@ -352,6 +354,9 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-holdings-crud-mgmt',
     '/test-holding-tx-log',
     '/api/verify-holding-tx-log',
+    '/test-benchmark-comparison',
+    '/api/verify-benchmark-comparison',
+    '/api/verify-price-feed',
   ]
 
   // Protected route prefixes that require authentication
