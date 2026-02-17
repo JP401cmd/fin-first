@@ -1,3 +1,40 @@
+## Session 2026-02-17 - Feature #180
+
+### Feature #180: Freedom-time in De Kern overview hero - PASSING
+- Modified De Kern overview hero section (app/(app)/core/page.tsx) with three key changes:
+  1. **Net worth freedom subtitle**: Added "dat is X jaar en Y maanden vrijheid" subtitle under net worth metric
+     - Conditional: only shows years when > 0 (e.g., "dat is 3 maanden vrijheid" for <1 year)
+     - Uses data-testid="net-worth-freedom-subtitle" for testing
+  2. **Removed "Verwachte FIRE" metric**: FIRE belongs to Horizon module only, removed from Kern hero
+  3. **Added "Vrijheidstijd opgebouwd"**: Unique Kern metric replacing FIRE display
+     - Shows Xj Ymnd format with "vrijheid die je bezit" subtitle
+     - Uses data-testid="vrijheidstijd-opgebouwd" for testing
+  4. **Added "Autonomiescore"**: Replaces FIRE column with autonomy grade (A+ to E) and free days/year
+- Hero section maintains 3-column grid layout (sm:grid-cols-3)
+- Amber color theme preserved (from-amber-950 via-amber-900 to-amber-950 gradient)
+- Freedom time calculations use real daily expenses from computeCoreData (netWorth / yearlyExpenses)
+- Cleaned unused FreedomTimeLabel import (only FreedomTimeBadge kept, still used elsewhere)
+- 10/10 verification tests passing at /api/verify-kern-hero
+- Zero console errors
+- No mock data patterns found
+
+### Changes Made
+- app/(app)/core/page.tsx: Restructured hero grid (removed FIRE, added Vrijheidstijd opgebouwd & Autonomiescore)
+- app/api/verify-kern-hero/route.ts: Created 10-test verification endpoint
+- app/test-kern-hero/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+
+### Current Status
+- 172/265 features passing (171 before + #180)
+- Feature #180 completed and marked passing
+
+### Notes for Next Session
+- Port 3000 used this session
+- No confirmed test users available (Supabase email rate limit)
+- The hero section still shows freedomPercentage from FIRE calculation as the main hero metric (X% vrijheid bereikt)
+  - This is fine because it's about "freedom reached" not about FIRE date
+- The Horizon module should have the FIRE-specific metrics (expectedFireDate, yearsToFire, monthsToFire)
+
 ## Session 2026-02-17 - Feature #179
 
 ### Feature #179: Freedom-time subtitles on Dashboard module cards - PASSING
