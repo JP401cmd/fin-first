@@ -1,3 +1,43 @@
+## Session 2026-02-17 - Feature #214
+
+### Feature #214: Debt balance trajectory visualization - PASSING
+- Verified all 6 feature steps implemented:
+  1. **Line chart showing debt balance over time**: DebtTrajectoryChart component (SVG) in debts/page.tsx with actual balance line (blue solid) and projected payoff (amber dashed)
+  2. **Overlay projected payoff from debtProjection()**: Uses amortizationSchedule, linearAmortization, interestOnlySchedule based on repayment_type
+  3. **Actual vs projected comparison**: Two distinct SVG paths with different styles, "vandaag" transition marker, gradient fills
+  4. **Mini sparkline on debt card**: New DebtMiniSparkline component showing balance trend with correct color logic (green = debt decreasing = good)
+  5. **Auto-track balance changes in valuations**: DebtForm.handleSave() upserts to valuations table when current_balance changes, ValuationModal also tracks
+  6. **Chart uses real data**: Queries debts and valuations from Supabase, no mock data patterns
+
+#### New Components/Changes:
+- **DebtMiniSparkline**: SVG sparkline (64x24) with gradient fill, last-point dot, green/red trend coloring
+- **loadAllDebtValuations**: Bulk-loads all debt valuations on page mount, groups by entity_id for sparkline display
+- Updated debt card layout to include sparkline between name/info and balance amounts
+- Added data-testid attributes: debt-card-{id}, debt-sparkline-{id}
+
+#### Verification:
+- 14/14 API tests passing at /api/verify-debt-trajectory
+- 10/10 visual tests on /test-debt-trajectory (3 chart types: annuity, aflossingsvrij, linear)
+- Zero console errors in production code (only hydration mismatch in test page from Date.now())
+- No mock data patterns found
+- TypeScript compiles clean (no errors in debts/page.tsx)
+
+### Changes Made
+- app/(app)/core/debts/page.tsx: Added DebtMiniSparkline component, loadAllDebtValuations function, integrated sparkline on debt cards
+- app/api/verify-debt-trajectory/route.ts: Updated to 14-test verification for feature #214
+- Commit: 5e2b6ba
+
+### Current Status
+- 209/265 features passing (208 before + #214)
+- Feature #214 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- DebtTrajectoryChart was already built from feature #125; this session added sparklines and bulk valuation loading
+- loadAllDebtValuations loads ALL debt valuations at page mount (not per-debt)
+- Sparkline hidden on mobile (sm:block) to keep cards compact
+- Auto-valuation tracking already present in DebtForm.handleSave() and ValuationModal
+
 ## Session 2026-02-17 - Feature #212
 
 ### Feature #212: 12-month budget spending trend sparklines - PASSING
