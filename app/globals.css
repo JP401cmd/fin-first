@@ -32,6 +32,14 @@
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
+/* Feature spotlight tooltip animation */
+@keyframes spotlight-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in {
+  animation: spotlight-fade-in 0.3s ease-out forwards;
+}
 @keyframes scroll-pulse {
   0%, 100% { opacity: 0.3; }
   50% { opacity: 0.7; }

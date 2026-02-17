@@ -1,3 +1,36 @@
+## Session 2026-02-17 - Feature #196
+
+### Feature #196: Meer functies beschikbaar footer on gated pages - PASSING
+- LockedFeaturesFooter component already existed at components/app/locked-features-footer.tsx
+- Component shows "X meer functies beschikbaar op niveau Y" when page has locked features
+- Clicking footer opens BottomSheet with locked features grouped by unlock phase
+- Footer hides itself when all features on the page are already visible (lockedFeatures.length === 0)
+- Styled with module-specific colors: amber (kern), teal (wil), purple (horizon)
+- Already integrated on 3 main pages: /core (kern), /will (wil), /horizon (horizon)
+- Added optional `featureIds?: string[]` prop for sub-pages with specific gated features
+- Added LockedFeaturesFooter to /core/debts page with featureIds=['schulden_aflosplan']
+- 12/12 verification tests passing at /api/verify-locked-footer
+- Zero console errors
+- No mock data patterns found
+
+### Changes Made
+- components/app/locked-features-footer.tsx: Added optional featureIds prop for sub-page support
+- app/(app)/core/debts/page.tsx: Added LockedFeaturesFooter with specific featureIds
+- app/api/verify-locked-footer/route.ts: Created 12-test verification endpoint
+- app/test-locked-footer/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: d97664b
+
+### Current Status
+- 188/265 features passing (187 before + #196)
+- Feature #196 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- No confirmed test users available for authenticated browser testing (Supabase email rate limit)
+- The belasting page wraps entire content in FeatureGate (box3_belasting), so footer is not needed there
+- schulden_aflosplan is already listed under 'wil' in MODULE_FEATURES but used on /core/debts page
+
 ## Session 2026-02-17 - Feature #195
 
 ### Feature #195: Jouw Pad progress widget on Dashboard - PASSING
