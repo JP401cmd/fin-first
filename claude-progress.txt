@@ -1,3 +1,42 @@
+## Session 2026-02-17 - Feature #198
+
+### Feature #198: Smart Volgende Stap next step engine - PASSING
+- NextStepCard component already existed with full structure at components/app/next-step-card.tsx
+- NextStepSection manages dismiss/complete state with API persistence
+- Three compute functions: computeAllKernSteps, computeAllWilSteps, computeAllHorizonSteps
+
+#### Changes Made:
+1. **Added budget attention step** - New 'budget_attention' step key that shows "X budgetten hebben aandacht nodig" when budgets exceed their spending limits
+2. **Updated step titles to match spec**:
+   - 'Importeer je transacties' → 'Importeer je eerste bankafschrift'
+   - 'Voeg je assets toe' → 'Voeg je vermogen toe'
+   - 'Stel je eerste doel' → 'Stel je eerste doel in'
+3. **Core page passes alertBudgetCount** to computeAllKernSteps for dynamic budget alerts
+4. **Extended valid step keys** in /api/next-steps/complete for all module steps
+5. **Created verification endpoint** at /api/verify-smart-next-step (14 tests all passing)
+6. **Created test page** at /test-smart-next-step with 6 scenarios
+
+#### Feature Verification (all 10 steps):
+1. ✅ NextStepCard component exists and renders correctly
+2. ✅ Algorithm evaluates user data completeness (transactions, budgets, assets, debts, goals, snapshots)
+3. ✅ Shows 'Importeer je eerste bankafschrift' when no transactions
+4. ✅ Shows 'Voeg je vermogen toe' when no assets
+5. ✅ Shows budget attention alerts when budgets over limit
+6. ✅ Shows 'Stel je eerste doel in' when no goals
+7. ✅ Card placed below hero on /core, /will, /horizon
+8. ✅ Limited to 1 suggestion per page (NextStepSection shows first non-dismissed step)
+9. ✅ Dismiss functionality with X button, optimistic UI update
+10. ✅ Persistence via API (/api/next-steps/dismiss, /api/next-steps/complete, table: next_step_completions)
+
+- Browser verified: all 6 scenarios render correctly with proper module colors
+- No mock data patterns found
+- 14/14 API verification tests passing
+- Commit: 6662f62
+
+### Current Status
+- 190/265 features passing (189 before + #198)
+- Feature #198 completed and committed
+
 ## Session 2026-02-17 - Feature #200
 
 ### Feature #200: Collapsible deep-dive sections - PASSING
