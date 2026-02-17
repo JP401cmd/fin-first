@@ -1,3 +1,44 @@
+## Session 2026-02-17 - Feature #225
+
+### Feature #225: Freedom percentage milestone forecast - PASSING
+- Implemented complete freedom milestone forecast system with all 6 feature steps:
+  1. **Calculate projected dates for 25%, 50%, 75%, 100% freedom milestones**: `computeFreedomMilestones()` in lib/freedom-milestones.ts uses same inflation-adjusted compound growth model as computeFireProjection()
+  2. **Create milestone timeline visualization**: Vertical timeline in JouwPadWidget with icons (check/clock/target/ban), color-coded backgrounds, and dates
+  3. **Show on Dashboard in 'Jouw Pad' widget**: Milestones computed server-side from real data and passed as props; displayed as "VRIJHEIDSMIJLPALEN" section
+  4. **Display contextual message per milestone with estimated date**: Dutch messages like "Je bereikt 50% vrijheid rond oktober 2030" with highlighted next milestone
+  5. **Update projections when financial data changes**: Pure computation from current netWorth, monthlyExpenses, monthlySavings — recalculated on every page load
+  6. **Handle edge cases: already past milestones, unreachable milestones**: Handles zero expenses, zero savings, negative savings, all reached, partial reached
+
+#### New Files:
+- **lib/freedom-milestones.ts**: `computeFreedomMilestones()` — pure function, no Supabase dependency
+- **app/api/verify-freedom-milestones/route.ts**: 12-test verification endpoint
+- **app/test-freedom-milestones/page.tsx**: Visual test page with 5 demo scenarios
+
+#### Modified Files:
+- **components/app/jouw-pad-widget.tsx**: Added milestones timeline section with icons, dates, next milestone message
+- **app/(app)/dashboard/page.tsx**: Compute milestones and pass to JouwPadWidget
+- **lib/supabase/proxy.ts**: Added test routes to public paths
+
+#### Verification:
+- 12/12 API verification tests passing at /api/verify-freedom-milestones
+- Visual test page at /test-freedom-milestones with 5 scenarios all rendering correctly
+- Zero console errors (0 errors, 0 warnings)
+- No mock data patterns found
+- Commit: cd1c11d
+
+### Current Status
+- 219/265 features passing (218 before + #225)
+- Feature #225 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- Milestones use same math as FIRE projection: inflation-adjusted real return, monthly compound growth + savings
+- JouwPadWidget milestones prop is optional — backward compatible with existing test page
+- Five milestone states: reached (check), future-reachable (clock/target), unreachable (ban), zero-expenses (ban + guidance)
+- Next milestone message highlighted with purple gradient background and Flag icon
+
+---
+
 ## Session 2026-02-17 - Feature #224
 
 ### Feature #224: Net worth growth projection - PASSING
