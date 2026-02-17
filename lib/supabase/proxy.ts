@@ -296,6 +296,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-smart-next-step',
     '/test-discover-carousel-201',
     '/api/verify-discover-carousel-201',
+    '/test-mission-control',
+    '/api/verify-mission-control',
   ]
 
   // Protected route prefixes that require authentication
