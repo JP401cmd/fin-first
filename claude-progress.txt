@@ -1,3 +1,56 @@
+## Session 2026-02-17 - Feature #204
+
+### Feature #204: Badge evaluation engine - PASSING
+- Built background badge evaluation engine with triggers after key actions
+- Enhanced POST /api/badges/evaluate to accept optional `trigger` parameter
+  - Valid triggers: login, action_complete, import, month_close, page_load, manual
+  - Trigger included in response for tracking/debugging
+
+#### Trigger Integration Points:
+1. **Login**: app/login/page.tsx — calls /api/badges/evaluate with trigger: 'login' after successful signInWithPassword (fire-and-forget)
+2. **Action completion**: components/app/action-board.tsx — imports useBadgeEvaluation hook, calls evaluateBadges('action_complete') when handleStatusChange sets status to 'completed'
+3. **Bank file import**: app/(app)/core/cash/import/page.tsx — calls /api/badges/evaluate with trigger: 'import' after successful import (setStep(4))
+4. **Month close/snapshot**: app/api/snapshots/auto/route.ts and app/api/snapshots/route.ts — server-side fetch to /api/badges/evaluate with trigger: 'month_close' after snapshot creation
+5. **Page load**: components/app/badge-evaluator.tsx — passes 'page_load' trigger (already on dashboard and identity pages)
+
+#### Key Design Decisions:
+- All triggers are fire-and-forget (.catch(() => {})) — badges are non-critical, should never block main flow
+- Login and import triggers use direct fetch() calls (no hook dependency needed)
+- Action completion uses the useBadgeEvaluation hook for toast notifications
+- Snapshot triggers use server-side fetch with cookie forwarding for auth context
+- useBadgeEvaluation hook updated to accept trigger parameter (typed as BadgeEvaluationTrigger)
+- Existing idempotency preserved: Set<string> of existing slugs, 11 existingEarned.has() checks
+
+#### Verification:
+- 12/12 tests passing at /api/verify-badge-evaluation-engine
+- Zero console errors
+- No mock data patterns found
+- Browser verified with playwright
+
+### Changes Made
+- app/api/badges/evaluate/route.ts: Added VALID_TRIGGERS, trigger parsing from request body, trigger in all responses
+- lib/hooks/use-badge-evaluation.ts: Added BadgeEvaluationTrigger type, trigger parameter to evaluateBadges()
+- components/app/badge-evaluator.tsx: Pass 'page_load' trigger
+- app/login/page.tsx: Fire-and-forget badge evaluation after login
+- components/app/action-board.tsx: Import useBadgeEvaluation, trigger on action completion
+- app/(app)/core/cash/import/page.tsx: Fire-and-forget badge evaluation after import
+- app/api/snapshots/auto/route.ts: Server-side badge evaluation after auto-snapshot
+- app/api/snapshots/route.ts: Server-side badge evaluation after manual snapshot
+- app/api/verify-badge-evaluation-engine/route.ts: 12-test verification endpoint
+- app/test-badge-evaluation-engine/page.tsx: Visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: 22af44d
+
+### Current Status
+- 196/265 features passing (195 before + #204)
+- Feature #204 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- Badge evaluation engine is fully integrated with all 5 trigger points
+- The evaluate endpoint accepts any valid trigger parameter but defaults to 'manual'
+- Other agents also modified some badge-related files (badge slugs renamed), evaluation logic adapted accordingly
+
 ## Session 2026-02-17 - Feature #202
 
 ### Feature #202: Consistent section ordering across modules - PASSING
