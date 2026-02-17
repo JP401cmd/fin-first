@@ -290,6 +290,12 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-locked-footer',
     '/test-feature-roadmap',
     '/api/verify-feature-roadmap',
+    '/test-collapsible-sections',
+    '/api/verify-collapsible-sections',
+    '/test-smart-next-step',
+    '/api/verify-smart-next-step',
+    '/test-discover-carousel-201',
+    '/api/verify-discover-carousel-201',
   ]
 
   // Protected route prefixes that require authentication
