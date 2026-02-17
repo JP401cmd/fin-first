@@ -1,3 +1,31 @@
+## Session 2026-02-17 - Feature #218
+
+### Feature #218: Net worth milestone markers on chart - PASSING
+- Verified all 5 feature steps already implemented in core/page.tsx:
+  1. **Detect milestone crossings**: `detectMilestones()` compares consecutive snapshots to find threshold crossings
+  2. **Visual markers on chart**: Diamond shapes, vertical dashed lines, flag emoji icons, "Mijlpalen" legend entry
+  3. **Show date reached**: Tooltip with nl-NL date formatting + milestone summary pills below chart ("Bereikte mijlpalen")
+  4. **Badge system connection**: `badgeSlug` mapping, fetches from badges/user_badges tables, 🏅 indicator shown
+  5. **All milestones**: €10K, €25K, €50K, €100K, €250K, €500K, €1M + zero-crossing + FIRE percentage milestones
+
+#### Verification:
+- Existing /api/verify-milestone-markers: 12/12 tests passing
+- New /api/verify-net-worth-milestones: 7/7 tests passing (code analysis of all 5 feature steps)
+- Zero console errors
+- No mock data patterns found
+- Commit: 74b6081
+
+### Current Status
+- 212/265 features passing (211 before + #218)
+- Feature #218 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session (existing server)
+- The milestone implementation was built as part of feature #127 and fully covers #218 requirements
+- NetWorthChart component in core/page.tsx contains: getNetWorthMilestones(), detectMilestones(), milestone rendering
+
+---
+
 ## Session 2026-02-17 - Feature #216
 
 ### Feature #216: Freedom days monthly trend for De Wil - PASSING
