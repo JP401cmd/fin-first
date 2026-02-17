@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { X, Plus, Check, ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
+import { X, Plus, Check, ChevronDown, ChevronUp, Trash2, BarChart3 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
   type Goal, type GoalType, GOAL_TYPE_LABELS,
@@ -9,6 +9,7 @@ import {
 } from '@/lib/goal-data'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { GoalForm } from '@/components/app/goal-form'
+import { GoalProgressTimeline, buildGoalHistory } from '@/components/app/will/goal-progress-timeline'
 
 type Asset = { id: string; name: string; current_value: number }
 type Debt = { id: string; name: string; current_balance: number }
@@ -267,6 +268,9 @@ function GoalCard({
   const [contribAmount, setContribAmount] = useState('')
   const [contribNotes, setContribNotes] = useState('')
   const [saving, setSaving] = useState(false)
+  const [showTimeline, setShowTimeline] = useState(false)
+  const [timelineHistory, setTimelineHistory] = useState<{ date: string; value: number; source?: string }[]>([])
+  const [timelineLoading, setTimelineLoading] = useState(false)
 
   async function loadContributions() {
     const supabase = createClient()
@@ -277,6 +281,30 @@ function GoalCard({
       .order('date', { ascending: false })
       .limit(10)
     setContributions((data ?? []) as GoalContribution[])
+  }
+
+  async function loadTimeline() {
+    setTimelineLoading(true)
+    try {
+      const supabase = createClient()
+      // Load all contributions for this goal (not just latest 10)
+      const { data: allContribs } = await supabase
+        .from('goal_contributions')
+        .select('amount, date')
+        .eq('goal_id', goal.id)
+        .order('date', { ascending: true })
+
+      const contribs = (allContribs ?? []) as { amount: number; date: string }[]
+      const history = buildGoalHistory(goal, contribs)
+      setTimelineHistory(history)
+    } catch {
+      // Fallback: just show current value
+      setTimelineHistory([
+        { date: goal.created_at.split('T')[0], value: 0, source: 'initial' },
+        { date: new Date().toISOString().split('T')[0], value: Number(goal.current_value), source: 'current' },
+      ])
+    }
+    setTimelineLoading(false)
   }
 
   async function addContribution() {
@@ -411,6 +439,34 @@ function GoalCard({
             </button>
           )}
         </div>
+      </div>
+
+      {/* Timeline chart section */}
+      <div className="border-t border-zinc-100 px-4 py-2" data-testid={`goal-timeline-section-${goal.id}`}>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            if (!showTimeline) loadTimeline()
+            setShowTimeline(v => !v)
+          }}
+          className="flex items-center gap-1 text-[10px] font-medium text-teal-600 hover:text-teal-700"
+        >
+          <BarChart3 className="h-3 w-3" />
+          Voortgang over tijd
+          {showTimeline ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        </button>
+
+        {showTimeline && (
+          <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+            {timelineLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
+              </div>
+            ) : (
+              <GoalProgressTimeline goal={goal} history={timelineHistory} />
+            )}
+          </div>
+        )}
       </div>
 
       {/* Contribution section — only for non-linked, non-completed goals */}

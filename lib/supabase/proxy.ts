@@ -332,6 +332,8 @@ export async function updateSession(request: NextRequest) {
     '/test-goal-timeline',
     '/api/verify-goal-timeline',
     '/api/goals/history',
+    '/test-resilience-history',
+    '/api/verify-resilience-history',
   ]
 
   // Protected route prefixes that require authentication
