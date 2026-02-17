@@ -12,7 +12,7 @@ import type { Budget } from '@/lib/budget-data'
 import type { NetWorthSnapshot } from '@/lib/net-worth-data'
 import {
   Calendar, TrendingUp, Sun, Star, Wallet, ShoppingCart,
-  PiggyBank, Building2, ArrowRight, Info, Camera, Download, ChevronDown, Receipt, Flag,
+  PiggyBank, Building2, ArrowRight, Info, Camera, Download, ChevronDown, Receipt, Flag, BarChart3,
 } from 'lucide-react'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { CollapsibleSection } from '@/components/app/collapsible-section'
@@ -35,6 +35,7 @@ export default function CorePage() {
   const [budgetCount, setBudgetCount] = useState(0)
   const [hasTransactions, setHasTransactions] = useState(false)
   const [earnedBadges, setEarnedBadges] = useState<{ slug: string; earned_at: string }[]>([])
+  const [netWorthGrowth, setNetWorthGrowth] = useState<{ amount: number; percentage: number; period: string } | null>(null)
 
   const loadData = useCallback(async () => {
     try {
@@ -221,7 +222,39 @@ export default function CorePage() {
       }
 
       if (snapshotResult.data) {
-        setSnapshots(snapshotResult.data as NetWorthSnapshot[])
+        const snaps = snapshotResult.data as NetWorthSnapshot[]
+        setSnapshots(snaps)
+
+        // Calculate net worth growth trend from snapshots
+        if (snaps.length >= 2) {
+          const latest = snaps[snaps.length - 1]
+          const latestNW = Number(latest.net_worth)
+          // Try to find snapshot ~3 months ago for quarterly trend, else use earliest
+          const threeMonthsAgo = new Date()
+          threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+          const threeMonthsAgoStr = threeMonthsAgo.toISOString().split('T')[0]
+          let compareSnap = snaps[0] // default: earliest
+          let periodLabel = ''
+          // Find closest snapshot to 3 months ago
+          for (const s of snaps) {
+            if (s.snapshot_date <= threeMonthsAgoStr) {
+              compareSnap = s
+            }
+          }
+          const compareNW = Number(compareSnap.net_worth)
+          const growthAmount = latestNW - compareNW
+          const growthPct = compareNW !== 0 ? ((latestNW - compareNW) / Math.abs(compareNW)) * 100 : 0
+          // Determine period label
+          const compareDate = new Date(compareSnap.snapshot_date)
+          const latestDate = new Date(latest.snapshot_date)
+          const diffMs = latestDate.getTime() - compareDate.getTime()
+          const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
+          if (diffDays <= 40) periodLabel = 'afgelopen maand'
+          else if (diffDays <= 100) periodLabel = 'afgelopen kwartaal'
+          else if (diffDays <= 200) periodLabel = `afgelopen ${Math.round(diffDays / 30)} maanden`
+          else periodLabel = `afgelopen ${Math.round(diffDays / 30)} maanden`
+          setNetWorthGrowth({ amount: growthAmount, percentage: growthPct, period: periodLabel })
+        }
       }
 
       // Fetch earned badges for milestone markers on net worth chart
@@ -331,7 +364,7 @@ export default function CorePage() {
             </div>
             <div className="mt-2 flex justify-between text-xs text-amber-300/50">
               <span>0%</span>
-              <span>{formatCurrency(data.fireTarget)} doel</span>
+              <span>{formatCurrency(data.fireTarget)} — volledige vrijheid</span>
               <span>100%</span>
             </div>
           </div>
@@ -381,8 +414,8 @@ export default function CorePage() {
       )}
 
       {/* === KPI Stat Cards === */}
-      <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+      <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5" data-testid="kern-kpi-grid">
+        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-dagen-gewonnen">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
               <Calendar className="h-5 w-5 text-amber-600" />
@@ -396,7 +429,7 @@ export default function CorePage() {
           <p className="mt-1 text-xs text-emerald-600">deze maand</p>
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-spaarquote">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
               <TrendingUp className="h-5 w-5 text-amber-600" />
@@ -412,7 +445,7 @@ export default function CorePage() {
           </p>
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-vrije-dagen">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
               <Sun className="h-5 w-5 text-amber-600" />
@@ -424,7 +457,7 @@ export default function CorePage() {
           <p className="mt-1 text-xs text-zinc-400">gedekt door passief inkomen</p>
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-autonomie-score">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
               <Star className="h-5 w-5 text-amber-600" />
@@ -441,6 +474,31 @@ export default function CorePage() {
              data.autonomyScore === 'D' ? 'vroeg stadium — groei zit erin' :
              'begin je reis'}
           </p>
+        </div>
+
+        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-vermogensgroei">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
+              <BarChart3 className="h-5 w-5 text-amber-600" />
+            </div>
+            <KpiTooltip text="De groei van je netto vermogen over tijd. Gebaseerd op je snapshots. Positieve groei = je bouwt vrijheid op." />
+          </div>
+          <p className="text-sm font-medium text-zinc-500">Vermogensgroei</p>
+          {netWorthGrowth ? (
+            <>
+              <p className={`mt-1 text-3xl font-bold ${netWorthGrowth.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {netWorthGrowth.amount >= 0 ? '+' : ''}{netWorthGrowth.percentage.toFixed(1)}%
+              </p>
+              <p className="mt-1 text-xs text-zinc-400">
+                {netWorthGrowth.amount >= 0 ? '+' : ''}{formatCurrency(netWorthGrowth.amount)} {netWorthGrowth.period}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="mt-1 text-3xl font-bold text-zinc-400">&mdash;</p>
+              <p className="mt-1 text-xs text-zinc-400">maak minimaal 2 snapshots</p>
+            </>
+          )}
         </div>
       </section>
 

@@ -233,9 +233,9 @@ export default function AssetsPage() {
       <section className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-zinc-900">Assets</h1>
+            <h1 className="text-xl font-bold text-zinc-900">Bezittingen</h1>
             <p className="mt-1 text-sm text-zinc-500">
-              {activeAssets.length} actieve asset{activeAssets.length !== 1 ? 's' : ''}
+              {activeAssets.length} actieve bezitting{activeAssets.length !== 1 ? 'en' : ''} — opgeslagen vrijheid
             </p>
           </div>
           <div className="flex items-center gap-2">
