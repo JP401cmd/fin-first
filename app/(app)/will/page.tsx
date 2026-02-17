@@ -24,6 +24,7 @@ import { CollapsibleSection } from '@/components/app/collapsible-section'
 import { DiscoverCarousel } from '@/components/app/discover-carousel'
 import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
 import { NextStepSection, computeAllWilSteps } from '@/components/app/next-step-card'
+import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-animation'
 
 type KpiData = {
   completedActions: { id: string; status: string; freedom_days_impact: number; source: string; completed_at: string | null; due_date: string | null; created_at: string; recommendation: { recommendation_type: string }[] | null }[]
@@ -169,6 +170,15 @@ export default function WillPage() {
     (sum, a) => sum + (Number(a.freedom_days_impact) || 0), 0
   )
 
+  // --- Weekly freedom days calculation ---
+  const now = new Date()
+  const weekStart = new Date(now)
+  weekStart.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1)) // Monday
+  weekStart.setHours(0, 0, 0, 0)
+  const weeklyFreedomDaysWon = completedActions
+    .filter(a => a.completed_at && new Date(a.completed_at) >= weekStart)
+    .reduce((sum, a) => sum + (Number(a.freedom_days_impact) || 0), 0)
+
   const openActionDays = openActions.reduce(
     (sum, a) => sum + (Number(a.freedom_days_impact) || 0), 0
   )
@@ -254,6 +264,7 @@ export default function WillPage() {
   }
 
   return (
+    <FreedomDaysAnimationProvider>
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* === 1. Hero (Gradient) === */}
       <section data-testid="wil-hero" className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-950 via-teal-900 to-teal-950 p-5 text-white sm:p-8 md:p-10">
@@ -267,7 +278,7 @@ export default function WillPage() {
             </p>
           </div>
 
-          <div className="mb-6 flex items-baseline gap-2" data-testid="wil-hero-primary-metric">
+          <div className="mb-2 flex items-baseline gap-2" data-testid="wil-hero-primary-metric">
             <span className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl" data-testid="wil-hero-freedom-days-value">
               {totalFreedomDaysWon > 0 ? `+${totalFreedomDaysWon}` : '0'}
             </span>
@@ -275,6 +286,16 @@ export default function WillPage() {
               {totalFreedomDaysWon === 1 ? 'vrijheidsdag gewonnen' : 'vrijheidsdagen gewonnen'}
             </span>
             <HeroTooltip text="Gewonnen vrijheidsdagen komen uitsluitend van voltooide acties in De Wil. Elke afgeronde actie levert concrete vrijheidsdagen op." />
+          </div>
+
+          {/* Weekly freedom days summary */}
+          <div className="mb-6 flex items-center gap-3" data-testid="wil-hero-weekly-summary">
+            <div className="inline-flex items-center gap-2 rounded-full bg-teal-800/50 px-3 py-1.5 backdrop-blur-sm">
+              <Sparkles className="h-3.5 w-3.5 text-teal-300" />
+              <span className="text-sm font-medium text-teal-200" data-testid="weekly-freedom-days-value">
+                Deze week: +{weeklyFreedomDaysWon % 1 === 0 ? weeklyFreedomDaysWon : weeklyFreedomDaysWon.toFixed(1)} {weeklyFreedomDaysWon === 1 ? 'vrijheidsdag' : 'vrijheidsdagen'} gewonnen
+              </span>
+            </div>
           </div>
 
           {/* Progress bar: completion ratio */}
@@ -571,6 +592,7 @@ export default function WillPage() {
       {/* === 10. Discover Carousel === */}
       <DiscoverCarousel module="wil" />
     </div>
+    </FreedomDaysAnimationProvider>
   )
 }
 

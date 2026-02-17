@@ -5,6 +5,7 @@ import { Plus, ChevronDown, ChevronRight, Sparkles } from 'lucide-react'
 import { ActionCard } from '@/components/app/action-card'
 import { ActionForm } from '@/components/app/action-form'
 import { useBadgeEvaluation } from '@/lib/hooks/use-badge-evaluation'
+import { useFreedomDaysAnimation } from '@/components/app/freedom-days-animation'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 
 type ActionBoardProps = {
@@ -17,6 +18,7 @@ export function ActionBoard({ initialActions }: ActionBoardProps) {
   const [showPostponed, setShowPostponed] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
   const { evaluateBadges } = useBadgeEvaluation()
+  const { triggerAnimation } = useFreedomDaysAnimation()
 
   const openActions = actions
     .filter((a) => a.status === 'open')
@@ -59,9 +61,15 @@ export function ActionBoard({ initialActions }: ActionBoardProps) {
       })
     )
 
-    // Trigger badge evaluation after action completion (fire-and-forget)
+    // Trigger badge evaluation and freedom days animation after action completion
     if (status === 'completed') {
       evaluateBadges('action_complete').catch(() => {})
+      // Find the action to get its freedom_days_impact for the animation
+      const completedAction = actions.find((a) => a.id === id)
+      const freedomDays = completedAction?.freedom_days_impact || 0
+      if (freedomDays > 0) {
+        triggerAnimation(freedomDays)
+      }
     }
   }
 
