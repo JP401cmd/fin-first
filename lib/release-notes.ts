@@ -44,6 +44,101 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'fin_prod_0.6',
+    date: '2026-02-18',
+    title: 'Voorspellingen, trendgrafieken & holdings-beheer',
+    sections: [
+      {
+        module: 'De Kern',
+        color: 'amber',
+        items: [
+          {
+            title: 'Netto-vermogen groeiprojectie',
+            description: 'Interactieve 1-5 jaar grafiek op de Kern-pagina die je verwachte vermogensgroei visualiseert op basis van huidige spaarquote en rendement.',
+          },
+          {
+            title: 'Cashflow-prognose 3-6 maanden',
+            description: 'Area chart met verwachte inkomsten en uitgaven voor de komende 3-6 maanden. Waarschuwt automatisch bij verwacht laag saldo.',
+          },
+          {
+            title: 'Budgetvoorspelling volgende maand',
+            description: 'AI-voorspelling van budgetbesteding voor de komende maand op basis van historische patronen en seizoenstrends.',
+          },
+          {
+            title: '12-maanden budget sparklines',
+            description: 'Compacte trendlijnen per budgetcategorie die in een oogopslag de bestedingstrend over het afgelopen jaar tonen.',
+          },
+          {
+            title: 'Mini sparklines op schuldkaarten',
+            description: 'Elke schuldkaart toont nu een mini-trendlijn van het aflosverloop. Waarderingen worden in bulk geladen voor snellere weergave.',
+          },
+          {
+            title: 'Holdings CRUD-beheer',
+            description: 'Volledige CRUD-operaties voor holdings op de asset-detailpagina: toevoegen, bewerken en verwijderen van posities binnen een beleggingsaccount.',
+          },
+          {
+            title: 'Transactielog per holding met P&L',
+            description: 'Elke holding heeft nu een transactielogboek met koop-/verkooptransacties en een lopende winst-en-verliesberekening.',
+          },
+        ],
+      },
+      {
+        module: 'De Wil',
+        color: 'teal',
+        items: [
+          {
+            title: 'AI-bestedingspatroonherkenning',
+            description: 'AI analyseert je transactiegeschiedenis en detecteert terugkerende patronen, seizoenstrends en ongebruikelijke uitgaven met concrete bespaarsuggesties.',
+          },
+          {
+            title: 'Vrijheidsdagen maandtrend',
+            description: 'Staafdiagram op De Wil dat per maand toont hoeveel vrijheidsdagen je netto hebt opgebouwd of verbruikt.',
+          },
+          {
+            title: 'Doelvoortgang tijdlijn',
+            description: 'Tijdlijngrafiek per doel met deadlinemarkers en tempoberichten die aangeven of je op schema ligt, voorloopt of achterloopt.',
+          },
+        ],
+      },
+      {
+        module: 'De Horizon',
+        color: 'purple',
+        items: [
+          {
+            title: 'FIRE-leeftijd historie',
+            description: 'Grafiek die bijhoudt hoe je berekende FIRE-leeftijd over tijd verandert — zie direct het effect van financiele beslissingen op je vrijheidsdatum.',
+          },
+          {
+            title: 'Portfolioprojectie geactiveerd',
+            description: 'De portfolioprojectie op De Horizon toont nu een contextueel bericht bij de verwachte groei van je beleggingsportefeuille.',
+          },
+          {
+            title: 'Schuldaflos-trajectgrafiek',
+            description: 'Vergelijk snowball- en avalanche-strategieen visueel: twee lijnen tonen het aflosverloop en de totale rentekosten per methode.',
+          },
+          {
+            title: 'Vrijheidspercentage mijlpaalvoorspelling',
+            description: 'Het Jouw Pad-widget voorspelt wanneer je de volgende vrijheidsmijlpaal bereikt (25%, 50%, 75%, 100%) op basis van je huidige tempo.',
+          },
+        ],
+      },
+      {
+        module: 'Identiteit',
+        color: 'blue',
+        items: [
+          {
+            title: 'Veerkrachtscore historiegrafiek',
+            description: 'Lijndiagram dat je financiele veerkrachtscore over tijd toont met contextuele berichten over je voortgang.',
+          },
+          {
+            title: 'Netto-vermogen mijlpaalmarkers',
+            description: 'Belangrijke vermogensmijlpalen worden als markers op de vermogensgrafiek getoond zodat je groei tastbaar wordt.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: 'fin_prod_0.5',
     date: '2026-02-15',
     title: 'Beveiliging, gamificatie & data-integriteit',
