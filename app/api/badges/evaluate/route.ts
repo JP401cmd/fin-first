@@ -208,6 +208,88 @@ async function evaluateBadges(
     newlyEarned.push('beslisser')
   }
 
+  // ── 4. Streak-based consistency badges ─────────────────────
+
+  // Try to fetch streak data from user_streaks table
+  const { data: streakData } = await supabase
+    .from('user_streaks')
+    .select('streak_type, current_count, longest_count')
+    .eq('user_id', userId)
+
+  if (streakData && streakData.length > 0) {
+    // Find best login streak (current or longest)
+    const loginStreak = streakData.find(
+      (s: { streak_type: string }) => s.streak_type === 'login'
+    )
+    const bestLoginStreak = loginStreak
+      ? Math.max(loginStreak.current_count as number, loginStreak.longest_count as number)
+      : 0
+
+    // Also consider all streak types for milestone badges
+    const bestOverallStreak = streakData.reduce((max: number, s: { current_count: number; longest_count: number }) => {
+      return Math.max(max, s.current_count as number, s.longest_count as number)
+    }, 0)
+
+    // Award streak milestones based on best login streak
+    const streakToCheck = Math.max(bestLoginStreak, bestOverallStreak)
+
+    if (!existingEarned.has('weekstreak_x4') && streakToCheck >= 4) {
+      newlyEarned.push('weekstreak_x4')
+    }
+    if (!existingEarned.has('maandmeester') && bestLoginStreak >= 4) {
+      newlyEarned.push('maandmeester')
+    }
+    if (!existingEarned.has('weekstreak_x12') && streakToCheck >= 12) {
+      newlyEarned.push('weekstreak_x12')
+    }
+    if (!existingEarned.has('weekstreak_x26') && streakToCheck >= 26) {
+      newlyEarned.push('weekstreak_x26')
+    }
+    if (!existingEarned.has('weekstreak_x52') && streakToCheck >= 52) {
+      newlyEarned.push('weekstreak_x52')
+    }
+  } else {
+    // Fallback: check app_settings for streak data
+    const streakSettingsKey = `streaks_${userId}`
+    const { data: streakSettings } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', streakSettingsKey)
+      .maybeSingle()
+
+    if (streakSettings?.value && Array.isArray(streakSettings.value)) {
+      const storedStreaks = streakSettings.value as Array<{
+        streak_type: string
+        current_count: number
+        longest_count: number
+      }>
+      const loginStreak = storedStreaks.find(s => s.streak_type === 'login')
+      const bestLoginStreak = loginStreak
+        ? Math.max(loginStreak.current_count, loginStreak.longest_count)
+        : 0
+      const bestOverallStreak = storedStreaks.reduce((max, s) => {
+        return Math.max(max, s.current_count, s.longest_count)
+      }, 0)
+      const streakToCheck = Math.max(bestLoginStreak, bestOverallStreak)
+
+      if (!existingEarned.has('weekstreak_x4') && streakToCheck >= 4) {
+        newlyEarned.push('weekstreak_x4')
+      }
+      if (!existingEarned.has('maandmeester') && bestLoginStreak >= 4) {
+        newlyEarned.push('maandmeester')
+      }
+      if (!existingEarned.has('weekstreak_x12') && streakToCheck >= 12) {
+        newlyEarned.push('weekstreak_x12')
+      }
+      if (!existingEarned.has('weekstreak_x26') && streakToCheck >= 26) {
+        newlyEarned.push('weekstreak_x26')
+      }
+      if (!existingEarned.has('weekstreak_x52') && streakToCheck >= 52) {
+        newlyEarned.push('weekstreak_x52')
+      }
+    }
+  }
+
   return newlyEarned
 }
 

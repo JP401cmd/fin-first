@@ -3,9 +3,9 @@
  * These define all possible badges a user can earn.
  * Used both client-side (for display) and server-side (for evaluation).
  *
- * 35 badges across 8 categories:
+ * 38 badges across 8 categories:
  * - onboarding (3)
- * - consistency (3)
+ * - consistency (6)
  * - financial_health (5)
  * - fire_milestones (4)
  * - actions (4)
@@ -53,6 +53,27 @@ export type BadgeCriteria = {
 }
 
 export const BADGE_CRITERIA: Record<string, BadgeCriteria> = {
+  // Consistency / Streaks
+  weekstreak_x4: {
+    target: 4,
+    unit: 'weken',
+    label: (c, t) => `${c} / ${t} weken`,
+  },
+  weekstreak_x12: {
+    target: 12,
+    unit: 'weken',
+    label: (c, t) => `${c} / ${t} weken`,
+  },
+  weekstreak_x26: {
+    target: 26,
+    unit: 'weken',
+    label: (c, t) => `${c} / ${t} weken`,
+  },
+  weekstreak_x52: {
+    target: 52,
+    unit: 'weken',
+    label: (c, t) => `${c} / ${t} weken`,
+  },
   // Financial Health
   positief_vermogen: {
     target: 0,
@@ -153,7 +174,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     sort_order: 3,
   },
 
-  // ── Consistency (3 badges) ─────────────────────────────
+  // ── Consistency (6 badges) ─────────────────────────────
   {
     slug: 'weekstreak_x4',
     name: 'Weekstreak x4',
@@ -173,13 +194,40 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     sort_order: 11,
   },
   {
+    slug: 'weekstreak_x12',
+    name: 'Kwartaalstreak',
+    description: '12 weken achter elkaar actief. Een kwartaal lang gedisciplineerd!',
+    icon: '🌟',
+    color: 'amber',
+    category: 'consistency',
+    sort_order: 12,
+  },
+  {
+    slug: 'weekstreak_x26',
+    name: 'Halfjaarsstreak',
+    description: '26 weken achter elkaar actief. Een half jaar consistentie!',
+    icon: '💫',
+    color: 'amber',
+    category: 'consistency',
+    sort_order: 13,
+  },
+  {
+    slug: 'weekstreak_x52',
+    name: 'Jaarstreak',
+    description: '52 weken achter elkaar actief. Een heel jaar lang onbreekbaar!',
+    icon: '👑',
+    color: 'amber',
+    category: 'consistency',
+    sort_order: 14,
+  },
+  {
     slug: 'dagelijkse_discipline',
     name: 'Dagelijkse Discipline',
     description: '30 dagen achter elkaar ingelogd. Onbreekbare discipline!',
     icon: '💪',
     color: 'amber',
     category: 'consistency',
-    sort_order: 12,
+    sort_order: 15,
   },
 
   // ── Financial Health (5 badges) ────────────────────────
