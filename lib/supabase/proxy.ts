@@ -282,6 +282,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-locked-default',
     '/test-freedom-days-disambiguation',
     '/api/verify-freedom-days-disambiguation',
+    '/test-feature-spotlight',
+    '/api/verify-feature-spotlight',
   ]
 
   // Protected route prefixes that require authentication

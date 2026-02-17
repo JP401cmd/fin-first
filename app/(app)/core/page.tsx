@@ -420,7 +420,7 @@ export default function CorePage() {
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
               <Calendar className="h-5 w-5 text-amber-600" />
             </div>
-            <KpiTooltip text="Hoeveel extra vrije dagen je deze maand hebt verdiend. Berekening: maandelijkse besparing / dagelijkse uitgaven." />
+            <KpiTooltip text="Dagen gewonnen deze maand — exclusief De Kern. Berekend als maandelijkse besparing gedeeld door dagelijkse uitgaven. Dit verschilt van 'vrijheidsdagen gewonnen' in De Wil, dat gebaseerd is op voltooide acties." />
           </div>
           <p className="text-sm font-medium text-zinc-500">Dagen Gewonnen</p>
           <p className="mt-1 text-3xl font-bold text-zinc-900">
@@ -450,7 +450,7 @@ export default function CorePage() {
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
               <Sun className="h-5 w-5 text-amber-600" />
             </div>
-            <KpiTooltip text="Hoeveel dagen per jaar je passief inkomen je kosten dekt. Berekening: (netto vermogen × 4% / jaarlijkse uitgaven) × 365." />
+            <KpiTooltip text="Vrije dagen per jaar — exclusief De Kern. Hoeveel dagen per jaar je passief inkomen je kosten dekt. Berekening: (netto vermogen × 4% / jaarlijkse uitgaven) × 365. Dit verschilt van 'Open potentieel' in De Wil, dat gebaseerd is op openstaande acties." />
           </div>
           <p className="text-sm font-medium text-zinc-500">Vrije Dagen per Jaar</p>
           <p className="mt-1 text-3xl font-bold text-zinc-900">{data.freeDaysPerYear}</p>
@@ -695,13 +695,14 @@ function KpiTooltip({ text }: { text: string }) {
     <div className="group relative">
       <button
         type="button"
+        aria-label="Meer informatie"
         onClick={() => setOpen(!open)}
         onBlur={() => setOpen(false)}
         className="touch-target"
       >
         <Info className={`h-4 w-4 cursor-help transition-colors ${open ? 'text-amber-500' : 'text-zinc-300'} group-hover:text-amber-500`} />
       </button>
-      <div className={`absolute right-0 z-10 mt-1 w-56 rounded-lg border border-zinc-200 bg-white p-3 text-xs leading-relaxed text-zinc-600 shadow-lg transition-opacity ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}>
+      <div role="tooltip" className={`absolute right-0 z-10 mt-1 w-56 rounded-lg border border-zinc-200 bg-white p-3 text-xs leading-relaxed text-zinc-600 shadow-lg transition-opacity ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}>
         {text}
       </div>
     </div>

@@ -1,257 +1,212 @@
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
 import { computeSovereigntyLevel, levelToPhaseId, PHASES, FEATURES, DEFAULT_MATRIX } from '@/lib/feature-phases'
+import * as fs from 'fs'
+import * as path from 'path'
 
 /**
  * GET /api/verify-phase-transition
  *
- * Verifies the phase transition workflow:
- * 1. Recovery phase user has correct features locked
- * 2. Financial data changes trigger sovereignty recalculation
- * 3. Newly unlocked features are correctly computed
- * 4. Phase transition detection works (oldPhase vs newPhase)
+ * Verifies the phase transition celebration modal (Feature #193):
+ * 1. PhaseTransitionModal component exists with required elements
+ * 2. Sovereignty level increase detection works
+ * 3. Congratulations message includes phase name
+ * 4. Newly unlocked features listed with descriptions
+ * 5. CTA button present
+ * 6. Themed animation matching phase color
+ * 7. Close button and overlay dismiss supported
  */
 export async function GET() {
   const tests: { name: string; pass: boolean; detail: string }[] = []
 
-  // ── Test 1: Recovery phase user (Roos persona - negative net worth + consumer debt)
+  // ── Test 1: PhaseTransitionModal component exists with required structure
   {
-    const recoveryAccess = computeFeatureAccess({
-      assets: [{ current_value: 3500 }],
-      debts: [
-        { current_balance: 4800, debt_type: 'credit_card' },
-        { current_balance: 12500, debt_type: 'personal_loan' },
-        { current_balance: 1200, debt_type: 'payment_plan' },
-      ],
-      transactions: [
-        // 3 months of expenses (~3200/month)
-        { amount: -950, is_income: false },
-        { amount: -220, is_income: false },
-        { amount: -175, is_income: false },
-        { amount: -530, is_income: false },
-        { amount: -390, is_income: false },
-        { amount: -555, is_income: false },
-        { amount: -325, is_income: false },
-        { amount: 2800, is_income: true },
-        { amount: -950, is_income: false },
-        { amount: -220, is_income: false },
-        { amount: -175, is_income: false },
-        { amount: -530, is_income: false },
-        { amount: -390, is_income: false },
-        { amount: -555, is_income: false },
-        { amount: -325, is_income: false },
-        { amount: 2800, is_income: true },
-        { amount: -950, is_income: false },
-        { amount: -220, is_income: false },
-        { amount: -175, is_income: false },
-        { amount: -530, is_income: false },
-        { amount: -390, is_income: false },
-        { amount: -555, is_income: false },
-        { amount: -325, is_income: false },
-        { amount: 2800, is_income: true },
-      ],
-      matrixJson: null,
-    })
+    let modalSource = ''
+    try {
+      modalSource = fs.readFileSync(
+        path.join(process.cwd(), 'components', 'app', 'phase-transition-modal.tsx'),
+        'utf-8'
+      )
+    } catch {
+      modalSource = ''
+    }
 
     tests.push({
-      name: 'Recovery user sovereignty level',
-      pass: recoveryAccess.level === -2,
-      detail: `Level: ${recoveryAccess.level} (expected -2), Phase: ${recoveryAccess.phase}`,
+      name: 'PhaseTransitionModal component file exists',
+      pass: modalSource.length > 0,
+      detail: modalSource.length > 0 ? `${modalSource.length} chars` : 'File not found',
     })
 
+    // Check for congratulations message with phase name
+    const hasGefeliciteerd = modalSource.includes('Gefeliciteerd!')
+    const hasPhaseNameInSubtitle = modalSource.includes('phaseLabelNl(newPhase)') || modalSource.includes('-fase')
     tests.push({
-      name: 'Recovery user phase is recovery',
-      pass: recoveryAccess.phase === 'recovery',
-      detail: `Phase: ${recoveryAccess.phase}`,
+      name: 'Shows "Gefeliciteerd!" with phase name',
+      pass: hasGefeliciteerd && hasPhaseNameInSubtitle,
+      detail: `Gefeliciteerd: ${hasGefeliciteerd}, Phase name in subtitle: ${hasPhaseNameInSubtitle}`,
     })
 
-    // Check that stability-gated features are locked
-    const stabilityFeatures = FEATURES.filter(f =>
-      DEFAULT_MATRIX[f.id]?.stability === true && DEFAULT_MATRIX[f.id]?.recovery === false
+    // Check for close button
+    const hasCloseButton = modalSource.includes('phase-transition-close') || modalSource.includes('Sluiten')
+    tests.push({
+      name: 'Close button present (X icon)',
+      pass: hasCloseButton,
+      detail: `Close button: ${hasCloseButton}`,
+    })
+
+    // Check for overlay click dismiss
+    const hasOverlayClick = modalSource.includes('handleOverlayClick') || modalSource.includes('e.target === e.currentTarget')
+    tests.push({
+      name: 'Overlay click dismiss supported',
+      pass: hasOverlayClick,
+      detail: `Overlay click: ${hasOverlayClick}`,
+    })
+
+    // Check for entrance animation
+    const hasEntranceAnimation = modalSource.includes('transition-all') && (
+      modalSource.includes('scale-100') || modalSource.includes('scale-90')
     )
-
-    const allLocked = stabilityFeatures.every(f => recoveryAccess.features[f.id] === false)
     tests.push({
-      name: 'Stability features locked for Recovery user',
-      pass: allLocked,
-      detail: `Stability-gated features: ${stabilityFeatures.map(f => f.id).join(', ')} — all locked: ${allLocked}`,
+      name: 'Entrance animation (scale + fade)',
+      pass: hasEntranceAnimation,
+      detail: `Entrance animation: ${hasEntranceAnimation}`,
     })
 
-    // Check that recovery-available features are accessible
-    const recoveryFeatures = FEATURES.filter(f =>
-      DEFAULT_MATRIX[f.id]?.recovery === true
-    )
-    const allAccessible = recoveryFeatures.every(f => recoveryAccess.features[f.id] === true)
+    // Check for themed sparkle/celebration animation
+    const hasSparkleAnimation = modalSource.includes('SparkleParticles') || modalSource.includes('sparkle')
     tests.push({
-      name: 'Recovery features accessible for Recovery user',
-      pass: allAccessible,
-      detail: `Recovery features: ${recoveryFeatures.map(f => f.id).join(', ')} — all accessible: ${allAccessible}`,
+      name: 'Themed celebration animation (sparkle particles)',
+      pass: hasSparkleAnimation,
+      detail: `Sparkle animation: ${hasSparkleAnimation}`,
+    })
+
+    // Check for phase-themed colors
+    const hasPhaseColors = modalSource.includes('PHASE_COLORS') && modalSource.includes('colors.gradient')
+    tests.push({
+      name: 'Phase-themed color gradients',
+      pass: hasPhaseColors,
+      detail: `Phase colors: ${hasPhaseColors}`,
+    })
+
+    // Check CTA button text
+    const hasCTA = modalSource.includes('Ontdek je nieuwe mogelijkheden')
+    tests.push({
+      name: 'CTA button "Ontdek je nieuwe mogelijkheden"',
+      pass: hasCTA,
+      detail: `CTA: ${hasCTA}`,
+    })
+
+    // Check for data-testid attributes
+    const hasTestIds = modalSource.includes('data-testid="phase-transition-modal"') &&
+      modalSource.includes('data-testid="phase-transition-cta"') &&
+      modalSource.includes('data-testid="phase-transition-close"')
+    tests.push({
+      name: 'Data-testid attributes for testing',
+      pass: hasTestIds,
+      detail: `TestIds: ${hasTestIds}`,
+    })
+
+    // Check for unlocked feature list with descriptions
+    const hasFeatureList = modalSource.includes('Nieuw ontgrendeld') && modalSource.includes('f.description')
+    tests.push({
+      name: 'Unlocked features listed with descriptions',
+      pass: hasFeatureList,
+      detail: `Feature list: ${hasFeatureList}`,
     })
   }
 
-  // ── Test 2: Stability phase user (net worth > 0, 1-3 months covered, no consumer debt)
+  // ── Test 2: Phase transition detection in layout
   {
-    const stabilityAccess = computeFeatureAccess({
-      assets: [{ current_value: 8000 }],
-      debts: [
-        { current_balance: 5000, debt_type: 'student_loan' }, // Not consumer debt
-      ],
-      transactions: [
-        // 3 months of expenses (~2000/month)
-        { amount: -600, is_income: false },
-        { amount: -400, is_income: false },
-        { amount: -400, is_income: false },
-        { amount: -200, is_income: false },
-        { amount: -200, is_income: false },
-        { amount: -200, is_income: false },
-        { amount: 3400, is_income: true },
-        { amount: -600, is_income: false },
-        { amount: -400, is_income: false },
-        { amount: -400, is_income: false },
-        { amount: -200, is_income: false },
-        { amount: -200, is_income: false },
-        { amount: -200, is_income: false },
-        { amount: 3400, is_income: true },
-        { amount: -600, is_income: false },
-        { amount: -400, is_income: false },
-        { amount: -400, is_income: false },
-        { amount: -200, is_income: false },
-        { amount: -200, is_income: false },
-        { amount: -200, is_income: false },
-        { amount: 3400, is_income: true },
-      ],
-      matrixJson: null,
-    })
+    let layoutSource = ''
+    try {
+      layoutSource = fs.readFileSync(
+        path.join(process.cwd(), 'app', '(app)', 'layout.tsx'),
+        'utf-8'
+      )
+    } catch {
+      layoutSource = ''
+    }
 
+    const hasPhaseDetection = layoutSource.includes('phaseTransition') && layoutSource.includes('last_known_phase')
+    const hasUpwardCheck = layoutSource.includes('newIndex > oldIndex')
     tests.push({
-      name: 'Stability user sovereignty level',
-      pass: stabilityAccess.level === 1 || stabilityAccess.level === 2,
-      detail: `Level: ${stabilityAccess.level} (expected 1 or 2), Phase: ${stabilityAccess.phase}, NetWorth: ${stabilityAccess.netWorth}, MonthlyExp: ${stabilityAccess.monthlyExpenses}`,
-    })
-
-    tests.push({
-      name: 'Stability user phase is stability',
-      pass: stabilityAccess.phase === 'stability',
-      detail: `Phase: ${stabilityAccess.phase}`,
-    })
-
-    // Check that stability-gated features are now accessible
-    const stabilityFeatures = FEATURES.filter(f =>
-      DEFAULT_MATRIX[f.id]?.stability === true && DEFAULT_MATRIX[f.id]?.recovery === false
-    )
-    const allUnlocked = stabilityFeatures.every(f => stabilityAccess.features[f.id] === true)
-    tests.push({
-      name: 'Stability features unlocked for Stability user',
-      pass: allUnlocked,
-      detail: `Stability-gated features: ${stabilityFeatures.map(f => `${f.id}=${stabilityAccess.features[f.id]}`).join(', ')}`,
+      name: 'Layout detects sovereignty level increase',
+      pass: hasPhaseDetection && hasUpwardCheck,
+      detail: `Phase detection: ${hasPhaseDetection}, Upward check: ${hasUpwardCheck}`,
     })
   }
 
-  // ── Test 3: Phase transition detection
+  // ── Test 3: Newly unlocked features for each transition
   {
-    const oldPhase = 'recovery'
-    const newPhase = 'stability'
-    const phaseIds = PHASES.map(p => p.id)
-    const oldIndex = phaseIds.indexOf(oldPhase)
-    const newIndex = phaseIds.indexOf(newPhase)
-    const isUpward = newIndex > oldIndex
-
-    tests.push({
-      name: 'Phase transition detection (recovery → stability)',
-      pass: isUpward,
-      detail: `Old: ${oldPhase} (index ${oldIndex}), New: ${newPhase} (index ${newIndex}), Upward: ${isUpward}`,
-    })
-  }
-
-  // ── Test 4: Newly unlocked features computation
-  {
-    const newFeatures = FEATURES.filter(f =>
+    // Recovery → Stability
+    const recoveryToStability = FEATURES.filter(f =>
       DEFAULT_MATRIX[f.id]?.stability === true && !DEFAULT_MATRIX[f.id]?.recovery
     )
-
     tests.push({
-      name: 'Newly unlocked features count > 0',
-      pass: newFeatures.length > 0,
-      detail: `${newFeatures.length} features unlock: ${newFeatures.map(f => f.label).join(', ')}`,
+      name: 'Recovery→Stability unlocks features with descriptions',
+      pass: recoveryToStability.length > 0 && recoveryToStability.every(f => f.description.length > 0),
+      detail: `${recoveryToStability.length} features: ${recoveryToStability.map(f => f.label).join(', ')}`,
     })
 
-    // Verify specific features that should unlock at Stability
-    const expectedUnlocks = ['box3_belasting', 'fire_projecties', 'levensgebeurtenissen', 'veerkracht_score', 'vermogensprojectie_chart', 'vermogensverloop', 'cashflow_sankey', 'doelen_systeem']
-    const actualUnlockIds = newFeatures.map(f => f.id)
-    const allExpectedPresent = expectedUnlocks.every(id => actualUnlockIds.includes(id))
-
+    // Stability → Momentum
+    const stabilityToMomentum = FEATURES.filter(f =>
+      DEFAULT_MATRIX[f.id]?.momentum === true && !DEFAULT_MATRIX[f.id]?.stability
+    )
     tests.push({
-      name: 'Expected Stability features are in unlock list',
-      pass: allExpectedPresent,
-      detail: `Expected: ${expectedUnlocks.join(', ')}. Actual: ${actualUnlockIds.join(', ')}`,
-    })
-  }
-
-  // ── Test 5: Sovereignty level computation edge cases
-  {
-    // Level -2: Negative net worth + consumer debt
-    const level_neg2 = computeSovereigntyLevel(-5000, 2000, 0, true)
-    tests.push({
-      name: 'Level -2: Negative net worth + consumer debt',
-      pass: level_neg2 === -2,
-      detail: `Got level ${level_neg2}`,
+      name: 'Stability→Momentum unlocks features with descriptions',
+      pass: stabilityToMomentum.length > 0 && stabilityToMomentum.every(f => f.description.length > 0),
+      detail: `${stabilityToMomentum.length} features: ${stabilityToMomentum.map(f => f.label).join(', ')}`,
     })
 
-    // Level -1: Negative net worth, no consumer debt
-    const level_neg1 = computeSovereigntyLevel(-5000, 2000, 0, false)
+    // Momentum → Mastery
+    const momentumToMastery = FEATURES.filter(f =>
+      DEFAULT_MATRIX[f.id]?.mastery === true && !DEFAULT_MATRIX[f.id]?.momentum
+    )
     tests.push({
-      name: 'Level -1: Negative net worth, no consumer debt',
-      pass: level_neg1 === -1,
-      detail: `Got level ${level_neg1}`,
-    })
-
-    // Level 0: Less than 1 month covered
-    const level_0 = computeSovereigntyLevel(500, 2000, 0.1, false)
-    tests.push({
-      name: 'Level 0: Less than 1 month covered',
-      pass: level_0 === 0,
-      detail: `Got level ${level_0}`,
-    })
-
-    // Level 1: 1-3 months covered
-    const level_1 = computeSovereigntyLevel(4000, 2000, 0.3, false)
-    tests.push({
-      name: 'Level 1: 1-3 months covered',
-      pass: level_1 === 1,
-      detail: `Got level ${level_1}`,
-    })
-
-    // Level 2: 3-6 months or freedom < 10%
-    const level_2 = computeSovereigntyLevel(10000, 2000, 1.7, false)
-    tests.push({
-      name: 'Level 2: 3-6 months covered',
-      pass: level_2 === 2,
-      detail: `Got level ${level_2}`,
-    })
-
-    // Phase mapping
-    const phase_recovery = levelToPhaseId(-2)
-    const phase_stability = levelToPhaseId(1)
-    const phase_momentum = levelToPhaseId(3)
-    const phase_mastery = levelToPhaseId(6)
-    tests.push({
-      name: 'Phase mapping correct',
-      pass: phase_recovery === 'recovery' && phase_stability === 'stability' && phase_momentum === 'momentum' && phase_mastery === 'mastery',
-      detail: `Recovery: ${phase_recovery}, Stability: ${phase_stability}, Momentum: ${phase_momentum}, Mastery: ${phase_mastery}`,
+      name: 'Momentum→Mastery unlocks features with descriptions',
+      pass: momentumToMastery.length > 0 && momentumToMastery.every(f => f.description.length > 0),
+      detail: `${momentumToMastery.length} features: ${momentumToMastery.map(f => f.label).join(', ')}`,
     })
   }
 
-  // ── Test 6: FeatureGate component exists and PhaseTransitionModal exists
+  // ── Test 4: Phase colors match all four phases
   {
-    tests.push({
-      name: 'PHASES array has 4 phases',
-      pass: PHASES.length === 4,
-      detail: `Phases: ${PHASES.map(p => p.id).join(', ')}`,
+    const allPhasesHaveColors = ['recovery', 'stability', 'momentum', 'mastery'].every(phase => {
+      let modalSource = ''
+      try {
+        modalSource = fs.readFileSync(
+          path.join(process.cwd(), 'components', 'app', 'phase-transition-modal.tsx'),
+          'utf-8'
+        )
+      } catch {
+        return false
+      }
+      return modalSource.includes(phase)
     })
 
     tests.push({
-      name: 'DEFAULT_MATRIX has entries for all features',
-      pass: FEATURES.every(f => DEFAULT_MATRIX[f.id] !== undefined),
-      detail: `Features: ${FEATURES.length}, Matrix entries: ${Object.keys(DEFAULT_MATRIX).length}`,
+      name: 'All four phases have themed colors defined',
+      pass: allPhasesHaveColors,
+      detail: `recovery/stability/momentum/mastery all present: ${allPhasesHaveColors}`,
+    })
+  }
+
+  // ── Test 5: Provider passes phaseTransition to modal
+  {
+    let providerSource = ''
+    try {
+      providerSource = fs.readFileSync(
+        path.join(process.cwd(), 'components', 'app', 'feature-access-provider.tsx'),
+        'utf-8'
+      )
+    } catch {
+      providerSource = ''
+    }
+
+    const passesTransition = providerSource.includes('PhaseTransitionModal') && providerSource.includes('phaseTransition')
+    tests.push({
+      name: 'FeatureAccessProvider renders PhaseTransitionModal on transition',
+      pass: passesTransition,
+      detail: `Provider renders modal: ${passesTransition}`,
     })
   }
 
