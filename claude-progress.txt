@@ -1,3 +1,62 @@
+## Session 2026-02-17 - Feature #206
+
+### Feature #206: Badge showcase on Identity page - PASSING
+- BadgeGrid component already existed at components/app/badge-grid.tsx (previously built for feature #117)
+- Already integrated into Identity page at app/(app)/identity/page.tsx in "Prestaties & Badges" section
+- Key enhancement: Added progress indicators for partially-met badge criteria
+
+#### What Was Added:
+1. **BADGE_CRITERIA definitions** (lib/badges.ts): 12 badge criteria with target values and label functions
+   - Financial health: positief_vermogen, eerste_10k, 100k_club
+   - Actions: eerste_actie, actieheld_x10, vrijheidsjager, beslisser
+   - Onboarding: data_detective, budgetbouwer
+   - FIRE milestones: fire_10_pct, fire_halftime, fire_bereikt
+2. **Progress computation in API** (app/api/badges/route.ts): computeBadgeProgress() function
+   - Fetches user's financial data (accounts, budgets, transactions, debts, assets, actions)
+   - Calculates progress 0-1 for each badge with criteria
+   - Returns progress and progress_label in API response
+3. **Progress indicators on BadgeCard** (components/app/badge-grid.tsx):
+   - Mini progress bar below locked badge icons
+   - Color-coded: zinc (<50%), amber (50-75%), emerald (>75%)
+   - Percentage text label
+4. **Progress in BadgeDetail modal**:
+   - "Voortgang" section with larger progress bar
+   - Percentage display
+   - Human-readable progress label (e.g., "€5,000 / €10,000" or "3 / 10 acties")
+5. **Data-testid attributes**: badge-grid, badge-progress-summary, badge-earned-count, badge-total-label, badge-detail-modal, badge-detail-name, badge-detail-description, badge-detail-close, badge-detail-overlay, badge-detail-progress
+
+#### Verification:
+- 12/12 API verification tests passing at /api/verify-badge-grid
+- Browser verified with playwright:
+  - Earned badges show in full color with icons and names
+  - Locked badges grayed with ❓ and ??? overlay
+  - Progress bars visible on badges with partial progress
+  - Click opens detail modal with name, description, earned date
+  - Locked badge detail shows progress bar and label
+  - "5 van 35 verdiend" count displayed
+  - Category grouping with per-category counts
+- Zero mock data patterns found (grep clean)
+- No console errors in production components (only hydration mismatch in test page due to Math.random())
+
+### Changes Made
+- lib/badges.ts: Added BadgeCriteria type and BADGE_CRITERIA definitions, extended BadgeWithStatus type with progress/progress_label
+- app/api/badges/route.ts: Added computeBadgeProgress() and addProgress() functions
+- components/app/badge-grid.tsx: Added progress bars on BadgeCard, progress section in BadgeDetail, data-testid attributes
+- app/api/verify-badge-grid/route.ts: Created 12-test verification endpoint
+- app/test-badge-showcase/page.tsx: Created visual test page with simulated data
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: b9f22b0
+
+### Current Status
+- 198/265 features passing (197 before + #206)
+- Feature #206 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- BadgeGrid was already fully built; this session added progress indicators and data-testid attributes
+- No authenticated test user available (Supabase email rate limit)
+- Progress data is computed from real database tables (bank_accounts, budgets, transactions, debts, assets, actions)
+
 ## Session 2026-02-17 - Feature #205
 
 ### Feature #205: Badge notification toast system - PASSING
