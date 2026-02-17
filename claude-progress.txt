@@ -1,3 +1,42 @@
+## Session 2026-02-17 - Feature #201
+
+### Feature #201: Ontdek feature discovery carousel - PASSING
+- DiscoverCarousel component already existed at components/app/discover-carousel.tsx (246 lines)
+- Fully implemented with all 8 feature requirements met:
+  1. Horizontal scrollable carousel (overflow-x-auto + flex layout + scroll ref)
+  2. Placed at bottom of all 3 overview pages: De Kern, De Wil, De Horizon
+  3. Shows unexplored features from feature_visits tracking (localStorage + API hybrid)
+  4. Teaser text "Wist je dat je..." displayed for unvisited features
+  5. Tracks visits via POST /api/feature-visits on card click (fire-and-forget)
+  6. Phase filtering via useFeatureAccess() - features[item.id] === false hides inaccessible
+  7. Visited features faded (opacity-60, muted border/bg colors)
+  8. Card click navigates via Next.js <Link> to feature page
+- 15 discoverable items across 3 modules (kern: 5, wil: 3, horizon: 7)
+- Dual persistence: localStorage for instant UX + /api/feature-visits for cross-device sync
+- Scroll navigation: ChevronLeft/Right buttons with canScrollLeft/Right state
+- Sorted: unvisited features first, visited last
+- Module filtering: excludes current module's features to show cross-discovery
+- 12/12 verification tests passing at /api/verify-discover-carousel-201
+- Zero console errors
+- No mock data patterns found
+- Feature visits API at app/api/feature-visits/route.ts has GET + POST with auth checks
+
+### Changes Made
+- app/api/verify-discover-carousel-201/route.ts: Created 12-test verification endpoint
+- app/test-discover-carousel-201/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: 835a688
+
+### Current Status
+- 194/265 features passing (193 before + #201)
+- Feature #201 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- DiscoverCarousel was already fully implemented by previous sessions
+- The component was built for Feature #123 and already placed on all overview pages
+- Database table user_feature_visits exists in Supabase for persistent tracking
+
 ## Session 2026-02-17 - Feature #198
 
 ### Feature #198: Smart Volgende Stap next step engine - PASSING
