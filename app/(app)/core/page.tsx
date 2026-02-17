@@ -13,7 +13,7 @@ import type { NetWorthSnapshot } from '@/lib/net-worth-data'
 import {
   Calendar, TrendingUp, Sun, Star, Wallet, ShoppingCart,
   PiggyBank, Building2, ArrowRight, Info, Camera, Download, ChevronDown, Receipt, Flag, BarChart3,
-  CheckCircle2, AlertTriangle, TrendingDown, ArrowUpRight, ArrowDownRight, Minus, LineChart,
+  CheckCircle2, AlertTriangle, TrendingDown, ArrowUpRight, ArrowDownRight, Minus, LineChart, Sparkles,
 } from 'lucide-react'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { CollapsibleSection } from '@/components/app/collapsible-section'
@@ -25,6 +25,7 @@ import { SparklineWithLabel, type SparklineDataPoint } from '@/components/app/bu
 import { CashFlowForecastChart, type ForecastPoint, type ForecastAlert } from '@/components/app/cashflow-forecast-chart'
 import { NetWorthProjectionChart } from '@/components/app/net-worth-projection-chart'
 import { computeNetWorthProjection, type NetWorthProjectionResult } from '@/lib/net-worth-projection'
+import { SpendingInsightsSection, type SpendingInsight } from '@/components/app/spending-insight-card'
 
 export default function CorePage() {
   const router = useRouter()
@@ -50,6 +51,11 @@ export default function CorePage() {
   const [cashFlowBalance, setCashFlowBalance] = useState(0)
   const [cashFlowHasData, setCashFlowHasData] = useState(false)
   const [nwProjection, setNwProjection] = useState<NetWorthProjectionResult | null>(null)
+  const [spendingInsights, setSpendingInsights] = useState<SpendingInsight[]>([])
+  const [spendingInsightsLoading, setSpendingInsightsLoading] = useState(false)
+  const [spendingInsightsDataMonths, setSpendingInsightsDataMonths] = useState(0)
+  const [spendingInsightsMessage, setSpendingInsightsMessage] = useState<string>('')
+  const [spendingInsightsHasData, setSpendingInsightsHasData] = useState(false)
 
   const loadData = useCallback(async () => {
     try {
@@ -413,6 +419,23 @@ export default function CorePage() {
         }
       } catch {
         // Cash flow forecast is non-critical
+      }
+
+      // Load spending pattern insights
+      try {
+        setSpendingInsightsLoading(true)
+        const patternsRes = await fetch('/api/spending-patterns')
+        if (patternsRes.ok) {
+          const patternsData = await patternsRes.json()
+          setSpendingInsights(patternsData.insights ?? [])
+          setSpendingInsightsDataMonths(patternsData.dataMonths ?? 0)
+          setSpendingInsightsMessage(patternsData.message ?? '')
+          setSpendingInsightsHasData(patternsData.hasData ?? false)
+        }
+      } catch {
+        // Spending patterns are non-critical
+      } finally {
+        setSpendingInsightsLoading(false)
       }
 
     } catch (err) {
@@ -807,6 +830,33 @@ export default function CorePage() {
           </CollapsibleSection>
         </section>
       )}
+
+      {/* === 4b2. Spending Pattern Insights (Feature-gated: Stability+) === */}
+      <FeatureGate featureId="spending_patterns" fallback="locked">
+        {(spendingInsightsLoading || spendingInsights.length > 0 || spendingInsightsHasData) && (
+          <section className="mt-8" data-testid="spending-patterns-section">
+            <CollapsibleSection
+              storageKey="kern_spending_patterns"
+              title="Uitgavenpatronen"
+              summary={
+                spendingInsightsLoading
+                  ? 'Patronen analyseren...'
+                  : spendingInsights.length > 0
+                    ? `${spendingInsights.length} patroon${spendingInsights.length !== 1 ? 'en' : ''} gedetecteerd`
+                    : 'Geen opvallende patronen'
+              }
+              icon={<Sparkles className="h-5 w-5 text-amber-600" />}
+            >
+              <SpendingInsightsSection
+                insights={spendingInsights}
+                dataMonths={spendingInsightsDataMonths}
+                message={spendingInsightsMessage}
+                isLoading={spendingInsightsLoading}
+              />
+            </CollapsibleSection>
+          </section>
+        )}
+      </FeatureGate>
 
       {/* === 4c. Cash Flow Forecast (Feature-gated: Stability+) === */}
       <FeatureGate featureId="cashflow_forecast" fallback="locked">

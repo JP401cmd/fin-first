@@ -48,6 +48,7 @@ export const FEATURES: FeatureDef[] = [
   // Wil
   { id: 'doelen_systeem',           label: 'Doelen Systeem',              description: 'Financiele doelen instellen, voortgang volgen, ETA-berekening' },
   { id: 'beslissingspatronen',      label: 'Beslissingspatronen',         description: 'Bar chart met vrijheidsdagen per actie-type + impact-analyse' },
+  { id: 'spending_patterns',        label: 'Uitgavenpatronen',            description: 'AI-gestuurde seizoenspatronen en trendanalyse van uitgaven' },
 ]
 
 /**
@@ -126,4 +127,6 @@ export const DEFAULT_MATRIX: FeaturePhaseMatrix = {
   // Wil
   doelen_systeem:            { recovery: false, stability: true,  momentum: true,  mastery: true },
   beslissingspatronen:       { recovery: false, stability: false, momentum: true,  mastery: true },
+  // Kern — Spending patterns
+  spending_patterns:         { recovery: false, stability: true,  momentum: true,  mastery: true },
 }

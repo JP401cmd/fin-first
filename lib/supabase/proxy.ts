@@ -346,6 +346,10 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-nw-projection',
     '/test-freedom-milestones',
     '/api/verify-freedom-milestones',
+    '/test-spending-patterns',
+    '/api/verify-spending-patterns',
+    '/test-holdings-crud-mgmt',
+    '/api/verify-holdings-crud-mgmt',
   ]
 
   // Protected route prefixes that require authentication
