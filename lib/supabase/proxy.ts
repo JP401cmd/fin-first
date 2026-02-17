@@ -320,6 +320,8 @@ export async function updateSession(request: NextRequest) {
     '/test-auto-snapshots',
     '/api/verify-auto-snapshots',
     '/api/snapshots/cron',
+    '/test-asset-valuation-trends',
+    '/api/verify-asset-valuation-trends',
   ]
 
   // Protected route prefixes that require authentication
