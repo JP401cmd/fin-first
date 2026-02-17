@@ -342,6 +342,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-portfolio-projection',
     '/test-cashflow-forecast',
     '/api/verify-cashflow-forecast',
+    '/test-nw-projection',
+    '/api/verify-nw-projection',
   ]
 
   // Protected route prefixes that require authentication
