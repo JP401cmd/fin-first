@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
+import { calculateFreedomTime, formatFreedomTimeString, formatWithFreedom } from '@/lib/format'
 import {
   type Debt,
   type DebtType,
@@ -40,7 +41,32 @@ export default function DebtsPage() {
   const [extraMonthly, setExtraMonthly] = useState(0)
   const [valuations, setValuations] = useState<Record<string, Valuation[]>>({})
   const [userAssets, setUserAssets] = useState<Asset[]>([])
+  const [dailyExpenses, setDailyExpenses] = useState(0)
   const seedingRef = useRef(false)
+
+  // Load monthly expenses to compute daily expenses for freedom-time calculations
+  const loadExpenses = useCallback(async () => {
+    try {
+      const supabase = createClient()
+      const now = new Date()
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
+
+      const { data } = await supabase
+        .from('transactions')
+        .select('amount')
+        .lt('amount', 0)
+        .gte('date', startOfMonth)
+        .lte('date', endOfMonth)
+
+      if (data && data.length > 0) {
+        const totalExpenses = data.reduce((sum: number, t: { amount: number }) => sum + Math.abs(Number(t.amount)), 0)
+        setDailyExpenses(totalExpenses > 0 ? totalExpenses / 30 : 0)
+      }
+    } catch (err) {
+      console.error('Error loading expenses for freedom-time:', err)
+    }
+  }, [])
 
   const loadDebts = useCallback(async () => {
     try {
@@ -124,13 +150,18 @@ export default function DebtsPage() {
   useEffect(() => {
     loadDebts()
     loadUserAssets()
-  }, [loadDebts, loadUserAssets])
+    loadExpenses()
+  }, [loadDebts, loadUserAssets, loadExpenses])
 
   const activeDebts = debts.filter((d) => d.is_active && Number(d.current_balance) > 0)
   const totalBalance = activeDebts.reduce((s, d) => s + Number(d.current_balance), 0)
   const totalOriginal = activeDebts.reduce((s, d) => s + Number(d.original_amount), 0)
   const totalMonthlyPayments = activeDebts.reduce((s, d) => s + Number(d.monthly_payment), 0)
   const paidOff = totalOriginal > 0 ? ((totalOriginal - totalBalance) / totalOriginal) * 100 : 0
+
+  // Freedom-time calculations for debts
+  const totalDebtFreedom = dailyExpenses > 0 ? calculateFreedomTime(totalBalance, dailyExpenses) : null
+  const monthlyPaymentFreedomDays = dailyExpenses > 0 ? Math.round(totalMonthlyPayments / dailyExpenses) : 0
 
   // Payoff simulation
   const simulation = useMemo(
@@ -198,7 +229,7 @@ export default function DebtsPage() {
           <div>
             <h1 className="text-xl font-bold text-zinc-900">Schulden</h1>
             <p className="mt-1 text-sm text-zinc-500">
-              {activeDebts.length} actieve schuld{activeDebts.length !== 1 ? 'en' : ''}
+              {activeDebts.length} actieve schuld{activeDebts.length !== 1 ? 'en' : ''} — vrijheid die je terugkoopt
             </p>
           </div>
           <button
@@ -211,17 +242,32 @@ export default function DebtsPage() {
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div>
+          <div data-testid="kpi-total-debt">
             <p className="text-xs font-medium text-zinc-500 uppercase">Totale schuld</p>
             <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalBalance)}</p>
+            {totalDebtFreedom && (
+              <p className="mt-0.5 text-xs text-amber-600/80" data-testid="debt-freedom-time">
+                je koopt deze tijd terug in {formatFreedomTimeString(totalDebtFreedom, 'long')}
+              </p>
+            )}
           </div>
-          <div>
+          <div data-testid="kpi-monthly-payment">
             <p className="text-xs font-medium text-zinc-500 uppercase">Maandelijkse aflossing</p>
             <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalMonthlyPayments)}</p>
+            {monthlyPaymentFreedomDays > 0 && (
+              <p className="mt-0.5 text-xs text-amber-600/80" data-testid="payment-freedom-days">
+                je wint {monthlyPaymentFreedomDays} {monthlyPaymentFreedomDays === 1 ? 'dag' : 'dagen'} per maand terug
+              </p>
+            )}
           </div>
-          <div>
+          <div data-testid="kpi-paid-off">
             <p className="text-xs font-medium text-zinc-500 uppercase">Al afgelost</p>
             <p className="mt-1 text-xl font-bold text-emerald-600">{formatCurrency(totalOriginal - totalBalance)}</p>
+            {dailyExpenses > 0 && totalOriginal - totalBalance > 0 && (
+              <p className="mt-0.5 text-xs text-emerald-600/80">
+                {formatFreedomTimeString(calculateFreedomTime(totalOriginal - totalBalance, dailyExpenses), 'long')} vrijheid herwonnen
+              </p>
+            )}
           </div>
           <div>
             <p className="text-xs font-medium text-zinc-500 uppercase">Voortgang</p>
@@ -272,22 +318,37 @@ export default function DebtsPage() {
 
         {/* Strategy results */}
         <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-3">
+          <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-3" data-testid="strategy-payoff-date">
             <p className="text-xs text-zinc-500">Schuldenvrij op</p>
             <p className="mt-1 text-sm font-bold text-zinc-900">
               {summary.payoffDate
                 ? new Date(summary.payoffDate).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
                 : 'Niet mogelijk'}
             </p>
+            {summary.payoffDate && (
+              <p className="mt-0.5 text-[10px] text-amber-600/80" data-testid="strategy-payoff-freedom">
+                Schuldenvrij in {new Date(summary.payoffDate).getFullYear()} — dan verdien je 100% voor jezelf
+              </p>
+            )}
           </div>
           <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-3">
             <p className="text-xs text-zinc-500">Totale rente</p>
             <p className="mt-1 text-sm font-bold text-red-600">{formatCurrency(summary.totalInterest)}</p>
+            {dailyExpenses > 0 && summary.totalInterest > 0 && (
+              <p className="mt-0.5 text-[10px] text-red-500/80">
+                {formatFreedomTimeString(calculateFreedomTime(summary.totalInterest, dailyExpenses), 'long')} aan verloren vrijheid
+              </p>
+            )}
           </div>
           {interestSaved > 0 && (
             <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
               <p className="text-xs text-emerald-600">Rente bespaard</p>
               <p className="mt-1 text-sm font-bold text-emerald-700">{formatCurrency(interestSaved)}</p>
+              {dailyExpenses > 0 && (
+                <p className="mt-0.5 text-[10px] text-emerald-600/80">
+                  {formatFreedomTimeString(calculateFreedomTime(interestSaved, dailyExpenses), 'long')} vrijheid gered
+                </p>
+              )}
             </div>
           )}
           {monthsSaved > 0 && (
@@ -339,6 +400,11 @@ export default function DebtsPage() {
                   <div className="shrink-0 text-right">
                     <p className="text-sm font-semibold text-zinc-900">{formatCurrency(balance)}</p>
                     <p className="text-xs text-zinc-400">van {formatCurrency(original)}</p>
+                    {dailyExpenses > 0 && balance > 0 && (
+                      <p className="text-[10px] text-amber-600/70">
+                        {formatFreedomTimeString(calculateFreedomTime(balance, dailyExpenses), 'short')} terug te winnen
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
@@ -367,6 +433,7 @@ export default function DebtsPage() {
           debt={selectedDebt}
           valuations={valuations[selectedDebt.id]}
           userAssets={userAssets}
+          dailyExpenses={dailyExpenses}
           onClose={closeDebtModal}
           onEdit={() => setModalStep('edit')}
           onRevalue={() => setModalStep('revalue')}
@@ -436,6 +503,7 @@ function DebtDetailModal({
   debt,
   valuations,
   userAssets,
+  dailyExpenses,
   onClose,
   onEdit,
   onRevalue,
@@ -444,6 +512,7 @@ function DebtDetailModal({
   debt: Debt
   valuations: Valuation[] | undefined
   userAssets: Asset[]
+  dailyExpenses: number
   onClose: () => void
   onEdit: () => void
   onRevalue: () => void
@@ -486,7 +555,12 @@ function DebtDetailModal({
 
         {/* Balance highlight */}
         <div className="border-b border-zinc-100 px-6 py-4 text-center">
-          <p className="text-3xl font-bold text-zinc-900">{formatCurrency(balance)}</p>
+          <p className="text-3xl font-bold text-zinc-900" data-testid="modal-debt-balance">{formatCurrency(balance)}</p>
+          {dailyExpenses > 0 && balance > 0 && (
+            <p className="mt-0.5 text-sm text-amber-600" data-testid="modal-debt-freedom-time">
+              je koopt deze tijd terug in {formatFreedomTimeString(calculateFreedomTime(balance, dailyExpenses), 'long')}
+            </p>
+          )}
           <p className="mt-1 text-sm text-zinc-500">van {formatCurrency(original)} ({pct.toFixed(1)}% afgelost)</p>
           <div className="mx-auto mt-2 h-2 w-48 overflow-hidden rounded-full bg-zinc-100">
             <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
@@ -516,9 +590,9 @@ function DebtDetailModal({
               <p className="mt-1 text-2xl font-bold text-amber-700" data-testid="months-to-payoff">
                 {proj.monthsToPayoff} maanden
               </p>
-              <p className="mt-0.5 text-xs text-amber-600">
+              <p className="mt-0.5 text-xs text-amber-600" data-testid="payoff-freedom-message">
                 {proj.payoffDate
-                  ? `Schuldenvrij in ${new Date(proj.payoffDate).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })}`
+                  ? `Schuldenvrij in ${new Date(proj.payoffDate).getFullYear()} — dan verdien je 100% voor jezelf`
                   : ''}
               </p>
             </div>
@@ -529,9 +603,14 @@ function DebtDetailModal({
               <p className="text-xs text-zinc-500">Rente</p>
               <p className="mt-0.5 text-sm font-medium text-zinc-900">{Number(debt.interest_rate)}% p.j.</p>
             </div>
-            <div className="rounded-lg bg-zinc-50 p-3">
+            <div className="rounded-lg bg-zinc-50 p-3" data-testid="modal-monthly-payment">
               <p className="text-xs text-zinc-500">Maandelijkse betaling</p>
               <p className="mt-0.5 text-sm font-medium text-zinc-900">{formatCurrency(Number(debt.monthly_payment))}</p>
+              {dailyExpenses > 0 && Number(debt.monthly_payment) > 0 && (
+                <p className="mt-0.5 text-[10px] text-amber-600/80" data-testid="modal-payment-freedom-days">
+                  je wint {Math.round(Number(debt.monthly_payment) / dailyExpenses)} {Math.round(Number(debt.monthly_payment) / dailyExpenses) === 1 ? 'dag' : 'dagen'} per maand terug
+                </p>
+              )}
             </div>
             <div className="rounded-lg bg-zinc-50 p-3">
               <p className="text-xs text-zinc-500">Aflossing op</p>
@@ -548,6 +627,11 @@ function DebtDetailModal({
               <p className="mt-0.5 text-sm font-medium text-red-600">
                 {proj.isPayable ? formatCurrency(proj.totalInterest) : 'Onbetaalbaar'}
               </p>
+              {dailyExpenses > 0 && proj.isPayable && proj.totalInterest > 0 && (
+                <p className="mt-0.5 text-[10px] text-red-500/80">
+                  {formatFreedomTimeString(calculateFreedomTime(proj.totalInterest, dailyExpenses), 'long')} verloren tijd
+                </p>
+              )}
             </div>
           </div>
 
