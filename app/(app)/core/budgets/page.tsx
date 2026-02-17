@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, Plus, X, Pencil, Save, Trash2,
   GitFork, Fingerprint, Workflow, CircleDot, AlertTriangle,
+  TrendingUp, AlertCircle, BarChart3,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getDefaultBudgets, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
@@ -18,6 +19,8 @@ import { BudgetSankey } from '@/components/app/budget-sankey'
 import { BudgetDonut } from '@/components/app/budget-donut'
 import { BudgetAlert, shouldAlert } from '@/components/app/budget-alert'
 import { useDailyExpenseRate, eurToFreedomTime } from '@/components/app/freedom-time-label'
+import { BudgetSparkline, SparklineWithLabel, type SparklineDataPoint } from '@/components/app/budget-sparkline'
+import { computeBudgetForecast, getConfidenceLabel, getConfidenceColors, type BudgetForecast } from '@/lib/budget-forecast'
 
 export default function BudgetsPage() {
   const searchParams = useSearchParams()
@@ -620,6 +623,7 @@ export default function BudgetsPage() {
         />
       )}
 
+
       {/* Budget edit modal */}
       {selectedBudget && modalStep === 'edit' && (
         <BudgetEditModal
@@ -822,6 +826,8 @@ function BudgetDetailModal({
   // 12-month spending history + limit changes (fetched on mount)
   const [history, setHistory] = useState<{ month: string; label: string; spent: number; limit: number }[]>([])
   const [limitHistory, setLimitHistory] = useState<{ date: string; amount: number }[]>([])
+  // Per-child sparkline data (budgetId -> SparklineDataPoint[])
+  const [childSparklines, setChildSparklines] = useState<Record<string, SparklineDataPoint[]>>({})
   useEffect(() => {
     async function loadHistory() {
       const supabase = createClient()
@@ -873,6 +879,19 @@ function BudgetDetailModal({
       })
 
       setHistory(result)
+
+      // Build per-child sparkline data
+      if (isParent && children.length > 0) {
+        const childData: Record<string, SparklineDataPoint[]> = {}
+        for (const child of children) {
+          childData[child.id] = months.map(m => {
+            const monthTx = (txData ?? []).filter(t => t.date >= m.start && t.date < m.end && t.budget_id === child.id)
+            const monthSpent = monthTx.reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
+            return { month: m.month, label: m.label, spent: monthSpent }
+          })
+        }
+        setChildSparklines(childData)
+      }
     }
 
     loadHistory()
@@ -966,6 +985,108 @@ function BudgetDetailModal({
           )}
         </div>
 
+        {/* Budget forecast next month prediction */}
+        {(() => {
+          const monthlySpending = history.map(h => h.spent)
+          if (monthlySpending.length < 3) return null
+          const forecast = computeBudgetForecast(monthlySpending, limit, budget.name)
+          if (!forecast.hasSufficientData) {
+            return (
+              <div className="border-t border-zinc-100 px-6 py-4" data-testid="budget-forecast-section">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingUp className="h-4 w-4 text-zinc-400" />
+                  <p className="text-xs font-semibold text-zinc-500 uppercase">Voorspelling volgende maand</p>
+                </div>
+                <p className="text-xs text-zinc-400 italic" data-testid="budget-forecast-insufficient">
+                  {forecast.message}
+                </p>
+              </div>
+            )
+          }
+
+          const confColors = getConfidenceColors(forecast.confidence)
+          const confLabel = getConfidenceLabel(forecast.confidence)
+
+          return (
+            <div className="border-t border-zinc-100 px-6 py-4" data-testid="budget-forecast-section">
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp className="h-4 w-4 text-purple-500" />
+                <p className="text-xs font-semibold text-zinc-500 uppercase">Voorspelling volgende maand</p>
+              </div>
+
+              {/* Predicted amount */}
+              <div className="rounded-xl border border-purple-200 bg-gradient-to-r from-purple-50 to-white p-4" data-testid="budget-forecast-card">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs text-purple-600 font-medium">Verwachte uitgaven</p>
+                    <p className="text-2xl font-bold text-zinc-900 mt-0.5" data-testid="budget-forecast-amount">
+                      {formatCurrency(forecast.predicted)}
+                    </p>
+                    {hasFreedomData && forecast.predicted >= 100 && (
+                      <p className="text-sm italic text-zinc-500 mt-0.5">
+                        ≈ {eurToFreedomTime(forecast.predicted, dailyExpenseRate).formattedDagen}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Confidence indicator */}
+                  <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 ${confColors.bg} border ${confColors.border}`} data-testid="budget-forecast-confidence">
+                    <div className={`h-2 w-2 rounded-full ${confColors.dot}`} />
+                    <span className={`text-[10px] font-medium ${confColors.text}`}>
+                      {confLabel}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Contextual message */}
+                <p className="text-xs text-zinc-500 mt-2" data-testid="budget-forecast-message">
+                  {forecast.message}
+                </p>
+
+                {/* Confidence detail */}
+                <div className="mt-2 flex items-center gap-3 text-[10px] text-zinc-400">
+                  <span>Gebaseerd op {forecast.monthsUsed} maanden</span>
+                  <span>•</span>
+                  <span>{forecast.confidencePercent}% betrouwbaarheid</span>
+                </div>
+
+                {/* Budget limit comparison bar */}
+                {limit > 0 && (
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1">
+                      <span>Voorspeld vs limiet</span>
+                      <span>{Math.round((forecast.predicted / limit) * 100)}%</span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          forecast.exceedsLimit ? 'bg-red-500' : forecast.predicted / limit > 0.8 ? 'bg-amber-400' : 'bg-purple-400'
+                        }`}
+                        style={{ width: `${Math.min((forecast.predicted / limit) * 100, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Alert when predicted exceeds limit */}
+              {forecast.exceedsLimit && forecast.alertMessage && (
+                <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3" data-testid="budget-forecast-alert">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-medium text-red-700" data-testid="budget-forecast-alert-message">
+                      {forecast.alertMessage}
+                    </p>
+                    <p className="text-[10px] text-red-500 mt-0.5">
+                      Limiet: {formatCurrency(limit)} — Verwacht: {formatCurrency(forecast.predicted)}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })()}
+
         {/* Children list */}
         {isParent && children.length > 0 && (
           <div className="border-t border-zinc-100 px-6 py-4">
@@ -975,6 +1096,7 @@ function BudgetDetailModal({
                 const childSpent = getSpent(child)
                 const childLimit = getEffectiveLimit(child)
                 const childPct = childLimit > 0 ? Math.min(Math.round((childSpent / childLimit) * 100), 100) : 0
+                const childSparkData = childSparklines[child.id]
                 return (
                   <div
                     key={child.id}
@@ -987,20 +1109,33 @@ function BudgetDetailModal({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
                         <p className="truncate text-xs font-medium text-zinc-700">{child.name}</p>
-                        <div className="ml-2 shrink-0 text-right">
-                          <span className="text-xs text-zinc-500">
-                            {formatCurrency(childSpent)} / {formatCurrency(childLimit)}
-                          </span>
-                          {hasFreedomData && childLimit - childSpent > 0 && (
-                            <p className="text-sm italic text-zinc-500" data-testid="child-freedom-remaining">
-                              nog {eurToFreedomTime(childLimit - childSpent, dailyExpenseRate).formattedDagen}
-                            </p>
+                        <div className="ml-2 flex shrink-0 items-center gap-2">
+                          {/* Per-child sparkline */}
+                          {childSparkData && childSparkData.length >= 2 && (
+                            <BudgetSparkline
+                              data={childSparkData}
+                              width={60}
+                              height={20}
+                              isIncome={budgetType === 'income'}
+                              showFill={true}
+                              testId={`child-sparkline-${child.id}`}
+                            />
                           )}
-                          {hasFreedomData && childSpent > childLimit && (
-                            <p className="text-sm italic text-zinc-500" data-testid="child-freedom-over">
-                              <span className="text-red-500">{eurToFreedomTime(childSpent - childLimit, dailyExpenseRate).formattedDagen} ingeleverd</span>
-                            </p>
-                          )}
+                          <div className="text-right">
+                            <span className="text-xs text-zinc-500">
+                              {formatCurrency(childSpent)} / {formatCurrency(childLimit)}
+                            </span>
+                            {hasFreedomData && childLimit - childSpent > 0 && (
+                              <p className="text-sm italic text-zinc-500" data-testid="child-freedom-remaining">
+                                nog {eurToFreedomTime(childLimit - childSpent, dailyExpenseRate).formattedDagen}
+                              </p>
+                            )}
+                            {hasFreedomData && childSpent > childLimit && (
+                              <p className="text-sm italic text-zinc-500" data-testid="child-freedom-over">
+                                <span className="text-red-500">{eurToFreedomTime(childSpent - childLimit, dailyExpenseRate).formattedDagen} ingeleverd</span>
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-zinc-100">
@@ -1049,6 +1184,22 @@ function BudgetDetailModal({
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* 12-month spending sparkline trend */}
+        {history.length >= 2 && (
+          <div className="border-t border-zinc-100 px-6 py-4" data-testid="budget-sparkline-section">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-zinc-500 uppercase">Uitgaventrend</p>
+              <SparklineWithLabel
+                data={history.map(h => ({ month: h.month, label: h.label, spent: h.spent }))}
+                width={100}
+                height={28}
+                isIncome={budgetType === 'income'}
+                testId="budget-detail-sparkline"
+              />
             </div>
           </div>
         )}
