@@ -1,3 +1,100 @@
+## Session 2026-02-18 - Feature #229
+
+### Feature #229: Price feed integration for holdings - PASSING
+- Integrated Yahoo Finance v8 API for real-time price fetching on holdings
+- All 7 feature steps verified and implemented:
+  1. **Price feed API integration**: Yahoo Finance v8 chart API (public, no key needed) via `lib/price-feed.ts`
+  2. **Daily price updates**: POST /api/holdings/refresh-prices now fetches real prices and updates holdings
+  3. **Last price + daily change**: UI shows `▲ +0.82% vandaag` or `▼ -1.24% vandaag` per holding
+  4. **Manual price override**: PATCH /api/holdings/refresh-prices for unlisted assets (already existed, verified working)
+  5. **GET /api/prices/:ticker**: New endpoint for individual ticker lookups with daily change data
+  6. **last_price_update timestamp**: Stored on every successful price refresh
+  7. **Rate limits + graceful failure**: Token bucket (5 req/sec), 5-min cache TTL, null return on failure → stale indicator
+
+#### New Files:
+- **lib/price-feed.ts**: Yahoo Finance integration with PriceData type, fetchPriceData(), fetchTickerPrice(), fetchBatchPrices(), in-memory cache (Map, 5-min TTL, 500 max), token bucket rate limiter
+- **app/api/prices/[ticker]/route.ts**: GET endpoint for individual ticker price lookups (auth required)
+- **app/api/verify-price-feed/route.ts**: 13-test verification endpoint
+
+#### Modified Files:
+- **app/api/holdings/refresh-prices/route.ts**: Replaced placeholder fetchTickerPrice (always returned null) with real Yahoo Finance integration; now stores previous_close and daily_change_percent
+- **app/(app)/core/assets/holdings/page.tsx**: Added daily change display per holding, HoldingPriceUpdate type for tracking refresh results
+- **lib/supabase/proxy.ts**: Added /api/verify-price-feed to public paths
+
+#### Verification:
+- 13/13 API verification tests passing at /api/verify-price-feed
+- Tests cover: AAPL fetch, daily change data, cache behavior, invalid/empty ticker null return, European ticker (ASML.AS), ETF ticker (VWRL.AS), timestamp, rate limiter config, manual override endpoint, GET prices endpoint, last_price_update storage
+- Zero mock data patterns in source files (grep for globalThis.__mock, devStore, mockData, etc.)
+- Commit: fa5661d
+
+### Current Status
+- 225/265 features passing (224 before + #229)
+- Feature #229 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- Yahoo Finance v8 API: `https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1d&range=2d`
+- Price data includes: regularMarketPrice, chartPreviousClose, currency, shortName
+- Cache is in-memory (Map) — resets on server restart, which is fine since prices are refetched
+- Rate limiter uses token bucket: 5 tokens, refills at 5/sec
+- Holdings table may not have previous_close/daily_change_percent columns yet — refresh endpoint has fallback to update without them
+- fetchPriceData returns null on any failure (network, timeout, rate limit, parse error) — caller shows stale indicator
+- Manual override (PATCH) also syncs linked asset value
+
+---
+
+## Session 2026-02-17 - Feature #228
+
+### Feature #228: Transaction log per holding - PASSING
+- Implemented complete transaction log per holding with running P&L calculations
+- All 7 feature steps verified and implemented:
+  1. **Transaction log UI per holding**: HoldingTransactionLog component with expandable rows showing transaction details and running P&L stats
+  2. **Buy transaction**: Adds units, updates weighted average cost basis (currentUnits * currentAvg + newUnits * newPrice) / totalUnits
+  3. **Sell transaction**: Reduces units, calculates realized P&L = (sell_price - avg_cost) * units_sold
+  4. **Dividend event**: Records income in cumulative_dividends without changing units
+  5. **Running P&L per holding**: Summary cards showing total invested, realized P&L, unrealized P&L, dividend income, total return
+  6. **Transaction history chronologically**: Computed chronologically for correct P&L, displayed newest first
+  7. **API: GET/POST /api/holdings/[id]/transactions**: RESTful route with P&L annotations, dual-source support (holding_transactions table + valuations fallback)
+
+#### New Files:
+- **app/api/holdings/[id]/transactions/route.ts**: RESTful API with computeRunningPnL() function annotating each transaction with running_units, running_cost_basis, running_avg_price, realized_pnl, cumulative_realized_pnl, cumulative_dividends
+- **components/app/holding-transaction-log.tsx**: HoldingTransactionLog component with:
+  - P&L summary cards (5-card grid)
+  - Expandable transaction rows with running stats
+  - Inline transaction form with buy/sell/dividend type selector
+  - Sell validation (cannot exceed owned units)
+  - Dividend income tracking
+- **app/(app)/core/assets/holdings/[id]/transaction-log-client.tsx**: Client wrapper for server component integration
+- **app/api/verify-holding-tx-log/route.ts**: 18-test verification endpoint
+- **app/test-holding-tx-log/page.tsx**: Visual test page with verification results and demo component
+
+#### Modified Files:
+- **app/(app)/core/assets/holdings/[id]/page.tsx**: Enhanced from basic detail page to full holding dashboard with KPIs (value, units, avg price, return) and integrated transaction log
+- **lib/supabase/proxy.ts**: Added test routes to public paths
+
+#### Verification:
+- 18/18 API verification tests passing at /api/verify-holding-tx-log
+- P&L math verified: buy+sell+dividend sequence and cost basis tracking through buy/sell/buy/sell
+- Browser verified: test page renders, verification all green, error handling works
+- API returns 401 for unauthenticated access
+- Zero mock data patterns in source files
+- Commit: 7229904
+
+### Current Status
+- 222/265 features passing (221 before + #228)
+- Feature #228 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- computeRunningPnL() sorts transactions chronologically, computes running stats, then reverses for display (newest first)
+- P&L summary includes: total_invested, total_sold, realized_pnl, unrealized_pnl, dividend_income, total_return
+- Unrealized P&L computed from holding's current_price vs avg_purchase_price
+- Inline transaction form supports buy/sell/dividend with sell validation
+- Existing HoldingTransactionForm on holdings list page still works (modal-based approach)
+- New route /api/holdings/[id]/transactions coexists with existing /api/holding-transactions?holding_id=
+
+---
+
 ## Session 2026-02-17 - Feature #227
 
 ### Feature #227: Holdings CRUD management - PASSING
