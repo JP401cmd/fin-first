@@ -1,3 +1,62 @@
+## Session 2026-02-17 - Feature #176
+
+### Feature #176: Collapsible sections default to collapsed state - PASSING
+- CollapsibleSection component at components/app/collapsible-section.tsx
+- Component prop: `defaultOpen` defaults to `false` — sections start collapsed
+- State initialization: `useState(defaultOpen)` sets isOpen to false by default
+- Summary preview: `{!isOpen && summary && <p>...` shows 1-line preview when collapsed
+- Content hiding: `max-h-0 opacity-0 overflow-hidden` hides content when collapsed
+- Content reveal: `max-h-[5000px] opacity-100` expands content on click
+- Chevron rotation: `isOpen ? 'rotate-180' : ''` rotates ChevronDown icon
+- Accessibility: `aria-expanded={isOpen}` attribute on toggle button
+- Three usages on overview pages, ALL collapsed by default:
+  1. De Kern (/core): "Vermogensverloop" — summary: "{n} snapshots — netto vermogen over tijd"
+  2. De Kern (/core): "Vergelijking snapshots" — summary: date range comparison
+  3. De Wil (/will): "Beslissingspatronen" — summary: "{n} categorieën — vrijheidsdagen per type actie"
+- None of the 3 usages pass `defaultOpen={true}` — all use default collapsed state
+- 12/12 API verification tests passing
+- Visual verification: collapsed sections show title + preview, expanded shows full content
+- Zero console errors
+- No mock data patterns found
+- Commit: 3528231
+
+### Current Status
+- 169/265 features passing (168 before + #176)
+- Feature #176 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- This was a verification-only feature — the CollapsibleSection component was already properly implemented
+- Horizon page (/horizon) does not use CollapsibleSection — only Core and Will pages use it
+- ActionBoard and Box3Calculation have their own inline collapse patterns (also start collapsed)
+
+## Session 2026-02-17 - Feature #174
+
+### Feature #174: Filter reset button clears all active filters - PASSING (verified)
+- Transactions page at app/(app)/core/cash/page.tsx has comprehensive filter system
+- Three filter dimensions: search text (filterSearch), type (filterType: all/income/expense), budget category (filterBudgetId)
+- resetFilters() function clears all three to defaults: '', 'all', 'all'
+- hasActiveFilters computed property checks if any filter differs from defaults
+- Reset button (data-testid="filter-reset") only renders when hasActiveFilters is true
+- Filter summary shows "X van Y transacties" count when filters active
+- Empty state shows filter-specific message with secondary reset button (data-testid="filter-reset-empty")
+- Test page at /test-transaction-filters with interactive demo mirroring exact filter logic
+- API endpoint at /api/verify-transaction-filters with 15 source code verification tests
+- All 15/15 source code tests passing
+- Interactive browser verification:
+  1. Applied search "net" + type "Uitgaven" -> showed 2/7 transactions (Netflix + Ziggo)
+  2. Reset button appeared, filter summary showed "2 van 7 transacties"
+  3. Clicked "Reset filters" button
+  4. All 7 transactions restored, all filter UI reset to defaults
+  5. Reset button and filter summary disappeared (hasActiveFilters = false)
+- Mock data grep: zero hits in production code
+- Console errors: only HMR/RSC connection resets (development artifacts)
+- Feature was already implemented and marked passing by previous session
+
+### Current Status
+- 170/265 features passing (64.2%)
+- Feature #174 verified and confirmed passing
+
 ## Session 2026-02-17 - Feature #175
 
 ### Feature #175: Privacy level defaults to anonymous for sharing - PASSING
