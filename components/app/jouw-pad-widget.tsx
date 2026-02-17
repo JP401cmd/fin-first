@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowRight, Shield, Check, Circle } from 'lucide-react'
+import { ArrowRight, Shield, Check, Circle, Target, Clock, Ban, Flag } from 'lucide-react'
+import type { FreedomMilestone } from '@/lib/freedom-milestones'
 
 // Phase definitions matching identity page
 const PHASES = [
@@ -92,9 +93,11 @@ interface JouwPadWidgetProps {
   netWorth?: number
   monthsCovered?: number
   hasConsumerDebt?: boolean
+  milestones?: FreedomMilestone[]
+  nextMilestoneMessage?: string | null
 }
 
-export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCovered = 0, hasConsumerDebt = false }: JouwPadWidgetProps) {
+export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCovered = 0, hasConsumerDebt = false, milestones, nextMilestoneMessage }: JouwPadWidgetProps) {
   const currentPhase = PHASES.find(p => p.id === phase) ?? PHASES[0]
   const colors = phaseColors[currentPhase.color]
   const levelName = LEVEL_NAMES[level] ?? 'Onbekend'
@@ -208,6 +211,96 @@ export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCo
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Freedom milestone forecast */}
+      {milestones && milestones.length > 0 && (
+        <div className="mt-3" data-testid="jouw-pad-milestones">
+          <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-2">
+            Vrijheidsmijlpalen
+          </p>
+
+          {/* Milestone timeline */}
+          <div className="relative" data-testid="milestone-timeline">
+            {/* Vertical line */}
+            <div className="absolute left-[7px] top-1 bottom-1 w-px bg-zinc-200" />
+
+            <div className="space-y-2">
+              {milestones.map((m) => {
+                const MilestoneIcon = m.icon === 'check' ? Check
+                  : m.icon === 'target' ? Target
+                  : m.icon === 'clock' ? Clock
+                  : Ban
+
+                const iconBg = m.reached
+                  ? 'bg-emerald-100'
+                  : m.icon === 'target'
+                    ? 'bg-purple-100'
+                    : m.icon === 'clock'
+                      ? 'bg-blue-100'
+                      : 'bg-zinc-100'
+
+                const iconColor = m.reached
+                  ? 'text-emerald-600'
+                  : m.icon === 'target'
+                    ? 'text-purple-600'
+                    : m.icon === 'clock'
+                      ? 'text-blue-600'
+                      : 'text-zinc-400'
+
+                return (
+                  <div
+                    key={m.percent}
+                    className="relative flex items-start gap-2.5 pl-0"
+                    data-testid={`milestone-${m.percent}`}
+                    data-reached={m.reached ? 'true' : 'false'}
+                  >
+                    {/* Milestone dot */}
+                    <div className={`relative z-10 flex h-[15px] w-[15px] shrink-0 items-center justify-center rounded-full ${iconBg}`}>
+                      <MilestoneIcon className={`h-2.5 w-2.5 ${iconColor}`} />
+                    </div>
+
+                    {/* Milestone content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className={`text-[11px] font-medium ${m.reached ? 'text-emerald-700' : 'text-zinc-700'}`}>
+                          {m.label}
+                        </span>
+                        {m.reached && (
+                          <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 rounded px-1.5 py-0.5">
+                            ✓
+                          </span>
+                        )}
+                        {m.projectedDate && !m.reached && (
+                          <span className="text-[9px] text-zinc-400 shrink-0">
+                            {m.projectedDate}
+                          </span>
+                        )}
+                      </div>
+                      {!m.reached && (
+                        <p className={`text-[10px] mt-0.5 ${m.monthsAway !== null ? 'text-zinc-500' : 'text-zinc-400 italic'}`}>
+                          {m.message}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Contextual next milestone message */}
+          {nextMilestoneMessage && (
+            <div className="mt-2.5 rounded-lg bg-gradient-to-r from-purple-50 to-blue-50 px-3 py-2 border border-purple-100" data-testid="milestone-next-message">
+              <div className="flex items-center gap-1.5">
+                <Flag className="h-3 w-3 text-purple-500 shrink-0" />
+                <p className="text-[11px] text-purple-700 font-medium">
+                  {nextMilestoneMessage}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

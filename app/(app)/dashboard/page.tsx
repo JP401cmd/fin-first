@@ -5,6 +5,7 @@ import { FhinAvatar, FinnAvatar, FfinAvatar } from '@/components/app/avatars'
 import { JouwPadWidget } from '@/components/app/jouw-pad-widget'
 import { BadgeEvaluator } from '@/components/app/badge-evaluator'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
+import { computeFreedomMilestones } from '@/lib/freedom-milestones'
 import Link from 'next/link'
 import { StreakIndicator } from '@/components/app/streak-indicator'
 import {
@@ -101,6 +102,10 @@ export default async function DashboardPage() {
   })
   const sovereigntyLevel = computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPct, hasConsumerDebt)
   const currentPhaseId = levelToPhaseId(sovereigntyLevel)
+
+  // Freedom milestone forecast for Jouw Pad widget
+  const monthlySavings = monthlyIncome - monthlyExpenses
+  const milestoneResult = computeFreedomMilestones(netWorth, monthlyExpenses, monthlySavings)
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-10">
@@ -282,6 +287,8 @@ export default async function DashboardPage() {
           netWorth={netWorth}
           monthsCovered={monthlyExpenses > 0 ? netWorth / monthlyExpenses : 0}
           hasConsumerDebt={hasConsumerDebt}
+          milestones={milestoneResult.milestones}
+          nextMilestoneMessage={milestoneResult.nextMilestone?.message ?? null}
         />
       </section>
     </div>
