@@ -300,6 +300,10 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-mission-control',
     '/test-section-ordering',
     '/api/verify-section-ordering',
+    '/test-badge-toast',
+    '/api/verify-badge-toast',
+    '/test-badge-evaluation-engine',
+    '/api/verify-badge-evaluation-engine',
   ]
 
   // Protected route prefixes that require authentication

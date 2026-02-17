@@ -255,7 +255,7 @@ export default function WillPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
-      {/* === 1. Hero: Jouw Wilskracht in Actie === */}
+      {/* === 1. Hero (Gradient) === */}
       <section data-testid="wil-hero" className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-950 via-teal-900 to-teal-950 p-5 text-white sm:p-8 md:p-10">
         <div className="pointer-events-none absolute -top-24 right-1/4 h-64 w-64 rounded-full bg-teal-500/10 blur-3xl" />
 
@@ -322,7 +322,7 @@ export default function WillPage() {
         </div>
       </section>
 
-      {/* === Next Step Card === */}
+      {/* === 1b. Next Step Card === */}
       <section className="mt-6">
         <NextStepSection
           steps={computeAllWilSteps({
@@ -335,7 +335,7 @@ export default function WillPage() {
         />
       </section>
 
-      {/* === 2. KPI Stat Cards === */}
+      {/* === 2. KPI Stat Cards (White cards, subtle borders) === */}
       <section data-testid="wil-kpi-grid" className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-voltooide-acties">
           <div className="mb-3 flex items-center justify-between">
@@ -398,7 +398,7 @@ export default function WillPage() {
 
       {/* === 3. Alerts === */}
       {(overdueActions.length > 0 || reactivatedRecs.length > 0 || offTrackGoals.length > 0) && (
-        <section className="mt-8">
+        <section className="mt-8" data-testid="wil-alerts">
           <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
             Aandachtspunten
           </h2>
@@ -431,7 +431,7 @@ export default function WillPage() {
         </section>
       )}
 
-      {/* === 4. Suggesties (RecommendationList inline) === */}
+      {/* === 4. Suggesties (Primary Content) === */}
       <section id="section-suggesties" className="mt-10 scroll-mt-8">
         <div className="mb-5">
           <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
@@ -444,14 +444,14 @@ export default function WillPage() {
         <RecommendationList initialRecommendations={recommendations} />
       </section>
 
-      {/* === 5. Budget Gezondheidscheck (NIBUD) — compact card + modal === */}
+      {/* === 5. Budget Gezondheidscheck (NIBUD) (Primary Content) === */}
       <FeatureGate featureId="nibud_benchmark" fallback="locked">
         <section id="section-gezondheidscheck" className="mt-8 scroll-mt-8">
           <NibudBenchmarkSection />
         </section>
       </FeatureGate>
 
-      {/* === 6. Acties (ActionBoard inline) === */}
+      {/* === 6. Acties (Primary Content) === */}
       <section id="section-acties" className="mt-10 scroll-mt-8">
         <div className="mb-5">
           <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
@@ -464,7 +464,7 @@ export default function WillPage() {
         <ActionBoard initialActions={actions} />
       </section>
 
-      {/* === 6. Doelen (compact + modal) === */}
+      {/* === 7. Doelen (Primary Content) === */}
       <FeatureGate featureId="doelen_systeem" fallback="locked">
       <section id="section-doelen" className="mt-10 scroll-mt-8">
         <div className="mb-5 flex items-center justify-between">
@@ -518,7 +518,7 @@ export default function WillPage() {
       </section>
       </FeatureGate>
 
-      {/* === 7. Beslissingspatronen (Collapsible Deep-Dive) === */}
+      {/* === 8. Beslissingspatronen (Deep Dive) === */}
       <FeatureGate featureId="beslissingspatronen" fallback="locked">
       <section className="mt-10">
         <CollapsibleSection
@@ -565,10 +565,10 @@ export default function WillPage() {
       )}
       </FeatureGate>
 
-      {/* === Locked Features Footer === */}
+      {/* === 9. Locked Features Footer === */}
       <LockedFeaturesFooter module="wil" />
 
-      {/* === Discover Carousel === */}
+      {/* === 10. Discover Carousel === */}
       <DiscoverCarousel module="wil" />
     </div>
   )

@@ -302,7 +302,7 @@ export default function HorizonPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
-      {/* === 1. Hero === */}
+      {/* === 1. Hero (Gradient) === */}
       <section data-testid="horizon-hero" className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-950 via-purple-900 to-purple-950 p-5 text-white sm:p-8 md:p-10">
         <div className="pointer-events-none absolute -top-24 right-1/4 h-64 w-64 rounded-full bg-purple-500/10 blur-3xl" />
 
@@ -386,7 +386,7 @@ export default function HorizonPage() {
         />
       </section>
 
-      {/* === 2. KPI Cards === */}
+      {/* === 2. KPI Cards (White cards, subtle borders) === */}
       <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" data-testid="horizon-kpis">
         <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-fire-age">
           <div className="mb-3 flex items-center justify-between">
@@ -454,28 +454,43 @@ export default function HorizonPage() {
         </FeatureGate>
       </section>
 
-      {/* === 2a. Resilience Trend Chart === */}
-      {resilienceSnapshots.filter(s => s.resilience_score !== null).length >= 2 && (
-        <FeatureGate featureId="veerkracht_score" fallback="hidden">
-        <section className="mt-8" data-testid="resilience-trend-section">
-          <div className="mb-3">
-            <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-              <Shield className="mr-1.5 inline h-3.5 w-3.5 text-purple-500" />
-              Veerkracht verloop
-            </h2>
-            <p className="mt-1 text-sm text-zinc-500">
-              Je veerkrachtscore over tijd, gebaseerd op echte snapshot data
-            </p>
-          </div>
-          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
-            <ResilienceTrendChart snapshots={resilienceSnapshots} />
+      {/* === 3. Alerts === */}
+      {(hasNoDob || fireNotReachable || hasDebt) && (
+        <section className="mt-8" data-testid="horizon-alerts">
+          <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+            Aandachtspunten
+          </h2>
+          <div className="space-y-2">
+            {hasNoDob && (
+              <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                <span className="flex-1 text-sm font-medium text-amber-700">
+                  Stel je geboortedatum in bij instellingen voor nauwkeurige leeftijdsberekeningen.
+                </span>
+              </div>
+            )}
+            {fireNotReachable && (
+              <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50/50 p-3">
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+                <span className="flex-1 text-sm font-medium text-red-700">
+                  Volledige vrijheid is niet haalbaar bij huidige koers. Verhoog je spaarquote of verlaag je uitgaven.
+                </span>
+              </div>
+            )}
+            {hasDebt && (
+              <div className="flex items-center gap-3 rounded-lg border border-purple-200 bg-purple-50/50 p-3">
+                <Info className="h-4 w-4 text-purple-500" />
+                <span className="flex-1 text-sm font-medium text-purple-700">
+                  Je hebt {formatCurrency(effectiveInput?.totalDebts ?? 0)} aan schulden — dit vertraagt je pad naar volledige vrijheid.
+                </span>
+              </div>
+            )}
           </div>
         </section>
-        </FeatureGate>
       )}
 
-      {/* === 2b. Projectie-invoer (Financial Inputs Summary) === */}
-      <section className="mt-8" data-testid="fire-inputs">
+      {/* === 4. Projectie-invoer (Financial Inputs Summary / Primary Content) === */}
+      <section className="mt-10" data-testid="fire-inputs">
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
@@ -632,42 +647,27 @@ export default function HorizonPage() {
         </div>
       </section>
 
-      {/* === 3. Alerts === */}
-      {(hasNoDob || fireNotReachable || hasDebt) && (
-        <section className="mt-8">
-          <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-            Aandachtspunten
-          </h2>
-          <div className="space-y-2">
-            {hasNoDob && (
-              <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
-                <span className="flex-1 text-sm font-medium text-amber-700">
-                  Stel je geboortedatum in bij instellingen voor nauwkeurige leeftijdsberekeningen.
-                </span>
-              </div>
-            )}
-            {fireNotReachable && (
-              <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50/50 p-3">
-                <AlertTriangle className="h-4 w-4 text-red-500" />
-                <span className="flex-1 text-sm font-medium text-red-700">
-                  Volledige vrijheid is niet haalbaar bij huidige koers. Verhoog je spaarquote of verlaag je uitgaven.
-                </span>
-              </div>
-            )}
-            {hasDebt && (
-              <div className="flex items-center gap-3 rounded-lg border border-purple-200 bg-purple-50/50 p-3">
-                <Info className="h-4 w-4 text-purple-500" />
-                <span className="flex-1 text-sm font-medium text-purple-700">
-                  Je hebt {formatCurrency(effectiveInput?.totalDebts ?? 0)} aan schulden — dit vertraagt je pad naar volledige vrijheid.
-                </span>
-              </div>
-            )}
+      {/* === 5. Resilience Trend Chart (Deep Dive) === */}
+      {resilienceSnapshots.filter(s => s.resilience_score !== null).length >= 2 && (
+        <FeatureGate featureId="veerkracht_score" fallback="hidden">
+        <section className="mt-10" data-testid="resilience-trend-section">
+          <div className="mb-3">
+            <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+              <Shield className="mr-1.5 inline h-3.5 w-3.5 text-purple-500" />
+              Veerkracht verloop
+            </h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              Je veerkrachtscore over tijd, gebaseerd op echte snapshot data
+            </p>
+          </div>
+          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
+            <ResilienceTrendChart snapshots={resilienceSnapshots} />
           </div>
         </section>
+        </FeatureGate>
       )}
 
-      {/* === 4. Verken-kaarten (Explore Cards) === */}
+      {/* === 6. Verken-kaarten (Explore Cards / Primary Content) === */}
       <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <FeatureGate featureId="fire_projecties" fallback="locked">
           <ExploreCard
@@ -707,7 +707,7 @@ export default function HorizonPage() {
         </FeatureGate>
       </section>
 
-      {/* === 5. Tijdlijn + 6. Levensgebeurtenissen === */}
+      {/* === 7. Tijdlijn + Levensgebeurtenissen (Primary Content) === */}
       <FeatureGate featureId="levensgebeurtenissen" fallback="locked">
       <section className="mt-10">
         <div className="mb-5">
@@ -760,7 +760,7 @@ export default function HorizonPage() {
         )}
       </section>
 
-      {/* === 6. Levensgebeurtenissen === */}
+      {/* === 8. Levensgebeurtenissen (Primary Content) === */}
       <section className="mt-8">
         {events.length > 0 && (
           <>
@@ -868,7 +868,7 @@ export default function HorizonPage() {
       </section>
       </FeatureGate>
 
-      {/* === 7. Acties === */}
+      {/* === 9. Acties (Primary Content) === */}
       {actions.length > 0 && (
         <section className="mt-8">
           <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
@@ -887,7 +887,7 @@ export default function HorizonPage() {
         </section>
       )}
 
-      {/* === 8. Projectie-chart === */}
+      {/* === 10. Projectie-chart (Deep Dive) === */}
       <FeatureGate featureId="vermogensprojectie_chart" fallback="locked">
       <section className="mt-10">
         <div className="mb-5">
@@ -904,7 +904,7 @@ export default function HorizonPage() {
       </section>
       </FeatureGate>
 
-      {/* === 9. Samenvatting === */}
+      {/* === 11. Samenvatting (Deep Dive) === */}
       <section className="mt-10">
         <div className="mb-5">
           <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">

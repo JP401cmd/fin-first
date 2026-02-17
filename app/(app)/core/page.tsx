@@ -1048,7 +1048,7 @@ type DetectedMilestone = NetWorthMilestone & {
 function getNetWorthMilestones(fireTarget: number): NetWorthMilestone[] {
   const milestones: NetWorthMilestone[] = [
     // Crossing zero — positive net worth
-    { amount: 0, label: 'In de plus', icon: '📈', color: '#10b981', badgeSlug: 'positive_net_worth' },
+    { amount: 0, label: 'In de plus', icon: '📈', color: '#10b981', badgeSlug: 'positief_vermogen' },
     // Round number milestones
     { amount: 10000, label: '€10k', icon: '🎯', color: '#f59e0b' },
     { amount: 25000, label: '€25k', icon: '⭐', color: '#f59e0b' },
@@ -1063,9 +1063,8 @@ function getNetWorthMilestones(fireTarget: number): NetWorthMilestone[] {
   if (fireTarget > 0) {
     milestones.push(
       { amount: fireTarget * 0.10, label: '10% FIRE', icon: '🌱', color: '#a855f7', badgeSlug: 'fire_10_pct' },
-      { amount: fireTarget * 0.25, label: '25% FIRE', icon: '🌿', color: '#a855f7', badgeSlug: 'fire_25_pct' },
-      { amount: fireTarget * 0.50, label: '50% FIRE', icon: '🌳', color: '#a855f7', badgeSlug: 'fire_50_pct' },
-      { amount: fireTarget * 1.00, label: '100% FIRE', icon: '∞', color: '#a855f7', badgeSlug: 'fire_100_pct' },
+      { amount: fireTarget * 0.50, label: '50% FIRE', icon: '🌳', color: '#a855f7', badgeSlug: 'fire_halftime' },
+      { amount: fireTarget * 1.00, label: '100% FIRE', icon: '∞', color: '#a855f7', badgeSlug: 'fire_bereikt' },
     )
   }
 
