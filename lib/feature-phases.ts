@@ -43,6 +43,7 @@ export const FEATURES: FeatureDef[] = [
   { id: 'snapshot_vergelijking',    label: 'Snapshot Vergelijking',       description: 'Side-by-side vergelijking laatste 2 snapshots' },
   { id: 'cashflow_sankey',          label: 'Cashflow Diagram',            description: 'Sankey inkomen→budget flow visualisatie' },
   { id: 'cashflow_forecast',        label: 'Cashflow Prognose',           description: 'Voorspelling banksaldo 3-6 maanden vooruit' },
+  { id: 'vermogensprognose_kern',   label: 'Vermogensprognose',           description: 'Korte-termijn (1-5 jaar) netto vermogensprognose op De Kern' },
   { id: 'data_export',              label: 'Data Export',                 description: 'CSV export van transacties, budgetten, vermogen, assets, schulden, doelen' },
   // Wil
   { id: 'doelen_systeem',           label: 'Doelen Systeem',              description: 'Financiele doelen instellen, voortgang volgen, ETA-berekening' },
@@ -120,6 +121,7 @@ export const DEFAULT_MATRIX: FeaturePhaseMatrix = {
   snapshot_vergelijking:     { recovery: false, stability: false, momentum: true,  mastery: true },
   cashflow_sankey:           { recovery: false, stability: true,  momentum: true,  mastery: true },
   cashflow_forecast:         { recovery: false, stability: true,  momentum: true,  mastery: true },
+  vermogensprognose_kern:    { recovery: false, stability: true,  momentum: true,  mastery: true },
   data_export:               { recovery: false, stability: false, momentum: true,  mastery: true },
   // Wil
   doelen_systeem:            { recovery: false, stability: true,  momentum: true,  mastery: true },

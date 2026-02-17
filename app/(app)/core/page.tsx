@@ -23,6 +23,8 @@ import { NextStepSection, computeAllKernSteps } from '@/components/app/next-step
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { SparklineWithLabel, type SparklineDataPoint } from '@/components/app/budget-sparkline'
 import { CashFlowForecastChart, type ForecastPoint, type ForecastAlert } from '@/components/app/cashflow-forecast-chart'
+import { NetWorthProjectionChart } from '@/components/app/net-worth-projection-chart'
+import { computeNetWorthProjection, type NetWorthProjectionResult } from '@/lib/net-worth-projection'
 
 export default function CorePage() {
   const router = useRouter()
@@ -47,6 +49,7 @@ export default function CorePage() {
   const [cashFlowAlerts, setCashFlowAlerts] = useState<ForecastAlert[]>([])
   const [cashFlowBalance, setCashFlowBalance] = useState(0)
   const [cashFlowHasData, setCashFlowHasData] = useState(false)
+  const [nwProjection, setNwProjection] = useState<NetWorthProjectionResult | null>(null)
 
   const loadData = useCallback(async () => {
     try {
@@ -190,6 +193,14 @@ export default function CorePage() {
 
       const coreData = computeCoreData(monthlyIncome, monthlyExpenses, totalAssets, totalDebts, extrapolatedIncome, yearlyMustExpenses)
       setData(coreData)
+
+      // Compute net worth projection (1-5 year short-term view)
+      const netWorth = totalAssets - totalDebts
+      const monthlySavings = monthlyIncome - monthlyExpenses
+      if (monthlyIncome > 0 || monthlyExpenses > 0 || netWorth !== 0) {
+        const projResult = computeNetWorthProjection(netWorth, monthlySavings, coreData.fireTarget)
+        setNwProjection(projResult)
+      }
 
       // Set next step data
       setHasTransactions((txResult.data?.length ?? 0) > 0)
@@ -812,6 +823,22 @@ export default function CorePage() {
                 alerts={cashFlowAlerts}
                 currentBalance={cashFlowBalance}
               />
+            </CollapsibleSection>
+          </section>
+        )}
+      </FeatureGate>
+
+      {/* === 4d. Net Worth Growth Projection (Short-term 1-5 year view) === */}
+      <FeatureGate featureId="vermogensprognose_kern" fallback="locked">
+        {nwProjection && nwProjection.points.length >= 2 && (
+          <section className="mt-8" data-testid="kern-nw-projection-section">
+            <CollapsibleSection
+              storageKey="kern_nw_projection"
+              title="Vermogensprognose"
+              summary="Op dit tempo bereik je... — 5-jarenprognose"
+              icon={<TrendingUp className="h-5 w-5 text-amber-600" />}
+            >
+              <NetWorthProjectionChart projection={nwProjection} />
             </CollapsibleSection>
           </section>
         )}
