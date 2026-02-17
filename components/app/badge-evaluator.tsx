@@ -35,7 +35,7 @@ export function BadgeEvaluator({ force = false }: { force?: boolean }) {
 
     // Delay evaluation slightly to not block page rendering
     const timer = setTimeout(async () => {
-      await evaluateBadges()
+      await evaluateBadges('page_load')
       if (typeof window !== 'undefined') {
         sessionStorage.setItem(sessionKey, Date.now().toString())
       }

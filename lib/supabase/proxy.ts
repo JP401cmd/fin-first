@@ -304,6 +304,11 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-badge-toast',
     '/test-badge-evaluation-engine',
     '/api/verify-badge-evaluation-engine',
+    '/api/badges/seed-public',
+    '/api/verify-badge-schema',
+    '/test-badge-schema',
+    '/test-badge-showcase',
+    '/api/verify-badge-grid',
   ]
 
   // Protected route prefixes that require authentication

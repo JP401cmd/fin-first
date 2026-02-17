@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { headers } from 'next/headers'
 import { computeFireProjection, computeResilienceScore, type HorizonInput } from '@/lib/horizon-data'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 
@@ -230,6 +231,25 @@ export async function POST() {
     upsertError = 'Extended columns not available (migration pending). Basic snapshot saved.'
   } else {
     snapshot = fullSnapshot
+  }
+
+  // Trigger badge evaluation after snapshot creation (fire-and-forget, server-side)
+  try {
+    const headersList = await headers()
+    const host = headersList.get('host') || 'localhost:3000'
+    const protocol = host.startsWith('localhost') ? 'http' : 'https'
+    const cookie = headersList.get('cookie') || ''
+
+    fetch(`${protocol}://${host}/api/badges/evaluate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': cookie,
+      },
+      body: JSON.stringify({ trigger: 'month_close' }),
+    }).catch(() => {}) // Fire-and-forget, non-blocking
+  } catch {
+    // Silent fail — badge evaluation is non-critical
   }
 
   return NextResponse.json({

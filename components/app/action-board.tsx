@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Plus, ChevronDown, ChevronRight, Sparkles } from 'lucide-react'
 import { ActionCard } from '@/components/app/action-card'
 import { ActionForm } from '@/components/app/action-form'
+import { useBadgeEvaluation } from '@/lib/hooks/use-badge-evaluation'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 
 type ActionBoardProps = {
@@ -15,6 +16,7 @@ export function ActionBoard({ initialActions }: ActionBoardProps) {
   const [showForm, setShowForm] = useState(false)
   const [showPostponed, setShowPostponed] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
+  const { evaluateBadges } = useBadgeEvaluation()
 
   const openActions = actions
     .filter((a) => a.status === 'open')
@@ -56,6 +58,11 @@ export function ActionBoard({ initialActions }: ActionBoardProps) {
         return { ...a, ...updates }
       })
     )
+
+    // Trigger badge evaluation after action completion (fire-and-forget)
+    if (status === 'completed') {
+      evaluateBadges('action_complete').catch(() => {})
+    }
   }
 
   async function handleUpdateAction(id: string, data: Record<string, unknown>) {

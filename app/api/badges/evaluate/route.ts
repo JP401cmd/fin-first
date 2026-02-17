@@ -132,30 +132,19 @@ async function evaluateBadges(
 
   // ── 1. Onboarding badges ─────────────────────────────────────
 
-  // first_login: User exists (they're logged in, so they've logged in at least once)
-  if (!existingEarned.has('first_login')) {
-    newlyEarned.push('first_login')
+  // eerste_stap: User exists (logged in = first login)
+  if (!existingEarned.has('eerste_stap')) {
+    newlyEarned.push('eerste_stap')
   }
 
-  // profile_complete: Check if required profile fields are filled
-  if (!existingEarned.has('profile_complete') && profile) {
-    const hasName = !!profile.full_name
-    const hasDob = !!profile.date_of_birth
-    const hasCountry = !!profile.country
-    const hasHousehold = !!profile.household_type
-    if (hasName && hasDob && hasCountry && hasHousehold) {
-      newlyEarned.push('profile_complete')
-    }
+  // data_detective: User has imported bank data (has transactions)
+  if (!existingEarned.has('data_detective') && transactions.length > 0) {
+    newlyEarned.push('data_detective')
   }
 
-  // first_account: User has at least one bank account
-  if (!existingEarned.has('first_account') && accounts.length > 0) {
-    newlyEarned.push('first_account')
-  }
-
-  // first_budget: User has at least one budget
-  if (!existingEarned.has('first_budget') && budgets.length > 0) {
-    newlyEarned.push('first_budget')
+  // budgetbouwer: User has at least one budget
+  if (!existingEarned.has('budgetbouwer') && budgets.length > 0) {
+    newlyEarned.push('budgetbouwer')
   }
 
   // ── 2. Financial Health badges ────────────────────────────────
@@ -176,18 +165,28 @@ async function evaluateBadges(
   )
   const netWorth = totalAssets + totalCash - totalDebt
 
-  // debt_free: No active debts (paid-off debts with is_active=false or current_balance=0 don't count)
+  // schuldenvrij: No active debts
   const activeDebts = debts.filter(
     (d: { is_active?: boolean; current_balance?: number }) =>
       d.is_active !== false && Number(d.current_balance) > 0
   )
-  if (!existingEarned.has('debt_free') && activeDebts.length === 0) {
-    newlyEarned.push('debt_free')
+  if (!existingEarned.has('schuldenvrij') && activeDebts.length === 0) {
+    newlyEarned.push('schuldenvrij')
   }
 
-  // positive_net_worth: Net worth > 0
-  if (!existingEarned.has('positive_net_worth') && netWorth > 0) {
-    newlyEarned.push('positive_net_worth')
+  // positief_vermogen: Net worth > 0
+  if (!existingEarned.has('positief_vermogen') && netWorth > 0) {
+    newlyEarned.push('positief_vermogen')
+  }
+
+  // eerste_10k: Net worth >= 10000
+  if (!existingEarned.has('eerste_10k') && netWorth >= 10000) {
+    newlyEarned.push('eerste_10k')
+  }
+
+  // 100k_club: Net worth >= 100000
+  if (!existingEarned.has('100k_club') && netWorth >= 100000) {
+    newlyEarned.push('100k_club')
   }
 
   // ── 3. Actions badges ────────────────────────────────────────
@@ -196,49 +195,45 @@ async function evaluateBadges(
     (a: { status?: string }) => a.status === 'completed' || a.status === 'done'
   )
 
-  if (!existingEarned.has('first_action') && completedActions.length >= 1) {
-    newlyEarned.push('first_action')
+  if (!existingEarned.has('eerste_actie') && completedActions.length >= 1) {
+    newlyEarned.push('eerste_actie')
   }
-  if (!existingEarned.has('actions_10') && completedActions.length >= 10) {
-    newlyEarned.push('actions_10')
+  if (!existingEarned.has('actieheld_x10') && completedActions.length >= 10) {
+    newlyEarned.push('actieheld_x10')
   }
-  if (!existingEarned.has('actions_50') && completedActions.length >= 50) {
-    newlyEarned.push('actions_50')
+  if (!existingEarned.has('vrijheidsjager') && completedActions.length >= 25) {
+    newlyEarned.push('vrijheidsjager')
   }
-
-  // ── 4. Sovereignty badges ────────────────────────────────────
-
-  // sovereignty_recovery: Everyone who has logged in is at least in recovery
-  if (!existingEarned.has('sovereignty_recovery')) {
-    newlyEarned.push('sovereignty_recovery')
-  }
-
-  // sovereignty_stability: Has positive net worth and at least 1 budget
-  if (
-    !existingEarned.has('sovereignty_stability') &&
-    netWorth > 0 &&
-    budgets.length > 0
-  ) {
-    newlyEarned.push('sovereignty_stability')
-  }
-
-  // sovereignty_momentum: Has assets and net worth > 10000
-  if (
-    !existingEarned.has('sovereignty_momentum') &&
-    assets.length > 0 &&
-    netWorth > 10000
-  ) {
-    newlyEarned.push('sovereignty_momentum')
+  if (!existingEarned.has('beslisser') && completedActions.length >= 50) {
+    newlyEarned.push('beslisser')
   }
 
   return newlyEarned
 }
 
 /**
+ * Valid trigger sources for badge evaluation.
+ * Used to track what triggered the evaluation for analytics and debugging.
+ */
+const VALID_TRIGGERS = ['login', 'action_complete', 'import', 'month_close', 'page_load', 'manual'] as const
+type EvaluationTrigger = typeof VALID_TRIGGERS[number]
+
+/**
  * POST /api/badges/evaluate — Evaluate which badges a user has earned.
  *
  * Checks user's financial data against badge criteria and awards any
  * newly earned badges. Returns list of newly awarded badges.
+ *
+ * Accepts optional JSON body:
+ *   { trigger?: 'login' | 'action_complete' | 'import' | 'month_close' | 'page_load' | 'manual' }
+ *
+ * Trigger sources:
+ *   - login: Called after successful user authentication
+ *   - action_complete: Called after an action is marked as completed
+ *   - import: Called after a bank file import completes
+ *   - month_close: Called after a monthly snapshot is created
+ *   - page_load: Called by BadgeEvaluator component on page mount
+ *   - manual: Called explicitly by user or test
  */
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -248,13 +243,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
-  // Validate request body if provided (body is optional for this endpoint)
+  // Parse request body (optional) to extract trigger
+  let trigger: EvaluationTrigger = 'manual'
   const contentType = request.headers.get('content-type')
   if (contentType && contentType.includes('application/json')) {
     try {
       const body = await request.json()
       if (body !== null && body !== undefined && (typeof body !== 'object' || Array.isArray(body))) {
         return NextResponse.json({ error: 'Request body moet een JSON-object zijn of leeg' }, { status: 400 })
+      }
+      // Extract trigger from body
+      if (body && typeof body === 'object' && 'trigger' in body) {
+        const t = body.trigger
+        if (typeof t === 'string' && VALID_TRIGGERS.includes(t as EvaluationTrigger)) {
+          trigger = t as EvaluationTrigger
+        }
       }
     } catch {
       return NextResponse.json({ error: 'Ongeldig JSON-formaat in request body' }, { status: 400 })
@@ -276,6 +279,7 @@ export async function POST(request: NextRequest) {
         total_badges: BADGE_DEFINITIONS.length,
         message: 'Geen nieuwe badges verdiend. Blijf groeien!',
         source,
+        trigger,
       })
     }
 
@@ -311,6 +315,7 @@ export async function POST(request: NextRequest) {
       total_badges: BADGE_DEFINITIONS.length,
       message: `${newlyEarnedDetails.length} nieuwe badge${newlyEarnedDetails.length === 1 ? '' : 's'} verdiend!`,
       source,
+      trigger,
     })
   } catch (err) {
     console.error('Badge evaluation error:', err)
@@ -320,6 +325,7 @@ export async function POST(request: NextRequest) {
       total_badges: BADGE_DEFINITIONS.length,
       message: 'Er ging iets mis bij het evalueren van badges.',
       source: 'definitions',
+      trigger,
       error: err instanceof Error ? err.message : 'Unknown error',
     })
   }

@@ -561,6 +561,13 @@ export default function ImportPage() {
     setImportedBatchIndex(0)
     setStep(4)
     setImporting(false)
+
+    // Trigger badge evaluation after successful import (fire-and-forget)
+    fetch('/api/badges/evaluate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trigger: 'import' }),
+    }).catch(() => {}) // Silent fail — badges are non-critical
   }
 
   const newCount = rows.filter((r) => !r.isDuplicate).length
