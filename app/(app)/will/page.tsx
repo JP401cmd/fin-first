@@ -16,7 +16,7 @@ import {
 import { computeGoalProgress, getGoalColorClasses, type Goal } from '@/lib/goal-data'
 import {
   CheckCircle, Sparkles, Target, Flame, Info, Plus,
-  AlertTriangle, Clock, TrendingDown, ArrowRight,
+  AlertTriangle, Clock, TrendingDown, ArrowRight, BarChart3,
 } from 'lucide-react'
 import { NibudBenchmarkSection } from '@/components/app/will/nibud-benchmark'
 import { FeatureGate } from '@/components/app/feature-gate'
@@ -25,6 +25,7 @@ import { DiscoverCarousel } from '@/components/app/discover-carousel'
 import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
 import { NextStepSection, computeAllWilSteps } from '@/components/app/next-step-card'
 import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-animation'
+import { FreedomDaysMonthlyTrend } from '@/components/app/will/freedom-days-monthly-trend'
 
 type KpiData = {
   completedActions: { id: string; status: string; freedom_days_impact: number; source: string; completed_at: string | null; due_date: string | null; created_at: string; recommendation: { recommendation_type: string }[] | null }[]
@@ -564,6 +565,22 @@ export default function WillPage() {
         </CollapsibleSection>
       </section>
       </FeatureGate>
+
+      {/* === 8b. Vrijheidsdagen Maandtrend (Deep Dive) === */}
+      <section className="mt-6" data-testid="wil-freedom-days-trend-section">
+        <CollapsibleSection
+          storageKey="wil_freedom_days_trend"
+          title="Vrijheidsdagen per maand"
+          summary={
+            completedActions.length > 0
+              ? `12-maandtrend — ${completedActions.filter(a => a.completed_at).length} voltooide acties`
+              : 'Nog geen voltooide acties'
+          }
+          icon={<BarChart3 className="h-5 w-5 text-teal-600" />}
+        >
+          <FreedomDaysMonthlyTrend completedActions={completedActions} />
+        </CollapsibleSection>
+      </section>
 
       {/* === Modals === */}
       <FeatureGate featureId="doelen_systeem" fallback="locked">

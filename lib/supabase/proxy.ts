@@ -152,6 +152,7 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-ai-recommendations',
     '/test-milestone-markers',
     '/api/verify-milestone-markers',
+    '/api/verify-net-worth-milestones',
     '/test-portfolio-donut',
     '/api/verify-portfolio-donut',
     '/test-box3-optimization',
@@ -326,6 +327,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-budget-sparklines-212',
     '/test-fire-age-trend',
     '/api/verify-fire-age-trend',
+    '/test-freedom-days-monthly-trend',
+    '/api/verify-freedom-days-monthly-trend',
   ]
 
   // Protected route prefixes that require authentication
