@@ -10,6 +10,7 @@ import { MobilePreviewFrame } from '@/components/app/beheer/mobile-preview-frame
 import { ToastProvider } from '@/components/app/toast-provider'
 import { BadgeNotifier } from '@/components/app/badge-notifier'
 import { SessionMonitor } from '@/components/app/session-monitor'
+import { AutoSnapshotTrigger } from '@/components/app/auto-snapshot-trigger'
 import { DailyExpenseProvider } from '@/components/app/freedom-time-label'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
 import { PHASES } from '@/lib/feature-phases'
@@ -76,6 +77,7 @@ export default async function AppLayout({
       <MobilePreviewFrame>
         <ToastProvider>
           <SessionMonitor />
+          <AutoSnapshotTrigger />
           <BadgeNotifier />
           <div className="min-h-screen bg-zinc-50">
             <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />

@@ -317,6 +317,9 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-level-up-celebration',
     '/test-streak-tracking',
     '/api/verify-streak-tracking',
+    '/test-auto-snapshots',
+    '/api/verify-auto-snapshots',
+    '/api/snapshots/cron',
   ]
 
   // Protected route prefixes that require authentication
