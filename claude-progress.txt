@@ -5197,3 +5197,42 @@ For Feature #51 (Transaction Import):
 - No confirmed test users available for authenticated browser testing (Supabase email rate limit)
 - The holdings/[id] dynamic route was partially created by feature #145 agent; this session enhanced it with assets fallback and full verification
 - The not-found.tsx uses Next.js 14+ notFound() pattern (server component calls notFound() → renders not-found.tsx)
+
+## Session 2026-02-17 - Feature #189
+
+### Feature #189: De Horizon unique timeline and future lens - PASSING
+- De Horizon hero shows FIRE age as primary metric (data-testid="hero-fire-age")
+  - Big number: Math.round(fire.fireAge) with label "jaar — FIRE leeftijd"
+  - Falls back to freedom percentage when fireAge is null
+- FIRE age does NOT appear as primary metric on any other page:
+  - Dashboard: shows countdown + freedom % (no fireAge reference)
+  - De Kern: shows net worth (no fireAge reference)
+  - De Wil: shows actions (no fireAge reference)
+- All four KPI cards present on De Horizon:
+  1. Vrijheidsleeftijd (FIRE age) - data-testid="kpi-fire-age"
+  2. Aftellen (countdown days) - data-testid="kpi-countdown"
+  3. Vrijheidspercentage (freedom %) - data-testid="kpi-freedom-pct"
+  4. Veerkracht (resilience) - data-testid="resilience-kpi" (feature-gated)
+- Consistent purple color theme throughout:
+  - Hero: purple-950 gradient, purple-300/80 text, purple-500/10 blur
+  - KPIs: purple-50 icon backgrounds, purple-600 icon text
+- Hero sub-metrics: countdown, freedom time, fire date (data-testid attributes added)
+- 12/12 verification tests passing
+- Zero console errors
+- No mock data patterns found
+
+### Changes Made
+- app/(app)/horizon/page.tsx: Added data-testid attributes to hero and KPI sections, updated hero label to "FIRE leeftijd"
+- app/api/verify-horizon-hero/route.ts: Created 12-test verification endpoint
+- app/test-horizon-hero/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: c945dc5
+
+### Current Status
+- 182/265 features passing (181 before + #189)
+- Feature #189 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- FIRE age is uniquely De Horizon's primary metric — other pages have their own unique primaries
+- The hero already had FIRE age as the big number; changes were primarily adding data-testid and clarifying the label

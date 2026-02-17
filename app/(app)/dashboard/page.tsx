@@ -8,8 +8,7 @@ import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import Link from 'next/link'
 import { StreakIndicator } from '@/components/app/streak-indicator'
 import {
-  ArrowRight, Wallet, Zap, Compass,
-  TrendingUp, Target, Clock, Shield,
+  ArrowRight, Zap, Compass, TrendingUp,
 } from 'lucide-react'
 
 export default async function DashboardPage() {
@@ -21,12 +20,10 @@ export default async function DashboardPage() {
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
-  const today = now.toISOString().split('T')[0]
-
   const [
     txResult, assetsResult, debtsResult, profileResult,
-    essentialBudgetsResult, actionsResult, eventsResult,
-    allBudgetsResult, recsResult, childBudgetsResult,
+    essentialBudgetsResult, actionsResult, _eventsResult,
+    _allBudgetsResult, _recsResult, childBudgetsResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('current_value, monthly_contribution').eq('is_active', true),
@@ -82,25 +79,17 @@ export default async function DashboardPage() {
   const allActions = actionsResult.data ?? []
   const openActions = allActions.filter(a => a.status === 'open')
   const totalFreedomDaysOpen = openActions.reduce((s, a) => s + (Number(a.freedom_days_impact) || 0), 0)
-  const latestRec = recsResult.data?.[0] ?? null
-
-  // Horizon calculations
-  const eventCount = eventsResult.data?.length ?? 0
-
-  // Budget alerts count
-  // For simplicity, estimate budget alerts as budgets where spending might be high
-  // We'll just show the count of active top-level budgets
-  const budgetCount = allBudgetsResult.data?.length ?? 0
 
   // Daily expenses for freedom-time calculations
   const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 0
 
-  // Net worth as freedom time (for De Kern subtitle)
-  const netWorthFreedom = dailyExpenses > 0
-    ? calculateFreedomTime(netWorth, dailyExpenses)
+  // Vermogensgroei deze maand (net cash flow this month: income - expenses)
+  const monthlyGrowth = monthlyIncome - monthlyExpenses
+  const growthDays = dailyExpenses > 0
+    ? calculateFreedomTime(Math.abs(monthlyGrowth), dailyExpenses)
     : null
-  const netWorthFreedomStr = netWorthFreedom
-    ? formatFreedomTimeString(netWorthFreedom, 'long')
+  const growthDaysStr = growthDays
+    ? formatFreedomTimeString(growthDays, 'long')
     : null
 
   const activated = profileResult.data?.last_known_phase !== null
@@ -151,38 +140,20 @@ export default async function DashboardPage() {
             Je financiele fundament. Inzicht in je vermogen, schulden en budgetten.
           </p>
 
-          {/* Preview metrics */}
+          {/* Preview metric — Vermogensgroei deze maand */}
           <div className="space-y-3 border-t border-zinc-100 pt-4">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                  <Wallet className="h-3.5 w-3.5" /> Netto vermogen
-                </span>
-                <span className="text-sm font-semibold text-zinc-900">
-                  {formatCurrency(netWorth)}
-                </span>
+            <div data-testid="kern-preview-metric">
+              <div className="flex items-center gap-1.5 text-xs text-zinc-400 mb-1">
+                <TrendingUp className="h-3.5 w-3.5" /> Vermogensgroei deze maand
               </div>
-              {netWorthFreedomStr && (
-                <p data-testid="kern-freedom-subtitle" className="mt-0.5 text-right text-xs text-amber-600/80">
-                  {netWorthFreedomStr} vrijheid
-                </p>
-              )}
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                <Shield className="h-3.5 w-3.5" /> Vrijheid
-              </span>
-              <span className="text-sm font-semibold text-amber-600">
-                {freedomPct.toFixed(1)}%
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                <TrendingUp className="h-3.5 w-3.5" /> Budgetten
-              </span>
-              <span className="text-sm font-medium text-zinc-600">
-                {budgetCount} actief
-              </span>
+              <p className="text-sm font-semibold text-zinc-900" data-testid="kern-preview-value">
+                {monthlyGrowth >= 0 ? '+' : ''}{formatCurrency(monthlyGrowth)}
+                {growthDaysStr && (
+                  <span className="ml-1 font-normal text-amber-600">
+                    ({monthlyGrowth >= 0 ? '+' : '-'}{growthDaysStr})
+                  </span>
+                )}
+              </p>
             </div>
           </div>
 
@@ -209,38 +180,19 @@ export default async function DashboardPage() {
               Bewuste keuzes en acties. Van inzicht naar impact.
             </p>
 
-            {/* Preview metrics */}
+            {/* Preview metric — X acties open — Y dagen te winnen */}
             <div className="space-y-3 border-t border-zinc-100 pt-4">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                  <Zap className="h-3.5 w-3.5" /> Open acties
-                </span>
-                <span className="text-sm font-semibold text-zinc-900">
-                  {openActions.length}
-                </span>
-              </div>
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                    <Target className="h-3.5 w-3.5" /> Vrijheid te winnen
-                  </span>
-                  <span data-testid="wil-freedom-subtitle" className="text-sm font-semibold text-teal-600">
-                    {Math.round(totalFreedomDaysOpen)} {Math.round(totalFreedomDaysOpen) === 1 ? 'dag' : 'dagen'}
-                  </span>
+              <div data-testid="wil-preview-metric">
+                <div className="flex items-center gap-1.5 text-xs text-zinc-400 mb-1">
+                  <Zap className="h-3.5 w-3.5" /> Openstaande acties
                 </div>
-                {totalFreedomDaysOpen > 0 && (
-                  <p className="mt-0.5 text-right text-xs text-teal-600/70">
-                    via {openActions.length} open {openActions.length === 1 ? 'actie' : 'acties'}
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                  <Clock className="h-3.5 w-3.5" /> Laatste aanbeveling
-                </span>
-                <span className="max-w-[140px] truncate text-sm font-medium text-zinc-600">
-                  {latestRec?.title ?? 'Geen'}
-                </span>
+                <p className="text-sm font-semibold text-zinc-900" data-testid="wil-preview-value">
+                  {openActions.length} {openActions.length === 1 ? 'actie' : 'acties'} open
+                  <span className="mx-1 text-zinc-400">—</span>
+                  <span className="text-teal-600">
+                    {Math.round(totalFreedomDaysOpen)} {Math.round(totalFreedomDaysOpen) === 1 ? 'dag' : 'dagen'} te winnen
+                  </span>
+                </p>
               </div>
             </div>
 
@@ -267,47 +219,20 @@ export default async function DashboardPage() {
               Je pad naar financiele vrijheid. Projecties, scenario&apos;s en je tijdlijn.
             </p>
 
-            {/* Preview metrics */}
+            {/* Preview metric — Countdown: X jaar, Y maanden */}
             <div className="space-y-3 border-t border-zinc-100 pt-4">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                  <Compass className="h-3.5 w-3.5" /> Verwachte FIRE-leeftijd
-                </span>
-                <span className="text-sm font-semibold text-zinc-900">
-                  {fireProjResult.fireAge != null ? `${Math.round(fireProjResult.fireAge)} jaar` : '-'}
-                </span>
-              </div>
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                    <TrendingUp className="h-3.5 w-3.5" /> Naar volledige vrijheid
-                  </span>
-                  <span data-testid="horizon-freedom-subtitle" className="text-sm font-semibold text-purple-600">
-                    {fireProjResult.countdownDays > 0
-                      ? `${fireProjResult.countdownYears}j ${fireProjResult.countdownMonths}mnd`
-                      : fireProjResult.fireDate === 'Bereikt!' ? 'Bereikt!' : '-'}
-                  </span>
+              <div data-testid="horizon-preview-metric">
+                <div className="flex items-center gap-1.5 text-xs text-zinc-400 mb-1">
+                  <Compass className="h-3.5 w-3.5" /> Countdown naar vrijheid
                 </div>
-                {fireProjResult.countdownDays > 0 && (
-                  <p className="mt-0.5 text-right text-xs text-purple-600/70">
-                    {fireProjResult.countdownYears > 0
-                      ? `${fireProjResult.countdownYears} jaar naar volledige vrijheid`
-                      : `${fireProjResult.countdownMonths} maanden naar volledige vrijheid`}
-                  </p>
-                )}
-                {fireProjResult.fireDate === 'Bereikt!' && (
-                  <p className="mt-0.5 text-right text-xs text-purple-600/70">
-                    Volledige vrijheid bereikt!
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                  <Target className="h-3.5 w-3.5" /> Levensgebeurtenissen
-                </span>
-                <span className="text-sm font-medium text-zinc-600">
-                  {eventCount} gepland
-                </span>
+                <p className="text-sm font-semibold text-zinc-900" data-testid="horizon-preview-value">
+                  {fireProjResult.fireDate === 'Bereikt!'
+                    ? <span className="text-purple-600">Bereikt! 🎉</span>
+                    : fireProjResult.countdownDays > 0
+                      ? <>Countdown: <span className="text-purple-600">{fireProjResult.countdownYears} jaar, {fireProjResult.countdownMonths} maanden</span></>
+                      : <span className="text-zinc-400">-</span>
+                  }
+                </p>
               </div>
             </div>
 
@@ -342,8 +267,8 @@ export default async function DashboardPage() {
           {fireProjResult.fireDate === 'Bereikt!'
             ? 'Je passief inkomen dekt je uitgaven!'
             : fireProjResult.fireDate === 'Niet haalbaar'
-              ? 'Verhoog je spaarcapaciteit om je FIRE-doel te bereiken'
-              : `Verwacht FIRE-moment: ${fireProjResult.fireDate}`
+              ? 'Verhoog je spaarcapaciteit om volledige vrijheid te bereiken'
+              : `Verwacht moment van volledige vrijheid: ${fireProjResult.fireDate}`
           }
         </p>
       </section>
