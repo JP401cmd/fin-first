@@ -1,3 +1,40 @@
+## Session 2026-02-17 - Feature #173
+
+### Feature #173: Data reset via onboarding clears all and resets to defaults - PASSING
+- Reset endpoint at POST /api/onboarding/reset handles comprehensive data clearing
+- deleteAllUserData() clears 23 tables in FK-safe batch ordering:
+  - Batch 0: holding_transactions, user_badges, user_streaks, user_feature_visits, next_step_completions
+  - Batch 0b: holdings
+  - Batch 1a: goal_contributions, category_corrections
+  - Batch 1b: recommendation_feedback, budget_rollovers, recurring_transactions, valuations, net_worth_snapshots, life_events, goals
+  - Batch 2: actions, transactions, budget_amounts
+  - Batch 3: recommendations, debts, assets, bank_accounts, budgets
+- Enhanced reset to also clear app_settings fallback entries (earned_badges_{userId}, streaks_{userId})
+- Profile reset to defaults: onboarding_completed=false, is_demo_user=false, full_name=null, date_of_birth=null, household_type='solo', temporal_balance=3, net_monthly_income=null, number_of_children=0, children_ages=[]
+- Sovereignty level auto-resets: computed from empty financial data → level=0, phase="recovery"
+- Badges reset: user_badges table cleared in batch 0
+- Streaks reset: user_streaks table cleared in batch 0
+- Fresh onboarding enabled: onboarding_completed=false triggers onboarding flow
+- 13/13 verification tests passing at /api/verify-data-reset-full
+- Zero console errors
+- Zero mock data patterns found
+- UI triggers: Identity page "Alles wissen" button + Beheer testdata "Bevestigen" button
+
+### Changes Made
+- app/api/onboarding/reset/route.ts: Added app_settings cleanup for badges/streaks fallback, enhanced profile reset fields
+- app/api/verify-data-reset-full/route.ts: Created 13-test verification endpoint
+- app/test-data-reset-full/page.tsx: Created visual test page
+- lib/supabase/proxy.ts: Added test routes to public paths
+
+### Current Status
+- 169/265 features passing (168 before + #173)
+- Feature #173 completed, verified, and committed
+
+### Notes for Next Session
+- Browser automation had issues due to shared playwright daemon (multiple agents competing)
+- Used curl-based API verification as primary test method
+- Port 3000 used this session
+
 ## Session 2026-02-17 - Feature #178
 
 ### Feature #178: formatWithFreedom() utility function - PASSING
