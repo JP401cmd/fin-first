@@ -1,3 +1,44 @@
+## Session 2026-02-17 - Feature #197
+
+### Feature #197: Feature roadmap view on Identity page - PASSING
+- Enhanced Chronology Scale section on /identity page to show per-phase feature unlock information
+- Implementation details:
+  1. Imported FEATURES, PHASES, DEFAULT_MATRIX, levelToPhaseId from lib/feature-phases.ts
+  2. Created getFeaturesPerPhase() helper that maps each feature to its first-available phase
+  3. Created featureIcons map with emoji icons for all 19 features
+  4. Added feature pills (icon + label) along each phase in the timeline
+  5. Feature pills show locked (🔒) vs unlocked (✓) state based on current sovereignty level
+  6. Each phase shows count of features that unlock ("X features worden ontgrendeld")
+  7. Expandable feature list per phase shows full feature names and descriptions
+  8. Tooltips on hover show feature description and unlock status
+  9. Visual consistency maintained with existing phase colors (rose/blue/teal/amber)
+- Feature distribution across phases:
+  - Recovery: 3 features (nibud_benchmark, budget_optimalisatie, schulden_aflosplan)
+  - Stability: 8 features (box3_belasting, fire_projecties, levensgebeurtenissen, veerkracht_score, vermogensprojectie_chart, vermogensverloop, cashflow_sankey, doelen_systeem)
+  - Momentum: 7 features (asset_allocatie, monte_carlo, fire_scenario_analyse, fire_geavanceerde_params, snapshot_vergelijking, data_export, beslissingspatronen)
+  - Mastery: 1 feature (withdrawal_strategie)
+- 12/12 verification tests passing at /api/verify-feature-roadmap
+- Zero console errors
+- No mock data patterns found (grep clean)
+- data-testid attributes: feature-roadmap-{phase}, feature-pill-{featureId}, feature-list-{phase}, feature-detail-{featureId}
+
+### Changes Made
+- app/(app)/identity/page.tsx: Enhanced with feature roadmap in Chronology Scale section
+- app/api/verify-feature-roadmap/route.ts: Created 12-test verification endpoint
+- app/test-feature-roadmap/page.tsx: Created visual test page with feature-phase mapping
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: 4e7a65f
+
+### Current Status
+- 190/265 features passing (189 before + #197)
+- Feature #197 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- No authenticated test user available for browser testing of /identity page (Supabase email rate limit)
+- Feature roadmap is purely client-side rendering based on FEATURES/PHASES/DEFAULT_MATRIX from lib/feature-phases.ts
+- The identity page calculates sovereignty level from Supabase data (assets, debts, transactions)
+
 ## Session 2026-02-17 - Feature #194
 
 ### Feature #194: New feature spotlight after phase transition - PASSING
