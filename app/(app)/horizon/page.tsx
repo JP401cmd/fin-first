@@ -662,6 +662,7 @@ export default function HorizonPage() {
             </p>
           </div>
           <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
+            <ResilienceContextMessage snapshots={resilienceSnapshots} />
             <ResilienceTrendChart snapshots={resilienceSnapshots} />
           </div>
         </section>
@@ -1210,6 +1211,55 @@ function getResilienceLabel(score: number): string {
   if (score >= 40) return 'Redelijk'
   if (score >= 20) return 'Kwetsbaar'
   return 'Kritiek'
+}
+
+function ResilienceContextMessage({ snapshots }: { snapshots: SnapshotForTrend[] }) {
+  const withScore = snapshots.filter(s => s.resilience_score !== null && s.resilience_score !== undefined)
+  if (withScore.length < 2) return null
+
+  const first = withScore[0]
+  const last = withScore[withScore.length - 1]
+  const firstScore = first.resilience_score as number
+  const lastScore = last.resilience_score as number
+  const diff = lastScore - firstScore
+
+  // Calculate month span between first and last snapshot
+  const firstDate = new Date(first.snapshot_date)
+  const lastDate = new Date(last.snapshot_date)
+  const monthSpan = (lastDate.getFullYear() - firstDate.getFullYear()) * 12 + (lastDate.getMonth() - firstDate.getMonth())
+  const monthLabel = monthSpan === 1 ? '1 maand' : `${monthSpan} maanden`
+
+  return (
+    <div className="mb-4 rounded-lg border border-purple-100 bg-purple-50 px-4 py-3" data-testid="resilience-context-message">
+      <p className="text-sm text-purple-800">
+        {diff > 0 ? (
+          <>
+            <span className="font-semibold text-emerald-700">
+              Je veerkracht is gestegen van {firstScore} naar {lastScore} in {monthLabel}
+            </span>
+            {' — '}
+            goed bezig! Je financiële buffer wordt sterker.
+          </>
+        ) : diff < 0 ? (
+          <>
+            <span className="font-semibold text-amber-700">
+              Je veerkracht is gedaald van {firstScore} naar {lastScore} in {monthLabel}
+            </span>
+            {' — '}
+            bekijk je uitgaven en buffer om je veerkracht te herstellen.
+          </>
+        ) : (
+          <>
+            Je veerkracht is stabiel gebleven op{' '}
+            <span className="font-bold">{lastScore}</span>
+            {monthSpan > 0 && <> over {monthLabel}</>}
+            {' — '}
+            <span className="font-medium">{getResilienceLabel(lastScore)}</span>.
+          </>
+        )}
+      </p>
+    </div>
+  )
 }
 
 function ResilienceTrendChart({ snapshots }: { snapshots: SnapshotForTrend[] }) {
