@@ -322,6 +322,10 @@ export async function updateSession(request: NextRequest) {
     '/api/snapshots/cron',
     '/test-asset-valuation-trends',
     '/api/verify-asset-valuation-trends',
+    '/test-budget-sparklines-212',
+    '/api/verify-budget-sparklines-212',
+    '/test-fire-age-trend',
+    '/api/verify-fire-age-trend',
   ]
 
   // Protected route prefixes that require authentication
