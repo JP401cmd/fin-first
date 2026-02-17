@@ -298,6 +298,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-discover-carousel-201',
     '/test-mission-control',
     '/api/verify-mission-control',
+    '/test-section-ordering',
+    '/api/verify-section-ordering',
   ]
 
   // Protected route prefixes that require authentication
