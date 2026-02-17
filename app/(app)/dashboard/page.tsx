@@ -279,6 +279,9 @@ export default async function DashboardPage() {
           level={sovereigntyLevel}
           phase={currentPhaseId}
           freedomPct={freedomPct}
+          netWorth={netWorth}
+          monthsCovered={monthlyExpenses > 0 ? netWorth / monthlyExpenses : 0}
+          hasConsumerDebt={hasConsumerDebt}
         />
       </section>
     </div>
