@@ -303,7 +303,7 @@ export default function HorizonPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* === 1. Hero === */}
-      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-950 via-purple-900 to-purple-950 p-5 text-white sm:p-8 md:p-10">
+      <section data-testid="horizon-hero" className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-950 via-purple-900 to-purple-950 p-5 text-white sm:p-8 md:p-10">
         <div className="pointer-events-none absolute -top-24 right-1/4 h-64 w-64 rounded-full bg-purple-500/10 blur-3xl" />
 
         <div className="relative">
@@ -314,17 +314,17 @@ export default function HorizonPage() {
             </p>
           </div>
 
-          <div className="mb-6">
+          <div className="mb-6" data-testid="hero-primary-metric">
             {fire.fireAge !== null ? (
               <>
-                <span className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
+                <span data-testid="hero-fire-age" className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
                   {Math.round(fire.fireAge)}
                 </span>
-                <span className="ml-3 text-lg text-purple-200/70">jaar -- verwachte FIRE leeftijd</span>
+                <span className="ml-3 text-lg text-purple-200/70">jaar — FIRE leeftijd</span>
               </>
             ) : (
               <>
-                <span className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl lg:text-6xl">
+                <span data-testid="hero-freedom-pct-fallback" className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl lg:text-6xl">
                   {fire.freedomPercentage.toFixed(1)}%
                 </span>
                 <span className="ml-3 text-lg text-purple-200/70">vrijheid bereikt</span>
@@ -341,28 +341,28 @@ export default function HorizonPage() {
             </div>
             <div className="mt-2 flex justify-between text-xs text-purple-300/50">
               <span>0%</span>
-              <span>{formatCurrency(fire.fireTarget)} FIRE doel</span>
+              <span>{formatCurrency(fire.fireTarget)} — volledige vrijheid</span>
               <span>100%</span>
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-3">
-            <div>
+            <div data-testid="hero-countdown">
               <p className="text-xs font-medium text-purple-300/60 uppercase">Aftellen</p>
               <p className="mt-1 text-2xl font-bold">
                 {fire.countdownDays > 0 ? `${fire.countdownDays.toLocaleString('nl-NL')} dagen` : fire.fireDate}
               </p>
-              <p className="text-sm text-purple-200/50">tot verwachte FIRE</p>
+              <p className="text-sm text-purple-200/50">tot volledige vrijheid</p>
             </div>
-            <div>
+            <div data-testid="hero-freedom-time">
               <p className="text-xs font-medium text-purple-300/60 uppercase">Vrijheidstijd</p>
               <p className="mt-1 text-2xl font-bold">
                 {fire.freedomYears}j {fire.freedomMonths}mnd
               </p>
               <p className="text-sm text-purple-200/50">opgebouwde vrijheid</p>
             </div>
-            <div>
-              <p className="text-xs font-medium text-purple-300/60 uppercase">Verwachte FIRE</p>
+            <div data-testid="hero-fire-date">
+              <p className="text-xs font-medium text-purple-300/60 uppercase">Volledige vrijheid</p>
               <p className="mt-1 text-2xl font-bold capitalize">{fire.fireDate}</p>
               {fire.fireAge !== null && (
                 <p className="text-sm text-purple-200/50">
@@ -387,15 +387,15 @@ export default function HorizonPage() {
       </section>
 
       {/* === 2. KPI Cards === */}
-      <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+      <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" data-testid="horizon-kpis">
+        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-fire-age">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-50">
               <Hourglass className="h-5 w-5 text-purple-600" />
             </div>
-            <KpiTooltip text="Je verwachte FIRE leeftijd met optimistisch en pessimistisch scenario." />
+            <KpiTooltip text="Je verwachte vrijheidsleeftijd met optimistisch en pessimistisch scenario." />
           </div>
-          <p className="text-sm font-medium text-zinc-500">FIRE Leeftijd</p>
+          <p className="text-sm font-medium text-zinc-500">Vrijheidsleeftijd</p>
           <p className="mt-1 text-3xl font-bold text-zinc-900">
             {fire.fireAge !== null ? Math.round(fire.fireAge) : '-'}
           </p>
@@ -406,30 +406,30 @@ export default function HorizonPage() {
           )}
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-countdown">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-50">
               <Calendar className="h-5 w-5 text-purple-600" />
             </div>
-            <KpiTooltip text="Aantal dagen tot je verwachte FIRE-datum." />
+            <KpiTooltip text="Aantal dagen tot je verwacht moment van volledige vrijheid." />
           </div>
           <p className="text-sm font-medium text-zinc-500">Aftellen</p>
           <p className="mt-1 text-3xl font-bold text-zinc-900">
             {fire.countdownDays > 0 ? fire.countdownDays.toLocaleString('nl-NL') : '0'}
           </p>
-          <p className="mt-1 text-xs text-zinc-400">dagen tot FIRE</p>
+          <p className="mt-1 text-xs text-zinc-400">dagen tot volledige vrijheid</p>
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-freedom-pct">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-50">
               <Percent className="h-5 w-5 text-purple-600" />
             </div>
-            <KpiTooltip text="Hoe ver je bent richting financiele vrijheid. 100% = FIRE bereikt." />
+            <KpiTooltip text="Hoe ver je bent richting volledige vrijheid. 100% = volledig vrij." />
           </div>
           <p className="text-sm font-medium text-zinc-500">Vrijheidspercentage</p>
           <p className="mt-1 text-3xl font-bold text-purple-600">{fire.freedomPercentage.toFixed(1)}%</p>
-          <p className="mt-1 text-xs text-zinc-400">van FIRE doel</p>
+          <p className="mt-1 text-xs text-zinc-400">van volledige vrijheid</p>
         </div>
 
         <FeatureGate featureId="veerkracht_score" fallback="locked">
@@ -482,7 +482,7 @@ export default function HorizonPage() {
               Projectie-invoer
             </h2>
             <p className="mt-1 text-sm text-zinc-500">
-              Jouw financiele gegevens die de FIRE-projectie bepalen
+              Jouw financiële gegevens die je pad naar volledige vrijheid bepalen
             </p>
           </div>
           {incomeOverride !== null && (
@@ -651,7 +651,7 @@ export default function HorizonPage() {
               <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50/50 p-3">
                 <AlertTriangle className="h-4 w-4 text-red-500" />
                 <span className="flex-1 text-sm font-medium text-red-700">
-                  FIRE is niet haalbaar bij huidige koers. Verhoog je spaarquote of verlaag je uitgaven.
+                  Volledige vrijheid is niet haalbaar bij huidige koers. Verhoog je spaarquote of verlaag je uitgaven.
                 </span>
               </div>
             )}
@@ -659,7 +659,7 @@ export default function HorizonPage() {
               <div className="flex items-center gap-3 rounded-lg border border-purple-200 bg-purple-50/50 p-3">
                 <Info className="h-4 w-4 text-purple-500" />
                 <span className="flex-1 text-sm font-medium text-purple-700">
-                  Je hebt {formatCurrency(effectiveInput?.totalDebts ?? 0)} aan schulden -- dit vertraagt je FIRE-datum.
+                  Je hebt {formatCurrency(effectiveInput?.totalDebts ?? 0)} aan schulden — dit vertraagt je pad naar volledige vrijheid.
                 </span>
               </div>
             )}
@@ -674,8 +674,8 @@ export default function HorizonPage() {
             onClick={() => setActiveModal('projections')}
             icon={<TrendingUp className="h-5 w-5 text-purple-600" />}
             title="Projecties"
-            value={fire.fireAge !== null ? `FIRE op ${Math.round(fire.fireAge)}` : fire.fireDate}
-            subtitle="FIRE voorspelling"
+            value={fire.fireAge !== null ? `Vrij op ${Math.round(fire.fireAge)}` : fire.fireDate}
+            subtitle="vrijheidsvoorspelling"
           />
         </FeatureGate>
         <FeatureGate featureId="fire_scenario_analyse" fallback="locked">
@@ -715,7 +715,7 @@ export default function HorizonPage() {
             Jouw tijdlijn
           </h2>
           <p className="mt-1 text-sm text-zinc-500">
-            Plan levensgebeurtenissen en acties, en zie hun impact op je FIRE-datum
+            Plan levensgebeurtenissen en acties, en zie hun impact op je pad naar vrijheid
           </p>
         </div>
 
@@ -723,7 +723,7 @@ export default function HorizonPage() {
         <div className="rounded-xl border border-purple-200 bg-purple-50 p-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="text-center">
-              <p className="text-xs font-medium text-purple-600 uppercase">Basis FIRE</p>
+              <p className="text-xs font-medium text-purple-600 uppercase">Basis vrijheid</p>
               <p className="mt-1 text-3xl font-bold text-zinc-900">
                 {baseFire?.fireAge != null ? `${Math.round(baseFire.fireAge)}j` : '-'}
               </p>
@@ -819,7 +819,7 @@ export default function HorizonPage() {
                           <div className="mt-3 rounded-lg bg-zinc-50 p-3">
                             <p className="text-xs text-zinc-600">
                               <span className="font-medium">Impact:</span>{' '}
-                              FIRE {impact.fireDelayMonths > 0 ? `+${impact.fireDelayMonths} maanden later` : 'geen vertraging'}{' '}
+                              Vrijheid {impact.fireDelayMonths > 0 ? `+${impact.fireDelayMonths} maanden later` : 'geen vertraging'}{' '}
                               {'\u00B7'} totale kosten {formatCurrency(impact.totalCost)}{' '}
                               {'\u00B7'} {impact.freedomDaysLost} vrijheidsdagen
                             </p>
@@ -895,7 +895,7 @@ export default function HorizonPage() {
             Vermogensprojectie
           </h2>
           <p className="mt-1 text-sm text-zinc-500">
-            Verwacht netto vermogen richting FIRE-doel (30 jaar, 7% rendement)
+            Verwacht netto vermogen richting volledige vrijheid (30 jaar, 7% rendement)
           </p>
         </div>
         <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
@@ -1114,7 +1114,7 @@ function ProjectionChart({ data, fireTarget }: { data: ProjectionMonth[]; fireTa
         <>
           <line x1={PAD} y1={fireY} x2={W - PAD} y2={fireY} stroke="#8B5CB8" strokeWidth="1.5" strokeDasharray="6 3" />
           <text x={W - PAD + 4} y={fireY + 3} className="fill-purple-500" style={{ fontSize: 9, fontWeight: 600 }}>
-            FIRE
+            Vrij
           </text>
         </>
       )}
