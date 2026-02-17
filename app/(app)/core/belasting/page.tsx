@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { formatCurrency } from '@/lib/format'
+import { formatCurrency, formatWithFreedom } from '@/lib/format'
 import { FhinAvatar } from '@/components/app/avatars'
 import {
   calculateBox3,
@@ -199,17 +199,20 @@ export default function BelastingPage() {
           </div>
 
           <div className="mb-3">
-            <span className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl lg:text-6xl">
+            <span className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl lg:text-6xl" data-testid="belasting-hero-amount">
               {formatCurrency(result.belasting)}
             </span>
           </div>
 
-          <div className="mb-6 flex items-center gap-3">
-            <p className="text-lg text-amber-200/70">
+          <div className="mb-1 flex items-center gap-3">
+            <p className="text-lg text-amber-200/70" data-testid="belasting-hero-freedom-days">
               Box 3 kost je <span className="font-semibold text-amber-300">{result.vrijheidsdagen} vrijheidsdagen</span>
             </p>
             <KpiTooltip text={BOX3_TOOLTIPS.box3} />
           </div>
+          <p className="mb-6 text-sm text-amber-300/50" data-testid="belasting-hero-freedom-time">
+            {formatWithFreedom(result.belasting, dailyExpenses, { includeCurrency: false })} verloren aan belasting
+          </p>
 
           <div className="flex items-center gap-2 text-xs text-amber-300/50">
             <CalendarDays className="h-3.5 w-3.5" />
@@ -221,7 +224,7 @@ export default function BelastingPage() {
 
       {/* === B. KPI Cards === */}
       <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-totale-belasting">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
               <Receipt className="h-5 w-5 text-amber-600" />
@@ -230,10 +233,12 @@ export default function BelastingPage() {
           </div>
           <p className="text-sm font-medium text-zinc-500">Totale Belasting</p>
           <p className="mt-1 text-3xl font-bold text-zinc-900">{formatCurrency(result.belasting)}</p>
-          <p className="mt-1 text-xs text-zinc-400">Box 3 {year}</p>
+          <p className="mt-1 text-xs text-red-500" data-testid="kpi-belasting-freedom">
+            {result.vrijheidsdagen} vrijheidsdagen verloren
+          </p>
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-effectief-tarief">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
               <Percent className="h-5 w-5 text-amber-600" />
@@ -242,22 +247,26 @@ export default function BelastingPage() {
           </div>
           <p className="text-sm font-medium text-zinc-500">Effectief Tarief</p>
           <p className="mt-1 text-3xl font-bold text-zinc-900">{effectiefTariefPct.toFixed(2)}%</p>
-          <p className="mt-1 text-xs text-zinc-400">over totaal Box 3 vermogen</p>
+          <p className="mt-1 text-xs text-zinc-400" data-testid="kpi-tarief-freedom">
+            {formatCurrency(result.belasting)} belasting
+          </p>
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-vrijheidsdagen">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
               <Clock className="h-5 w-5 text-amber-600" />
             </div>
             <KpiTooltip text="Hoeveel vrijheidsdagen je verliest aan Box 3 belasting. Berekening: belasting / dagelijkse uitgaven." />
           </div>
-          <p className="text-sm font-medium text-zinc-500">Vrijheidsdagen</p>
+          <p className="text-sm font-medium text-zinc-500">Vrijheidsdagen verloren</p>
           <p className="mt-1 text-3xl font-bold text-red-600">-{result.vrijheidsdagen}</p>
-          <p className="mt-1 text-xs text-zinc-400">verloren aan belasting</p>
+          <p className="mt-1 text-xs text-red-400" data-testid="kpi-vrijheidsdagen-time">
+            {formatWithFreedom(result.belasting, dailyExpenses, { includeCurrency: false })}
+          </p>
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-heffingsvrij">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
               <ShieldCheck className="h-5 w-5 text-amber-600" />
@@ -266,8 +275,8 @@ export default function BelastingPage() {
           </div>
           <p className="text-sm font-medium text-zinc-500">Heffingsvrij Benut</p>
           <p className="mt-1 text-3xl font-bold text-zinc-900">{heffingsvrijBenut.toFixed(0)}%</p>
-          <p className="mt-1 text-xs text-zinc-400">
-            van {formatCurrency(result.heffingsvrijVermogen)}
+          <p className="mt-1 text-xs text-zinc-400" data-testid="kpi-heffingsvrij-freedom">
+            {formatWithFreedom(result.heffingsvrijVermogen, dailyExpenses, { format: 'short', includeCurrency: true })}
           </p>
         </div>
       </section>
@@ -370,13 +379,13 @@ export default function BelastingPage() {
                     <p className="text-sm font-semibold text-zinc-900">{tip.title}</p>
                     <p className="mt-1 text-xs text-zinc-500">{tip.description}</p>
                     {tip.besparing > 0 && (
-                      <div className="mt-2 flex items-center gap-3">
+                      <div className="mt-2 flex flex-wrap items-center gap-2" data-testid={`optimization-${tip.id}-savings`}>
                         <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
-                          Besparing: {formatCurrency(tip.besparing)}
+                          Besparing: {formatWithFreedom(tip.besparing, dailyExpenses)}
                         </span>
                         {tip.vrijheidsdagen > 0 && (
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-                            +{tip.vrijheidsdagen} vrijheidsdagen
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700" data-testid={`optimization-${tip.id}-freedom`}>
+                            +{tip.vrijheidsdagen} vrijheidsdagen teruggewonnen
                           </span>
                         )}
                       </div>
