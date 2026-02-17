@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { AlertTriangle, TrendingDown, Info, X } from 'lucide-react'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { shouldAlert, type BudgetType } from '@/lib/budget-alerts'
+import { useDailyExpenseRate, eurToFreedomTime } from '@/components/app/freedom-time-label'
 
 // Re-export shouldAlert and BudgetType for backwards compatibility
 export { shouldAlert, type BudgetType } from '@/lib/budget-alerts'
@@ -28,12 +29,21 @@ export function BudgetAlert({
   onNavigate,
 }: BudgetAlertProps) {
   const [dismissed, setDismissed] = useState(false)
+  const { dailyExpenseRate, loading: rateLoading, source } = useDailyExpenseRate()
+
   if (dismissed) return null
 
   // Income: no alerts
   if (budgetType === 'income') return null
 
   const pct = limit > 0 ? (spent / limit) * 100 : 0
+
+  // Freedom-time calculation for over-budget amounts
+  const overAmount = spent > limit ? spent - limit : 0
+  const hasFreedomData = !rateLoading && source === 'transactions' && dailyExpenseRate > 0
+  const freedomOver = hasFreedomData && overAmount > 0
+    ? eurToFreedomTime(overAmount, dailyExpenseRate)
+    : null
 
   let level: 'warning' | 'danger' | 'critical' | 'info'
   let message: string
@@ -75,6 +85,7 @@ export function BudgetAlert({
       className={`flex items-center gap-3 rounded-lg border p-3 ${colorClasses} ${
         level === 'critical' ? 'animate-pulse' : ''
       }`}
+      data-testid="budget-alert"
     >
       <IconComponent className={`h-4 w-4 shrink-0 ${
         budgetType === 'savings' ? 'text-blue-500' :
@@ -88,6 +99,11 @@ export function BudgetAlert({
         <p className="text-xs opacity-80">
           {message} — {formatCurrency(spent)} van {formatCurrency(limit)}
         </p>
+        {freedomOver && (
+          <p className="text-sm italic text-zinc-500" data-testid="alert-freedom-time">
+            {formatCurrency(overAmount)} over — {freedomOver.formattedDagen} ingeleverd
+          </p>
+        )}
       </div>
       <button
         onClick={(e) => { e.stopPropagation(); setDismissed(true) }}

@@ -120,9 +120,10 @@ export function eurToFreedomTime(amount: number, dailyExpenseRate: number): {
   months: number
   years: number
   formatted: string
+  formattedDagen: string
 } {
   if (dailyExpenseRate <= 0 || amount <= 0) {
-    return { days: 0, months: 0, years: 0, formatted: '-' }
+    return { days: 0, months: 0, years: 0, formatted: '-', formattedDagen: '0 dagen' }
   }
 
   const totalDays = amount / dailyExpenseRate
@@ -139,7 +140,16 @@ export function eurToFreedomTime(amount: number, dailyExpenseRate: number): {
     formatted = `${Math.max(days, 1)}d`
   }
 
-  return { days: Math.round(totalDays), months, years, formatted }
+  // Dutch-locale decimal days format for budget displays: "2,4 dagen"
+  const formattedDagen = totalDays < 1
+    ? `${totalDays.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} dagen`
+    : totalDays < 30
+      ? `${totalDays.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} dagen`
+      : totalDays < 365
+        ? `${(totalDays / 30).toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} maanden`
+        : `${(totalDays / 365).toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} jaar`
+
+  return { days: Math.round(totalDays), months, years, formatted, formattedDagen }
 }
 
 /**

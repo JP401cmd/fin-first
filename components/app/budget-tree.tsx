@@ -3,6 +3,7 @@
 import { useRef, useLayoutEffect, useState, useCallback, useEffect } from 'react'
 import { BudgetIcon, formatCurrency, getTypeColors, type BudgetType } from '@/components/app/budget-shared'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
+import { useDailyExpenseRate, eurToFreedomTime } from '@/components/app/freedom-time-label'
 
 interface BudgetTreeProps {
   groups: BudgetWithChildren[]
@@ -105,14 +106,42 @@ function ChildBar({
         />
       </div>
 
-      {/* Amount label */}
-      <span className="w-24 shrink-0 text-right text-xs text-zinc-500 lg:w-28">
-        <span className={`font-medium ${overBudget ? 'text-red-600' : 'text-zinc-700'}`}>
-          {formatCurrency(spent)}
+      {/* Amount label + freedom days */}
+      <div className="w-28 shrink-0 text-right lg:w-32">
+        <span className="text-xs text-zinc-500">
+          <span className={`font-medium ${overBudget ? 'text-red-600' : 'text-zinc-700'}`}>
+            {formatCurrency(spent)}
+          </span>
+          <span className="text-zinc-400"> / {formatCurrency(limit)}</span>
         </span>
-        <span className="text-zinc-400"> / {formatCurrency(limit)}</span>
-      </span>
+        <FreedomDaysLabel spent={spent} limit={limit} overBudget={overBudget} />
+      </div>
     </div>
+  )
+}
+
+/** Tiny inline label showing remaining budget as freedom days */
+function FreedomDaysLabel({ spent, limit, overBudget }: { spent: number; limit: number; overBudget: boolean }) {
+  const { dailyExpenseRate, loading, source } = useDailyExpenseRate()
+  if (loading || source === 'none' || dailyExpenseRate <= 0) return null
+
+  const remaining = limit - spent
+  if (overBudget) {
+    const overAmount = spent - limit
+    const freedom = eurToFreedomTime(overAmount, dailyExpenseRate)
+    return (
+      <p className="text-sm italic text-zinc-500" data-testid="freedom-days-over">
+        <span className="text-red-500">{formatCurrency(overAmount)} over — {freedom.formattedDagen} ingeleverd</span>
+      </p>
+    )
+  }
+
+  if (remaining <= 0) return null
+  const freedom = eurToFreedomTime(remaining, dailyExpenseRate)
+  return (
+    <p className="text-sm italic text-zinc-500" data-testid="freedom-days-remaining">
+      nog {freedom.formattedDagen} deze maand
+    </p>
   )
 }
 

@@ -1,3 +1,45 @@
+## Session 2026-02-17 - Feature #184
+
+### Feature #184: Freedom-time in debt displays - PASSING
+- Added freedom-time framing throughout the debt page (app/(app)/core/debts/page.tsx)
+- Imported calculateFreedomTime, formatFreedomTimeString, formatWithFreedom from lib/format.ts
+- Added loadExpenses callback that fetches monthly expenses from transactions table to compute dailyExpenses
+- Hero section KPIs now show:
+  - Total debt: "je koopt deze tijd terug in X jaar en Y maanden"
+  - Monthly payment: "je wint X dagen per maand terug"
+  - Already paid off: "X jaar en Y maanden vrijheid herwonnen"
+- Debt list items show freedom-time in short format: "Xj Ym terug te winnen"
+- DebtDetailModal balance highlight: "je koopt deze tijd terug in X jaar en Y maanden"
+- DebtDetailModal monthly payment: "je wint X dagen per maand terug"
+- DebtDetailModal payoff timeline: "Schuldenvrij in YYYY — dan verdien je 100% voor jezelf"
+- DebtDetailModal remaining interest: "X maanden verloren tijd"
+- Payoff strategy section:
+  - Payoff date: "Schuldenvrij in YYYY — dan verdien je 100% voor jezelf"
+  - Total interest: "X jaar aan verloren vrijheid"
+  - Interest saved: "X maanden vrijheid gered"
+- Page header subtitle: "vrijheid die je terugkoopt"
+- dailyExpenses passed as prop to DebtDetailModal for per-debt freedom-time calculations
+- 12/12 API verification tests passing at /api/verify-debt-freedom-time
+- Visual verification: test page shows 12/12 green checkmarks
+- Zero console errors on clean page load
+- No mock data patterns found
+
+### Changes Made
+- app/(app)/core/debts/page.tsx: Added freedom-time imports, dailyExpenses state, loadExpenses callback, freedom-time labels throughout hero section, debt list, detail modal, and strategy results
+- app/api/verify-debt-freedom-time/route.ts: Created 12-test verification endpoint (source-code verified)
+- app/test-debt-freedom-time/page.tsx: Created visual test page with freedom-time examples
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: 03233c4
+
+### Current Status
+- 177/265 features passing (176 before + #184)
+- Feature #184 completed and marked passing
+
+### Notes for Next Session
+- Port 3000 used this session
+- Freedom-time calculations depend on dailyExpenses from transactions; if user has no transactions, freedom-time subtitles won't show (gracefully hidden with conditional rendering)
+- The debt page uses the same pattern as cash page: totalExpenses / 30 = dailyExpenses
+
 ## Session 2026-02-17 - Feature #183
 
 ### Feature #183: Freedom-time in asset cards and detail - PASSING

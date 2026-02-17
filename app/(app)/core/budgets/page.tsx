@@ -17,6 +17,7 @@ import { BudgetBlob } from '@/components/app/budget-blob'
 import { BudgetSankey } from '@/components/app/budget-sankey'
 import { BudgetDonut } from '@/components/app/budget-donut'
 import { BudgetAlert, shouldAlert } from '@/components/app/budget-alert'
+import { useDailyExpenseRate, eurToFreedomTime } from '@/components/app/freedom-time-label'
 
 export default function BudgetsPage() {
   const searchParams = useSearchParams()
@@ -400,11 +401,13 @@ export default function BudgetsPage() {
             <p className="text-xs font-medium text-blue-600 uppercase">Sparen</p>
             <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalSavingsBudget)}</p>
             <p className="text-xs text-zinc-400">{formatCurrency(totalSavingsActual)} gespaard</p>
+            <p className="text-[10px] text-blue-500/70">vrijheid opbouwen</p>
           </div>
           <div>
             <p className="text-xs font-medium text-red-600 uppercase">Schulden</p>
             <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalDebtBudget)}</p>
             <p className="text-xs text-zinc-400">{formatCurrency(totalDebtActual)} afgelost</p>
+            <p className="text-[10px] text-red-500/70">vrijheid terugkopen</p>
           </div>
         </div>
       </section>
@@ -540,7 +543,7 @@ export default function BudgetsPage() {
           )}
           {savingsBudgets.length > 0 && (
             <div className="mt-8">
-              <h3 className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">Sparen</h3>
+              <h3 className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">Sparen <span className="ml-1 font-normal normal-case tracking-normal text-blue-400/70">— vrijheid opbouwen</span></h3>
               <BudgetTree
                 groups={savingsBudgets}
                 spending={spending}
@@ -551,7 +554,7 @@ export default function BudgetsPage() {
           )}
           {debtBudgets.length > 0 && (
             <div className="mt-8">
-              <h3 className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">Schulden</h3>
+              <h3 className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">Schulden <span className="ml-1 font-normal normal-case tracking-normal text-red-400/70">— vrijheid terugkopen</span></h3>
               <BudgetTree
                 groups={debtBudgets}
                 spending={spending}
@@ -793,6 +796,8 @@ function BudgetDetailModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const { dailyExpenseRate, loading: rateLoading, source: rateSource } = useDailyExpenseRate()
+  const hasFreedomData = !rateLoading && rateSource === 'transactions' && dailyExpenseRate > 0
   const budgetType = (budget.budget_type ?? 'expense') as BudgetType
   const colors = getTypeColors(budgetType)
   const children = parent && 'children' in parent ? (parent as BudgetWithChildren).children : []
@@ -902,16 +907,34 @@ function BudgetDetailModal({
             <div className="rounded-lg bg-zinc-50 p-3">
               <p className="text-xs text-zinc-500">Limiet</p>
               <p className="mt-0.5 text-lg font-bold text-zinc-900">{formatCurrency(limit)}</p>
+              {hasFreedomData && limit >= 100 && (
+                <p className="text-sm italic text-zinc-500" data-testid="modal-limit-freedom">
+                  ≈ {eurToFreedomTime(limit, dailyExpenseRate).formattedDagen}
+                </p>
+              )}
             </div>
             <div className="rounded-lg bg-zinc-50 p-3">
               <p className="text-xs text-zinc-500">Besteed</p>
               <p className="mt-0.5 text-lg font-bold text-zinc-900">{formatCurrency(spent)}</p>
+              {hasFreedomData && spent >= 100 && (
+                <p className="text-sm italic text-zinc-500" data-testid="modal-spent-freedom">
+                  ≈ {eurToFreedomTime(spent, dailyExpenseRate).formattedDagen}
+                </p>
+              )}
             </div>
             <div className="rounded-lg bg-zinc-50 p-3">
               <p className="text-xs text-zinc-500">Resterend</p>
               <p className={`mt-0.5 text-lg font-bold ${remaining >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                 {formatCurrency(remaining)}
               </p>
+              {hasFreedomData && Math.abs(remaining) >= 10 && (
+                <p className={`text-sm italic text-zinc-500`} data-testid="modal-remaining-freedom">
+                  {remaining >= 0
+                    ? `nog ${eurToFreedomTime(remaining, dailyExpenseRate).formattedDagen}`
+                    : <span className="text-red-500">{eurToFreedomTime(Math.abs(remaining), dailyExpenseRate).formattedDagen} ingeleverd</span>
+                  }
+                </p>
+              )}
             </div>
           </div>
 
@@ -922,7 +945,20 @@ function BudgetDetailModal({
                 style={{ width: `${pct}%` }}
               />
             </div>
-            <p className="mt-1 text-right text-xs text-zinc-400">{pct}% besteed</p>
+            <div className="mt-1 flex items-center justify-between">
+              {hasFreedomData && remaining > 0 && (
+                <p className="text-sm italic text-zinc-500" data-testid="modal-bar-freedom">
+                  nog {eurToFreedomTime(remaining, dailyExpenseRate).formattedDagen} deze maand
+                </p>
+              )}
+              {hasFreedomData && remaining <= 0 && spent > limit && (
+                <p className="text-sm italic text-zinc-500" data-testid="modal-bar-freedom-over">
+                  <span className="text-red-500">{formatCurrency(Math.abs(remaining))} over — {eurToFreedomTime(Math.abs(remaining), dailyExpenseRate).formattedDagen} ingeleverd</span>
+                </p>
+              )}
+              {!hasFreedomData && <span />}
+              <p className="text-right text-xs text-zinc-400">{pct}% besteed</p>
+            </div>
           </div>
 
           {carry > 0 && (
@@ -951,9 +987,21 @@ function BudgetDetailModal({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
                         <p className="truncate text-xs font-medium text-zinc-700">{child.name}</p>
-                        <span className="ml-2 shrink-0 text-xs text-zinc-500">
-                          {formatCurrency(childSpent)} / {formatCurrency(childLimit)}
-                        </span>
+                        <div className="ml-2 shrink-0 text-right">
+                          <span className="text-xs text-zinc-500">
+                            {formatCurrency(childSpent)} / {formatCurrency(childLimit)}
+                          </span>
+                          {hasFreedomData && childLimit - childSpent > 0 && (
+                            <p className="text-sm italic text-zinc-500" data-testid="child-freedom-remaining">
+                              nog {eurToFreedomTime(childLimit - childSpent, dailyExpenseRate).formattedDagen}
+                            </p>
+                          )}
+                          {hasFreedomData && childSpent > childLimit && (
+                            <p className="text-sm italic text-zinc-500" data-testid="child-freedom-over">
+                              <span className="text-red-500">{eurToFreedomTime(childSpent - childLimit, dailyExpenseRate).formattedDagen} ingeleverd</span>
+                            </p>
+                          )}
+                        </div>
                       </div>
                       <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-zinc-100">
                         <div
@@ -989,9 +1037,16 @@ function BudgetDetailModal({
                       )}
                     </p>
                   </div>
-                  <span className={`ml-3 shrink-0 text-xs font-medium ${Number(tx.amount) < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                    {formatCurrency(Math.abs(Number(tx.amount)))}
-                  </span>
+                  <div className="ml-3 shrink-0 text-right">
+                    <span className={`text-xs font-medium ${Number(tx.amount) < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                      {formatCurrency(Math.abs(Number(tx.amount)))}
+                    </span>
+                    {hasFreedomData && Math.abs(Number(tx.amount)) >= 10 && (
+                      <p className="text-sm italic text-zinc-500" data-testid="tx-freedom-time">
+                        {eurToFreedomTime(Math.abs(Number(tx.amount)), dailyExpenseRate).formattedDagen}
+                      </p>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
