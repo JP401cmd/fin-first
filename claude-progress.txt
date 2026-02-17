@@ -1,3 +1,35 @@
+## Session 2026-02-17 - Feature #227
+
+### Feature #227: Holdings CRUD management - PASSING
+- Implemented Holdings CRUD management per asset on asset detail page
+- All 7 feature steps verified and implemented:
+  1. **HoldingsList component on asset detail page**: New HoldingsList component in assets/page.tsx, integrated into AssetDetailModal for investment/crypto/savings/retirement assets
+  2. **Create holding form**: Form with fields: name, ticker, ISIN, units, avg purchase price, purchase date, with validation
+  3. **Read/list holdings per asset**: API GET /api/holdings now supports ?asset_id= query param; HoldingsList fetches per-asset holdings
+  4. **Update holding details**: Edit button per holding opens inline form pre-populated with holding data, uses PATCH /api/holdings
+  5. **Delete holding with confirmation**: 2-step delete flow (click trash → confirm "Ja") with loading state
+  6. **Aggregate holdings sync to parent asset**: New syncAssetValueFromHoldings() function recalculates asset current_value from all holdings on create/update/delete
+  7. **API endpoints**: GET (with asset_id filter), POST (with idempotency), PATCH (with optimistic locking), DELETE (with pre-delete asset lookup for sync)
+
+#### Modified Files:
+- **app/(app)/core/assets/page.tsx**: Added HoldingsList component (~300 lines) with full CRUD, integrated in AssetDetailModal
+- **app/api/holdings/route.ts**: Added asset_id filter to GET, added syncAssetValueFromHoldings aggregate function
+
+#### New Files:
+- **app/api/verify-holdings-crud-mgmt/route.ts**: 17-test verification endpoint
+- **app/test-holdings-crud-mgmt/page.tsx**: Visual test page
+
+#### Verification:
+- 17/17 API verification tests passing at /api/verify-holdings-crud-mgmt
+- Zero console errors (0 errors, 0 warnings)
+- No mock data patterns found
+- Commit: 0650111
+
+### Current Status
+- 221/265 features passing (220 before + #227)
+
+---
+
 ## Session 2026-02-17 - Feature #226
 
 ### Feature #226: AI-powered spending pattern predictions - PASSING
