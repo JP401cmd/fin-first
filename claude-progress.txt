@@ -1,3 +1,41 @@
+## Session 2026-02-17 - Feature #222
+
+### Feature #222: Asset portfolio projection in UI - PASSING
+- All 6 feature steps verified and implemented:
+  1. **Locate and activate existing projectPortfolio() function**: Already active — imported from lib/asset-data.ts and called with useMemo on line 200 of assets/page.tsx
+  2. **Create area chart for portfolio projection**: ProjectionChart SVG component exists with area path (fill + line), y-axis ticks, x-axis time labels
+  3. **Show projection for 5, 10, 20, 30 year horizons**: Four year-selector buttons with amber active state, dynamic data-testid attributes
+  4. **Include monthly contribution assumptions in projection**: projectPortfolio() uses monthly_contribution from each asset via projectAsset() compound growth calculation
+  5. **Display on /core/assets page**: Projection section with chart, growth display, and year selector buttons
+  6. **Show contextual message with projected future value**: NEW — Added "Met je huidige inleg van €X/maand groeit je portfolio naar €Y in Z jaar" message with freedom-time equivalent
+
+### Changes Made
+- app/(app)/core/assets/page.tsx: Added contextual projection message, data-testid attributes for projection section/chart/buttons/growth
+- app/api/verify-portfolio-projection/route.ts: Created 10-test verification endpoint
+- app/test-portfolio-projection/page.tsx: Created visual test page with 3 demo scenarios (with contributions, without, empty)
+- lib/supabase/proxy.ts: Added test routes to public paths
+- Commit: 4c36dd0
+
+### Verification
+- 10/10 API verification tests passing at /api/verify-portfolio-projection
+- Browser verified with playwright: area chart renders, year buttons switch projections, contextual message updates dynamically
+- Zero console errors (0 errors, 0 warnings)
+- No mock data patterns found in assets page
+- Test page shows 3 scenarios: with monthly contributions, without, and empty portfolio
+
+### Current Status
+- 216/265 features passing (215 before + #222)
+- Feature #222 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- projectPortfolio() was already active — feature primarily needed the contextual message
+- Contextual message has two variants: with monthly contribution (€X/maand) and without ("Zonder extra inleg")
+- Freedom-time equivalent shown in emerald text when dailyExpenses > 0
+- No authenticated browser testing available (Supabase email rate limit)
+
+---
+
 ## Session 2026-02-17 - Feature #221
 
 ### Feature #221: Cash flow forecast 3-6 months - PASSING
