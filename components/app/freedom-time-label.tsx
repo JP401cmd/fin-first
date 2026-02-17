@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Clock } from 'lucide-react'
+import { formatWithFreedom, formatCurrency } from '@/lib/format'
 
 /**
  * Context that provides the user's real daily expense rate
@@ -159,23 +160,32 @@ export function eurToFreedomTime(amount: number, dailyExpenseRate: number): {
  * This component translates EUR amounts into how many days/months/years of
  * financial freedom they represent, based on the user's actual daily expenses.
  *
+ * Uses formatWithFreedom() utility internally for consistent formatting.
+ *
  * Usage:
  *   <FreedomTimeLabel amount={50000} />
  *   → "€50.000 ≈ 2j 3mnd vrijheid"
  *
+ *   <FreedomTimeLabel amount={50000} format="long" />
+ *   → "€50.000 ≈ 2 jaar en 3 maanden vrijheid"
+ *
  * Props:
  *   amount: EUR amount to display (required)
+ *   dailyExpenses: optional daily expense rate (overrides context)
  *   showCurrency: whether to show the EUR amount (default true)
  *   showIcon: whether to show clock icon (default false)
  *   size: text size variant (default 'sm')
+ *   format: 'short' (e.g. "2j 3m") or 'long' (e.g. "2 jaar en 3 maanden") (default 'short')
  *   className: additional CSS classes
  *   variant: 'inline' shows on same line, 'block' on separate lines
  */
 interface FreedomTimeLabelProps {
   amount: number
+  dailyExpenses?: number
   showCurrency?: boolean
   showIcon?: boolean
   size?: 'xs' | 'sm' | 'base'
+  format?: 'short' | 'long'
   className?: string
   variant?: 'inline' | 'block'
   currencyClassName?: string
@@ -184,28 +194,30 @@ interface FreedomTimeLabelProps {
 
 export function FreedomTimeLabel({
   amount,
+  dailyExpenses,
   showCurrency = true,
   showIcon = false,
   size = 'sm',
+  format = 'short',
   className = '',
   variant = 'inline',
   currencyClassName = '',
   timeClassName = '',
 }: FreedomTimeLabelProps) {
-  const { dailyExpenseRate, loading, source } = useDailyExpenseRate()
+  const { dailyExpenseRate: contextRate, loading, source } = useDailyExpenseRate()
+
+  // Use prop dailyExpenses if provided, otherwise use context
+  const effectiveDailyRate = dailyExpenses ?? contextRate
+  const hasExpenseData = dailyExpenses != null ? dailyExpenses > 0 : (source === 'transactions' && contextRate > 0)
 
   // Only show freedom time for amounts over €100 (per spec)
-  const showFreedomTime = Math.abs(amount) >= 100 && source === 'transactions' && dailyExpenseRate > 0
+  const showFreedomTime = Math.abs(amount) >= 100 && hasExpenseData && effectiveDailyRate > 0
 
-  const formattedCurrency = new Intl.NumberFormat('nl-NL', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount)
+  const formattedCurrency = formatCurrency(amount)
 
-  const freedom = showFreedomTime
-    ? eurToFreedomTime(Math.abs(amount), dailyExpenseRate)
+  // Use formatWithFreedom() utility internally for freedom time string
+  const freedomTimeStr = showFreedomTime
+    ? formatWithFreedom(Math.abs(amount), effectiveDailyRate, { format, includeCurrency: false })
     : null
 
   const sizeClasses = {
@@ -216,16 +228,16 @@ export function FreedomTimeLabel({
 
   if (variant === 'block') {
     return (
-      <span className={`${className}`}>
+      <span className={`${className}`} data-testid="freedom-time-label">
         {showCurrency && (
-          <span className={`font-bold ${sizeClasses[size]} ${currencyClassName}`}>
+          <span className={`font-bold ${sizeClasses[size]} ${currencyClassName}`} data-testid="freedom-time-label-currency">
             {formattedCurrency}
           </span>
         )}
-        {showFreedomTime && freedom && !loading && (
-          <span className={`flex items-center gap-1 text-xs text-amber-600/80 ${timeClassName}`}>
+        {showFreedomTime && freedomTimeStr && !loading && (
+          <span className={`flex items-center gap-1 text-sm italic font-normal text-zinc-500 ${timeClassName}`} data-testid="freedom-time-label-time">
             {showIcon && <Clock className="h-3 w-3" />}
-            ≈ {freedom.formatted} vrijheid
+            ≈ {freedomTimeStr} vrijheid
           </span>
         )}
       </span>
@@ -233,16 +245,16 @@ export function FreedomTimeLabel({
   }
 
   return (
-    <span className={`inline-flex items-center gap-1.5 ${className}`}>
+    <span className={`inline-flex items-center gap-1.5 ${className}`} data-testid="freedom-time-label">
       {showCurrency && (
-        <span className={`font-semibold ${sizeClasses[size]} ${currencyClassName}`}>
+        <span className={`font-semibold ${sizeClasses[size]} ${currencyClassName}`} data-testid="freedom-time-label-currency">
           {formattedCurrency}
         </span>
       )}
-      {showFreedomTime && freedom && !loading && (
-        <span className={`inline-flex items-center gap-0.5 text-xs text-amber-600/80 ${timeClassName}`}>
+      {showFreedomTime && freedomTimeStr && !loading && (
+        <span className={`inline-flex items-center gap-0.5 text-sm italic font-normal text-zinc-500 ${timeClassName}`} data-testid="freedom-time-label-time">
           {showIcon && <Clock className="h-3 w-3" />}
-          <span>≈ {freedom.formatted}</span>
+          <span>≈ {freedomTimeStr}</span>
         </span>
       )}
     </span>

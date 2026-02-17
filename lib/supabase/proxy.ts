@@ -311,6 +311,12 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-badge-grid',
     '/test-freedom-days-animation',
     '/api/verify-freedom-days-animation',
+    '/test-freedom-time-label-component',
+    '/api/verify-freedom-time-label-component',
+    '/test-level-up-celebration',
+    '/api/verify-level-up-celebration',
+    '/test-streak-tracking',
+    '/api/verify-streak-tracking',
   ]
 
   // Protected route prefixes that require authentication
