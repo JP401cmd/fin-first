@@ -8,6 +8,7 @@ import { BottomNav } from '@/components/app/bottom-nav'
 import { MobilePreviewProvider } from '@/components/app/beheer/mobile-preview-provider'
 import { MobilePreviewFrame } from '@/components/app/beheer/mobile-preview-frame'
 import { ToastProvider } from '@/components/app/toast-provider'
+import { BadgeNotifier } from '@/components/app/badge-notifier'
 import { SessionMonitor } from '@/components/app/session-monitor'
 import { DailyExpenseProvider } from '@/components/app/freedom-time-label'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
@@ -75,6 +76,7 @@ export default async function AppLayout({
       <MobilePreviewFrame>
         <ToastProvider>
           <SessionMonitor />
+          <BadgeNotifier />
           <div className="min-h-screen bg-zinc-50">
             <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
             <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation}>
