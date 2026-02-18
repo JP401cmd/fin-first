@@ -8,6 +8,7 @@ import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { computeFreedomMilestones } from '@/lib/freedom-milestones'
 import Link from 'next/link'
 import { StreakIndicator } from '@/components/app/streak-indicator'
+import { StreakBreakWarning } from '@/components/app/streak-break-warning'
 import {
   ArrowRight, Zap, Compass, TrendingUp,
 } from 'lucide-react'
@@ -123,6 +124,11 @@ export default async function DashboardPage() {
         <p className="mt-1 text-sm text-zinc-500">
           TriFinity helpt je bewust omgaan met je opgeslagen levensenergie.
         </p>
+      </div>
+
+      {/* Streak break warning notification */}
+      <div className="mb-6" data-testid="streak-warning-section">
+        <StreakBreakWarning />
       </div>
 
       {/* Three module cards */}
@@ -247,35 +253,42 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      {/* Freedom indicator */}
-      <section className="mt-8 rounded-xl border border-zinc-200 bg-white p-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium text-zinc-400 uppercase">
-              Financiele vrijheid
-            </p>
-            <p className="mt-1 text-2xl font-bold text-zinc-900">
-              {freedomPct.toFixed(1)}%
-            </p>
-          </div>
-          <div className="text-right text-xs text-zinc-400">
-            {formatCurrency(netWorth)} / {formatCurrency(fireTarget)}
+      {/* Freedom indicator — preview teaser linking to De Kern (primary owner) */}
+      <section className="mt-8" data-testid="dashboard-freedom-teaser">
+        <div className="rounded-xl border border-zinc-200 bg-white px-5 py-4">
+          <div className="flex items-center gap-4">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-medium text-zinc-400 uppercase">
+                  Financiele vrijheid
+                </p>
+                <span className="text-xs text-zinc-300">·</span>
+                <span className="text-xs text-zinc-400">
+                  {formatCurrency(netWorth)} / {formatCurrency(fireTarget)}
+                </span>
+              </div>
+              <div className="mt-2 flex items-center gap-3">
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-amber-400 via-teal-400 to-purple-500 transition-all duration-1000"
+                    style={{ width: `${Math.min(freedomPct, 100)}%` }}
+                  />
+                </div>
+                <span className="text-sm font-semibold text-zinc-700 tabular-nums">
+                  {freedomPct.toFixed(1)}%
+                </span>
+              </div>
+              <p className="mt-1.5 text-xs text-zinc-400">
+                {fireProjResult.fireDate === 'Bereikt!'
+                  ? 'Je passief inkomen dekt je uitgaven!'
+                  : fireProjResult.fireDate === 'Niet haalbaar'
+                    ? 'Verhoog je spaarcapaciteit om volledige vrijheid te bereiken'
+                    : `Verwacht moment van volledige vrijheid: ${fireProjResult.fireDate}`
+                }
+              </p>
+            </div>
           </div>
         </div>
-        <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-zinc-100">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-amber-400 via-teal-400 to-purple-500 transition-all duration-1000"
-            style={{ width: `${Math.min(freedomPct, 100)}%` }}
-          />
-        </div>
-        <p className="mt-2 text-xs text-zinc-400">
-          {fireProjResult.fireDate === 'Bereikt!'
-            ? 'Je passief inkomen dekt je uitgaven!'
-            : fireProjResult.fireDate === 'Niet haalbaar'
-              ? 'Verhoog je spaarcapaciteit om volledige vrijheid te bereiken'
-              : `Verwacht moment van volledige vrijheid: ${fireProjResult.fireDate}`
-          }
-        </p>
       </section>
 
       {/* Jouw Pad widget */}
