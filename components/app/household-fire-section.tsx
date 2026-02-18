@@ -1,0 +1,544 @@
+'use client'
+
+import { useEffect, useState, useCallback } from 'react'
+import { formatCurrency } from '@/components/app/budget-shared'
+import { formatFireAge } from '@/lib/horizon-data'
+import {
+  Users, TrendingUp, Hourglass, Percent, Target, User,
+  ArrowRight, Clock, PiggyBank, Wallet, Info,
+} from 'lucide-react'
+
+// Types matching the API response
+interface PartnerFinancials {
+  userId: string
+  fullName: string | null
+  isCurrentUser: boolean
+  totalAssets: number
+  totalDebts: number
+  monthlyIncome: number
+  monthlyExpenses: number
+  monthlyContributions: number
+  yearlyMustExpenses: number
+  dateOfBirth: string | null
+  netWorth: number
+  sharedAssetsValue: number
+  sharedDebtsValue: number
+}
+
+interface FireProjectionData {
+  fireTarget: number
+  netWorth: number
+  freedomPercentage: number
+  fireAge: number | null
+  currentAge: number | null
+  fireDate: string
+  countdownDays: number
+  freedomYears: number
+  freedomMonths: number
+  monthlyPassiveIncome: number
+  monthlySavings: number
+  savingsRate: number
+}
+
+interface PartnerProjection {
+  userId: string
+  fullName: string | null
+  isCurrentUser: boolean
+  financials: PartnerFinancials
+  projection: FireProjectionData
+}
+
+interface HouseholdFireData {
+  hasHousehold: boolean
+  householdName: string
+  combined: {
+    projection: FireProjectionData
+  }
+  partners: PartnerProjection[]
+  comparison: {
+    combinedNetWorth: number
+    combinedMonthlyIncome: number
+    combinedMonthlyExpenses: number
+    combinedMonthlySavings: number
+    combinedSavingsRate: number
+    combinedFireTarget: number
+    combinedFreedomPercentage: number
+    sharedFireTarget: number
+    individualFireTargets: Array<{
+      userId: string
+      fullName: string | null
+      fireTarget: number
+      fireAge: number | null
+      freedomPercentage: number
+    }>
+  }
+}
+
+/**
+ * HouseholdFireSection - Displays combined and individual FIRE projections
+ * for household members. Shows side-by-side partner comparison.
+ *
+ * Renders on /horizon page when user has a household.
+ */
+export function HouseholdFireSection() {
+  const [data, setData] = useState<HouseholdFireData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadData = useCallback(async () => {
+    try {
+      const res = await fetch('/api/household/fire-projections')
+      if (!res.ok) {
+        if (res.status === 401) {
+          setData(null)
+          return
+        }
+        throw new Error('Kon huishoudgegevens niet laden')
+      }
+      const json = await res.json()
+      if (!json.hasHousehold) {
+        setData(null)
+        return
+      }
+      setData(json)
+    } catch (err) {
+      console.error('Error loading household FIRE data:', err)
+      setError('Kon huishouden FIRE-gegevens niet laden')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  // Don't render anything if no household
+  if (!loading && !data) return null
+  if (error) return null
+
+  if (loading) {
+    return (
+      <section className="mt-10" data-testid="household-fire-section">
+        <div className="mb-3 flex items-center gap-2">
+          <Users className="h-4 w-4 text-purple-500" />
+          <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+            Huishouden FIRE Projecties
+          </h2>
+        </div>
+        <div className="flex items-center justify-center rounded-xl border border-zinc-200 bg-white p-12">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
+        </div>
+      </section>
+    )
+  }
+
+  if (!data) return null
+
+  const { combined, partners, comparison, householdName } = data
+  const hasMultiplePartners = partners.length >= 2
+
+  return (
+    <section className="mt-10" data-testid="household-fire-section">
+      {/* Section Header */}
+      <div className="mb-5">
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-purple-500" />
+          <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+            {householdName} — FIRE Projecties
+          </h2>
+        </div>
+        <p className="mt-1 text-sm text-zinc-500">
+          Gecombineerd inkomen, gecombineerde uitgaven. Gedeeld en individueel FIRE-doel.
+        </p>
+      </div>
+
+      {/* Combined Household Hero Card */}
+      <div className="rounded-xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-white p-6" data-testid="household-combined-card">
+        <div className="mb-4 flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100">
+            <Users className="h-4 w-4 text-purple-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-purple-900">Gedeeld FIRE-doel</p>
+            <p className="text-xs text-purple-600/60">Gecombineerde projectie voor het huishouden</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4" data-testid="household-combined-kpis">
+          {/* Combined Freedom % */}
+          <div>
+            <p className="text-[10px] font-medium text-purple-600/50 uppercase">Vrijheid</p>
+            <p className="text-2xl font-bold text-purple-700" data-testid="combined-freedom-pct">
+              {combined.projection.freedomPercentage.toFixed(1)}%
+            </p>
+          </div>
+
+          {/* Combined FIRE Age */}
+          <div>
+            <p className="text-[10px] font-medium text-purple-600/50 uppercase">FIRE leeftijd</p>
+            <p className="text-2xl font-bold text-purple-700" data-testid="combined-fire-age">
+              {combined.projection.fireAge !== null ? Math.round(combined.projection.fireAge) : '-'}
+            </p>
+          </div>
+
+          {/* Combined FIRE Target */}
+          <div>
+            <p className="text-[10px] font-medium text-purple-600/50 uppercase">FIRE-doel</p>
+            <p className="text-lg font-bold text-purple-700" data-testid="combined-fire-target">
+              {formatCurrency(combined.projection.fireTarget)}
+            </p>
+          </div>
+
+          {/* Combined Freedom Time */}
+          <div>
+            <p className="text-[10px] font-medium text-purple-600/50 uppercase">Vrijheidstijd</p>
+            <p className="text-lg font-bold text-purple-700" data-testid="combined-freedom-time">
+              {combined.projection.freedomYears}j {combined.projection.freedomMonths}mnd
+            </p>
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div className="mt-4">
+          <div className="h-2.5 w-full overflow-hidden rounded-full bg-purple-100">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-purple-600 to-purple-400 transition-all duration-1000"
+              style={{ width: `${Math.max(Math.min(combined.projection.freedomPercentage, 100), 0)}%` }}
+              data-testid="combined-progress-bar"
+            />
+          </div>
+          <div className="mt-1 flex justify-between text-[10px] text-purple-400">
+            <span>0%</span>
+            <span>{combined.projection.fireDate}</span>
+            <span>100%</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Combined Financial Summary */}
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" data-testid="household-combined-financials">
+        <FinancialCard
+          icon={<PiggyBank className="h-4 w-4 text-purple-600" />}
+          label="Gecomb. vermogen"
+          value={formatCurrency(comparison.combinedNetWorth)}
+          testId="combined-net-worth"
+        />
+        <FinancialCard
+          icon={<TrendingUp className="h-4 w-4 text-emerald-600" />}
+          label="Gecomb. inkomen"
+          value={formatCurrency(comparison.combinedMonthlyIncome)}
+          suffix="/mnd"
+          testId="combined-income"
+        />
+        <FinancialCard
+          icon={<Wallet className="h-4 w-4 text-red-500" />}
+          label="Gecomb. uitgaven"
+          value={formatCurrency(comparison.combinedMonthlyExpenses)}
+          suffix="/mnd"
+          testId="combined-expenses"
+        />
+        <FinancialCard
+          icon={<Target className="h-4 w-4 text-teal-600" />}
+          label="Gecomb. sparen"
+          value={formatCurrency(comparison.combinedMonthlySavings)}
+          suffix="/mnd"
+          testId="combined-savings"
+        />
+        <FinancialCard
+          icon={<Percent className="h-4 w-4 text-amber-600" />}
+          label="Spaarquote"
+          value={`${comparison.combinedSavingsRate.toFixed(1)}%`}
+          testId="combined-savings-rate"
+        />
+      </div>
+
+      {/* Partner Comparison View */}
+      {hasMultiplePartners && (
+        <div className="mt-6" data-testid="partner-comparison-view">
+          <div className="mb-3 flex items-center gap-2">
+            <User className="h-3.5 w-3.5 text-zinc-400" />
+            <h3 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+              Partner vergelijking
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {partners.map((partner, idx) => (
+              <PartnerCard
+                key={partner.userId}
+                partner={partner}
+                partnerIndex={idx}
+                otherPartner={partners.find(p => p.userId !== partner.userId) ?? null}
+              />
+            ))}
+          </div>
+
+          {/* Side-by-side comparison bars */}
+          <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-5" data-testid="comparison-bars">
+            <h4 className="mb-4 text-xs font-semibold text-zinc-500 uppercase">Vergelijking</h4>
+
+            <ComparisonBar
+              label="Netto vermogen"
+              values={partners.map(p => ({
+                name: p.fullName ?? (p.isCurrentUser ? 'Jij' : 'Partner'),
+                value: p.financials.netWorth,
+                formatted: formatCurrency(p.financials.netWorth),
+              }))}
+              testId="comparison-net-worth"
+            />
+
+            <ComparisonBar
+              label="Maandinkomen"
+              values={partners.map(p => ({
+                name: p.fullName ?? (p.isCurrentUser ? 'Jij' : 'Partner'),
+                value: p.financials.monthlyIncome,
+                formatted: formatCurrency(p.financials.monthlyIncome),
+              }))}
+              testId="comparison-income"
+            />
+
+            <ComparisonBar
+              label="Spaarquote"
+              values={partners.map(p => ({
+                name: p.fullName ?? (p.isCurrentUser ? 'Jij' : 'Partner'),
+                value: p.projection.savingsRate,
+                formatted: `${p.projection.savingsRate.toFixed(1)}%`,
+              }))}
+              testId="comparison-savings-rate"
+            />
+
+            <ComparisonBar
+              label="Vrijheidspercentage"
+              values={partners.map(p => ({
+                name: p.fullName ?? (p.isCurrentUser ? 'Jij' : 'Partner'),
+                value: p.projection.freedomPercentage,
+                formatted: `${p.projection.freedomPercentage.toFixed(1)}%`,
+              }))}
+              testId="comparison-freedom-pct"
+            />
+
+            <ComparisonBar
+              label="FIRE leeftijd"
+              values={partners.map(p => ({
+                name: p.fullName ?? (p.isCurrentUser ? 'Jij' : 'Partner'),
+                value: p.projection.fireAge ?? 0,
+                formatted: p.projection.fireAge !== null ? `${Math.round(p.projection.fireAge)}j` : '-',
+              }))}
+              testId="comparison-fire-age"
+              invertColors
+            />
+          </div>
+
+          {/* Combined vs Individual insight */}
+          <div className="mt-4 rounded-xl border border-purple-100 bg-purple-50/50 p-4" data-testid="household-insight">
+            <div className="flex items-start gap-3">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-purple-500" />
+              <div className="text-sm text-purple-800">
+                <p className="font-medium">Samen sterker</p>
+                <p className="mt-1 text-purple-700/80">
+                  {combined.projection.fireAge !== null && partners.every(p => p.projection.fireAge !== null) ? (
+                    (() => {
+                      const avgIndividual = partners.reduce((sum, p) => sum + (p.projection.fireAge ?? 0), 0) / partners.length
+                      const diff = Math.round(avgIndividual - combined.projection.fireAge!)
+                      if (diff > 0) {
+                        return `Als huishouden bereiken jullie FIRE ${diff} jaar eerder dan het gemiddelde van jullie individuele projecties. Samenwerking loont!`
+                      } else if (diff < 0) {
+                        return `De individuele FIRE-doelen liggen dichter bij dan het gezamenlijke doel. Overweeg om uitgaven te optimaliseren als huishouden.`
+                      }
+                      return `Jullie gezamenlijke en individuele FIRE-leeftijden liggen dicht bij elkaar.`
+                    })()
+                  ) : (
+                    `Jullie gecombineerde netto vermogen is ${formatCurrency(comparison.combinedNetWorth)}, dat is ${comparison.combinedFreedomPercentage.toFixed(1)}% richting volledige vrijheid voor het huishouden.`
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Single partner info */}
+      {!hasMultiplePartners && partners.length === 1 && (
+        <div className="mt-4 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-5 text-center" data-testid="single-partner-notice">
+          <Users className="mx-auto mb-2 h-6 w-6 text-zinc-400" />
+          <p className="text-sm font-medium text-zinc-600">
+            Partner vergelijking wordt beschikbaar zodra je partner het huishouden heeft geaccepteerd.
+          </p>
+          <p className="mt-1 text-xs text-zinc-400">
+            Nodig je partner uit via je profiel om samen je pad naar vrijheid te plannen.
+          </p>
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ── Helper Components ────────────────────────────────────
+
+function FinancialCard({
+  icon, label, value, suffix, testId,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: string
+  suffix?: string
+  testId: string
+}) {
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-white p-3" data-testid={testId}>
+      <div className="mb-1 flex items-center gap-1.5">
+        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-zinc-50">
+          {icon}
+        </div>
+        <p className="text-[10px] font-medium text-zinc-500">{label}</p>
+      </div>
+      <p className="text-sm font-bold text-zinc-900">
+        {value}{suffix && <span className="text-xs font-normal text-zinc-400">{suffix}</span>}
+      </p>
+    </div>
+  )
+}
+
+function PartnerCard({
+  partner,
+  partnerIndex,
+  otherPartner,
+}: {
+  partner: PartnerProjection
+  partnerIndex: number
+  otherPartner: PartnerProjection | null
+}) {
+  const colors = partnerIndex === 0
+    ? { border: 'border-purple-200', bg: 'bg-purple-50/30', accent: 'text-purple-700', icon: 'bg-purple-100 text-purple-600', bar: 'from-purple-600 to-purple-400' }
+    : { border: 'border-teal-200', bg: 'bg-teal-50/30', accent: 'text-teal-700', icon: 'bg-teal-100 text-teal-600', bar: 'from-teal-600 to-teal-400' }
+
+  const name = partner.fullName ?? (partner.isCurrentUser ? 'Jij' : 'Partner')
+
+  return (
+    <div
+      className={`rounded-xl border ${colors.border} ${colors.bg} p-5`}
+      data-testid={`partner-card-${partner.isCurrentUser ? 'self' : 'other'}`}
+    >
+      <div className="mb-3 flex items-center gap-2">
+        <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${colors.icon}`}>
+          <User className="h-4 w-4" />
+        </div>
+        <div>
+          <p className={`text-sm font-semibold ${colors.accent}`}>{name}</p>
+          {partner.isCurrentUser && (
+            <span className="text-[10px] text-zinc-400">jouw projectie</span>
+          )}
+        </div>
+      </div>
+
+      {/* Individual FIRE KPIs */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-[10px] font-medium text-zinc-400 uppercase">FIRE leeftijd</p>
+          <p className={`text-xl font-bold ${colors.accent}`} data-testid={`partner-fire-age-${partner.isCurrentUser ? 'self' : 'other'}`}>
+            {partner.projection.fireAge !== null ? Math.round(partner.projection.fireAge) : '-'}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-medium text-zinc-400 uppercase">Vrijheid</p>
+          <p className={`text-xl font-bold ${colors.accent}`} data-testid={`partner-freedom-pct-${partner.isCurrentUser ? 'self' : 'other'}`}>
+            {partner.projection.freedomPercentage.toFixed(1)}%
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-medium text-zinc-400 uppercase">FIRE-doel</p>
+          <p className="text-sm font-semibold text-zinc-700">
+            {formatCurrency(partner.projection.fireTarget)}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-medium text-zinc-400 uppercase">Spaarquote</p>
+          <p className="text-sm font-semibold text-zinc-700">
+            {partner.projection.savingsRate.toFixed(1)}%
+          </p>
+        </div>
+      </div>
+
+      {/* Mini progress bar */}
+      <div className="mt-3">
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-200/50">
+          <div
+            className={`h-full rounded-full bg-gradient-to-r ${colors.bar} transition-all duration-1000`}
+            style={{ width: `${Math.max(Math.min(partner.projection.freedomPercentage, 100), 0)}%` }}
+          />
+        </div>
+        <div className="mt-0.5 flex justify-between text-[9px] text-zinc-400">
+          <span>{partner.projection.fireDate}</span>
+          <span>
+            {partner.projection.freedomYears}j {partner.projection.freedomMonths}mnd vrijheid
+          </span>
+        </div>
+      </div>
+
+      {/* Financial details */}
+      <div className="mt-3 space-y-1.5 text-xs text-zinc-600">
+        <div className="flex justify-between">
+          <span>Netto vermogen</span>
+          <span className="font-medium">{formatCurrency(partner.financials.netWorth)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Inkomen/mnd</span>
+          <span className="font-medium">{formatCurrency(partner.financials.monthlyIncome)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Uitgaven/mnd</span>
+          <span className="font-medium">{formatCurrency(partner.financials.monthlyExpenses)}</span>
+        </div>
+        {partner.financials.sharedAssetsValue > 0 && (
+          <div className="flex justify-between text-purple-600/70">
+            <span>Gedeeld vermogen (aandeel)</span>
+            <span className="font-medium">{formatCurrency(partner.financials.sharedAssetsValue)}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ComparisonBar({
+  label,
+  values,
+  testId,
+  invertColors = false,
+}: {
+  label: string
+  values: Array<{ name: string; value: number; formatted: string }>
+  testId: string
+  invertColors?: boolean
+}) {
+  const maxValue = Math.max(...values.map(v => Math.abs(v.value)), 1)
+
+  return (
+    <div className="mb-4 last:mb-0" data-testid={testId}>
+      <p className="mb-1.5 text-xs font-medium text-zinc-500">{label}</p>
+      <div className="space-y-1.5">
+        {values.map((v, i) => {
+          const pct = maxValue > 0 ? (Math.abs(v.value) / maxValue) * 100 : 0
+          const isLeading = Math.abs(v.value) >= Math.abs(values[1 - i]?.value ?? 0)
+          const barColor = invertColors
+            ? (isLeading ? 'bg-amber-400' : 'bg-emerald-400')
+            : (i === 0 ? 'bg-purple-400' : 'bg-teal-400')
+
+          return (
+            <div key={v.name} className="flex items-center gap-2">
+              <span className="w-16 shrink-0 text-xs text-zinc-500 truncate">{v.name}</span>
+              <div className="h-5 flex-1 overflow-hidden rounded-full bg-zinc-100">
+                <div
+                  className={`h-full rounded-full ${barColor} transition-all duration-700`}
+                  style={{ width: `${Math.max(pct, 2)}%` }}
+                />
+              </div>
+              <span className="w-20 shrink-0 text-right text-xs font-medium text-zinc-700">{v.formatted}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+export default HouseholdFireSection

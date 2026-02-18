@@ -380,6 +380,10 @@ export async function updateSession(request: NextRequest) {
     '/api/apply-perspective-migration',
     '/test-household-invite',
     '/api/verify-household-invite',
+    '/test-shared-data',
+    '/api/verify-shared-data',
+    '/test-household-fire',
+    '/api/verify-household-fire',
   ]
 
   // Protected route prefixes that require authentication

@@ -32,6 +32,7 @@ import { FeatureGate } from '@/components/app/feature-gate'
 import { DiscoverCarousel } from '@/components/app/discover-carousel'
 import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
 import { NextStepSection, computeAllHorizonSteps } from '@/components/app/next-step-card'
+import { HouseholdFireSection } from '@/components/app/household-fire-section'
 
 type ActiveModal = null | 'projections' | 'scenarios' | 'simulations' | 'withdrawal'
 
@@ -56,6 +57,7 @@ export default function HorizonPage() {
   const [impacts, setImpacts] = useState<LifeEventImpact[]>([])
   const [actions, setActions] = useState<Action[]>([])
   const [debts, setDebts] = useState<Debt[]>([])
+  const [monthlyDividendIncome, setMonthlyDividendIncome] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeModal, setActiveModal] = useState<ActiveModal>(null)
@@ -132,6 +134,19 @@ export default function HorizonPage() {
       }
 
       const dob = profileResult.data?.date_of_birth ?? null
+
+      // Fetch dividend income for FIRE passive income calculations
+      let dividendMonthly = 0
+      try {
+        const divRes = await fetch('/api/dividends')
+        if (divRes.ok) {
+          const divData = await divRes.json()
+          dividendMonthly = divData.aggregate?.monthly_dividend_income ?? 0
+        }
+      } catch {
+        // Non-critical — continue without dividend data
+      }
+      setMonthlyDividendIncome(dividendMonthly)
 
       const horizonInput: HorizonInput = {
         totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
@@ -454,6 +469,9 @@ export default function HorizonPage() {
         </div>
         </FeatureGate>
       </section>
+
+      {/* === 2b. Household FIRE Projections === */}
+      <HouseholdFireSection />
 
       {/* === 3. Alerts === */}
       {(hasNoDob || fireNotReachable || hasDebt) && (
@@ -986,14 +1004,22 @@ export default function HorizonPage() {
           <div className="rounded-xl border border-zinc-200 bg-white p-6">
             <p className="text-sm font-medium text-zinc-500">Passief inkomen vs. uitgaven</p>
             <p className="mt-2 text-2xl font-bold text-zinc-900">
-              {formatCurrency(fire.monthlyPassiveIncome)} / mnd
+              {formatCurrency(fire.monthlyPassiveIncome + monthlyDividendIncome)} / mnd
             </p>
             <p className="mt-1 text-sm text-zinc-400">
-              passief inkomen dekt {fire.monthlyPassiveIncome > 0 && effectiveInput?.monthlyExpenses
-                ? `${Math.round((fire.monthlyPassiveIncome / effectiveInput.monthlyExpenses) * 100)}%`
+              passief inkomen dekt {(fire.monthlyPassiveIncome + monthlyDividendIncome) > 0 && effectiveInput?.monthlyExpenses
+                ? `${Math.round(((fire.monthlyPassiveIncome + monthlyDividendIncome) / effectiveInput.monthlyExpenses) * 100)}%`
                 : '0%'
               } van je maandelijkse uitgaven ({formatCurrency(effectiveInput?.monthlyExpenses ?? 0)})
             </p>
+            {monthlyDividendIncome > 0 && (
+              <div className="mt-2 flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-1.5" data-testid="dividend-passive-income">
+                <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
+                <p className="text-xs text-emerald-700">
+                  Waarvan {formatCurrency(monthlyDividendIncome)} / mnd uit dividenden
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </section>
