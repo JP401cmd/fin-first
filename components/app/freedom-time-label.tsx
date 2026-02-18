@@ -206,24 +206,51 @@ export function FreedomTimeLabel({
 }: FreedomTimeLabelProps) {
   const { dailyExpenseRate: contextRate, loading, source } = useDailyExpenseRate()
 
+  // Guard against NaN/undefined/Infinity — treat as 0
+  const safeAmount = (amount == null || typeof amount !== 'number' || !isFinite(amount)) ? 0 : amount
+
   // Use prop dailyExpenses if provided, otherwise use context
   const effectiveDailyRate = dailyExpenses ?? contextRate
+  // Guard daily rate against NaN/Infinity
+  const safeDailyRate = (effectiveDailyRate == null || typeof effectiveDailyRate !== 'number' || !isFinite(effectiveDailyRate)) ? 0 : effectiveDailyRate
+
   const hasExpenseData = dailyExpenses != null ? dailyExpenses > 0 : (source === 'transactions' && contextRate > 0)
 
-  // Only show freedom time for amounts over €100 (per spec)
-  const showFreedomTime = Math.abs(amount) >= 100 && hasExpenseData && effectiveDailyRate > 0
+  // Determine if the amount is a deficit (negative)
+  const isDeficit = safeAmount < 0
+  const absAmount = Math.abs(safeAmount)
 
-  const formattedCurrency = formatCurrency(amount)
+  // Edge case: zero daily expenses with amount >= €100 → show "∞ vrijheid"
+  const isZeroExpenses = dailyExpenses != null ? safeDailyRate <= 0 : false
+  const showInfinite = absAmount >= 100 && isZeroExpenses && !isDeficit
+
+  // Only show freedom time for amounts over €100 (per spec)
+  const showFreedomTime = absAmount >= 100 && hasExpenseData && safeDailyRate > 0
+
+  const formattedCurrency = formatCurrency(safeAmount)
 
   // Use formatWithFreedom() utility internally for freedom time string
+  // Pass original amount (not abs) so deficit framing ("achter") is applied
   const freedomTimeStr = showFreedomTime
-    ? formatWithFreedom(Math.abs(amount), effectiveDailyRate, { format, includeCurrency: false })
+    ? formatWithFreedom(safeAmount, safeDailyRate, { format, includeCurrency: false })
     : null
 
   const sizeClasses = {
     xs: 'text-xs',
     sm: 'text-sm',
     base: 'text-base',
+  }
+
+  // Build the time annotation text
+  let timeAnnotation: string | null = null
+  if (showInfinite) {
+    timeAnnotation = '∞ vrijheid'
+  } else if (showFreedomTime && freedomTimeStr) {
+    // formatWithFreedom with includeCurrency:false returns just the time string
+    // For negative amounts it already includes " achter" suffix
+    timeAnnotation = isDeficit
+      ? `${freedomTimeStr}`
+      : `${freedomTimeStr} vrijheid`
   }
 
   if (variant === 'block') {
@@ -234,10 +261,10 @@ export function FreedomTimeLabel({
             {formattedCurrency}
           </span>
         )}
-        {showFreedomTime && freedomTimeStr && !loading && (
+        {timeAnnotation && !loading && (
           <span className={`flex items-center gap-1 text-sm italic font-normal text-zinc-500 ${timeClassName}`} data-testid="freedom-time-label-time">
             {showIcon && <Clock className="h-3 w-3" />}
-            ≈ {freedomTimeStr} vrijheid
+            ≈ {timeAnnotation}
           </span>
         )}
       </span>
@@ -251,10 +278,10 @@ export function FreedomTimeLabel({
           {formattedCurrency}
         </span>
       )}
-      {showFreedomTime && freedomTimeStr && !loading && (
+      {timeAnnotation && !loading && (
         <span className={`inline-flex items-center gap-0.5 text-sm italic font-normal text-zinc-500 ${timeClassName}`} data-testid="freedom-time-label-time">
           {showIcon && <Clock className="h-3 w-3" />}
-          <span>≈ {freedomTimeStr}</span>
+          <span>≈ {timeAnnotation}</span>
         </span>
       )}
     </span>

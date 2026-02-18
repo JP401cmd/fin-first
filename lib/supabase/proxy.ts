@@ -384,6 +384,10 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-shared-data',
     '/test-household-fire',
     '/api/verify-household-fire',
+    '/test-freedom-time-label-edge-cases',
+    '/api/verify-freedom-time-label-edge-cases',
+    '/test-kpi-deduplication',
+    '/api/verify-kpi-deduplication',
   ]
 
   // Protected route prefixes that require authentication
