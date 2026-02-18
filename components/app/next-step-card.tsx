@@ -235,6 +235,14 @@ export function NextStepSection({ steps, moduleColor }: { steps: NextStepSuggest
 
 /**
  * Compute the next step suggestion for De Kern module based on financial data.
+ *
+ * Smart prioritization (Feature #255):
+ * 1. No transactions (import first)
+ * 2. No assets (add wealth)
+ * 3. Budget alerts (needs attention)
+ * 4. No goals (set goals)
+ * 5. FIRE unreachable (try scenarios)
+ * Then: budgets, debts, snapshots, tax
  */
 export function computeKernNextStep(data: {
   totalAssets: number
@@ -245,8 +253,10 @@ export function computeKernNextStep(data: {
   snapshotCount: number
   hasTransactions: boolean
   alertBudgetCount?: number
+  hasGoals?: boolean
+  fireUnreachable?: boolean
 }): NextStepSuggestion {
-  // Priority order: import transactions > create budgets > budget alerts > track debts > assets > snapshots > belasting
+  // Priority 1: No transactions (import first)
   if (!data.hasTransactions) {
     return {
       key: 'import_transactions',
@@ -258,24 +268,61 @@ export function computeKernNextStep(data: {
     }
   }
 
-  if (data.budgetCount === 0) {
+  // Priority 2: No assets (add wealth)
+  if (data.totalAssets === 0) {
     return {
-      key: 'set_budgets',
-      title: 'Stel je budgetten in',
-      description: 'Maak budgetten aan om grip te krijgen op je uitgaven.',
-      href: '/core/budgets',
-      icon: 'cart',
+      key: 'add_assets',
+      title: 'Voeg je vermogen toe',
+      description: 'Registreer je bezittingen voor een compleet vermogensoverzicht.',
+      href: '/core/assets',
+      icon: 'piggybank',
       moduleColor: 'amber',
     }
   }
 
-  // Budget attention alerts when budgets are over their limit
+  // Priority 3: Budget attention alerts when budgets are over their limit
   if ((data.alertBudgetCount ?? 0) > 0) {
     const count = data.alertBudgetCount!
     return {
       key: 'budget_attention',
       title: `${count} budget${count > 1 ? 'ten' : ''} ${count > 1 ? 'hebben' : 'heeft'} aandacht nodig`,
       description: `${count} van je budgetten ${count > 1 ? 'overschrijden' : 'overschrijdt'} de limiet. Bekijk je uitgaven.`,
+      href: '/core/budgets',
+      icon: 'cart',
+      moduleColor: 'amber',
+    }
+  }
+
+  // Priority 4: No goals set
+  if (data.hasGoals === false) {
+    return {
+      key: 'set_goals',
+      title: 'Stel een financieel doel',
+      description: 'Definieer een concreet doel om naartoe te werken.',
+      href: '/will',
+      icon: 'target',
+      moduleColor: 'amber',
+    }
+  }
+
+  // Priority 5: FIRE target unreachable (try scenarios)
+  if (data.fireUnreachable === true) {
+    return {
+      key: 'fire_unreachable',
+      title: 'FIRE-doel niet haalbaar',
+      description: 'Je huidige spaarquote is onvoldoende. Verken scenario\'s om je plan te verbeteren.',
+      href: '/horizon',
+      icon: 'compass',
+      moduleColor: 'amber',
+    }
+  }
+
+  // Lower priority: budgets, debts, snapshots, tax
+  if (data.budgetCount === 0) {
+    return {
+      key: 'set_budgets',
+      title: 'Stel je budgetten in',
+      description: 'Maak budgetten aan om grip te krijgen op je uitgaven.',
       href: '/core/budgets',
       icon: 'cart',
       moduleColor: 'amber',
@@ -289,17 +336,6 @@ export function computeKernNextStep(data: {
       description: 'Analyseer je schulden en maak een aflosplan.',
       href: '/core/debts',
       icon: 'building',
-      moduleColor: 'amber',
-    }
-  }
-
-  if (data.totalAssets === 0) {
-    return {
-      key: 'add_assets',
-      title: 'Voeg je vermogen toe',
-      description: 'Registreer je bezittingen voor een compleet vermogensoverzicht.',
-      href: '/core/assets',
-      icon: 'piggybank',
       moduleColor: 'amber',
     }
   }
@@ -327,6 +363,14 @@ export function computeKernNextStep(data: {
 
 /**
  * Compute ALL remaining kern steps (not just the first one).
+ *
+ * Smart prioritization (Feature #255):
+ * 1. No transactions (import first)
+ * 2. No assets (add wealth)
+ * 3. Budget alerts (needs attention)
+ * 4. No goals (set goals)
+ * 5. FIRE unreachable (try scenarios)
+ * Then: budgets, debts, snapshots, tax
  */
 export function computeAllKernSteps(data: {
   totalAssets: number
@@ -337,9 +381,12 @@ export function computeAllKernSteps(data: {
   snapshotCount: number
   hasTransactions: boolean
   alertBudgetCount?: number
+  hasGoals?: boolean
+  fireUnreachable?: boolean
 }): NextStepSuggestion[] {
   const steps: NextStepSuggestion[] = []
 
+  // Priority 1: No transactions (import first)
   if (!data.hasTransactions) {
     steps.push({
       key: 'import_transactions',
@@ -351,24 +398,61 @@ export function computeAllKernSteps(data: {
     })
   }
 
-  if (data.budgetCount === 0) {
+  // Priority 2: No assets (add wealth)
+  if (data.totalAssets === 0) {
     steps.push({
-      key: 'set_budgets',
-      title: 'Stel je budgetten in',
-      description: 'Maak budgetten aan om grip te krijgen op je uitgaven.',
-      href: '/core/budgets',
-      icon: 'cart',
+      key: 'add_assets',
+      title: 'Voeg je vermogen toe',
+      description: 'Registreer je bezittingen voor een compleet vermogensoverzicht.',
+      href: '/core/assets',
+      icon: 'piggybank',
       moduleColor: 'amber',
     })
   }
 
-  // Budget attention alerts when budgets are over their limit
+  // Priority 3: Budget attention alerts when budgets are over their limit
   if ((data.alertBudgetCount ?? 0) > 0) {
     const count = data.alertBudgetCount!
     steps.push({
       key: 'budget_attention',
       title: `${count} budget${count > 1 ? 'ten' : ''} ${count > 1 ? 'hebben' : 'heeft'} aandacht nodig`,
       description: `${count} van je budgetten ${count > 1 ? 'overschrijden' : 'overschrijdt'} de limiet. Bekijk je uitgaven.`,
+      href: '/core/budgets',
+      icon: 'cart',
+      moduleColor: 'amber',
+    })
+  }
+
+  // Priority 4: No goals set
+  if (data.hasGoals === false) {
+    steps.push({
+      key: 'set_goals',
+      title: 'Stel een financieel doel',
+      description: 'Definieer een concreet doel om naartoe te werken.',
+      href: '/will',
+      icon: 'target',
+      moduleColor: 'amber',
+    })
+  }
+
+  // Priority 5: FIRE unreachable (try scenarios)
+  if (data.fireUnreachable === true) {
+    steps.push({
+      key: 'fire_unreachable',
+      title: 'FIRE-doel niet haalbaar',
+      description: 'Je huidige spaarquote is onvoldoende. Verken scenario\'s om je plan te verbeteren.',
+      href: '/horizon',
+      icon: 'compass',
+      moduleColor: 'amber',
+    })
+  }
+
+  // Lower priority steps
+  if (data.budgetCount === 0) {
+    steps.push({
+      key: 'set_budgets',
+      title: 'Stel je budgetten in',
+      description: 'Maak budgetten aan om grip te krijgen op je uitgaven.',
       href: '/core/budgets',
       icon: 'cart',
       moduleColor: 'amber',
@@ -382,17 +466,6 @@ export function computeAllKernSteps(data: {
       description: 'Analyseer je schulden en maak een aflosplan.',
       href: '/core/debts',
       icon: 'building',
-      moduleColor: 'amber',
-    })
-  }
-
-  if (data.totalAssets === 0) {
-    steps.push({
-      key: 'add_assets',
-      title: 'Voeg je vermogen toe',
-      description: 'Registreer je bezittingen voor een compleet vermogensoverzicht.',
-      href: '/core/assets',
-      icon: 'piggybank',
       moduleColor: 'amber',
     })
   }

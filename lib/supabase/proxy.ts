@@ -409,6 +409,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-freedom-card-safe-data',
     '/test-next-step-prioritization',
     '/api/verify-next-step-prioritization',
+    '/test-streak-break-warning',
+    '/api/verify-streak-break-warning',
   ]
 
   // Protected route prefixes that require authentication

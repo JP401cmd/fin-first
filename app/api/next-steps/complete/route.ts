@@ -18,6 +18,7 @@ const VALID_STEP_KEYS = [
   'calculate_fire',
   'plan_life_event',
   'explore_scenarios',
+  'fire_unreachable',
 ]
 
 /**

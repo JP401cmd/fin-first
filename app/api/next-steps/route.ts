@@ -7,16 +7,15 @@ import { NextResponse } from 'next/server'
  * Returns a prioritized list of actions the user should take next,
  * based on their ACTUAL financial data state (not static defaults).
  *
- * Also checks for dismissed steps and excludes them from suggestions.
+ * Smart prioritization algorithm (Feature #255):
+ * Priority 1: No transactions imported yet (import first)
+ * Priority 2: No assets added (add wealth)
+ * Priority 3: Budget categories over limit (needs attention)
+ * Priority 4: No goals set (set goals)
+ * Priority 5: FIRE target unreachable (try scenarios)
+ * Priority 6+: Other steps (budgets, debts, profile, snapshots)
  *
- * The logic checks real data in the database:
- * - Has the user imported transactions?
- * - Has the user set up budgets?
- * - Has the user added assets?
- * - Has the user registered debts?
- * - Has the user created net worth snapshots?
- * - Has the user completed their profile?
- * - Has the user set any goals?
+ * Maximum 1-2 suggestions shown per page.
  *
  * Steps that are already completed (based on real data) or dismissed
  * are removed from the suggestion list, making recommendations dynamic.
@@ -31,6 +30,10 @@ export async function GET() {
 
   try {
     // Query actual user data state in parallel
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+
     const [
       transactionsResult,
       budgetsResult,
@@ -40,6 +43,9 @@ export async function GET() {
       profileResult,
       goalsResult,
       dismissedResult,
+      // Additional queries for smart prioritization
+      budgetSpendingResult,
+      monthlyTxResult,
     ] = await Promise.all([
       supabase
         .from('transactions')
@@ -48,22 +54,19 @@ export async function GET() {
         .limit(1),
       supabase
         .from('budgets')
-        .select('id')
+        .select('id, name, default_limit')
         .eq('user_id', user.id)
-        .is('parent_id', null)
-        .limit(1),
+        .is('parent_id', null),
       supabase
         .from('assets')
-        .select('id')
+        .select('id, current_value')
         .eq('user_id', user.id)
-        .eq('is_active', true)
-        .limit(1),
+        .eq('is_active', true),
       supabase
         .from('debts')
-        .select('id')
+        .select('id, current_balance')
         .eq('user_id', user.id)
-        .eq('is_active', true)
-        .limit(1),
+        .eq('is_active', true),
       supabase
         .from('net_worth_snapshots')
         .select('id')
@@ -84,6 +87,21 @@ export async function GET() {
         .from('next_step_completions')
         .select('step_key, dismissed')
         .eq('user_id', user.id),
+      // Budget spending this month (for alert detection)
+      supabase
+        .from('transactions')
+        .select('budget_id, amount')
+        .eq('user_id', user.id)
+        .gte('date', monthStart)
+        .lt('date', monthEnd)
+        .lt('amount', 0),
+      // Monthly income/expenses for FIRE check
+      supabase
+        .from('transactions')
+        .select('amount')
+        .eq('user_id', user.id)
+        .gte('date', monthStart)
+        .lt('date', monthEnd),
     ])
 
     // Determine what the user has done based on real data
@@ -99,6 +117,62 @@ export async function GET() {
       profileResult.data?.household_type
     )
 
+    // Calculate budget alerts (budgets over their limit this month)
+    let alertBudgetCount = 0
+    if (budgetsResult.data && budgetSpendingResult.data) {
+      const spendingByBudget = new Map<string, number>()
+      for (const tx of budgetSpendingResult.data) {
+        if (tx.budget_id) {
+          const current = spendingByBudget.get(tx.budget_id) ?? 0
+          spendingByBudget.set(tx.budget_id, current + Math.abs(tx.amount))
+        }
+      }
+      for (const budget of budgetsResult.data) {
+        const spent = spendingByBudget.get(budget.id) ?? 0
+        if (budget.default_limit && spent > budget.default_limit) {
+          alertBudgetCount++
+        }
+      }
+    }
+
+    // Calculate FIRE reachability
+    let fireUnreachable = false
+    if (hasTransactions && hasAssets) {
+      const totalAssets = (assetsResult.data ?? []).reduce((sum, a) => sum + (a.current_value ?? 0), 0)
+      const totalDebts = (debtsResult.data ?? []).reduce((sum, d) => sum + (d.current_balance ?? 0), 0)
+      const netWorth = totalAssets - totalDebts
+      const monthlyTxs = monthlyTxResult.data ?? []
+      const monthlyIncome = monthlyTxs.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
+      const monthlyExpenses = Math.abs(monthlyTxs.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0))
+      const monthlySavings = monthlyIncome - monthlyExpenses
+      const yearlyExpenses = monthlyExpenses * 12
+      const SWR = 0.04
+      const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / SWR : 0
+
+      // FIRE is unreachable if: target exists but savings <= 0 and haven't reached target
+      // OR if it would take > 50 years (600 months) to reach
+      if (fireTarget > 0 && netWorth < fireTarget) {
+        if (monthlySavings <= 0) {
+          fireUnreachable = true
+        } else {
+          // Simulate to check if reachable within 50 years
+          const annualReturn = 0.07
+          const inflation = 0.02
+          const realReturn = (1 + annualReturn) / (1 + inflation) - 1
+          const monthlyReturn = realReturn / 12
+          let projected = netWorth
+          let months = 0
+          while (projected < fireTarget && months < 600) {
+            projected = projected * (1 + monthlyReturn) + monthlySavings
+            months++
+          }
+          if (months >= 600) {
+            fireUnreachable = true
+          }
+        }
+      }
+    }
+
     // Build dismissed set from database (if table exists)
     const dismissedKeys = new Set<string>()
     const completedByDb = new Set<string>()
@@ -112,7 +186,14 @@ export async function GET() {
       }
     }
 
-    // Build step list based on actual data state AND explicit completions from DB
+    // Build step list with smart prioritization (Feature #255):
+    // Priority 1: No transactions (import first)
+    // Priority 2: No assets (add wealth)
+    // Priority 3: Budget alerts (needs attention)
+    // Priority 4: No goals (set goals)
+    // Priority 5: FIRE unreachable (try scenarios)
+    // Priority 6+: Other steps (budgets, debts, profile, snapshots)
+    //
     // A step is "completed" if either:
     // 1. The real data state shows it's done (e.g., hasTransactions for import_transactions)
     // 2. The user explicitly marked it as completed via POST /api/next-steps/complete
@@ -129,33 +210,70 @@ export async function GET() {
         dismissed: dismissedKeys.has('import_transactions'),
       },
       {
-        key: 'set_budgets',
-        title: 'Stel je budgetten in',
-        description: 'Maak budgetten aan om grip te krijgen op je uitgaven per categorie.',
-        category: 'onboarding',
-        priority: 2,
-        href: '/core/budgets',
-        icon: 'cart',
-        completed: hasBudgets || completedByDb.has('set_budgets'),
-        dismissed: dismissedKeys.has('set_budgets'),
-      },
-      {
         key: 'add_assets',
         title: 'Voeg je bezittingen toe',
         description: 'Registreer je spaargeld, beleggingen en andere bezittingen.',
         category: 'financial',
-        priority: 3,
+        priority: 2,
         href: '/core/assets',
         icon: 'piggybank',
         completed: hasAssets || completedByDb.has('add_assets'),
         dismissed: dismissedKeys.has('add_assets'),
       },
       {
+        key: 'budget_attention',
+        title: alertBudgetCount > 0
+          ? `${alertBudgetCount} budget${alertBudgetCount > 1 ? 'ten' : ''} ${alertBudgetCount > 1 ? 'hebben' : 'heeft'} aandacht nodig`
+          : 'Budgetten bekijken',
+        description: alertBudgetCount > 0
+          ? `${alertBudgetCount} van je budgetten overschrijdt de limiet. Bekijk je uitgaven.`
+          : 'Bekijk of je budgetten binnen de limiet blijven.',
+        category: 'attention',
+        priority: 3,
+        href: '/core/budgets',
+        icon: 'cart',
+        completed: alertBudgetCount === 0 || completedByDb.has('budget_attention'),
+        dismissed: dismissedKeys.has('budget_attention'),
+      },
+      {
+        key: 'set_goals',
+        title: 'Stel een financieel doel',
+        description: 'Definieer een concreet doel om naartoe te werken, zoals een spaardoel of schuld aflossen.',
+        category: 'growth',
+        priority: 4,
+        href: '/will',
+        icon: 'target',
+        completed: hasGoals || completedByDb.has('set_goals'),
+        dismissed: dismissedKeys.has('set_goals'),
+      },
+      {
+        key: 'fire_unreachable',
+        title: 'FIRE-doel niet haalbaar',
+        description: 'Je huidige spaarquote is onvoldoende om financiële vrijheid te bereiken. Verken scenario\'s om je plan te verbeteren.',
+        category: 'horizon',
+        priority: 5,
+        href: '/horizon',
+        icon: 'compass',
+        completed: !fireUnreachable || completedByDb.has('fire_unreachable'),
+        dismissed: dismissedKeys.has('fire_unreachable'),
+      },
+      {
+        key: 'set_budgets',
+        title: 'Stel je budgetten in',
+        description: 'Maak budgetten aan om grip te krijgen op je uitgaven per categorie.',
+        category: 'onboarding',
+        priority: 6,
+        href: '/core/budgets',
+        icon: 'cart',
+        completed: hasBudgets || completedByDb.has('set_budgets'),
+        dismissed: dismissedKeys.has('set_budgets'),
+      },
+      {
         key: 'register_debts',
         title: 'Schulden registreren',
         description: 'Registreer eventuele leningen en schulden voor een compleet overzicht.',
         category: 'financial',
-        priority: 4,
+        priority: 7,
         href: '/core/debts',
         icon: 'building',
         completed: hasDebts || completedByDb.has('register_debts'),
@@ -166,7 +284,7 @@ export async function GET() {
         title: 'Profiel aanvullen',
         description: 'Vul je persoonlijke gegevens en huishoudprofiel in voor gepersonaliseerde inzichten.',
         category: 'onboarding',
-        priority: 5,
+        priority: 8,
         href: '/identity',
         icon: 'target',
         completed: profileComplete || completedByDb.has('complete_profile'),
@@ -177,22 +295,11 @@ export async function GET() {
         title: 'Maak je eerste vermogenssnapshot',
         description: 'Leg je huidige vermogenspositie vast om je voortgang over tijd te volgen.',
         category: 'financial',
-        priority: 6,
+        priority: 9,
         href: '/core',
         icon: 'chart',
         completed: hasSnapshots || completedByDb.has('create_snapshot'),
         dismissed: dismissedKeys.has('create_snapshot'),
-      },
-      {
-        key: 'set_goals',
-        title: 'Stel een financieel doel',
-        description: 'Definieer een concreet doel om naartoe te werken, zoals een spaardoel of schuld aflossen.',
-        category: 'growth',
-        priority: 7,
-        href: '/will',
-        icon: 'target',
-        completed: hasGoals || completedByDb.has('set_goals'),
-        dismissed: dismissedKeys.has('set_goals'),
       },
     ]
 
@@ -202,6 +309,7 @@ export async function GET() {
     const dismissedSteps = steps.filter(s => s.dismissed && !s.completed)
 
     // Return the first pending step as the primary suggestion
+    // Maximum 2 suggestions returned in pending_steps for display (Feature #255)
     const nextStep = pendingSteps.length > 0 ? pendingSteps[0] : null
 
     return NextResponse.json({
@@ -220,6 +328,8 @@ export async function GET() {
         has_snapshots: hasSnapshots,
         has_goals: hasGoals,
         profile_complete: profileComplete,
+        alert_budget_count: alertBudgetCount,
+        fire_unreachable: fireUnreachable,
       },
       source: 'database',
     })

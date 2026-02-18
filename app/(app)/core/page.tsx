@@ -56,6 +56,9 @@ export default function CorePage() {
   const [spendingInsightsDataMonths, setSpendingInsightsDataMonths] = useState(0)
   const [spendingInsightsMessage, setSpendingInsightsMessage] = useState<string>('')
   const [spendingInsightsHasData, setSpendingInsightsHasData] = useState(false)
+  // Smart prioritization state (Feature #255)
+  const [hasGoals, setHasGoals] = useState(false)
+  const [fireUnreachable, setFireUnreachable] = useState(false)
 
   const loadData = useCallback(async () => {
     try {
@@ -211,14 +214,41 @@ export default function CorePage() {
       // Set next step data
       setHasTransactions((txResult.data?.length ?? 0) > 0)
 
-      // Fetch budget alert data + debt progress + asset valuations
-      const [budgetResult, spendingResult, snapshotResult, debtFullResult, assetValuationResult] = await Promise.all([
+      // Compute FIRE reachability for smart prioritization (Feature #255)
+      const SWR = 0.04
+      const fireTarget = (monthlyExpenses * 12) > 0 ? (monthlyExpenses * 12) / SWR : 0
+      if (fireTarget > 0 && netWorth < fireTarget) {
+        if (monthlySavings <= 0) {
+          setFireUnreachable(true)
+        } else {
+          const annualReturn = 0.07
+          const inflation = 0.02
+          const realReturn = (1 + annualReturn) / (1 + inflation) - 1
+          const monthlyReturnRate = realReturn / 12
+          let projectedNW = netWorth
+          let fireMonths = 0
+          while (projectedNW < fireTarget && fireMonths < 600) {
+            projectedNW = projectedNW * (1 + monthlyReturnRate) + monthlySavings
+            fireMonths++
+          }
+          setFireUnreachable(fireMonths >= 600)
+        }
+      } else {
+        setFireUnreachable(false)
+      }
+
+      // Fetch budget alert data + debt progress + asset valuations + goals
+      const [budgetResult, spendingResult, snapshotResult, debtFullResult, assetValuationResult, goalsResult] = await Promise.all([
         supabase.from('budgets').select('*'),
         supabase.from('transactions').select('budget_id, amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('net_worth_snapshots').select('*').order('snapshot_date', { ascending: true }).limit(24),
         supabase.from('debts').select('current_balance, original_amount').eq('is_active', true),
         supabase.from('valuations').select('value, valuation_date').eq('entity_type', 'asset').order('valuation_date', { ascending: false }).limit(50),
+        supabase.from('goals').select('id').limit(1),
       ])
+
+      // Set goals state for smart prioritization (Feature #255)
+      setHasGoals((goalsResult.data?.length ?? 0) > 0)
 
       if (budgetResult.data) {
         setBudgetCount((budgetResult.data as Budget[]).filter(b => !b.parent_id).length)
@@ -572,6 +602,8 @@ export default function CorePage() {
               snapshotCount: snapshots.length,
               hasTransactions,
               alertBudgetCount: alertBudgets.length,
+              hasGoals,
+              fireUnreachable,
             })}
             moduleColor="amber"
           />
