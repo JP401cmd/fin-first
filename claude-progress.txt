@@ -1,3 +1,48 @@
+## Session 2026-02-18 - Feature #235
+
+### Feature #235: Privacy levels for sharing - PASSING
+- Enhanced existing FreedomCardGenerator with localStorage persistence and Full mode opt-in
+- All 6 feature steps verified and implemented:
+  1. **Create privacy level selector UI with 3 options**: Already existed in FreedomCardGenerator — 3 buttons (Anoniem, Met naam, Volledig) with teal active state and descriptions
+  2. **Anonymous mode: percentages only, no name**: API guard excludes displayName for anonymous, card conditionally renders {displayName && ...}
+  3. **Named mode: with name, no EUR amounts**: API includes displayName for named/full, excludes netWorth/fireTarget for non-full
+  4. **Full mode: requires explicit opt-in**: NEW — showFullOptIn state, opt-in confirmation dialog with warning about amounts visibility, "Ja, bedragen tonen" / "Annuleren" buttons
+  5. **Default to Anonymous for first-time use**: getStoredPrivacyLevel() returns 'anonymous' when no localStorage value, useState defaults to 'anonymous'
+  6. **Remember user's last privacy preference**: NEW — PRIVACY_STORAGE_KEY ('trifinity_privacy_level'), localStorage read on mount via useEffect, write on every change via storePrivacyLevel()
+
+#### New Files:
+- **app/api/verify-privacy-levels/route.ts**: 12-test verification endpoint checking all 6 steps
+- **app/test-privacy-levels/page.tsx**: Visual test page with API tests, client-side localStorage tests, and 3 card demos (anonymous/named/full)
+
+#### Modified Files:
+- **components/app/freedom-card.tsx**: Added PRIVACY_STORAGE_KEY, getStoredPrivacyLevel(), storePrivacyLevel(), handlePrivacyChange() with Full opt-in flow, showFullOptIn state, opt-in confirmation dialog, data-testid attributes
+- **lib/supabase/proxy.ts**: Added /test-privacy-levels and /api/verify-privacy-levels to public paths
+
+#### Verification:
+- 12/12 API verification tests passing at /api/verify-privacy-levels
+- 4/4 client-side localStorage tests passing on test page
+- 10/10 existing privacy-default tests still passing at /api/verify-privacy-default
+- 16/16 existing freedom-card tests still passing at /api/verify-freedom-card
+- Zero console errors on fresh page load
+- No mock data patterns found
+- Visual demo shows all 3 card modes rendering correctly: anonymous (no name, no amounts), named (with name, no amounts), full (with name and EUR amounts)
+- Commits: b50e24a (code changes), f51c80f (new test/verify files)
+
+### Current Status
+- 230/265 features passing (229 before + #235)
+- Feature #235 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- PRIVACY_STORAGE_KEY is 'trifinity_privacy_level' in localStorage
+- FreedomCardGenerator loads from localStorage on mount, saves on every privacy change
+- Full mode opt-in dialog shows amber warning about netto vermogen and FIRE-doelbedrag visibility
+- Canceling opt-in keeps current privacy level, does not revert to anonymous
+- Test page at /test-privacy-levels includes both API and client-side verification
+- The test-freedom-card page has its own independent privacy selector (doesn't use FreedomCardGenerator)
+
+---
+
 ## Session 2026-02-18 - Feature #234
 
 ### Feature #234: Freedom card generator - PASSING
