@@ -392,6 +392,10 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-household-db',
     '/test-badge-definitions',
     '/api/verify-badge-definitions',
+    '/test-next-step-completion-tracking',
+    '/api/verify-next-step-completion-tracking',
+    '/test-enhanced-snapshots',
+    '/api/verify-enhanced-snapshots',
   ]
 
   // Protected route prefixes that require authentication
