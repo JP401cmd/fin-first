@@ -388,6 +388,10 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-freedom-time-label-edge-cases',
     '/test-kpi-deduplication',
     '/api/verify-kpi-deduplication',
+    '/test-household-db',
+    '/api/verify-household-db',
+    '/test-badge-definitions',
+    '/api/verify-badge-definitions',
   ]
 
   // Protected route prefixes that require authentication
