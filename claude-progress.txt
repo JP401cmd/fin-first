@@ -1,3 +1,39 @@
+## Session 2026-02-18 - Feature #244
+
+### Feature #244: FreedomTimeLabel handles edge cases correctly - PASSING
+- Enhanced FreedomTimeLabel component to handle all edge cases properly
+- All 18/18 verification tests passing at /api/verify-freedom-time-label-edge-cases
+- All 5 feature steps verified:
+  1. **Zero daily expenses**: Shows "∞ vrijheid" (not JS Infinity). Component now has `showInfinite` logic that triggers when `dailyExpenses=0` and amount >= €100
+  2. **Negative amounts (deficit framing)**: Shows "X achter" suffix (e.g., "1 maand achter", "5d achter"). Component now passes original amount (not Math.abs) to formatWithFreedom() so deficit framing works
+  3. **Amounts under €100**: Correctly hides freedom time. Uses `absAmount >= 100` threshold
+  4. **Very large amounts**: Capped at 9999 years by calculateFreedomTime(). €500M shows "9999 jaar vrijheid"
+  5. **NaN/undefined inputs**: Component guards with safeAmount/isFinite checks. NaN → €0, Infinity → €0, no crashes
+
+#### Key Changes:
+- **components/app/freedom-time-label.tsx**: Added safeAmount/safeDailyRate guards, showInfinite logic, deficit framing, absAmount threshold
+- **app/api/verify-freedom-time-label-edge-cases/route.ts**: 18-test verification endpoint
+- **app/test-freedom-time-label-edge-cases/page.tsx**: Visual test page with all 5 edge case sections
+
+#### Verification:
+- 18/18 verification tests passing
+- Zero console errors (0 errors, 0 warnings)
+- No mock data patterns found
+- Existing tests #210 (10/10) and #178 (12/12) still pass — no regressions
+- Commit: 9b3fd9e
+
+### Current Status
+- 239/265 features passing (238 before + #244)
+- Feature #244 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- FreedomTimeLabel now has 3 display modes: normal freedom time, infinite freedom (∞), and hidden (under €100)
+- Deficit amounts show "achter" suffix in both long ("1 maand achter") and short ("5d achter") format
+- NaN expenses are treated as zero expenses (shows ∞ vrijheid for amounts >= €100)
+
+---
+
 ## Session 2026-02-18 - Feature #242
 
 ### Feature #242: Shared vs personal data management - PASSING
