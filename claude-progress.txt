@@ -1,3 +1,47 @@
+## Session 2026-02-18 - Feature #245
+
+### Feature #245: No KPI appears as primary metric on multiple pages - PASSING
+- Verified complete KPI deduplication across all 4 main pages (Dashboard, De Kern, De Wil, De Horizon)
+- All 15/15 verification tests passing at /api/verify-kpi-deduplication
+- All 5 feature steps verified:
+  1. **Dashboard only has previews**: 3 preview teasers (kern-preview-metric, wil-preview-metric, horizon-preview-metric) + freedom teaser. No primary KPI grid (no data-testid="kpi-" anywhere)
+  2. **De Kern does NOT have FIRE age**: Hero shows freedom %, KPIs are Dagen Gewonnen, Spaarquote, Vrije Dagen/Jaar, Autonomie Score, Vermogensgroei. No kpi-fire-age or "Vrijheidsleeftijd"
+  3. **De Wil does NOT have net worth metrics**: Hero shows freedom days won, KPIs are Voltooide Acties, Open Potentieel, Doelvoortgang, Wilskrachtscore. No kpi-netto-vermogen or kpi-net-worth
+  4. **De Horizon does NOT have action-based freedom days**: Hero shows FIRE age, KPIs are Vrijheidsleeftijd, Aftellen, FIRE Doelbedrag, Veerkracht. No kpi-dagen-gewonnen or kpi-voltooide-acties
+  5. **Each primary KPI on exactly one page**: FIRE age only on Horizon, Freedom days won only on Wil, Vermogensgroei only on Kern, Spaarquote only on Kern, Wilskrachtscore only on Wil, Veerkracht only on Horizon
+
+#### Key Finding:
+- Test #6 originally failed because the Kern page's tooltip text references "vrijheidsdagen gewonnen in De Wil" (cross-page differentiation). Fixed test to check for the primary metric display (data-testid) rather than any text occurrence.
+- KPI tooltips on Kern and Wil explicitly differentiate similar metrics: "Dit verschilt van 'vrijheidsdagen gewonnen' in De Wil" and "Dit verschilt van 'Vrije Dagen per Jaar' in De Kern"
+
+#### Key Files (all previously built by other agents):
+- **app/(app)/dashboard/page.tsx**: Preview teasers only, links to modules
+- **app/(app)/core/page.tsx**: 5 KPI stat cards, hero with freedom %
+- **app/(app)/will/page.tsx**: 4 KPI stat cards, hero with freedom days won
+- **app/(app)/horizon/page.tsx**: 4 KPI stat cards, hero with FIRE age
+- **app/api/verify-kpi-deduplication/route.ts**: 15-test verification endpoint (fixed test #6)
+- **app/test-kpi-deduplication/page.tsx**: Visual test page with KPI ownership map
+
+#### Verification:
+- 15/15 API verification tests passing
+- Zero console errors (0 errors, 0 warnings)
+- No mock data patterns found
+- Browser verified: all test results green on test page
+- Commits: b24c1e1 (verification fix), aabddcc (test page)
+
+### Current Status
+- 242/265 features passing (241 before + #245)
+- Feature #245 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- KPI deduplication is enforced by convention + data-testid attributes
+- Each module has a unique hero primary metric: Kern=freedom%, Wil=freedom days, Horizon=FIRE age
+- Dashboard only shows preview teasers that link to module pages
+- Tooltips explicitly cross-reference other modules to help users understand metric differences
+
+---
+
 ## Session 2026-02-18 - Feature #247
 
 ### Feature #247: NextStepCard completion tracking via API - PASSING
