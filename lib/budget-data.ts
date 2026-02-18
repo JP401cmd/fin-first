@@ -26,6 +26,9 @@ export type Budget = {
   sort_order: number
   created_at: string
   updated_at: string
+  // Household fields
+  ownership: 'personal' | 'shared'
+  household_id: string | null
 }
 
 /** Stable budget slugs — use these for matching instead of display names. */

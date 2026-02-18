@@ -65,6 +65,9 @@ export interface Asset {
   depreciation_rate: number | null
   address_postcode: string | null
   address_house_number: string | null
+  // Household fields
+  ownership: 'personal' | 'shared'
+  household_id: string | null
 }
 
 export const ASSET_TYPE_LABELS: Record<AssetType, string> = {

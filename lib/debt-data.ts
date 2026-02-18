@@ -57,6 +57,9 @@ export interface Debt {
   credit_limit: number | null
   repayment_type: RepaymentType | null
   draagkrachtmeting_date: string | null
+  // Household fields
+  ownership: 'personal' | 'shared'
+  household_id: string | null
 }
 
 export const DEBT_TYPE_LABELS: Record<DebtType, string> = {

@@ -1,3 +1,46 @@
+## Session 2026-02-18 - Feature #243
+
+### Feature #243: Household FIRE projections - PASSING
+- Verified complete implementation of household FIRE projections with partner comparison
+- All 6 feature steps verified and implemented:
+  1. **Calculate combined household income from both partners**: API fetches transactions for all household members, sums positive amounts as monthlyIncome per member, combines into combinedMonthlyIncome
+  2. **Calculate combined household expenses**: API fetches negative transactions, computes monthlyExpenses per member, handles personal vs shared asset/debt ownership split
+  3. **Compute shared FIRE target based on combined data**: Uses computeFireProjection() with combined HorizonInput (all personal + shared assets/debts counted once). FIRE target = yearlyExpenses / 0.04 (25x rule)
+  4. **Compute individual FIRE targets per partner**: Each partner gets personal assets + 50% of shared assets, personal debts + 50% of shared debts. Individual computeFireProjection() and computeFireRange() calls
+  5. **Create partner comparison view**: HouseholdFireSection (544 lines) with combined hero card, 5 financial summary cards, 2 PartnerCards, 5 ComparisonBars (net worth, income, savings rate, freedom %, FIRE age), "Samen sterker" insight
+  6. **Integrate with existing FIRE projection logic**: Uses computeFireProjection/computeFireRange from lib/horizon-data.ts, formatCurrency/formatFireAge, HouseholdFireSection rendered on /horizon page
+
+#### Key Files:
+- **components/app/household-fire-section.tsx**: Full-featured UI component (544 lines) with combined card, partner cards, comparison bars, insight section
+- **app/api/household/fire-projections/route.ts**: GET endpoint (391 lines) fetching all financial data for household members in parallel
+- **lib/household-data.ts**: Pure utility functions for split mode calculations, perspective filtering, net worth computation
+- **app/api/verify-household-fire/route.ts**: 20-test verification endpoint covering all 6 feature steps
+- **app/test-household-fire/page.tsx**: Visual test page with verification results and API response preview
+
+#### Verification:
+- 20/20 API verification tests passing at /api/verify-household-fire
+- API returns 401 for unauthenticated access
+- /horizon redirects to /login for unauthenticated users
+- Zero mock data patterns found in source files
+- Only console error: expected 401 from unauthenticated API call on test page
+- Commit: 5518531
+
+### Current Status
+- 237/265 features passing (236 before + #243)
+- Feature #243 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- HouseholdFireSection self-fetches from /api/household/fire-projections (no props needed)
+- Shows nothing if user has no household (returns null silently)
+- Combined projection uses oldest DOB for conservative FIRE age
+- Shared assets/debts split 50/50 for individual calculations
+- Combined totals count shared items once (not duplicated per member)
+- ComparisonBar supports invertColors for FIRE age (lower = better)
+- "Samen sterker" insight compares combined vs average individual FIRE age
+
+---
+
 ## Session 2026-02-18 - Feature #240
 
 ### Feature #240: Partner invitation and management - PASSING

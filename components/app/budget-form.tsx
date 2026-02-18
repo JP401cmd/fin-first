@@ -7,6 +7,7 @@ import { ArrowLeft, Save, AlertTriangle, RefreshCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Budget } from '@/lib/budget-data'
 import { iconMap, iconOptions } from '@/components/app/budget-shared'
+import { OwnershipToggle, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
 
 type FormData = {
   name: string
@@ -23,6 +24,7 @@ type FormData = {
   priority_score: number
   is_inflation_indexed: boolean
   parent_id: string
+  ownership: OwnershipType
 }
 
 export function BudgetForm({
@@ -36,6 +38,7 @@ export function BudgetForm({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [categoryName, setCategoryName] = useState('')
+  const { hasHousehold, householdId } = useHouseholdStatus()
 
   const [form, setForm] = useState<FormData>({
     name: budget?.name ?? '',
@@ -52,6 +55,7 @@ export function BudgetForm({
     priority_score: budget?.priority_score ?? 3,
     is_inflation_indexed: budget?.is_inflation_indexed ?? false,
     parent_id: budget?.parent_id ?? '',
+    ownership: budget?.ownership ?? 'personal',
   })
 
   const needsAutoParent = !budget && !form.parent_id
@@ -111,6 +115,7 @@ export function BudgetForm({
     priority_score: budget?.priority_score ?? 3,
     is_inflation_indexed: budget?.is_inflation_indexed ?? false,
     parent_id: budget?.parent_id ?? '',
+    ownership: budget?.ownership ?? 'personal',
   }), [budget])
 
   const isDirty = useMemo(() => {
@@ -129,6 +134,7 @@ export function BudgetForm({
       form.priority_score !== initialForm.priority_score ||
       form.is_inflation_indexed !== initialForm.is_inflation_indexed ||
       form.parent_id !== initialForm.parent_id ||
+      form.ownership !== initialForm.ownership ||
       (needsAutoParent && categoryName.trim() !== '')
     )
   }, [form, initialForm, needsAutoParent, categoryName])
@@ -217,6 +223,11 @@ export function BudgetForm({
       return
     }
 
+    const ownershipFields = {
+      ownership: form.ownership,
+      household_id: form.ownership === 'shared' ? householdId : null,
+    }
+
     if (budget) {
       // Edit existing budget
       const row = {
@@ -235,6 +246,7 @@ export function BudgetForm({
         priority_score: form.priority_score,
         is_inflation_indexed: form.is_inflation_indexed,
         parent_id: form.parent_id || null,
+        ...ownershipFields,
       }
 
       const { error: updateError } = await supabase
@@ -267,6 +279,7 @@ export function BudgetForm({
           priority_score: form.priority_score,
           is_inflation_indexed: form.is_inflation_indexed,
           parent_id: null,
+          ...ownershipFields,
         })
         .select('id')
         .single()
@@ -296,6 +309,7 @@ export function BudgetForm({
           is_inflation_indexed: form.is_inflation_indexed,
           parent_id: parentData.id,
           sort_order: 0,
+          ...ownershipFields,
         })
 
       if (childError) {
@@ -321,6 +335,7 @@ export function BudgetForm({
         priority_score: form.priority_score,
         is_inflation_indexed: form.is_inflation_indexed,
         parent_id: form.parent_id || null,
+        ...ownershipFields,
       }
 
       const { error: insertError } = await supabase
@@ -531,6 +546,18 @@ export function BudgetForm({
             />
           </div>
         </div>
+      </fieldset>
+
+      {/* === Eigendom === */}
+      <fieldset className="mb-8">
+        <legend className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          Eigendom
+        </legend>
+        <OwnershipToggle
+          value={form.ownership}
+          onChange={(v) => update('ownership', v)}
+          hasHousehold={hasHousehold}
+        />
       </fieldset>
 
       {/* === Financieel === */}
