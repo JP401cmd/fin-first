@@ -399,6 +399,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-enhanced-snapshots',
     '/test-feature-visits-tracking',
     '/api/verify-feature-visits-tracking',
+    '/test-trend-chart',
+    '/api/verify-trend-chart',
   ]
 
   // Protected route prefixes that require authentication
