@@ -363,6 +363,11 @@ export async function updateSession(request: NextRequest) {
     '/api/dividends',
     '/test-holdings-sync',
     '/api/verify-holdings-sync',
+    '/test-privacy-levels',
+    '/api/verify-privacy-levels',
+    '/api/verify-freedom-card',
+    '/test-share-targets',
+    '/api/verify-share-targets',
   ]
 
   // Protected route prefixes that require authentication

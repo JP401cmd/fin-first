@@ -32,7 +32,7 @@ export async function GET(request: Request) {
       supabase.from('debts').select('current_balance, debt_type').eq('is_active', true),
       supabase.from('profiles').select('full_name, date_of_birth').single(),
       supabase.from('budgets').select('id, default_limit, interval').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
-      supabase.from('actions').select('id, status, freedom_days_impact').in('status', ['open', 'completed']),
+      supabase.from('actions').select('id, status, freedom_days_impact, completed_at').in('status', ['open', 'completed']),
       supabase.from('budgets').select('id, parent_id, default_limit').not('parent_id', 'is', null),
     ])
 
@@ -94,6 +94,17 @@ export async function GET(request: Request) {
       (s: number, a: { freedom_days_impact?: number }) => s + (Number(a.freedom_days_impact) || 0), 0
     )
 
+    // Days won THIS MONTH (completed actions with completed_at in current month)
+    const freedomDaysWonThisMonth = completedActions
+      .filter((a: { completed_at?: string }) => {
+        if (!a.completed_at) return false
+        const completedDate = a.completed_at.split('T')[0]
+        return completedDate >= monthStart && completedDate < monthEnd
+      })
+      .reduce(
+        (s: number, a: { freedom_days_impact?: number }) => s + (Number(a.freedom_days_impact) || 0), 0
+      )
+
     // Determine if FIRE calculation is possible (requires expense data)
     const canCalculateFire = hasExpenses && yearlyExpenses > 0
 
@@ -106,6 +117,7 @@ export async function GET(request: Request) {
       privacyLevel,
       freedomPercentage: canCalculateFire ? Math.round(freedomPct * 10) / 10 : null,
       freedomDaysWon: Math.round(totalFreedomDaysWon),
+      freedomDaysWonThisMonth: Math.round(freedomDaysWonThisMonth),
       fireCountdown: {
         years: fireProj.countdownYears,
         months: fireProj.countdownMonths,
