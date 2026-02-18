@@ -1,3 +1,85 @@
+## Session 2026-02-18 - Feature #251
+
+### Feature #251: Spending variance confidence indicator - PASSING
+- Verified complete implementation of spending variance confidence indicators
+- All 27/27 verification tests passing at /api/verify-spending-variance-confidence
+- All 5 feature steps verified:
+  1. **Calculate standard deviation of spending per budget category**: calculateSpendingVariance() computes mean, variance, stdDev from non-zero monthly amounts. /api/budget-variance maps over all parent budgets with child transaction aggregation
+  2. **Determine confidence level: low variance = high confidence**: Coefficient of Variation (CV = stdDev/mean) mapping: CV < 0.15 = high (90%), CV 0.15-0.35 = medium (75%), CV > 0.35 = low (45%). Same logic in both spending-confidence-indicator.tsx and budget-forecast.ts
+  3. **Create visual confidence indicator component**: Three components — SpendingConfidenceIndicator (1-3 WiFi-style signal bars), SpendingConfidenceBadge (compact pill with bars + Dutch label), SpendingVarianceDetailPanel (full breakdown with stats grid + progress bar). Color-coded: emerald=high, amber=medium, zinc=low
+  4. **Display on budget forecast predictions**: Budget page imports and renders SpendingConfidenceBadge in forecast card header and SpendingVarianceDetailPanel below. calculateSpendingVariance called with monthly spending history
+  5. **Handle categories with insufficient data**: < 3 months returns confidence="insufficient" with 0 bars, Dutch message "Onvoldoende data", separate rendering path in forecast section
+
+#### Key Files (all previously built by other agents):
+- **components/app/spending-confidence-indicator.tsx**: calculateSpendingVariance, SpendingConfidenceIndicator, SpendingConfidenceBadge, SpendingVarianceDetailPanel
+- **lib/budget-forecast.ts**: computeBudgetForecast with same CV-based confidence logic
+- **app/api/budget-variance/route.ts**: GET endpoint with per-category variance + summary
+- **app/(app)/core/budgets/page.tsx**: Integration in budget detail modal forecast section
+- **app/api/verify-spending-variance-confidence/route.ts**: 27-test verification endpoint
+- **app/test-spending-variance-confidence/page.tsx**: Visual test page with component demos
+
+#### Verification:
+- 27/27 API verification tests passing
+- Zero mock data patterns (globalThis, devStore, mockData, etc.)
+- Console errors: only HMR WebSocket reconnects (standard Next.js dev behavior)
+- Browser verified: all test results green, visual components render correctly
+- Commit: d3ab6a3
+
+### Current Status
+- 246/265 features passing (245 before + #251)
+- Feature #251 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- All implementation was already done by previous agents — only added verification endpoint and test page
+- Confidence indicator architecture: CV-based with 3 thresholds (0.15, 0.35) mapping to high/medium/low
+- 3 visual components at different detail levels: bars only, badge, full detail panel
+- API returns both per-category data and distribution summary
+- Budget forecast section in budgets page uses both SpendingConfidenceBadge and SpendingVarianceDetailPanel
+
+---
+
+## Session 2026-02-18 - Feature #249
+
+### Feature #249: TrendChart consistent visualization component - PASSING
+- Verified complete implementation of reusable TrendChart component
+- All 13/13 verification tests passing at /api/verify-trend-chart
+- All 7 feature steps verified:
+  1. **TrendChart reusable component created**: Exported function with TrendChartMode, TrendChartSeries, TrendChartProps types
+  2. **Line chart mode**: SVG path with strokeLinejoin for smooth curves, data point circles with hover interaction
+  3. **Area chart mode**: Filled SVG path with gradient fill (linearGradient), semi-transparent fill below line
+  4. **Bar chart mode**: SVG rect elements with dynamic barWidth calculation, grouped multi-series bars
+  5. **Actual vs projected data overlay**: Dashed line (strokeDasharray), lighter area fill for projections, "Prognose" legend
+  6. **Consistent module color themes**: MODULE_COLORS record with amber (#f59e0b), teal (#14b8a6), purple (#a855f7)
+  7. **Responsive design**: ViewBox-based SVG (600px width), w-full class, configurable height prop, maxHeight style
+
+#### Key Files:
+- **components/app/trend-chart.tsx**: Main reusable component (729 lines, SVG-based)
+- **app/test-trend-chart/page.tsx**: Interactive test page with all modes, colors, and features
+- **app/api/verify-trend-chart/route.ts**: 13-test verification endpoint
+- **lib/supabase/proxy.ts**: Added /test-trend-chart and /api/verify-trend-chart to public paths
+
+#### Verification:
+- 13/13 API verification tests passing
+- Zero console errors (0 errors, 0 warnings)
+- No mock data patterns found
+- Browser verified: all chart modes (line/area/bar), all colors (amber/teal/purple), projected overlays, responsive sizes
+- Interactive demo with mode/color switcher verified via Playwright
+- Commit: 65495c0
+
+### Current Status
+- 244/265 features passing (243 before + #249)
+- Feature #249 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- TrendChart component is a pure UI component (no database interaction)
+- Component supports: 3 chart modes, 3 module colors, multi-series, hover tooltips, projected data, custom formatting
+- Not yet integrated into existing app pages (still using custom inline SVG charts on /horizon)
+- Future enhancement: replace inline ResilienceTrendChart and FireAgeTrendChart with TrendChart component
+
+---
+
 ## Session 2026-02-18 - Feature #250
 
 ### Feature #250: User feature visits tracking system - PASSING
