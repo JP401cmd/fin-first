@@ -1,3 +1,48 @@
+## Session 2026-02-18 - Feature #247
+
+### Feature #247: NextStepCard completion tracking via API - PASSING
+- Verified complete implementation of next step completion tracking via API
+- All 13/13 verification tests passing at /api/verify-next-step-completion-tracking
+- All 6 feature steps verified:
+  1. **next_step_completions table exists**: Table in migration 20260215000001_create_new_tables.sql with id, user_id, step_key, completed_at, dismissed columns
+  2. **POST /api/next-steps/complete stores completion with timestamp**: Uses upsert with completed_at timestamp, dismissed=false, validates step_key against VALID_STEP_KEYS
+  3. **POST /api/next-steps/dismiss stores dismissal**: Uses upsert with dismissed=true, onConflict user_id,step_key
+  4. **GET /api/next-steps filters out completed and dismissed steps**: Queries next_step_completions table, builds dismissed/completed sets, returns pending/completed/dismissed arrays
+  5. **Unique constraint on user_id + step_key prevents duplicates**: UNIQUE(user_id, step_key) in migration, upsert uses onConflict
+  6. **RLS ensures users can only access own completions**: RLS enabled, SELECT/INSERT/UPDATE policies with auth.uid() = user_id
+
+#### Key Files (all previously built by other agents):
+- **app/api/next-steps/route.ts**: GET endpoint with dual completion logic (data-state + DB)
+- **app/api/next-steps/complete/route.ts**: POST endpoint with step_key validation
+- **app/api/next-steps/dismiss/route.ts**: POST endpoint with upsert dismiss
+- **components/app/next-step-card.tsx**: NextStepCard, NextStepSection with dismiss handling
+- **supabase/migrations/20260215000001_create_new_tables.sql**: Table creation with RLS
+- **app/api/apply-migration/route.ts**: Runtime migration with same schema
+- **app/api/verify-next-step-completion-tracking/route.ts**: 13-test verification endpoint
+- **app/test-next-step-completion-tracking/page.tsx**: Visual test page
+
+#### Verification:
+- 13/13 API verification tests passing
+- Zero console errors (0 errors, 0 warnings)
+- No mock data patterns found (globalThis, devStore, mockData, etc.)
+- API returns 401 for unauthenticated access
+- Browser verified: all tests green on test page
+- Dual completion: steps marked complete via real data state OR explicit DB completion
+
+### Current Status
+- 241/265 features passing (240 before + #247)
+- Feature #247 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- next_step_completions table was already created by migration
+- All API endpoints were already implemented by previous agents
+- NextStepSection component loads dismissed/completed keys from API on mount
+- Complete endpoint validates against 15 valid step keys
+- Dismiss uses optimistic UI update + best-effort API persist
+
+---
+
 ## Session 2026-02-18 - Feature #246
 
 ### Feature #246: Badge definitions complete with 30+ badges - PASSING
