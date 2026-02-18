@@ -1,3 +1,48 @@
+## Session 2026-02-18 - Feature #233
+
+### Feature #233: Auto-sync holdings to asset values - PASSING
+- Verified that all 6 feature steps are fully implemented across the codebase
+- Created comprehensive 23-test verification endpoint at /api/verify-holdings-sync
+- Created visual test page at /test-holdings-sync
+
+#### Feature Steps Verified:
+1. **Calculate total portfolio value**: `syncAssetValueFromHoldings()` in lib/holdings-sync.ts queries active holdings and sums (current_price ?? avg_purchase_price) * units
+2. **Auto-sync to asset current_value**: Updates assets table with computed total, user-scoped
+3. **Portfolio tracker is source of truth**: `assetHasActiveHoldings()` check function + GET /api/assets/has-holdings endpoint
+4. **Sync on create/update/delete**: syncAssetValueFromHoldings called in POST, PATCH, DELETE /api/holdings + POST /api/holding-transactions (buy/sell)
+5. **Sync on price feed updates**: Called in POST /api/holdings/refresh-prices (batch) and PATCH (manual override)
+6. **Prevent manual edit when holdings active**: Warning banner, disabled revalue button, readOnly value input, valuation modal warning
+
+#### New Files:
+- **app/api/verify-holdings-sync/route.ts**: 23-test verification endpoint
+- **app/test-holdings-sync/page.tsx**: Visual test page with step-by-step results + architecture diagram
+
+#### Key Files (Verified, already existed):
+- **lib/holdings-sync.ts**: Core sync and check functions
+- **app/api/assets/has-holdings/route.ts**: Check endpoint for UI
+- **app/api/holdings/route.ts**: CRUD with sync on create/update/delete
+- **app/api/holding-transactions/route.ts**: Transaction sync on buy/sell
+- **app/api/holdings/refresh-prices/route.ts**: Price feed sync
+- **app/(app)/core/assets/page.tsx**: UI prevention (banner, disabled btn, readonly field)
+
+#### Verification:
+- 23/23 API verification tests passing
+- Zero console errors (fresh browser session)
+- Zero mock data patterns in source files
+- Commit: 7932eac
+
+### Current Status
+- 227/265 features passing (226 before + #233)
+- Feature #233 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- holdings-sync.ts was created by previous agent but never committed — now committed
+- has-holdings API endpoint was also never committed — now committed
+- proxy.ts already had the test routes added by another agent's session
+
+---
+
 ## Session 2026-02-18 - Feature #230
 
 ### Feature #230: Portfolio allocation visualization - PASSING
