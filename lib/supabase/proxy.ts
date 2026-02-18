@@ -403,6 +403,12 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-trend-chart',
     '/test-spending-variance-confidence',
     '/api/verify-spending-variance-confidence',
+    '/api/verify-holdings-list-detail',
+    '/test-holdings-list-detail',
+    '/test-freedom-card-safe-data',
+    '/api/verify-freedom-card-safe-data',
+    '/test-next-step-prioritization',
+    '/api/verify-next-step-prioritization',
   ]
 
   // Protected route prefixes that require authentication
