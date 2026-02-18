@@ -1,3 +1,43 @@
+## Session 2026-02-18 - Feature #238
+
+### Feature #238: Badge showcase sharing - PASSING
+- Enhanced badge sharing with reliable canvas-based image download
+- All 6 feature steps verified and implemented:
+  1. **Share button in badge detail view**: Already existed — "Deel deze badge" button with Share2 icon, conditionally shown only for earned badges
+  2. **Generate shareable badge image with TriFinity branding**: renderBadgeCardToCanvas (800x480px) with dark gradient, badge icon circle with glow, name, category, description, earned date, and TriFinity branding dots
+  3. **Include badge name and description in share text**: handleBadgeShare creates text "Ik heb de {name} badge verdiend op TriFinity! {icon}\n\n{description}"
+  4. **Support sharing via Web Share API**: ShareDialog with navigator.share integration, fallback to manual share targets
+  5. **Support copy link and download image**: NEW — Added renderCanvas prop to ShareDialog for reliable canvas-based PNG download (preferred over unreliable SVG foreignObject). File named trifinity-badge-{date}.png
+  6. **Apply consistent branding to shared badge image**: TriFinity amber/teal/purple dots + logo in top-right of canvas image, "BADGE BEHAALD" label
+
+#### Key Enhancement:
+- **ShareDialog renderCanvas prop**: Added optional `renderCanvas?: () => HTMLCanvasElement` prop to ShareDialog. When provided, image download uses programmatic canvas rendering instead of SVG foreignObject approach. Badge grid passes `renderBadgeCardToCanvas` through this prop for reliable PNG generation.
+
+#### Modified Files:
+- **components/app/share-dialog.tsx**: Added `renderCanvas` prop to ShareDialogProps, updated handleDownloadImage to prefer canvas when available, updated download button condition to show when either captureRef or renderCanvas provided
+- **components/app/badge-grid.tsx**: Added canvas renderer, share dialog integration, share button in detail modal, BadgeShareCard component, renderBadgeCanvas callback
+
+#### Verification:
+- 12/12 API verification tests passing at /api/verify-badge-share
+- Badge canvas images render correctly for all badge colors (emerald, purple, amber, teal)
+- Zero console errors on test page (/test-badge-share)
+- No mock data patterns found
+- Commit: 830ac55
+
+### Current Status
+- 233/265 features passing (232 before + #238)
+- Feature #238 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- ShareDialog now supports two image download strategies: renderCanvas (preferred) and captureRef (fallback)
+- renderBadgeCardToCanvas is exported from badge-grid.tsx for use in test pages
+- Badge share text format: "Ik heb de {name} badge verdiend op TriFinity! {icon}\n\n{description}"
+- Badge image filename: trifinity-badge-{date}.png
+- Canvas renderer creates 800x480px PNG with dark gradient background
+
+---
+
 ## Session 2026-02-18 - Feature #237
 
 ### Feature #237: Year-in-Review Jaaroverzicht - PASSING
