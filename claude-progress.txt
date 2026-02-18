@@ -1,3 +1,94 @@
+## Session 2026-02-18 - Feature #250
+
+### Feature #250: User feature visits tracking system - PASSING
+- Verified complete implementation of user feature visits tracking system
+- All 13/13 verification tests passing at /api/verify-feature-visits-tracking
+- All 7 feature steps verified:
+  1. **user_feature_visits table exists**: Created in migration 20260215000001_create_new_tables.sql with id (UUID PK), user_id (UUID NOT NULL), feature_slug (TEXT NOT NULL), first_visited_at (TIMESTAMPTZ), visit_count (INT DEFAULT 1)
+  2. **POST /api/feature-visits records feature visit**: Auth check, validates feature_slug, inserts new record with timestamp
+  3. **Increment visit_count on repeat visits**: Checks for existing record via maybeSingle(), increments visit_count, returns 'incremented' action
+  4. **GET /api/feature-visits returns all visited features**: Auth-gated, selects feature_slug/visit_count/first_visited_at, filters by user_id
+  5. **UNIQUE constraint on user_id + feature_slug**: In both migration SQL and apply-migration route
+  6. **RLS enabled on table**: SELECT, INSERT, UPDATE policies all scoped with auth.uid() = user_id
+  7. **DiscoverCarousel integration**: Fetches from API on mount, records visits on click, merges localStorage + API, sorts unvisited first, faded styling for visited items
+
+#### Key Files (all previously built by other agents):
+- **supabase/migrations/20260215000001_create_new_tables.sql**: Table definition with UNIQUE and RLS
+- **app/api/apply-migration/route.ts**: Runtime migration with same schema
+- **app/api/feature-visits/route.ts**: GET and POST endpoints with auth, validation, upsert logic
+- **components/app/discover-carousel.tsx**: Hybrid persistence (localStorage + API), visual differentiation
+- **app/api/verify-feature-visits-tracking/route.ts**: 13-test verification endpoint
+- **app/test-feature-visits/page.tsx**: Interactive test page for manual testing
+
+#### Verification:
+- 13/13 API verification tests passing
+- Table confirmed existing in live Supabase database via /api/apply-migration status check
+- Zero console errors (0 errors, 0 warnings) on /api/apply-migration page
+- No mock data patterns found (globalThis, devStore, mockData, etc.)
+- API returns 401 for unauthenticated access (verified on test page)
+- DiscoverCarousel used on all 3 module pages (core, will, horizon)
+- Commit: dcf18d3
+
+### Current Status
+- 244/265 features passing (243 before + #250)
+- Feature #250 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- user_feature_visits table was already created by previous agents via migration
+- All API endpoints and DiscoverCarousel integration were already implemented
+- Only change made: added verify endpoint and test page path to proxy.ts public paths
+- DiscoverCarousel has hybrid persistence: localStorage for instant load, API for cross-device sync
+- Visit tracking is fire-and-forget on click (doesn't block navigation)
+
+---
+
+## Session 2026-02-18 - Feature #248
+
+### Feature #248: Enhanced net_worth_snapshots table columns - PASSING
+- Verified complete implementation of 5 new columns on net_worth_snapshots table
+- All 14/14 verification tests passing at /api/verify-enhanced-snapshots
+- All 7 feature steps verified:
+  1. **freedom_percentage column (numeric, nullable)**: ALTER TABLE ADD COLUMN IF NOT EXISTS in migration + apply-migration route
+  2. **fire_age column (numeric, nullable)**: Same pattern, NUMERIC type for decimal age values
+  3. **sovereignty_level column (int, nullable)**: INT type for -2 to 6 level scale
+  4. **savings_rate column (numeric, nullable)**: NUMERIC type for percentage values
+  5. **resilience_score column (int, nullable)**: INT type for 0-100 composite score
+  6. **Existing snapshot data not affected**: IF NOT EXISTS prevents re-creation, nullable columns default to NULL
+  7. **New columns populated by snapshot creation logic**: All 3 endpoints (POST /api/snapshots, GET /api/snapshots/auto, GET /api/snapshots/cron) compute and store all 5 values
+
+#### Key Files:
+- **supabase/migrations/20260215000001_create_new_tables.sql**: ALTER TABLE with 5 ADD COLUMN IF NOT EXISTS statements
+- **app/api/apply-migration/route.ts**: Runtime migration with same ALTER statements + GET status check
+- **app/api/snapshots/route.ts**: Manual snapshot with extendedFields + graceful fallback
+- **app/api/snapshots/auto/route.ts**: Auto monthly snapshot with same logic
+- **app/api/snapshots/cron/route.ts**: Bulk cron snapshot for all users
+- **app/api/verify-enhanced-snapshots/route.ts**: 14-test verification endpoint
+- **app/test-enhanced-snapshots/page.tsx**: Visual test page with DB status + test results
+
+#### Verification:
+- 14/14 API verification tests passing
+- All 5 columns exist in live Supabase database (confirmed via /api/apply-migration GET)
+- Zero console errors (0 errors, 0 warnings)
+- No mock data patterns found
+- Browser verified: test page shows all green checkmarks
+- Commit: 649605a
+
+### Current Status
+- 242/265 features passing (241 before + #248)
+- Feature #248 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- All 5 columns were already implemented by previous agents across migrations and snapshot endpoints
+- Verification confirms: migration SQL, apply-migration route, 3 snapshot creation endpoints all consistent
+- Graceful fallback in all endpoints: tries extended fields first, retries with basic 5 if columns missing
+- Data types: NUMERIC for percentages/ages, INT for levels/scores
+- Sovereignty level range: -2 to 6 (from computeSovereigntyLevel in lib/feature-phases.ts)
+- Resilience score range: 0-100 (from computeResilienceScore in lib/horizon-data.ts)
+
+---
+
 ## Session 2026-02-18 - Feature #245
 
 ### Feature #245: No KPI appears as primary metric on multiple pages - PASSING
