@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Share2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { BADGE_DEFINITIONS, type BadgeWithStatus, type BadgeCategory } from '@/lib/badges'
+import { ShareDialog, type ShareContent } from '@/components/app/share-dialog'
 
 // ── Color mapping for badge categories ──────────────────────────────
 
@@ -75,7 +77,7 @@ const colorMap: Record<string, {
 const categoryLabels: Record<BadgeCategory, string> = {
   onboarding: 'Onboarding',
   consistency: 'Consistentie',
-  financial_health: 'Financiële Gezondheid',
+  financial_health: 'Financiele Gezondheid',
   fire_milestones: 'FIRE Mijlpalen',
   actions: 'Acties',
   budget: 'Budget',
@@ -83,14 +85,203 @@ const categoryLabels: Record<BadgeCategory, string> = {
   sovereignty: 'Soevereiniteit',
 }
 
+// ── Canvas color hex values per badge color ─────────────────────────
+
+const canvasColorHex: Record<string, { primary: string; bg: string; bgDark: string }> = {
+  amber:   { primary: '#fbbf24', bg: '#fffbeb', bgDark: '#78350f' },
+  teal:    { primary: '#2dd4bf', bg: '#f0fdfa', bgDark: '#134e4a' },
+  purple:  { primary: '#a855f7', bg: '#faf5ff', bgDark: '#581c87' },
+  emerald: { primary: '#34d399', bg: '#ecfdf5', bgDark: '#064e3b' },
+  rose:    { primary: '#fb7185', bg: '#fff1f2', bgDark: '#881337' },
+  blue:    { primary: '#60a5fa', bg: '#eff6ff', bgDark: '#1e3a5f' },
+  zinc:    { primary: '#a1a1aa', bg: '#fafafa', bgDark: '#27272a' },
+}
+
+// ── Render badge card to canvas for sharing ─────────────────────────
+
+export function renderBadgeCardToCanvas(badge: BadgeWithStatus): HTMLCanvasElement {
+  const W = 800
+  const H = 480
+  const canvas = document.createElement('canvas')
+  canvas.width = W
+  canvas.height = H
+  const ctx = canvas.getContext('2d')!
+
+  const badgeColors = canvasColorHex[badge.color] ?? canvasColorHex.zinc
+  const BG_DARK = '#18181b'
+  const BG_MID = '#27272a'
+  const TEXT_WHITE = '#ffffff'
+  const TEXT_ZINC_300 = '#d4d4d8'
+  const TEXT_ZINC_400 = '#a1a1aa'
+  const TEXT_ZINC_500 = '#71717a'
+  const AMBER_400 = '#fbbf24'
+  const TEAL_400 = '#2dd4bf'
+  const PURPLE_400 = '#c084fc'
+
+  // Rounded rect helper
+  function roundRect(x: number, y: number, w: number, h: number, r: number) {
+    ctx.beginPath()
+    ctx.moveTo(x + r, y)
+    ctx.lineTo(x + w - r, y)
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+    ctx.lineTo(x + w, y + h - r)
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+    ctx.lineTo(x + r, y + h)
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+    ctx.lineTo(x, y + r)
+    ctx.quadraticCurveTo(x, y, x + r, y)
+    ctx.closePath()
+  }
+
+  // ── Background ──
+  const bgGrad = ctx.createLinearGradient(0, 0, W, H)
+  bgGrad.addColorStop(0, BG_DARK)
+  bgGrad.addColorStop(0.5, BG_MID)
+  bgGrad.addColorStop(1, BG_DARK)
+  roundRect(0, 0, W, H, 32)
+  ctx.fillStyle = bgGrad
+  ctx.fill()
+
+  // Background glow using badge color
+  const glow1 = ctx.createRadialGradient(W * 0.7, 0, 0, W * 0.7, 0, 300)
+  glow1.addColorStop(0, badgeColors.primary + '30')
+  glow1.addColorStop(0.5, badgeColors.primary + '10')
+  glow1.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = glow1
+  ctx.fillRect(0, 0, W, H)
+
+  const glow2 = ctx.createRadialGradient(60, H, 0, 60, H, 200)
+  glow2.addColorStop(0, PURPLE_400 + '18')
+  glow2.addColorStop(0.5, TEAL_400 + '08')
+  glow2.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = glow2
+  ctx.fillRect(0, 0, W, H)
+
+  const pad = 48
+  let y = pad
+
+  // ── TriFinity branding (top-right) ──
+  const brandX = W - pad - 150
+  const dotSize = 10
+  const dotGap = 16
+  ctx.fillStyle = AMBER_400
+  ctx.beginPath(); ctx.arc(brandX, y + 10, dotSize / 2, 0, Math.PI * 2); ctx.fill()
+  ctx.fillStyle = TEAL_400
+  ctx.beginPath(); ctx.arc(brandX + dotGap, y + 10, dotSize / 2, 0, Math.PI * 2); ctx.fill()
+  ctx.fillStyle = PURPLE_400
+  ctx.beginPath(); ctx.arc(brandX + dotGap * 2, y + 10, dotSize / 2, 0, Math.PI * 2); ctx.fill()
+  ctx.font = 'bold 20px system-ui, -apple-system, sans-serif'
+  ctx.textBaseline = 'top'
+  ctx.fillStyle = TEXT_ZINC_400
+  ctx.fillText('TriFinity', brandX + dotGap * 3 + 8, y)
+
+  // ── Top label ──
+  ctx.font = '600 16px system-ui, -apple-system, sans-serif'
+  ctx.fillStyle = TEXT_ZINC_500
+  ctx.fillText('BADGE BEHAALD', pad, y + 4)
+  y += 56
+
+  // ── Badge icon circle ──
+  const iconCenterX = W / 2
+  const iconCenterY = y + 56
+  const iconRadius = 56
+
+  // Outer glow ring
+  const ringGrad = ctx.createRadialGradient(iconCenterX, iconCenterY, iconRadius - 4, iconCenterX, iconCenterY, iconRadius + 16)
+  ringGrad.addColorStop(0, badgeColors.primary + '40')
+  ringGrad.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = ringGrad
+  ctx.beginPath()
+  ctx.arc(iconCenterX, iconCenterY, iconRadius + 16, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Circle background
+  ctx.fillStyle = badgeColors.bgDark
+  ctx.beginPath()
+  ctx.arc(iconCenterX, iconCenterY, iconRadius, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Circle border
+  ctx.strokeStyle = badgeColors.primary
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  ctx.arc(iconCenterX, iconCenterY, iconRadius, 0, Math.PI * 2)
+  ctx.stroke()
+
+  // Badge emoji icon
+  ctx.font = '56px system-ui, -apple-system, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillStyle = TEXT_WHITE
+  ctx.fillText(badge.icon, iconCenterX, iconCenterY)
+
+  y = iconCenterY + iconRadius + 28
+
+  // ── Badge name ──
+  ctx.font = 'bold 36px system-ui, -apple-system, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillStyle = TEXT_WHITE
+  ctx.fillText(badge.name, W / 2, y)
+  y += 16
+
+  // ── Category label ──
+  ctx.font = '500 18px system-ui, -apple-system, sans-serif'
+  ctx.fillStyle = badgeColors.primary
+  const catLabel = categoryLabels[badge.category] ?? badge.category
+  ctx.fillText(catLabel, W / 2, y + 24)
+  y += 52
+
+  // ── Badge description ──
+  ctx.font = '400 18px system-ui, -apple-system, sans-serif'
+  ctx.fillStyle = TEXT_ZINC_300
+  // Word-wrap description
+  const maxLineW = W - pad * 2
+  const words = badge.description.split(' ')
+  let line = ''
+  const lines: string[] = []
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word
+    if (ctx.measureText(test).width > maxLineW) {
+      lines.push(line)
+      line = word
+    } else {
+      line = test
+    }
+  }
+  if (line) lines.push(line)
+  for (const l of lines.slice(0, 3)) {
+    ctx.fillText(l, W / 2, y)
+    y += 26
+  }
+
+  // ── Earned date (bottom) ──
+  if (badge.earned_at) {
+    const dateStr = new Date(badge.earned_at).toLocaleDateString('nl-NL', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    })
+    ctx.font = '400 15px system-ui, -apple-system, sans-serif'
+    ctx.fillStyle = TEXT_ZINC_500
+    ctx.fillText(`Verdiend op ${dateStr}`, W / 2, H - pad)
+  }
+
+  // Reset alignment
+  ctx.textAlign = 'start'
+
+  return canvas
+}
+
 // ── Badge detail modal ──────────────────────────────────────────────
 
 function BadgeDetail({
   badge,
   onClose,
+  onShare,
 }: {
   badge: BadgeWithStatus
   onClose: () => void
+  onShare?: (badge: BadgeWithStatus) => void
 }) {
   const colors = colorMap[badge.color] ?? colorMap.zinc
 
@@ -112,7 +303,7 @@ function BadgeDetail({
               badge.earned ? colors.bgEarned : 'bg-zinc-100'
             } ${badge.earned ? colors.borderEarned : 'border-zinc-200'} border-2`}
           >
-            {badge.earned ? badge.icon : '❓'}
+            {badge.earned ? badge.icon : '?'}
           </div>
           <div className="flex-1">
             <h3 className="text-lg font-bold text-zinc-900" data-testid="badge-detail-name">
@@ -174,9 +365,21 @@ function BadgeDetail({
         {!badge.earned && (
           <div className="mt-4 rounded-lg bg-zinc-50 p-3">
             <p className="text-xs font-medium text-zinc-500">
-              💡 Tip: {badge.description}
+              Tip: {badge.description}
             </p>
           </div>
+        )}
+
+        {/* Share button for earned badges */}
+        {badge.earned && onShare && (
+          <button
+            onClick={() => onShare(badge)}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm font-medium text-teal-700 transition-all hover:bg-teal-100 hover:border-teal-300 active:scale-[0.98]"
+            data-testid="badge-share-button"
+          >
+            <Share2 className="h-4 w-4" />
+            <span>Deel deze badge</span>
+          </button>
         )}
       </div>
     </div>
@@ -225,7 +428,7 @@ function BadgeCard({
           badge.earned ? '' : 'grayscale opacity-30'
         }`}
       >
-        {badge.earned ? badge.icon : '❓'}
+        {badge.earned ? badge.icon : '?'}
       </div>
 
       {/* Name */}
@@ -276,6 +479,12 @@ export function BadgeGrid() {
   const [dataSource, setDataSource] = useState<string>('loading')
   const [selectedBadge, setSelectedBadge] = useState<BadgeWithStatus | null>(null)
   const [newlyEarnedSlugs, setNewlyEarnedSlugs] = useState<Set<string>>(new Set())
+
+  // Share dialog state
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shareContent, setShareContent] = useState<ShareContent | null>(null)
+  const [shareBadge, setShareBadge] = useState<BadgeWithStatus | null>(null)
+  const badgeCardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     async function fetchBadges() {
@@ -331,6 +540,34 @@ export function BadgeGrid() {
       }
     }
     fetchBadges()
+  }, [])
+
+  // Handle badge share from detail modal
+  const handleBadgeShare = useCallback((badge: BadgeWithStatus) => {
+    setShareBadge(badge)
+    setShareContent({
+      title: `${badge.icon} ${badge.name} — TriFinity Badge`,
+      text: `Ik heb de ${badge.name} badge verdiend op TriFinity! ${badge.icon}\n\n${badge.description}`,
+      url: typeof window !== 'undefined' ? window.location.origin : '',
+      contentType: 'badge',
+    })
+    setShareOpen(true)
+    // Close the detail modal to avoid z-index conflicts
+    setSelectedBadge(null)
+  }, [])
+
+  // Canvas render function for badge image download
+  const renderBadgeCanvas = useCallback(() => {
+    if (!shareBadge) throw new Error('No badge selected for sharing')
+    return renderBadgeCardToCanvas(shareBadge)
+  }, [shareBadge])
+
+  const handleShareClose = useCallback(() => {
+    setShareOpen(false)
+    setTimeout(() => {
+      setShareContent(null)
+      setShareBadge(null)
+    }, 300)
   }, [])
 
   if (loading) {
@@ -401,8 +638,103 @@ export function BadgeGrid() {
         <BadgeDetail
           badge={selectedBadge}
           onClose={() => setSelectedBadge(null)}
+          onShare={handleBadgeShare}
         />
       )}
+
+      {/* Hidden badge card for image capture */}
+      {shareBadge && (
+        <div
+          ref={badgeCardRef}
+          className="fixed -left-[9999px] -top-[9999px]"
+          aria-hidden="true"
+          data-testid="badge-share-capture"
+        >
+          <BadgeShareCard badge={shareBadge} />
+        </div>
+      )}
+
+      {/* Share dialog */}
+      {shareContent && (
+        <ShareDialog
+          open={shareOpen}
+          onClose={handleShareClose}
+          content={shareContent}
+          renderCanvas={shareBadge ? renderBadgeCanvas : undefined}
+          captureRef={badgeCardRef}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Badge share card (for image capture via ShareDialog) ────────────
+
+function BadgeShareCard({ badge }: { badge: BadgeWithStatus }) {
+  const badgeColors = canvasColorHex[badge.color] ?? canvasColorHex.zinc
+  const catLabel = categoryLabels[badge.category] ?? badge.category
+
+  return (
+    <div
+      id="badge-share-card"
+      style={{
+        width: 400,
+        height: 240,
+        background: `linear-gradient(135deg, #18181b, #27272a, #18181b)`,
+        borderRadius: 16,
+        padding: 24,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Badge icon */}
+      <div
+        style={{
+          width: 64,
+          height: 64,
+          borderRadius: '50%',
+          background: badgeColors.bgDark,
+          border: `2px solid ${badgeColors.primary}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 32,
+        }}
+      >
+        {badge.icon}
+      </div>
+
+      {/* Badge name */}
+      <div style={{ marginTop: 12, fontSize: 22, fontWeight: 'bold', color: '#fff', textAlign: 'center' }}>
+        {badge.name}
+      </div>
+
+      {/* Category */}
+      <div style={{ marginTop: 4, fontSize: 13, color: badgeColors.primary, textAlign: 'center' }}>
+        {catLabel}
+      </div>
+
+      {/* TriFinity branding */}
+      <div style={{
+        position: 'absolute',
+        bottom: 12,
+        right: 16,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        fontSize: 12,
+        color: '#71717a',
+      }}>
+        <span style={{ color: '#fbbf24' }}>●</span>
+        <span style={{ color: '#2dd4bf' }}>●</span>
+        <span style={{ color: '#a855f7' }}>●</span>
+        <span style={{ fontWeight: 600, letterSpacing: 1 }}>TriFinity</span>
+      </div>
     </div>
   )
 }

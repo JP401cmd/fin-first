@@ -15,7 +15,7 @@ import { useToast } from '@/components/app/toast-provider'
 
 // ── Types ──────────────────────────────────────────────────────────
 
-export type ShareContentType = 'freedom_card' | 'milestone' | 'achievement'
+export type ShareContentType = 'freedom_card' | 'milestone' | 'achievement' | 'badge'
 
 export interface ShareContent {
   /** The title shown in the share dialog / native share sheet */
@@ -39,6 +39,8 @@ export interface ShareDialogProps {
   content: ShareContent
   /** Ref to the DOM element to capture as image (optional) */
   captureRef?: React.RefObject<HTMLElement | null>
+  /** Optional canvas render function for reliable image generation (preferred over captureRef) */
+  renderCanvas?: () => HTMLCanvasElement
   /** Additional class on the backdrop */
   className?: string
 }
@@ -111,6 +113,7 @@ export function ShareDialog({
   onClose,
   content,
   captureRef,
+  renderCanvas,
   className,
 }: ShareDialogProps) {
   const [copied, setCopied] = useState(false)
@@ -186,18 +189,37 @@ export function ShareDialog({
 
   // ── Download as image ──────────────────────────────────────────
   const handleDownloadImage = useCallback(async () => {
-    const element = captureRef?.current
-    if (!element) {
-      toast.addToast({
-        type: 'warning',
-        title: 'Download niet beschikbaar',
-        message: 'Geen kaart om te downloaden',
-      })
-      return
-    }
-
     setDownloading(true)
     try {
+      // Prefer renderCanvas (programmatic canvas) over captureRef (SVG foreignObject)
+      if (renderCanvas) {
+        const canvas = renderCanvas()
+        const link = document.createElement('a')
+        const filePrefix = content.contentType === 'badge' ? 'trifinity-badge' : 'trifinity-vrijheidskaart'
+        link.download = `${filePrefix}-${new Date().toISOString().split('T')[0]}.png`
+        link.href = canvas.toDataURL('image/png')
+        link.click()
+
+        toast.addToast({
+          type: 'success',
+          title: 'Gedownload!',
+          message: 'Afbeelding opgeslagen',
+          icon: '📥',
+        })
+        trackShareEvent('download_image', content.contentType, content.privacyLevel)
+        return
+      }
+
+      const element = captureRef?.current
+      if (!element) {
+        toast.addToast({
+          type: 'warning',
+          title: 'Download niet beschikbaar',
+          message: 'Geen kaart om te downloaden',
+        })
+        return
+      }
+
       // Find the actual card element
       const cardEl = element.querySelector('#freedom-card') as HTMLElement || element
 
@@ -261,7 +283,7 @@ export function ShareDialog({
     } finally {
       setDownloading(false)
     }
-  }, [captureRef, content.contentType, content.privacyLevel, toast])
+  }, [renderCanvas, captureRef, content.contentType, content.privacyLevel, toast])
 
   // ── Native Web Share API ───────────────────────────────────────
   const handleWebShare = useCallback(async () => {
@@ -429,8 +451,8 @@ export function ShareDialog({
             </button>
           </div>
 
-          {/* Row 3: Download image (if captureRef provided) */}
-          {captureRef && (
+          {/* Row 3: Download image (if captureRef or renderCanvas provided) */}
+          {(captureRef || renderCanvas) && (
             <button
               onClick={handleDownloadImage}
               disabled={downloading}
