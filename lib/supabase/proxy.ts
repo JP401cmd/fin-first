@@ -368,6 +368,18 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-freedom-card',
     '/test-share-targets',
     '/api/verify-share-targets',
+    '/test-badge-share',
+    '/api/verify-badge-share',
+    '/test-household-schema',
+    '/api/verify-household-schema',
+    '/api/apply-household-migration',
+    '/test-year-in-review',
+    '/api/verify-year-in-review',
+    '/test-perspective-switcher',
+    '/api/verify-perspective-switcher',
+    '/api/apply-perspective-migration',
+    '/test-household-invite',
+    '/api/verify-household-invite',
   ]
 
   // Protected route prefixes that require authentication

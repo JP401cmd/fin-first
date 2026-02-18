@@ -7,6 +7,8 @@ import { computeSovereigntyLevel, FEATURES, PHASES, DEFAULT_MATRIX, levelToPhase
 import { BadgeGrid } from '@/components/app/badge-grid'
 import { BadgeEvaluator } from '@/components/app/badge-evaluator'
 import { FreedomCardGenerator } from '@/components/app/freedom-card'
+import { StreakRecords } from '@/components/app/streak-records'
+import { HouseholdSection } from '@/components/app/household-section'
 
 // ── Temporal Balance levels ──────────────────────────────────────────
 
@@ -738,6 +740,9 @@ export default function IdentityPage() {
         </div>
       </section>
 
+      {/* ── A3. Huishouden Management ────────────────────────────────── */}
+      <HouseholdSection />
+
       {/* ── B. The Temporal Balance ──────────────────────────────────── */}
       <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
         <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
@@ -1078,7 +1083,19 @@ export default function IdentityPage() {
         </div>
       </section>
 
-      {/* ── D. Prestaties & Badges ───────────────────────────────────── */}
+      {/* ── D. Streak Records ──────────────────────────────────────────── */}
+      <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8" data-testid="identity-streak-records">
+        <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          Streaks & Consistentie
+        </h2>
+        <p className="mt-1 mb-6 text-sm text-zinc-500">
+          Houd bij hoe consistent je bent. Elke week telt!
+        </p>
+
+        <StreakRecords />
+      </section>
+
+      {/* ── E. Prestaties & Badges ───────────────────────────────────── */}
       <BadgeEvaluator force={true} />
       <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
         <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
