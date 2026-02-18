@@ -1,3 +1,52 @@
+## Session 2026-02-18 - Feature #256
+
+### Feature #256: Cost splitting calculation modes - PASSING
+- Verified complete implementation of household cost splitting with 4 calculation modes
+- All 11/11 verification tests passing at /api/verify-cost-splitting
+- All 7 feature steps verified:
+  1. **50/50 equal split**: computeSharePct returns 50% for 'equal' mode, calculateCostSplit computes both partner shares
+  2. **Income-ratio proportional split**: Calculates myIncome/(myIncome+partnerIncome)*100, rounds to integer, falls back to 50% when total income is 0
+  3. **Custom percentage split with user input**: Uses customSplitPct (default 50) with primaryPayerId, UI range slider (0-100) with clamping and real-time updates
+  4. **One-pays-all mode**: Returns 100% for primary payer and 0% for partner via primaryPayerId
+  5. **Apply splitting to shared budgets**: SharedBudgetSplitList filters shared budgets, calculates per-partner amounts, shows individual and total breakdowns
+  6. **Apply splitting to shared debts**: SharedDebtSplitList splits both balance AND monthly payment per partner with 'Saldo' and 'Aflossing' display
+  7. **Per-partner contribution UI**: PartnerContributionSummary, ContributionBar, CostSplitCalculator (mode selector + compare all modes + custom slider), compact and full modes
+
+#### Additional verifications (4 bonus tests):
+- computeSharePct handles all 4 modes with switch/case and default fallback
+- calculateCostSplit returns properly structured CostSplitResult with PartnerContribution array
+- API settings endpoint (GET/PATCH) with owner-only auth and 4-mode validation
+- Perspective-aware net worth calculation applies split to shared assets/debts
+
+#### Key Files (all previously built by other agents):
+- **lib/household-data.ts**: computeSharePct, SplitMode type, filterByPerspective, computePerspectiveNetWorth
+- **components/app/cost-split-calculator.tsx**: calculateCostSplit, calculateAllModes, CostSplitCalculator, PartnerContributionSummary, SharedBudgetSplitList, SharedDebtSplitList
+- **app/api/household/settings/route.ts**: GET/PATCH with split mode CRUD and validation
+- **app/api/verify-cost-splitting/route.ts**: 11-test verification endpoint (NEW)
+- **app/test-cost-splitting/page.tsx**: Visual test page with live demos (NEW)
+
+#### Verification:
+- 11/11 API verification tests passing (7 core + 4 bonus)
+- Zero console errors (0 errors, 0 warnings)
+- No mock data patterns found (globalThis, devStore, mockData, etc.)
+- Browser verified: all 4 modes render correctly with proper per-partner amounts
+- Interactive mode switching verified: mode buttons, custom slider, compare view all work
+- Commit: e25569d
+
+### Current Status
+- 251/265 features passing (250 before + #256)
+- Feature #256 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- Household cost splitting architecture is complete and verified
+- 4 split modes: equal (50/50), income_ratio (auto from incomes), custom (slider), one_carries_all (100/0)
+- All household features use same SplitMode type from lib/household-data.ts
+- API settings restricted to household owner only
+- Privacy-safe: household_partner_totals() prevents exposing individual items
+
+---
+
 ## Session 2026-02-18 - Feature #257
 
 ### Feature #257: Streak break warning notification - PASSING
