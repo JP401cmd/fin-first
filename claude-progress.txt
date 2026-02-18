@@ -1,3 +1,57 @@
+## Session 2026-02-18 - Feature #255
+
+### Feature #255: Smart next step algorithm prioritization - PASSING
+- Verified complete implementation of smart next step algorithm prioritization
+- All 12/12 verification tests passing at /api/verify-next-step-prioritization
+- All 8 feature steps verified:
+  1. **Priority ordering implemented**: computeAllKernSteps and API both enforce P1-P5 ordering
+  2. **Highest priority: no transactions imported**: import_transactions at position 0 in priority chain
+  3. **Second priority: no assets added**: add_assets follows import_transactions
+  4. **Third priority: budget categories over limit**: budget_attention follows add_assets, uses alertBudgetCount
+  5. **Fourth priority: no goals set**: set_goals follows budget_attention, checks hasGoals
+  6. **Fifth priority: FIRE target unreachable**: fire_unreachable follows set_goals, links to /horizon
+  7. **Limit display to 1-2 suggestions per page**: NextStepSection renders only first non-dismissed step
+  8. **Priority changes as user completes steps**: Dynamic conditions based on real data state
+
+#### Implementation Architecture:
+- **Client-side (computeAllKernSteps)**: Conditionally pushes steps based on data flags (hasTransactions, totalAssets, alertBudgetCount, hasGoals, fireUnreachable)
+- **Server-side (/api/next-steps)**: Parallel Supabase queries for all data states, builds step list with priority numbers 1-9
+- **Core page**: Fetches hasGoals and fireUnreachable from live data, passes to computeAllKernSteps
+- **FIRE reachability**: Calculated via compound interest projection (7% annual return, 2% inflation, 50-year horizon, 4% SWR)
+- **All 3 module pages**: Core uses computeAllKernSteps, Will uses computeAllWilSteps, Horizon uses computeAllHorizonSteps
+
+#### Key Files (all previously built by other agents):
+- **components/app/next-step-card.tsx**: computeAllKernSteps, computeAllWilSteps, computeAllHorizonSteps, NextStepSection, NextStepCard
+- **app/api/next-steps/route.ts**: GET endpoint with parallel data queries, priority-ordered step list, FIRE calculation
+- **app/api/next-steps/complete/route.ts**: POST with fire_unreachable in VALID_STEP_KEYS
+- **app/(app)/core/page.tsx**: Passes hasGoals and fireUnreachable to computeAllKernSteps
+- **app/api/verify-next-step-prioritization/route.ts**: 12-test verification endpoint
+- **app/test-next-step-prioritization/page.tsx**: Visual test page with 6 priority scenarios
+
+#### Verification:
+- 12/12 API verification tests passing
+- Browser verified: test page shows ALL TESTS PASSING with green checkmarks
+- All 6 priority scenarios render correct first step
+- Max 1-2 rule enforced: queue has 6 steps but only 1 card shown
+- API returns 401 for unauthenticated access
+- No mock data patterns found (globalThis, devStore, mockData, etc.)
+- Console errors: only expected 401s from unauthenticated NextStepSection API calls (graceful fallback)
+- Commit: bad0a21
+
+### Current Status
+- 251/265 features passing (250 before + #255)
+- Feature #255 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- All implementation was already done by previous agents — only verified and committed
+- Smart prioritization covers: transactions, assets, budget alerts, goals, FIRE reachability
+- FIRE unreachable detection uses: SWR 4%, 7% returns, 2% inflation, 50-year max horizon
+- NextStepSection shows exactly 1 card at a time (highest priority non-dismissed step)
+- All 3 module pages integrate: core/will/horizon with their respective compute functions
+
+---
+
 ## Session 2026-02-18 - Feature #252
 
 ### Feature #252: Holdings list and detail UI components - PASSING
