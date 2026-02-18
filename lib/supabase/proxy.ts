@@ -390,12 +390,15 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-kpi-deduplication',
     '/test-household-db',
     '/api/verify-household-db',
+    '/api/run-household-migration',
     '/test-badge-definitions',
     '/api/verify-badge-definitions',
     '/test-next-step-completion-tracking',
     '/api/verify-next-step-completion-tracking',
     '/test-enhanced-snapshots',
     '/api/verify-enhanced-snapshots',
+    '/test-feature-visits-tracking',
+    '/api/verify-feature-visits-tracking',
   ]
 
   // Protected route prefixes that require authentication
