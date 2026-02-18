@@ -411,6 +411,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-next-step-prioritization',
     '/test-streak-break-warning',
     '/api/verify-streak-break-warning',
+    '/test-cost-splitting',
+    '/api/verify-cost-splitting',
   ]
 
   // Protected route prefixes that require authentication
