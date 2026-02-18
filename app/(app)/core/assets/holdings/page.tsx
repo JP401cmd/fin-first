@@ -7,6 +7,7 @@ import { formatCurrency } from '@/components/app/budget-shared'
 import PortfolioAllocationVisualization, { type HoldingForAllocation } from '@/components/app/portfolio-allocation-chart'
 import { BenchmarkComparisonChart } from '@/components/app/benchmark-comparison-chart'
 import { TIME_PERIODS, type TimePeriod, type ComparisonResult } from '@/lib/benchmark-comparison'
+import DividendTracker from '@/components/app/dividend-tracker'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -469,6 +470,13 @@ export default function HoldingsPage() {
             activePeriod={benchmarkPeriod}
             loading={benchmarkLoading}
           />
+        </section>
+      )}
+
+      {/* Dividend Tracker */}
+      {holdings.length > 0 && (
+        <section className="mt-6" data-testid="dividend-tracker-section">
+          <DividendTracker />
         </section>
       )}
 

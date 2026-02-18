@@ -357,6 +357,12 @@ export async function updateSession(request: NextRequest) {
     '/test-benchmark-comparison',
     '/api/verify-benchmark-comparison',
     '/api/verify-price-feed',
+    '/test-dividend-tracker',
+    '/api/verify-dividend-tracker',
+    '/api/verify-dividend-tracker-code',
+    '/api/dividends',
+    '/test-holdings-sync',
+    '/api/verify-holdings-sync',
   ]
 
   // Protected route prefixes that require authentication
