@@ -1,0 +1,286 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3143
+- Network:       http://192.168.86.37:3143
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1313ms
+⨯ Error: Cannot find module 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+Require stack:
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\dev\next-dev-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at ignore-listed frames {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\static\development\_buildManifest.js.tmp.srmnak50ac8'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\static\\development\\_buildManifest.js.tmp.srmnak50ac8'
+}
+Error: Cannot find module 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+Require stack:
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\dev\next-dev-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at ignore-listed frames {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /api/health 500 in 2.9s (compile: 126ms, proxy.ts: 2.8s, render: 26ms)
+⨯ Error: Cannot find module 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+Require stack:
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\dev\next-dev-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at ignore-listed frames {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: Cannot find module 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+Require stack:
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\dev\next-dev-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at ignore-listed frames {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /api/health 500 in 150ms (compile: 65ms, proxy.ts: 72ms, render: 14ms)
+⨯ Error: Cannot find module 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+Require stack:
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\dev\next-dev-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at ignore-listed frames {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: Cannot find module 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+Require stack:
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\dev\next-dev-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at ignore-listed frames {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /api/health 500 in 180ms (compile: 68ms, proxy.ts: 94ms, render: 18ms)
+⨯ Error: Cannot find module 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+Require stack:
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\dev\next-dev-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at ignore-listed frames {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: Cannot find module 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+Require stack:
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\dev\next-dev-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at ignore-listed frames {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+ GET /api/health 200 in 1017ms (compile: 633ms, proxy.ts: 144ms, render: 240ms)
+⨯ Error: Cannot find module '../../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-debt-crud\page.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-debt-crud\page.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/test-debt-crud'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: Cannot find module '../../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-debt-crud\page.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-debt-crud\page.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/test-debt-crud'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+ GET /test-debt-crud 500 in 929ms (proxy.ts: 4ms)
+ GET /test-debt-crud 500 in 929ms (proxy.ts: 4ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\_not-found\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\_not-found\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+ GET /test-debt-crud 500 in 139ms (proxy.ts: 6ms)
+ GET /test-debt-crud 500 in 139ms (proxy.ts: 6ms)
+ GET /test-debt-crud 404 in 192ms (compile: 65ms, proxy.ts: 6ms, render: 121ms)
+ GET /test-debt-crud 404 in 44ms (compile: 10ms, proxy.ts: 5ms, render: 29ms)
+ GET /test-debt-crud 404 in 52ms (compile: 11ms, proxy.ts: 7ms, render: 33ms)
+ GET /test-debt-crud 404 in 50ms (compile: 9ms, proxy.ts: 7ms, render: 33ms)
+✓ Compiled in 409ms
+✓ Compiled in 690ms
+✓ Compiled in 722ms
+Terminated

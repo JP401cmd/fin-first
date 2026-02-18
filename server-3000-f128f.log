@@ -1,0 +1,47 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.86.37:3000
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 998ms
+ GET /test-goal-progress-bar 200 in 1707ms (compile: 1465ms, proxy.ts: 122ms, render: 120ms)
+ GET /api/goals 401 in 173ms (compile: 146ms, proxy.ts: 5ms, render: 22ms)
+ GET /api/verify-goal-progress-bar 200 in 801ms (compile: 403ms, proxy.ts: 11ms, render: 387ms)
+ GET /api/health 200 in 334ms (compile: 141ms, proxy.ts: 7ms, render: 186ms)
+ GET /api/health 404 in 577ms (compile: 516ms, proxy.ts: 6ms, render: 55ms)
+ GET /api/health 200 in 78ms (compile: 5ms, proxy.ts: 5ms, render: 68ms)
+ GET /api/health 200 in 101ms (compile: 7ms, proxy.ts: 5ms, render: 89ms)
+ GET /api/schema-check 200 in 6.7s (compile: 160ms, proxy.ts: 11ms, render: 6.5s)
+ GET /api/verify-schema 200 in 1842ms (compile: 96ms, proxy.ts: 7ms, render: 1739ms)
+ GET /login 200 in 621ms (compile: 552ms, proxy.ts: 4ms, render: 65ms)
+ GET /test-portfolio-donut 200 in 406ms (compile: 360ms, proxy.ts: 7ms, render: 39ms)
+ GET /test-milestone-markers 200 in 322ms (compile: 289ms, proxy.ts: 6ms, render: 28ms)
+ GET /signup 200 in 405ms (compile: 346ms, proxy.ts: 3ms, render: 56ms)
+ GET /api/verify-milestone-markers 200 in 448ms (compile: 111ms, proxy.ts: 3ms, render: 334ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\goals\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\goals\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+ GET /api/goals 500 in 841ms (compile: 740ms, proxy.ts: 3ms, render: 97ms)
+ GET /api/verify-milestone-markers 404 in 53ms (compile: 8ms, proxy.ts: 9ms, render: 37ms)
+ GET /signup 404 in 48ms (compile: 12ms, proxy.ts: 6ms, render: 29ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\goals\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\goals\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+Could not find files for /_error in .next/build-manifest.json
+Could not find files for /_error in .next/build-manifest.json
+ GET /api/goals 500 in 50ms (compile: 31ms, proxy.ts: 9ms, render: 10ms)
+ GET /login 404 in 48ms (compile: 7ms, proxy.ts: 6ms, render: 34ms)
+ GET /api/health?persistence_test=RESTART_TEST_12345 200 in 442ms (compile: 6ms, proxy.ts: 10ms, render: 426ms)
+ GET /login 404 in 69ms (compile: 13ms, proxy.ts: 9ms, render: 47ms)
+Terminated

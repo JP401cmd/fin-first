@@ -1,0 +1,11 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3095
+- Network:       http://192.168.86.37:3095
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1130ms
+ GET /test-feature-gating 200 in 2.4s (compile: 2.0s, proxy.ts: 162ms, render: 256ms)
+Terminated

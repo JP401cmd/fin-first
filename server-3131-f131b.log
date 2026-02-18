@@ -1,0 +1,20 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3131
+- Network:       http://192.168.86.37:3131
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1004ms
+ GET /api/health 200 in 727ms (compile: 374ms, proxy.ts: 140ms, render: 214ms)
+ GET /api/verify-resilience-score 200 in 477ms (compile: 154ms, proxy.ts: 4ms, render: 318ms)
+ GET /test-resilience-score 200 in 1850ms (compile: 1715ms, proxy.ts: 8ms, render: 127ms)
+ GET /test-resilience-score 404 in 546ms (compile: 477ms, proxy.ts: 8ms, render: 60ms)
+ GET /test-resilience-score 200 in 42ms (compile: 5ms, proxy.ts: 8ms, render: 29ms)
+ GET /test-resilience-score 200 in 36ms (compile: 3ms, proxy.ts: 4ms, render: 29ms)
+ GET /test-resilience-score 200 in 31ms (compile: 3ms, proxy.ts: 4ms, render: 24ms)
+ GET /test-resilience-score 200 in 80ms (compile: 5ms, proxy.ts: 6ms, render: 68ms)
+ GET /api/verify-resilience-score 200 in 582ms (compile: 8ms, proxy.ts: 7ms, render: 567ms)
+ GET /login?redirectTo=%2Fhorizon 200 in 576ms (compile: 510ms, proxy.ts: 4ms, render: 62ms)
+[?25h

@@ -436,12 +436,14 @@ export async function seedPersonaData(
   onProgress('Schulden, budgetten & aanbevelingen toevoegen...', 'phase2', 'insert',
     (summary.debts ?? 0) + (summary.budgets ?? 0) + (summary.recommendations ?? 0))
 
-  // ── Phase 3: Transactions (needs account ID + budget slug→ID map) ──
+  // ── Phase 3: Transactions (needs account IDs + budget slug→ID map) ──
 
-  if (primaryAccountId) {
+  const accountIds = insertedAccounts?.map((a: { id: string }) => a.id) ?? []
+
+  if (accountIds.length > 0) {
     const txRows = persona.transactions.map((t) => ({
       user_id: userId,
-      account_id: primaryAccountId,
+      account_id: accountIds[t.accountIndex ?? 0] ?? accountIds[0],
       budget_id: budgetSlugToId[t.budgetSlug] ?? null,
       date: daysAgo(t.dayOffset),
       amount: t.amount,
@@ -466,6 +468,93 @@ export async function seedPersonaData(
   }
 
   onProgress('Transacties toevoegen...', 'phase3', 'insert', summary.transactions)
+
+  // ── Phase 4: Streaks, Valuations, Holdings ────────────────────
+
+  // Streaks
+  if (persona.streaks && persona.streaks.length > 0) {
+    const streakRows = persona.streaks.map((s) => ({
+      user_id: userId,
+      streak_type: s.streak_type,
+      current_count: s.current_count,
+      longest_count: s.longest_count,
+      last_activity_date: daysAgo(s.last_activity_date_daysAgo),
+      started_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }))
+    const { error: streakErr } = await supabase.from('user_streaks').insert(streakRows)
+    if (streakErr) throw new Error(`Streaks insert mislukt: ${streakErr.message}`)
+    summary.user_streaks = streakRows.length
+  }
+
+  // Valuations
+  if (persona.valuations && persona.valuations.length > 0) {
+    const valuationRows = persona.valuations.map((v) => ({
+      user_id: userId,
+      entity_type: v.entity_type,
+      entity_id: assetNameToId[v.assetName],
+      valuation_date: monthsAgoDate(v.monthsAgo),
+      value: v.value,
+    }))
+    // Filter out any with missing entity_id
+    const validRows = valuationRows.filter((r) => r.entity_id)
+    if (validRows.length > 0) {
+      const { error: valErr } = await supabase.from('valuations').insert(validRows)
+      if (valErr) throw new Error(`Valuations insert mislukt: ${valErr.message}`)
+    }
+    summary.valuations = validRows.length
+  }
+
+  // Holdings + Holding Transactions
+  if (persona.holdings && persona.holdings.length > 0) {
+    let holdingCount = 0
+    let holdingTxCount = 0
+
+    for (const h of persona.holdings) {
+      const assetId = assetNameToId[h.assetName]
+      if (!assetId) continue
+
+      const { data: holdingData, error: holdingErr } = await supabase
+        .from('holdings')
+        .insert({
+          user_id: userId,
+          asset_id: assetId,
+          ticker: h.ticker,
+          isin: h.isin,
+          name: h.name,
+          units: h.units,
+          avg_purchase_price: h.avg_purchase_price,
+          current_price: h.current_price,
+          purchase_date: monthsAgoDate(h.purchase_date_monthsAgo),
+          is_active: true,
+        })
+        .select('id')
+        .single()
+      if (holdingErr) throw new Error(`Holding "${h.name}" insert mislukt: ${holdingErr.message}`)
+      holdingCount++
+
+      if (h.transactions.length > 0) {
+        const htRows = h.transactions.map((ht) => ({
+          holding_id: holdingData.id,
+          user_id: userId,
+          type: ht.type,
+          units: ht.units,
+          price_per_unit: ht.price_per_unit,
+          total_amount: ht.total_amount,
+          date: monthsAgoDate(ht.monthsAgo),
+          notes: ht.notes,
+        }))
+        const { error: htErr } = await supabase.from('holding_transactions').insert(htRows)
+        if (htErr) throw new Error(`Holding transacties insert mislukt: ${htErr.message}`)
+        holdingTxCount += htRows.length
+      }
+    }
+    summary.holdings = holdingCount
+    summary.holding_transactions = holdingTxCount
+  }
+
+  onProgress('Streaks, waarderingen & holdings toevoegen...', 'phase4', 'insert',
+    (summary.user_streaks ?? 0) + (summary.valuations ?? 0) + (summary.holdings ?? 0) + (summary.holding_transactions ?? 0))
 
   return summary
 }

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { syncAssetValueFromHoldings } from '@/lib/holdings-sync'
 
 /**
  * Check if the holdings table exists by trying a lightweight query.
@@ -8,41 +9,6 @@ import { NextRequest, NextResponse } from 'next/server'
 async function holdingsTableExists(supabase: Awaited<ReturnType<typeof createClient>>): Promise<boolean> {
   const { error } = await supabase.from('holdings').select('id').limit(0)
   return !error || !error.message.includes('Could not find')
-}
-
-/**
- * Aggregate all active holdings for a given asset and sync the total to the
- * parent asset's current_value. This ensures the asset always reflects the
- * sum of (current_price * units) across all its holdings.
- */
-async function syncAssetValueFromHoldings(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  assetId: string,
-  userId: string
-): Promise<void> {
-  try {
-    const { data: holdings } = await supabase
-      .from('holdings')
-      .select('units, current_price, avg_purchase_price')
-      .eq('asset_id', assetId)
-      .eq('user_id', userId)
-      .eq('is_active', true)
-
-    if (!holdings) return
-
-    const totalValue = holdings.reduce((sum, h) => {
-      const price = h.current_price ?? h.avg_purchase_price
-      return sum + (price * h.units)
-    }, 0)
-
-    await supabase
-      .from('assets')
-      .update({ current_value: totalValue })
-      .eq('id', assetId)
-      .eq('user_id', userId)
-  } catch {
-    // Non-critical: don't fail the main operation if sync fails
-  }
 }
 
 /**

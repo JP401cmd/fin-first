@@ -1,0 +1,1005 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.86.37:3000
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1261ms
+ GET /test-sell-transaction 200 in 3.1s (compile: 2.7s, proxy.ts: 155ms, render: 201ms)
+ GET /login 200 in 1464ms (compile: 974ms, proxy.ts: 63ms, render: 428ms)
+ GET /test-sell-transaction 200 in 135ms (compile: 9ms, proxy.ts: 13ms, render: 112ms)
+ GET /api/health 200 in 993ms (compile: 449ms, proxy.ts: 6ms, render: 539ms)
+ GET /api/health 200 in 363ms (compile: 66ms, proxy.ts: 70ms, render: 228ms)
+ GET /login 404 in 586ms (proxy.ts: 72ms)
+ GET /test-sell-transaction 404 in 976ms (compile: 664ms, proxy.ts: 74ms, render: 238ms)
+ GET /test-sell-transaction 200 in 211ms (compile: 35ms, proxy.ts: 16ms, render: 160ms)
+ GET /test-sell-transaction 200 in 265ms (compile: 64ms, proxy.ts: 18ms, render: 184ms)
+ GET /api/health 200 in 207ms (compile: 5ms, proxy.ts: 5ms, render: 197ms)
+ GET /test-sell-transaction 404 in 53ms (compile: 10ms, proxy.ts: 5ms, render: 38ms)
+✓ Compiled in 435ms
+ GET /test-sell-transaction 404 in 72ms (compile: 9ms, proxy.ts: 28ms, render: 36ms)
+ GET /test-freedom-card 200 in 523ms (compile: 454ms, proxy.ts: 7ms, render: 62ms)
+ GET /login 200 in 96ms (compile: 10ms, proxy.ts: 6ms, render: 80ms)
+✓ Compiled in 1831ms
+ GET /test-sell-transaction 200 in 610ms (compile: 122ms, proxy.ts: 230ms, render: 259ms)
+ GET /login 200 in 585ms (compile: 160ms, proxy.ts: 204ms, render: 221ms)
+ GET /test-freedom-card 200 in 585ms (compile: 191ms, proxy.ts: 207ms, render: 188ms)
+ GET /login 200 in 255ms (compile: 38ms, proxy.ts: 17ms, render: 200ms)
+ GET /test-sell-transaction 200 in 264ms (compile: 17ms, proxy.ts: 18ms, render: 230ms)
+ GET /test-freedom-card 200 in 262ms (compile: 66ms, proxy.ts: 17ms, render: 180ms)
+ GET /test-freedom-card 200 in 234ms (compile: 50ms, proxy.ts: 40ms, render: 143ms)
+ GET /login 200 in 242ms (compile: 44ms, proxy.ts: 30ms, render: 167ms)
+ GET /test-sell-transaction 200 in 247ms (compile: 28ms, proxy.ts: 27ms, render: 192ms)
+ GET /test-sell-transaction 200 in 216ms (compile: 17ms, proxy.ts: 16ms, render: 183ms)
+ GET /login 200 in 218ms (compile: 35ms, proxy.ts: 18ms, render: 165ms)
+ GET /test-freedom-card 200 in 217ms (compile: 53ms, proxy.ts: 19ms, render: 145ms)
+ GET /login 200 in 203ms (compile: 32ms, proxy.ts: 17ms, render: 154ms)
+ GET /test-sell-transaction 200 in 209ms (compile: 15ms, proxy.ts: 15ms, render: 179ms)
+ GET /test-freedom-card 200 in 212ms (compile: 48ms, proxy.ts: 19ms, render: 146ms)
+ GET /test-sell-transaction 200 in 199ms (compile: 18ms, proxy.ts: 18ms, render: 163ms)
+ GET /login 200 in 198ms (compile: 34ms, proxy.ts: 20ms, render: 144ms)
+ GET /test-freedom-card 200 in 199ms (compile: 61ms, proxy.ts: 19ms, render: 119ms)
+ GET /test-sell-transaction 200 in 192ms (compile: 17ms, proxy.ts: 31ms, render: 144ms)
+ GET /login 200 in 176ms (compile: 31ms, proxy.ts: 17ms, render: 127ms)
+ GET /test-freedom-card 200 in 185ms (compile: 49ms, proxy.ts: 17ms, render: 119ms)
+ GET /test-sell-transaction 200 in 187ms (compile: 15ms, proxy.ts: 23ms, render: 149ms)
+ GET /login 200 in 173ms (compile: 23ms, proxy.ts: 14ms, render: 136ms)
+ GET /test-freedom-card 200 in 180ms (compile: 47ms, proxy.ts: 13ms, render: 120ms)
+ GET /test-sell-transaction 200 in 204ms (compile: 18ms, proxy.ts: 30ms, render: 156ms)
+ GET /login 200 in 190ms (compile: 30ms, proxy.ts: 15ms, render: 145ms)
+ GET /test-freedom-card 200 in 190ms (compile: 45ms, proxy.ts: 18ms, render: 127ms)
+ GET /login 200 in 184ms (compile: 31ms, proxy.ts: 17ms, render: 137ms)
+ GET /test-sell-transaction 200 in 190ms (compile: 16ms, proxy.ts: 13ms, render: 161ms)
+ GET /test-freedom-card 200 in 191ms (compile: 47ms, proxy.ts: 16ms, render: 128ms)
+ GET /test-sell-transaction 200 in 175ms (compile: 15ms, proxy.ts: 19ms, render: 141ms)
+ GET /login 200 in 178ms (compile: 27ms, proxy.ts: 21ms, render: 130ms)
+ GET /test-freedom-card 200 in 179ms (compile: 42ms, proxy.ts: 18ms, render: 119ms)
+ GET /login 200 in 168ms (compile: 29ms, proxy.ts: 17ms, render: 122ms)
+ GET /test-freedom-card 200 in 167ms (compile: 42ms, proxy.ts: 17ms, render: 109ms)
+ GET /test-sell-transaction 200 in 172ms (compile: 16ms, proxy.ts: 14ms, render: 142ms)
+ GET /test-sell-transaction 200 in 187ms (compile: 10ms, proxy.ts: 12ms, render: 165ms)
+ GET /test-freedom-card 200 in 189ms (compile: 37ms, proxy.ts: 14ms, render: 138ms)
+ GET /login 200 in 192ms (compile: 23ms, proxy.ts: 14ms, render: 155ms)
+ GET /test-sell-transaction 200 in 210ms (compile: 17ms, proxy.ts: 12ms, render: 181ms)
+ GET /login 200 in 211ms (compile: 33ms, proxy.ts: 13ms, render: 165ms)
+ GET /test-freedom-card 200 in 217ms (compile: 49ms, proxy.ts: 14ms, render: 153ms)
+ GET /test-sell-transaction 200 in 200ms (compile: 18ms, proxy.ts: 15ms, render: 168ms)
+ GET /login 200 in 199ms (compile: 33ms, proxy.ts: 16ms, render: 150ms)
+ GET /test-freedom-card 200 in 200ms (compile: 47ms, proxy.ts: 19ms, render: 134ms)
+ GET /test-sell-transaction 200 in 207ms (compile: 18ms, proxy.ts: 13ms, render: 177ms)
+ GET /login 200 in 209ms (compile: 35ms, proxy.ts: 13ms, render: 161ms)
+ GET /test-freedom-card 200 in 216ms (compile: 53ms, proxy.ts: 17ms, render: 146ms)
+ GET /test-sell-transaction 200 in 216ms (compile: 20ms, proxy.ts: 29ms, render: 167ms)
+ GET /login 200 in 223ms (compile: 38ms, proxy.ts: 29ms, render: 156ms)
+ GET /test-freedom-card 200 in 205ms (compile: 59ms, proxy.ts: 19ms, render: 127ms)
+ GET /test-sell-transaction 200 in 197ms (compile: 21ms, proxy.ts: 35ms, render: 141ms)
+ GET /login 200 in 178ms (compile: 31ms, proxy.ts: 20ms, render: 127ms)
+ GET /test-freedom-card 200 in 179ms (compile: 48ms, proxy.ts: 18ms, render: 113ms)
+ GET /test-sell-transaction 200 in 189ms (compile: 15ms, proxy.ts: 30ms, render: 143ms)
+ GET /login 200 in 174ms (compile: 28ms, proxy.ts: 16ms, render: 130ms)
+ GET /test-freedom-card 200 in 173ms (compile: 38ms, proxy.ts: 15ms, render: 120ms)
+ GET /test-sell-transaction 200 in 177ms (compile: 14ms, proxy.ts: 14ms, render: 149ms)
+ GET /login 200 in 184ms (compile: 25ms, proxy.ts: 16ms, render: 142ms)
+ GET /test-freedom-card 200 in 182ms (compile: 39ms, proxy.ts: 16ms, render: 127ms)
+ GET /login 200 in 164ms (compile: 24ms, proxy.ts: 13ms, render: 127ms)
+ GET /test-freedom-card 200 in 164ms (compile: 40ms, proxy.ts: 14ms, render: 110ms)
+ GET /test-sell-transaction 200 in 169ms (compile: 10ms, proxy.ts: 11ms, render: 147ms)
+ GET /login 200 in 175ms (compile: 29ms, proxy.ts: 20ms, render: 127ms)
+ GET /test-sell-transaction 200 in 177ms (compile: 14ms, proxy.ts: 17ms, render: 146ms)
+ GET /test-freedom-card 200 in 171ms (compile: 42ms, proxy.ts: 16ms, render: 113ms)
+ GET /test-sell-transaction 200 in 181ms (compile: 10ms, proxy.ts: 15ms, render: 156ms)
+ GET /login 200 in 184ms (compile: 28ms, proxy.ts: 15ms, render: 140ms)
+ GET /test-freedom-card 200 in 187ms (compile: 43ms, proxy.ts: 16ms, render: 128ms)
+ GET /login 200 in 195ms (compile: 38ms, proxy.ts: 16ms, render: 141ms)
+ GET /test-sell-transaction 200 in 199ms (compile: 21ms, proxy.ts: 13ms, render: 164ms)
+ GET /test-freedom-card 200 in 212ms (compile: 54ms, proxy.ts: 16ms, render: 142ms)
+ GET /test-sell-transaction 200 in 207ms (compile: 14ms, proxy.ts: 11ms, render: 182ms)
+ GET /login 200 in 208ms (compile: 27ms, proxy.ts: 15ms, render: 167ms)
+ GET /test-freedom-card 200 in 213ms (compile: 46ms, proxy.ts: 16ms, render: 151ms)
+ GET /test-sell-transaction 200 in 204ms (compile: 15ms, proxy.ts: 31ms, render: 157ms)
+ GET /login 200 in 206ms (compile: 32ms, proxy.ts: 30ms, render: 144ms)
+ GET /test-freedom-card 200 in 207ms (compile: 50ms, proxy.ts: 28ms, render: 129ms)
+ GET /test-sell-transaction 200 in 180ms (compile: 15ms, proxy.ts: 16ms, render: 149ms)
+ GET /login 200 in 175ms (compile: 28ms, proxy.ts: 15ms, render: 132ms)
+ GET /test-freedom-card 200 in 181ms (compile: 42ms, proxy.ts: 16ms, render: 122ms)
+ GET /test-sell-transaction 200 in 173ms (compile: 13ms, proxy.ts: 14ms, render: 146ms)
+ GET /login 200 in 176ms (compile: 24ms, proxy.ts: 17ms, render: 135ms)
+ GET /test-freedom-card 200 in 176ms (compile: 39ms, proxy.ts: 17ms, render: 121ms)
+ GET /test-sell-transaction 200 in 184ms (compile: 13ms, proxy.ts: 12ms, render: 159ms)
+ GET /login 200 in 186ms (compile: 27ms, proxy.ts: 15ms, render: 144ms)
+ GET /test-freedom-card 200 in 188ms (compile: 41ms, proxy.ts: 17ms, render: 130ms)
+ GET /test-sell-transaction 200 in 185ms (compile: 15ms, proxy.ts: 15ms, render: 156ms)
+ GET /test-freedom-card 200 in 182ms (compile: 42ms, proxy.ts: 16ms, render: 123ms)
+ GET /login 200 in 188ms (compile: 34ms, proxy.ts: 11ms, render: 142ms)
+ GET /login 200 in 176ms (compile: 21ms, proxy.ts: 16ms, render: 139ms)
+ GET /test-sell-transaction 200 in 179ms (compile: 9ms, proxy.ts: 16ms, render: 154ms)
+ GET /test-freedom-card 200 in 178ms (compile: 35ms, proxy.ts: 15ms, render: 128ms)
+ GET /test-sell-transaction 200 in 167ms (compile: 15ms, proxy.ts: 14ms, render: 139ms)
+ GET /test-freedom-card 200 in 168ms (compile: 46ms, proxy.ts: 15ms, render: 106ms)
+ GET /login 200 in 171ms (compile: 29ms, proxy.ts: 15ms, render: 127ms)
+ GET /login 200 in 149ms (compile: 7ms, proxy.ts: 13ms, render: 130ms)
+ GET /test-sell-transaction 200 in 154ms (compile: 23ms, proxy.ts: 12ms, render: 119ms)
+ GET /test-freedom-card 200 in 160ms (compile: 37ms, proxy.ts: 14ms, render: 109ms)
+ GET /login 200 in 168ms (compile: 13ms, proxy.ts: 13ms, render: 141ms)
+ GET /test-freedom-card 200 in 165ms (compile: 36ms, proxy.ts: 13ms, render: 115ms)
+ GET /test-sell-transaction 200 in 170ms (compile: 27ms, proxy.ts: 12ms, render: 131ms)
+ GET /test-sell-transaction 200 in 173ms (compile: 31ms, proxy.ts: 17ms, render: 126ms)
+ GET /login 200 in 178ms (compile: 10ms, proxy.ts: 18ms, render: 150ms)
+ GET /test-freedom-card 200 in 173ms (compile: 44ms, proxy.ts: 18ms, render: 111ms)
+ GET /login 200 in 190ms (compile: 11ms, proxy.ts: 16ms, render: 164ms)
+ GET /test-sell-transaction 200 in 191ms (compile: 23ms, proxy.ts: 18ms, render: 149ms)
+ GET /test-freedom-card 200 in 195ms (compile: 36ms, proxy.ts: 18ms, render: 140ms)
+ GET /login 200 in 206ms (compile: 28ms, proxy.ts: 12ms, render: 167ms)
+ GET /test-freedom-card 200 in 205ms (compile: 59ms, proxy.ts: 17ms, render: 129ms)
+ GET /test-sell-transaction 200 in 213ms (compile: 41ms, proxy.ts: 18ms, render: 154ms)
+ GET /login 200 in 198ms (compile: 10ms, proxy.ts: 15ms, render: 172ms)
+ GET /test-sell-transaction 200 in 200ms (compile: 26ms, proxy.ts: 17ms, render: 157ms)
+ GET /test-freedom-card 200 in 199ms (compile: 45ms, proxy.ts: 17ms, render: 136ms)
+ GET /login 200 in 200ms (compile: 14ms, proxy.ts: 18ms, render: 168ms)
+ GET /test-sell-transaction 200 in 203ms (compile: 33ms, proxy.ts: 19ms, render: 151ms)
+ GET /test-freedom-card 200 in 203ms (compile: 49ms, proxy.ts: 23ms, render: 131ms)
+ GET /login 200 in 204ms (compile: 11ms, proxy.ts: 14ms, render: 178ms)
+ GET /test-sell-transaction 200 in 207ms (compile: 27ms, proxy.ts: 16ms, render: 163ms)
+ GET /test-freedom-card 200 in 211ms (compile: 46ms, proxy.ts: 17ms, render: 148ms)
+ GET /test-sell-transaction 200 in 233ms (compile: 41ms, proxy.ts: 16ms, render: 176ms)
+ GET /login 200 in 235ms (compile: 17ms, proxy.ts: 15ms, render: 204ms)
+ GET /test-freedom-card 200 in 239ms (compile: 61ms, proxy.ts: 18ms, render: 160ms)
+ GET /login 200 in 248ms (compile: 35ms, proxy.ts: 32ms, render: 182ms)
+ GET /test-sell-transaction 200 in 231ms (compile: 52ms, proxy.ts: 16ms, render: 163ms)
+ GET /test-freedom-card 200 in 231ms (compile: 76ms, proxy.ts: 19ms, render: 136ms)
+ GET /login 200 in 198ms (compile: 14ms, proxy.ts: 16ms, render: 167ms)
+ GET /test-sell-transaction 200 in 198ms (compile: 35ms, proxy.ts: 17ms, render: 147ms)
+ GET /test-freedom-card 200 in 200ms (compile: 51ms, proxy.ts: 18ms, render: 130ms)
+ GET /login 200 in 183ms (compile: 14ms, proxy.ts: 15ms, render: 155ms)
+ GET /test-sell-transaction 200 in 187ms (compile: 32ms, proxy.ts: 15ms, render: 140ms)
+ GET /test-freedom-card 200 in 187ms (compile: 48ms, proxy.ts: 17ms, render: 121ms)
+ GET /login 200 in 183ms (compile: 12ms, proxy.ts: 15ms, render: 156ms)
+ GET /test-sell-transaction 200 in 184ms (compile: 26ms, proxy.ts: 18ms, render: 140ms)
+ GET /test-freedom-card 200 in 183ms (compile: 44ms, proxy.ts: 18ms, render: 121ms)
+ GET /login 200 in 201ms (compile: 12ms, proxy.ts: 12ms, render: 176ms)
+ GET /test-sell-transaction 200 in 205ms (compile: 29ms, proxy.ts: 13ms, render: 163ms)
+ GET /test-freedom-card 200 in 206ms (compile: 42ms, proxy.ts: 15ms, render: 149ms)
+ GET /test-sell-transaction 200 in 245ms (compile: 28ms, proxy.ts: 16ms, render: 200ms)
+ GET /login 200 in 254ms (compile: 13ms, proxy.ts: 17ms, render: 224ms)
+ GET /test-freedom-card 200 in 263ms (compile: 42ms, proxy.ts: 18ms, render: 203ms)
+ GET /test-sell-transaction 200 in 332ms (compile: 16ms, proxy.ts: 32ms, render: 284ms)
+ GET /login 200 in 348ms (compile: 43ms, proxy.ts: 30ms, render: 276ms)
+ GET /test-freedom-card 200 in 332ms (compile: 59ms, proxy.ts: 22ms, render: 250ms)
+ GET /test-sell-transaction 200 in 266ms (compile: 83ms, proxy.ts: 32ms, render: 151ms)
+ GET /test-sell-transaction 200 in 456ms (compile: 45ms, proxy.ts: 25ms, render: 386ms)
+ GET /login 200 in 450ms (compile: 71ms, proxy.ts: 31ms, render: 348ms)
+ GET /test-freedom-card 200 in 453ms (compile: 86ms, proxy.ts: 39ms, render: 328ms)
+ GET /test-sell-transaction 200 in 455ms (compile: 40ms, proxy.ts: 58ms, render: 356ms)
+ GET /login 200 in 420ms (compile: 54ms, proxy.ts: 22ms, render: 344ms)
+ GET /test-freedom-card 200 in 428ms (compile: 182ms, proxy.ts: 30ms, render: 216ms)
+ GET /test-sell-transaction 200 in 381ms (compile: 24ms, proxy.ts: 61ms, render: 295ms)
+ GET /login 200 in 384ms (compile: 52ms, proxy.ts: 63ms, render: 268ms)
+ GET /test-freedom-card 200 in 354ms (compile: 85ms, proxy.ts: 32ms, render: 237ms)
+ GET /test-sell-transaction 200 in 338ms (compile: 23ms, proxy.ts: 53ms, render: 261ms)
+ GET /login 200 in 338ms (compile: 55ms, proxy.ts: 50ms, render: 233ms)
+ GET /test-freedom-card 200 in 307ms (compile: 120ms, proxy.ts: 28ms, render: 159ms)
+ GET /test-sell-transaction 200 in 274ms (compile: 27ms, proxy.ts: 65ms, render: 183ms)
+ GET /login 200 in 231ms (compile: 40ms, proxy.ts: 27ms, render: 164ms)
+ GET /test-freedom-card 200 in 234ms (compile: 67ms, proxy.ts: 23ms, render: 145ms)
+ GET /login 200 in 231ms (compile: 33ms, proxy.ts: 33ms, render: 165ms)
+ GET /test-sell-transaction 200 in 236ms (compile: 17ms, proxy.ts: 33ms, render: 186ms)
+ GET /test-freedom-card 200 in 211ms (compile: 58ms, proxy.ts: 15ms, render: 139ms)
+ GET /test-sell-transaction 200 in 221ms (compile: 20ms, proxy.ts: 36ms, render: 165ms)
+ GET /login 200 in 199ms (compile: 37ms, proxy.ts: 19ms, render: 143ms)
+ GET /test-freedom-card 200 in 200ms (compile: 58ms, proxy.ts: 17ms, render: 126ms)
+ GET /test-sell-transaction 200 in 216ms (compile: 16ms, proxy.ts: 33ms, render: 167ms)
+ GET /login 200 in 204ms (compile: 30ms, proxy.ts: 17ms, render: 157ms)
+ GET /test-freedom-card 200 in 201ms (compile: 50ms, proxy.ts: 17ms, render: 134ms)
+ GET /test-sell-transaction 200 in 215ms (compile: 15ms, proxy.ts: 34ms, render: 166ms)
+ GET /login 200 in 193ms (compile: 30ms, proxy.ts: 15ms, render: 147ms)
+ GET /test-freedom-card 200 in 197ms (compile: 59ms, proxy.ts: 16ms, render: 121ms)
+ GET /login 200 in 207ms (compile: 30ms, proxy.ts: 34ms, render: 143ms)
+ GET /test-sell-transaction 200 in 210ms (compile: 14ms, proxy.ts: 33ms, render: 163ms)
+ GET /test-freedom-card 200 in 225ms (compile: 52ms, proxy.ts: 14ms, render: 158ms)
+ GET /test-sell-transaction 200 in 198ms (compile: 20ms, proxy.ts: 26ms, render: 152ms)
+ GET /login 200 in 198ms (compile: 28ms, proxy.ts: 34ms, render: 136ms)
+ GET /test-freedom-card 200 in 213ms (compile: 50ms, proxy.ts: 14ms, render: 149ms)
+ GET /login 200 in 192ms (compile: 26ms, proxy.ts: 34ms, render: 132ms)
+ GET /test-sell-transaction 200 in 195ms (compile: 12ms, proxy.ts: 30ms, render: 152ms)
+ GET /test-freedom-card 200 in 174ms (compile: 11ms, proxy.ts: 48ms, render: 115ms)
+ GET /test-sell-transaction 200 in 204ms (compile: 9ms, proxy.ts: 30ms, render: 165ms)
+ GET /login 200 in 204ms (compile: 26ms, proxy.ts: 30ms, render: 148ms)
+ GET /test-freedom-card 200 in 208ms (compile: 14ms, proxy.ts: 44ms, render: 149ms)
+ GET /test-sell-transaction 200 in 210ms (compile: 13ms, proxy.ts: 34ms, render: 163ms)
+ GET /login 200 in 212ms (compile: 28ms, proxy.ts: 34ms, render: 150ms)
+ GET /test-freedom-card 200 in 191ms (compile: 46ms, proxy.ts: 8ms, render: 137ms)
+ GET /test-sell-transaction 200 in 220ms (compile: 14ms, proxy.ts: 42ms, render: 163ms)
+ GET /login 200 in 223ms (compile: 33ms, proxy.ts: 45ms, render: 145ms)
+ GET /test-freedom-card 200 in 197ms (compile: 49ms, proxy.ts: 17ms, render: 131ms)
+ GET /login 200 in 193ms (compile: 33ms, proxy.ts: 17ms, render: 143ms)
+ GET /test-sell-transaction 200 in 218ms (compile: 17ms, proxy.ts: 34ms, render: 167ms)
+ GET /test-freedom-card 200 in 196ms (compile: 52ms, proxy.ts: 14ms, render: 130ms)
+ GET /login 200 in 189ms (compile: 30ms, proxy.ts: 19ms, render: 139ms)
+ GET /test-sell-transaction 200 in 214ms (compile: 14ms, proxy.ts: 38ms, render: 162ms)
+ GET /test-freedom-card 200 in 195ms (compile: 50ms, proxy.ts: 17ms, render: 128ms)
+ GET /test-sell-transaction 200 in 207ms (compile: 23ms, proxy.ts: 28ms, render: 155ms)
+ GET /login 200 in 215ms (compile: 34ms, proxy.ts: 35ms, render: 146ms)
+ GET /test-freedom-card 200 in 191ms (compile: 47ms, proxy.ts: 18ms, render: 126ms)
+ GET /login 200 in 191ms (compile: 29ms, proxy.ts: 17ms, render: 144ms)
+ GET /test-sell-transaction 200 in 216ms (compile: 15ms, proxy.ts: 33ms, render: 168ms)
+ GET /test-freedom-card 200 in 196ms (compile: 50ms, proxy.ts: 17ms, render: 130ms)
+ GET /test-sell-transaction 200 in 227ms (compile: 11ms, proxy.ts: 32ms, render: 184ms)
+ GET /login 200 in 227ms (compile: 27ms, proxy.ts: 31ms, render: 170ms)
+ GET /test-freedom-card 200 in 215ms (compile: 53ms, proxy.ts: 13ms, render: 150ms)
+ GET /test-sell-transaction 200 in 245ms (compile: 16ms, proxy.ts: 37ms, render: 192ms)
+ GET /login 200 in 251ms (compile: 41ms, proxy.ts: 40ms, render: 170ms)
+ GET /test-freedom-card 200 in 230ms (compile: 58ms, proxy.ts: 17ms, render: 154ms)
+ GET /test-sell-transaction 200 in 235ms (compile: 24ms, proxy.ts: 34ms, render: 178ms)
+ GET /login 200 in 218ms (compile: 41ms, proxy.ts: 20ms, render: 157ms)
+ GET /test-freedom-card 200 in 218ms (compile: 63ms, proxy.ts: 20ms, render: 134ms)
+ GET /test-sell-transaction 200 in 222ms (compile: 18ms, proxy.ts: 35ms, render: 170ms)
+ GET /login 200 in 213ms (compile: 34ms, proxy.ts: 17ms, render: 161ms)
+ GET /test-freedom-card 200 in 211ms (compile: 53ms, proxy.ts: 17ms, render: 141ms)
+ GET /test-sell-transaction 200 in 244ms (compile: 16ms, proxy.ts: 34ms, render: 194ms)
+ GET /login 200 in 232ms (compile: 32ms, proxy.ts: 16ms, render: 184ms)
+ GET /test-freedom-card 200 in 231ms (compile: 51ms, proxy.ts: 16ms, render: 164ms)
+ GET /test-sell-transaction 200 in 248ms (compile: 23ms, proxy.ts: 45ms, render: 180ms)
+ GET /login 200 in 231ms (compile: 44ms, proxy.ts: 27ms, render: 161ms)
+ GET /test-freedom-card 200 in 233ms (compile: 55ms, proxy.ts: 28ms, render: 151ms)
+ GET /test-sell-transaction 200 in 205ms (compile: 17ms, proxy.ts: 29ms, render: 158ms)
+ GET /login 200 in 196ms (compile: 32ms, proxy.ts: 19ms, render: 144ms)
+ GET /test-freedom-card 200 in 196ms (compile: 46ms, proxy.ts: 20ms, render: 130ms)
+ GET /test-sell-transaction 200 in 181ms (compile: 19ms, proxy.ts: 17ms, render: 145ms)
+ GET /login 200 in 181ms (compile: 34ms, proxy.ts: 18ms, render: 130ms)
+ GET /test-freedom-card 200 in 180ms (compile: 41ms, proxy.ts: 19ms, render: 120ms)
+ GET /api/verify-phase-transition 200 in 222ms (compile: 191ms, proxy.ts: 23ms, render: 8ms)
+ GET /test-sell-transaction 200 in 196ms (compile: 14ms, proxy.ts: 11ms, render: 171ms)
+ GET /login 200 in 195ms (compile: 28ms, proxy.ts: 14ms, render: 153ms)
+ GET /test-freedom-card 200 in 200ms (compile: 42ms, proxy.ts: 16ms, render: 142ms)
+ GET /test-sell-transaction 200 in 197ms (compile: 47ms, proxy.ts: 8ms, render: 141ms)
+ GET /login 200 in 195ms (compile: 59ms, proxy.ts: 13ms, render: 122ms)
+ GET /test-freedom-card 200 in 201ms (compile: 72ms, proxy.ts: 17ms, render: 113ms)
+ GET /test-sell-transaction 200 in 174ms (compile: 8ms, proxy.ts: 12ms, render: 155ms)
+ GET /login 200 in 178ms (compile: 24ms, proxy.ts: 12ms, render: 142ms)
+ GET /test-freedom-card 200 in 181ms (compile: 41ms, proxy.ts: 13ms, render: 127ms)
+ GET /login 200 in 172ms (compile: 35ms, proxy.ts: 14ms, render: 123ms)
+ GET /test-sell-transaction 200 in 186ms (compile: 21ms, proxy.ts: 22ms, render: 143ms)
+ GET /test-freedom-card 200 in 207ms (compile: 47ms, proxy.ts: 14ms, render: 145ms)
+ GET /login 200 in 195ms (compile: 26ms, proxy.ts: 14ms, render: 154ms)
+ GET /test-sell-transaction 200 in 202ms (compile: 13ms, proxy.ts: 12ms, render: 177ms)
+ GET /test-freedom-card 200 in 200ms (compile: 40ms, proxy.ts: 16ms, render: 144ms)
+ GET /login 200 in 198ms (compile: 61ms, proxy.ts: 12ms, render: 125ms)
+ GET /test-sell-transaction 200 in 201ms (compile: 46ms, proxy.ts: 10ms, render: 145ms)
+ GET /test-freedom-card 200 in 201ms (compile: 45ms, proxy.ts: 47ms, render: 109ms)
+ GET /login 200 in 163ms (compile: 28ms, proxy.ts: 11ms, render: 124ms)
+ GET /test-sell-transaction 200 in 184ms (compile: 13ms, proxy.ts: 29ms, render: 142ms)
+ GET /test-freedom-card 200 in 176ms (compile: 40ms, proxy.ts: 14ms, render: 122ms)
+ GET /test-sell-transaction 200 in 192ms (compile: 17ms, proxy.ts: 30ms, render: 146ms)
+ GET /login 200 in 178ms (compile: 28ms, proxy.ts: 19ms, render: 131ms)
+ GET /test-freedom-card 200 in 176ms (compile: 42ms, proxy.ts: 20ms, render: 115ms)
+ GET /test-sell-transaction 200 in 198ms (compile: 21ms, proxy.ts: 29ms, render: 147ms)
+ GET /login 200 in 182ms (compile: 36ms, proxy.ts: 13ms, render: 133ms)
+ GET /test-freedom-card 200 in 187ms (compile: 42ms, proxy.ts: 25ms, render: 121ms)
+ GET /test-sell-transaction 200 in 196ms (compile: 13ms, proxy.ts: 29ms, render: 154ms)
+ GET /login 200 in 180ms (compile: 29ms, proxy.ts: 13ms, render: 138ms)
+ GET /test-freedom-card 200 in 183ms (compile: 47ms, proxy.ts: 17ms, render: 120ms)
+ GET /test-sell-transaction 200 in 206ms (compile: 15ms, proxy.ts: 36ms, render: 155ms)
+ GET /login 200 in 211ms (compile: 29ms, proxy.ts: 37ms, render: 144ms)
+ GET /test-freedom-card 200 in 183ms (compile: 40ms, proxy.ts: 15ms, render: 128ms)
+ GET /login 200 in 183ms (compile: 31ms, proxy.ts: 17ms, render: 135ms)
+ GET /test-sell-transaction 200 in 206ms (compile: 13ms, proxy.ts: 36ms, render: 157ms)
+ GET /test-freedom-card 200 in 179ms (compile: 51ms, proxy.ts: 13ms, render: 115ms)
+ GET /test-sell-transaction 200 in 212ms (compile: 11ms, proxy.ts: 33ms, render: 167ms)
+ GET /login 200 in 196ms (compile: 26ms, proxy.ts: 16ms, render: 155ms)
+ GET /test-freedom-card 200 in 197ms (compile: 47ms, proxy.ts: 13ms, render: 137ms)
+ GET /test-sell-transaction 200 in 217ms (compile: 14ms, proxy.ts: 26ms, render: 177ms)
+ GET /login 200 in 204ms (compile: 32ms, proxy.ts: 14ms, render: 158ms)
+ GET /test-freedom-card 200 in 210ms (compile: 66ms, proxy.ts: 14ms, render: 130ms)
+ GET /test-sell-transaction 200 in 225ms (compile: 21ms, proxy.ts: 31ms, render: 173ms)
+ GET /login 200 in 209ms (compile: 34ms, proxy.ts: 17ms, render: 158ms)
+ GET /test-freedom-card 200 in 211ms (compile: 49ms, proxy.ts: 15ms, render: 147ms)
+ GET /test-sell-transaction 200 in 222ms (compile: 18ms, proxy.ts: 33ms, render: 171ms)
+ GET /login 200 in 205ms (compile: 36ms, proxy.ts: 17ms, render: 152ms)
+ GET /test-freedom-card 200 in 208ms (compile: 56ms, proxy.ts: 20ms, render: 132ms)
+ GET /test-sell-transaction 200 in 207ms (compile: 16ms, proxy.ts: 17ms, render: 174ms)
+ GET /login 200 in 203ms (compile: 27ms, proxy.ts: 18ms, render: 158ms)
+ GET /test-freedom-card 200 in 208ms (compile: 44ms, proxy.ts: 19ms, render: 146ms)
+ GET /test-sell-transaction 200 in 253ms (compile: 17ms, proxy.ts: 17ms, render: 219ms)
+ GET /login 200 in 255ms (compile: 32ms, proxy.ts: 19ms, render: 204ms)
+ GET /test-freedom-card 200 in 254ms (compile: 50ms, proxy.ts: 21ms, render: 183ms)
+ GET /test-sell-transaction 200 in 250ms (compile: 14ms, proxy.ts: 16ms, render: 220ms)
+ GET /login 200 in 250ms (compile: 32ms, proxy.ts: 16ms, render: 201ms)
+ GET /test-freedom-card 200 in 259ms (compile: 52ms, proxy.ts: 20ms, render: 187ms)
+ GET /test-sell-transaction 200 in 260ms (compile: 18ms, proxy.ts: 42ms, render: 200ms)
+ GET /login 200 in 239ms (compile: 36ms, proxy.ts: 20ms, render: 183ms)
+ GET /test-freedom-card 200 in 236ms (compile: 52ms, proxy.ts: 23ms, render: 161ms)
+ GET /test-sell-transaction 200 in 230ms (compile: 12ms, proxy.ts: 24ms, render: 195ms)
+ GET /login 200 in 228ms (compile: 41ms, proxy.ts: 18ms, render: 168ms)
+ GET /test-freedom-card 200 in 231ms (compile: 64ms, proxy.ts: 17ms, render: 149ms)
+ GET /test-sell-transaction 200 in 231ms (compile: 16ms, proxy.ts: 15ms, render: 200ms)
+ GET /login 200 in 237ms (compile: 39ms, proxy.ts: 11ms, render: 187ms)
+ GET /test-freedom-card 200 in 241ms (compile: 55ms, proxy.ts: 16ms, render: 169ms)
+ GET /test-sell-transaction 200 in 328ms (compile: 14ms, proxy.ts: 18ms, render: 296ms)
+ GET /test-sell-transaction 200 in 203ms (compile: 64ms, proxy.ts: 24ms, render: 114ms)
+ GET /login 200 in 342ms (compile: 30ms, proxy.ts: 18ms, render: 294ms)
+ GET /test-freedom-card 200 in 340ms (compile: 54ms, proxy.ts: 17ms, render: 269ms)
+ GET /login 200 in 338ms (compile: 44ms, proxy.ts: 26ms, render: 269ms)
+ GET /test-freedom-card 200 in 338ms (compile: 98ms, proxy.ts: 25ms, render: 215ms)
+ GET /test-sell-transaction 200 in 423ms (compile: 21ms, proxy.ts: 25ms, render: 377ms)
+ GET /login 200 in 249ms (compile: 50ms, proxy.ts: 34ms, render: 164ms)
+ GET /test-freedom-card 200 in 247ms (compile: 75ms, proxy.ts: 36ms, render: 135ms)
+ GET /test-freedom-card 200 in 169ms (compile: 32ms, proxy.ts: 16ms, render: 121ms)
+ GET /login 200 in 176ms (compile: 13ms, proxy.ts: 16ms, render: 148ms)
+ GET /login 200 in 175ms (compile: 12ms, proxy.ts: 18ms, render: 145ms)
+ GET /test-freedom-card 200 in 175ms (compile: 28ms, proxy.ts: 20ms, render: 128ms)
+ GET /login 200 in 189ms (compile: 15ms, proxy.ts: 17ms, render: 157ms)
+ GET /test-freedom-card 200 in 188ms (compile: 31ms, proxy.ts: 20ms, render: 137ms)
+ GET /login 200 in 193ms (compile: 21ms, proxy.ts: 18ms, render: 155ms)
+ GET /test-freedom-card 200 in 193ms (compile: 36ms, proxy.ts: 23ms, render: 135ms)
+ GET /test-freedom-card 200 in 190ms (compile: 14ms, proxy.ts: 16ms, render: 160ms)
+ GET /login 200 in 194ms (compile: 42ms, proxy.ts: 16ms, render: 136ms)
+ GET /test-freedom-card 200 in 177ms (compile: 17ms, proxy.ts: 16ms, render: 144ms)
+ GET /login 200 in 177ms (compile: 36ms, proxy.ts: 20ms, render: 121ms)
+ GET /test-freedom-card 200 in 170ms (compile: 17ms, proxy.ts: 12ms, render: 141ms)
+ GET /login 200 in 175ms (compile: 32ms, proxy.ts: 18ms, render: 125ms)
+ GET /test-freedom-card 200 in 173ms (compile: 14ms, proxy.ts: 14ms, render: 146ms)
+ GET /login 200 in 169ms (compile: 31ms, proxy.ts: 15ms, render: 122ms)
+ GET /test-freedom-card 200 in 143ms (compile: 8ms, proxy.ts: 15ms, render: 120ms)
+ GET /login 200 in 149ms (compile: 28ms, proxy.ts: 17ms, render: 103ms)
+ GET /test-freedom-card 200 in 137ms (compile: 9ms, proxy.ts: 17ms, render: 112ms)
+ GET /login 200 in 140ms (compile: 28ms, proxy.ts: 16ms, render: 96ms)
+ GET /test-freedom-card 200 in 137ms (compile: 7ms, proxy.ts: 14ms, render: 116ms)
+ GET /login 200 in 137ms (compile: 27ms, proxy.ts: 14ms, render: 95ms)
+ GET /test-freedom-card 200 in 129ms (compile: 8ms, proxy.ts: 13ms, render: 108ms)
+ GET /login 200 in 129ms (compile: 29ms, proxy.ts: 14ms, render: 86ms)
+ GET /login 200 in 133ms (compile: 23ms, proxy.ts: 12ms, render: 98ms)
+ GET /test-freedom-card 200 in 136ms (compile: 7ms, proxy.ts: 12ms, render: 118ms)
+ GET /test-freedom-card 200 in 141ms (compile: 8ms, proxy.ts: 13ms, render: 120ms)
+ GET /login 200 in 142ms (compile: 29ms, proxy.ts: 12ms, render: 100ms)
+ GET /test-freedom-card 200 in 124ms (compile: 6ms, proxy.ts: 13ms, render: 105ms)
+ GET /login 200 in 126ms (compile: 25ms, proxy.ts: 12ms, render: 89ms)
+ GET /login 200 in 121ms (compile: 24ms, proxy.ts: 10ms, render: 86ms)
+ GET /test-freedom-card 200 in 126ms (compile: 8ms, proxy.ts: 12ms, render: 106ms)
+ GET /test-freedom-card 200 in 126ms (compile: 8ms, proxy.ts: 13ms, render: 105ms)
+ GET /login 200 in 128ms (compile: 27ms, proxy.ts: 13ms, render: 88ms)
+ GET /test-freedom-card 200 in 117ms (compile: 10ms, proxy.ts: 8ms, render: 99ms)
+ GET /login 200 in 119ms (compile: 25ms, proxy.ts: 10ms, render: 83ms)
+ GET /test-freedom-card 200 in 114ms (compile: 4ms, proxy.ts: 9ms, render: 100ms)
+ GET /login 200 in 116ms (compile: 22ms, proxy.ts: 9ms, render: 85ms)
+ GET /test-freedom-card 200 in 123ms (compile: 8ms, proxy.ts: 13ms, render: 102ms)
+ GET /login 200 in 125ms (compile: 23ms, proxy.ts: 13ms, render: 88ms)
+ GET /test-freedom-card 200 in 121ms (compile: 8ms, proxy.ts: 10ms, render: 103ms)
+ GET /login 200 in 122ms (compile: 23ms, proxy.ts: 11ms, render: 88ms)
+ GET /test-freedom-card 200 in 112ms (compile: 7ms, proxy.ts: 10ms, render: 95ms)
+ GET /login 200 in 113ms (compile: 19ms, proxy.ts: 12ms, render: 82ms)
+ GET /test-freedom-card 200 in 108ms (compile: 8ms, proxy.ts: 20ms, render: 80ms)
+ GET /login 200 in 101ms (compile: 22ms, proxy.ts: 13ms, render: 66ms)
+ GET /test-freedom-card 200 in 93ms (compile: 6ms, proxy.ts: 8ms, render: 79ms)
+ GET /login 200 in 97ms (compile: 18ms, proxy.ts: 8ms, render: 71ms)
+ GET /test-freedom-card 200 in 94ms (compile: 6ms, proxy.ts: 9ms, render: 79ms)
+ GET /login 200 in 95ms (compile: 19ms, proxy.ts: 9ms, render: 68ms)
+ GET /test-freedom-card 200 in 99ms (compile: 6ms, proxy.ts: 12ms, render: 80ms)
+ GET /login 200 in 99ms (compile: 19ms, proxy.ts: 12ms, render: 67ms)
+ GET /test-freedom-card 200 in 106ms (compile: 6ms, proxy.ts: 10ms, render: 90ms)
+ GET /login 200 in 108ms (compile: 20ms, proxy.ts: 10ms, render: 77ms)
+ GET /test-freedom-card 200 in 107ms (compile: 7ms, proxy.ts: 8ms, render: 92ms)
+ GET /login 200 in 107ms (compile: 21ms, proxy.ts: 8ms, render: 78ms)
+ GET /test-freedom-card 200 in 98ms (compile: 5ms, proxy.ts: 11ms, render: 82ms)
+ GET /login 200 in 110ms (compile: 20ms, proxy.ts: 11ms, render: 79ms)
+ GET /test-freedom-card 200 in 115ms (compile: 7ms, proxy.ts: 9ms, render: 99ms)
+ GET /login 200 in 119ms (compile: 19ms, proxy.ts: 11ms, render: 89ms)
+ GET /test-freedom-card 200 in 124ms (compile: 5ms, proxy.ts: 19ms, render: 100ms)
+ GET /login 200 in 129ms (compile: 19ms, proxy.ts: 19ms, render: 91ms)
+ GET /test-freedom-card 200 in 114ms (compile: 9ms, proxy.ts: 13ms, render: 93ms)
+ GET /login 200 in 116ms (compile: 24ms, proxy.ts: 12ms, render: 80ms)
+ GET /test-freedom-card 200 in 114ms (compile: 9ms, proxy.ts: 9ms, render: 96ms)
+ GET /login 200 in 119ms (compile: 24ms, proxy.ts: 11ms, render: 85ms)
+ GET /test-freedom-card 200 in 126ms (compile: 7ms, proxy.ts: 11ms, render: 108ms)
+ GET /login 200 in 129ms (compile: 22ms, proxy.ts: 11ms, render: 96ms)
+ GET /test-freedom-card 200 in 136ms (compile: 11ms, proxy.ts: 12ms, render: 113ms)
+ GET /login 200 in 136ms (compile: 28ms, proxy.ts: 15ms, render: 93ms)
+ GET /test-freedom-card 200 in 126ms (compile: 14ms, proxy.ts: 13ms, render: 100ms)
+ GET /login 200 in 127ms (compile: 27ms, proxy.ts: 16ms, render: 84ms)
+ GET /test-freedom-card 200 in 119ms (compile: 6ms, proxy.ts: 15ms, render: 98ms)
+ GET /login 200 in 121ms (compile: 22ms, proxy.ts: 15ms, render: 84ms)
+ GET /test-freedom-card 200 in 131ms (compile: 7ms, proxy.ts: 13ms, render: 110ms)
+ GET /login 200 in 135ms (compile: 24ms, proxy.ts: 14ms, render: 98ms)
+ GET /test-freedom-card 200 in 127ms (compile: 17ms, proxy.ts: 13ms, render: 96ms)
+ GET /login 200 in 127ms (compile: 26ms, proxy.ts: 22ms, render: 79ms)
+ GET /login 200 in 107ms (compile: 4ms, proxy.ts: 14ms, render: 89ms)
+ GET /test-freedom-card 200 in 111ms (compile: 27ms, proxy.ts: 10ms, render: 75ms)
+ GET /test-freedom-card 200 in 110ms (compile: 4ms, proxy.ts: 12ms, render: 94ms)
+ GET /login 200 in 114ms (compile: 23ms, proxy.ts: 11ms, render: 80ms)
+ GET /test-freedom-card 200 in 110ms (compile: 8ms, proxy.ts: 13ms, render: 90ms)
+ GET /login 200 in 111ms (compile: 25ms, proxy.ts: 14ms, render: 71ms)
+ GET /test-freedom-card 200 in 104ms (compile: 8ms, proxy.ts: 8ms, render: 88ms)
+ GET /login 200 in 106ms (compile: 21ms, proxy.ts: 9ms, render: 75ms)
+ GET /test-freedom-card 200 in 101ms (compile: 7ms, proxy.ts: 9ms, render: 86ms)
+ GET /login 200 in 103ms (compile: 20ms, proxy.ts: 9ms, render: 74ms)
+ GET /test-freedom-card 200 in 95ms (compile: 7ms, proxy.ts: 11ms, render: 77ms)
+ GET /login 200 in 100ms (compile: 19ms, proxy.ts: 10ms, render: 71ms)
+ GET /test-freedom-card 200 in 121ms (compile: 6ms, proxy.ts: 12ms, render: 104ms)
+ GET /login 200 in 121ms (compile: 19ms, proxy.ts: 10ms, render: 92ms)
+ GET /test-freedom-card 200 in 123ms (compile: 22ms, proxy.ts: 13ms, render: 88ms)
+ GET /login 200 in 123ms (compile: 30ms, proxy.ts: 20ms, render: 73ms)
+ GET /test-freedom-card 200 in 102ms (compile: 11ms, proxy.ts: 10ms, render: 81ms)
+ GET /login 200 in 102ms (compile: 24ms, proxy.ts: 9ms, render: 68ms)
+ GET /test-freedom-card 200 in 107ms (compile: 6ms, proxy.ts: 10ms, render: 91ms)
+ GET /login 200 in 108ms (compile: 21ms, proxy.ts: 11ms, render: 76ms)
+ GET /test-freedom-card 200 in 108ms (compile: 6ms, proxy.ts: 11ms, render: 91ms)
+ GET /login 200 in 108ms (compile: 24ms, proxy.ts: 11ms, render: 74ms)
+ GET /test-freedom-card 200 in 105ms (compile: 5ms, proxy.ts: 9ms, render: 91ms)
+ GET /login 200 in 106ms (compile: 23ms, proxy.ts: 8ms, render: 75ms)
+ GET /test-freedom-card 200 in 109ms (compile: 5ms, proxy.ts: 11ms, render: 93ms)
+ GET /login 200 in 108ms (compile: 22ms, proxy.ts: 8ms, render: 78ms)
+ GET /login 200 in 106ms (compile: 23ms, proxy.ts: 9ms, render: 75ms)
+ GET /test-freedom-card 200 in 109ms (compile: 7ms, proxy.ts: 9ms, render: 93ms)
+ GET /test-freedom-card 200 in 130ms (compile: 6ms, proxy.ts: 9ms, render: 116ms)
+ GET /login 200 in 134ms (compile: 24ms, proxy.ts: 9ms, render: 102ms)
+ GET /test-freedom-card 200 in 132ms (compile: 9ms, proxy.ts: 9ms, render: 114ms)
+ GET /login 200 in 136ms (compile: 22ms, proxy.ts: 11ms, render: 103ms)
+ GET /test-freedom-card 200 in 113ms (compile: 6ms, proxy.ts: 12ms, render: 95ms)
+ GET /login 200 in 116ms (compile: 20ms, proxy.ts: 12ms, render: 83ms)
+ GET /test-freedom-card 200 in 110ms (compile: 7ms, proxy.ts: 11ms, render: 92ms)
+ GET /login 200 in 109ms (compile: 19ms, proxy.ts: 11ms, render: 79ms)
+ GET /test-freedom-card 200 in 109ms (compile: 7ms, proxy.ts: 11ms, render: 91ms)
+ GET /login 200 in 109ms (compile: 23ms, proxy.ts: 13ms, render: 73ms)
+ GET /test-freedom-card 200 in 113ms (compile: 7ms, proxy.ts: 10ms, render: 96ms)
+ GET /login 200 in 114ms (compile: 21ms, proxy.ts: 11ms, render: 82ms)
+ GET /test-freedom-card 200 in 115ms (compile: 6ms, proxy.ts: 14ms, render: 96ms)
+ GET /login 200 in 119ms (compile: 22ms, proxy.ts: 14ms, render: 82ms)
+ GET /test-freedom-card 200 in 130ms (compile: 8ms, proxy.ts: 14ms, render: 108ms)
+ GET /login 200 in 132ms (compile: 24ms, proxy.ts: 15ms, render: 92ms)
+ GET /test-freedom-card 200 in 150ms (compile: 10ms, proxy.ts: 15ms, render: 126ms)
+ GET /login 200 in 149ms (compile: 30ms, proxy.ts: 15ms, render: 104ms)
+ GET /login 200 in 137ms (compile: 27ms, proxy.ts: 13ms, render: 97ms)
+ GET /test-freedom-card 200 in 139ms (compile: 8ms, proxy.ts: 12ms, render: 120ms)
+ GET /test-freedom-card 200 in 122ms (compile: 8ms, proxy.ts: 13ms, render: 101ms)
+ GET /login 200 in 121ms (compile: 26ms, proxy.ts: 12ms, render: 83ms)
+ GET /test-freedom-card 200 in 121ms (compile: 7ms, proxy.ts: 10ms, render: 104ms)
+ GET /login 200 in 127ms (compile: 24ms, proxy.ts: 12ms, render: 91ms)
+ GET /test-freedom-card 200 in 126ms (compile: 6ms, proxy.ts: 13ms, render: 108ms)
+ GET /login 200 in 128ms (compile: 23ms, proxy.ts: 12ms, render: 93ms)
+ GET /test-freedom-card 200 in 132ms (compile: 8ms, proxy.ts: 10ms, render: 113ms)
+ GET /login 200 in 134ms (compile: 23ms, proxy.ts: 13ms, render: 98ms)
+ GET /test-freedom-card 200 in 152ms (compile: 11ms, proxy.ts: 13ms, render: 128ms)
+ GET /login 200 in 155ms (compile: 30ms, proxy.ts: 13ms, render: 112ms)
+ GET /test-freedom-card 200 in 153ms (compile: 11ms, proxy.ts: 12ms, render: 130ms)
+ GET /login 200 in 159ms (compile: 32ms, proxy.ts: 12ms, render: 114ms)
+ GET /test-freedom-card 200 in 145ms (compile: 9ms, proxy.ts: 19ms, render: 117ms)
+ GET /login 200 in 140ms (compile: 26ms, proxy.ts: 15ms, render: 98ms)
+ GET /test-freedom-card 200 in 468ms (compile: 10ms, proxy.ts: 14ms, render: 443ms)
+ GET /login 200 in 467ms (compile: 28ms, proxy.ts: 16ms, render: 422ms)
+ GET /test-freedom-card 200 in 461ms (compile: 14ms, proxy.ts: 20ms, render: 427ms)
+ GET /login 200 in 464ms (compile: 35ms, proxy.ts: 26ms, render: 402ms)
+ GET /test-freedom-card 200 in 118ms (compile: 5ms, proxy.ts: 12ms, render: 100ms)
+ GET /login 200 in 116ms (compile: 20ms, proxy.ts: 9ms, render: 87ms)
+ GET /login 200 in 106ms (compile: 21ms, proxy.ts: 21ms, render: 64ms)
+ GET /test-freedom-card 200 in 111ms (compile: 13ms, proxy.ts: 16ms, render: 81ms)
+ GET /test-freedom-card 200 in 93ms (compile: 7ms, proxy.ts: 8ms, render: 78ms)
+ GET /login 200 in 95ms (compile: 20ms, proxy.ts: 9ms, render: 67ms)
+ GET /test-freedom-card 200 in 93ms (compile: 7ms, proxy.ts: 8ms, render: 78ms)
+ GET /login 200 in 94ms (compile: 22ms, proxy.ts: 8ms, render: 63ms)
+ GET /test-freedom-card 200 in 95ms (compile: 5ms, proxy.ts: 10ms, render: 81ms)
+ GET /login 200 in 96ms (compile: 18ms, proxy.ts: 10ms, render: 67ms)
+ GET /test-freedom-card 200 in 93ms (compile: 7ms, proxy.ts: 8ms, render: 78ms)
+ GET /login 200 in 93ms (compile: 21ms, proxy.ts: 8ms, render: 64ms)
+ GET /test-freedom-card 200 in 97ms (compile: 8ms, proxy.ts: 8ms, render: 81ms)
+ GET /login 200 in 99ms (compile: 21ms, proxy.ts: 8ms, render: 70ms)
+ GET /test-freedom-card 200 in 105ms (compile: 6ms, proxy.ts: 9ms, render: 90ms)
+ GET /login 200 in 106ms (compile: 21ms, proxy.ts: 8ms, render: 76ms)
+ GET /test-freedom-card 200 in 107ms (compile: 5ms, proxy.ts: 9ms, render: 93ms)
+ GET /login 200 in 107ms (compile: 20ms, proxy.ts: 8ms, render: 79ms)
+ GET /test-freedom-card 200 in 108ms (compile: 6ms, proxy.ts: 10ms, render: 91ms)
+ GET /login 200 in 108ms (compile: 20ms, proxy.ts: 10ms, render: 78ms)
+ GET /test-freedom-card 200 in 107ms (compile: 7ms, proxy.ts: 8ms, render: 92ms)
+ GET /login 200 in 109ms (compile: 23ms, proxy.ts: 8ms, render: 78ms)
+ GET /test-freedom-card 200 in 116ms (compile: 7ms, proxy.ts: 8ms, render: 100ms)
+ GET /login 200 in 116ms (compile: 24ms, proxy.ts: 10ms, render: 81ms)
+ GET /test-freedom-card 200 in 113ms (compile: 6ms, proxy.ts: 12ms, render: 95ms)
+ GET /login 200 in 117ms (compile: 22ms, proxy.ts: 13ms, render: 82ms)
+ GET /test-freedom-card 200 in 120ms (compile: 6ms, proxy.ts: 9ms, render: 104ms)
+ GET /login 200 in 121ms (compile: 24ms, proxy.ts: 9ms, render: 88ms)
+ GET /test-freedom-card 200 in 122ms (compile: 7ms, proxy.ts: 10ms, render: 105ms)
+ GET /login 200 in 121ms (compile: 24ms, proxy.ts: 9ms, render: 87ms)
+ GET /test-freedom-card 200 in 124ms (compile: 7ms, proxy.ts: 12ms, render: 106ms)
+ GET /login 200 in 123ms (compile: 25ms, proxy.ts: 11ms, render: 88ms)
+ GET /test-freedom-card 200 in 126ms (compile: 10ms, proxy.ts: 9ms, render: 106ms)
+ GET /login 200 in 131ms (compile: 31ms, proxy.ts: 11ms, render: 89ms)
+ GET /test-freedom-card 200 in 121ms (compile: 7ms, proxy.ts: 8ms, render: 105ms)
+ GET /login 200 in 119ms (compile: 21ms, proxy.ts: 8ms, render: 90ms)
+ GET /test-freedom-card 200 in 117ms (compile: 8ms, proxy.ts: 14ms, render: 94ms)
+ GET /login 200 in 117ms (compile: 21ms, proxy.ts: 15ms, render: 81ms)
+ GET /login 200 in 107ms (compile: 24ms, proxy.ts: 12ms, render: 71ms)
+ GET /test-freedom-card 200 in 111ms (compile: 8ms, proxy.ts: 13ms, render: 89ms)
+ GET /test-freedom-card 200 in 97ms (compile: 6ms, proxy.ts: 7ms, render: 83ms)
+ GET /login 200 in 99ms (compile: 22ms, proxy.ts: 8ms, render: 69ms)
+ GET /test-freedom-card 200 in 98ms (compile: 8ms, proxy.ts: 7ms, render: 83ms)
+ GET /login 200 in 99ms (compile: 24ms, proxy.ts: 7ms, render: 68ms)
+ GET /login 200 in 93ms (compile: 24ms, proxy.ts: 8ms, render: 61ms)
+ GET /test-freedom-card 200 in 98ms (compile: 10ms, proxy.ts: 8ms, render: 80ms)
+ GET /test-freedom-card 200 in 105ms (compile: 8ms, proxy.ts: 7ms, render: 90ms)
+ GET /login 200 in 106ms (compile: 19ms, proxy.ts: 9ms, render: 78ms)
+ GET /test-freedom-card 200 in 125ms (compile: 13ms, proxy.ts: 11ms, render: 101ms)
+ GET /login 200 in 136ms (compile: 26ms, proxy.ts: 15ms, render: 94ms)
+ GET /test-freedom-card 200 in 135ms (compile: 10ms, proxy.ts: 9ms, render: 116ms)
+ GET /login 200 in 137ms (compile: 27ms, proxy.ts: 9ms, render: 101ms)
+ GET /test-freedom-card 200 in 129ms (compile: 4ms, proxy.ts: 25ms, render: 101ms)
+ GET /login 200 in 132ms (compile: 20ms, proxy.ts: 25ms, render: 86ms)
+ GET /test-freedom-card 200 in 117ms (compile: 7ms, proxy.ts: 10ms, render: 100ms)
+ GET /login 200 in 121ms (compile: 28ms, proxy.ts: 10ms, render: 83ms)
+ GET /test-freedom-card 200 in 124ms (compile: 7ms, proxy.ts: 10ms, render: 106ms)
+ GET /login 200 in 127ms (compile: 24ms, proxy.ts: 11ms, render: 91ms)
+ GET /test-freedom-card 200 in 124ms (compile: 6ms, proxy.ts: 12ms, render: 106ms)
+ GET /login 200 in 125ms (compile: 28ms, proxy.ts: 13ms, render: 84ms)
+ GET /test-freedom-card 200 in 114ms (compile: 10ms, proxy.ts: 9ms, render: 95ms)
+ GET /login 200 in 116ms (compile: 24ms, proxy.ts: 11ms, render: 80ms)
+ GET /test-freedom-card 200 in 120ms (compile: 6ms, proxy.ts: 11ms, render: 103ms)
+ GET /login 200 in 133ms (compile: 22ms, proxy.ts: 12ms, render: 99ms)
+ GET /test-freedom-card 200 in 142ms (compile: 8ms, proxy.ts: 13ms, render: 121ms)
+ GET /login 200 in 137ms (compile: 24ms, proxy.ts: 8ms, render: 105ms)
+ GET /test-freedom-card 200 in 145ms (compile: 7ms, proxy.ts: 23ms, render: 115ms)
+ GET /login 200 in 144ms (compile: 27ms, proxy.ts: 23ms, render: 94ms)
+ GET /test-freedom-card 200 in 124ms (compile: 16ms, proxy.ts: 12ms, render: 96ms)
+ GET /login 200 in 126ms (compile: 30ms, proxy.ts: 13ms, render: 82ms)
+ GET /test-freedom-card 200 in 118ms (compile: 7ms, proxy.ts: 11ms, render: 100ms)
+ GET /login 200 in 122ms (compile: 27ms, proxy.ts: 10ms, render: 85ms)
+ GET /test-freedom-card 200 in 116ms (compile: 6ms, proxy.ts: 12ms, render: 98ms)
+ GET /login 200 in 119ms (compile: 25ms, proxy.ts: 13ms, render: 81ms)
+ GET /test-freedom-card 200 in 113ms (compile: 7ms, proxy.ts: 11ms, render: 94ms)
+ GET /login 200 in 113ms (compile: 26ms, proxy.ts: 12ms, render: 76ms)
+ GET /test-freedom-card 200 in 104ms (compile: 8ms, proxy.ts: 8ms, render: 88ms)
+ GET /login 200 in 105ms (compile: 27ms, proxy.ts: 8ms, render: 70ms)
+ GET /test-freedom-card 200 in 108ms (compile: 7ms, proxy.ts: 8ms, render: 92ms)
+ GET /login 200 in 109ms (compile: 21ms, proxy.ts: 9ms, render: 80ms)
+ GET /test-freedom-card 200 in 130ms (compile: 9ms, proxy.ts: 24ms, render: 98ms)
+ GET /login 200 in 116ms (compile: 24ms, proxy.ts: 8ms, render: 84ms)
+ GET /test-freedom-card 200 in 137ms (compile: 10ms, proxy.ts: 30ms, render: 97ms)
+ GET /login 200 in 115ms (compile: 23ms, proxy.ts: 11ms, render: 82ms)
+ GET /test-freedom-card 200 in 114ms (compile: 8ms, proxy.ts: 10ms, render: 96ms)
+ GET /login 200 in 115ms (compile: 32ms, proxy.ts: 9ms, render: 74ms)
+ GET /test-freedom-card 200 in 118ms (compile: 10ms, proxy.ts: 9ms, render: 100ms)
+ GET /login 200 in 116ms (compile: 24ms, proxy.ts: 9ms, render: 84ms)
+ GET /test-freedom-card 200 in 120ms (compile: 7ms, proxy.ts: 13ms, render: 101ms)
+ GET /login 200 in 119ms (compile: 23ms, proxy.ts: 11ms, render: 85ms)
+ GET /test-freedom-card 200 in 119ms (compile: 8ms, proxy.ts: 16ms, render: 95ms)
+ GET /login 200 in 120ms (compile: 24ms, proxy.ts: 15ms, render: 80ms)
+ GET /test-freedom-card 200 in 112ms (compile: 6ms, proxy.ts: 13ms, render: 93ms)
+ GET /login 200 in 112ms (compile: 22ms, proxy.ts: 13ms, render: 77ms)
+ GET /test-freedom-card 200 in 117ms (compile: 6ms, proxy.ts: 11ms, render: 100ms)
+ GET /login 200 in 117ms (compile: 20ms, proxy.ts: 12ms, render: 84ms)
+ GET /login 200 in 122ms (compile: 26ms, proxy.ts: 12ms, render: 84ms)
+ GET /test-freedom-card 200 in 125ms (compile: 6ms, proxy.ts: 11ms, render: 108ms)
+ GET /test-freedom-card 200 in 136ms (compile: 6ms, proxy.ts: 11ms, render: 119ms)
+ GET /login 200 in 139ms (compile: 23ms, proxy.ts: 12ms, render: 104ms)
+ GET /test-freedom-card 200 in 136ms (compile: 7ms, proxy.ts: 13ms, render: 116ms)
+ GET /login 200 in 141ms (compile: 26ms, proxy.ts: 12ms, render: 103ms)
+ GET /test-freedom-card 200 in 120ms (compile: 10ms, proxy.ts: 9ms, render: 100ms)
+ GET /login 200 in 120ms (compile: 28ms, proxy.ts: 10ms, render: 82ms)
+ GET /test-freedom-card 200 in 112ms (compile: 7ms, proxy.ts: 10ms, render: 95ms)
+ GET /login 200 in 117ms (compile: 24ms, proxy.ts: 11ms, render: 81ms)
+ GET /login 200 in 112ms (compile: 5ms, proxy.ts: 9ms, render: 98ms)
+ GET /test-freedom-card 200 in 118ms (compile: 26ms, proxy.ts: 10ms, render: 83ms)
+ GET /login 200 in 119ms (compile: 9ms, proxy.ts: 9ms, render: 101ms)
+ GET /test-freedom-card 200 in 119ms (compile: 26ms, proxy.ts: 10ms, render: 83ms)
+ GET /test-freedom-card 200 in 115ms (compile: 26ms, proxy.ts: 13ms, render: 76ms)
+ GET /login 200 in 121ms (compile: 8ms, proxy.ts: 14ms, render: 99ms)
+ GET /login 200 in 111ms (compile: 6ms, proxy.ts: 9ms, render: 96ms)
+ GET /test-freedom-card 200 in 110ms (compile: 22ms, proxy.ts: 9ms, render: 80ms)
+ GET /test-freedom-card 200 in 60ms (compile: 24ms, proxy.ts: 17ms, render: 19ms)
+ GET /login 200 in 65ms (compile: 8ms, proxy.ts: 16ms, render: 41ms)
+ GET /login?redirectTo=%2Fcore%2Fassets%2Fholdings 200 in 153ms (compile: 5ms, proxy.ts: 8ms, render: 141ms)
+ GET /test-phase-transition 200 in 634ms (compile: 525ms, proxy.ts: 12ms, render: 97ms)
+ GET /api/verify-phase-transition 200 in 24ms (compile: 10ms, proxy.ts: 7ms, render: 6ms)
+ GET /test-sell-transaction 200 in 53ms (compile: 5ms, proxy.ts: 5ms, render: 43ms)
+ GET /api/test-streaks 200 in 428ms (compile: 201ms, proxy.ts: 4ms, render: 223ms)
+ GET /api/dev-login 200 in 159ms (compile: 150ms, proxy.ts: 4ms, render: 5ms)
+ POST /api/test-streaks 200 in 429ms (compile: 4ms, proxy.ts: 7ms, render: 418ms)
+ POST /api/dev-login 401 in 100ms (compile: 8ms, proxy.ts: 4ms, render: 88ms)
+✓ Compiled in 822ms
+ POST /api/test-streaks 200 in 276ms (compile: 4ms, proxy.ts: 8ms, render: 264ms)
+ GET /api/session-info 200 in 162ms (compile: 138ms, proxy.ts: 3ms, render: 21ms)
+ GET /test-freedom-card 200 in 126ms (compile: 50ms, proxy.ts: 6ms, render: 70ms)
+ GET /login?redirectTo=%2Fhorizon 200 in 28ms (compile: 3ms, proxy.ts: 6ms, render: 19ms)
+ GET /test-phase-transition 200 in 68ms (compile: 4ms, proxy.ts: 5ms, render: 59ms)
+ GET /api/verify-phase-transition 200 in 15ms (compile: 4ms, proxy.ts: 6ms, render: 5ms)
+ GET /api/health 200 in 235ms (compile: 27ms, proxy.ts: 11ms, render: 197ms)
+✓ Compiled in 1098ms
+ GET /api/test-streaks 200 in 88ms (compile: 75ms, proxy.ts: 5ms, render: 8ms)
+ GET /test-phase-transition 200 in 147ms (compile: 42ms, proxy.ts: 5ms, render: 100ms)
+ GET /api/verify-phase-transition 200 in 19ms (compile: 5ms, proxy.ts: 7ms, render: 6ms)
+ POST /api/test-streaks 200 in 19ms (compile: 6ms, proxy.ts: 6ms, render: 8ms)
+ GET /api/health 200 in 232ms (compile: 4ms, proxy.ts: 6ms, render: 222ms)
+ GET /api/health?persistence_test=RESTART_TEST_12345 200 in 510ms (compile: 3ms, proxy.ts: 6ms, render: 501ms)
+ GET /test-streaks 200 in 432ms (compile: 373ms, proxy.ts: 7ms, render: 52ms)
+ GET /api/test-streaks 200 in 17ms (compile: 4ms, proxy.ts: 8ms, render: 5ms)
+ POST /api/test-streaks 200 in 18ms (compile: 3ms, proxy.ts: 7ms, render: 7ms)
+ GET /api/test-streaks 200 in 13ms (compile: 3ms, proxy.ts: 5ms, render: 5ms)
+ GET /api/goals 401 in 145ms (compile: 132ms, proxy.ts: 6ms, render: 8ms)
+ GET / 200 in 607ms (compile: 478ms, proxy.ts: 8ms, render: 120ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\login\\page\\build-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+ GET /login 500 in 1448ms (compile: 1249ms, proxy.ts: 7ms, render: 192ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\login\\page\\build-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+ GET /login?redirectTo=%2Fdashboard 500 in 79ms (compile: 60ms, proxy.ts: 5ms, render: 14ms)
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 686ms
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\login\\page\\build-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+ GET /login?redirectTo=%2Fdashboard 500 in 117ms (compile: 81ms, proxy.ts: 27ms, render: 9ms)
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 580ms
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\login\\page\\build-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+ GET /login?redirectTo=%2Fdashboard 500 in 167ms (compile: 117ms, proxy.ts: 39ms, render: 11ms)
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 906ms
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\login\\page\\build-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+ GET /login?redirectTo=%2Fdashboard 500 in 121ms (compile: 83ms, proxy.ts: 24ms, render: 13ms)
+ GET /api/schema-check 200 in 2.4s (compile: 701ms, proxy.ts: 5ms, render: 1673ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-phase-transition\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-phase-transition\\page\\build-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+ GET /test-phase-transition 500 in 80ms (compile: 61ms, proxy.ts: 7ms, render: 12ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-phase-transition\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-phase-transition\\page\\build-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+ GET /test-phase-transition 500 in 63ms (compile: 51ms, proxy.ts: 4ms, render: 7ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\verify-phase-transition\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\verify-phase-transition\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+ GET /api/verify-phase-transition 500 in 103ms (compile: 91ms, proxy.ts: 5ms, render: 8ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\verify-phase-transition\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\verify-phase-transition\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+ GET /api/verify-phase-transition 500 in 63ms (compile: 48ms, proxy.ts: 4ms, render: 11ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\login\\page\\build-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+ GET /login 500 in 83ms (compile: 65ms, proxy.ts: 5ms, render: 13ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\health\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\health\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\health\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\health\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\health\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\health\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+[?25h

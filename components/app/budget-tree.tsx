@@ -128,6 +128,8 @@ function FreedomDaysLabel({ spent, limit, overBudget }: { spent: number; limit: 
   const remaining = limit - spent
   if (overBudget) {
     const overAmount = spent - limit
+    // Only show freedom time for amounts >= €100 (per spec: avoid clutter for small amounts)
+    if (overAmount < 100) return null
     const freedom = eurToFreedomTime(overAmount, dailyExpenseRate)
     return (
       <p className="text-sm italic text-zinc-500" data-testid="freedom-days-over">
@@ -136,7 +138,8 @@ function FreedomDaysLabel({ spent, limit, overBudget }: { spent: number; limit: 
     )
   }
 
-  if (remaining <= 0) return null
+  // Only show freedom time for amounts >= €100 (per spec: avoid clutter for small amounts)
+  if (remaining < 100) return null
   const freedom = eurToFreedomTime(remaining, dailyExpenseRate)
   return (
     <p className="text-sm italic text-zinc-500" data-testid="freedom-days-remaining">

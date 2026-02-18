@@ -1,0 +1,230 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3177
+- Network:       http://192.168.86.37:3177
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1422ms
+ GET /api/health 200 in 951ms (compile: 521ms, proxy.ts: 173ms, render: 257ms)
+ GET /test-budget-workflow 200 in 2.9s (compile: 2.7s, proxy.ts: 8ms, render: 209ms)
+ GET /test-budget-workflow 200 in 64ms (compile: 5ms, proxy.ts: 9ms, render: 49ms)
+⨯ Error: Could not find the module "[project]/app/test-budget-workflow/page.tsx#default" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>) {
+  digest: '281947875'
+}
+⨯ Error: Could not find the module "[project]/app/test-budget-workflow/page.tsx#default" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>) {
+  digest: '281947875'
+}
+ GET /test-budget-workflow 404 in 2.4s (compile: 1089ms, proxy.ts: 269ms, render: 1053ms)
+ GET /test-budget-workflow 200 in 977ms (compile: 68ms, proxy.ts: 17ms, render: 893ms)
+⨯ Error: Could not find the module "[project]/app/test-budget-workflow/page.tsx#default" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>) {
+  digest: '281947875'
+}
+ GET /test-budget-workflow 200 in 326ms (compile: 15ms, proxy.ts: 19ms, render: 292ms)
+ GET /test-budget-workflow 500 in 1350ms (compile: 557ms, proxy.ts: 20ms, render: 773ms)
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/esm/next-devtools/userspace/app/segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>) {
+  digest: '654975887'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/esm/client/components/layout-router.js#default" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '468592575'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/esm/client/components/render-from-template-context.js#default" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>)
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '1036833503'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/esm/client/components/layout-router.js#default" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '2030844464'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/esm/client/components/render-from-template-context.js#default" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '2502734928'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/esm/next-devtools/userspace/app/segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '3408473552'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/client/app-dir/link.js#" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>)
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '2275334608'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/client/app-dir/link.js#" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>)
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '2275334608'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/esm/next-devtools/userspace/app/segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '3408473552'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/esm/client/components/layout-router.js#default" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>) {
+  digest: '1650703215'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/esm/client/components/render-from-template-context.js#default" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>) {
+  digest: '254384975'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/esm/next-devtools/userspace/app/segment-explorer-node.js#SegmentViewNode" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>) {
+  digest: '654975887'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/client/app-dir/link.js#" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '3306074979'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/client/app-dir/link.js#" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '3306074979'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/esm/lib/framework/boundary-components.js#OutletBoundary" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '595669840'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/esm/lib/framework/boundary-components.js#ViewportBoundary" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '2480152784'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/esm/lib/framework/boundary-components.js#MetadataBoundary" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '71739792'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/client/components/builtin/global-error.js#default" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>) {
+  digest: '1760595279'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/esm/lib/metadata/generate/icon-mark.js#IconMark" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>) {
+  digest: '877194418'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/esm/lib/framework/boundary-components.js#ViewportBoundary" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '2480152784'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/esm/lib/framework/boundary-components.js#MetadataBoundary" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>)
+    at stringify (<anonymous>) {
+  digest: '71739792'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/client/components/builtin/global-error.js#default" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>) {
+  digest: '1760595279'
+}
+[0m[7m Server [0m Error: Could not find the module "[project]/node_modules/next/dist/client/components/builtin/global-error.js#default" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>:1:18) {
+  environmentName: 'Server',
+  digest: '1760595279'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/client/components/builtin/global-error.js#default" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>:1:18) {
+  environmentName: 'Server',
+  digest: '1760595279'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/client/components/builtin/global-error.js#default" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>:1:18) {
+  environmentName: 'Server',
+  digest: '1760595279'
+}
+⨯ Error: Could not find the module "[project]/node_modules/next/dist/esm/lib/metadata/generate/icon-mark.js#IconMark" in the React Client Manifest. This is probably a bug in the React Server Components bundler.
+    at stringify (<anonymous>) {
+  digest: '877194418'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\_not-found\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\_not-found\\page\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\static\development\_buildManifest.js.tmp.d8j6tiaqeba'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\static\\development\\_buildManifest.js.tmp.d8j6tiaqeba'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /_next/_next/static/chunks/node_modules_next_dist_be32b49c._.js 500 in 7.2s (compile: 7.1s, proxy.ts: 36ms, render: 25ms)
+ GET /_next/_next/static/chunks/node_modules_next_dist_be32b49c._.js 500 in 7.2s (compile: 7.1s, proxy.ts: 36ms, render: 25ms)
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /_next/_next/static/chunks/app_favicon_ico_mjs_745fddaf._.js 500 in 7.2s (compile: 7.2s, proxy.ts: 37ms, render: 25ms)
+ GET /_next/_next/static/chunks/app_favicon_ico_mjs_745fddaf._.js 500 in 7.2s (compile: 7.2s, proxy.ts: 37ms, render: 25ms)
+Terminated

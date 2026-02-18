@@ -1,0 +1,370 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:5100
+- Network:       http://192.168.86.37:5100
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 998ms
+ GET / 200 in 3.6s (compile: 2.9s, proxy.ts: 397ms, render: 219ms)
+⨯ Error: Cannot find module '../../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/login'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+ GET /login 500 in 1522ms (compile: 1410ms, proxy.ts: 5ms, render: 107ms)
+⨯ Error: Cannot find module '../../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/login'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+ GET /login 500 in 89ms (compile: 73ms, proxy.ts: 5ms, render: 11ms)
+⨯ Error: Cannot find module '../../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/login'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+ GET /login 500 in 73ms (compile: 59ms, proxy.ts: 6ms, render: 8ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\login\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\login\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages-manifest.json',
+  page: '/api/health'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages-manifest.json',
+  page: '/api/health'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+ GET /api/health 500 in 490ms (proxy.ts: 5ms)
+ GET /api/health 500 in 490ms (proxy.ts: 5ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+⨯ Error: Cannot find module '../../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\app\_not-found\page.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\app\_not-found\page.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+ GET /login 500 in 475ms (compile: 457ms, proxy.ts: 7ms, render: 10ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\login\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\login\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\login\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\pages-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\pages-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\login\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\pages-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\pages-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\pages-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\pages-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\login\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document\pages-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_document\\pages-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\login\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document\pages-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_document\\pages-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document\pages-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_document\\pages-manifest.json'
+}
+⨯ TypeError: Cannot read properties of undefined (reading 'length')
+    at ignore-listed frames
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_error\client-build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_error\\client-build-manifest.json'
+}
+TypeError: Cannot read properties of undefined (reading 'length')
+    at ignore-listed frames
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_error\client-build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_error\\client-build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_error\client-build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_error\\client-build-manifest.json'
+}
+✓ Compiled in 624ms
+Terminated

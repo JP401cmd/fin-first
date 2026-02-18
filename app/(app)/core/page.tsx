@@ -26,6 +26,7 @@ import { CashFlowForecastChart, type ForecastPoint, type ForecastAlert } from '@
 import { NetWorthProjectionChart } from '@/components/app/net-worth-projection-chart'
 import { computeNetWorthProjection, type NetWorthProjectionResult } from '@/lib/net-worth-projection'
 import { SpendingInsightsSection, type SpendingInsight } from '@/components/app/spending-insight-card'
+import { SnapshotComparisonView } from '@/components/app/snapshot-comparison-view'
 
 export default function CorePage() {
   const router = useRouter()
@@ -973,10 +974,10 @@ export default function CorePage() {
           <CollapsibleSection
             storageKey="kern_snapshot_vergelijking"
             title="Vergelijking snapshots"
-            summary={`${new Date(snapshots[snapshots.length - 2].snapshot_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })} vs ${new Date(snapshots[snapshots.length - 1].snapshot_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`}
+            summary={`Vergelijk ${snapshots.length} snapshots — alle metrics naast elkaar`}
             icon={<Camera className="h-5 w-5 text-amber-600" />}
           >
-            <SnapshotComparisonContent snapshots={snapshots} />
+            <SnapshotComparisonView snapshots={snapshots} />
           </CollapsibleSection>
         </section>
       )}

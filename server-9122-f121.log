@@ -1,0 +1,10 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:9122
+- Network:       http://192.168.86.37:9122
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1022ms
+ GET /test-sparkline 200 in 2.3s (compile: 1969ms, proxy.ts: 150ms, render: 165ms)

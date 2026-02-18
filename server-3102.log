@@ -1,0 +1,41 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3102
+- Network:       http://192.168.86.37:3102
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 991ms
+ GET / 200 in 2.1s (compile: 1773ms, proxy.ts: 144ms, render: 142ms)
+ GET /api/dev-login 200 in 386ms (compile: 370ms, proxy.ts: 6ms, render: 10ms)
+ POST /api/dev-login 401 in 219ms (compile: 5ms, proxy.ts: 7ms, render: 208ms)
+ POST /api/dev-login 401 in 207ms (compile: 4ms, proxy.ts: 7ms, render: 196ms)
+ POST /api/dev-login 401 in 213ms (compile: 4ms, proxy.ts: 6ms, render: 204ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\dev-login\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\dev-login\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+Could not find files for /_error in .next/build-manifest.json
+Could not find files for /_error in .next/build-manifest.json
+ POST /api/dev-login 500 in 1445ms (compile: 1298ms, proxy.ts: 8ms, render: 140ms)
+Terminated

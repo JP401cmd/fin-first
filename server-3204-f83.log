@@ -1,0 +1,99 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3204
+- Network:       http://192.168.86.37:3204
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1229ms
+ GET /test-onboarding-workflow 200 in 2.0s (compile: 1745ms, proxy.ts: 117ms, render: 165ms)
+ GET /test-onboarding-workflow 404 in 510ms (compile: 429ms, proxy.ts: 8ms, render: 73ms)
+ GET /login 200 in 584ms (compile: 472ms, proxy.ts: 8ms, render: 104ms)
+ GET /test-onboarding-workflow 404 in 45ms (compile: 9ms, proxy.ts: 5ms, render: 30ms)
+✓ Compiled in 214ms
+ GET /test-onboarding-workflow 404 in 338ms (compile: 130ms, proxy.ts: 125ms, render: 82ms)
+ GET /test-onboarding-workflow 404 in 146ms (compile: 24ms, proxy.ts: 15ms, render: 107ms)
+ GET /test-onboarding-workflow 404 in 40ms (proxy.ts: 12ms)
+ GET /test-onboarding-workflow 404 in 211ms (compile: 44ms, proxy.ts: 12ms, render: 155ms)
+ GET /test-onboarding-workflow 404 in 245ms (compile: 96ms, proxy.ts: 95ms, render: 54ms)
+ GET /test-onboarding-workflow 404 in 71ms (compile: 17ms, proxy.ts: 10ms, render: 44ms)
+ GET /test-onboarding-workflow 404 in 57ms (compile: 12ms, proxy.ts: 6ms, render: 40ms)
+ GET /test-onboarding-workflow 404 in 109ms (compile: 61ms, proxy.ts: 10ms, render: 38ms)
+ GET /test-onboarding-workflow 404 in 139ms (compile: 15ms, proxy.ts: 8ms, render: 116ms)
+✓ Compiled in 167ms
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-onboarding-workflow\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-onboarding-workflow\\page\\build-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+ GET /test-onboarding-workflow 500 in 1104ms (compile: 947ms, proxy.ts: 61ms, render: 96ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-onboarding-workflow\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-onboarding-workflow\\page\\build-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+ GET /test-onboarding-workflow 500 in 106ms (compile: 88ms, proxy.ts: 6ms, render: 11ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-onboarding-workflow\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-onboarding-workflow\\page\\build-manifest.json'
+}
+Could not find files for /_error in .next/build-manifest.json
+Could not find files for /_error in .next/build-manifest.json
+ GET /test-onboarding-workflow 500 in 89ms (compile: 61ms, proxy.ts: 5ms, render: 23ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\login\\page\\build-manifest.json'
+}
+✓ Compiled in 365ms
+✓ Compiled in 508ms
+✓ Compiled in 507ms
+✓ Compiled in 684ms
+✓ Compiled in 751ms
+✓ Compiled in 613ms
+/c/Program Files/nodejs/npx: line 65: 25459 Killed                  "$NODE_EXE" "$NPX_CLI_JS" "$@"
+✓ Compiled in 1126ms
+✓ Compiled in 690ms
+✓ Compiled in 713ms

@@ -58,7 +58,9 @@
       "Bash(git commit:*)",
       "Bash(start:*)",
       "Bash(head:*)",
-      "Bash(npx supabase:*)"
+      "Bash(npx supabase:*)",
+      "Bash(curl:*)",
+      "Skill(playwright-cli)"
     ]
   },
   "enableAllProjectMcpServers": true,

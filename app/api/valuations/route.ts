@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const entityId = searchParams.get('entity_id')
   const entityType = searchParams.get('entity_type') || 'asset'
-  const limit = Math.min(Number(searchParams.get('limit') || '20'), 100)
+  const limitParam = searchParams.get('limit')
+  const limit = limitParam ? Math.min(Number(limitParam), 1000) : 1000
 
   let query = supabase
     .from('valuations')

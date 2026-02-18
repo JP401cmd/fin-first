@@ -1,0 +1,20 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3500
+- Network:       http://192.168.86.37:3500
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1059ms
+ GET /test-next-step-dismiss 200 in 2.3s (compile: 1959ms, proxy.ts: 161ms, render: 165ms)
+ GET /test-next-step-dismiss 200 in 65ms (compile: 9ms, proxy.ts: 8ms, render: 48ms)
+ GET /test-next-step-dismiss 200 in 111ms (compile: 10ms, proxy.ts: 7ms, render: 94ms)
+✓ Compiled in 520ms
+✓ Compiled in 675ms
+✓ Compiled in 821ms
+✓ Compiled in 615ms
+/c/Program Files/nodejs/npx: line 65: 35008 Killed                  "$NODE_EXE" "$NPX_CLI_JS" "$@"
+✓ Compiled in 1072ms
+✓ Compiled in 718ms
+✓ Compiled in 671ms

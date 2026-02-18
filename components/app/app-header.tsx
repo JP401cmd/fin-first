@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
+import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
 
 const allNavItems = [
   { label: 'Dashboard', href: '/dashboard', color: 'zinc', requiresActivation: false },
@@ -67,6 +68,7 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
         </div>
 
         <div className="flex items-center gap-3">
+          <PerspectiveSwitcher />
           <div className="relative">
             <button
               onClick={() => setMenuOpen(!menuOpen)}

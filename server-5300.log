@@ -1,0 +1,19 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:5300
+- Network:       http://192.168.86.37:5300
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1091ms
+○ Compiling /test-holding-crud ...
+ GET /test-holding-crud 200 in 3.8s (compile: 3.6s, proxy.ts: 15ms, render: 195ms)
+⚠ Cross origin request detected from 192.168.86.37 to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
+Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+ GET /test-holding-crud 404 in 2.3s (compile: 1179ms, proxy.ts: 965ms, render: 115ms)
+ GET /test-holding-crud 404 in 182ms (compile: 28ms, proxy.ts: 15ms, render: 139ms)
+ GET /test-holding-crud 404 in 275ms (compile: 52ms, proxy.ts: 13ms, render: 209ms)
+✓ Compiled in 212ms
+✓ Compiled in 302ms
+✓ Compiled in 319ms

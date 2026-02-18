@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { OwnershipToggle, OwnershipBadge, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
 import {
   type Asset,
   type AssetType,
@@ -422,7 +423,10 @@ export default function AssetsPage() {
                 <BudgetIcon name={icon} className="h-4 w-4" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-zinc-900">{asset.name}</p>
+                <p className="truncate text-sm font-medium text-zinc-900 flex items-center gap-1.5">
+                  {asset.name}
+                  <OwnershipBadge ownership={asset.ownership ?? 'personal'} />
+                </p>
                 <p className="truncate text-xs text-zinc-500">
                   {ASSET_TYPE_LABELS[asset.asset_type]}
                   {asset.subtype && ASSET_SUBTYPE_LABELS[asset.asset_type]?.[asset.subtype]
@@ -549,12 +553,27 @@ function AssetDetailModal({
   onDelete: () => void
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [hasActiveHoldings, setHasActiveHoldings] = useState(false)
+  const [holdingsCount, setHoldingsCount] = useState(0)
   const value = Number(asset.current_value)
   const purchase = Number(asset.purchase_value)
   const returnPct = purchase > 0 ? ((value - purchase) / purchase) * 100 : 0
   const icon = ASSET_TYPE_ICONS[asset.asset_type] ?? 'Briefcase'
   const color = ASSET_TYPE_COLORS[asset.asset_type]
   const isEigenHuis = asset.asset_type === 'eigen_huis'
+
+  // Check if this asset has active holdings (portfolio tracker is source of truth)
+  useEffect(() => {
+    if (['investment', 'crypto', 'savings', 'retirement'].includes(asset.asset_type)) {
+      fetch(`/api/assets/has-holdings?asset_id=${asset.id}`)
+        .then(res => res.json())
+        .then(data => {
+          setHasActiveHoldings(data.has_holdings === true)
+          setHoldingsCount(data.holdings_count || 0)
+        })
+        .catch(() => { /* non-critical */ })
+    }
+  }, [asset.id, asset.asset_type])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -732,11 +751,28 @@ function AssetDetailModal({
           )}
         </div>
 
+        {/* Holdings source-of-truth banner */}
+        {hasActiveHoldings && (
+          <div className="mx-6 mb-0 mt-2 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2" data-testid="holdings-source-of-truth-banner">
+            <Briefcase className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+            <p className="text-xs text-amber-700">
+              <strong>Portfolio tracker actief</strong> ({holdingsCount} holding{holdingsCount !== 1 ? 's' : ''}): de waarde van deze asset wordt automatisch berekend uit de holdings. Handmatig herwaarderen is uitgeschakeld.
+            </p>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex gap-2 border-t border-zinc-200 px-6 py-4">
           <button
-            onClick={onRevalue}
-            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-amber-200 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-50"
+            onClick={hasActiveHoldings ? undefined : onRevalue}
+            disabled={hasActiveHoldings}
+            title={hasActiveHoldings ? 'Waarde wordt automatisch berekend uit holdings' : undefined}
+            className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium ${
+              hasActiveHoldings
+                ? 'border-zinc-200 text-zinc-400 cursor-not-allowed bg-zinc-50'
+                : 'border-amber-200 text-amber-700 hover:bg-amber-50'
+            }`}
+            data-testid="revalue-btn"
           >
             <RefreshCw className="h-3.5 w-3.5" />
             Herwaarderen
@@ -1642,11 +1678,26 @@ function AssetForm({
   onSaved: () => void
 }) {
   const isEdit = !!asset
+  const [hasActiveHoldings, setHasActiveHoldings] = useState(false)
+  const [holdingsCount, setHoldingsCount] = useState(0)
 
   const [name, setName] = useState(asset?.name ?? '')
   const [assetType, setAssetType] = useState<AssetType>(asset?.asset_type ?? 'savings')
   const [currentValue, setCurrentValue] = useState(String(asset?.current_value ?? ''))
   const [purchaseValue, setPurchaseValue] = useState(String(asset?.purchase_value ?? ''))
+
+  // Check if editing an asset with active holdings
+  useEffect(() => {
+    if (isEdit && asset && ['investment', 'crypto', 'savings', 'retirement'].includes(asset.asset_type)) {
+      fetch(`/api/assets/has-holdings?asset_id=${asset.id}`)
+        .then(res => res.json())
+        .then(data => {
+          setHasActiveHoldings(data.has_holdings === true)
+          setHoldingsCount(data.holdings_count || 0)
+        })
+        .catch(() => { /* non-critical */ })
+    }
+  }, [isEdit, asset])
   const [purchaseDate, setPurchaseDate] = useState(asset?.purchase_date ?? '')
   const [expectedReturn, setExpectedReturn] = useState(String(asset?.expected_return ?? TYPICAL_RETURNS.savings))
   const [monthlyContribution, setMonthlyContribution] = useState(String(asset?.monthly_contribution ?? '0'))
@@ -1670,6 +1721,9 @@ function AssetForm({
   const [wozResult, setWozResult] = useState<{ peildatum: string; waarde: number }[] | null>(null)
   const [wozError, setWozError] = useState<string | null>(null)
   const [validationError, setValidationError] = useState<string | null>(null)
+  // Household ownership
+  const [ownership, setOwnership] = useState<OwnershipType>(asset?.ownership ?? 'personal')
+  const { hasHousehold, householdId } = useHouseholdStatus()
 
   const subtypeOptions = ASSET_SUBTYPE_LABELS[assetType]
   const visibleFields = ASSET_TYPE_FIELDS[assetType]
@@ -1786,6 +1840,9 @@ function AssetForm({
       depreciation_rate: depreciationRate ? Number(depreciationRate) : null,
       address_postcode: addressPostcode || null,
       address_house_number: addressHouseNumber || null,
+      // Household fields
+      ownership: ownership,
+      household_id: ownership === 'shared' ? householdId : null,
     }
 
     if (isEdit && asset) {
@@ -1852,6 +1909,13 @@ function AssetForm({
             </div>
           </div>
 
+          {/* Ownership toggle */}
+          <OwnershipToggle
+            value={ownership}
+            onChange={setOwnership}
+            hasHousehold={hasHousehold}
+          />
+
           {/* Subtype dropdown (conditional) */}
           {subtypeOptions && (
             <div>
@@ -1869,6 +1933,16 @@ function AssetForm({
             </div>
           )}
 
+          {/* Warning when holdings are active */}
+          {hasActiveHoldings && (
+            <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2" data-testid="asset-form-holdings-warning">
+              <Briefcase className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+              <p className="text-xs text-amber-700">
+                Deze asset heeft {holdingsCount} actieve holding{holdingsCount !== 1 ? 's' : ''}. De waarde wordt automatisch berekend uit de portfolio tracker. Het veld &ldquo;Huidige waarde&rdquo; kan niet handmatig worden gewijzigd.
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-zinc-600">
@@ -1877,9 +1951,18 @@ function AssetForm({
               <input
                 type="number"
                 value={currentValue}
-                onChange={(e) => setCurrentValue(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                onChange={(e) => !hasActiveHoldings && setCurrentValue(e.target.value)}
+                readOnly={hasActiveHoldings}
+                className={`w-full rounded-lg border px-3 py-2 text-sm ${
+                  hasActiveHoldings
+                    ? 'border-zinc-200 bg-zinc-50 text-zinc-400 cursor-not-allowed'
+                    : 'border-zinc-200'
+                }`}
+                title={hasActiveHoldings ? 'Waarde wordt automatisch berekend uit holdings' : undefined}
               />
+              {hasActiveHoldings && (
+                <p className="mt-1 text-[10px] text-amber-600">Automatisch gesynchroniseerd vanuit holdings</p>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-zinc-600">
@@ -2176,9 +2259,24 @@ function ValuationModal({
   const [value, setValue] = useState(String(currentValue))
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
+  const [hasActiveHoldings, setHasActiveHoldings] = useState(false)
+  const [holdingsCount, setHoldingsCount] = useState(0)
+
+  // Check if asset has active holdings (blocks manual revaluation)
+  useEffect(() => {
+    if (entityType === 'asset') {
+      fetch(`/api/assets/has-holdings?asset_id=${entityId}`)
+        .then(res => res.json())
+        .then(data => {
+          setHasActiveHoldings(data.has_holdings === true)
+          setHoldingsCount(data.holdings_count || 0)
+        })
+        .catch(() => { /* non-critical */ })
+    }
+  }, [entityId, entityType])
 
   async function handleSave() {
-    if (!value) return
+    if (!value || hasActiveHoldings) return
     setSaving(true)
 
     const supabase = createClient()
@@ -2226,6 +2324,16 @@ function ValuationModal({
         </div>
 
         <p className="mb-4 text-sm text-zinc-500">{entityName}</p>
+
+        {/* Warning when holdings are active */}
+        {hasActiveHoldings && (
+          <div className="mb-4 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2" data-testid="valuation-holdings-warning">
+            <Briefcase className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+            <p className="text-xs text-amber-700">
+              Deze asset heeft {holdingsCount} actieve holding{holdingsCount !== 1 ? 's' : ''}. De waarde wordt automatisch berekend uit de portfolio tracker. Handmatig herwaarderen is niet mogelijk.
+            </p>
+          </div>
+        )}
 
         <div className="space-y-3">
           <div>

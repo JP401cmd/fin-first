@@ -1,0 +1,71 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.86.37:3000
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1033ms
+ GET /test-debt-trajectory 200 in 2.6s (compile: 2.0s, proxy.ts: 117ms, render: 396ms)
+ GET /test-badge-grid 200 in 1079ms (compile: 736ms, proxy.ts: 7ms, render: 335ms)
+ GET / 200 in 2.6s (compile: 2.3s, proxy.ts: 119ms, render: 206ms)
+ GET /api/badges/verify 200 in 1051ms (compile: 465ms, proxy.ts: 10ms, render: 576ms)
+ GET /api/health 200 in 301ms (compile: 145ms, proxy.ts: 6ms, render: 150ms)
+ GET /api/health 200 in 282ms (compile: 3ms, proxy.ts: 6ms, render: 273ms)
+ GET /api/verify-ai-recommendations 200 in 1415ms (compile: 147ms, proxy.ts: 5ms, render: 1263ms)
+ GET /api/verify-ai-recommendations 200 in 702ms (compile: 6ms, proxy.ts: 6ms, render: 690ms)
+ GET /test-ai-recommendations 200 in 409ms (compile: 373ms, proxy.ts: 6ms, render: 29ms)
+ GET /api/schema-check 200 in 6.5s (compile: 149ms, proxy.ts: 3ms, render: 6.3s)
+ GET /test-ai-recommendations 200 in 81ms (compile: 5ms, proxy.ts: 8ms, render: 68ms)
+ GET /api/verify-ai-recommendations 200 in 591ms (compile: 5ms, proxy.ts: 8ms, render: 578ms)
+ GET /api/dev-login 200 in 115ms (compile: 104ms, proxy.ts: 4ms, render: 8ms)
+ POST /api/dev-login 401 in 385ms (compile: 3ms, proxy.ts: 6ms, render: 375ms)
+ POST /api/dev-login 401 in 184ms (compile: 5ms, proxy.ts: 4ms, render: 175ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\dev-login\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\dev-login\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\static\development\_buildManifest.js.tmp.d1nudginrq6'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\static\\development\\_buildManifest.js.tmp.d1nudginrq6'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\dev-login\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\dev-login\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ POST /api/dev-login 500 in 898ms (compile: 880ms, proxy.ts: 6ms, render: 12ms)
+ POST /api/dev-login 500 in 898ms (compile: 880ms, proxy.ts: 6ms, render: 13ms)
+[?25h

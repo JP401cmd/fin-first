@@ -1,0 +1,75 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3045
+- Network:       http://192.168.86.37:3045
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 2.3s
+ GET / 200 in 2.6s (compile: 2.3s, proxy.ts: 181ms, render: 198ms)
+⨯ Error: Attempted to call shouldAlert() from the server but shouldAlert is on the client. It's not possible to invoke a client function from the server, it can only be rendered as a Component or passed to props of a Client Component.
+    at <unknown> (app\api\test-budget-alerts\route.ts:24:31)
+    at Array.map (<anonymous>)
+    at GET (app\api\test-budget-alerts\route.ts:23:29)
+  22 |
+  23 |   const results = testCases.map(tc => {
+> 24 |     const result = shouldAlert(tc.spent, tc.limit, tc.threshold, tc.type)
+     |                               ^
+  25 |     return {
+  26 |       label: tc.label,
+  27 |       spent: tc.spent,
+ GET /api/test-budget-alerts 500 in 456ms (compile: 336ms, proxy.ts: 6ms, render: 114ms)
+⨯ Error: Attempted to call shouldAlert() from the server but shouldAlert is on the client. It's not possible to invoke a client function from the server, it can only be rendered as a Component or passed to props of a Client Component.
+    at <unknown> (app\api\test-budget-alerts\route.ts:24:31)
+    at Array.map (<anonymous>)
+    at GET (app\api\test-budget-alerts\route.ts:23:29)
+  22 |
+  23 |   const results = testCases.map(tc => {
+> 24 |     const result = shouldAlert(tc.spent, tc.limit, tc.threshold, tc.type)
+     |                               ^
+  25 |     return {
+  26 |       label: tc.label,
+  27 |       spent: tc.spent,
+ GET /api/test-budget-alerts 500 in 46ms (compile: 3ms, proxy.ts: 6ms, render: 37ms)
+ GET /api/test-budget-alerts 200 in 170ms (compile: 99ms, proxy.ts: 53ms, render: 18ms)
+ GET /api/verify-budget-spending 200 in 795ms (compile: 300ms, proxy.ts: 5ms, render: 490ms)
+ GET / 200 in 277ms (compile: 70ms, proxy.ts: 7ms, render: 200ms)
+⨯ Error: Cannot find module '../../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/login'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+ GET /login 500 in 1804ms (compile: 1660ms, proxy.ts: 6ms, render: 139ms)
+✓ Compiled in 156ms
+✓ Compiled in 157ms
+✓ Compiled in 161ms
+✓ Compiled in 181ms

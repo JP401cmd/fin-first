@@ -1,0 +1,12 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3165
+- Network:       http://192.168.86.37:3165
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1159ms
+ GET /test-box3-verification 200 in 3.2s (compile: 2.8s, proxy.ts: 188ms, render: 252ms)
+ GET /api/verify-box3?year=2025 200 in 754ms (compile: 518ms, proxy.ts: 13ms, render: 222ms)
+✓ Compiled in 700ms

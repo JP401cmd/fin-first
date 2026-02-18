@@ -1,0 +1,129 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3050
+- Network:       http://192.168.86.37:3050
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1135ms
+⨯ Error: Cannot find module 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+Require stack:
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\dev\next-dev-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at ignore-listed frames {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\static\development\_buildManifest.js.tmp.xgxupmkkvgg'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\static\\development\\_buildManifest.js.tmp.xgxupmkkvgg'
+}
+Error: Cannot find module 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+Require stack:
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\dev\next-dev-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at ignore-listed frames {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /login 500 in 2.7s (compile: 123ms, proxy.ts: 2.6s, render: 20ms)
+⨯ Error: Cannot find module 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+Require stack:
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\dev\next-dev-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at ignore-listed frames {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: Cannot find module 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+Require stack:
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\dev\next-dev-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at ignore-listed frames {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /login 500 in 175ms (compile: 62ms, proxy.ts: 98ms, render: 15ms)
+✓ Compiled in 130ms
+⨯ Error [ChunkLoadError]: Failed to load chunk server/chunks/ssr/node_modules_@opentelemetry_api_build_esm_c2831320._.js from runtime for chunk server/app/login/page.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page.js:5:3) {
+  page: '/login',
+  [cause]: Error: Cannot find module 'C:\Users\janpa\cd\development\fin\.next\dev\server\chunks\ssr\node_modules_@opentelemetry_api_build_esm_c2831320._.js'
+  Require stack:
+  - C:\Users\janpa\cd\development\fin\.next\dev\server\chunks\ssr\[turbopack]_runtime.js
+  - C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page.js
+  - C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+  - C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+  - C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+  - C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+  - C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+  - C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+  - C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+  - C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+  - C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+      at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\app\login\page.js:5:3) {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: [
+      'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\chunks\\ssr\\[turbopack]_runtime.js',
+      'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\login\\page.js',
+      'C:\\Users\\janpa\\cd\\development\\fin\\node_modules\\next\\dist\\server\\require.js',
+      'C:\\Users\\janpa\\cd\\development\\fin\\node_modules\\next\\dist\\server\\load-components.js',
+      'C:\\Users\\janpa\\cd\\development\\fin\\node_modules\\next\\dist\\build\\utils.js',
+      'C:\\Users\\janpa\\cd\\development\\fin\\node_modules\\next\\dist\\build\\swc\\options.js',
+      'C:\\Users\\janpa\\cd\\development\\fin\\node_modules\\next\\dist\\build\\swc\\index.js',
+      'C:\\Users\\janpa\\cd\\development\\fin\\node_modules\\next\\dist\\build\\next-config-ts\\transpile-config.js',
+      'C:\\Users\\janpa\\cd\\development\\fin\\node_modules\\next\\dist\\server\\config.js',
+      'C:\\Users\\janpa\\cd\\development\\fin\\node_modules\\next\\dist\\server\\next.js',
+      'C:\\Users\\janpa\\cd\\development\\fin\\node_modules\\next\\dist\\server\\lib\\start-server.js'
+    ]
+  }
+}
+ GET /login 500 in 919ms (proxy.ts: 120ms)
+Terminated

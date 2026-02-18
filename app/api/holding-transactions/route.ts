@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { syncAssetValueFromHoldings } from '@/lib/holdings-sync'
 
 /**
  * Check if the holding_transactions table exists.
@@ -59,12 +60,53 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Fallback: no holding_transactions table exists yet
-    // Return empty list — transactions will be stored once the table is created
+    // Fallback: use valuations table to store holding transactions
+    // entity_type pattern: 'holding_tx_buy', 'holding_tx_sell', 'holding_tx_dividend'
+    const { data: valRows, error: valError } = await supabase
+      .from('valuations')
+      .select('*')
+      .eq('entity_id', holdingId)
+      .eq('user_id', user.id)
+      .in('entity_type', ['holding_tx_buy', 'holding_tx_sell', 'holding_tx_dividend'])
+      .order('valuation_date', { ascending: false })
+
+    if (valError) {
+      return NextResponse.json({ transactions: [], source: 'valuations_fallback', error: valError.message })
+    }
+
+    // Map valuations to holding transaction shape
+    const transactions = (valRows || []).map((v: Record<string, unknown>) => {
+      const txType = (v.entity_type as string).replace('holding_tx_', '') as 'buy' | 'sell' | 'dividend'
+      // Parse notes JSON for units and price_per_unit
+      let units = 1
+      let pricePerUnit = Number(v.value) || 0
+      let notes: string | null = null
+      try {
+        const meta = JSON.parse(v.notes as string || '{}')
+        units = meta.units ?? 1
+        pricePerUnit = meta.price_per_unit ?? pricePerUnit
+        notes = meta.notes ?? null
+      } catch {
+        // notes is plain text
+        notes = v.notes as string || null
+      }
+      return {
+        id: v.id as string,
+        holding_id: v.entity_id as string,
+        user_id: v.user_id as string,
+        type: txType,
+        units,
+        price_per_unit: pricePerUnit,
+        total_amount: Number(v.value) || 0,
+        date: v.valuation_date as string,
+        notes,
+        created_at: v.created_at as string,
+      }
+    })
+
     return NextResponse.json({
-      transactions: [],
-      source: 'no_table',
-      message: 'holding_transactions table does not exist yet. Transactions will be stored in-memory until migration is applied.',
+      transactions,
+      source: 'valuations_fallback',
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Onbekende fout'
@@ -137,10 +179,33 @@ export async function POST(request: NextRequest) {
       transaction = data
       source = 'holding_transactions_table'
     } else {
-      // Fallback: return the transaction data without persisting to holding_transactions
-      // (table doesn't exist yet, but we still update the holding)
+      // Fallback: store in valuations table with entity_type='holding_tx_{type}'
+      const entityType = `holding_tx_${type}`
+      const metaNotes = JSON.stringify({
+        units: numUnits,
+        price_per_unit: numPrice,
+        notes: notes || null,
+      })
+
+      const { data: valRow, error: valError } = await supabase
+        .from('valuations')
+        .insert({
+          user_id: user.id,
+          entity_type: entityType,
+          entity_id: holding_id,
+          valuation_date: date,
+          value: totalAmount,
+          notes: metaNotes,
+        })
+        .select()
+        .single()
+
+      if (valError) {
+        return NextResponse.json({ error: valError.message }, { status: 500 })
+      }
+
       transaction = {
-        id: crypto.randomUUID(),
+        id: valRow.id,
         holding_id,
         user_id: user.id,
         type,
@@ -149,17 +214,17 @@ export async function POST(request: NextRequest) {
         total_amount: totalAmount,
         date,
         notes: notes || null,
-        created_at: new Date().toISOString(),
+        created_at: valRow.created_at,
       }
-      source = 'no_holding_transactions_table'
+      source = 'valuations_fallback'
     }
 
     // Update the holding's units (and optionally avg_purchase_price)
     if (hasHoldingsTable) {
-      // Get current holding data
+      // Get current holding data (including asset_id for sync)
       const { data: holding } = await supabase
         .from('holdings')
-        .select('id, units, avg_purchase_price')
+        .select('id, units, avg_purchase_price, asset_id')
         .eq('id', holding_id)
         .eq('user_id', user.id)
         .single()
@@ -201,12 +266,19 @@ export async function POST(request: NextRequest) {
           }, { status: 201 })
         }
 
+        // Sync parent asset's current_value from all holdings
+        // Portfolio tracker is source of truth when holdings exist
+        if (holding.asset_id && (type === 'buy' || type === 'sell')) {
+          await syncAssetValueFromHoldings(supabase, holding.asset_id, user.id)
+        }
+
         return NextResponse.json({
           transaction,
           source,
           holding_updated: true,
           new_units: newUnits,
           new_avg_price: parseFloat(newAvg.toFixed(4)),
+          asset_synced: !!holding.asset_id && (type === 'buy' || type === 'sell'),
         }, { status: 201 })
       }
     } else {
@@ -288,6 +360,17 @@ export async function DELETE(request: NextRequest) {
     if (hasTable) {
       const { error } = await supabase
         .from('holding_transactions')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id)
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+    } else {
+      // Fallback: delete from valuations table
+      const { error } = await supabase
+        .from('valuations')
         .delete()
         .eq('id', id)
         .eq('user_id', user.id)

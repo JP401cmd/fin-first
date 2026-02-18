@@ -1,0 +1,205 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3002
+- Network:       http://192.168.86.37:3002
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 994ms
+ GET / 200 in 2.2s (compile: 1934ms, proxy.ts: 125ms, render: 157ms)
+ GET /api/verify-dashboard-kpis 200 in 1032ms (compile: 433ms, proxy.ts: 24ms, render: 575ms)
+✓ Compiled in 187ms
+ GET /test-dashboard-kpis 200 in 499ms (compile: 423ms, proxy.ts: 25ms, render: 51ms)
+ GET /test-dashboard-kpis 404 in 440ms (compile: 381ms, proxy.ts: 7ms, render: 53ms)
+ GET /test-dashboard-kpis 200 in 39ms (compile: 5ms, proxy.ts: 7ms, render: 26ms)
+ GET /test-dashboard-kpis 200 in 54ms (compile: 3ms, proxy.ts: 7ms, render: 44ms)
+ GET /api/verify-dashboard-kpis 200 in 523ms (compile: 3ms, proxy.ts: 8ms, render: 512ms)
+ GET /test-dashboard-kpis 200 in 437ms (compile: 212ms, proxy.ts: 155ms, render: 70ms)
+ GET /test-dashboard-kpis 200 in 81ms (compile: 7ms, proxy.ts: 8ms, render: 66ms)
+ GET /test-dashboard-kpis 200 in 78ms (compile: 7ms, proxy.ts: 8ms, render: 63ms)
+ GET /test-dashboard-kpis 200 in 72ms (compile: 5ms, proxy.ts: 11ms, render: 56ms)
+ GET /test-dashboard-kpis 200 in 41ms (compile: 7ms, proxy.ts: 5ms, render: 29ms)
+ GET /test-dashboard-kpis 200 in 76ms (compile: 4ms, proxy.ts: 6ms, render: 66ms)
+ GET /test-dashboard-kpis 200 in 87ms (compile: 5ms, proxy.ts: 10ms, render: 72ms)
+ GET /test-dashboard-kpis 200 in 85ms (compile: 5ms, proxy.ts: 10ms, render: 71ms)
+ GET /test-dashboard-kpis 200 in 58ms (compile: 11ms, proxy.ts: 11ms, render: 36ms)
+ GET /test-dashboard-kpis 200 in 46ms (compile: 5ms, proxy.ts: 6ms, render: 35ms)
+ GET /test-dashboard-kpis 200 in 32ms (compile: 6ms, proxy.ts: 4ms, render: 21ms)
+ GET /test-dashboard-kpis 200 in 28ms (compile: 3ms, proxy.ts: 5ms, render: 20ms)
+ GET /test-dashboard-kpis 200 in 28ms (compile: 4ms, proxy.ts: 4ms, render: 20ms)
+ GET /test-dashboard-kpis 200 in 29ms (compile: 4ms, proxy.ts: 6ms, render: 20ms)
+ GET /test-dashboard-kpis 200 in 35ms (compile: 3ms, proxy.ts: 5ms, render: 27ms)
+ GET /test-dashboard-kpis 200 in 27ms (compile: 3ms, proxy.ts: 7ms, render: 17ms)
+ GET /test-dashboard-kpis 200 in 27ms (compile: 3ms, proxy.ts: 4ms, render: 20ms)
+ GET /test-dashboard-kpis 200 in 28ms (compile: 6ms, proxy.ts: 5ms, render: 17ms)
+ GET /test-dashboard-kpis 200 in 28ms (compile: 3ms, proxy.ts: 6ms, render: 19ms)
+ GET /test-dashboard-kpis 200 in 46ms (compile: 4ms, proxy.ts: 4ms, render: 38ms)
+ GET /test-dashboard-kpis 200 in 28ms (compile: 3ms, proxy.ts: 6ms, render: 19ms)
+ GET /test-dashboard-kpis 200 in 22ms (compile: 3ms, proxy.ts: 4ms, render: 15ms)
+ GET /test-dashboard-kpis 200 in 48ms (compile: 3ms, proxy.ts: 5ms, render: 40ms)
+ GET /test-dashboard-kpis 200 in 30ms (compile: 3ms, proxy.ts: 7ms, render: 20ms)
+ GET /test-dashboard-kpis 200 in 72ms (compile: 3ms, proxy.ts: 4ms, render: 65ms)
+ GET /test-dashboard-kpis 200 in 69ms (compile: 3ms, proxy.ts: 5ms, render: 61ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json',
+  page: '/test-dashboard-kpis'
+}
+ GET /test-dashboard-kpis 200 in 309ms (compile: 5ms, proxy.ts: 6ms, render: 299ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\static\development\_buildManifest.js.tmp.3nbknjiat7c'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\static\\development\\_buildManifest.js.tmp.3nbknjiat7c'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json',
+  page: '/test-dashboard-kpis'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /test-dashboard-kpis 500 in 1300ms (compile: 1281ms, proxy.ts: 5ms, render: 14ms)
+ GET /test-dashboard-kpis 500 in 1300ms (compile: 1281ms, proxy.ts: 5ms, render: 14ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-dashboard-kpis\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-dashboard-kpis\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-dashboard-kpis\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-dashboard-kpis\\page\\build-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-dashboard-kpis\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-dashboard-kpis\\page\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-dashboard-kpis\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-dashboard-kpis\\page\\build-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /test-dashboard-kpis 500 in 212ms (compile: 192ms, proxy.ts: 4ms, render: 16ms)
+ GET /test-dashboard-kpis 500 in 212ms (compile: 192ms, proxy.ts: 4ms, render: 16ms)
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /test-dashboard-kpis 500 in 228ms (compile: 209ms, proxy.ts: 4ms, render: 15ms)
+ GET /test-dashboard-kpis 500 in 228ms (compile: 209ms, proxy.ts: 4ms, render: 15ms)
+✓ Compiled in 182ms
+✓ Compiled in 216ms
+[?25h

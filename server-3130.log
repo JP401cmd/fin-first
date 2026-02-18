@@ -1,0 +1,44 @@
+
+> fin@0.2.0 dev
+> next dev -p 3130
+
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3130
+- Network:       http://192.168.86.37:3130
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+○ Compiling proxy ...
+✓ Ready in 19.7s
+○ Compiling /api/health ...
+ GET /api/health 200 in 6.3s (compile: 4.2s, proxy.ts: 1480ms, render: 604ms)
+○ Compiling /test-holdings ...
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages-manifest.json',
+  page: '/test-holdings'
+}
+○ Compiling /_error ...
+ GET /test-holdings 500 in 83s (compile: 82s, proxy.ts: 7ms, render: 877ms)
+ GET /test-holdings 200 in 951ms (compile: 214ms, proxy.ts: 8ms, render: 729ms)
+ GET /test-holdings 200 in 477ms (compile: 88ms, proxy.ts: 9ms, render: 380ms)
+✓ Compiled in 3.8s
+○ Compiling /_not-found/page ...
+ GET /test-holdings 404 in 22.9s (compile: 20.4s, proxy.ts: 1213ms, render: 1312ms)
+ GET /test-holdings 200 in 1204ms (compile: 323ms, proxy.ts: 150ms, render: 731ms)
+ GET /test-holdings 200 in 1212ms (compile: 485ms, proxy.ts: 64ms, render: 663ms)
+ GET /test-holdings 200 in 1212ms (compile: 597ms, proxy.ts: 96ms, render: 519ms)
+ GET /test-holdings 200 in 1214ms (compile: 778ms, proxy.ts: 98ms, render: 339ms)
+ GET /test-holdings 200 in 1215ms (compile: 921ms, proxy.ts: 101ms, render: 193ms)
+ GET /test-holdings 200 in 1082ms (compile: 128ms, proxy.ts: 721ms, render: 232ms)
+ GET /test-holdings 200 in 1112ms (compile: 110ms, proxy.ts: 702ms, render: 301ms)
+ GET /test-holdings 200 in 1126ms (compile: 887ms, proxy.ts: 57ms, render: 182ms)
+ GET /test-holdings 200 in 1117ms (compile: 229ms, proxy.ts: 663ms, render: 226ms)
+ GET /test-holdings 200 in 1377ms (compile: 172ms, proxy.ts: 14ms, render: 1191ms)
+○ Compiling /login ...
+ GET /login 200 in 27.3s (compile: 25.8s, proxy.ts: 17ms, render: 1504ms)

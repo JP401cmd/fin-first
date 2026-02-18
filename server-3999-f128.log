@@ -1,0 +1,14 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3999
+- Network:       http://192.168.86.37:3999
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1083ms
+ GET /api/health 200 in 760ms (compile: 390ms, proxy.ts: 145ms, render: 226ms)
+ GET /test-portfolio-donut 200 in 2.2s (compile: 2.0s, proxy.ts: 7ms, render: 172ms)
+ GET /api/verify-portfolio-donut 200 in 361ms (compile: 189ms, proxy.ts: 6ms, render: 167ms)
+ GET /test-portfolio-donut 200 in 86ms (compile: 7ms, proxy.ts: 9ms, render: 69ms)
+ GET /api/verify-portfolio-donut 200 in 198ms (compile: 8ms, proxy.ts: 9ms, render: 181ms)

@@ -143,7 +143,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
             </div>
 
             {/* Advanced parameters */}
-            <FeatureGate featureId="fire_geavanceerde_params">
+            <FeatureGate featureId="fire_geavanceerde_params" fallback="locked">
             <button
               onClick={() => setShowParams(!showParams)}
               className="mt-4 flex items-center gap-1 text-xs font-medium text-purple-600 hover:text-purple-700"

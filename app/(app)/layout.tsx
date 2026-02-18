@@ -12,6 +12,7 @@ import { BadgeNotifier } from '@/components/app/badge-notifier'
 import { SessionMonitor } from '@/components/app/session-monitor'
 import { AutoSnapshotTrigger } from '@/components/app/auto-snapshot-trigger'
 import { DailyExpenseProvider } from '@/components/app/freedom-time-label'
+import { PerspectiveProvider } from '@/components/app/perspective-provider'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
 import { PHASES } from '@/lib/feature-phases'
 
@@ -79,18 +80,20 @@ export default async function AppLayout({
           <SessionMonitor />
           <AutoSnapshotTrigger />
           <BadgeNotifier />
-          <div className="min-h-screen bg-zinc-50">
-            <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
-            <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation}>
-              <DailyExpenseProvider>
-                <main className="pb-20 md:pb-0">{children}</main>
-                <BottomNav />
-                <ChatProvider>
-                  <ChatPanel />
-                </ChatProvider>
-              </DailyExpenseProvider>
-            </FeatureAccessProvider>
-          </div>
+          <PerspectiveProvider>
+            <div className="min-h-screen bg-zinc-50">
+              <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
+              <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation}>
+                <DailyExpenseProvider>
+                  <main className="pb-20 md:pb-0">{children}</main>
+                  <BottomNav />
+                  <ChatProvider>
+                    <ChatPanel />
+                  </ChatProvider>
+                </DailyExpenseProvider>
+              </FeatureAccessProvider>
+            </div>
+          </PerspectiveProvider>
         </ToastProvider>
       </MobilePreviewFrame>
     </MobilePreviewProvider>

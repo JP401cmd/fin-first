@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { fetchPriceData } from '@/lib/price-feed'
+import { syncAssetValueFromHoldings } from '@/lib/holdings-sync'
 
 /**
  * POST /api/holdings/refresh-prices — Attempt to refresh prices for holdings.
@@ -132,10 +133,9 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // Also sync linked asset value
+          // Sync linked asset value — aggregate ALL holdings for the asset,
+          // not just this one holding (portfolio tracker is source of truth)
           if (holding.id) {
-            const newValue = priceData.price * (holding.units || 1)
-            // Use asset_id if available, otherwise skip
             const { data: holdingFull } = await supabase
               .from('holdings')
               .select('asset_id')
@@ -143,11 +143,7 @@ export async function POST(request: NextRequest) {
               .single()
 
             if (holdingFull?.asset_id) {
-              await supabase
-                .from('assets')
-                .update({ current_value: newValue })
-                .eq('id', holdingFull.asset_id)
-                .eq('user_id', user.id)
+              await syncAssetValueFromHoldings(supabase, holdingFull.asset_id, user.id)
             }
           }
 
@@ -263,14 +259,10 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Holding niet gevonden' }, { status: 404 })
     }
 
-    // Sync linked asset's current_value
+    // Sync linked asset's current_value — aggregate ALL holdings for the asset,
+    // not just this one holding (portfolio tracker is source of truth)
     if (holding.asset_id) {
-      const newValue = Number(price) * (holding.units || 1)
-      await supabase
-        .from('assets')
-        .update({ current_value: newValue })
-        .eq('id', holding.asset_id)
-        .eq('user_id', user.id)
+      await syncAssetValueFromHoldings(supabase, holding.asset_id, user.id)
     }
 
     return NextResponse.json({

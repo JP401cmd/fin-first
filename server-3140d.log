@@ -1,0 +1,22 @@
+
+> fin@0.2.0 dev
+> next dev -p 3140
+
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3140
+- Network:       http://192.168.86.37:3140
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1021ms
+ GET /api/health 200 in 852ms (compile: 445ms, proxy.ts: 157ms, render: 249ms)
+ POST /api/dev-login 401 in 460ms (compile: 161ms, proxy.ts: 8ms, render: 291ms)
+ POST /api/dev-login 404 in 1816ms (compile: 1695ms, proxy.ts: 6ms, render: 114ms)
+ POST /api/dev-login 401 in 163ms (compile: 5ms, proxy.ts: 5ms, render: 153ms)
+ GET /test-asset-crud 200 in 1274ms (compile: 1069ms, proxy.ts: 40ms, render: 165ms)
+ GET /login?redirectTo=%2Fcore%2Fassets 200 in 607ms (compile: 492ms, proxy.ts: 6ms, render: 109ms)
+ GET /test-asset-crud 404 in 108ms (compile: 44ms, proxy.ts: 8ms, render: 57ms)
+ GET /test-asset-crud 404 in 56ms (compile: 10ms, proxy.ts: 5ms, render: 41ms)
+[?25h

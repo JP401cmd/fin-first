@@ -21,6 +21,8 @@ import { BudgetAlert, shouldAlert } from '@/components/app/budget-alert'
 import { useDailyExpenseRate, eurToFreedomTime } from '@/components/app/freedom-time-label'
 import { BudgetSparkline, SparklineWithLabel, type SparklineDataPoint } from '@/components/app/budget-sparkline'
 import { computeBudgetForecast, getConfidenceLabel, getConfidenceColors, type BudgetForecast } from '@/lib/budget-forecast'
+import { OwnershipToggle, OwnershipBadge, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
+import { SpendingConfidenceBadge, SpendingVarianceDetailPanel, calculateSpendingVariance, type SpendingVarianceData } from '@/components/app/spending-confidence-indicator'
 
 export default function BudgetsPage() {
   const searchParams = useSearchParams()
@@ -946,7 +948,7 @@ function BudgetDetailModal({
               <p className={`mt-0.5 text-lg font-bold ${remaining >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                 {formatCurrency(remaining)}
               </p>
-              {hasFreedomData && Math.abs(remaining) >= 10 && (
+              {hasFreedomData && Math.abs(remaining) >= 100 && (
                 <p className={`text-sm italic text-zinc-500`} data-testid="modal-remaining-freedom">
                   {remaining >= 0
                     ? `nog ${eurToFreedomTime(remaining, dailyExpenseRate).formattedDagen}`
@@ -965,12 +967,12 @@ function BudgetDetailModal({
               />
             </div>
             <div className="mt-1 flex items-center justify-between">
-              {hasFreedomData && remaining > 0 && (
+              {hasFreedomData && remaining >= 100 && (
                 <p className="text-sm italic text-zinc-500" data-testid="modal-bar-freedom">
                   nog {eurToFreedomTime(remaining, dailyExpenseRate).formattedDagen} deze maand
                 </p>
               )}
-              {hasFreedomData && remaining <= 0 && spent > limit && (
+              {hasFreedomData && remaining <= 0 && spent > limit && Math.abs(remaining) >= 100 && (
                 <p className="text-sm italic text-zinc-500" data-testid="modal-bar-freedom-over">
                   <span className="text-red-500">{formatCurrency(Math.abs(remaining))} over — {eurToFreedomTime(Math.abs(remaining), dailyExpenseRate).formattedDagen} ingeleverd</span>
                 </p>
@@ -985,11 +987,13 @@ function BudgetDetailModal({
           )}
         </div>
 
-        {/* Budget forecast next month prediction */}
+        {/* Budget forecast next month prediction with spending variance confidence */}
         {(() => {
           const monthlySpending = history.map(h => h.spent)
           if (monthlySpending.length < 3) return null
           const forecast = computeBudgetForecast(monthlySpending, limit, budget.name)
+          const varianceData = calculateSpendingVariance(monthlySpending, budget.name)
+
           if (!forecast.hasSufficientData) {
             return (
               <div className="border-t border-zinc-100 px-6 py-4" data-testid="budget-forecast-section">
@@ -1000,6 +1004,8 @@ function BudgetDetailModal({
                 <p className="text-xs text-zinc-400 italic" data-testid="budget-forecast-insufficient">
                   {forecast.message}
                 </p>
+                {/* Variance detail for insufficient data */}
+                <SpendingVarianceDetailPanel data={varianceData} className="mt-2" />
               </div>
             )
           }
@@ -1029,13 +1035,8 @@ function BudgetDetailModal({
                     )}
                   </div>
 
-                  {/* Confidence indicator */}
-                  <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 ${confColors.bg} border ${confColors.border}`} data-testid="budget-forecast-confidence">
-                    <div className={`h-2 w-2 rounded-full ${confColors.dot}`} />
-                    <span className={`text-[10px] font-medium ${confColors.text}`}>
-                      {confLabel}
-                    </span>
-                  </div>
+                  {/* Spending variance confidence badge with signal bars */}
+                  <SpendingConfidenceBadge data={varianceData} />
                 </div>
 
                 {/* Contextual message */}
@@ -1068,6 +1069,9 @@ function BudgetDetailModal({
                   </div>
                 )}
               </div>
+
+              {/* Spending variance detail panel */}
+              <SpendingVarianceDetailPanel data={varianceData} className="mt-3" />
 
               {/* Alert when predicted exceeds limit */}
               {forecast.exceedsLimit && forecast.alertMessage && (
@@ -1125,12 +1129,12 @@ function BudgetDetailModal({
                             <span className="text-xs text-zinc-500">
                               {formatCurrency(childSpent)} / {formatCurrency(childLimit)}
                             </span>
-                            {hasFreedomData && childLimit - childSpent > 0 && (
+                            {hasFreedomData && childLimit - childSpent >= 100 && (
                               <p className="text-sm italic text-zinc-500" data-testid="child-freedom-remaining">
                                 nog {eurToFreedomTime(childLimit - childSpent, dailyExpenseRate).formattedDagen}
                               </p>
                             )}
-                            {hasFreedomData && childSpent > childLimit && (
+                            {hasFreedomData && childSpent > childLimit && childSpent - childLimit >= 100 && (
                               <p className="text-sm italic text-zinc-500" data-testid="child-freedom-over">
                                 <span className="text-red-500">{eurToFreedomTime(childSpent - childLimit, dailyExpenseRate).formattedDagen} ingeleverd</span>
                               </p>
@@ -1176,7 +1180,7 @@ function BudgetDetailModal({
                     <span className={`text-xs font-medium ${Number(tx.amount) < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
                       {formatCurrency(Math.abs(Number(tx.amount)))}
                     </span>
-                    {hasFreedomData && Math.abs(Number(tx.amount)) >= 10 && (
+                    {hasFreedomData && Math.abs(Number(tx.amount)) >= 100 && (
                       <p className="text-sm italic text-zinc-500" data-testid="tx-freedom-time">
                         {eurToFreedomTime(Math.abs(Number(tx.amount)), dailyExpenseRate).formattedDagen}
                       </p>
@@ -1380,6 +1384,9 @@ function BudgetEditModal({
   const [saving, setSaving] = useState(false)
   const [showIcons, setShowIcons] = useState(false)
   const [showCloseConfirm, setShowCloseConfirm] = useState(false)
+  // Household ownership
+  const [ownership, setOwnership] = useState<OwnershipType>(budget.ownership ?? 'personal')
+  const { hasHousehold, householdId } = useHouseholdStatus()
 
   // Track dirty state
   const isDirty = useMemo(() => {
@@ -1396,9 +1403,10 @@ function BudgetEditModal({
       maxSingleAmount !== String(budget.max_single_transaction_amount ?? 0) ||
       isEssential !== (budget.is_essential ?? false) ||
       priorityScore !== (budget.priority_score ?? 3) ||
-      isInflationIndexed !== (budget.is_inflation_indexed ?? false)
+      isInflationIndexed !== (budget.is_inflation_indexed ?? false) ||
+      ownership !== (budget.ownership ?? 'personal')
     )
-  }, [name, icon, description, defaultLimit, budgetType, interval, rolloverType, limitType, alertThreshold, maxSingleAmount, isEssential, priorityScore, isInflationIndexed, budget])
+  }, [name, icon, description, defaultLimit, budgetType, interval, rolloverType, limitType, alertThreshold, maxSingleAmount, isEssential, priorityScore, isInflationIndexed, ownership, budget])
 
   // beforeunload warning for page refresh
   useEffect(() => {
@@ -1469,6 +1477,8 @@ function BudgetEditModal({
         is_essential: isEssential,
         priority_score: priorityScore,
         is_inflation_indexed: isInflationIndexed,
+        ownership: ownership,
+        household_id: ownership === 'shared' ? householdId : null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', budget.id)
@@ -1608,6 +1618,14 @@ function BudgetEditModal({
               })}
             </div>
           )}
+
+          {/* Ownership toggle */}
+          <OwnershipToggle
+            value={ownership}
+            onChange={setOwnership}
+            hasHousehold={hasHousehold}
+            compact
+          />
 
           {/* Financial row: Type + Limit + Interval */}
           <div className="grid grid-cols-3 gap-3">

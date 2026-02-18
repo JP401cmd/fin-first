@@ -1,0 +1,61 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3280
+- Network:       http://192.168.86.37:3280
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1196ms
+⨯ Error: Cannot find module 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+Require stack:
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\dev\next-dev-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at ignore-listed frames {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\static\development\_buildManifest.js.tmp.hc2jqzrkicm'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\static\\development\\_buildManifest.js.tmp.hc2jqzrkicm'
+}
+Error: Cannot find module 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+Require stack:
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\dev\next-dev-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at ignore-listed frames {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /login 500 in 3.2s (compile: 128ms, proxy.ts: 3.0s, render: 25ms)
+✓ Compiled in 359ms
+✓ Compiled in 534ms
+✓ Compiled in 568ms
+✓ Compiled in 682ms
+✓ Compiled in 817ms
+✓ Compiled in 636ms
+/c/Program Files/nodejs/npx: line 65: 27974 Killed                  "$NODE_EXE" "$NPX_CLI_JS" "$@"
+✓ Compiled in 986ms
+✓ Compiled in 690ms
+✓ Compiled in 758ms

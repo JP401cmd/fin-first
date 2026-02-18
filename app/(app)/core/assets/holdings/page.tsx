@@ -534,6 +534,12 @@ export default function HoldingsPage() {
               data-sold-out={soldOut ? 'true' : 'false'}
               data-units={Math.max(0, holding.units)}
             >
+              {/* Clickable area — navigates to holding detail page */}
+              <Link
+                href={`/core/assets/holdings/${holding.id}`}
+                className="flex min-w-0 flex-1 items-center gap-3"
+                data-testid={`holding-link-${holding.id}`}
+              >
               <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
                 soldOut ? 'bg-zinc-100' :
                 stale ? 'bg-amber-100' : 'bg-amber-50'
@@ -606,6 +612,7 @@ export default function HoldingsPage() {
                   </p>
                 )}
               </div>
+              </Link>
               <div className="flex shrink-0 items-center gap-1">
                 {stale && (
                   <button

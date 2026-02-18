@@ -1,0 +1,1531 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.86.37:3000
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1003ms
+ GET /test-ai-recommendations 200 in 2.2s (compile: 1856ms, proxy.ts: 111ms, render: 254ms)
+ GET /test-badge-grid 200 in 2.2s (compile: 1903ms, proxy.ts: 110ms, render: 210ms)
+ GET / 200 in 2.2s (compile: 1656ms, proxy.ts: 109ms, render: 465ms)
+ GET /api/badges/verify 200 in 787ms (compile: 384ms, proxy.ts: 11ms, render: 392ms)
+ GET /api/verify-ai-recommendations 200 in 1177ms (compile: 469ms, proxy.ts: 34ms, render: 675ms)
+ POST /api/dev-login 401 in 269ms (compile: 178ms, proxy.ts: 5ms, render: 86ms)
+ GET / 200 in 48ms (compile: 6ms, proxy.ts: 7ms, render: 35ms)
+ GET /login 200 in 532ms (compile: 434ms, proxy.ts: 8ms, render: 91ms)
+✓ Compiled in 181ms
+ GET /test-badge-grid 200 in 483ms (compile: 224ms, proxy.ts: 52ms, render: 207ms)
+ GET /login 200 in 481ms (compile: 260ms, proxy.ts: 61ms, render: 160ms)
+ GET /test-badge-grid 200 in 133ms (compile: 9ms, proxy.ts: 33ms, render: 90ms)
+ GET /login 200 in 133ms (compile: 24ms, proxy.ts: 33ms, render: 76ms)
+ GET /test-badge-grid 200 in 99ms (compile: 7ms, proxy.ts: 15ms, render: 77ms)
+ GET /login 200 in 97ms (compile: 18ms, proxy.ts: 11ms, render: 67ms)
+ GET /test-badge-grid 200 in 99ms (compile: 5ms, proxy.ts: 10ms, render: 84ms)
+ GET /login 200 in 101ms (compile: 20ms, proxy.ts: 10ms, render: 71ms)
+ GET /test-badge-grid 200 in 104ms (compile: 5ms, proxy.ts: 10ms, render: 89ms)
+ GET /login 200 in 106ms (compile: 19ms, proxy.ts: 10ms, render: 77ms)
+ GET /test-badge-grid 200 in 112ms (compile: 6ms, proxy.ts: 11ms, render: 94ms)
+ GET /login 200 in 111ms (compile: 20ms, proxy.ts: 11ms, render: 79ms)
+ GET /test-badge-grid 200 in 101ms (compile: 7ms, proxy.ts: 11ms, render: 83ms)
+ GET /login 200 in 100ms (compile: 21ms, proxy.ts: 12ms, render: 68ms)
+ GET /test-badge-grid 200 in 91ms (compile: 6ms, proxy.ts: 7ms, render: 78ms)
+ GET /login 200 in 93ms (compile: 18ms, proxy.ts: 7ms, render: 68ms)
+ GET /test-badge-grid 200 in 102ms (compile: 6ms, proxy.ts: 9ms, render: 87ms)
+ GET /login 200 in 104ms (compile: 19ms, proxy.ts: 10ms, render: 74ms)
+ GET /test-badge-grid 200 in 110ms (compile: 6ms, proxy.ts: 12ms, render: 92ms)
+ GET /login 200 in 107ms (compile: 19ms, proxy.ts: 11ms, render: 77ms)
+ GET /test-badge-grid 200 in 96ms (compile: 10ms, proxy.ts: 10ms, render: 76ms)
+ GET /login 200 in 96ms (compile: 24ms, proxy.ts: 11ms, render: 61ms)
+ GET /login 200 in 72ms (compile: 16ms, proxy.ts: 8ms, render: 48ms)
+ GET /test-badge-grid 200 in 74ms (compile: 4ms, proxy.ts: 8ms, render: 62ms)
+ GET /test-badge-grid 200 in 68ms (compile: 4ms, proxy.ts: 5ms, render: 60ms)
+ GET /login 200 in 70ms (compile: 14ms, proxy.ts: 5ms, render: 50ms)
+ GET /test-badge-grid 200 in 84ms (compile: 3ms, proxy.ts: 6ms, render: 75ms)
+ GET /login 200 in 86ms (compile: 15ms, proxy.ts: 6ms, render: 65ms)
+ GET /test-badge-grid 200 in 82ms (compile: 6ms, proxy.ts: 6ms, render: 71ms)
+ GET /login 200 in 84ms (compile: 16ms, proxy.ts: 7ms, render: 61ms)
+ GET /test-badge-grid 200 in 74ms (compile: 4ms, proxy.ts: 7ms, render: 63ms)
+ GET /login 200 in 73ms (compile: 16ms, proxy.ts: 6ms, render: 51ms)
+ GET /test-badge-grid 200 in 83ms (compile: 5ms, proxy.ts: 17ms, render: 61ms)
+ GET /login 200 in 74ms (compile: 17ms, proxy.ts: 6ms, render: 51ms)
+ GET /test-badge-grid 200 in 93ms (compile: 5ms, proxy.ts: 17ms, render: 71ms)
+ GET /login 200 in 87ms (compile: 15ms, proxy.ts: 5ms, render: 67ms)
+ GET /test-badge-grid 200 in 100ms (compile: 5ms, proxy.ts: 18ms, render: 77ms)
+ GET /login 200 in 89ms (compile: 15ms, proxy.ts: 7ms, render: 67ms)
+ GET /test-badge-grid 200 in 104ms (compile: 6ms, proxy.ts: 32ms, render: 65ms)
+ GET /login 200 in 83ms (compile: 17ms, proxy.ts: 11ms, render: 56ms)
+ GET /test-badge-grid 200 in 76ms (compile: 6ms, proxy.ts: 16ms, render: 54ms)
+ GET /login 200 in 79ms (compile: 5ms, proxy.ts: 19ms, render: 55ms)
+ GET /test-badge-grid 200 in 78ms (compile: 7ms, proxy.ts: 20ms, render: 51ms)
+ GET /login 200 in 80ms (compile: 6ms, proxy.ts: 17ms, render: 57ms)
+ GET /test-badge-grid 200 in 88ms (compile: 4ms, proxy.ts: 17ms, render: 67ms)
+ GET /login 200 in 99ms (compile: 3ms, proxy.ts: 18ms, render: 77ms)
+ GET /test-badge-grid 200 in 102ms (compile: 11ms, proxy.ts: 21ms, render: 69ms)
+ GET /login 200 in 103ms (compile: 6ms, proxy.ts: 27ms, render: 70ms)
+ GET /test-badge-grid 200 in 103ms (compile: 9ms, proxy.ts: 23ms, render: 70ms)
+ GET /login 200 in 106ms (compile: 6ms, proxy.ts: 25ms, render: 75ms)
+ GET /test-badge-grid 200 in 101ms (compile: 11ms, proxy.ts: 20ms, render: 69ms)
+ GET /login 200 in 119ms (compile: 8ms, proxy.ts: 29ms, render: 82ms)
+ GET /test-badge-grid 200 in 111ms (compile: 9ms, proxy.ts: 22ms, render: 80ms)
+ GET /login 200 in 112ms (compile: 8ms, proxy.ts: 23ms, render: 81ms)
+ GET /test-badge-grid 200 in 110ms (compile: 13ms, proxy.ts: 31ms, render: 65ms)
+ GET /login 200 in 106ms (compile: 9ms, proxy.ts: 26ms, render: 72ms)
+ GET /test-badge-grid 200 in 103ms (compile: 4ms, proxy.ts: 26ms, render: 73ms)
+ GET /login 200 in 102ms (compile: 16ms, proxy.ts: 20ms, render: 66ms)
+ GET /test-badge-grid 200 in 105ms (compile: 6ms, proxy.ts: 29ms, render: 69ms)
+ GET /login 200 in 98ms (compile: 8ms, proxy.ts: 20ms, render: 69ms)
+ GET /test-badge-grid 200 in 117ms (compile: 7ms, proxy.ts: 24ms, render: 86ms)
+ GET /login 200 in 106ms (compile: 9ms, proxy.ts: 21ms, render: 76ms)
+ GET /test-badge-grid 200 in 110ms (compile: 6ms, proxy.ts: 24ms, render: 80ms)
+ GET /login 200 in 117ms (compile: 10ms, proxy.ts: 20ms, render: 86ms)
+ GET /test-badge-grid 200 in 125ms (compile: 10ms, proxy.ts: 29ms, render: 86ms)
+ GET /login 200 in 116ms (compile: 11ms, proxy.ts: 24ms, render: 81ms)
+ GET /test-badge-grid 200 in 114ms (compile: 8ms, proxy.ts: 29ms, render: 76ms)
+ GET /login 200 in 111ms (compile: 11ms, proxy.ts: 29ms, render: 71ms)
+ GET /test-badge-grid 200 in 87ms (compile: 22ms, proxy.ts: 8ms, render: 57ms)
+ GET /login 200 in 82ms (compile: 4ms, proxy.ts: 28ms, render: 50ms)
+ GET /test-badge-grid 200 in 74ms (compile: 16ms, proxy.ts: 5ms, render: 52ms)
+ GET /login 200 in 87ms (compile: 5ms, proxy.ts: 19ms, render: 64ms)
+ GET /test-badge-grid 200 in 79ms (compile: 16ms, proxy.ts: 7ms, render: 55ms)
+ GET /login 200 in 89ms (compile: 4ms, proxy.ts: 17ms, render: 68ms)
+ GET /test-badge-grid 200 in 77ms (compile: 3ms, proxy.ts: 18ms, render: 56ms)
+ GET /login 200 in 88ms (compile: 7ms, proxy.ts: 22ms, render: 59ms)
+ GET /test-badge-grid 200 in 77ms (compile: 16ms, proxy.ts: 7ms, render: 54ms)
+ GET /login 200 in 75ms (compile: 6ms, proxy.ts: 17ms, render: 52ms)
+ GET /test-badge-grid 200 in 79ms (compile: 7ms, proxy.ts: 18ms, render: 54ms)
+ GET /login 200 in 77ms (compile: 4ms, proxy.ts: 21ms, render: 51ms)
+ GET /test-badge-grid 200 in 74ms (compile: 5ms, proxy.ts: 16ms, render: 53ms)
+ GET /login 200 in 83ms (compile: 4ms, proxy.ts: 19ms, render: 60ms)
+ GET /test-badge-grid 200 in 81ms (compile: 5ms, proxy.ts: 16ms, render: 60ms)
+ GET /login 200 in 82ms (compile: 3ms, proxy.ts: 19ms, render: 59ms)
+ GET /test-badge-grid 200 in 80ms (compile: 12ms, proxy.ts: 16ms, render: 51ms)
+ GET /login 200 in 73ms (compile: 4ms, proxy.ts: 18ms, render: 51ms)
+ GET /test-badge-grid 200 in 73ms (compile: 4ms, proxy.ts: 18ms, render: 51ms)
+ GET /login 200 in 72ms (compile: 5ms, proxy.ts: 17ms, render: 50ms)
+ GET /test-badge-grid 200 in 82ms (compile: 3ms, proxy.ts: 17ms, render: 62ms)
+ GET /login 200 in 97ms (compile: 5ms, proxy.ts: 17ms, render: 76ms)
+ GET /test-badge-grid 200 in 107ms (compile: 6ms, proxy.ts: 17ms, render: 84ms)
+ GET /login 200 in 113ms (compile: 8ms, proxy.ts: 27ms, render: 78ms)
+ GET /test-badge-grid 200 in 106ms (compile: 7ms, proxy.ts: 26ms, render: 73ms)
+ GET /login 200 in 104ms (compile: 9ms, proxy.ts: 24ms, render: 71ms)
+ GET /test-badge-grid 200 in 109ms (compile: 9ms, proxy.ts: 24ms, render: 76ms)
+ GET /login 200 in 109ms (compile: 8ms, proxy.ts: 21ms, render: 80ms)
+ GET /test-badge-grid 200 in 136ms (compile: 6ms, proxy.ts: 28ms, render: 103ms)
+ GET /login 200 in 121ms (compile: 9ms, proxy.ts: 29ms, render: 83ms)
+ GET /test-badge-grid 200 in 115ms (compile: 11ms, proxy.ts: 23ms, render: 81ms)
+ GET /login 200 in 110ms (compile: 13ms, proxy.ts: 29ms, render: 69ms)
+ GET /test-badge-grid 200 in 101ms (compile: 6ms, proxy.ts: 29ms, render: 66ms)
+ GET /login 200 in 97ms (compile: 6ms, proxy.ts: 25ms, render: 66ms)
+ GET /test-badge-grid 200 in 93ms (compile: 4ms, proxy.ts: 22ms, render: 66ms)
+ GET /login 200 in 93ms (compile: 5ms, proxy.ts: 21ms, render: 67ms)
+ GET /test-badge-grid 200 in 96ms (compile: 7ms, proxy.ts: 24ms, render: 66ms)
+ GET /login 200 in 97ms (compile: 5ms, proxy.ts: 23ms, render: 69ms)
+ GET /test-badge-grid 200 in 97ms (compile: 8ms, proxy.ts: 20ms, render: 69ms)
+ GET /login 200 in 102ms (compile: 6ms, proxy.ts: 24ms, render: 72ms)
+ GET /test-badge-grid 200 in 101ms (compile: 8ms, proxy.ts: 22ms, render: 71ms)
+ GET /login 200 in 104ms (compile: 6ms, proxy.ts: 24ms, render: 74ms)
+ GET /test-badge-grid 200 in 127ms (compile: 10ms, proxy.ts: 25ms, render: 92ms)
+ GET /login 200 in 111ms (compile: 23ms, proxy.ts: 7ms, render: 82ms)
+ GET /test-badge-grid 200 in 149ms (compile: 10ms, proxy.ts: 28ms, render: 111ms)
+ GET /login 200 in 134ms (compile: 26ms, proxy.ts: 14ms, render: 94ms)
+ GET /test-badge-grid 200 in 118ms (compile: 13ms, proxy.ts: 11ms, render: 94ms)
+ GET /login 200 in 119ms (compile: 39ms, proxy.ts: 17ms, render: 63ms)
+ GET /test-badge-grid 200 in 108ms (compile: 6ms, proxy.ts: 24ms, render: 78ms)
+ GET /login 200 in 90ms (compile: 17ms, proxy.ts: 7ms, render: 66ms)
+ GET /test-badge-grid 200 in 93ms (compile: 9ms, proxy.ts: 9ms, render: 75ms)
+ GET /login 200 in 97ms (compile: 20ms, proxy.ts: 12ms, render: 66ms)
+ GET /test-badge-grid 200 in 74ms (compile: 4ms, proxy.ts: 8ms, render: 62ms)
+ GET /login 200 in 85ms (compile: 24ms, proxy.ts: 6ms, render: 55ms)
+ GET /test-badge-grid 200 in 91ms (compile: 3ms, proxy.ts: 26ms, render: 63ms)
+ GET /login 200 in 89ms (compile: 6ms, proxy.ts: 20ms, render: 63ms)
+ GET /test-badge-grid 200 in 96ms (compile: 5ms, proxy.ts: 24ms, render: 67ms)
+ GET /login 200 in 93ms (compile: 4ms, proxy.ts: 21ms, render: 67ms)
+ GET /test-badge-grid 200 in 94ms (compile: 9ms, proxy.ts: 20ms, render: 65ms)
+ GET /login 200 in 109ms (compile: 8ms, proxy.ts: 25ms, render: 77ms)
+ GET /test-badge-grid 200 in 117ms (compile: 5ms, proxy.ts: 21ms, render: 91ms)
+ GET /login 200 in 102ms (compile: 8ms, proxy.ts: 20ms, render: 74ms)
+ GET /test-badge-grid 200 in 107ms (compile: 11ms, proxy.ts: 30ms, render: 66ms)
+ GET /login 200 in 95ms (compile: 6ms, proxy.ts: 21ms, render: 68ms)
+ GET /test-badge-grid 200 in 93ms (compile: 5ms, proxy.ts: 22ms, render: 65ms)
+ GET /login 200 in 96ms (compile: 6ms, proxy.ts: 25ms, render: 65ms)
+ GET /test-badge-grid 200 in 91ms (compile: 4ms, proxy.ts: 23ms, render: 64ms)
+ GET /login 200 in 97ms (compile: 8ms, proxy.ts: 20ms, render: 69ms)
+ GET /test-badge-grid 200 in 95ms (compile: 7ms, proxy.ts: 22ms, render: 66ms)
+ GET /login 200 in 92ms (compile: 7ms, proxy.ts: 20ms, render: 65ms)
+ GET /test-badge-grid 200 in 96ms (compile: 8ms, proxy.ts: 24ms, render: 64ms)
+ GET /login 200 in 91ms (compile: 5ms, proxy.ts: 21ms, render: 65ms)
+ GET /test-badge-grid 200 in 100ms (compile: 8ms, proxy.ts: 22ms, render: 70ms)
+ GET /login 200 in 108ms (compile: 5ms, proxy.ts: 24ms, render: 80ms)
+ GET /test-badge-grid 200 in 120ms (compile: 5ms, proxy.ts: 20ms, render: 94ms)
+ GET /login 200 in 120ms (compile: 14ms, proxy.ts: 23ms, render: 83ms)
+ GET /test-badge-grid 200 in 118ms (compile: 6ms, proxy.ts: 32ms, render: 80ms)
+ GET /login 200 in 119ms (compile: 16ms, proxy.ts: 24ms, render: 79ms)
+ GET /test-badge-grid 200 in 91ms (compile: 6ms, proxy.ts: 20ms, render: 65ms)
+ GET /login 200 in 96ms (compile: 8ms, proxy.ts: 26ms, render: 63ms)
+ GET /test-badge-grid 200 in 89ms (compile: 19ms, proxy.ts: 5ms, render: 65ms)
+ GET /login 200 in 94ms (compile: 8ms, proxy.ts: 21ms, render: 65ms)
+ GET /test-badge-grid 200 in 100ms (compile: 25ms, proxy.ts: 8ms, render: 67ms)
+ GET /login 200 in 94ms (compile: 4ms, proxy.ts: 22ms, render: 68ms)
+ GET /test-badge-grid 200 in 99ms (compile: 9ms, proxy.ts: 21ms, render: 69ms)
+ GET /login 200 in 97ms (compile: 6ms, proxy.ts: 27ms, render: 64ms)
+ GET /test-badge-grid 200 in 95ms (compile: 9ms, proxy.ts: 20ms, render: 67ms)
+ GET /login 200 in 95ms (compile: 4ms, proxy.ts: 24ms, render: 66ms)
+ GET /test-badge-grid 200 in 97ms (compile: 5ms, proxy.ts: 20ms, render: 71ms)
+ GET /login 200 in 126ms (compile: 7ms, proxy.ts: 24ms, render: 95ms)
+ GET /test-badge-grid 200 in 107ms (compile: 9ms, proxy.ts: 22ms, render: 76ms)
+ GET /login 200 in 104ms (compile: 7ms, proxy.ts: 24ms, render: 73ms)
+ GET /test-badge-grid 200 in 110ms (compile: 5ms, proxy.ts: 22ms, render: 82ms)
+ GET /login 200 in 109ms (compile: 4ms, proxy.ts: 33ms, render: 72ms)
+ GET /test-badge-grid 200 in 100ms (compile: 6ms, proxy.ts: 20ms, render: 73ms)
+ GET /login 200 in 100ms (compile: 6ms, proxy.ts: 31ms, render: 63ms)
+ GET /test-badge-grid 200 in 93ms (compile: 8ms, proxy.ts: 20ms, render: 65ms)
+ GET /login 200 in 94ms (compile: 6ms, proxy.ts: 22ms, render: 66ms)
+ GET /test-badge-grid 200 in 92ms (compile: 6ms, proxy.ts: 20ms, render: 66ms)
+ GET /login 200 in 96ms (compile: 7ms, proxy.ts: 24ms, render: 65ms)
+ GET /test-badge-grid 200 in 91ms (compile: 6ms, proxy.ts: 22ms, render: 64ms)
+ GET /login 200 in 95ms (compile: 5ms, proxy.ts: 21ms, render: 68ms)
+ GET /test-badge-grid 200 in 101ms (compile: 6ms, proxy.ts: 23ms, render: 72ms)
+ GET /login 200 in 101ms (compile: 4ms, proxy.ts: 21ms, render: 76ms)
+ GET /test-badge-grid 200 in 101ms (compile: 10ms, proxy.ts: 24ms, render: 67ms)
+ GET /login 200 in 117ms (compile: 6ms, proxy.ts: 28ms, render: 83ms)
+ GET /test-badge-grid 200 in 110ms (compile: 9ms, proxy.ts: 20ms, render: 81ms)
+ GET /login 200 in 109ms (compile: 7ms, proxy.ts: 23ms, render: 79ms)
+ GET /test-badge-grid 200 in 110ms (compile: 7ms, proxy.ts: 38ms, render: 64ms)
+ GET /login 200 in 95ms (compile: 9ms, proxy.ts: 20ms, render: 66ms)
+ GET /test-badge-grid 200 in 95ms (compile: 5ms, proxy.ts: 21ms, render: 69ms)
+ GET /login 200 in 98ms (compile: 10ms, proxy.ts: 20ms, render: 69ms)
+ GET /test-badge-grid 200 in 98ms (compile: 5ms, proxy.ts: 24ms, render: 68ms)
+ GET /login 200 in 99ms (compile: 7ms, proxy.ts: 22ms, render: 70ms)
+ GET /test-badge-grid 200 in 101ms (compile: 5ms, proxy.ts: 26ms, render: 70ms)
+ GET /login 200 in 105ms (compile: 5ms, proxy.ts: 23ms, render: 77ms)
+ GET /test-badge-grid 200 in 100ms (compile: 11ms, proxy.ts: 20ms, render: 69ms)
+ GET /login 200 in 106ms (compile: 8ms, proxy.ts: 26ms, render: 72ms)
+ GET /test-badge-grid 200 in 101ms (compile: 8ms, proxy.ts: 26ms, render: 67ms)
+ GET /login 200 in 101ms (compile: 9ms, proxy.ts: 20ms, render: 72ms)
+ GET /test-badge-grid 200 in 110ms (compile: 9ms, proxy.ts: 25ms, render: 77ms)
+ GET /login 200 in 115ms (compile: 6ms, proxy.ts: 23ms, render: 87ms)
+ GET /test-badge-grid 200 in 111ms (compile: 6ms, proxy.ts: 27ms, render: 77ms)
+ GET /login 200 in 109ms (compile: 14ms, proxy.ts: 21ms, render: 74ms)
+ GET /test-badge-grid 200 in 105ms (compile: 7ms, proxy.ts: 30ms, render: 68ms)
+ GET /login 200 in 99ms (compile: 5ms, proxy.ts: 19ms, render: 75ms)
+ GET /test-badge-grid 200 in 104ms (compile: 8ms, proxy.ts: 26ms, render: 70ms)
+ GET /login 200 in 99ms (compile: 6ms, proxy.ts: 25ms, render: 69ms)
+ GET /test-badge-grid 200 in 94ms (compile: 8ms, proxy.ts: 24ms, render: 63ms)
+ GET /login 200 in 92ms (compile: 5ms, proxy.ts: 24ms, render: 64ms)
+ GET /test-badge-grid 200 in 94ms (compile: 7ms, proxy.ts: 23ms, render: 65ms)
+ GET /login 200 in 98ms (compile: 7ms, proxy.ts: 20ms, render: 70ms)
+ GET /test-badge-grid 200 in 99ms (compile: 4ms, proxy.ts: 20ms, render: 75ms)
+ GET /login 200 in 108ms (compile: 9ms, proxy.ts: 25ms, render: 74ms)
+ GET /test-badge-grid 200 in 104ms (compile: 5ms, proxy.ts: 25ms, render: 73ms)
+ GET /login 200 in 101ms (compile: 11ms, proxy.ts: 23ms, render: 67ms)
+ GET /test-badge-grid 200 in 114ms (compile: 8ms, proxy.ts: 27ms, render: 79ms)
+ GET /login 200 in 110ms (compile: 8ms, proxy.ts: 19ms, render: 83ms)
+ GET /test-badge-grid 200 in 109ms (compile: 4ms, proxy.ts: 24ms, render: 80ms)
+ GET /login 200 in 109ms (compile: 10ms, proxy.ts: 31ms, render: 67ms)
+ GET /test-badge-grid 200 in 97ms (compile: 8ms, proxy.ts: 25ms, render: 65ms)
+ GET /login 200 in 91ms (compile: 4ms, proxy.ts: 21ms, render: 66ms)
+ GET /test-badge-grid 200 in 91ms (compile: 10ms, proxy.ts: 23ms, render: 59ms)
+ GET /login 200 in 88ms (compile: 3ms, proxy.ts: 21ms, render: 63ms)
+ GET /test-badge-grid 200 in 88ms (compile: 6ms, proxy.ts: 22ms, render: 60ms)
+ GET /login 200 in 85ms (compile: 7ms, proxy.ts: 20ms, render: 57ms)
+ GET /test-badge-grid 200 in 94ms (compile: 5ms, proxy.ts: 25ms, render: 65ms)
+ GET /login 200 in 96ms (compile: 3ms, proxy.ts: 20ms, render: 73ms)
+ GET /test-badge-grid 200 in 98ms (compile: 9ms, proxy.ts: 20ms, render: 69ms)
+ GET /login 200 in 100ms (compile: 5ms, proxy.ts: 28ms, render: 68ms)
+ GET /test-badge-grid 200 in 96ms (compile: 8ms, proxy.ts: 22ms, render: 67ms)
+ GET /login 200 in 102ms (compile: 5ms, proxy.ts: 21ms, render: 76ms)
+ GET /test-badge-grid 200 in 102ms (compile: 7ms, proxy.ts: 21ms, render: 73ms)
+ GET /login 200 in 103ms (compile: 4ms, proxy.ts: 25ms, render: 74ms)
+ GET /test-badge-grid 200 in 108ms (compile: 15ms, proxy.ts: 20ms, render: 73ms)
+ GET /login 200 in 108ms (compile: 8ms, proxy.ts: 24ms, render: 76ms)
+ GET /test-badge-grid 200 in 107ms (compile: 14ms, proxy.ts: 23ms, render: 70ms)
+ GET /login 200 in 105ms (compile: 7ms, proxy.ts: 26ms, render: 71ms)
+ GET /test-badge-grid 200 in 100ms (compile: 9ms, proxy.ts: 24ms, render: 67ms)
+ GET /login 200 in 133ms (compile: 7ms, proxy.ts: 23ms, render: 103ms)
+ GET /test-badge-grid 200 in 135ms (compile: 8ms, proxy.ts: 20ms, render: 107ms)
+ GET /login 200 in 138ms (compile: 8ms, proxy.ts: 24ms, render: 106ms)
+ GET /test-badge-grid 200 in 136ms (compile: 39ms, proxy.ts: 26ms, render: 71ms)
+ GET /login 200 in 134ms (compile: 10ms, proxy.ts: 58ms, render: 67ms)
+ GET /test-badge-grid 200 in 96ms (compile: 7ms, proxy.ts: 24ms, render: 65ms)
+ GET /login 200 in 91ms (compile: 5ms, proxy.ts: 21ms, render: 64ms)
+ GET /test-badge-grid 200 in 93ms (compile: 10ms, proxy.ts: 19ms, render: 64ms)
+ GET /login 200 in 103ms (compile: 5ms, proxy.ts: 21ms, render: 78ms)
+ GET /test-badge-grid 200 in 103ms (compile: 6ms, proxy.ts: 19ms, render: 78ms)
+ GET /login 200 in 109ms (compile: 7ms, proxy.ts: 22ms, render: 80ms)
+ GET /test-badge-grid 200 in 121ms (compile: 6ms, proxy.ts: 33ms, render: 83ms)
+ GET /login 200 in 93ms (compile: 6ms, proxy.ts: 21ms, render: 67ms)
+ GET /test-badge-grid 200 in 98ms (compile: 5ms, proxy.ts: 27ms, render: 66ms)
+ GET /login 200 in 100ms (compile: 4ms, proxy.ts: 24ms, render: 72ms)
+ GET /test-badge-grid 200 in 101ms (compile: 9ms, proxy.ts: 22ms, render: 70ms)
+ GET /login 200 in 106ms (compile: 24ms, proxy.ts: 10ms, render: 72ms)
+ GET /test-badge-grid 200 in 105ms (compile: 10ms, proxy.ts: 25ms, render: 70ms)
+ GET /login 200 in 99ms (compile: 22ms, proxy.ts: 11ms, render: 67ms)
+ GET /test-badge-grid 200 in 94ms (compile: 7ms, proxy.ts: 25ms, render: 62ms)
+ GET /login 200 in 95ms (compile: 6ms, proxy.ts: 28ms, render: 61ms)
+ GET /test-badge-grid 200 in 88ms (compile: 6ms, proxy.ts: 17ms, render: 65ms)
+ GET /login 200 in 97ms (compile: 10ms, proxy.ts: 19ms, render: 67ms)
+ GET /test-badge-grid 200 in 107ms (compile: 20ms, proxy.ts: 8ms, render: 78ms)
+ GET /login 200 in 136ms (compile: 6ms, proxy.ts: 23ms, render: 107ms)
+ GET /test-badge-grid 200 in 121ms (compile: 9ms, proxy.ts: 28ms, render: 84ms)
+ GET /login 200 in 114ms (compile: 17ms, proxy.ts: 28ms, render: 69ms)
+ GET /test-badge-grid 200 in 108ms (compile: 24ms, proxy.ts: 14ms, render: 70ms)
+ GET /login 200 in 99ms (compile: 7ms, proxy.ts: 26ms, render: 66ms)
+ GET /test-badge-grid 200 in 95ms (compile: 6ms, proxy.ts: 24ms, render: 65ms)
+ GET /login 200 in 98ms (compile: 9ms, proxy.ts: 20ms, render: 69ms)
+ GET /test-badge-grid 200 in 114ms (compile: 5ms, proxy.ts: 23ms, render: 86ms)
+ GET /login 200 in 96ms (compile: 5ms, proxy.ts: 21ms, render: 70ms)
+ GET /test-badge-grid 200 in 99ms (compile: 11ms, proxy.ts: 22ms, render: 66ms)
+ GET /login 200 in 94ms (compile: 6ms, proxy.ts: 24ms, render: 63ms)
+ GET /test-badge-grid 200 in 92ms (compile: 6ms, proxy.ts: 22ms, render: 64ms)
+ GET /login 200 in 97ms (compile: 7ms, proxy.ts: 24ms, render: 66ms)
+ GET /test-badge-grid 200 in 94ms (compile: 4ms, proxy.ts: 22ms, render: 68ms)
+ GET /login 200 in 95ms (compile: 6ms, proxy.ts: 21ms, render: 68ms)
+ GET /test-badge-grid 200 in 103ms (compile: 7ms, proxy.ts: 24ms, render: 71ms)
+ GET /login 200 in 97ms (compile: 7ms, proxy.ts: 24ms, render: 66ms)
+ GET /test-badge-grid 200 in 94ms (compile: 5ms, proxy.ts: 23ms, render: 66ms)
+ GET /login 200 in 92ms (compile: 16ms, proxy.ts: 18ms, render: 58ms)
+ GET /test-badge-grid 200 in 87ms (compile: 5ms, proxy.ts: 16ms, render: 66ms)
+ GET /login 200 in 92ms (compile: 5ms, proxy.ts: 20ms, render: 66ms)
+ GET /test-badge-grid 200 in 96ms (compile: 8ms, proxy.ts: 19ms, render: 68ms)
+ GET /login 200 in 101ms (compile: 6ms, proxy.ts: 27ms, render: 68ms)
+ GET /test-badge-grid 200 in 96ms (compile: 6ms, proxy.ts: 19ms, render: 72ms)
+ GET /login 200 in 97ms (compile: 5ms, proxy.ts: 25ms, render: 67ms)
+ GET /test-badge-grid 200 in 99ms (compile: 8ms, proxy.ts: 28ms, render: 62ms)
+ GET /login 200 in 93ms (compile: 4ms, proxy.ts: 21ms, render: 67ms)
+ GET /test-badge-grid 200 in 94ms (compile: 4ms, proxy.ts: 19ms, render: 70ms)
+ GET /login 200 in 97ms (compile: 10ms, proxy.ts: 20ms, render: 67ms)
+ GET /test-badge-grid 200 in 96ms (compile: 7ms, proxy.ts: 25ms, render: 64ms)
+ GET /login 200 in 92ms (compile: 7ms, proxy.ts: 24ms, render: 62ms)
+ GET /test-badge-grid 200 in 98ms (compile: 6ms, proxy.ts: 22ms, render: 70ms)
+ GET /login 200 in 99ms (compile: 4ms, proxy.ts: 23ms, render: 72ms)
+ GET /test-badge-grid 200 in 102ms (compile: 6ms, proxy.ts: 20ms, render: 76ms)
+ GET /login 200 in 101ms (compile: 5ms, proxy.ts: 29ms, render: 67ms)
+ GET /test-badge-grid 200 in 90ms (compile: 8ms, proxy.ts: 22ms, render: 60ms)
+ GET /login 200 in 108ms (compile: 6ms, proxy.ts: 24ms, render: 78ms)
+ GET /test-badge-grid 200 in 91ms (compile: 21ms, proxy.ts: 8ms, render: 63ms)
+ GET /login 200 in 94ms (compile: 4ms, proxy.ts: 25ms, render: 64ms)
+ GET /test-badge-grid 200 in 95ms (compile: 5ms, proxy.ts: 23ms, render: 67ms)
+ GET /login 200 in 95ms (compile: 6ms, proxy.ts: 23ms, render: 66ms)
+ GET /test-badge-grid 200 in 97ms (compile: 8ms, proxy.ts: 23ms, render: 67ms)
+ GET /login 200 in 96ms (compile: 4ms, proxy.ts: 23ms, render: 68ms)
+ GET /test-badge-grid 200 in 96ms (compile: 6ms, proxy.ts: 22ms, render: 68ms)
+ GET /login 200 in 94ms (compile: 6ms, proxy.ts: 23ms, render: 66ms)
+ GET /api/schema-check 200 in 7.9s (compile: 195ms, proxy.ts: 24ms, render: 7.6s)
+ GET /test-badge-grid 200 in 100ms (compile: 11ms, proxy.ts: 21ms, render: 68ms)
+ GET /login 200 in 105ms (compile: 5ms, proxy.ts: 25ms, render: 76ms)
+ GET /test-badge-grid 200 in 102ms (compile: 7ms, proxy.ts: 19ms, render: 76ms)
+ GET /login 200 in 105ms (compile: 6ms, proxy.ts: 28ms, render: 70ms)
+ GET /test-badge-grid 200 in 98ms (compile: 15ms, proxy.ts: 19ms, render: 65ms)
+ GET /login 200 in 96ms (compile: 5ms, proxy.ts: 24ms, render: 68ms)
+ GET /test-badge-grid 200 in 92ms (compile: 8ms, proxy.ts: 21ms, render: 64ms)
+ GET /login 200 in 93ms (compile: 8ms, proxy.ts: 20ms, render: 66ms)
+ GET /test-badge-grid 200 in 95ms (compile: 5ms, proxy.ts: 25ms, render: 65ms)
+ GET /login 200 in 110ms (compile: 7ms, proxy.ts: 21ms, render: 83ms)
+ GET /test-badge-grid 200 in 95ms (compile: 6ms, proxy.ts: 22ms, render: 67ms)
+ GET /login 200 in 94ms (compile: 7ms, proxy.ts: 23ms, render: 65ms)
+ GET /test-badge-grid 200 in 96ms (compile: 4ms, proxy.ts: 25ms, render: 67ms)
+ GET /login 200 in 98ms (compile: 5ms, proxy.ts: 21ms, render: 73ms)
+ GET /test-badge-grid 200 in 100ms (compile: 10ms, proxy.ts: 21ms, render: 70ms)
+ GET /login 200 in 97ms (compile: 5ms, proxy.ts: 25ms, render: 67ms)
+ GET /test-badge-grid 200 in 98ms (compile: 9ms, proxy.ts: 24ms, render: 66ms)
+ GET /login 200 in 108ms (compile: 6ms, proxy.ts: 24ms, render: 78ms)
+ GET /test-badge-grid 200 in 125ms (compile: 5ms, proxy.ts: 20ms, render: 101ms)
+ GET /login 200 in 127ms (compile: 7ms, proxy.ts: 26ms, render: 94ms)
+ GET /test-badge-grid 200 in 121ms (compile: 19ms, proxy.ts: 23ms, render: 79ms)
+ GET /login 200 in 112ms (compile: 5ms, proxy.ts: 42ms, render: 65ms)
+ GET /test-badge-grid 200 in 98ms (compile: 6ms, proxy.ts: 20ms, render: 72ms)
+ GET /login 200 in 101ms (compile: 6ms, proxy.ts: 23ms, render: 72ms)
+ GET /test-badge-grid 200 in 101ms (compile: 6ms, proxy.ts: 23ms, render: 72ms)
+ GET /login 200 in 105ms (compile: 7ms, proxy.ts: 26ms, render: 72ms)
+ GET /test-badge-grid 200 in 100ms (compile: 9ms, proxy.ts: 21ms, render: 69ms)
+ GET /login 200 in 98ms (compile: 9ms, proxy.ts: 23ms, render: 66ms)
+ GET /test-badge-grid 200 in 94ms (compile: 9ms, proxy.ts: 25ms, render: 60ms)
+ GET /login 200 in 98ms (compile: 6ms, proxy.ts: 23ms, render: 69ms)
+ GET /test-badge-grid 200 in 96ms (compile: 5ms, proxy.ts: 21ms, render: 70ms)
+ GET /login 200 in 104ms (compile: 9ms, proxy.ts: 19ms, render: 76ms)
+ GET /test-badge-grid 200 in 107ms (compile: 7ms, proxy.ts: 28ms, render: 72ms)
+ GET /login 200 in 111ms (compile: 14ms, proxy.ts: 21ms, render: 76ms)
+ GET /test-badge-grid 200 in 112ms (compile: 7ms, proxy.ts: 29ms, render: 75ms)
+ GET /login 200 in 106ms (compile: 9ms, proxy.ts: 20ms, render: 76ms)
+ GET /test-badge-grid 200 in 108ms (compile: 8ms, proxy.ts: 30ms, render: 70ms)
+ GET /login 200 in 100ms (compile: 7ms, proxy.ts: 23ms, render: 70ms)
+ GET /test-badge-grid 200 in 115ms (compile: 10ms, proxy.ts: 23ms, render: 82ms)
+ GET /login 200 in 96ms (compile: 5ms, proxy.ts: 26ms, render: 65ms)
+ GET /test-badge-grid 200 in 113ms (compile: 10ms, proxy.ts: 23ms, render: 80ms)
+ GET /login 200 in 97ms (compile: 20ms, proxy.ts: 10ms, render: 67ms)
+ GET /test-badge-grid 200 in 96ms (compile: 6ms, proxy.ts: 23ms, render: 67ms)
+ GET /login 200 in 95ms (compile: 22ms, proxy.ts: 6ms, render: 68ms)
+ GET /test-badge-grid 200 in 100ms (compile: 4ms, proxy.ts: 26ms, render: 70ms)
+ GET /login 200 in 99ms (compile: 8ms, proxy.ts: 22ms, render: 68ms)
+ GET /test-badge-grid 200 in 94ms (compile: 4ms, proxy.ts: 25ms, render: 66ms)
+ GET /login 200 in 100ms (compile: 7ms, proxy.ts: 23ms, render: 70ms)
+ GET /test-badge-grid 200 in 98ms (compile: 6ms, proxy.ts: 21ms, render: 71ms)
+ GET /login 200 in 106ms (compile: 5ms, proxy.ts: 21ms, render: 81ms)
+ GET /test-badge-grid 200 in 103ms (compile: 6ms, proxy.ts: 30ms, render: 67ms)
+ GET /login 200 in 93ms (compile: 7ms, proxy.ts: 22ms, render: 65ms)
+ GET /test-badge-grid 200 in 91ms (compile: 5ms, proxy.ts: 30ms, render: 56ms)
+ GET /login 200 in 83ms (compile: 5ms, proxy.ts: 18ms, render: 60ms)
+ GET /test-badge-grid 200 in 85ms (compile: 7ms, proxy.ts: 20ms, render: 58ms)
+ GET /login 200 in 83ms (compile: 9ms, proxy.ts: 16ms, render: 58ms)
+ GET /test-badge-grid 200 in 86ms (compile: 5ms, proxy.ts: 23ms, render: 59ms)
+ GET /login 200 in 82ms (compile: 5ms, proxy.ts: 20ms, render: 57ms)
+ GET /test-badge-grid 200 in 85ms (compile: 8ms, proxy.ts: 19ms, render: 58ms)
+ GET /login 200 in 91ms (compile: 3ms, proxy.ts: 22ms, render: 66ms)
+ GET /test-badge-grid 200 in 93ms (compile: 5ms, proxy.ts: 19ms, render: 70ms)
+ GET /login 200 in 98ms (compile: 9ms, proxy.ts: 22ms, render: 67ms)
+ GET /test-badge-grid 200 in 94ms (compile: 6ms, proxy.ts: 24ms, render: 64ms)
+ GET /login 200 in 92ms (compile: 7ms, proxy.ts: 21ms, render: 64ms)
+ GET /test-badge-grid 200 in 96ms (compile: 8ms, proxy.ts: 21ms, render: 66ms)
+ GET /login 200 in 106ms (compile: 4ms, proxy.ts: 21ms, render: 80ms)
+ GET /test-badge-grid 200 in 118ms (compile: 8ms, proxy.ts: 22ms, render: 88ms)
+ GET /login 200 in 362ms (compile: 6ms, proxy.ts: 25ms, render: 331ms)
+ GET /test-badge-grid 200 in 373ms (compile: 23ms, proxy.ts: 19ms, render: 331ms)
+ GET /login 200 in 351ms (compile: 8ms, proxy.ts: 33ms, render: 310ms)
+ GET /test-badge-grid 200 in 335ms (compile: 13ms, proxy.ts: 260ms, render: 62ms)
+ GET /login 200 in 94ms (compile: 4ms, proxy.ts: 28ms, render: 62ms)
+ GET /test-badge-grid 200 in 84ms (compile: 9ms, proxy.ts: 21ms, render: 54ms)
+ GET /login 200 in 89ms (compile: 4ms, proxy.ts: 25ms, render: 60ms)
+ GET /test-badge-grid 200 in 87ms (compile: 3ms, proxy.ts: 20ms, render: 65ms)
+ GET /login 200 in 94ms (compile: 8ms, proxy.ts: 19ms, render: 67ms)
+ GET /test-badge-grid 200 in 97ms (compile: 6ms, proxy.ts: 22ms, render: 69ms)
+ GET /login 200 in 99ms (compile: 6ms, proxy.ts: 22ms, render: 71ms)
+ GET /test-badge-grid 200 in 110ms (compile: 8ms, proxy.ts: 22ms, render: 79ms)
+ GET /login 200 in 92ms (compile: 7ms, proxy.ts: 23ms, render: 62ms)
+ GET /test-badge-grid 200 in 92ms (compile: 7ms, proxy.ts: 24ms, render: 61ms)
+ GET /login 200 in 89ms (compile: 4ms, proxy.ts: 21ms, render: 63ms)
+ GET /test-badge-grid 200 in 86ms (compile: 5ms, proxy.ts: 18ms, render: 62ms)
+ GET /login 200 in 89ms (compile: 6ms, proxy.ts: 26ms, render: 58ms)
+ GET /test-badge-grid 200 in 85ms (compile: 5ms, proxy.ts: 20ms, render: 60ms)
+ GET /login 200 in 85ms (compile: 5ms, proxy.ts: 17ms, render: 62ms)
+ GET /test-badge-grid 200 in 92ms (compile: 6ms, proxy.ts: 20ms, render: 66ms)
+ GET /login 200 in 93ms (compile: 8ms, proxy.ts: 19ms, render: 66ms)
+ GET /test-badge-grid 200 in 91ms (compile: 6ms, proxy.ts: 24ms, render: 62ms)
+ GET /login 200 in 84ms (compile: 12ms, proxy.ts: 18ms, render: 53ms)
+ GET /test-badge-grid 200 in 83ms (compile: 8ms, proxy.ts: 18ms, render: 57ms)
+ GET /login 200 in 90ms (compile: 5ms, proxy.ts: 18ms, render: 68ms)
+ GET /test-badge-grid 200 in 90ms (compile: 6ms, proxy.ts: 16ms, render: 68ms)
+ GET /login 200 in 95ms (compile: 10ms, proxy.ts: 20ms, render: 66ms)
+ GET /test-badge-grid 200 in 95ms (compile: 5ms, proxy.ts: 29ms, render: 61ms)
+ GET /login 200 in 86ms (compile: 4ms, proxy.ts: 18ms, render: 65ms)
+ GET /test-badge-grid 200 in 90ms (compile: 6ms, proxy.ts: 22ms, render: 61ms)
+ GET /login 200 in 85ms (compile: 6ms, proxy.ts: 21ms, render: 58ms)
+ GET /test-badge-grid 200 in 86ms (compile: 5ms, proxy.ts: 20ms, render: 61ms)
+ GET /login 200 in 82ms (compile: 6ms, proxy.ts: 22ms, render: 54ms)
+ GET /test-badge-grid 200 in 79ms (compile: 6ms, proxy.ts: 17ms, render: 57ms)
+ GET /login 200 in 110ms (compile: 4ms, proxy.ts: 22ms, render: 84ms)
+ GET /test-badge-grid 200 in 94ms (compile: 5ms, proxy.ts: 16ms, render: 73ms)
+ GET /login 200 in 101ms (compile: 4ms, proxy.ts: 19ms, render: 78ms)
+ GET /test-badge-grid 200 in 102ms (compile: 17ms, proxy.ts: 20ms, render: 64ms)
+ GET /login 200 in 103ms (compile: 8ms, proxy.ts: 34ms, render: 61ms)
+ GET /test-badge-grid 200 in 93ms (compile: 5ms, proxy.ts: 24ms, render: 63ms)
+ GET /login 200 in 88ms (compile: 6ms, proxy.ts: 20ms, render: 62ms)
+ GET /test-badge-grid 200 in 90ms (compile: 7ms, proxy.ts: 19ms, render: 63ms)
+ GET /login 200 in 91ms (compile: 4ms, proxy.ts: 23ms, render: 64ms)
+ GET /test-badge-grid 200 in 89ms (compile: 6ms, proxy.ts: 21ms, render: 62ms)
+ GET /login 200 in 89ms (compile: 9ms, proxy.ts: 21ms, render: 59ms)
+ GET /test-badge-grid 200 in 91ms (compile: 4ms, proxy.ts: 23ms, render: 64ms)
+ GET /login 200 in 92ms (compile: 5ms, proxy.ts: 18ms, render: 69ms)
+ GET /test-badge-grid 200 in 97ms (compile: 8ms, proxy.ts: 19ms, render: 70ms)
+ GET /login 200 in 96ms (compile: 5ms, proxy.ts: 25ms, render: 66ms)
+ GET /test-badge-grid 200 in 96ms (compile: 8ms, proxy.ts: 23ms, render: 65ms)
+ GET /login 200 in 102ms (compile: 9ms, proxy.ts: 19ms, render: 74ms)
+ GET /test-badge-grid 200 in 103ms (compile: 6ms, proxy.ts: 23ms, render: 75ms)
+ GET /login 200 in 102ms (compile: 8ms, proxy.ts: 23ms, render: 71ms)
+ GET /test-badge-grid 200 in 101ms (compile: 13ms, proxy.ts: 23ms, render: 66ms)
+ GET /login 200 in 93ms (compile: 6ms, proxy.ts: 21ms, render: 65ms)
+ GET /test-badge-grid 200 in 90ms (compile: 7ms, proxy.ts: 21ms, render: 62ms)
+ GET /login 200 in 91ms (compile: 8ms, proxy.ts: 22ms, render: 61ms)
+ GET /test-badge-grid 200 in 90ms (compile: 6ms, proxy.ts: 21ms, render: 64ms)
+ GET /login 200 in 88ms (compile: 6ms, proxy.ts: 19ms, render: 64ms)
+ GET /test-badge-grid 200 in 91ms (compile: 9ms, proxy.ts: 21ms, render: 61ms)
+ GET /login 200 in 91ms (compile: 7ms, proxy.ts: 20ms, render: 64ms)
+ GET /test-badge-grid 200 in 89ms (compile: 4ms, proxy.ts: 20ms, render: 65ms)
+ GET /login 200 in 93ms (compile: 6ms, proxy.ts: 20ms, render: 67ms)
+ GET /test-badge-grid 200 in 95ms (compile: 5ms, proxy.ts: 24ms, render: 66ms)
+ GET /login 200 in 93ms (compile: 6ms, proxy.ts: 21ms, render: 65ms)
+ GET /test-badge-grid 200 in 95ms (compile: 9ms, proxy.ts: 22ms, render: 64ms)
+ GET /login 200 in 104ms (compile: 4ms, proxy.ts: 24ms, render: 76ms)
+ GET /test-badge-grid 200 in 103ms (compile: 5ms, proxy.ts: 21ms, render: 78ms)
+ GET /login 200 in 100ms (compile: 8ms, proxy.ts: 21ms, render: 70ms)
+ GET /test-badge-grid 200 in 101ms (compile: 17ms, proxy.ts: 24ms, render: 60ms)
+ GET /login 200 in 107ms (compile: 5ms, proxy.ts: 24ms, render: 78ms)
+ GET /test-badge-grid 200 in 86ms (compile: 6ms, proxy.ts: 17ms, render: 64ms)
+ GET /login 200 in 88ms (compile: 8ms, proxy.ts: 20ms, render: 60ms)
+ GET /test-badge-grid 200 in 91ms (compile: 5ms, proxy.ts: 21ms, render: 65ms)
+ GET /login 200 in 90ms (compile: 5ms, proxy.ts: 22ms, render: 64ms)
+ GET /test-badge-grid 200 in 90ms (compile: 7ms, proxy.ts: 19ms, render: 64ms)
+ GET /login 200 in 111ms (compile: 6ms, proxy.ts: 24ms, render: 81ms)
+ GET /test-badge-grid 200 in 95ms (compile: 23ms, proxy.ts: 8ms, render: 64ms)
+ GET /login 200 in 96ms (compile: 7ms, proxy.ts: 22ms, render: 67ms)
+ GET /test-badge-grid 200 in 93ms (compile: 4ms, proxy.ts: 22ms, render: 67ms)
+ GET /login 200 in 93ms (compile: 4ms, proxy.ts: 22ms, render: 67ms)
+ GET /test-badge-grid 200 in 98ms (compile: 9ms, proxy.ts: 23ms, render: 65ms)
+ GET /login 200 in 101ms (compile: 5ms, proxy.ts: 22ms, render: 74ms)
+ GET /test-badge-grid 200 in 100ms (compile: 9ms, proxy.ts: 19ms, render: 72ms)
+ GET /login 200 in 101ms (compile: 8ms, proxy.ts: 22ms, render: 71ms)
+ GET /test-badge-grid 200 in 103ms (compile: 7ms, proxy.ts: 30ms, render: 66ms)
+ GET /login 200 in 92ms (compile: 6ms, proxy.ts: 21ms, render: 65ms)
+ GET /test-badge-grid 200 in 89ms (compile: 5ms, proxy.ts: 21ms, render: 63ms)
+ GET /login 200 in 87ms (compile: 9ms, proxy.ts: 21ms, render: 57ms)
+ GET /test-badge-grid 200 in 91ms (compile: 5ms, proxy.ts: 22ms, render: 64ms)
+ GET /login 200 in 88ms (compile: 4ms, proxy.ts: 20ms, render: 64ms)
+ GET /test-badge-grid 200 in 97ms (compile: 8ms, proxy.ts: 19ms, render: 70ms)
+ GET /login 200 in 98ms (compile: 7ms, proxy.ts: 24ms, render: 66ms)
+ GET /test-badge-grid 200 in 94ms (compile: 6ms, proxy.ts: 21ms, render: 67ms)
+ GET /login 200 in 96ms (compile: 10ms, proxy.ts: 20ms, render: 65ms)
+ GET /test-badge-grid 200 in 92ms (compile: 4ms, proxy.ts: 23ms, render: 65ms)
+ GET /login 200 in 89ms (compile: 9ms, proxy.ts: 21ms, render: 60ms)
+ GET /test-badge-grid 200 in 92ms (compile: 6ms, proxy.ts: 22ms, render: 64ms)
+ GET /login 200 in 98ms (compile: 5ms, proxy.ts: 20ms, render: 73ms)
+ GET /test-badge-grid 200 in 98ms (compile: 10ms, proxy.ts: 18ms, render: 71ms)
+ GET /login 200 in 97ms (compile: 6ms, proxy.ts: 23ms, render: 68ms)
+ GET /test-badge-grid 200 in 94ms (compile: 6ms, proxy.ts: 28ms, render: 59ms)
+ GET /login 200 in 91ms (compile: 7ms, proxy.ts: 20ms, render: 65ms)
+ GET /test-badge-grid 200 in 90ms (compile: 4ms, proxy.ts: 20ms, render: 66ms)
+ GET /login 200 in 95ms (compile: 9ms, proxy.ts: 20ms, render: 65ms)
+ GET /test-badge-grid 200 in 94ms (compile: 7ms, proxy.ts: 25ms, render: 63ms)
+ GET /login 200 in 89ms (compile: 6ms, proxy.ts: 20ms, render: 62ms)
+ GET /test-badge-grid 200 in 88ms (compile: 9ms, proxy.ts: 20ms, render: 59ms)
+ GET /login 200 in 94ms (compile: 5ms, proxy.ts: 23ms, render: 66ms)
+ GET /test-badge-grid 200 in 105ms (compile: 6ms, proxy.ts: 18ms, render: 81ms)
+ GET /login 200 in 94ms (compile: 6ms, proxy.ts: 20ms, render: 68ms)
+ GET /test-badge-grid 200 in 123ms (compile: 8ms, proxy.ts: 23ms, render: 92ms)
+ GET /login 200 in 104ms (compile: 4ms, proxy.ts: 21ms, render: 79ms)
+ GET /test-badge-grid 200 in 133ms (compile: 7ms, proxy.ts: 24ms, render: 102ms)
+ GET /login 200 in 117ms (compile: 9ms, proxy.ts: 26ms, render: 83ms)
+ GET /test-badge-grid 200 in 128ms (compile: 5ms, proxy.ts: 29ms, render: 94ms)
+ GET /login 200 in 107ms (compile: 23ms, proxy.ts: 6ms, render: 78ms)
+ GET /test-badge-grid 200 in 119ms (compile: 9ms, proxy.ts: 33ms, render: 77ms)
+ GET /login 200 in 95ms (compile: 20ms, proxy.ts: 9ms, render: 66ms)
+ GET /test-badge-grid 200 in 94ms (compile: 6ms, proxy.ts: 7ms, render: 81ms)
+ GET /login 200 in 95ms (compile: 21ms, proxy.ts: 7ms, render: 68ms)
+ GET /test-badge-grid 200 in 79ms (compile: 4ms, proxy.ts: 11ms, render: 64ms)
+ GET /login 200 in 95ms (compile: 21ms, proxy.ts: 8ms, render: 66ms)
+ GET /test-badge-grid 200 in 95ms (compile: 4ms, proxy.ts: 26ms, render: 65ms)
+ GET /login 200 in 94ms (compile: 7ms, proxy.ts: 22ms, render: 65ms)
+ GET /test-badge-grid 200 in 98ms (compile: 8ms, proxy.ts: 22ms, render: 68ms)
+ GET /login 200 in 95ms (compile: 6ms, proxy.ts: 22ms, render: 66ms)
+ GET /test-badge-grid 200 in 97ms (compile: 7ms, proxy.ts: 22ms, render: 68ms)
+ GET /login 200 in 101ms (compile: 8ms, proxy.ts: 24ms, render: 69ms)
+ GET /test-badge-grid 200 in 98ms (compile: 7ms, proxy.ts: 22ms, render: 69ms)
+ GET /login 200 in 108ms (compile: 9ms, proxy.ts: 25ms, render: 74ms)
+ GET /test-badge-grid 200 in 107ms (compile: 5ms, proxy.ts: 26ms, render: 76ms)
+ GET /login 200 in 106ms (compile: 7ms, proxy.ts: 21ms, render: 78ms)
+ GET /test-badge-grid 200 in 107ms (compile: 8ms, proxy.ts: 32ms, render: 68ms)
+ GET /login 200 in 97ms (compile: 6ms, proxy.ts: 24ms, render: 68ms)
+ GET /test-badge-grid 200 in 91ms (compile: 7ms, proxy.ts: 24ms, render: 60ms)
+ GET /login 200 in 86ms (compile: 9ms, proxy.ts: 19ms, render: 58ms)
+ GET /test-badge-grid 200 in 89ms (compile: 5ms, proxy.ts: 24ms, render: 60ms)
+ GET /login 200 in 82ms (compile: 5ms, proxy.ts: 19ms, render: 59ms)
+ GET /test-badge-grid 200 in 80ms (compile: 7ms, proxy.ts: 19ms, render: 54ms)
+ GET /login 200 in 80ms (compile: 6ms, proxy.ts: 23ms, render: 52ms)
+ GET /test-badge-grid 200 in 73ms (compile: 5ms, proxy.ts: 18ms, render: 50ms)
+ GET /login 200 in 79ms (compile: 5ms, proxy.ts: 17ms, render: 57ms)
+ GET /test-badge-grid 200 in 80ms (compile: 4ms, proxy.ts: 18ms, render: 58ms)
+ GET /login 200 in 83ms (compile: 4ms, proxy.ts: 19ms, render: 60ms)
+ GET /test-badge-grid 200 in 92ms (compile: 8ms, proxy.ts: 21ms, render: 63ms)
+ GET /login 200 in 94ms (compile: 3ms, proxy.ts: 22ms, render: 69ms)
+ GET /test-badge-grid 200 in 91ms (compile: 4ms, proxy.ts: 19ms, render: 68ms)
+ GET /login 200 in 91ms (compile: 5ms, proxy.ts: 25ms, render: 61ms)
+ GET /test-badge-grid 200 in 86ms (compile: 5ms, proxy.ts: 26ms, render: 56ms)
+ GET /login 200 in 79ms (compile: 7ms, proxy.ts: 17ms, render: 55ms)
+ GET /test-badge-grid 200 in 94ms (compile: 6ms, proxy.ts: 19ms, render: 68ms)
+ GET /login 200 in 79ms (compile: 7ms, proxy.ts: 18ms, render: 54ms)
+ GET /test-badge-grid 200 in 74ms (compile: 4ms, proxy.ts: 19ms, render: 51ms)
+ GET /login 200 in 73ms (compile: 3ms, proxy.ts: 20ms, render: 51ms)
+ GET /test-badge-grid 200 in 71ms (compile: 4ms, proxy.ts: 17ms, render: 50ms)
+ GET /login 200 in 72ms (compile: 4ms, proxy.ts: 17ms, render: 52ms)
+ GET /test-badge-grid 200 in 77ms (compile: 4ms, proxy.ts: 19ms, render: 55ms)
+ GET /login 200 in 79ms (compile: 4ms, proxy.ts: 17ms, render: 59ms)
+ GET /test-badge-grid 200 in 85ms (compile: 6ms, proxy.ts: 16ms, render: 64ms)
+ GET /login 200 in 93ms (compile: 6ms, proxy.ts: 22ms, render: 65ms)
+ GET /test-badge-grid 200 in 90ms (compile: 6ms, proxy.ts: 20ms, render: 65ms)
+ GET /login 200 in 101ms (compile: 10ms, proxy.ts: 21ms, render: 70ms)
+ GET /test-badge-grid 200 in 102ms (compile: 5ms, proxy.ts: 24ms, render: 73ms)
+ GET /login 200 in 100ms (compile: 6ms, proxy.ts: 19ms, render: 74ms)
+ GET /test-badge-grid 200 in 102ms (compile: 5ms, proxy.ts: 31ms, render: 66ms)
+ GET /login 200 in 104ms (compile: 7ms, proxy.ts: 22ms, render: 75ms)
+ GET /test-badge-grid 200 in 108ms (compile: 6ms, proxy.ts: 24ms, render: 79ms)
+ GET /login 200 in 122ms (compile: 10ms, proxy.ts: 22ms, render: 89ms)
+ GET /test-badge-grid 200 in 108ms (compile: 7ms, proxy.ts: 32ms, render: 69ms)
+ GET /login 200 in 112ms (compile: 8ms, proxy.ts: 23ms, render: 81ms)
+ GET /test-badge-grid 200 in 93ms (compile: 5ms, proxy.ts: 23ms, render: 65ms)
+ GET /login 200 in 104ms (compile: 8ms, proxy.ts: 22ms, render: 74ms)
+ GET /test-badge-grid 200 in 94ms (compile: 5ms, proxy.ts: 23ms, render: 67ms)
+ GET /login 200 in 113ms (compile: 4ms, proxy.ts: 20ms, render: 88ms)
+ GET /test-badge-grid 200 in 581ms (compile: 264ms, proxy.ts: 24ms, render: 293ms)
+ GET /login 200 in 557ms (compile: 312ms, proxy.ts: 13ms, render: 231ms)
+ GET /test-badge-grid 200 in 217ms (compile: 49ms, proxy.ts: 53ms, render: 116ms)
+ GET /login 200 in 218ms (compile: 97ms, proxy.ts: 64ms, render: 57ms)
+ GET /login 200 in 87ms (compile: 16ms, proxy.ts: 7ms, render: 64ms)
+ GET /test-badge-grid 200 in 90ms (compile: 4ms, proxy.ts: 7ms, render: 79ms)
+ GET /test-badge-grid 200 in 100ms (compile: 4ms, proxy.ts: 5ms, render: 92ms)
+ GET /login 200 in 101ms (compile: 17ms, proxy.ts: 4ms, render: 79ms)
+ GET /test-badge-grid 200 in 110ms (compile: 8ms, proxy.ts: 12ms, render: 89ms)
+ GET /login 200 in 109ms (compile: 21ms, proxy.ts: 12ms, render: 76ms)
+ GET /test-badge-grid 200 in 103ms (compile: 8ms, proxy.ts: 8ms, render: 87ms)
+ GET /login 200 in 104ms (compile: 21ms, proxy.ts: 9ms, render: 74ms)
+ GET /test-badge-grid 200 in 94ms (compile: 6ms, proxy.ts: 9ms, render: 79ms)
+ GET /login 200 in 97ms (compile: 19ms, proxy.ts: 10ms, render: 68ms)
+ GET /test-badge-grid 200 in 97ms (compile: 7ms, proxy.ts: 6ms, render: 84ms)
+ GET /login 200 in 97ms (compile: 21ms, proxy.ts: 7ms, render: 70ms)
+ GET /test-badge-grid 200 in 96ms (compile: 9ms, proxy.ts: 7ms, render: 80ms)
+ GET /login 200 in 98ms (compile: 20ms, proxy.ts: 7ms, render: 70ms)
+ GET /test-badge-grid 200 in 90ms (compile: 6ms, proxy.ts: 6ms, render: 78ms)
+ GET /login 200 in 90ms (compile: 19ms, proxy.ts: 6ms, render: 64ms)
+ GET /test-badge-grid 200 in 90ms (compile: 4ms, proxy.ts: 9ms, render: 77ms)
+ GET /login 200 in 90ms (compile: 19ms, proxy.ts: 7ms, render: 63ms)
+ GET /test-badge-grid 200 in 98ms (compile: 4ms, proxy.ts: 10ms, render: 84ms)
+ GET /login 200 in 99ms (compile: 17ms, proxy.ts: 10ms, render: 72ms)
+ GET /test-badge-grid 200 in 101ms (compile: 8ms, proxy.ts: 7ms, render: 87ms)
+ GET /login 200 in 101ms (compile: 19ms, proxy.ts: 7ms, render: 76ms)
+ GET /test-badge-grid 200 in 102ms (compile: 7ms, proxy.ts: 8ms, render: 86ms)
+ GET /login 200 in 102ms (compile: 22ms, proxy.ts: 8ms, render: 73ms)
+ GET /test-badge-grid 200 in 112ms (compile: 8ms, proxy.ts: 7ms, render: 97ms)
+ GET /login 200 in 115ms (compile: 27ms, proxy.ts: 7ms, render: 82ms)
+ GET /test-badge-grid 200 in 116ms (compile: 8ms, proxy.ts: 9ms, render: 99ms)
+ GET /login 200 in 117ms (compile: 20ms, proxy.ts: 10ms, render: 87ms)
+ GET /test-badge-grid 200 in 98ms (compile: 15ms, proxy.ts: 10ms, render: 73ms)
+ GET /login 200 in 98ms (compile: 20ms, proxy.ts: 20ms, render: 58ms)
+ GET /test-badge-grid 200 in 62ms (compile: 5ms, proxy.ts: 8ms, render: 49ms)
+ GET /login 200 in 75ms (compile: 17ms, proxy.ts: 8ms, render: 50ms)
+ GET /test-badge-grid 200 in 71ms (compile: 5ms, proxy.ts: 20ms, render: 46ms)
+ GET /login 200 in 69ms (compile: 8ms, proxy.ts: 16ms, render: 45ms)
+ GET /test-badge-grid 200 in 73ms (compile: 5ms, proxy.ts: 17ms, render: 52ms)
+ GET /login 200 in 85ms (compile: 8ms, proxy.ts: 16ms, render: 61ms)
+ GET /test-badge-grid 200 in 91ms (compile: 15ms, proxy.ts: 9ms, render: 67ms)
+ GET /login 200 in 91ms (compile: 5ms, proxy.ts: 19ms, render: 68ms)
+ GET /test-badge-grid 200 in 96ms (compile: 14ms, proxy.ts: 20ms, render: 62ms)
+ GET /login 200 in 106ms (compile: 4ms, proxy.ts: 22ms, render: 80ms)
+ GET /test-badge-grid 200 in 89ms (compile: 7ms, proxy.ts: 19ms, render: 63ms)
+ GET /login 200 in 88ms (compile: 6ms, proxy.ts: 21ms, render: 61ms)
+ GET /test-badge-grid 200 in 91ms (compile: 5ms, proxy.ts: 23ms, render: 64ms)
+ GET /login 200 in 87ms (compile: 5ms, proxy.ts: 19ms, render: 62ms)
+ GET /test-badge-grid 200 in 87ms (compile: 7ms, proxy.ts: 20ms, render: 60ms)
+ GET /login 200 in 90ms (compile: 5ms, proxy.ts: 23ms, render: 62ms)
+ GET /test-badge-grid 200 in 89ms (compile: 5ms, proxy.ts: 20ms, render: 64ms)
+ GET /login 200 in 102ms (compile: 5ms, proxy.ts: 20ms, render: 76ms)
+ GET /test-badge-grid 200 in 102ms (compile: 9ms, proxy.ts: 19ms, render: 73ms)
+ GET /login 200 in 103ms (compile: 13ms, proxy.ts: 24ms, render: 66ms)
+ GET /test-badge-grid 200 in 100ms (compile: 6ms, proxy.ts: 31ms, render: 62ms)
+ GET /login 200 in 95ms (compile: 5ms, proxy.ts: 21ms, render: 69ms)
+ GET /test-badge-grid 200 in 94ms (compile: 4ms, proxy.ts: 22ms, render: 67ms)
+ GET /login 200 in 95ms (compile: 7ms, proxy.ts: 20ms, render: 68ms)
+ GET /test-badge-grid 200 in 99ms (compile: 6ms, proxy.ts: 28ms, render: 65ms)
+ GET /login 200 in 90ms (compile: 4ms, proxy.ts: 22ms, render: 64ms)
+ GET /test-badge-grid 200 in 90ms (compile: 4ms, proxy.ts: 20ms, render: 66ms)
+ GET /login 200 in 98ms (compile: 7ms, proxy.ts: 24ms, render: 66ms)
+ GET /test-badge-grid 200 in 92ms (compile: 5ms, proxy.ts: 20ms, render: 67ms)
+ GET /login 200 in 93ms (compile: 6ms, proxy.ts: 20ms, render: 66ms)
+ GET /test-badge-grid 200 in 94ms (compile: 4ms, proxy.ts: 27ms, render: 62ms)
+ GET /login 200 in 88ms (compile: 5ms, proxy.ts: 19ms, render: 64ms)
+ GET /test-badge-grid 200 in 95ms (compile: 7ms, proxy.ts: 21ms, render: 67ms)
+ GET /login 200 in 95ms (compile: 6ms, proxy.ts: 23ms, render: 66ms)
+ GET /test-badge-grid 200 in 112ms (compile: 6ms, proxy.ts: 21ms, render: 84ms)
+ GET /login 200 in 99ms (compile: 9ms, proxy.ts: 22ms, render: 69ms)
+ GET /test-badge-grid 200 in 113ms (compile: 7ms, proxy.ts: 23ms, render: 83ms)
+ GET /login 200 in 106ms (compile: 5ms, proxy.ts: 21ms, render: 79ms)
+ GET /test-badge-grid 200 in 105ms (compile: 7ms, proxy.ts: 25ms, render: 72ms)
+ GET /login 200 in 104ms (compile: 22ms, proxy.ts: 9ms, render: 73ms)
+ GET /test-badge-grid 200 in 96ms (compile: 4ms, proxy.ts: 31ms, render: 60ms)
+ GET /login 200 in 90ms (compile: 9ms, proxy.ts: 20ms, render: 61ms)
+ GET /test-badge-grid 200 in 89ms (compile: 4ms, proxy.ts: 23ms, render: 62ms)
+ GET /login 200 in 87ms (compile: 5ms, proxy.ts: 18ms, render: 64ms)
+ GET /test-badge-grid 200 in 87ms (compile: 9ms, proxy.ts: 20ms, render: 57ms)
+ GET /login 200 in 100ms (compile: 6ms, proxy.ts: 23ms, render: 71ms)
+ GET /test-badge-grid 200 in 84ms (compile: 20ms, proxy.ts: 6ms, render: 58ms)
+ GET /login 200 in 82ms (compile: 7ms, proxy.ts: 20ms, render: 55ms)
+ GET /test-badge-grid 200 in 83ms (compile: 18ms, proxy.ts: 9ms, render: 56ms)
+ GET /login 200 in 84ms (compile: 3ms, proxy.ts: 20ms, render: 61ms)
+ GET /test-badge-grid 200 in 87ms (compile: 6ms, proxy.ts: 19ms, render: 63ms)
+ GET /login 200 in 91ms (compile: 5ms, proxy.ts: 20ms, render: 67ms)
+ GET /test-badge-grid 200 in 92ms (compile: 7ms, proxy.ts: 21ms, render: 63ms)
+ GET /login 200 in 100ms (compile: 5ms, proxy.ts: 23ms, render: 73ms)
+ GET /test-badge-grid 200 in 98ms (compile: 7ms, proxy.ts: 22ms, render: 70ms)
+ GET /login 200 in 96ms (compile: 5ms, proxy.ts: 20ms, render: 70ms)
+ GET /test-badge-grid 200 in 95ms (compile: 9ms, proxy.ts: 29ms, render: 58ms)
+ GET /login 200 in 91ms (compile: 20ms, proxy.ts: 7ms, render: 65ms)
+ GET /test-badge-grid 200 in 92ms (compile: 6ms, proxy.ts: 21ms, render: 66ms)
+ GET /login 200 in 93ms (compile: 21ms, proxy.ts: 6ms, render: 66ms)
+ GET /test-badge-grid 200 in 108ms (compile: 6ms, proxy.ts: 28ms, render: 74ms)
+ GET /login 200 in 88ms (compile: 21ms, proxy.ts: 8ms, render: 59ms)
+ GET /test-badge-grid 200 in 97ms (compile: 4ms, proxy.ts: 24ms, render: 69ms)
+ GET /login 200 in 82ms (compile: 18ms, proxy.ts: 7ms, render: 56ms)
+ GET /test-badge-grid 200 in 84ms (compile: 4ms, proxy.ts: 21ms, render: 59ms)
+ GET /login 200 in 84ms (compile: 17ms, proxy.ts: 5ms, render: 62ms)
+ GET /test-badge-grid 200 in 91ms (compile: 7ms, proxy.ts: 21ms, render: 62ms)
+ GET /login 200 in 94ms (compile: 20ms, proxy.ts: 9ms, render: 66ms)
+ GET /test-badge-grid 200 in 91ms (compile: 4ms, proxy.ts: 22ms, render: 66ms)
+ GET /login 200 in 104ms (compile: 27ms, proxy.ts: 5ms, render: 72ms)
+ GET /test-badge-grid 200 in 100ms (compile: 3ms, proxy.ts: 27ms, render: 69ms)
+ GET /login 200 in 98ms (compile: 5ms, proxy.ts: 21ms, render: 72ms)
+ GET /test-badge-grid 200 in 96ms (compile: 7ms, proxy.ts: 32ms, render: 58ms)
+ GET /login 200 in 88ms (compile: 23ms, proxy.ts: 6ms, render: 60ms)
+ GET /test-badge-grid 200 in 89ms (compile: 4ms, proxy.ts: 22ms, render: 63ms)
+ GET /login 200 in 87ms (compile: 20ms, proxy.ts: 6ms, render: 61ms)
+ GET /test-badge-grid 200 in 106ms (compile: 10ms, proxy.ts: 22ms, render: 74ms)
+ GET /login 200 in 95ms (compile: 20ms, proxy.ts: 11ms, render: 64ms)
+ GET /test-badge-grid 200 in 87ms (compile: 7ms, proxy.ts: 21ms, render: 60ms)
+ GET /login 200 in 96ms (compile: 22ms, proxy.ts: 6ms, render: 68ms)
+ GET /test-badge-grid 200 in 96ms (compile: 3ms, proxy.ts: 24ms, render: 68ms)
+ GET /login 200 in 94ms (compile: 6ms, proxy.ts: 20ms, render: 67ms)
+ GET /test-badge-grid 200 in 95ms (compile: 6ms, proxy.ts: 27ms, render: 63ms)
+ GET /login 200 in 86ms (compile: 6ms, proxy.ts: 20ms, render: 61ms)
+ GET /test-badge-grid 200 in 87ms (compile: 7ms, proxy.ts: 20ms, render: 60ms)
+ GET /login 200 in 109ms (compile: 8ms, proxy.ts: 22ms, render: 80ms)
+ GET /test-badge-grid 200 in 90ms (compile: 20ms, proxy.ts: 5ms, render: 65ms)
+ GET /login 200 in 103ms (compile: 8ms, proxy.ts: 19ms, render: 75ms)
+ GET /test-badge-grid 200 in 88ms (compile: 26ms, proxy.ts: 6ms, render: 56ms)
+ GET /login 200 in 86ms (compile: 5ms, proxy.ts: 6ms, render: 75ms)
+ GET /test-badge-grid 200 in 85ms (compile: 19ms, proxy.ts: 5ms, render: 61ms)
+ GET /login 200 in 78ms (compile: 5ms, proxy.ts: 8ms, render: 65ms)
+ GET /test-badge-grid 200 in 94ms (compile: 22ms, proxy.ts: 8ms, render: 64ms)
+ GET /login 200 in 93ms (compile: 4ms, proxy.ts: 20ms, render: 69ms)
+ GET /test-badge-grid 200 in 100ms (compile: 9ms, proxy.ts: 23ms, render: 68ms)
+ GET /login 200 in 94ms (compile: 5ms, proxy.ts: 22ms, render: 67ms)
+ GET /test-badge-grid 200 in 96ms (compile: 8ms, proxy.ts: 23ms, render: 66ms)
+ GET /login 200 in 95ms (compile: 5ms, proxy.ts: 26ms, render: 64ms)
+ GET /test-badge-grid 200 in 89ms (compile: 7ms, proxy.ts: 19ms, render: 63ms)
+ GET /login 200 in 95ms (compile: 7ms, proxy.ts: 23ms, render: 66ms)
+ GET /test-badge-grid 200 in 95ms (compile: 6ms, proxy.ts: 22ms, render: 68ms)
+ GET /login 200 in 101ms (compile: 6ms, proxy.ts: 20ms, render: 75ms)
+ GET /test-badge-grid 200 in 102ms (compile: 6ms, proxy.ts: 25ms, render: 71ms)
+ GET /login 200 in 111ms (compile: 8ms, proxy.ts: 23ms, render: 80ms)
+ GET /test-badge-grid 200 in 96ms (compile: 28ms, proxy.ts: 5ms, render: 63ms)
+ GET /login 200 in 101ms (compile: 7ms, proxy.ts: 22ms, render: 72ms)
+ GET /test-badge-grid 200 in 86ms (compile: 20ms, proxy.ts: 7ms, render: 59ms)
+ GET /login 200 in 86ms (compile: 4ms, proxy.ts: 20ms, render: 62ms)
+ GET /test-badge-grid 200 in 91ms (compile: 4ms, proxy.ts: 20ms, render: 66ms)
+ GET /login 200 in 90ms (compile: 9ms, proxy.ts: 20ms, render: 62ms)
+ GET /test-badge-grid 200 in 94ms (compile: 8ms, proxy.ts: 21ms, render: 65ms)
+ GET /login 200 in 87ms (compile: 5ms, proxy.ts: 22ms, render: 59ms)
+ GET /test-badge-grid 200 in 88ms (compile: 6ms, proxy.ts: 20ms, render: 61ms)
+ GET /login 200 in 91ms (compile: 4ms, proxy.ts: 23ms, render: 64ms)
+ GET /test-badge-grid 200 in 89ms (compile: 6ms, proxy.ts: 19ms, render: 64ms)
+ GET /login 200 in 96ms (compile: 6ms, proxy.ts: 23ms, render: 67ms)
+ GET /test-badge-grid 200 in 94ms (compile: 7ms, proxy.ts: 22ms, render: 65ms)
+ GET /login 200 in 101ms (compile: 7ms, proxy.ts: 21ms, render: 73ms)
+ GET /test-badge-grid 200 in 99ms (compile: 9ms, proxy.ts: 22ms, render: 68ms)
+ GET /login 200 in 96ms (compile: 5ms, proxy.ts: 24ms, render: 67ms)
+ GET /test-badge-grid 200 in 93ms (compile: 15ms, proxy.ts: 19ms, render: 59ms)
+ GET /login 200 in 85ms (compile: 4ms, proxy.ts: 19ms, render: 62ms)
+ GET /test-badge-grid 200 in 85ms (compile: 4ms, proxy.ts: 19ms, render: 62ms)
+ GET /login 200 in 95ms (compile: 7ms, proxy.ts: 22ms, render: 67ms)
+ GET /test-badge-grid 200 in 118ms (compile: 5ms, proxy.ts: 23ms, render: 90ms)
+ GET /login 200 in 102ms (compile: 6ms, proxy.ts: 19ms, render: 77ms)
+ GET /test-badge-grid 200 in 115ms (compile: 6ms, proxy.ts: 25ms, render: 85ms)
+ GET /login 200 in 97ms (compile: 11ms, proxy.ts: 19ms, render: 67ms)
+ GET /test-badge-grid 200 in 114ms (compile: 6ms, proxy.ts: 28ms, render: 79ms)
+ GET /login 200 in 92ms (compile: 19ms, proxy.ts: 6ms, render: 66ms)
+ GET /test-badge-grid 200 in 111ms (compile: 7ms, proxy.ts: 23ms, render: 81ms)
+ GET /login 200 in 96ms (compile: 20ms, proxy.ts: 8ms, render: 68ms)
+ GET /test-badge-grid 200 in 97ms (compile: 5ms, proxy.ts: 24ms, render: 68ms)
+ GET /login 200 in 106ms (compile: 7ms, proxy.ts: 22ms, render: 77ms)
+ GET /test-badge-grid 200 in 102ms (compile: 6ms, proxy.ts: 23ms, render: 73ms)
+ GET /login 200 in 99ms (compile: 7ms, proxy.ts: 24ms, render: 68ms)
+ GET /test-badge-grid 200 in 94ms (compile: 6ms, proxy.ts: 30ms, render: 58ms)
+ GET /login 200 in 86ms (compile: 7ms, proxy.ts: 19ms, render: 61ms)
+ GET /test-badge-grid 200 in 88ms (compile: 4ms, proxy.ts: 20ms, render: 64ms)
+ GET /login 200 in 88ms (compile: 7ms, proxy.ts: 18ms, render: 63ms)
+ GET /test-badge-grid 200 in 92ms (compile: 8ms, proxy.ts: 22ms, render: 62ms)
+ GET /login 200 in 97ms (compile: 6ms, proxy.ts: 24ms, render: 67ms)
+ GET /test-badge-grid 200 in 96ms (compile: 6ms, proxy.ts: 23ms, render: 66ms)
+ GET /login 200 in 97ms (compile: 8ms, proxy.ts: 19ms, render: 70ms)
+ GET /test-badge-grid 200 in 96ms (compile: 6ms, proxy.ts: 24ms, render: 66ms)
+ GET /login 200 in 98ms (compile: 6ms, proxy.ts: 22ms, render: 69ms)
+ GET /test-badge-grid 200 in 94ms (compile: 8ms, proxy.ts: 22ms, render: 64ms)
+ GET /login 200 in 99ms (compile: 8ms, proxy.ts: 22ms, render: 69ms)
+ GET /test-badge-grid 200 in 99ms (compile: 7ms, proxy.ts: 23ms, render: 69ms)
+ GET /login 200 in 108ms (compile: 5ms, proxy.ts: 20ms, render: 83ms)
+ GET /test-badge-grid 200 in 112ms (compile: 7ms, proxy.ts: 26ms, render: 79ms)
+ GET /login 200 in 107ms (compile: 7ms, proxy.ts: 23ms, render: 77ms)
+ GET /test-badge-grid 200 in 129ms (compile: 9ms, proxy.ts: 36ms, render: 83ms)
+ GET /login 200 in 95ms (compile: 22ms, proxy.ts: 7ms, render: 66ms)
+ GET /test-badge-grid 200 in 116ms (compile: 6ms, proxy.ts: 20ms, render: 91ms)
+ GET /login 200 in 106ms (compile: 28ms, proxy.ts: 6ms, render: 71ms)
+ GET /test-badge-grid 200 in 114ms (compile: 9ms, proxy.ts: 24ms, render: 82ms)
+ GET /login 200 in 99ms (compile: 23ms, proxy.ts: 9ms, render: 66ms)
+ GET /test-badge-grid 200 in 112ms (compile: 8ms, proxy.ts: 23ms, render: 81ms)
+ GET /login 200 in 101ms (compile: 22ms, proxy.ts: 7ms, render: 72ms)
+ GET /test-badge-grid 200 in 122ms (compile: 5ms, proxy.ts: 25ms, render: 93ms)
+ GET /login 200 in 108ms (compile: 19ms, proxy.ts: 6ms, render: 83ms)
+ GET /test-badge-grid 200 in 111ms (compile: 12ms, proxy.ts: 12ms, render: 88ms)
+ GET /login 200 in 106ms (compile: 22ms, proxy.ts: 10ms, render: 74ms)
+ GET /test-badge-grid 200 in 109ms (compile: 6ms, proxy.ts: 12ms, render: 91ms)
+ GET /login 200 in 111ms (compile: 19ms, proxy.ts: 12ms, render: 80ms)
+ GET /test-badge-grid 200 in 106ms (compile: 5ms, proxy.ts: 8ms, render: 92ms)
+ GET /login 200 in 106ms (compile: 18ms, proxy.ts: 7ms, render: 80ms)
+ GET /test-badge-grid 200 in 99ms (compile: 5ms, proxy.ts: 11ms, render: 83ms)
+ GET /login 200 in 99ms (compile: 20ms, proxy.ts: 11ms, render: 68ms)
+ GET /test-badge-grid 200 in 100ms (compile: 6ms, proxy.ts: 8ms, render: 85ms)
+ GET /login 200 in 100ms (compile: 21ms, proxy.ts: 9ms, render: 70ms)
+ GET /test-badge-grid 200 in 90ms (compile: 7ms, proxy.ts: 9ms, render: 74ms)
+ GET /login 200 in 91ms (compile: 21ms, proxy.ts: 10ms, render: 61ms)
+ GET /test-badge-grid 200 in 86ms (compile: 3ms, proxy.ts: 8ms, render: 76ms)
+ GET /login 200 in 88ms (compile: 17ms, proxy.ts: 7ms, render: 64ms)
+ GET /test-badge-grid 200 in 95ms (compile: 5ms, proxy.ts: 9ms, render: 80ms)
+ GET /login 200 in 95ms (compile: 18ms, proxy.ts: 9ms, render: 68ms)
+ GET /test-badge-grid 200 in 99ms (compile: 9ms, proxy.ts: 10ms, render: 80ms)
+ GET /login 200 in 99ms (compile: 21ms, proxy.ts: 11ms, render: 67ms)
+ GET /test-badge-grid 200 in 100ms (compile: 6ms, proxy.ts: 9ms, render: 84ms)
+ GET /login 200 in 100ms (compile: 20ms, proxy.ts: 9ms, render: 71ms)
+ GET /test-badge-grid 200 in 95ms (compile: 5ms, proxy.ts: 7ms, render: 84ms)
+ GET /login 200 in 97ms (compile: 19ms, proxy.ts: 7ms, render: 72ms)
+ GET /test-badge-grid 200 in 97ms (compile: 4ms, proxy.ts: 7ms, render: 86ms)
+ GET /login 200 in 101ms (compile: 19ms, proxy.ts: 7ms, render: 76ms)
+ GET /test-badge-grid 200 in 104ms (compile: 6ms, proxy.ts: 11ms, render: 87ms)
+ GET /login 200 in 106ms (compile: 23ms, proxy.ts: 12ms, render: 71ms)
+ GET /test-badge-grid 200 in 108ms (compile: 5ms, proxy.ts: 10ms, render: 93ms)
+ GET /login 200 in 107ms (compile: 20ms, proxy.ts: 10ms, render: 77ms)
+ GET /test-badge-grid 200 in 103ms (compile: 4ms, proxy.ts: 11ms, render: 87ms)
+ GET /login 200 in 105ms (compile: 21ms, proxy.ts: 11ms, render: 73ms)
+ GET /test-badge-grid 200 in 91ms (compile: 5ms, proxy.ts: 6ms, render: 80ms)
+ GET /login 200 in 92ms (compile: 20ms, proxy.ts: 6ms, render: 66ms)
+ GET /test-badge-grid 200 in 93ms (compile: 5ms, proxy.ts: 10ms, render: 78ms)
+ GET /login 200 in 94ms (compile: 18ms, proxy.ts: 9ms, render: 67ms)
+ GET /test-badge-grid 200 in 105ms (compile: 5ms, proxy.ts: 12ms, render: 88ms)
+ GET /login 200 in 106ms (compile: 19ms, proxy.ts: 12ms, render: 75ms)
+ GET /test-badge-grid 200 in 100ms (compile: 7ms, proxy.ts: 6ms, render: 87ms)
+ GET /login 200 in 101ms (compile: 21ms, proxy.ts: 6ms, render: 73ms)
+ GET /test-badge-grid 200 in 88ms (compile: 4ms, proxy.ts: 9ms, render: 75ms)
+ GET /login 200 in 89ms (compile: 20ms, proxy.ts: 8ms, render: 61ms)
+ GET /test-badge-grid 200 in 95ms (compile: 6ms, proxy.ts: 7ms, render: 83ms)
+ GET /login 200 in 97ms (compile: 20ms, proxy.ts: 6ms, render: 70ms)
+ GET /test-badge-grid 200 in 96ms (compile: 4ms, proxy.ts: 7ms, render: 84ms)
+ GET /login 200 in 98ms (compile: 23ms, proxy.ts: 6ms, render: 69ms)
+ GET /test-badge-grid 200 in 104ms (compile: 4ms, proxy.ts: 10ms, render: 89ms)
+ GET /login 200 in 105ms (compile: 18ms, proxy.ts: 9ms, render: 78ms)
+ GET /test-badge-grid 200 in 100ms (compile: 6ms, proxy.ts: 13ms, render: 82ms)
+ GET /login 200 in 100ms (compile: 25ms, proxy.ts: 12ms, render: 64ms)
+ GET /test-badge-grid 200 in 93ms (compile: 5ms, proxy.ts: 12ms, render: 75ms)
+ GET /login 200 in 92ms (compile: 20ms, proxy.ts: 12ms, render: 61ms)
+ GET /login 200 in 95ms (compile: 20ms, proxy.ts: 8ms, render: 67ms)
+ GET /test-badge-grid 200 in 98ms (compile: 5ms, proxy.ts: 8ms, render: 85ms)
+ GET /test-badge-grid 200 in 89ms (compile: 8ms, proxy.ts: 7ms, render: 73ms)
+ GET /login 200 in 89ms (compile: 19ms, proxy.ts: 10ms, render: 60ms)
+ GET /test-badge-grid 200 in 79ms (compile: 7ms, proxy.ts: 6ms, render: 66ms)
+ GET /login 200 in 80ms (compile: 18ms, proxy.ts: 7ms, render: 55ms)
+ GET /test-badge-grid 200 in 80ms (compile: 5ms, proxy.ts: 8ms, render: 66ms)
+ GET /login 200 in 81ms (compile: 18ms, proxy.ts: 8ms, render: 55ms)
+ GET /test-badge-grid 200 in 80ms (compile: 3ms, proxy.ts: 7ms, render: 69ms)
+ GET /login 200 in 78ms (compile: 18ms, proxy.ts: 6ms, render: 55ms)
+ GET /test-badge-grid 200 in 81ms (compile: 7ms, proxy.ts: 6ms, render: 69ms)
+ GET /login 200 in 83ms (compile: 15ms, proxy.ts: 7ms, render: 61ms)
+ GET /test-badge-grid 200 in 85ms (compile: 5ms, proxy.ts: 8ms, render: 72ms)
+ GET /login 200 in 87ms (compile: 18ms, proxy.ts: 9ms, render: 59ms)
+ GET /test-badge-grid 200 in 77ms (compile: 7ms, proxy.ts: 7ms, render: 63ms)
+ GET /login 200 in 82ms (compile: 17ms, proxy.ts: 8ms, render: 57ms)
+ GET /test-badge-grid 200 in 84ms (compile: 3ms, proxy.ts: 8ms, render: 73ms)
+ GET /login 200 in 84ms (compile: 15ms, proxy.ts: 8ms, render: 61ms)
+ GET /test-badge-grid 200 in 92ms (compile: 3ms, proxy.ts: 9ms, render: 80ms)
+ GET /login 200 in 89ms (compile: 17ms, proxy.ts: 6ms, render: 67ms)
+ GET /test-badge-grid 200 in 91ms (compile: 4ms, proxy.ts: 7ms, render: 80ms)
+ GET /login 200 in 92ms (compile: 18ms, proxy.ts: 7ms, render: 67ms)
+ GET /test-badge-grid 200 in 91ms (compile: 7ms, proxy.ts: 11ms, render: 73ms)
+ GET /login 200 in 92ms (compile: 18ms, proxy.ts: 13ms, render: 61ms)
+ GET /test-badge-grid 200 in 93ms (compile: 4ms, proxy.ts: 7ms, render: 82ms)
+ GET /login 200 in 93ms (compile: 19ms, proxy.ts: 7ms, render: 67ms)
+ GET /test-badge-grid 200 in 96ms (compile: 4ms, proxy.ts: 10ms, render: 82ms)
+ GET /login 200 in 97ms (compile: 18ms, proxy.ts: 10ms, render: 68ms)
+ GET /test-badge-grid 200 in 96ms (compile: 7ms, proxy.ts: 7ms, render: 82ms)
+ GET /login 200 in 97ms (compile: 21ms, proxy.ts: 8ms, render: 68ms)
+ GET /test-badge-grid 200 in 89ms (compile: 7ms, proxy.ts: 6ms, render: 75ms)
+ GET /login 200 in 90ms (compile: 19ms, proxy.ts: 7ms, render: 64ms)
+ GET /test-badge-grid 200 in 108ms (compile: 5ms, proxy.ts: 7ms, render: 96ms)
+ GET /login 200 in 107ms (compile: 18ms, proxy.ts: 7ms, render: 82ms)
+ GET /test-badge-grid 200 in 115ms (compile: 7ms, proxy.ts: 10ms, render: 98ms)
+ GET /login 200 in 114ms (compile: 22ms, proxy.ts: 10ms, render: 82ms)
+ GET /test-badge-grid 200 in 111ms (compile: 8ms, proxy.ts: 9ms, render: 94ms)
+ GET /login 200 in 112ms (compile: 21ms, proxy.ts: 11ms, render: 80ms)
+ GET /test-badge-grid 200 in 89ms (compile: 7ms, proxy.ts: 10ms, render: 72ms)
+ GET /login 200 in 90ms (compile: 22ms, proxy.ts: 11ms, render: 56ms)
+ GET /login 200 in 267ms (compile: 180ms, proxy.ts: 28ms, render: 59ms)
+ GET /test-badge-grid 200 in 273ms (compile: 165ms, proxy.ts: 27ms, render: 80ms)
+ GET /test-badge-grid 200 in 118ms (compile: 3ms, proxy.ts: 5ms, render: 109ms)
+ GET /login 200 in 119ms (compile: 18ms, proxy.ts: 5ms, render: 96ms)
+ GET /login 200 in 103ms (compile: 25ms, proxy.ts: 10ms, render: 68ms)
+ GET /test-badge-grid 200 in 107ms (compile: 6ms, proxy.ts: 11ms, render: 90ms)
+ GET /api/health 200 in 367ms (compile: 127ms, proxy.ts: 4ms, render: 236ms)
+✓ Compiled in 184ms
+ GET /test-badge-grid 200 in 202ms (compile: 124ms, proxy.ts: 32ms, render: 46ms)
+ GET /login 200 in 234ms (compile: 137ms, proxy.ts: 32ms, render: 65ms)
+ GET /login 200 in 40ms (compile: 3ms, proxy.ts: 10ms, render: 27ms)
+ GET /login 200 in 31ms (compile: 4ms, proxy.ts: 7ms, render: 20ms)
+ GET /login 200 in 90ms (compile: 4ms, proxy.ts: 4ms, render: 81ms)
+ GET /login 200 in 38ms (compile: 6ms, proxy.ts: 5ms, render: 28ms)
+ GET /login 200 in 35ms (compile: 5ms, proxy.ts: 6ms, render: 23ms)
+ GET /login 200 in 31ms (compile: 3ms, proxy.ts: 5ms, render: 22ms)
+ GET /login 200 in 33ms (compile: 6ms, proxy.ts: 6ms, render: 21ms)
+ GET /login 200 in 28ms (compile: 3ms, proxy.ts: 6ms, render: 20ms)
+ GET /login 200 in 30ms (compile: 3ms, proxy.ts: 7ms, render: 19ms)
+ GET /login 200 in 36ms (compile: 4ms, proxy.ts: 7ms, render: 25ms)
+ GET /login 200 in 38ms (compile: 4ms, proxy.ts: 8ms, render: 26ms)
+ GET /login 200 in 52ms (compile: 4ms, proxy.ts: 6ms, render: 42ms)
+ GET /login 200 in 33ms (compile: 4ms, proxy.ts: 8ms, render: 21ms)
+ GET /login 200 in 39ms (compile: 3ms, proxy.ts: 6ms, render: 29ms)
+ GET /login 200 in 35ms (compile: 6ms, proxy.ts: 7ms, render: 21ms)
+ GET /login 200 in 31ms (compile: 3ms, proxy.ts: 6ms, render: 23ms)
+ GET /login 200 in 38ms (compile: 3ms, proxy.ts: 7ms, render: 28ms)
+ GET /login 200 in 32ms (compile: 5ms, proxy.ts: 6ms, render: 22ms)
+ GET /login 200 in 34ms (compile: 4ms, proxy.ts: 5ms, render: 25ms)
+ GET /login 200 in 49ms (compile: 4ms, proxy.ts: 6ms, render: 39ms)
+ GET /login 200 in 29ms (compile: 3ms, proxy.ts: 5ms, render: 22ms)
+ GET /login 200 in 27ms (compile: 3ms, proxy.ts: 5ms, render: 18ms)
+ GET /login 200 in 30ms (compile: 2ms, proxy.ts: 4ms, render: 24ms)
+ GET /login 200 in 28ms (compile: 4ms, proxy.ts: 6ms, render: 18ms)
+ GET /login 200 in 29ms (compile: 4ms, proxy.ts: 4ms, render: 21ms)
+ GET /login 200 in 28ms (compile: 4ms, proxy.ts: 5ms, render: 18ms)
+ GET /login 200 in 27ms (compile: 3ms, proxy.ts: 4ms, render: 20ms)
+ GET /login 200 in 61ms (compile: 5ms, proxy.ts: 5ms, render: 52ms)
+ GET /login 200 in 45ms (compile: 5ms, proxy.ts: 18ms, render: 23ms)
+ GET /login 200 in 47ms (compile: 5ms, proxy.ts: 5ms, render: 37ms)
+ GET /login 200 in 47ms (compile: 9ms, proxy.ts: 5ms, render: 33ms)
+ GET /login 200 in 35ms (compile: 4ms, proxy.ts: 7ms, render: 24ms)
+ GET /login 200 in 30ms (compile: 4ms, proxy.ts: 5ms, render: 21ms)
+ GET /login 200 in 26ms (compile: 4ms, proxy.ts: 4ms, render: 19ms)
+ GET /login 200 in 26ms (compile: 3ms, proxy.ts: 6ms, render: 17ms)
+ GET /login 200 in 27ms (compile: 2ms, proxy.ts: 5ms, render: 19ms)
+ GET /login 200 in 26ms (compile: 3ms, proxy.ts: 4ms, render: 19ms)
+ GET /login 200 in 26ms (compile: 3ms, proxy.ts: 6ms, render: 17ms)
+ GET /login 200 in 23ms (compile: 2ms, proxy.ts: 4ms, render: 17ms)
+ GET /login 200 in 27ms (compile: 2ms, proxy.ts: 5ms, render: 19ms)
+ GET /login 200 in 27ms (compile: 2ms, proxy.ts: 7ms, render: 17ms)
+ GET /login 200 in 23ms (compile: 2ms, proxy.ts: 5ms, render: 16ms)
+ GET /login 200 in 23ms (compile: 2ms, proxy.ts: 4ms, render: 17ms)
+ GET /login 200 in 30ms (compile: 3ms, proxy.ts: 6ms, render: 20ms)
+ GET /login 200 in 29ms (compile: 3ms, proxy.ts: 6ms, render: 20ms)
+ GET /login 200 in 36ms (compile: 4ms, proxy.ts: 6ms, render: 27ms)
+ GET /login 200 in 27ms (compile: 3ms, proxy.ts: 4ms, render: 20ms)
+ GET /login 200 in 26ms (compile: 3ms, proxy.ts: 6ms, render: 17ms)
+ GET /login 200 in 23ms (compile: 2ms, proxy.ts: 4ms, render: 16ms)
+ GET /login 200 in 34ms (compile: 4ms, proxy.ts: 5ms, render: 25ms)
+ GET /login 200 in 33ms (compile: 4ms, proxy.ts: 6ms, render: 22ms)
+ GET /login 200 in 27ms (compile: 4ms, proxy.ts: 5ms, render: 17ms)
+ GET /login 200 in 27ms (compile: 2ms, proxy.ts: 5ms, render: 20ms)
+ GET /login 200 in 28ms (compile: 4ms, proxy.ts: 4ms, render: 20ms)
+ GET /login 200 in 30ms (compile: 2ms, proxy.ts: 6ms, render: 21ms)
+ GET /login 200 in 26ms (compile: 4ms, proxy.ts: 5ms, render: 17ms)
+ GET /login 200 in 41ms (compile: 3ms, proxy.ts: 11ms, render: 27ms)
+ GET /login 200 in 29ms (compile: 5ms, proxy.ts: 6ms, render: 18ms)
+ GET /login 200 in 25ms (compile: 2ms, proxy.ts: 4ms, render: 19ms)
+ GET /login 200 in 26ms (compile: 3ms, proxy.ts: 6ms, render: 17ms)
+ GET /login 200 in 24ms (compile: 2ms, proxy.ts: 5ms, render: 16ms)
+ GET /login 200 in 40ms (compile: 3ms, proxy.ts: 5ms, render: 32ms)
+ GET /login 200 in 29ms (compile: 5ms, proxy.ts: 5ms, render: 20ms)
+ GET /login 200 in 30ms (compile: 3ms, proxy.ts: 5ms, render: 22ms)
+ GET /login 200 in 26ms (compile: 5ms, proxy.ts: 5ms, render: 17ms)
+ GET /login 200 in 26ms (compile: 3ms, proxy.ts: 6ms, render: 17ms)
+ GET /login 200 in 25ms (compile: 2ms, proxy.ts: 5ms, render: 18ms)
+ GET /login 200 in 34ms (compile: 4ms, proxy.ts: 6ms, render: 25ms)
+ GET /login 200 in 34ms (compile: 4ms, proxy.ts: 6ms, render: 24ms)
+ GET /login 200 in 32ms (compile: 4ms, proxy.ts: 6ms, render: 21ms)
+ GET /login 200 in 34ms (compile: 4ms, proxy.ts: 4ms, render: 25ms)
+ GET /login 200 in 32ms (compile: 4ms, proxy.ts: 7ms, render: 21ms)
+ GET /login 200 in 30ms (compile: 6ms, proxy.ts: 4ms, render: 20ms)
+ GET /login 200 in 23ms (compile: 2ms, proxy.ts: 4ms, render: 16ms)
+ GET /login 200 in 27ms (compile: 3ms, proxy.ts: 4ms, render: 19ms)
+ GET /login 200 in 23ms (compile: 2ms, proxy.ts: 8ms, render: 13ms)
+ GET /login 200 in 27ms (compile: 5ms, proxy.ts: 5ms, render: 17ms)
+ GET /login 200 in 51ms (compile: 4ms, proxy.ts: 4ms, render: 43ms)
+ GET /login 200 in 27ms (compile: 3ms, proxy.ts: 4ms, render: 21ms)
+ GET /login 200 in 31ms (compile: 2ms, proxy.ts: 6ms, render: 22ms)
+ GET /login 200 in 30ms (compile: 3ms, proxy.ts: 5ms, render: 22ms)
+ GET /login 200 in 31ms (compile: 3ms, proxy.ts: 8ms, render: 19ms)
+ GET /login 200 in 27ms (compile: 4ms, proxy.ts: 5ms, render: 18ms)
+ GET /login 200 in 28ms (compile: 3ms, proxy.ts: 8ms, render: 17ms)
+ GET /login 200 in 26ms (compile: 2ms, proxy.ts: 5ms, render: 19ms)
+ GET /login 200 in 34ms (compile: 3ms, proxy.ts: 8ms, render: 23ms)
+ GET /login 200 in 33ms (compile: 4ms, proxy.ts: 5ms, render: 24ms)
+ GET /login 200 in 51ms (compile: 4ms, proxy.ts: 7ms, render: 39ms)
+ GET /login 200 in 32ms (compile: 4ms, proxy.ts: 4ms, render: 24ms)
+ GET /login 200 in 25ms (compile: 2ms, proxy.ts: 8ms, render: 15ms)
+ GET /login 200 in 28ms (compile: 2ms, proxy.ts: 5ms, render: 21ms)
+ GET /login 200 in 29ms (compile: 6ms, proxy.ts: 6ms, render: 17ms)
+ GET /login 200 in 25ms (compile: 2ms, proxy.ts: 4ms, render: 18ms)
+ GET /login 200 in 37ms (compile: 3ms, proxy.ts: 5ms, render: 29ms)
+ GET /login 200 in 30ms (compile: 5ms, proxy.ts: 4ms, render: 21ms)
+ GET /login 200 in 25ms (compile: 2ms, proxy.ts: 6ms, render: 17ms)
+ GET /login 200 in 29ms (compile: 2ms, proxy.ts: 4ms, render: 23ms)
+ GET /login 200 in 29ms (compile: 3ms, proxy.ts: 8ms, render: 19ms)
+ GET /login 200 in 32ms (compile: 3ms, proxy.ts: 4ms, render: 25ms)
+ GET /login 200 in 32ms (compile: 4ms, proxy.ts: 8ms, render: 20ms)
+ GET /login 200 in 31ms (compile: 3ms, proxy.ts: 6ms, render: 21ms)
+ GET /login 200 in 26ms (compile: 2ms, proxy.ts: 7ms, render: 17ms)
+ GET /login 200 in 30ms (compile: 3ms, proxy.ts: 4ms, render: 23ms)
+ GET /login 200 in 26ms (compile: 2ms, proxy.ts: 6ms, render: 18ms)
+ GET /login 200 in 29ms (compile: 3ms, proxy.ts: 6ms, render: 21ms)
+ GET /login 200 in 26ms (compile: 3ms, proxy.ts: 6ms, render: 17ms)
+ GET /login 200 in 26ms (compile: 2ms, proxy.ts: 4ms, render: 20ms)
+ GET /login 200 in 27ms (compile: 6ms, proxy.ts: 5ms, render: 17ms)
+ GET /login 200 in 28ms (compile: 3ms, proxy.ts: 6ms, render: 19ms)
+ GET /login 200 in 32ms (compile: 2ms, proxy.ts: 4ms, render: 25ms)
+ GET /login 200 in 24ms (compile: 3ms, proxy.ts: 4ms, render: 17ms)
+ GET /login 200 in 24ms (compile: 3ms, proxy.ts: 5ms, render: 16ms)
+ GET /login 200 in 27ms (compile: 3ms, proxy.ts: 6ms, render: 17ms)
+ GET /login 200 in 28ms (compile: 2ms, proxy.ts: 4ms, render: 22ms)
+ GET /login 200 in 27ms (compile: 6ms, proxy.ts: 5ms, render: 16ms)
+ GET /login 200 in 33ms (compile: 2ms, proxy.ts: 5ms, render: 26ms)
+ GET /login 200 in 28ms (compile: 4ms, proxy.ts: 5ms, render: 19ms)
+ GET /login 200 in 24ms (compile: 4ms, proxy.ts: 4ms, render: 16ms)
+ GET /login 200 in 29ms (compile: 3ms, proxy.ts: 5ms, render: 21ms)
+ GET /login 200 in 28ms (compile: 4ms, proxy.ts: 5ms, render: 19ms)
+ GET /login 200 in 29ms (compile: 3ms, proxy.ts: 6ms, render: 20ms)
+ GET /login 200 in 27ms (compile: 3ms, proxy.ts: 7ms, render: 17ms)
+ GET /login 200 in 30ms (compile: 2ms, proxy.ts: 6ms, render: 22ms)
+ GET /login 200 in 31ms (compile: 6ms, proxy.ts: 5ms, render: 20ms)
+ GET /login 200 in 26ms (compile: 3ms, proxy.ts: 4ms, render: 18ms)
+ GET /login 200 in 34ms (compile: 3ms, proxy.ts: 5ms, render: 25ms)
+ GET /login 200 in 28ms (compile: 2ms, proxy.ts: 5ms, render: 21ms)
+ GET /login 200 in 28ms (compile: 3ms, proxy.ts: 8ms, render: 18ms)
+ GET /login 200 in 25ms (compile: 2ms, proxy.ts: 5ms, render: 19ms)
+ GET /login 200 in 33ms (compile: 3ms, proxy.ts: 7ms, render: 23ms)
+ GET /login 200 in 29ms (compile: 3ms, proxy.ts: 5ms, render: 21ms)
+ GET /login 200 in 30ms (compile: 3ms, proxy.ts: 9ms, render: 18ms)
+ GET /login 200 in 22ms (compile: 3ms, proxy.ts: 4ms, render: 15ms)
+ GET /login 200 in 29ms (compile: 4ms, proxy.ts: 5ms, render: 20ms)
+ GET /login 200 in 25ms (compile: 2ms, proxy.ts: 6ms, render: 17ms)
+ GET /login 200 in 25ms (compile: 2ms, proxy.ts: 5ms, render: 17ms)
+ GET /login 200 in 29ms (compile: 4ms, proxy.ts: 6ms, render: 19ms)
+ GET /login 200 in 33ms (compile: 2ms, proxy.ts: 7ms, render: 24ms)
+ GET /login 200 in 31ms (compile: 3ms, proxy.ts: 9ms, render: 20ms)
+ GET /login 200 in 28ms (compile: 5ms, proxy.ts: 5ms, render: 18ms)
+ GET /login 200 in 30ms (compile: 3ms, proxy.ts: 6ms, render: 21ms)
+ GET /login 200 in 36ms (compile: 3ms, proxy.ts: 8ms, render: 25ms)
+ GET /login 200 in 30ms (compile: 2ms, proxy.ts: 5ms, render: 23ms)
+ GET /login 200 in 33ms (compile: 7ms, proxy.ts: 6ms, render: 19ms)
+ GET /login 200 in 23ms (compile: 3ms, proxy.ts: 4ms, render: 17ms)
+ GET /login 200 in 29ms (compile: 3ms, proxy.ts: 4ms, render: 22ms)
+ GET /login 200 in 28ms (compile: 4ms, proxy.ts: 7ms, render: 17ms)
+ GET /login 200 in 23ms (compile: 2ms, proxy.ts: 5ms, render: 17ms)
+ GET /login 200 in 30ms (compile: 4ms, proxy.ts: 5ms, render: 21ms)
+ GET /login 200 in 61ms (compile: 3ms, proxy.ts: 6ms, render: 52ms)
+ GET /login 200 in 36ms (compile: 7ms, proxy.ts: 6ms, render: 23ms)
+ GET /login 200 in 31ms (compile: 6ms, proxy.ts: 5ms, render: 20ms)
+ GET /login 200 in 30ms (compile: 3ms, proxy.ts: 4ms, render: 23ms)
+ GET /login 200 in 26ms (compile: 4ms, proxy.ts: 4ms, render: 17ms)
+ GET /login 200 in 28ms (compile: 3ms, proxy.ts: 6ms, render: 19ms)
+ GET /login 200 in 25ms (compile: 2ms, proxy.ts: 5ms, render: 17ms)
+ GET /login 200 in 29ms (compile: 3ms, proxy.ts: 7ms, render: 20ms)
+ GET /login 200 in 54ms (compile: 3ms, proxy.ts: 4ms, render: 47ms)
+ GET /login 200 in 28ms (compile: 2ms, proxy.ts: 4ms, render: 22ms)
+ GET /login 200 in 26ms (compile: 4ms, proxy.ts: 3ms, render: 19ms)
+ GET /login 200 in 28ms (compile: 2ms, proxy.ts: 6ms, render: 19ms)
+ GET /login 200 in 44ms (compile: 3ms, proxy.ts: 4ms, render: 38ms)
+ GET /login 200 in 47ms (compile: 4ms, proxy.ts: 4ms, render: 39ms)
+ GET /login 200 in 25ms (compile: 2ms, proxy.ts: 4ms, render: 19ms)
+ GET /login 200 in 30ms (compile: 3ms, proxy.ts: 5ms, render: 22ms)
+ GET /login 200 in 28ms (compile: 3ms, proxy.ts: 5ms, render: 20ms)
+ GET /login 200 in 25ms (compile: 4ms, proxy.ts: 3ms, render: 18ms)
+ GET /login 200 in 32ms (compile: 3ms, proxy.ts: 7ms, render: 22ms)
+ GET /login 200 in 50ms (compile: 3ms, proxy.ts: 6ms, render: 40ms)
+ GET /login 200 in 29ms (compile: 4ms, proxy.ts: 6ms, render: 20ms)
+ GET /login 200 in 26ms (compile: 3ms, proxy.ts: 5ms, render: 17ms)
+ GET /login 200 in 30ms (compile: 3ms, proxy.ts: 6ms, render: 21ms)
+ GET /login 200 in 58ms (compile: 4ms, proxy.ts: 4ms, render: 50ms)
+ GET /login 200 in 36ms (compile: 5ms, proxy.ts: 4ms, render: 26ms)
+ GET /login 200 in 30ms (compile: 4ms, proxy.ts: 3ms, render: 23ms)
+ GET /login 200 in 27ms (compile: 3ms, proxy.ts: 5ms, render: 19ms)
+ GET /login 200 in 28ms (compile: 3ms, proxy.ts: 5ms, render: 20ms)
+ GET /login 200 in 32ms (compile: 3ms, proxy.ts: 8ms, render: 22ms)
+ GET /login 200 in 28ms (compile: 4ms, proxy.ts: 5ms, render: 19ms)
+ GET /login 200 in 28ms (compile: 3ms, proxy.ts: 7ms, render: 18ms)
+ GET /login 200 in 25ms (compile: 3ms, proxy.ts: 5ms, render: 18ms)
+ GET /login 200 in 30ms (compile: 4ms, proxy.ts: 5ms, render: 21ms)
+ GET /login 200 in 23ms (compile: 2ms, proxy.ts: 4ms, render: 17ms)
+ GET /login 200 in 31ms (compile: 3ms, proxy.ts: 5ms, render: 23ms)
+ GET /login 200 in 54ms (compile: 3ms, proxy.ts: 6ms, render: 45ms)
+ GET /login 200 in 39ms (compile: 4ms, proxy.ts: 4ms, render: 31ms)
+ GET /login 200 in 25ms (compile: 3ms, proxy.ts: 4ms, render: 18ms)
+ GET /login 200 in 28ms (compile: 3ms, proxy.ts: 6ms, render: 19ms)
+ GET /login 200 in 28ms (compile: 4ms, proxy.ts: 4ms, render: 20ms)
+ GET /login 200 in 34ms (compile: 5ms, proxy.ts: 4ms, render: 25ms)
+ GET /login 200 in 25ms (compile: 3ms, proxy.ts: 4ms, render: 19ms)
+ GET /login 200 in 29ms (compile: 3ms, proxy.ts: 7ms, render: 19ms)
+ GET /login 200 in 27ms (compile: 4ms, proxy.ts: 3ms, render: 20ms)
+ GET /login 200 in 30ms (compile: 4ms, proxy.ts: 5ms, render: 20ms)
+ GET /login 200 in 28ms (compile: 3ms, proxy.ts: 5ms, render: 20ms)
+ GET /login 200 in 28ms (compile: 6ms, proxy.ts: 4ms, render: 18ms)
+ GET /login 200 in 30ms (compile: 2ms, proxy.ts: 5ms, render: 23ms)
+ GET /login 200 in 30ms (compile: 6ms, proxy.ts: 6ms, render: 18ms)
+ GET /login 200 in 26ms (compile: 3ms, proxy.ts: 5ms, render: 18ms)
+ GET /login 200 in 32ms (compile: 3ms, proxy.ts: 4ms, render: 25ms)
+ GET /login 200 in 27ms (compile: 3ms, proxy.ts: 6ms, render: 18ms)
+ GET /login 200 in 28ms (compile: 3ms, proxy.ts: 4ms, render: 21ms)
+ GET /login 200 in 31ms (compile: 3ms, proxy.ts: 7ms, render: 21ms)
+ GET /login 200 in 26ms (compile: 4ms, proxy.ts: 4ms, render: 18ms)
+ GET /login 200 in 28ms (compile: 3ms, proxy.ts: 8ms, render: 17ms)
+ GET /login 200 in 37ms (compile: 3ms, proxy.ts: 5ms, render: 29ms)
+ GET /login 200 in 31ms (compile: 3ms, proxy.ts: 5ms, render: 23ms)
+ GET /login 200 in 28ms (compile: 3ms, proxy.ts: 6ms, render: 19ms)
+ GET /login 200 in 29ms (compile: 4ms, proxy.ts: 5ms, render: 21ms)
+ GET /login 200 in 30ms (compile: 4ms, proxy.ts: 6ms, render: 21ms)
+ GET /login 200 in 39ms (compile: 4ms, proxy.ts: 4ms, render: 32ms)
+ GET /login 200 in 23ms (compile: 2ms, proxy.ts: 5ms, render: 16ms)
+ GET /login 200 in 29ms (compile: 3ms, proxy.ts: 5ms, render: 22ms)
+ GET /login 200 in 53ms (compile: 5ms, proxy.ts: 5ms, render: 43ms)
+ GET /login 200 in 29ms (compile: 3ms, proxy.ts: 3ms, render: 23ms)
+ GET /login 200 in 26ms (compile: 5ms, proxy.ts: 4ms, render: 17ms)
+ GET /login 200 in 30ms (compile: 3ms, proxy.ts: 7ms, render: 20ms)
+ GET /login 200 in 36ms (compile: 6ms, proxy.ts: 8ms, render: 22ms)
+ GET /login 200 in 30ms (compile: 4ms, proxy.ts: 4ms, render: 23ms)
+ GET /login 200 in 54ms (compile: 5ms, proxy.ts: 6ms, render: 42ms)
+ GET /login 200 in 35ms (compile: 5ms, proxy.ts: 5ms, render: 26ms)
+ GET /login 200 in 56ms (compile: 3ms, proxy.ts: 5ms, render: 48ms)
+ GET /login 200 in 54ms (compile: 9ms, proxy.ts: 22ms, render: 24ms)
+ GET /login 200 in 85ms (compile: 7ms, proxy.ts: 5ms, render: 73ms)
+ GET /login 200 in 227ms (compile: 86ms, proxy.ts: 117ms, render: 24ms)
+ GET /login 200 in 33ms (compile: 3ms, proxy.ts: 5ms, render: 25ms)
+ GET /test-portfolio-donut 200 in 549ms (compile: 484ms, proxy.ts: 5ms, render: 60ms)
+ GET /login 200 in 137ms (compile: 2ms, proxy.ts: 4ms, render: 131ms)
+ GET /login 200 in 57ms (compile: 3ms, proxy.ts: 10ms, render: 44ms)
+ GET /login 200 in 33ms (compile: 6ms, proxy.ts: 6ms, render: 21ms)
+ GET /login 200 in 33ms (compile: 3ms, proxy.ts: 4ms, render: 25ms)
+ GET /login 200 in 23ms (compile: 3ms, proxy.ts: 5ms, render: 15ms)
+ GET /login 200 in 22ms (compile: 2ms, proxy.ts: 6ms, render: 14ms)
+ GET /login 200 in 22ms (compile: 2ms, proxy.ts: 4ms, render: 16ms)
+ GET /login 200 in 25ms (compile: 4ms, proxy.ts: 5ms, render: 16ms)
+ GET /login 200 in 26ms (compile: 2ms, proxy.ts: 8ms, render: 16ms)
+ GET /login 200 in 21ms (compile: 1833µs, proxy.ts: 4ms, render: 16ms)
+ GET /login 200 in 20ms (compile: 2ms, proxy.ts: 3ms, render: 15ms)
+ GET /login 200 in 22ms (compile: 3ms, proxy.ts: 4ms, render: 15ms)
+ GET /login 200 in 33ms (compile: 4ms, proxy.ts: 4ms, render: 25ms)
+ GET /login 200 in 26ms (compile: 3ms, proxy.ts: 7ms, render: 16ms)
+ GET /login 200 in 32ms (compile: 3ms, proxy.ts: 3ms, render: 25ms)
+ GET /login 200 in 24ms (compile: 3ms, proxy.ts: 5ms, render: 16ms)
+ GET /login 200 in 24ms (compile: 2ms, proxy.ts: 3ms, render: 18ms)
+ GET /login 200 in 20ms (compile: 3ms, proxy.ts: 3ms, render: 14ms)
+ GET /login 200 in 38ms (compile: 3ms, proxy.ts: 3ms, render: 33ms)
+ GET /login 200 in 37ms (compile: 6ms, proxy.ts: 7ms, render: 24ms)
+ GET /login 200 in 37ms (compile: 5ms, proxy.ts: 8ms, render: 25ms)
+ GET /login 200 in 31ms (compile: 5ms, proxy.ts: 8ms, render: 18ms)
+ GET /login 200 in 25ms (compile: 3ms, proxy.ts: 3ms, render: 19ms)
+ GET /login 200 in 33ms (compile: 5ms, proxy.ts: 7ms, render: 21ms)
+ GET /login 200 in 29ms (compile: 4ms, proxy.ts: 5ms, render: 21ms)
+ GET /login 200 in 50ms (compile: 6ms, proxy.ts: 5ms, render: 39ms)
+ GET /login 200 in 31ms (compile: 3ms, proxy.ts: 4ms, render: 23ms)
+ GET /login 200 in 32ms (compile: 2ms, proxy.ts: 7ms, render: 23ms)
+ GET /login 200 in 72ms (compile: 4ms, proxy.ts: 6ms, render: 61ms)
+ GET /login 200 in 46ms (compile: 4ms, proxy.ts: 23ms, render: 19ms)
+ GET /login 200 in 37ms (compile: 3ms, proxy.ts: 9ms, render: 26ms)
+ GET /login 200 in 30ms (compile: 4ms, proxy.ts: 4ms, render: 22ms)
+ GET /login 200 in 31ms (compile: 3ms, proxy.ts: 5ms, render: 23ms)
+ GET /login 200 in 32ms (compile: 3ms, proxy.ts: 8ms, render: 22ms)
+ GET /login 200 in 27ms (compile: 4ms, proxy.ts: 4ms, render: 19ms)
+ GET /login 200 in 33ms (compile: 4ms, proxy.ts: 8ms, render: 22ms)
+ GET /login 200 in 32ms (compile: 6ms, proxy.ts: 6ms, render: 20ms)
+ GET /login 200 in 30ms (compile: 4ms, proxy.ts: 6ms, render: 20ms)
+ GET /login 200 in 30ms (compile: 4ms, proxy.ts: 4ms, render: 22ms)
+ GET /login 200 in 29ms (compile: 3ms, proxy.ts: 6ms, render: 19ms)
+ GET /login 200 in 22ms (compile: 3ms, proxy.ts: 3ms, render: 17ms)
+ GET /login 200 in 29ms (compile: 2ms, proxy.ts: 4ms, render: 23ms)
+ GET /login 200 in 28ms (compile: 4ms, proxy.ts: 6ms, render: 19ms)
+ GET /login 200 in 28ms (compile: 4ms, proxy.ts: 4ms, render: 20ms)
+ GET /login 200 in 31ms (compile: 5ms, proxy.ts: 4ms, render: 22ms)
+ GET /login 200 in 29ms (compile: 4ms, proxy.ts: 7ms, render: 18ms)
+ GET /login 200 in 35ms (compile: 4ms, proxy.ts: 3ms, render: 27ms)
+ GET /login 200 in 27ms (compile: 3ms, proxy.ts: 3ms, render: 21ms)
+ GET /login 200 in 29ms (compile: 6ms, proxy.ts: 4ms, render: 20ms)
+ GET /login 200 in 26ms (compile: 3ms, proxy.ts: 4ms, render: 18ms)
+ GET /login 200 in 27ms (compile: 2ms, proxy.ts: 4ms, render: 21ms)
+ GET /login 200 in 28ms (compile: 5ms, proxy.ts: 4ms, render: 19ms)
+ GET /login 200 in 23ms (compile: 1952µs, proxy.ts: 4ms, render: 17ms)
+ GET /login 200 in 23ms (compile: 3ms, proxy.ts: 5ms, render: 16ms)
+ GET /login 200 in 27ms (compile: 3ms, proxy.ts: 6ms, render: 19ms)
+ GET /login 200 in 42ms (compile: 3ms, proxy.ts: 3ms, render: 35ms)
+ GET /login 200 in 28ms (compile: 1967µs, proxy.ts: 4ms, render: 22ms)
+ GET /login 200 in 34ms (compile: 6ms, proxy.ts: 4ms, render: 24ms)
+ GET /login 200 in 32ms (compile: 5ms, proxy.ts: 5ms, render: 22ms)
+ GET /api/verify-portfolio-donut 200 in 161ms (compile: 132ms, proxy.ts: 17ms, render: 12ms)
+ GET /login 200 in 106ms (compile: 3ms, proxy.ts: 4ms, render: 98ms)
+ GET /login 200 in 44ms (compile: 3ms, proxy.ts: 7ms, render: 35ms)
+ GET /login 200 in 29ms (compile: 4ms, proxy.ts: 4ms, render: 21ms)
+ GET /login 200 in 26ms (compile: 3ms, proxy.ts: 6ms, render: 17ms)
+ GET /login 200 in 25ms (compile: 3ms, proxy.ts: 4ms, render: 18ms)
+ GET /login 200 in 30ms (compile: 3ms, proxy.ts: 7ms, render: 20ms)
+ GET /login 200 in 28ms (compile: 4ms, proxy.ts: 4ms, render: 21ms)
+ GET /login 200 in 28ms (compile: 2ms, proxy.ts: 8ms, render: 18ms)
+ GET /login 200 in 27ms (compile: 2ms, proxy.ts: 6ms, render: 19ms)
+ GET /login 200 in 29ms (compile: 3ms, proxy.ts: 9ms, render: 18ms)
+ GET /login 200 in 48ms (compile: 3ms, proxy.ts: 4ms, render: 41ms)
+ GET /login 200 in 25ms (compile: 3ms, proxy.ts: 5ms, render: 17ms)
+ GET /login 200 in 24ms (compile: 2ms, proxy.ts: 4ms, render: 17ms)
+ GET /login 200 in 29ms (compile: 3ms, proxy.ts: 5ms, render: 21ms)
+ GET /login 200 in 30ms (compile: 4ms, proxy.ts: 5ms, render: 21ms)
+ GET /login 200 in 31ms (compile: 3ms, proxy.ts: 5ms, render: 22ms)
+ GET /login 200 in 80ms (compile: 5ms, proxy.ts: 5ms, render: 69ms)
+ GET /login 200 in 37ms (compile: 3ms, proxy.ts: 8ms, render: 26ms)
+ GET /login 200 in 34ms (compile: 6ms, proxy.ts: 4ms, render: 24ms)
+ GET /login 200 in 667ms (compile: 4ms, proxy.ts: 5ms, render: 658ms)
+ GET /login 200 in 672ms (compile: 640ms, proxy.ts: 6ms, render: 27ms)
+ GET /login 200 in 28ms (compile: 4ms, proxy.ts: 4ms, render: 19ms)
+ GET /login 200 in 25ms (compile: 3ms, proxy.ts: 4ms, render: 18ms)
+ GET /login 200 in 28ms (compile: 3ms, proxy.ts: 3ms, render: 22ms)
+ GET /login 200 in 27ms (compile: 4ms, proxy.ts: 5ms, render: 17ms)
+ GET /login 200 in 27ms (compile: 3ms, proxy.ts: 4ms, render: 21ms)
+ GET /login 200 in 28ms (compile: 3ms, proxy.ts: 4ms, render: 21ms)
+ GET /login 200 in 31ms (compile: 5ms, proxy.ts: 5ms, render: 21ms)
+ GET /login 200 in 31ms (compile: 3ms, proxy.ts: 5ms, render: 24ms)
+ GET /login 200 in 25ms (compile: 5ms, proxy.ts: 4ms, render: 17ms)
+ GET /login 200 in 35ms (compile: 3ms, proxy.ts: 5ms, render: 28ms)
+ GET /login 200 in 31ms (compile: 5ms, proxy.ts: 7ms, render: 19ms)
+ GET /login 200 in 25ms (compile: 3ms, proxy.ts: 4ms, render: 18ms)
+ GET /login 200 in 32ms (compile: 2ms, proxy.ts: 5ms, render: 24ms)
+ GET /login 200 in 36ms (compile: 5ms, proxy.ts: 7ms, render: 24ms)
+ GET /login 200 in 27ms (compile: 4ms, proxy.ts: 5ms, render: 18ms)
+ GET /login 200 in 27ms (compile: 2ms, proxy.ts: 5ms, render: 19ms)
+ GET /login 200 in 30ms (compile: 4ms, proxy.ts: 6ms, render: 20ms)
+ GET /login 200 in 41ms (compile: 3ms, proxy.ts: 8ms, render: 30ms)
+ GET /login 200 in 35ms (compile: 3ms, proxy.ts: 13ms, render: 19ms)
+ GET /login 200 in 30ms (compile: 4ms, proxy.ts: 5ms, render: 21ms)
+ GET /login 200 in 28ms (compile: 2ms, proxy.ts: 6ms, render: 19ms)
+ GET /login 200 in 31ms (compile: 3ms, proxy.ts: 6ms, render: 22ms)
+ GET /login 200 in 26ms (compile: 4ms, proxy.ts: 5ms, render: 17ms)
+ GET /login 200 in 28ms (compile: 4ms, proxy.ts: 4ms, render: 19ms)
+ GET /login 200 in 26ms (compile: 2ms, proxy.ts: 8ms, render: 16ms)
+ GET /login 200 in 27ms (compile: 2ms, proxy.ts: 4ms, render: 21ms)
+ GET /login 200 in 28ms (compile: 5ms, proxy.ts: 5ms, render: 19ms)
+ GET /login 200 in 24ms (compile: 2ms, proxy.ts: 5ms, render: 17ms)
+ GET /login 200 in 29ms (compile: 3ms, proxy.ts: 6ms, render: 20ms)
+ GET /login 200 in 30ms (compile: 4ms, proxy.ts: 5ms, render: 21ms)
+ GET /login 200 in 27ms (compile: 4ms, proxy.ts: 6ms, render: 17ms)
+ GET /login 200 in 26ms (compile: 4ms, proxy.ts: 4ms, render: 17ms)
+ GET /login 200 in 34ms (compile: 1900µs, proxy.ts: 4ms, render: 28ms)
+ GET /login 200 in 40ms (compile: 3ms, proxy.ts: 14ms, render: 24ms)
+ GET /login 200 in 29ms (compile: 3ms, proxy.ts: 3ms, render: 23ms)
+ GET /login 200 in 25ms (compile: 3ms, proxy.ts: 6ms, render: 17ms)
+ GET /login 200 in 25ms (compile: 3ms, proxy.ts: 4ms, render: 18ms)
+ GET /login 200 in 30ms (compile: 2ms, proxy.ts: 3ms, render: 24ms)
+ GET /login 200 in 30ms (compile: 5ms, proxy.ts: 5ms, render: 20ms)
+ GET /login 200 in 25ms (compile: 3ms, proxy.ts: 3ms, render: 20ms)
+ GET /login 200 in 59ms (compile: 4ms, proxy.ts: 4ms, render: 52ms)
+ GET /login 200 in 64ms (compile: 4ms, proxy.ts: 7ms, render: 54ms)
+ GET /login 200 in 37ms (compile: 4ms, proxy.ts: 7ms, render: 27ms)
+ GET /login 200 in 29ms (compile: 4ms, proxy.ts: 5ms, render: 21ms)
+ GET /login 200 in 35ms (compile: 6ms, proxy.ts: 6ms, render: 23ms)
+ GET /login 200 in 28ms (compile: 4ms, proxy.ts: 4ms, render: 20ms)
+ GET /login 200 in 26ms (compile: 3ms, proxy.ts: 5ms, render: 18ms)
+ GET /login 200 in 57ms (compile: 3ms, proxy.ts: 5ms, render: 49ms)
+ GET /login 200 in 39ms (compile: 3ms, proxy.ts: 5ms, render: 31ms)
+ GET /login 200 in 27ms (compile: 4ms, proxy.ts: 5ms, render: 19ms)
+ GET /login 200 in 24ms (compile: 2ms, proxy.ts: 4ms, render: 17ms)
+ GET /login 200 in 63ms (compile: 4ms, proxy.ts: 5ms, render: 54ms)
+ GET /login 404 in 389ms (compile: 353ms, proxy.ts: 9ms, render: 27ms)
+ GET /login 200 in 103ms (compile: 4ms, proxy.ts: 5ms, render: 94ms)
+ GET /login 200 in 83ms (compile: 55ms, proxy.ts: 5ms, render: 23ms)
+ GET /login 200 in 34ms (compile: 5ms, proxy.ts: 4ms, render: 25ms)
+ GET /login 200 in 127ms (compile: 6ms, proxy.ts: 5ms, render: 116ms)
+ GET /api/verify-portfolio-donut 200 in 30ms (compile: 3ms, proxy.ts: 4ms, render: 24ms)
+ GET /api/dev-login 200 in 39ms (compile: 28ms, proxy.ts: 6ms, render: 6ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\static\development\_buildManifest.js.tmp.06n31o5gn8kg'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\static\\development\\_buildManifest.js.tmp.06n31o5gn8kg'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\_not-found\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\_not-found\\page\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /api/health 500 in 885ms (compile: 55ms, proxy.ts: 816ms, render: 13ms)
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\_not-found\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\_not-found\\page\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /api/health 500 in 190ms (compile: 96ms, proxy.ts: 83ms, render: 11ms)
+✓ Compiled in 184ms
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\_not-found\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\_not-found\\page\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /api/health 500 in 221ms (compile: 61ms, proxy.ts: 149ms, render: 11ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /test-portfolio-donut 500 in 452ms (compile: 71ms, proxy.ts: 361ms, render: 19ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /api/health 500 in 320ms (compile: 56ms, proxy.ts: 253ms, render: 11ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET / 500 in 368ms (compile: 72ms, proxy.ts: 283ms, render: 13ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /api/verify-box3-optimization 500 in 510ms (compile: 64ms, proxy.ts: 434ms, render: 12ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /_next/static 500 in 251ms (compile: 240ms, render: 12ms)
+ GET /_next/static 500 in 251ms (compile: 240ms, render: 12ms)
+[?25h

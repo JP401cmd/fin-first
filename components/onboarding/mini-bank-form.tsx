@@ -1,0 +1,81 @@
+'use client'
+
+export interface BankAccountEntry {
+  name: string
+  bank_name: string
+  account_type: string
+  balance: string
+}
+
+const EMPTY: BankAccountEntry = { name: '', bank_name: '', account_type: 'checking', balance: '' }
+
+export function MiniBankForm({
+  items,
+  onChange,
+}: {
+  items: BankAccountEntry[]
+  onChange: (items: BankAccountEntry[]) => void
+}) {
+  const add = () => onChange([...items, { ...EMPTY }])
+  const remove = (i: number) => onChange(items.filter((_, idx) => idx !== i))
+  const update = (i: number, patch: Partial<BankAccountEntry>) =>
+    onChange(items.map((item, idx) => (idx === i ? { ...item, ...patch } : item)))
+
+  return (
+    <div className="space-y-3">
+      {items.map((item, i) => (
+        <div key={i} className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-zinc-500">Rekening {i + 1}</span>
+            <button onClick={() => remove(i)} className="text-xs text-red-500 hover:text-red-700">Verwijder</button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              placeholder="Naam (bijv. Betaalrekening)"
+              value={item.name}
+              onChange={(e) => update(i, { name: e.target.value })}
+              className="col-span-2 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs text-zinc-900 outline-none focus:border-zinc-500"
+            />
+            <input
+              type="text"
+              placeholder="Bank (bijv. ING)"
+              value={item.bank_name}
+              onChange={(e) => update(i, { bank_name: e.target.value })}
+              className="rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs text-zinc-900 outline-none focus:border-zinc-500"
+            />
+            <select
+              value={item.account_type}
+              onChange={(e) => update(i, { account_type: e.target.value })}
+              className="rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs text-zinc-900 outline-none focus:border-zinc-500"
+            >
+              <option value="checking">Betaalrekening</option>
+              <option value="savings">Spaarrekening</option>
+              <option value="joint">Gezamenlijk</option>
+            </select>
+            <div className="col-span-2 relative">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-zinc-400">&euro;</span>
+              <input
+                type="number"
+                step={0.01}
+                placeholder="Saldo"
+                value={item.balance}
+                onChange={(e) => update(i, { balance: e.target.value })}
+                className="w-full rounded-md border border-zinc-300 bg-white py-1.5 pr-2.5 pl-6 text-xs text-zinc-900 outline-none focus:border-zinc-500"
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+      <button
+        onClick={add}
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-zinc-300 py-2 text-xs font-medium text-zinc-500 hover:border-zinc-400 hover:text-zinc-700"
+      >
+        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+        Rekening toevoegen
+      </button>
+    </div>
+  )
+}

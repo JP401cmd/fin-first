@@ -1,0 +1,13 @@
+Starting Next.js dev server on port 3073 in C:\Users\janpa\cd\development\fin
+(node:28980) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3073
+- Network:       http://192.168.86.37:3073
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1104ms
+Server exited with code 143

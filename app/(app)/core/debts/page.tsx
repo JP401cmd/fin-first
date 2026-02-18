@@ -29,6 +29,7 @@ import {
 import { type Asset, ASSET_TYPE_LABELS } from '@/lib/asset-data'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
+import { OwnershipToggle, OwnershipBadge, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
 
 export default function DebtsPage() {
   const [debts, setDebts] = useState<Debt[]>([])
@@ -294,7 +295,7 @@ export default function DebtsPage() {
           <div data-testid="kpi-paid-off">
             <p className="text-xs font-medium text-zinc-500 uppercase">Al afgelost</p>
             <p className="mt-1 text-xl font-bold text-emerald-600">{formatCurrency(totalOriginal - totalBalance)}</p>
-            {dailyExpenses > 0 && totalOriginal - totalBalance > 0 && (
+            {dailyExpenses > 0 && totalOriginal - totalBalance >= 100 && (
               <p className="mt-0.5 text-xs text-emerald-600/80">
                 {formatFreedomTimeString(calculateFreedomTime(totalOriginal - totalBalance, dailyExpenses), 'long')} vrijheid herwonnen
               </p>
@@ -365,7 +366,7 @@ export default function DebtsPage() {
           <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-3">
             <p className="text-xs text-zinc-500">Totale rente</p>
             <p className="mt-1 text-sm font-bold text-red-600">{formatCurrency(summary.totalInterest)}</p>
-            {dailyExpenses > 0 && summary.totalInterest > 0 && (
+            {dailyExpenses > 0 && summary.totalInterest >= 100 && (
               <p className="mt-0.5 text-[10px] text-red-500/80">
                 {formatFreedomTimeString(calculateFreedomTime(summary.totalInterest, dailyExpenses), 'long')} aan verloren vrijheid
               </p>
@@ -375,7 +376,7 @@ export default function DebtsPage() {
             <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
               <p className="text-xs text-emerald-600">Rente bespaard</p>
               <p className="mt-1 text-sm font-bold text-emerald-700">{formatCurrency(interestSaved)}</p>
-              {dailyExpenses > 0 && (
+              {dailyExpenses > 0 && interestSaved >= 100 && (
                 <p className="mt-0.5 text-[10px] text-emerald-600/80">
                   {formatFreedomTimeString(calculateFreedomTime(interestSaved, dailyExpenses), 'long')} vrijheid gered
                 </p>
@@ -438,7 +439,10 @@ export default function DebtsPage() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-zinc-900">{debt.name}</p>
+                    <p className="truncate text-sm font-medium text-zinc-900 flex items-center gap-1.5">
+                      {debt.name}
+                      <OwnershipBadge ownership={debt.ownership ?? 'personal'} />
+                    </p>
                     <p className="truncate text-xs text-zinc-500">
                       {DEBT_TYPE_LABELS[debt.debt_type]}
                       {debt.subtype && DEBT_SUBTYPE_LABELS[debt.debt_type]?.[debt.subtype]
@@ -452,7 +456,7 @@ export default function DebtsPage() {
                   <div className="shrink-0 text-right ml-3">
                     <p className="text-sm font-semibold text-zinc-900">{formatCurrency(balance)}</p>
                     <p className="text-xs text-zinc-400">van {formatCurrency(original)}</p>
-                    {dailyExpenses > 0 && balance > 0 && (
+                    {dailyExpenses > 0 && balance >= 100 && (
                       <p className="text-[10px] text-amber-600/70">
                         {formatFreedomTimeString(calculateFreedomTime(balance, dailyExpenses), 'short')} terug te winnen
                       </p>
@@ -611,7 +615,7 @@ function DebtDetailModal({
         {/* Balance highlight */}
         <div className="border-b border-zinc-100 px-6 py-4 text-center">
           <p className="text-3xl font-bold text-zinc-900" data-testid="modal-debt-balance">{formatCurrency(balance)}</p>
-          {dailyExpenses > 0 && balance > 0 && (
+          {dailyExpenses > 0 && balance >= 100 && (
             <p className="mt-0.5 text-sm text-amber-600" data-testid="modal-debt-freedom-time">
               je koopt deze tijd terug in {formatFreedomTimeString(calculateFreedomTime(balance, dailyExpenses), 'long')}
             </p>
@@ -682,7 +686,7 @@ function DebtDetailModal({
               <p className="mt-0.5 text-sm font-medium text-red-600">
                 {proj.isPayable ? formatCurrency(proj.totalInterest) : 'Onbetaalbaar'}
               </p>
-              {dailyExpenses > 0 && proj.isPayable && proj.totalInterest > 0 && (
+              {dailyExpenses > 0 && proj.isPayable && proj.totalInterest >= 100 && (
                 <p className="mt-0.5 text-[10px] text-red-500/80">
                   {formatFreedomTimeString(calculateFreedomTime(proj.totalInterest, dailyExpenses), 'long')} verloren tijd
                 </p>
@@ -1256,6 +1260,9 @@ function DebtForm({
   const [creditLimit, setCreditLimit] = useState(String(debt?.credit_limit ?? ''))
   const [draagkrachtmetingDate, setDraagkrachtmetingDate] = useState(debt?.draagkrachtmeting_date ?? '')
   const [validationError, setValidationError] = useState<string | null>(null)
+  // Household ownership
+  const [ownership, setOwnership] = useState<OwnershipType>(debt?.ownership ?? 'personal')
+  const { hasHousehold, householdId } = useHouseholdStatus()
 
   const subtypeOptions = DEBT_SUBTYPE_LABELS[debtType]
   const visibleFields = DEBT_TYPE_FIELDS[debtType]
@@ -1341,6 +1348,9 @@ function DebtForm({
       linked_asset_id: linkedAssetId || null,
       credit_limit: creditLimit ? Number(creditLimit) : null,
       draagkrachtmeting_date: draagkrachtmetingDate || null,
+      // Household fields
+      ownership: ownership,
+      household_id: ownership === 'shared' ? householdId : null,
     }
 
     if (isEdit && debt) {
@@ -1414,6 +1424,13 @@ function DebtForm({
               </select>
             </div>
           </div>
+
+          {/* Ownership toggle */}
+          <OwnershipToggle
+            value={ownership}
+            onChange={setOwnership}
+            hasHousehold={hasHousehold}
+          />
 
           {/* Subtype dropdown (conditional) */}
           {subtypeOptions && (

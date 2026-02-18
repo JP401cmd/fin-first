@@ -1,0 +1,932 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.86.37:3000
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 973ms
+ GET /test-streak-indicator 200 in 1668ms (compile: 1454ms, proxy.ts: 112ms, render: 102ms)
+ GET /api/verify-streak-indicator 200 in 303ms (compile: 246ms, proxy.ts: 13ms, render: 44ms)
+ GET /test-streak-indicator 200 in 366ms (compile: 93ms, proxy.ts: 62ms, render: 211ms)
+ GET /test-streak-indicator 200 in 186ms (compile: 18ms, proxy.ts: 48ms, render: 120ms)
+ GET /test-streak-indicator 200 in 120ms (compile: 9ms, proxy.ts: 13ms, render: 98ms)
+ GET /test-streak-indicator 200 in 159ms (compile: 5ms, proxy.ts: 15ms, render: 139ms)
+ GET /test-streak-indicator 200 in 133ms (compile: 14ms, proxy.ts: 36ms, render: 83ms)
+ GET /test-streak-indicator 200 in 59ms (compile: 5ms, proxy.ts: 11ms, render: 43ms)
+ GET /test-streak-indicator 200 in 75ms (compile: 10ms, proxy.ts: 9ms, render: 56ms)
+ GET /test-streak-indicator 200 in 44ms (compile: 6ms, proxy.ts: 11ms, render: 27ms)
+ GET /test-streak-indicator 200 in 61ms (compile: 5ms, proxy.ts: 8ms, render: 49ms)
+ GET /test-streak-indicator 200 in 40ms (compile: 4ms, proxy.ts: 8ms, render: 27ms)
+ GET /test-streak-indicator 200 in 93ms (compile: 5ms, proxy.ts: 7ms, render: 80ms)
+ GET /test-streak-indicator 200 in 68ms (compile: 8ms, proxy.ts: 6ms, render: 54ms)
+ GET /test-streak-indicator 200 in 87ms (compile: 5ms, proxy.ts: 7ms, render: 74ms)
+ GET /test-streak-indicator 200 in 98ms (compile: 5ms, proxy.ts: 17ms, render: 75ms)
+ GET /test-streak-indicator 200 in 49ms (compile: 7ms, proxy.ts: 9ms, render: 33ms)
+ GET /test-streak-indicator 200 in 94ms (compile: 6ms, proxy.ts: 8ms, render: 80ms)
+ GET /test-streak-indicator 200 in 79ms (compile: 4ms, proxy.ts: 27ms, render: 48ms)
+ GET /test-streak-indicator 200 in 35ms (compile: 5ms, proxy.ts: 6ms, render: 24ms)
+ GET /test-streak-indicator 200 in 38ms (compile: 5ms, proxy.ts: 5ms, render: 27ms)
+ GET /test-streak-indicator 200 in 135ms (compile: 4ms, proxy.ts: 5ms, render: 127ms)
+ GET /test-streak-indicator 200 in 129ms (compile: 10ms, proxy.ts: 11ms, render: 108ms)
+ GET /test-streak-indicator 200 in 54ms (compile: 6ms, proxy.ts: 7ms, render: 42ms)
+ GET /test-streak-indicator 200 in 30ms (compile: 3ms, proxy.ts: 9ms, render: 18ms)
+ GET /test-streak-indicator 200 in 32ms (compile: 3ms, proxy.ts: 6ms, render: 23ms)
+ GET /test-streak-indicator 200 in 24ms (compile: 3ms, proxy.ts: 4ms, render: 17ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 4ms, proxy.ts: 6ms, render: 19ms)
+ GET /test-streak-indicator 200 in 27ms (compile: 3ms, proxy.ts: 6ms, render: 18ms)
+ GET /test-streak-indicator 200 in 25ms (compile: 3ms, proxy.ts: 4ms, render: 18ms)
+ GET /api/health 200 in 637ms (compile: 397ms, proxy.ts: 28ms, render: 212ms)
+ GET /test-streak-indicator 200 in 34ms (compile: 4ms, proxy.ts: 5ms, render: 25ms)
+ GET /test-streak-indicator 200 in 33ms (compile: 6ms, proxy.ts: 4ms, render: 22ms)
+ GET /test-streak-indicator 200 in 57ms (compile: 4ms, proxy.ts: 5ms, render: 48ms)
+ GET /test-streak-indicator 200 in 31ms (compile: 4ms, proxy.ts: 7ms, render: 21ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 3ms, proxy.ts: 4ms, render: 20ms)
+ GET /test-streak-indicator 200 in 34ms (compile: 5ms, proxy.ts: 5ms, render: 24ms)
+ GET /test-streak-indicator 200 in 30ms (compile: 4ms, proxy.ts: 7ms, render: 18ms)
+ GET /test-streak-indicator 200 in 28ms (compile: 3ms, proxy.ts: 6ms, render: 19ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 3ms, proxy.ts: 4ms, render: 19ms)
+ GET /test-streak-indicator 200 in 71ms (compile: 3ms, proxy.ts: 4ms, render: 64ms)
+ GET /test-streak-indicator 200 in 53ms (compile: 10ms, proxy.ts: 14ms, render: 29ms)
+ GET /test-streak-indicator 200 in 27ms (compile: 4ms, proxy.ts: 5ms, render: 18ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 3ms, proxy.ts: 6ms, render: 17ms)
+ GET /test-streak-indicator 200 in 54ms (compile: 3ms, proxy.ts: 4ms, render: 48ms)
+ GET /test-streak-indicator 200 in 39ms (compile: 11ms, proxy.ts: 5ms, render: 24ms)
+ GET /test-streak-indicator 200 in 34ms (compile: 8ms, proxy.ts: 5ms, render: 21ms)
+ GET /test-streak-indicator 200 in 44ms (compile: 4ms, proxy.ts: 4ms, render: 36ms)
+ GET /test-streak-indicator 200 in 58ms (compile: 4ms, proxy.ts: 3ms, render: 51ms)
+ GET /test-streak-indicator 200 in 57ms (compile: 3ms, proxy.ts: 8ms, render: 46ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 3ms, proxy.ts: 7ms, render: 19ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 3ms, proxy.ts: 3ms, render: 20ms)
+ GET /test-streak-indicator 200 in 30ms (compile: 3ms, proxy.ts: 5ms, render: 22ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 5ms, proxy.ts: 6ms, render: 18ms)
+ GET /test-streak-indicator 200 in 33ms (compile: 3ms, proxy.ts: 3ms, render: 27ms)
+ GET /test-streak-indicator 200 in 23ms (compile: 2ms, proxy.ts: 4ms, render: 17ms)
+ GET /test-streak-indicator 200 in 21ms (compile: 3ms, proxy.ts: 3ms, render: 15ms)
+ GET /test-streak-indicator 200 in 21ms (compile: 2ms, proxy.ts: 3ms, render: 16ms)
+ GET /test-streak-indicator 200 in 20ms (compile: 2ms, proxy.ts: 3ms, render: 15ms)
+ GET /test-streak-indicator 200 in 20ms (compile: 2ms, proxy.ts: 3ms, render: 15ms)
+ GET /test-streak-indicator 200 in 20ms (compile: 3ms, proxy.ts: 3ms, render: 14ms)
+ GET /test-streak-indicator 200 in 22ms (compile: 3ms, proxy.ts: 3ms, render: 17ms)
+ GET /test-streak-indicator 200 in 24ms (compile: 3ms, proxy.ts: 3ms, render: 17ms)
+ GET /test-streak-indicator 200 in 23ms (compile: 4ms, proxy.ts: 3ms, render: 16ms)
+ GET /test-streak-indicator 200 in 36ms (compile: 8ms, proxy.ts: 4ms, render: 25ms)
+ GET /test-streak-indicator 200 in 32ms (compile: 4ms, proxy.ts: 7ms, render: 20ms)
+ GET /test-streak-indicator 200 in 37ms (compile: 5ms, proxy.ts: 6ms, render: 26ms)
+ GET /test-streak-indicator 200 in 33ms (compile: 4ms, proxy.ts: 4ms, render: 25ms)
+ GET /test-streak-indicator 200 in 24ms (compile: 3ms, proxy.ts: 4ms, render: 17ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 4ms, proxy.ts: 5ms, render: 20ms)
+ GET /test-streak-indicator 200 in 28ms (compile: 4ms, proxy.ts: 7ms, render: 17ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 3ms, proxy.ts: 5ms, render: 20ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 3ms, proxy.ts: 7ms, render: 19ms)
+ GET /test-streak-indicator 200 in 31ms (compile: 4ms, proxy.ts: 6ms, render: 21ms)
+ GET /test-streak-indicator 200 in 31ms (compile: 4ms, proxy.ts: 6ms, render: 20ms)
+ GET /test-streak-indicator 200 in 27ms (compile: 3ms, proxy.ts: 5ms, render: 19ms)
+ GET /test-streak-indicator 200 in 27ms (compile: 3ms, proxy.ts: 7ms, render: 17ms)
+ GET /test-streak-indicator 200 in 25ms (compile: 2ms, proxy.ts: 5ms, render: 17ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 3ms, proxy.ts: 7ms, render: 16ms)
+ GET /test-streak-indicator 200 in 27ms (compile: 3ms, proxy.ts: 6ms, render: 18ms)
+ GET /test-streak-indicator 200 in 48ms (compile: 3ms, proxy.ts: 5ms, render: 40ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 3ms, proxy.ts: 7ms, render: 19ms)
+ GET /test-streak-indicator 200 in 23ms (compile: 2ms, proxy.ts: 3ms, render: 18ms)
+ GET /test-streak-indicator 200 in 39ms (compile: 5ms, proxy.ts: 6ms, render: 28ms)
+ GET /test-streak-indicator 200 in 32ms (compile: 4ms, proxy.ts: 4ms, render: 24ms)
+ GET /test-streak-indicator 200 in 27ms (compile: 3ms, proxy.ts: 7ms, render: 17ms)
+ GET /test-streak-indicator 200 in 22ms (compile: 3ms, proxy.ts: 4ms, render: 16ms)
+ GET /test-streak-indicator 200 in 21ms (compile: 3ms, proxy.ts: 4ms, render: 14ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 4ms, proxy.ts: 3ms, render: 19ms)
+ GET /test-streak-indicator 200 in 30ms (compile: 5ms, proxy.ts: 6ms, render: 18ms)
+ GET /test-streak-indicator 200 in 23ms (compile: 3ms, proxy.ts: 4ms, render: 16ms)
+ GET /test-streak-indicator 200 in 21ms (compile: 3ms, proxy.ts: 3ms, render: 14ms)
+ GET /test-streak-indicator 200 in 27ms (compile: 5ms, proxy.ts: 5ms, render: 17ms)
+ GET /test-streak-indicator 200 in 19ms (compile: 2ms, proxy.ts: 6ms, render: 11ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 2ms, proxy.ts: 6ms, render: 17ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 3ms, proxy.ts: 7ms, render: 16ms)
+ GET /test-streak-indicator 200 in 24ms (compile: 2ms, proxy.ts: 3ms, render: 18ms)
+ GET /test-streak-indicator 200 in 24ms (compile: 4ms, proxy.ts: 5ms, render: 15ms)
+ GET /test-streak-indicator 200 in 32ms (compile: 3ms, proxy.ts: 3ms, render: 25ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 3ms, proxy.ts: 4ms, render: 19ms)
+ GET /test-streak-indicator 200 in 34ms (compile: 4ms, proxy.ts: 4ms, render: 25ms)
+ GET /test-streak-indicator 200 in 24ms (compile: 3ms, proxy.ts: 4ms, render: 17ms)
+ GET /test-streak-indicator 200 in 23ms (compile: 2ms, proxy.ts: 4ms, render: 17ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 3ms, proxy.ts: 4ms, render: 19ms)
+ GET /test-streak-indicator 200 in 22ms (compile: 4ms, proxy.ts: 4ms, render: 13ms)
+ GET /test-streak-indicator 200 in 27ms (compile: 2ms, proxy.ts: 6ms, render: 18ms)
+ GET /test-streak-indicator 200 in 27ms (compile: 4ms, proxy.ts: 6ms, render: 17ms)
+ GET /test-streak-indicator 200 in 21ms (compile: 3ms, proxy.ts: 3ms, render: 16ms)
+ GET /test-streak-indicator 200 in 53ms (compile: 2ms, proxy.ts: 4ms, render: 47ms)
+ GET /test-streak-indicator 200 in 36ms (compile: 4ms, proxy.ts: 7ms, render: 25ms)
+ GET /test-streak-indicator 200 in 30ms (compile: 4ms, proxy.ts: 6ms, render: 19ms)
+ GET /test-streak-indicator 200 in 31ms (compile: 2ms, proxy.ts: 5ms, render: 24ms)
+ GET /test-streak-indicator 200 in 32ms (compile: 4ms, proxy.ts: 5ms, render: 23ms)
+ GET /test-streak-indicator 200 in 35ms (compile: 6ms, proxy.ts: 4ms, render: 25ms)
+ GET /test-streak-indicator 200 in 47ms (compile: 3ms, proxy.ts: 5ms, render: 39ms)
+ GET /test-streak-indicator 200 in 30ms (compile: 5ms, proxy.ts: 6ms, render: 19ms)
+ GET /test-streak-indicator 200 in 28ms (compile: 3ms, proxy.ts: 4ms, render: 21ms)
+ GET /test-streak-indicator 200 in 39ms (compile: 5ms, proxy.ts: 4ms, render: 30ms)
+ GET /test-streak-indicator 200 in 27ms (compile: 5ms, proxy.ts: 5ms, render: 18ms)
+ GET /test-streak-indicator 200 in 24ms (compile: 2ms, proxy.ts: 5ms, render: 17ms)
+ GET /test-streak-indicator 200 in 33ms (compile: 3ms, proxy.ts: 4ms, render: 26ms)
+ GET /test-streak-indicator 200 in 42ms (compile: 9ms, proxy.ts: 8ms, render: 25ms)
+ GET /test-streak-indicator 200 in 30ms (compile: 4ms, proxy.ts: 7ms, render: 19ms)
+ GET /test-streak-indicator 200 in 24ms (compile: 3ms, proxy.ts: 4ms, render: 17ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 4ms, proxy.ts: 5ms, render: 18ms)
+ GET /test-streak-indicator 200 in 27ms (compile: 3ms, proxy.ts: 7ms, render: 17ms)
+ GET /test-streak-indicator 200 in 24ms (compile: 2ms, proxy.ts: 5ms, render: 17ms)
+ GET /test-streak-indicator 200 in 32ms (compile: 5ms, proxy.ts: 7ms, render: 21ms)
+ GET /test-streak-indicator 200 in 33ms (compile: 3ms, proxy.ts: 5ms, render: 26ms)
+ GET /test-streak-indicator 200 in 32ms (compile: 4ms, proxy.ts: 7ms, render: 21ms)
+ GET /test-streak-indicator 200 in 22ms (compile: 3ms, proxy.ts: 4ms, render: 15ms)
+ GET /test-streak-indicator 200 in 25ms (compile: 3ms, proxy.ts: 3ms, render: 19ms)
+ GET /test-streak-indicator 200 in 27ms (compile: 6ms, proxy.ts: 5ms, render: 17ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 4ms, proxy.ts: 5ms, render: 17ms)
+ GET /test-streak-indicator 200 in 32ms (compile: 4ms, proxy.ts: 7ms, render: 22ms)
+ GET /test-streak-indicator 200 in 25ms (compile: 5ms, proxy.ts: 3ms, render: 18ms)
+ GET /test-streak-indicator 200 in 28ms (compile: 3ms, proxy.ts: 6ms, render: 19ms)
+ GET /test-streak-indicator 200 in 24ms (compile: 2ms, proxy.ts: 3ms, render: 19ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 4ms, proxy.ts: 5ms, render: 18ms)
+ GET /test-streak-indicator 200 in 27ms (compile: 2ms, proxy.ts: 6ms, render: 19ms)
+ GET /test-streak-indicator 200 in 27ms (compile: 3ms, proxy.ts: 4ms, render: 20ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 5ms, proxy.ts: 4ms, render: 20ms)
+ GET /test-streak-indicator 200 in 24ms (compile: 3ms, proxy.ts: 4ms, render: 17ms)
+ GET /test-streak-indicator 200 in 27ms (compile: 3ms, proxy.ts: 5ms, render: 20ms)
+ GET /test-streak-indicator 200 in 31ms (compile: 2ms, proxy.ts: 7ms, render: 22ms)
+ GET /test-streak-indicator 200 in 33ms (compile: 4ms, proxy.ts: 6ms, render: 24ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 4ms, proxy.ts: 6ms, render: 20ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 3ms, proxy.ts: 4ms, render: 19ms)
+ GET /test-streak-indicator 200 in 30ms (compile: 5ms, proxy.ts: 4ms, render: 22ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 3ms, proxy.ts: 5ms, render: 18ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 4ms, proxy.ts: 7ms, render: 19ms)
+ GET /test-streak-indicator 200 in 35ms (compile: 2ms, proxy.ts: 6ms, render: 27ms)
+ GET /test-streak-indicator 200 in 25ms (compile: 3ms, proxy.ts: 4ms, render: 18ms)
+ GET /test-streak-indicator 200 in 35ms (compile: 3ms, proxy.ts: 5ms, render: 26ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 2ms, proxy.ts: 7ms, render: 20ms)
+ GET /test-streak-indicator 200 in 25ms (compile: 3ms, proxy.ts: 4ms, render: 18ms)
+ GET /test-streak-indicator 200 in 28ms (compile: 4ms, proxy.ts: 4ms, render: 19ms)
+ GET /test-streak-indicator 200 in 31ms (compile: 4ms, proxy.ts: 7ms, render: 20ms)
+ GET /test-streak-indicator 200 in 35ms (compile: 3ms, proxy.ts: 3ms, render: 29ms)
+ GET /test-streak-indicator 200 in 30ms (compile: 3ms, proxy.ts: 4ms, render: 23ms)
+ GET /test-streak-indicator 200 in 48ms (compile: 4ms, proxy.ts: 5ms, render: 39ms)
+ GET /test-streak-indicator 200 in 47ms (compile: 3ms, proxy.ts: 5ms, render: 39ms)
+ GET /test-streak-indicator 200 in 32ms (compile: 5ms, proxy.ts: 5ms, render: 22ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 3ms, proxy.ts: 5ms, render: 22ms)
+ GET /test-streak-indicator 200 in 25ms (compile: 5ms, proxy.ts: 5ms, render: 15ms)
+ GET /test-streak-indicator 200 in 32ms (compile: 4ms, proxy.ts: 7ms, render: 20ms)
+ GET /test-streak-indicator 200 in 27ms (compile: 4ms, proxy.ts: 4ms, render: 18ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 3ms, proxy.ts: 7ms, render: 20ms)
+ GET /test-streak-indicator 200 in 36ms (compile: 3ms, proxy.ts: 4ms, render: 29ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 4ms, proxy.ts: 5ms, render: 20ms)
+ GET /test-streak-indicator 200 in 27ms (compile: 3ms, proxy.ts: 8ms, render: 17ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 2ms, proxy.ts: 5ms, render: 19ms)
+ GET /test-streak-indicator 200 in 28ms (compile: 6ms, proxy.ts: 4ms, render: 19ms)
+ GET /test-streak-indicator 200 in 28ms (compile: 3ms, proxy.ts: 6ms, render: 19ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 3ms, proxy.ts: 4ms, render: 23ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 5ms, proxy.ts: 5ms, render: 17ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 2ms, proxy.ts: 6ms, render: 21ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 4ms, proxy.ts: 5ms, render: 20ms)
+ GET /test-streak-indicator 200 in 28ms (compile: 4ms, proxy.ts: 4ms, render: 19ms)
+ GET /test-streak-indicator 200 in 27ms (compile: 3ms, proxy.ts: 4ms, render: 20ms)
+ GET /test-streak-indicator 200 in 31ms (compile: 3ms, proxy.ts: 5ms, render: 23ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 5ms, proxy.ts: 6ms, render: 18ms)
+ GET /test-streak-indicator 200 in 27ms (compile: 2ms, proxy.ts: 4ms, render: 20ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 5ms, proxy.ts: 4ms, render: 20ms)
+ GET /test-streak-indicator 200 in 30ms (compile: 3ms, proxy.ts: 7ms, render: 20ms)
+ GET /test-streak-indicator 200 in 33ms (compile: 3ms, proxy.ts: 4ms, render: 25ms)
+ GET /test-streak-indicator 200 in 24ms (compile: 3ms, proxy.ts: 3ms, render: 18ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 3ms, proxy.ts: 4ms, render: 19ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 4ms, proxy.ts: 4ms, render: 18ms)
+ GET /test-streak-indicator 200 in 27ms (compile: 3ms, proxy.ts: 6ms, render: 18ms)
+ GET /test-streak-indicator 200 in 35ms (compile: 2ms, proxy.ts: 5ms, render: 28ms)
+ GET /test-streak-indicator 200 in 35ms (compile: 4ms, proxy.ts: 8ms, render: 22ms)
+ GET /test-streak-indicator 200 in 31ms (compile: 4ms, proxy.ts: 5ms, render: 23ms)
+ GET /test-streak-indicator 200 in 32ms (compile: 4ms, proxy.ts: 8ms, render: 19ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 3ms, proxy.ts: 7ms, render: 19ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 3ms, proxy.ts: 6ms, render: 16ms)
+ GET /test-streak-indicator 200 in 41ms (compile: 3ms, proxy.ts: 9ms, render: 29ms)
+ GET /test-streak-indicator 200 in 25ms (compile: 3ms, proxy.ts: 4ms, render: 17ms)
+ GET /test-streak-indicator 200 in 28ms (compile: 3ms, proxy.ts: 4ms, render: 21ms)
+ GET /test-streak-indicator 200 in 30ms (compile: 4ms, proxy.ts: 6ms, render: 20ms)
+ GET /test-streak-indicator 200 in 28ms (compile: 3ms, proxy.ts: 4ms, render: 21ms)
+ GET /test-streak-indicator 200 in 31ms (compile: 6ms, proxy.ts: 4ms, render: 20ms)
+ GET /test-streak-indicator 200 in 59ms (compile: 3ms, proxy.ts: 5ms, render: 51ms)
+ GET /test-streak-indicator 200 in 48ms (compile: 3ms, proxy.ts: 4ms, render: 41ms)
+ GET /test-streak-indicator 200 in 31ms (compile: 3ms, proxy.ts: 7ms, render: 21ms)
+ GET /test-streak-indicator 200 in 47ms (compile: 3ms, proxy.ts: 4ms, render: 41ms)
+ GET /test-streak-indicator 200 in 30ms (compile: 5ms, proxy.ts: 5ms, render: 20ms)
+ GET /test-streak-indicator 200 in 28ms (compile: 3ms, proxy.ts: 4ms, render: 21ms)
+ GET /test-streak-indicator 200 in 28ms (compile: 6ms, proxy.ts: 4ms, render: 18ms)
+ GET /test-streak-indicator 200 in 26ms (compile: 3ms, proxy.ts: 4ms, render: 19ms)
+ GET /test-streak-indicator 200 in 35ms (compile: 4ms, proxy.ts: 5ms, render: 26ms)
+ GET /test-streak-indicator 200 in 29ms (compile: 8ms, proxy.ts: 5ms, render: 16ms)
+ GET /test-streak-indicator 200 in 30ms (compile: 3ms, proxy.ts: 5ms, render: 22ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\prerender-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\prerender-manifest.json',
+  page: '/test-streak-indicator'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\static\development\_buildManifest.js.tmp.fwbitieuma'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\static\\development\\_buildManifest.js.tmp.fwbitieuma'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\prerender-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\prerender-manifest.json',
+  page: '/test-streak-indicator'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /test-streak-indicator 500 in 1521ms (compile: 1498ms, proxy.ts: 4ms, render: 18ms)
+ GET /test-streak-indicator 500 in 1521ms (compile: 1498ms, proxy.ts: 4ms, render: 18ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-streak-indicator\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-streak-indicator\\page\\build-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-streak-indicator\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-streak-indicator\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-streak-indicator\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-streak-indicator\\page\\build-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /test-streak-indicator 500 in 185ms (compile: 163ms, proxy.ts: 9ms, render: 13ms)
+ GET /test-streak-indicator 500 in 185ms (compile: 163ms, proxy.ts: 9ms, render: 13ms)
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-streak-indicator\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-streak-indicator\\page\\build-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /test-streak-indicator 500 in 215ms (compile: 170ms, proxy.ts: 33ms, render: 12ms)
+ GET /test-streak-indicator 500 in 215ms (compile: 170ms, proxy.ts: 33ms, render: 12ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-streak-indicator\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-streak-indicator\\page\\build-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-streak-indicator\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-streak-indicator\\page\\build-manifest.json'
+}
+⨯ Error: Cannot find module '../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages-manifest.json',
+  page: '/'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages-manifest.json',
+  page: '/'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+ GET / 500 in 735ms (proxy.ts: 5ms)
+ GET / 500 in 735ms (proxy.ts: 5ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\health\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\health\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\health\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\health\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\health\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\health\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+⨯ Error: Cannot find module '../../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-holdings-list\page.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-holdings-list\page.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/test-holdings-list'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: Cannot find module '../../chunks/ssr/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-holdings-list\page.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-holdings-list\page.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/test-holdings-list'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+ GET /test-holdings-list 500 in 454ms (proxy.ts: 40ms)
+ GET /test-holdings-list 500 in 454ms (proxy.ts: 40ms)
+✓ Compiled in 214ms
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\health\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\health\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\health\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\health\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-holdings-list\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-holdings-list\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-holdings-list\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-holdings-list\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+⨯ Error [ChunkLoadError]: Failed to load chunk server/chunks/ssr/node_modules_eef41739._.js from module [project]/node_modules/next/dist/esm/build/templates/app-page.js?page=/_not-found/page { METADATA_0 => "[project]/app/favicon.ico.mjs { IMAGE => \"[project]/app/favicon.ico (static in ecmascript, tag client)\" } [app-rsc] (structured image object, ecmascript, Next.js Server Component)", MODULE_1 => "[project]/app/layout.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_2 => "[project]/app/error.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_3 => "[project]/app/not-found.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_4 => "[project]/node_modules/next/dist/client/components/builtin/forbidden.js [app-rsc] (ecmascript, Next.js Server Component)", MODULE_5 => "[project]/node_modules/next/dist/client/components/builtin/unauthorized.js [app-rsc] (ecmascript, Next.js Server Component)", MODULE_6 => "[project]/app/not-found.tsx [app-rsc] (ecmascript, Next.js Server Component)" } [app-rsc] (ecmascript) <locals>
+    at ignore-listed frames {
+  digest: '1926101059',
+  [cause]: Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\chunks\ssr\node_modules_eef41739._.js'
+      at ignore-listed frames {
+    errno: -4058,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\chunks\\ssr\\node_modules_eef41739._.js'
+  }
+}
+Error [ChunkLoadError]: Failed to load chunk server/chunks/ssr/node_modules_eef41739._.js from module [project]/node_modules/next/dist/esm/build/templates/app-page.js?page=/_not-found/page { METADATA_0 => "[project]/app/favicon.ico.mjs { IMAGE => \"[project]/app/favicon.ico (static in ecmascript, tag client)\" } [app-rsc] (structured image object, ecmascript, Next.js Server Component)", MODULE_1 => "[project]/app/layout.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_2 => "[project]/app/error.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_3 => "[project]/app/not-found.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_4 => "[project]/node_modules/next/dist/client/components/builtin/forbidden.js [app-rsc] (ecmascript, Next.js Server Component)", MODULE_5 => "[project]/node_modules/next/dist/client/components/builtin/unauthorized.js [app-rsc] (ecmascript, Next.js Server Component)", MODULE_6 => "[project]/app/not-found.tsx [app-rsc] (ecmascript, Next.js Server Component)" } [app-rsc] (ecmascript) <locals>
+    at ignore-listed frames {
+  digest: '1926101059',
+  [cause]: Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\chunks\ssr\node_modules_eef41739._.js'
+      at ignore-listed frames {
+    errno: -4058,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\chunks\\ssr\\node_modules_eef41739._.js'
+  }
+}
+⨯ unhandledRejection: Error [ChunkLoadError]: Failed to load chunk server/chunks/ssr/node_modules_eef41739._.js from module [project]/node_modules/next/dist/esm/build/templates/app-page.js?page=/_not-found/page { METADATA_0 => "[project]/app/favicon.ico.mjs { IMAGE => \"[project]/app/favicon.ico (static in ecmascript, tag client)\" } [app-rsc] (structured image object, ecmascript, Next.js Server Component)", MODULE_1 => "[project]/app/layout.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_2 => "[project]/app/error.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_3 => "[project]/app/not-found.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_4 => "[project]/node_modules/next/dist/client/components/builtin/forbidden.js [app-rsc] (ecmascript, Next.js Server Component)", MODULE_5 => "[project]/node_modules/next/dist/client/components/builtin/unauthorized.js [app-rsc] (ecmascript, Next.js Server Component)", MODULE_6 => "[project]/app/not-found.tsx [app-rsc] (ecmascript, Next.js Server Component)" } [app-rsc] (ecmascript) <locals>
+    at ignore-listed frames {
+  digest: '1926101059',
+  [cause]: Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\chunks\ssr\node_modules_eef41739._.js'
+      at ignore-listed frames {
+    errno: -4058,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\chunks\\ssr\\node_modules_eef41739._.js'
+  }
+}
+⨯ unhandledRejection:  Error [ChunkLoadError]: Failed to load chunk server/chunks/ssr/node_modules_eef41739._.js from module [project]/node_modules/next/dist/esm/build/templates/app-page.js?page=/_not-found/page { METADATA_0 => "[project]/app/favicon.ico.mjs { IMAGE => \"[project]/app/favicon.ico (static in ecmascript, tag client)\" } [app-rsc] (structured image object, ecmascript, Next.js Server Component)", MODULE_1 => "[project]/app/layout.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_2 => "[project]/app/error.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_3 => "[project]/app/not-found.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_4 => "[project]/node_modules/next/dist/client/components/builtin/forbidden.js [app-rsc] (ecmascript, Next.js Server Component)", MODULE_5 => "[project]/node_modules/next/dist/client/components/builtin/unauthorized.js [app-rsc] (ecmascript, Next.js Server Component)", MODULE_6 => "[project]/app/not-found.tsx [app-rsc] (ecmascript, Next.js Server Component)" } [app-rsc] (ecmascript) <locals>
+    at ignore-listed frames {
+  digest: '1926101059',
+  [cause]: Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\chunks\ssr\node_modules_eef41739._.js'
+      at ignore-listed frames {
+    errno: -4058,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\chunks\\ssr\\node_modules_eef41739._.js'
+  }
+}
+Error [ChunkLoadError]: Failed to load chunk server/chunks/ssr/[externals]_next_dist_compiled_next-server_app-page-turbo_runtime_dev_062c5159.js from module [project]/node_modules/next/dist/esm/build/templates/app-page.js?page=/_not-found/page { METADATA_0 => "[project]/app/favicon.ico.mjs { IMAGE => \"[project]/app/favicon.ico (static in ecmascript, tag client)\" } [app-rsc] (structured image object, ecmascript, Next.js Server Component)", MODULE_1 => "[project]/app/layout.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_2 => "[project]/app/error.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_3 => "[project]/app/not-found.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_4 => "[project]/node_modules/next/dist/client/components/builtin/forbidden.js [app-rsc] (ecmascript, Next.js Server Component)", MODULE_5 => "[project]/node_modules/next/dist/client/components/builtin/unauthorized.js [app-rsc] (ecmascript, Next.js Server Component)", MODULE_6 => "[project]/app/not-found.tsx [app-rsc] (ecmascript, Next.js Server Component)" } [app-rsc] (ecmascript) <locals>
+    at ignore-listed frames {
+  [cause]: Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\chunks\ssr\[externals]_next_dist_compiled_next-server_app-page-turbo_runtime_dev_062c5159.js'
+      at ignore-listed frames {
+    errno: -4058,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\chunks\\ssr\\[externals]_next_dist_compiled_next-server_app-page-turbo_runtime_dev_062c5159.js'
+  }
+}
+⨯ unhandledRejection: Error [ChunkLoadError]: Failed to load chunk server/chunks/ssr/[externals]_next_dist_compiled_next-server_app-page-turbo_runtime_dev_062c5159.js from module [project]/node_modules/next/dist/esm/build/templates/app-page.js?page=/_not-found/page { METADATA_0 => "[project]/app/favicon.ico.mjs { IMAGE => \"[project]/app/favicon.ico (static in ecmascript, tag client)\" } [app-rsc] (structured image object, ecmascript, Next.js Server Component)", MODULE_1 => "[project]/app/layout.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_2 => "[project]/app/error.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_3 => "[project]/app/not-found.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_4 => "[project]/node_modules/next/dist/client/components/builtin/forbidden.js [app-rsc] (ecmascript, Next.js Server Component)", MODULE_5 => "[project]/node_modules/next/dist/client/components/builtin/unauthorized.js [app-rsc] (ecmascript, Next.js Server Component)", MODULE_6 => "[project]/app/not-found.tsx [app-rsc] (ecmascript, Next.js Server Component)" } [app-rsc] (ecmascript) <locals>
+    at ignore-listed frames {
+  [cause]: Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\chunks\ssr\[externals]_next_dist_compiled_next-server_app-page-turbo_runtime_dev_062c5159.js'
+      at ignore-listed frames {
+    errno: -4058,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\chunks\\ssr\\[externals]_next_dist_compiled_next-server_app-page-turbo_runtime_dev_062c5159.js'
+  }
+}
+⨯ unhandledRejection:  Error [ChunkLoadError]: Failed to load chunk server/chunks/ssr/[externals]_next_dist_compiled_next-server_app-page-turbo_runtime_dev_062c5159.js from module [project]/node_modules/next/dist/esm/build/templates/app-page.js?page=/_not-found/page { METADATA_0 => "[project]/app/favicon.ico.mjs { IMAGE => \"[project]/app/favicon.ico (static in ecmascript, tag client)\" } [app-rsc] (structured image object, ecmascript, Next.js Server Component)", MODULE_1 => "[project]/app/layout.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_2 => "[project]/app/error.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_3 => "[project]/app/not-found.tsx [app-rsc] (ecmascript, Next.js Server Component)", MODULE_4 => "[project]/node_modules/next/dist/client/components/builtin/forbidden.js [app-rsc] (ecmascript, Next.js Server Component)", MODULE_5 => "[project]/node_modules/next/dist/client/components/builtin/unauthorized.js [app-rsc] (ecmascript, Next.js Server Component)", MODULE_6 => "[project]/app/not-found.tsx [app-rsc] (ecmascript, Next.js Server Component)" } [app-rsc] (ecmascript) <locals>
+    at ignore-listed frames {
+  [cause]: Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\chunks\ssr\[externals]_next_dist_compiled_next-server_app-page-turbo_runtime_dev_062c5159.js'
+      at ignore-listed frames {
+    errno: -4058,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\chunks\\ssr\\[externals]_next_dist_compiled_next-server_app-page-turbo_runtime_dev_062c5159.js'
+  }
+}
+ GET /_next/static 500 in 2.5s (compile: 422ms, render: 2.1s)
+ GET / 200 in 138ms (compile: 40ms, proxy.ts: 6ms, render: 92ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\health\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\api\\health\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+⨯ Error [ChunkLoadError]: Failed to load chunk server/chunks/node_modules_@opentelemetry_api_build_esm_7e8f41ca._.js from runtime for chunk server/app/api/verify-holdings-list/route.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\verify-holdings-list\route.js:3:3) {
+  page: '/api/verify-holdings-list',
+  [cause]: Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\chunks\node_modules_@opentelemetry_api_build_esm_7e8f41ca._.js'
+      at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\verify-holdings-list\route.js:3:3) {
+    errno: -4058,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\chunks\\node_modules_@opentelemetry_api_build_esm_7e8f41ca._.js'
+  }
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error [ChunkLoadError]: Failed to load chunk server/chunks/node_modules_@opentelemetry_api_build_esm_7e8f41ca._.js from runtime for chunk server/app/api/verify-holdings-list/route.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\verify-holdings-list\route.js:3:3) {
+  page: '/api/verify-holdings-list',
+  [cause]: Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\chunks\node_modules_@opentelemetry_api_build_esm_7e8f41ca._.js'
+      at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\verify-holdings-list\route.js:3:3) {
+    errno: -4058,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\chunks\\node_modules_@opentelemetry_api_build_esm_7e8f41ca._.js'
+  }
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+ GET /api/verify-holdings-list 500 in 277ms (proxy.ts: 6ms)
+ GET /api/verify-holdings-list 500 in 277ms (proxy.ts: 6ms)
+[?25h

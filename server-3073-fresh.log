@@ -1,0 +1,28 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3073
+- Network:       http://192.168.86.37:3073
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1231ms
+⨯ Error: Cannot find module 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+Require stack:
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\dev\next-dev-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at ignore-listed frames {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\static\development\_buildManifest.js.tmp.ot2dvv98ro'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\static\\development\\_buildManifest.js.tmp.ot2dvv98ro'
+}
+ GET /login 200 in 933ms (compile: 749ms, proxy.ts: 76ms, render: 108ms)
+Terminated

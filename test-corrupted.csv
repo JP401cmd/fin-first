@@ -1,0 +1,7 @@
+This is not valid CSV data
+random garbage here &*#@!$^
+no headers, no delimiters
+just corrupted file content
+more random text 12345 &&&
+binary garbage: ÿþÿ
+another broken line

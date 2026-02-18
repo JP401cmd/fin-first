@@ -1,0 +1,11 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3072
+- Network:       http://192.168.86.37:3072
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1131ms
+ GET /api/health 200 in 1129ms (compile: 551ms, proxy.ts: 165ms, render: 413ms)
+Terminated

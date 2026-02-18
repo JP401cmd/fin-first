@@ -1,0 +1,13 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:4000
+- Network:       http://192.168.86.37:4000
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1006ms
+ GET /test-streak-indicator 200 in 2.1s (compile: 1735ms, proxy.ts: 159ms, render: 187ms)
+ GET /test-streak-indicator 200 in 147ms (compile: 29ms, proxy.ts: 31ms, render: 87ms)
+✓ Compiled in 275ms
+ GET /api/verify-streak-indicator 200 in 413ms (compile: 327ms, proxy.ts: 45ms, render: 41ms)

@@ -1,0 +1,140 @@
+'use client'
+
+import { useState } from 'react'
+import { getDefaultBudgets } from '@/lib/budget-data'
+
+export function BudgetAmountEditor({
+  amounts,
+  onChange,
+  netIncome,
+}: {
+  amounts: Record<string, number>
+  onChange: (amounts: Record<string, number>) => void
+  netIncome: number
+}) {
+  const budgets = getDefaultBudgets()
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    // Open all groups by default
+    const initial: Record<string, boolean> = {}
+    for (const b of budgets) {
+      initial[b.slug] = true
+    }
+    return initial
+  })
+
+  const toggleGroup = (slug: string) => {
+    setOpenGroups((prev) => ({ ...prev, [slug]: !prev[slug] }))
+  }
+
+  const setAmount = (slug: string, value: number) => {
+    onChange({ ...amounts, [slug]: Math.max(0, value) })
+  }
+
+  // Calculate totals
+  let totalExpenses = 0
+  let totalIncome = 0
+  let totalSavings = 0
+
+  for (const parent of budgets) {
+    if (!parent.children) continue
+    for (const child of parent.children) {
+      const val = amounts[child.slug] ?? child.default_limit
+      if (parent.budget_type === 'income') {
+        totalIncome += val
+      } else if (parent.budget_type === 'savings' || parent.budget_type === 'debt') {
+        totalSavings += val
+      } else {
+        totalExpenses += val
+      }
+    }
+  }
+
+  const totalOut = totalExpenses + totalSavings
+  const remaining = netIncome - totalOut
+  const isOver = remaining < 0
+
+  return (
+    <div className="space-y-3">
+      {budgets
+        .filter((b) => b.budget_type !== 'income') // Don't show income budgets in editor
+        .map((parent) => {
+          const isOpen = openGroups[parent.slug] ?? true
+          const groupTotal = (parent.children ?? []).reduce(
+            (sum, c) => sum + (amounts[c.slug] ?? c.default_limit),
+            0,
+          )
+
+          return (
+            <div key={parent.slug} className="rounded-xl border border-zinc-200 bg-white">
+              <button
+                onClick={() => toggleGroup(parent.slug)}
+                className="flex w-full items-center justify-between px-4 py-3 text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-zinc-800">{parent.name}</span>
+                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500">
+                    &euro;{groupTotal.toLocaleString('nl-NL')}
+                  </span>
+                </div>
+                <svg
+                  className={`h-4 w-4 text-zinc-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+              </button>
+
+              {isOpen && parent.children && (
+                <div className="border-t border-zinc-100 px-4 py-3 space-y-3">
+                  {parent.children.map((child) => {
+                    const val = amounts[child.slug] ?? child.default_limit
+                    return (
+                      <div key={child.slug} className="flex items-center gap-3">
+                        <label className="min-w-0 flex-1 text-xs text-zinc-600 truncate" title={child.name}>
+                          {child.name}
+                        </label>
+                        <div className="relative w-28 shrink-0">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-zinc-400">&euro;</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={5}
+                            value={val}
+                            onChange={(e) => setAmount(child.slug, Number(e.target.value))}
+                            className="w-full rounded-md border border-zinc-300 bg-zinc-50 py-1.5 pr-2 pl-6 text-right text-xs text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+      {/* Running total */}
+      <div className={`rounded-xl border-2 p-4 ${isOver ? 'border-red-300 bg-red-50' : 'border-zinc-200 bg-zinc-50'}`}>
+        <div className="flex justify-between text-sm">
+          <span className="text-zinc-600">Netto inkomen</span>
+          <span className="font-semibold text-zinc-800">&euro;{netIncome.toLocaleString('nl-NL')}</span>
+        </div>
+        <div className="mt-1 flex justify-between text-sm">
+          <span className="text-zinc-600">Totale uitgaven + sparen</span>
+          <span className="font-medium text-zinc-700">&euro;{totalOut.toLocaleString('nl-NL')}</span>
+        </div>
+        <div className="mt-2 border-t border-zinc-200 pt-2 flex justify-between text-sm">
+          <span className={`font-semibold ${isOver ? 'text-red-600' : 'text-emerald-600'}`}>
+            {isOver ? 'Tekort' : 'Over'}
+          </span>
+          <span className={`font-bold ${isOver ? 'text-red-600' : 'text-emerald-600'}`}>
+            &euro;{Math.abs(remaining).toLocaleString('nl-NL')}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}

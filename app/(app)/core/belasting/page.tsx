@@ -210,9 +210,12 @@ export default function BelastingPage() {
             </p>
             <KpiTooltip text={BOX3_TOOLTIPS.box3} />
           </div>
-          <p className="mb-6 text-sm text-amber-300/50" data-testid="belasting-hero-freedom-time">
-            {formatWithFreedom(result.belasting, dailyExpenses, { includeCurrency: false })} verloren aan belasting
-          </p>
+          {result.belasting >= 100 && (
+            <p className="mb-6 text-sm text-amber-300/50" data-testid="belasting-hero-freedom-time">
+              {formatWithFreedom(result.belasting, dailyExpenses, { includeCurrency: false })} verloren aan belasting
+            </p>
+          )}
+          {result.belasting < 100 && <div className="mb-6" />}
 
           <div className="flex items-center gap-2 text-xs text-amber-300/50">
             <CalendarDays className="h-3.5 w-3.5" />
@@ -261,9 +264,11 @@ export default function BelastingPage() {
           </div>
           <p className="text-sm font-medium text-zinc-500">Vrijheidsdagen verloren</p>
           <p className="mt-1 text-3xl font-bold text-red-600">-{result.vrijheidsdagen}</p>
-          <p className="mt-1 text-xs text-red-400" data-testid="kpi-vrijheidsdagen-time">
-            {formatWithFreedom(result.belasting, dailyExpenses, { includeCurrency: false })}
-          </p>
+          {result.belasting >= 100 && (
+            <p className="mt-1 text-xs text-red-400" data-testid="kpi-vrijheidsdagen-time">
+              {formatWithFreedom(result.belasting, dailyExpenses, { includeCurrency: false })}
+            </p>
+          )}
         </div>
 
         <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-heffingsvrij">
@@ -381,7 +386,7 @@ export default function BelastingPage() {
                     {tip.besparing > 0 && (
                       <div className="mt-2 flex flex-wrap items-center gap-2" data-testid={`optimization-${tip.id}-savings`}>
                         <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
-                          Besparing: {formatWithFreedom(tip.besparing, dailyExpenses)}
+                          Besparing: {tip.besparing >= 100 ? formatWithFreedom(tip.besparing, dailyExpenses) : formatCurrency(tip.besparing)}
                         </span>
                         {tip.vrijheidsdagen > 0 && (
                           <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700" data-testid={`optimization-${tip.id}-freedom`}>

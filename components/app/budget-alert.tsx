@@ -41,7 +41,8 @@ export function BudgetAlert({
   // Freedom-time calculation for over-budget amounts
   const overAmount = spent > limit ? spent - limit : 0
   const hasFreedomData = !rateLoading && source === 'transactions' && dailyExpenseRate > 0
-  const freedomOver = hasFreedomData && overAmount > 0
+  // Only show freedom time for amounts >= €100 (per spec: avoid clutter for small amounts)
+  const freedomOver = hasFreedomData && overAmount >= 100
     ? eurToFreedomTime(overAmount, dailyExpenseRate)
     : null
 

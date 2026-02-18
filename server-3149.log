@@ -1,0 +1,165 @@
+▲ Next.js 16.1.6 (webpack)
+- Local:         http://localhost:3149
+- Network:       http://192.168.86.37:3149
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 1470ms
+○ Compiling /test-debt-crud ...
+ GET /test-debt-crud 200 in 5.3s (compile: 4.9s, proxy.ts: 182ms, render: 190ms)
+ GET /test-debt-crud 200 in 125ms (compile: 10ms, proxy.ts: 13ms, render: 102ms)
+ GET /test-debt-crud 404 in 519ms (compile: 455ms, proxy.ts: 16ms, render: 48ms)
+ GET /test-debt-crud 200 in 249ms (compile: 12ms, proxy.ts: 72ms, render: 165ms)
+ GET /test-debt-crud 404 in 77ms (compile: 16ms, proxy.ts: 26ms, render: 35ms)
+ GET /test-debt-crud 404 in 88ms (compile: 12ms, proxy.ts: 16ms, render: 61ms)
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET /login 200 in 697ms (compile: 559ms, proxy.ts: 10ms, render: 128ms)
+ GET /login 404 in 1857ms (compile: 1806ms, proxy.ts: 14ms, render: 37ms)
+ GET /login 200 in 116ms (compile: 55ms, proxy.ts: 10ms, render: 51ms)
+ GET /login 200 in 114ms (compile: 7ms, proxy.ts: 19ms, render: 88ms)
+ GET /login 200 in 217ms (compile: 18ms, proxy.ts: 90ms, render: 109ms)
+[Error: ENOENT: no such file or directory, stat 'C:\Users\janpa\cd\development\fin\.next\dev\cache\webpack\client-development\0.pack.gz'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'stat',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\cache\\webpack\\client-development\\0.pack.gz'
+}
+⨯ unhandledRejection: [Error: ENOENT: no such file or directory, stat 'C:\Users\janpa\cd\development\fin\.next\dev\cache\webpack\client-development\0.pack.gz'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'stat',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\cache\\webpack\\client-development\\0.pack.gz'
+}
+⨯ unhandledRejection:  [Error: ENOENT: no such file or directory, stat 'C:\Users\janpa\cd\development\fin\.next\dev\cache\webpack\client-development\0.pack.gz'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'stat',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\cache\\webpack\\client-development\\0.pack.gz'
+}
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, stat 'C:\Users\janpa\cd\development\fin\.next\dev\cache\webpack\client-development\0.pack.gz'
+ GET /signup 200 in 500ms (compile: 403ms, proxy.ts: 8ms, render: 89ms)
+ GET /signup? 200 in 47ms (compile: 5ms, proxy.ts: 10ms, render: 32ms)
+[Error: ENOENT: no such file or directory, stat 'C:\Users\janpa\cd\development\fin\.next\dev\cache\webpack\server-development\0.pack.gz'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'stat',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\cache\\webpack\\server-development\\0.pack.gz'
+}
+⨯ unhandledRejection: [Error: ENOENT: no such file or directory, stat 'C:\Users\janpa\cd\development\fin\.next\dev\cache\webpack\server-development\0.pack.gz'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'stat',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\cache\\webpack\\server-development\\0.pack.gz'
+}
+⨯ unhandledRejection:  [Error: ENOENT: no such file or directory, stat 'C:\Users\janpa\cd\development\fin\.next\dev\cache\webpack\server-development\0.pack.gz'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'stat',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\cache\\webpack\\server-development\\0.pack.gz'
+}
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, stat 'C:\Users\janpa\cd\development\fin\.next\dev\cache\webpack\server-development\0.pack.gz'
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\middleware-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_document.js'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\middleware-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_document.js'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\middleware-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_document.js'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET / 500 in 3.0s (compile: 168ms, proxy.ts: 2.8s, render: 21ms)
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\middleware-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_document.js'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_document.js'
+}
+Could not find files for /_error in .next/build-manifest.json
+Could not find files for /_error in .next/build-manifest.json
+ GET /test-debt-crud 500 in 3.1s (compile: 106ms, proxy.ts: 2.9s, render: 121ms)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename 'C:\Users\janpa\cd\development\fin\.next\dev\cache\webpack\client-development-fallback\0.pack.gz_' -> 'C:\Users\janpa\cd\development\fin\.next\dev\cache\webpack\client-development-fallback\0.pack.gz'
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\middleware-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\middleware-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /api/health 500 in 97ms (compile: 31ms, proxy.ts: 52ms, render: 14ms)
+Terminated

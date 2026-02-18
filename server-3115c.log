@@ -1,0 +1,25 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3115
+- Network:       http://192.168.86.37:3115
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1028ms
+ GET / 200 in 2.2s (compile: 1901ms, proxy.ts: 111ms, render: 225ms)
+ GET /api/health 200 in 1097ms (compile: 464ms, proxy.ts: 7ms, render: 625ms)
+ GET /test-holding-price-update 200 in 1165ms (compile: 959ms, proxy.ts: 40ms, render: 165ms)
+✓ Compiled in 182ms
+ GET /test-holding-price-update 200 in 207ms (compile: 47ms, proxy.ts: 19ms, render: 141ms)
+ GET /test-holding-price-update 404 in 1142ms (compile: 741ms, proxy.ts: 140ms, render: 261ms)
+ GET /test-holding-price-update 200 in 310ms (compile: 63ms, proxy.ts: 27ms, render: 220ms)
+ GET /test-holding-price-update 404 in 73ms (compile: 10ms, proxy.ts: 6ms, render: 57ms)
+ GET /test-holding-price-update 404 in 61ms (compile: 12ms, proxy.ts: 9ms, render: 41ms)
+ GET /test-holding-price-update 404 in 52ms (compile: 14ms, proxy.ts: 5ms, render: 33ms)
+ GET /test-holding-price-update 404 in 38ms (compile: 7ms, proxy.ts: 5ms, render: 26ms)
+ GET /test-holding-price-update 404 in 36ms (compile: 10ms, proxy.ts: 3ms, render: 22ms)
+ GET /test-holding-price-update 404 in 51ms (compile: 11ms, proxy.ts: 5ms, render: 35ms)
+✓ Compiled in 172ms
+✓ Compiled in 161ms
+Terminated

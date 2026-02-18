@@ -1,0 +1,170 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3199
+- Network:       http://192.168.86.37:3199
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1031ms
+⨯ Error: Cannot find module 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+Require stack:
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\dev\next-dev-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at ignore-listed frames {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\static\development\_buildManifest.js.tmp.u4zxlwiftnr'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\static\\development\\_buildManifest.js.tmp.u4zxlwiftnr'
+}
+Error: Cannot find module 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+Require stack:
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\dev\next-dev-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at ignore-listed frames {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /api/health 500 in 2.9s (compile: 122ms, proxy.ts: 2.8s, render: 29ms)
+✓ Compiled in 95ms
+⨯ Error: Cannot find module 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+Require stack:
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\dev\next-dev-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at ignore-listed frames {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: Cannot find module 'C:\Users\janpa\cd\development\fin\.next\dev\server\middleware-manifest.json'
+Require stack:
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\dev\next-dev-server.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at ignore-listed frames {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+ GET /api/health 200 in 926ms (compile: 477ms, proxy.ts: 163ms, render: 286ms)
+✓ Compiled in 124ms
+ GET /api/verify-data-isolation 401 in 257ms (compile: 210ms, proxy.ts: 33ms, render: 14ms)
+ GET /test-data-isolation 200 in 887ms (compile: 682ms, proxy.ts: 8ms, render: 197ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\_not-found\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\_not-found\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\pages\_app\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\pages\\_app\\build-manifest.json'
+}
+ GET /api/verify-data-isolation 500 in 193ms (proxy.ts: 7ms)
+ GET /api/verify-data-isolation 500 in 193ms (proxy.ts: 7ms)
+ POST /api/dev-login 401 in 333ms (compile: 174ms, proxy.ts: 6ms, render: 153ms)
+✓ Compiled in 625ms
+ GET /test-data-isolation 200 in 400ms (compile: 83ms, proxy.ts: 231ms, render: 86ms)
+ GET /test-data-isolation 200 in 97ms (compile: 6ms, proxy.ts: 10ms, render: 81ms)
+ GET /test-data-isolation 200 in 93ms (compile: 10ms, proxy.ts: 12ms, render: 71ms)
+ GET /test-data-isolation 200 in 81ms (compile: 9ms, proxy.ts: 11ms, render: 61ms)
+ GET /test-data-isolation 200 in 74ms (compile: 5ms, proxy.ts: 8ms, render: 61ms)
+ GET /test-data-isolation 200 in 80ms (compile: 5ms, proxy.ts: 8ms, render: 66ms)
+ GET /test-data-isolation 200 in 80ms (compile: 11ms, proxy.ts: 8ms, render: 61ms)
+ GET /test-data-isolation 200 in 80ms (compile: 7ms, proxy.ts: 9ms, render: 64ms)
+ GET /test-data-isolation 200 in 88ms (compile: 6ms, proxy.ts: 7ms, render: 75ms)
+ GET /test-data-isolation 200 in 94ms (compile: 8ms, proxy.ts: 9ms, render: 76ms)
+ GET /test-data-isolation 200 in 76ms (compile: 9ms, proxy.ts: 8ms, render: 59ms)
+ GET /test-data-isolation 200 in 84ms (compile: 5ms, proxy.ts: 8ms, render: 72ms)
+ GET /test-data-isolation 200 in 66ms (compile: 7ms, proxy.ts: 11ms, render: 48ms)
+ GET /test-data-isolation 404 in 251ms (compile: 59ms, proxy.ts: 11ms, render: 181ms)
+ GET /test-data-isolation 404 in 45ms (proxy.ts: 13ms)
+ GET /test-data-isolation 404 in 198ms (compile: 30ms, proxy.ts: 14ms, render: 155ms)
+ GET /test-data-isolation 404 in 281ms (compile: 50ms, proxy.ts: 11ms, render: 219ms)
+ GET /login 200 in 702ms (compile: 608ms, proxy.ts: 6ms, render: 88ms)
+ POST /api/dev-login 401 in 259ms (compile: 42ms, proxy.ts: 63ms, render: 153ms)
+ GET /test-data-isolation 404 in 56ms (compile: 11ms, proxy.ts: 9ms, render: 36ms)
+ GET /test-data-isolation 404 in 55ms (compile: 13ms, proxy.ts: 6ms, render: 36ms)
+ GET /test-data-isolation 404 in 45ms (compile: 10ms, proxy.ts: 6ms, render: 29ms)
+ GET /test-data-isolation 404 in 515ms (compile: 128ms, proxy.ts: 233ms, render: 155ms)
+ GET /test-data-isolation 404 in 38ms (proxy.ts: 17ms)
+ GET /test-data-isolation 404 in 207ms (compile: 46ms, proxy.ts: 20ms, render: 141ms)
+ GET /test-data-isolation 404 in 274ms (compile: 54ms, proxy.ts: 26ms, render: 193ms)
+✓ Compiled in 149ms

@@ -1,0 +1,69 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3002
+- Network:       http://192.168.86.37:3002
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1124ms
+○ Compiling /test-phase-transition ...
+ GET /test-phase-transition 200 in 5.1s (compile: 3.7s, proxy.ts: 161ms, render: 1181ms)
+ GET /api/verify-phase-transition 200 in 325ms (compile: 277ms, proxy.ts: 32ms, render: 16ms)
+✓ Compiled in 870ms
+ GET /test-phase-transition 404 in 623ms (compile: 474ms, proxy.ts: 40ms, render: 109ms)
+✓ Compiled in 651ms
+✓ Compiled in 662ms
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-phase-transition\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-phase-transition\\page\\build-manifest.json'
+}
+ GET /test-phase-transition 500 in 2.2s (compile: 1741ms, proxy.ts: 272ms, render: 178ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-phase-transition\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-phase-transition\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-phase-transition\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-phase-transition\\page\\build-manifest.json'
+}
+ GET /test-phase-transition 500 in 144ms (compile: 65ms, proxy.ts: 18ms, render: 60ms)
+ GET /test-phase-transition 500 in 135ms (compile: 73ms, proxy.ts: 49ms, render: 13ms)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-phase-transition\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-phase-transition\\page\\build-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-phase-transition\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-phase-transition\\page\\build-manifest.json'
+}
+✓ Compiled in 560ms
+ GET /test-phase-transition 500 in 608ms (compile: 426ms, proxy.ts: 155ms, render: 26ms)
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload when ./node_modules/next/dist/shared/lib/router/router.js changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\server\app\test-phase-transition\page\build-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\server\\app\\test-phase-transition\\page\\build-manifest.json'
+}
+Could not find files for /_error in .next/build-manifest.json
+Could not find files for /_error in .next/build-manifest.json
+ GET /test-phase-transition 500 in 315ms (compile: 84ms, proxy.ts: 218ms, render: 13ms)

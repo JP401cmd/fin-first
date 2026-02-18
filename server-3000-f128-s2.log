@@ -1,0 +1,15 @@
+
+> fin@0.2.0 dev
+> next dev
+
+⚠ Port 3000 is in use by process 27408, using available port 3004 instead.
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3004
+- Network:       http://192.168.86.37:3004
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1314ms
+ GET /test-portfolio-donut 200 in 2.8s (compile: 2.3s, proxy.ts: 196ms, render: 273ms)

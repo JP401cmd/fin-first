@@ -13,6 +13,9 @@ type StreakRecord = {
   updated_at: string
 }
 
+const VALID_STREAK_TYPES = ['login', 'budget_compliance', 'action_completion'] as const
+type StreakType = typeof VALID_STREAK_TYPES[number]
+
 /**
  * Get ISO week number for a date.
  * ISO 8601: Week 1 is the week containing the first Thursday of the year.
@@ -105,18 +108,19 @@ function calculateStreak(
 }
 
 /**
- * POST /api/streaks/checkin — Record a weekly login check-in.
+ * POST /api/streaks/checkin — Record a weekly check-in for any streak type.
  *
  * Streak logic (WEEKLY — per app spec "Weekstreak"):
- * - If no login streak exists yet, creates one with current_count=1
+ * - If no streak exists yet, creates one with current_count=1
  * - If last_activity_date is in the same ISO week, returns current streak (idempotent)
  * - If last_activity_date is in the previous ISO week, increments current_count (consecutive week)
  * - If last_activity_date is older than the previous week, resets current_count to 1
  * - Always updates longest_count if current_count exceeds it
  * - Always sets last_activity_date to the check-in date
  *
- * Optional query parameter:
+ * Optional query parameters:
  * - ?date=YYYY-MM-DD — Simulate a check-in on a specific date (for testing)
+ * - ?type=login|budget_compliance|action_completion — Streak type (default: login)
  *
  * Falls back to app_settings if user_streaks table doesn't exist.
  */
@@ -138,6 +142,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Ongeldige datum. Gebruik YYYY-MM-DD formaat.' }, { status: 400 })
   }
 
+  // Parse streak type (default: login)
+  const streakTypeParam = url.searchParams.get('type') || 'login'
+  if (!VALID_STREAK_TYPES.includes(streakTypeParam as StreakType)) {
+    return NextResponse.json({
+      error: `Ongeldig streak-type. Kies uit: ${VALID_STREAK_TYPES.join(', ')}`,
+    }, { status: 400 })
+  }
+  const streakType = streakTypeParam as StreakType
+
   const checkinDateObj = new Date(checkinDate + 'T00:00:00Z')
   const checkinWeek = getISOWeek(checkinDateObj)
 
@@ -147,16 +160,16 @@ export async function POST(request: NextRequest) {
       .from('user_streaks')
       .select('*')
       .eq('user_id', user.id)
-      .eq('streak_type', 'login')
+      .eq('streak_type', streakType)
       .maybeSingle()
 
     if (!fetchError) {
       // Table exists — use real database
-      return await handleDbStreak(supabase, user.id, existing, checkinDate, checkinWeek)
+      return await handleDbStreak(supabase, user.id, existing, checkinDate, checkinWeek, streakType)
     }
 
     // Fallback: use app_settings
-    return await handleAppSettingsStreak(supabase, user.id, checkinDate, checkinWeek)
+    return await handleAppSettingsStreak(supabase, user.id, checkinDate, checkinWeek, streakType)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })
@@ -171,15 +184,16 @@ async function handleDbStreak(
   userId: string,
   existing: Record<string, unknown> | null,
   checkinDate: string,
-  checkinWeek: { year: number; week: number }
+  checkinWeek: { year: number; week: number },
+  streakType: StreakType
 ) {
   if (!existing) {
-    // First login ever — create new streak
+    // First ever — create new streak
     const { data: created, error: insertError } = await supabase
       .from('user_streaks')
       .insert({
         user_id: userId,
-        streak_type: 'login',
+        streak_type: streakType,
         current_count: 1,
         longest_count: 1,
         last_activity_date: checkinDate,
@@ -193,6 +207,7 @@ async function handleDbStreak(
 
     return NextResponse.json({
       streak: created,
+      streak_type: streakType,
       action: 'created',
       week: checkinWeek,
       source: 'database',
@@ -212,6 +227,7 @@ async function handleDbStreak(
   if (action === 'already_checked_in') {
     return NextResponse.json({
       streak: existing,
+      streak_type: streakType,
       action,
       week: checkinWeek,
       source: 'database',
@@ -237,6 +253,7 @@ async function handleDbStreak(
 
   return NextResponse.json({
     streak: updated,
+    streak_type: streakType,
     action,
     previous_count: existing.current_count,
     week: checkinWeek,
@@ -252,7 +269,8 @@ async function handleAppSettingsStreak(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   checkinDate: string,
-  checkinWeek: { year: number; week: number }
+  checkinWeek: { year: number; week: number },
+  streakType: StreakType
 ) {
   const settingsKey = `streaks_${userId}`
 
@@ -264,14 +282,14 @@ async function handleAppSettingsStreak(
     .maybeSingle()
 
   const storedStreaks: StreakRecord[] = (settingsData?.value as StreakRecord[]) ?? []
-  const loginStreak = storedStreaks.find(s => s.streak_type === 'login')
+  const targetStreak = storedStreaks.find(s => s.streak_type === streakType)
 
   const now = new Date().toISOString()
 
-  if (!loginStreak) {
-    // First login ever — create new streak
+  if (!targetStreak) {
+    // First ever — create new streak
     const newStreak: StreakRecord = {
-      streak_type: 'login',
+      streak_type: streakType,
       current_count: 1,
       longest_count: 1,
       last_activity_date: checkinDate,
@@ -287,6 +305,7 @@ async function handleAppSettingsStreak(
 
     return NextResponse.json({
       streak: newStreak,
+      streak_type: streakType,
       action: 'created',
       week: checkinWeek,
       source: 'app_settings',
@@ -297,16 +316,17 @@ async function handleAppSettingsStreak(
   // Calculate streak change
   const { newCount, newLongest, action, message } = calculateStreak(
     {
-      current_count: loginStreak.current_count,
-      longest_count: loginStreak.longest_count,
-      last_activity_date: loginStreak.last_activity_date,
+      current_count: targetStreak.current_count,
+      longest_count: targetStreak.longest_count,
+      last_activity_date: targetStreak.last_activity_date,
     },
     checkinDate
   )
 
   if (action === 'already_checked_in') {
     return NextResponse.json({
-      streak: loginStreak,
+      streak: targetStreak,
+      streak_type: streakType,
       action,
       week: checkinWeek,
       source: 'app_settings',
@@ -314,10 +334,10 @@ async function handleAppSettingsStreak(
     })
   }
 
-  // Update the login streak in the array
-  const previousCount = loginStreak.current_count
+  // Update the streak in the array
+  const previousCount = targetStreak.current_count
   const updatedStreaks = storedStreaks.map(s => {
-    if (s.streak_type === 'login') {
+    if (s.streak_type === streakType) {
       return {
         ...s,
         current_count: newCount,
@@ -334,10 +354,11 @@ async function handleAppSettingsStreak(
     { onConflict: 'key' }
   )
 
-  const updatedStreak = updatedStreaks.find(s => s.streak_type === 'login')!
+  const updatedStreak = updatedStreaks.find(s => s.streak_type === streakType)!
 
   return NextResponse.json({
     streak: updatedStreak,
+    streak_type: streakType,
     action,
     previous_count: previousCount,
     week: checkinWeek,

@@ -1,0 +1,76 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3135
+- Network:       http://192.168.86.37:3135
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1046ms
+ GET / 200 in 2.3s (compile: 1969ms, proxy.ts: 129ms, render: 191ms)
+ GET /test-goal-progress 200 in 796ms (compile: 701ms, proxy.ts: 6ms, render: 88ms)
+ GET /test-goal-progress 200 in 37ms (compile: 4ms, proxy.ts: 6ms, render: 27ms)
+ GET /test-goal-progress 404 in 493ms (compile: 430ms, proxy.ts: 9ms, render: 55ms)
+ GET / 200 in 83ms (compile: 7ms, proxy.ts: 9ms, render: 67ms)
+ GET /test-goal-progress 404 in 58ms (compile: 10ms, proxy.ts: 8ms, render: 40ms)
+ GET /test-goal-progress 404 in 87ms (compile: 9ms, proxy.ts: 8ms, render: 70ms)
+ GET /login 200 in 560ms (compile: 483ms, proxy.ts: 7ms, render: 70ms)
+ GET /test-goal-progress 200 in 51ms (compile: 5ms, proxy.ts: 9ms, render: 37ms)
+⨯ Error: Cannot find module '../../../chunks/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\route.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\route.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/api/health'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\static\development\_buildManifest.js.tmp.14qqicqrs2w'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\static\\development\\_buildManifest.js.tmp.14qqicqrs2w'
+}
+Error: Cannot find module '../../../chunks/[turbopack]_runtime.js'
+Require stack:
+- C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\route.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\require.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\load-components.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\utils.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\options.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\swc\index.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\config.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\next.js
+- C:\Users\janpa\cd\development\fin\node_modules\next\dist\server\lib\start-server.js
+    at Object.<anonymous> (C:\Users\janpa\cd\development\fin\.next\dev\server\app\api\health\route.js:1:7) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/api/health'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\janpa\cd\development\fin\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\janpa\\cd\\development\\fin\\.next\\dev\\routes-manifest.json'
+}
+ GET /api/health 500 in 1522ms (compile: 1495ms, proxy.ts: 6ms, render: 21ms)
+ GET /api/health 500 in 1522ms (compile: 1495ms, proxy.ts: 6ms, render: 21ms)
+Terminated

@@ -370,12 +370,12 @@ export default function HorizonPage() {
               </p>
               <p className="text-sm text-purple-200/50">tot volledige vrijheid</p>
             </div>
-            <div data-testid="hero-freedom-time">
-              <p className="text-xs font-medium text-purple-300/60 uppercase">Vrijheidstijd</p>
+            <div data-testid="hero-passive-income">
+              <p className="text-xs font-medium text-purple-300/60 uppercase">Passief inkomen</p>
               <p className="mt-1 text-2xl font-bold">
-                {fire.freedomYears}j {fire.freedomMonths}mnd
+                {formatCurrency(fire.monthlyPassiveIncome + monthlyDividendIncome)}/mnd
               </p>
-              <p className="text-sm text-purple-200/50">opgebouwde vrijheid</p>
+              <p className="text-sm text-purple-200/50">uit vermogen + dividenden</p>
             </div>
             <div data-testid="hero-fire-date">
               <p className="text-xs font-medium text-purple-300/60 uppercase">Volledige vrijheid</p>
@@ -436,16 +436,16 @@ export default function HorizonPage() {
           <p className="mt-1 text-xs text-zinc-400">dagen tot volledige vrijheid</p>
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-freedom-pct">
+        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-fire-target">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-50">
-              <Percent className="h-5 w-5 text-purple-600" />
+              <Target className="h-5 w-5 text-purple-600" />
             </div>
-            <KpiTooltip text="Hoe ver je bent richting volledige vrijheid. 100% = volledig vrij." />
+            <KpiTooltip text="Het doelbedrag voor volledige financiële vrijheid, berekend als je jaarlijkse uitgaven × 25 (4%-regel)." />
           </div>
-          <p className="text-sm font-medium text-zinc-500">Vrijheidspercentage</p>
-          <p className="mt-1 text-3xl font-bold text-purple-600">{fire.freedomPercentage.toFixed(1)}%</p>
-          <p className="mt-1 text-xs text-zinc-400">van volledige vrijheid</p>
+          <p className="text-sm font-medium text-zinc-500">FIRE Doelbedrag</p>
+          <p className="mt-1 text-3xl font-bold text-purple-600">{formatCurrency(fire.fireTarget)}</p>
+          <p className="mt-1 text-xs text-zinc-400">nodig voor volledige vrijheid</p>
         </div>
 
         <FeatureGate featureId="veerkracht_score" fallback="locked">

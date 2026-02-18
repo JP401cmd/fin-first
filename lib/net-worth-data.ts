@@ -10,4 +10,10 @@ export type NetWorthSnapshot = {
   total_debts: number
   net_worth: number
   created_at: string
+  /** Extended metrics (added by migration 20260215000001) */
+  freedom_percentage?: number | null
+  fire_age?: number | null
+  sovereignty_level?: number | null
+  savings_rate?: number | null
+  resilience_score?: number | null
 }

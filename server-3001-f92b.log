@@ -1,0 +1,12 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3001
+- Network:       http://0.0.0.0:3001
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 1074ms
+✓ Compiled in 37ms
+✓ Compiled in 27ms
+✓ Compiled in 21ms

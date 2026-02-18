@@ -28,6 +28,7 @@ const VALID_CONTENT_TYPES = [
   'freedom_card',
   'milestone',
   'achievement',
+  'badge',
 ] as const
 
 export async function POST(req: Request) {

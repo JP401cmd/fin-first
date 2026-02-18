@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { ArrowLeft, Briefcase, TrendingUp, TrendingDown, DollarSign } from 'lucide-react'
 import HoldingTransactionLogClient from './transaction-log-client'
+import HoldingValueChartClient from './value-chart-client'
 
 // UUID v4 regex for validation
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -115,7 +116,7 @@ export default async function HoldingDetailPage({
           <div className="flex-1">
             <h1 className="text-xl font-bold text-zinc-900" data-testid="holding-name">{name}</h1>
             {ticker && (
-              <p className="mt-0.5 text-sm font-medium text-amber-600">{ticker}</p>
+              <p className="mt-0.5 text-sm font-medium text-amber-600" data-testid="holding-ticker">{ticker}</p>
             )}
           </div>
           <Link
@@ -168,6 +169,11 @@ export default async function HoldingDetailPage({
             )}
           </div>
         </div>
+      </section>
+
+      {/* Value Chart Section */}
+      <section className="mt-6" data-testid="value-chart-section">
+        <HoldingValueChartClient holdingId={id} />
       </section>
 
       {/* Transaction Log Section */}

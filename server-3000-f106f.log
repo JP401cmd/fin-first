@@ -1,0 +1,13 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.86.37:3000
+- Environments: .env.local
+- Experiments (use with caution):
+  ⨯ turbopackFileSystemCacheForDev
+
+✓ Starting...
+✓ Ready in 969ms
+ POST /api/ai/chat-test-timeout?mode=error 500 in 527ms (compile: 401ms, proxy.ts: 112ms, render: 14ms)
+ GET /api/verify-empty-badge-eval 200 in 631ms (compile: 449ms, proxy.ts: 110ms, render: 72ms)
+ GET /api/health 200 in 750ms (compile: 504ms, proxy.ts: 108ms, render: 138ms)
+[?25h
