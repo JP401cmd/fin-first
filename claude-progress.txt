@@ -1,3 +1,45 @@
+## Session 2026-02-18 - Feature #257
+
+### Feature #257: Streak break warning notification - PASSING
+- Implemented streak break warning notification system
+- All 18/18 verification tests passing at /api/verify-streak-break-warning
+- All 5 feature steps verified:
+  1. **Detect when streak is at risk**: checkStreakAtRisk() in /api/streaks uses ISO week comparison to detect streaks approaching deadline (last activity in previous week, must act this week)
+  2. **Show warning message**: Updated format to "Je [type]-streak van X weken staat op het spel!" matching specification
+  3. **Display warning on Dashboard**: Created StreakBreakWarning component rendered prominently on Dashboard below header
+  4. **Show for all streak types**: login, budget compliance, action completion - all 3 types checked and displayed with individual at-risk badges
+  5. **Clear warning when user performs streak activity**: Auto-polls every 60s, dismissible, clears when API returns no warnings after activity
+
+#### Changes Made:
+- **app/api/streaks/route.ts**: Updated risk_message format from "loopt gevaar" to "staat op het spel!" per spec
+- **components/app/streak-break-warning.tsx**: NEW - Prominent dismissible notification banner with at-risk streak badges
+- **app/(app)/dashboard/page.tsx**: Added StreakBreakWarning import and rendering in streak-warning-section
+- **app/api/verify-streak-break-warning/route.ts**: NEW - 18-test verification endpoint
+- **app/test-streak-break-warning/page.tsx**: NEW - Visual test page with feature steps coverage
+- **lib/supabase/proxy.ts**: Added test/verify paths to public paths
+
+#### Verification:
+- 18/18 API verification tests passing
+- Zero console errors (0 errors, 0 warnings)
+- No mock data patterns found (globalThis, devStore, mockData, etc.)
+- Existing streak tests still pass: #208 (12/12) - no regressions
+- Browser verified: all test results green
+- Commit: 86d7510
+
+### Current Status
+- 251/265 features passing (250 before + #257)
+- Feature #257 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- StreakBreakWarning is a client component that auto-polls /api/streaks every 60s
+- Warning format: "Je [login/budget/actie]-streak van X weken staat op het spel!"
+- Component shows on Dashboard between header and module cards
+- Dismissible via X button (session-only dismiss, reappears on page reload)
+- StreakIndicator (in header) also has inline warning display for compact view
+
+---
+
 ## Session 2026-02-18 - Feature #255
 
 ### Feature #255: Smart next step algorithm prioritization - PASSING
