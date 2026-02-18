@@ -1,3 +1,43 @@
+## Session 2026-02-18 - Feature #230
+
+### Feature #230: Portfolio allocation visualization - PASSING
+- Verified complete implementation of portfolio allocation visualization
+- All 6 feature steps already implemented and verified:
+  1. **Create donut chart showing portfolio allocation**: AllocationDonut SVG component in portfolio-allocation-chart.tsx with proportional ring segments, total value in center, category count
+  2. **Support views by: sector, geography, asset class**: Three view tabs with VIEW_MODE_ICONS, switching recomputes slices via computeAllocationSlices()
+  3. **Show current vs target allocation comparison**: ComparisonBar components with current % → target % bars, drift warnings ("+X% boven doel" / "-X% onder doel"), color-coded (red/amber)
+  4. **Generate rebalancing suggestions when allocation drifts**: computeRebalancingSuggestions() with 2% drift threshold, "Bijkopen"/"Afbouwen" cards with EUR amounts
+  5. **Display on portfolio/assets page**: Integrated on /core/assets/holdings page (line 457) with PieChart section header
+  6. **Use real holdings data for calculations**: Data flows from /api/holdings → holdings state → holdingsForAllocation useMemo → PortfolioAllocationVisualization component
+
+#### Key Files:
+- **components/app/portfolio-allocation-chart.tsx**: PortfolioAllocationVisualization (main), AllocationDonut, ComparisonBar, TargetEditor
+- **lib/portfolio-allocation.ts**: computeAllocationSlices(), computeRebalancingSuggestions(), types, constants (ASSET_CLASS_LABELS, SECTOR_LABELS, GEOGRAPHY_LABELS, ALLOCATION_COLORS, DEFAULT_TARGETS)
+- **app/api/verify-portfolio-allocation-viz/route.ts**: 16-test verification endpoint
+- **app/test-portfolio-allocation/page.tsx**: Visual test page with client+API tests, live chart, holdings editor, unclassified scenario, empty state
+
+#### Verification:
+- 16/16 API verification tests passing at /api/verify-portfolio-allocation-viz
+- 6/6 client-side tests passing on test page
+- Browser verified: donut chart renders, view tabs switch correctly (Assetklasse/Sector/Geografie), target comparison shows bars, rebalancing suggestions display
+- Zero console errors (0 errors, 0 warnings)
+- No mock data patterns found in portfolio-allocation-chart.tsx or portfolio-allocation.ts
+- Commit: b17cff9
+
+### Current Status
+- 227/265 features passing (226 before + #230)
+- Feature #230 completed and committed
+
+### Notes for Next Session
+- Port 3000 used this session
+- PortfolioAllocationVisualization is on /core/assets/holdings page (not on /core/assets main page)
+- Target editor is a modal with total % validation (must sum to 100%)
+- Default targets: asset_class has 60/20/10/5/5 split, geography has 50/20/15/10/5 split, sector has none
+- Drift threshold is 2% — only suggests rebalancing when drift > 2%
+- No authenticated browser testing possible (Supabase email rate limit)
+
+---
+
 ## Session 2026-02-18 - Feature #229
 
 ### Feature #229: Price feed integration for holdings - PASSING
