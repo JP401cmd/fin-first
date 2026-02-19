@@ -234,7 +234,7 @@ export async function GET(request: Request) {
     let badgesEarned: { slug: string; name: string; icon: string; color: string; earned_at: string }[] = []
 
     if (userBadges.length > 0) {
-      badgesEarned = (userBadges as BadgeJoin[])
+      badgesEarned = (userBadges as unknown as BadgeJoin[])
         .filter(b => b.badges)
         .map(b => ({
           slug: b.badges!.slug,
