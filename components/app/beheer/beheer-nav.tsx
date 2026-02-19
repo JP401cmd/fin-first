@@ -11,6 +11,7 @@ const tabs = [
   { label: 'Features', href: '/beheer/features' },
   { label: 'Database', href: '/beheer/migration' },
   { label: 'Mobile Preview', href: '/beheer/testdata#mobile-preview' },
+  { label: 'GoCardless', href: '/beheer/gocardless' },
 ] as const
 
 export function BeheerNav() {

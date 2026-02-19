@@ -29,6 +29,11 @@ const segmentLabels: Record<string, string> = {
   assets: 'Assets',
   belasting: 'Belasting',
   identity: 'Identiteit',
+  profiel: 'Profiel',
+  voortgang: 'Voortgang',
+  delen: 'Delen',
+  instellingen: 'Instellingen',
+  jaaroverzicht: 'Jaaroverzicht',
   beheer: 'Beheer',
   onboarding: 'Onboarding',
 }
@@ -37,9 +42,9 @@ const segmentLabels: Record<string, string> = {
  * Color styles matching the module theme.
  */
 const colorAccent: Record<DomainColor, { text: string; hover: string }> = {
-  amber: { text: 'text-amber-700', hover: 'hover:text-amber-600' },
-  teal: { text: 'text-teal-700', hover: 'hover:text-teal-600' },
-  purple: { text: 'text-purple-700', hover: 'hover:text-purple-600' },
+  amber: { text: 'text-kern-700', hover: 'hover:text-kern-600' },
+  teal: { text: 'text-wil-700', hover: 'hover:text-wil-600' },
+  purple: { text: 'text-horizon-700', hover: 'hover:text-horizon-600' },
 }
 
 /**

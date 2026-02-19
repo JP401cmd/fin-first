@@ -87,6 +87,37 @@ export function BenchmarkComparisonChart({
     }
   }, [comparison])
 
+  // Y-axis grid values
+  const yTicks = useMemo(() => {
+    if (!chartData) return []
+    const range = chartData.maxVal - chartData.minVal
+    const step = range / 4
+    return Array.from({ length: 5 }, (_, i) => chartData.minVal + step * i)
+  }, [chartData])
+
+  // X-axis date labels (show ~5 labels)
+  const xLabels = useMemo(() => {
+    if (!chartData) return []
+    const { dates } = chartData
+    if (dates.length <= 5) return dates.map((d, i) => ({ date: d, index: i }))
+    const step = Math.max(1, Math.floor(dates.length / 4))
+    const labels: { date: string; index: number }[] = []
+    for (let i = 0; i < dates.length; i += step) {
+      labels.push({ date: dates[i], index: i })
+    }
+    // Always include last
+    const lastIdx = dates.length - 1
+    if (labels[labels.length - 1]?.index !== lastIdx) {
+      labels.push({ date: dates[lastIdx], index: lastIdx })
+    }
+    return labels
+  }, [chartData])
+
+  const sortedByReturn = useMemo(
+    () => comparison ? [...comparison.benchmarks].sort((a, b) => b.returnPct - a.returnPct) : [],
+    [comparison],
+  )
+
   // SVG dimensions
   const width = 600
   const height = 280
@@ -172,7 +203,7 @@ export function BenchmarkComparisonChart({
     return (
       <div className="rounded-2xl border border-zinc-200 bg-white p-6" data-testid="benchmark-comparison-section">
         <div className="flex items-center gap-2 mb-4">
-          <BarChart3 className="h-4 w-4 text-amber-600" />
+          <BarChart3 className="h-4 w-4 text-kern-600" />
           <h2 className="text-sm font-semibold text-zinc-700">Benchmark vergelijking</h2>
         </div>
         <div className="animate-pulse space-y-4">
@@ -188,7 +219,7 @@ export function BenchmarkComparisonChart({
     return (
       <div className="rounded-2xl border border-zinc-200 bg-white p-6" data-testid="benchmark-comparison-section">
         <div className="flex items-center gap-2 mb-4">
-          <BarChart3 className="h-4 w-4 text-amber-600" />
+          <BarChart3 className="h-4 w-4 text-kern-600" />
           <h2 className="text-sm font-semibold text-zinc-700">Benchmark vergelijking</h2>
         </div>
         <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -204,34 +235,6 @@ export function BenchmarkComparisonChart({
     )
   }
 
-  // Y-axis grid values
-  const yTicks = useMemo(() => {
-    const range = chartData.maxVal - chartData.minVal
-    const step = range / 4
-    return Array.from({ length: 5 }, (_, i) => chartData.minVal + step * i)
-  }, [chartData])
-
-  // X-axis date labels (show ~5 labels)
-  const xLabels = useMemo(() => {
-    const { dates } = chartData
-    if (dates.length <= 5) return dates.map((d, i) => ({ date: d, index: i }))
-    const step = Math.max(1, Math.floor(dates.length / 4))
-    const labels: { date: string; index: number }[] = []
-    for (let i = 0; i < dates.length; i += step) {
-      labels.push({ date: dates[i], index: i })
-    }
-    // Always include last
-    const lastIdx = dates.length - 1
-    if (labels[labels.length - 1]?.index !== lastIdx) {
-      labels.push({ date: dates[lastIdx], index: lastIdx })
-    }
-    return labels
-  }, [chartData])
-
-  const sortedByReturn = useMemo(
-    () => [...comparison.benchmarks].sort((a, b) => b.returnPct - a.returnPct),
-    [comparison.benchmarks],
-  )
   const bestBenchmark = sortedByReturn[0] ?? null
   const alphaVsBest = bestBenchmark ? getAlphaDescription(bestBenchmark.alpha) : null
 
@@ -240,7 +243,7 @@ export function BenchmarkComparisonChart({
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <BarChart3 className="h-4 w-4 text-amber-600" />
+          <BarChart3 className="h-4 w-4 text-kern-600" />
           <h2 className="text-sm font-semibold text-zinc-700">Benchmark vergelijking</h2>
         </div>
         {/* Period buttons */}
@@ -252,7 +255,7 @@ export function BenchmarkComparisonChart({
               data-testid={`benchmark-period-${p.id}`}
               className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${
                 activePeriod.id === p.id
-                  ? 'bg-amber-100 text-amber-700'
+                  ? 'bg-kern-100 text-kern-700'
                   : 'text-zinc-400 hover:text-zinc-600'
               }`}
             >
@@ -471,8 +474,8 @@ export function BenchmarkComparisonChart({
 
       {/* Contextual message */}
       {alphaVsBest && (
-        <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50/50 p-3" data-testid="benchmark-context-message">
-          <Info className="h-3.5 w-3.5 shrink-0 text-amber-500 mt-0.5" />
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-kern-100 bg-kern-50/50 p-3" data-testid="benchmark-context-message">
+          <Info className="h-3.5 w-3.5 shrink-0 text-kern-500 mt-0.5" />
           <p className="text-xs text-zinc-600 leading-relaxed">
             <span className="font-medium">Benchmarkvergelijking:</span>{' '}
             Je portfolio rendement van{' '}

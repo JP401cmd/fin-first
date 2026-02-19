@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { RotateCcw, ChevronDown, ChevronUp } from 'lucide-react'
 
 interface Settings {
   ai_provider: string
@@ -25,6 +26,8 @@ export default function BeheerAIPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [defaultPrompt, setDefaultPrompt] = useState<string>('')
+  const [showDefaultPreview, setShowDefaultPreview] = useState(false)
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -39,9 +42,21 @@ export default function BeheerAIPage() {
     }
   }, [])
 
+  const fetchDefaultPrompt = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/ai-prompt-default')
+      if (!res.ok) return
+      const data = await res.json()
+      setDefaultPrompt(data.prompt ?? '')
+    } catch {
+      // silently fail — default prompt preview is optional
+    }
+  }, [])
+
   useEffect(() => {
     fetchSettings()
-  }, [fetchSettings])
+    fetchDefaultPrompt()
+  }, [fetchSettings, fetchDefaultPrompt])
 
   async function handleSave() {
     setSaving(true)
@@ -65,6 +80,12 @@ export default function BeheerAIPage() {
     }
   }
 
+  const hasOverride = settings.ai_system_prompt_override.trim().length > 0
+
+  function handleResetPrompt() {
+    setSettings({ ...settings, ai_system_prompt_override: '' })
+  }
+
   if (loading) {
     return (
       <div className="animate-pulse space-y-4">
@@ -73,6 +94,9 @@ export default function BeheerAIPage() {
       </div>
     )
   }
+
+  // Show the active prompt text (override or default) in the textarea
+  const promptValue = hasOverride ? settings.ai_system_prompt_override : defaultPrompt
 
   return (
     <div className="space-y-6">
@@ -100,7 +124,7 @@ export default function BeheerAIPage() {
               value="anthropic"
               checked={settings.ai_provider === 'anthropic'}
               onChange={() => setSettings({ ...settings, ai_provider: 'anthropic' })}
-              className="accent-amber-600"
+              className="accent-kern-600"
             />
             <span className="text-sm font-medium text-zinc-700">Anthropic</span>
           </label>
@@ -111,7 +135,7 @@ export default function BeheerAIPage() {
               value="openai"
               checked={settings.ai_provider === 'openai'}
               onChange={() => setSettings({ ...settings, ai_provider: 'openai' })}
-              className="accent-amber-600"
+              className="accent-kern-600"
             />
             <span className="text-sm font-medium text-zinc-700">OpenAI</span>
           </label>
@@ -136,7 +160,7 @@ export default function BeheerAIPage() {
                   : 'ai_model_openai']: e.target.value,
               })
             }
-            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500"
             placeholder="Model ID"
           />
         </div>
@@ -158,7 +182,7 @@ export default function BeheerAIPage() {
                 onChange={(e) =>
                   setSettings({ ...settings, anthropic_api_key: e.target.value })
                 }
-                className="flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                className="flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500"
                 placeholder="sk-ant-..."
               />
               <StatusBadge configured={settings.anthropic_api_key !== '' && !settings.anthropic_api_key.includes('***')} />
@@ -181,7 +205,7 @@ export default function BeheerAIPage() {
                 onChange={(e) =>
                   setSettings({ ...settings, openai_api_key: e.target.value })
                 }
-                className="flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                className="flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500"
                 placeholder="sk-..."
               />
               <StatusBadge configured={settings.openai_api_key !== '' && !settings.openai_api_key.includes('***')} />
@@ -195,21 +219,75 @@ export default function BeheerAIPage() {
         </div>
       </div>
 
-      {/* System Prompt Override */}
+      {/* Will's System Prompt */}
       <div className="rounded-xl border border-zinc-200 bg-white p-6">
-        <h2 className="mb-4 text-lg font-semibold text-zinc-900">System Prompt Override</h2>
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-zinc-900">Will&apos;s Systeem Prompt</h2>
+            {hasOverride && (
+              <span className="rounded-full bg-wil-100 px-2.5 py-0.5 text-xs font-medium text-wil-700">
+                Aangepast
+              </span>
+            )}
+          </div>
+          {hasOverride && (
+            <button
+              type="button"
+              onClick={handleResetPrompt}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Reset naar standaard
+            </button>
+          )}
+        </div>
+
         <p className="mb-3 text-sm text-zinc-500">
-          Laat leeg om het standaard DNA-prompt te gebruiken. Als je hier tekst invult, vervangt dit het basis systeem prompt.
+          {hasOverride
+            ? 'Je gebruikt een aangepast prompt. Dit vervangt het volledige standaard prompt (inclusief persoonlijkheid).'
+            : 'Dit is het standaard prompt van Will. Bewerk het om een aangepast prompt te gebruiken.'}
         </p>
+
         <textarea
-          value={settings.ai_system_prompt_override}
+          value={promptValue}
           onChange={(e) =>
             setSettings({ ...settings, ai_system_prompt_override: e.target.value })
           }
-          rows={12}
-          className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 font-mono focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-          placeholder="Leeg = standaard TriFinity DNA prompt wordt gebruikt..."
+          rows={16}
+          className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 font-mono focus:border-wil-500 focus:outline-none focus:ring-1 focus:ring-wil-500"
+          placeholder="Leeg = standaard Will prompt wordt gebruikt..."
         />
+
+        <div className="mt-1.5 flex items-center justify-between">
+          <span className="text-xs text-zinc-400">
+            {promptValue.length.toLocaleString('nl-NL')} tekens
+          </span>
+        </div>
+
+        {/* Default prompt preview when override is active */}
+        {hasOverride && defaultPrompt && (
+          <div className="mt-4 rounded-lg border border-zinc-100 bg-zinc-50">
+            <button
+              type="button"
+              onClick={() => setShowDefaultPreview(!showDefaultPreview)}
+              className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-700"
+            >
+              <span>Standaard prompt bekijken</span>
+              {showDefaultPreview ? (
+                <ChevronUp className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5" />
+              )}
+            </button>
+            {showDefaultPreview && (
+              <div className="border-t border-zinc-200 px-3 py-2">
+                <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs text-zinc-500 font-mono">
+                  {defaultPrompt}
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Save Button */}
@@ -217,7 +295,7 @@ export default function BeheerAIPage() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="rounded-lg bg-amber-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="rounded-lg bg-kern-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {saving ? 'Opslaan...' : 'Instellingen opslaan'}
         </button>

@@ -224,7 +224,7 @@ export function TransactionForm({
                   type="date"
                   value={form.date}
                   onChange={(e) => update('date', e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                   required
                 />
               </div>
@@ -239,7 +239,7 @@ export function TransactionForm({
                   step="0.01"
                   value={form.amount}
                   onChange={(e) => update('amount', e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                   placeholder="0,00"
                   required
                 />
@@ -256,7 +256,7 @@ export function TransactionForm({
                 type="text"
                 value={form.description}
                 onChange={(e) => update('description', e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 placeholder="bijv. Albert Heijn boodschappen"
                 required
               />
@@ -272,7 +272,7 @@ export function TransactionForm({
                 type="text"
                 value={form.counterparty_name}
                 onChange={(e) => update('counterparty_name', e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 placeholder="bijv. Albert Heijn"
               />
             </div>
@@ -286,7 +286,7 @@ export function TransactionForm({
                 id="tx-budget"
                 value={form.budget_id}
                 onChange={(e) => update('budget_id', e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               >
                 <option value="">Niet gecategoriseerd</option>
                 {budgetGroups
@@ -311,7 +311,7 @@ export function TransactionForm({
                     type="checkbox"
                     checked={form.is_recurring}
                     onChange={(e) => update('is_recurring', e.target.checked)}
-                    className="h-4 w-4 rounded border-zinc-300 text-amber-600 focus:ring-amber-500"
+                    className="h-4 w-4 rounded border-zinc-300 text-kern-600 focus:ring-kern-500"
                   />
                   <Repeat className="h-4 w-4 text-zinc-500" />
                   <span className="text-sm font-medium text-zinc-700">Terugkerende transactie</span>
@@ -328,7 +328,7 @@ export function TransactionForm({
                           id="tx-frequency"
                           value={form.frequency}
                           onChange={(e) => update('frequency', e.target.value)}
-                          className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                          className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                         >
                           {Object.entries(FREQUENCY_LABELS).map(([value, label]) => (
                             <option key={value} value={value}>{label}</option>
@@ -344,7 +344,7 @@ export function TransactionForm({
                             id="tx-dow"
                             value={form.day_of_week}
                             onChange={(e) => update('day_of_week', e.target.value)}
-                            className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                            className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                           >
                             {['Zondag','Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag'].map((d, i) => (
                               <option key={i} value={i}>{d}</option>
@@ -363,7 +363,7 @@ export function TransactionForm({
                             max="31"
                             value={form.day_of_month}
                             onChange={(e) => update('day_of_month', e.target.value)}
-                            className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                            className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                           />
                         </div>
                       )}
@@ -377,7 +377,7 @@ export function TransactionForm({
                         type="date"
                         value={form.end_date}
                         onChange={(e) => update('end_date', e.target.value)}
-                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                       />
                     </div>
                   </div>
@@ -394,7 +394,7 @@ export function TransactionForm({
                 id="tx-notes"
                 value={form.notes}
                 onChange={(e) => update('notes', e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 rows={2}
                 placeholder="Optionele notities..."
               />
@@ -431,7 +431,7 @@ export function TransactionForm({
               <button
                 type="submit"
                 disabled={saving}
-                className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
               >
                 <Save className="h-4 w-4" />
                 {saving ? 'Opslaan...' : 'Opslaan'}

@@ -128,7 +128,39 @@ If the user asks you to modify code, explain that you're a project assistant and
       - formatCurrency() for EUR formatting (nl-NL locale)
       - Supabase client for all data operations
       - Three AI personality modules (kern, wil, horizon)
+      - **Kassabon** — receipt-style breakdown modal (see UI Patterns below)
     </key_patterns>
+
+    <ui_patterns>
+      <kassabon>
+        A "kassabon" (receipt) is a standard UI pattern for showing the user HOW a number was calculated. Whenever a KPI, metric, or summary number is shown, make the card/element clickable and open a BottomSheet with a kassabon inside.
+
+        **When to use:** Any computed metric the user might wonder about — totals, percentages, targets, projections.
+
+        **Structure:**
+        1. **Header** — centered title (uppercase, tracking-widest) + subtitle with context (period, data source)
+        2. **Uitleg** (optional) — 1-2 sentences explaining what this metric means and why it matters, in `text-[11px] text-zinc-400`
+        3. **Regelitems** — line items that make up the calculation, `flex justify-between` with label left and `tabular-nums` amount right
+        4. **Scheidingslijnen** — `border-b border-dashed border-zinc-300` between sections
+        5. **Totaalregel** — `border-t-2 border-zinc-900` with bold result
+        6. **Extra context** (optional) — extrapolation notes, intermediate results, "nog nodig" etc.
+        7. **FreedomTimeBadge** — centered, when the total is an EUR amount
+        8. **Formule** (optional) — explain the formula used in `text-[11px] text-zinc-400`
+        9. **Footer** — `text-[10px] text-zinc-400` centered, describes data source
+
+        **Container styling:**
+        ```
+        rounded-lg border border-dashed border-zinc-300 bg-zinc-50/50 p-4 font-mono text-sm
+        ```
+
+        **Clickable card:** Convert the card's `<div>` to `<button type="button">` with:
+        ```
+        text-left transition-all hover:border-{module-color}-300 hover:shadow-sm
+        ```
+
+        **Reference implementation:** `app/(app)/core/page.tsx` — kassabon modals for Geschat Jaarinkomen, Must Uitgaven, Spaarquote, and FIRE-bedrag.
+      </kassabon>
+    </ui_patterns>
   </existing_architecture>
 
   <security_and_a

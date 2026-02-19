@@ -109,7 +109,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             disabled={!isEditable}
-            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-teal-300 focus:outline-none focus:ring-1 focus:ring-teal-300 disabled:bg-zinc-50 disabled:text-zinc-500"
+            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300 disabled:bg-zinc-50 disabled:text-zinc-500"
           />
         </div>
 
@@ -121,7 +121,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
             onChange={(e) => setDescription(e.target.value)}
             disabled={!isEditable}
             rows={2}
-            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-teal-300 focus:outline-none focus:ring-1 focus:ring-teal-300 disabled:bg-zinc-50 disabled:text-zinc-500"
+            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300 disabled:bg-zinc-50 disabled:text-zinc-500"
           />
         </div>
 
@@ -136,7 +136,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
               disabled={!isEditable}
               min="0"
               step="0.1"
-              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-teal-300 focus:outline-none focus:ring-1 focus:ring-teal-300 disabled:bg-zinc-50 disabled:text-zinc-500"
+              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300 disabled:bg-zinc-50 disabled:text-zinc-500"
             />
           </div>
           <div>
@@ -148,7 +148,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
               disabled={!isEditable}
               min="0"
               step="1"
-              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-teal-300 focus:outline-none focus:ring-1 focus:ring-teal-300 disabled:bg-zinc-50 disabled:text-zinc-500"
+              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300 disabled:bg-zinc-50 disabled:text-zinc-500"
             />
           </div>
         </div>
@@ -164,7 +164,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
               value={scheduledWeek}
               onChange={(e) => setScheduledWeek(e.target.value)}
               disabled={!isEditable}
-              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-teal-300 focus:outline-none focus:ring-1 focus:ring-teal-300 disabled:bg-zinc-50 disabled:text-zinc-500"
+              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300 disabled:bg-zinc-50 disabled:text-zinc-500"
             >
               <option value="">Niet ingepland</option>
               {weekOptions.map((w) => (
@@ -179,7 +179,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
               disabled={!isEditable}
-              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-teal-300 focus:outline-none focus:ring-1 focus:ring-teal-300 disabled:bg-zinc-50 disabled:text-zinc-500"
+              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300 disabled:bg-zinc-50 disabled:text-zinc-500"
             />
           </div>
         </div>
@@ -196,8 +196,8 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
                 disabled={!isEditable}
                 className={`flex-1 rounded-md py-1.5 text-xs font-medium transition-colors ${
                   priority >= p
-                    ? 'bg-teal-500 text-white'
-                    : 'bg-white text-zinc-400 ring-1 ring-zinc-200 hover:bg-teal-50'
+                    ? 'bg-wil-500 text-white'
+                    : 'bg-white text-zinc-400 ring-1 ring-zinc-200 hover:bg-wil-50'
                 } disabled:opacity-60`}
               >
                 {p}
@@ -243,7 +243,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
             <button
               type="button"
               onClick={() => onStatusChange('open')}
-              className="flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-teal-600 transition-colors hover:bg-teal-50"
+              className="flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-wil-600 transition-colors hover:bg-wil-50"
             >
               Heropenen
             </button>
@@ -264,7 +264,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
               type="button"
               onClick={handleSave}
               disabled={saving || !title.trim()}
-              className="rounded-lg bg-teal-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-600 disabled:opacity-50"
+              className="rounded-lg bg-wil-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-600 disabled:opacity-50"
             >
               {saving ? 'Opslaan...' : 'Opslaan'}
             </button>

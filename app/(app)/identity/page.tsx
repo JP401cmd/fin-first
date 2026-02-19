@@ -2,239 +2,28 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { computeSovereigntyLevel, FEATURES, PHASES, DEFAULT_MATRIX, levelToPhaseId } from '@/lib/feature-phases'
-import { BadgeGrid } from '@/components/app/badge-grid'
-import { BadgeEvaluator } from '@/components/app/badge-evaluator'
-import { FreedomCardGenerator } from '@/components/app/freedom-card'
-import { StreakRecords } from '@/components/app/streak-records'
-import { HouseholdSection } from '@/components/app/household-section'
-
-// ── Temporal Balance levels ──────────────────────────────────────────
-
-const temporalLevels = [
-  {
-    level: 1,
-    icon: '\uD83D\uDD25',
-    name: 'The Hedonist',
-    nameNl: 'De Levensgenieter',
-    tagline: 'Burn Bright Now.',
-    description:
-      'Je wilt niet inleveren op comfort. FIRE is een leuke bonus, geen obsessie. Comfort > Snelheid.',
-  },
-  {
-    level: 2,
-    icon: '\uD83E\uDDED',
-    name: 'The Voyager',
-    nameNl: 'De Reiziger',
-    tagline: 'Enjoy the Journey.',
-    description:
-      'Je spaart wat overblijft. Ervaringen en herinneringen gaan voor. Balans, licht hellend naar nu.',
-  },
-  {
-    level: 3,
-    icon: '\u2696\uFE0F',
-    name: 'The Architect',
-    nameNl: 'De Architect',
-    tagline: 'Build with Balance.',
-    description:
-      'Je optimaliseert bewust. Bereid luxe op te offeren als het tijd oplevert, maar geen kluizenaar. De gulden middenweg.',
-  },
-  {
-    level: 4,
-    icon: '\uD83C\uDFDB\uFE0F',
-    name: 'The Stoic',
-    nameNl: 'De Sto\u00efcijn',
-    tagline: 'Discipline is Freedom.',
-    description:
-      'Je haalt plezier uit soberheid en efficiency. Streng en doelgericht. Snelheid > Comfort.',
-  },
-  {
-    level: 5,
-    icon: '\uD83D\uDC8E',
-    name: 'The Essentialist',
-    nameNl: 'De Essentialist',
-    tagline: 'Pure Focus.',
-    description:
-      'Alles wat niet essentieel is, moet weg. Minimalistisch leven voor maximale snelheid naar vrijheid.',
-  },
-]
-
-// ── Chronology Scale ─────────────────────────────────────────────────
-
-type ChronologyLevel = {
-  level: number
-  name: string
-  focus: string
-  metaphor: string
-  phase: number
-}
-
-const chronologyPhases = [
-  { phase: 1, name: 'Recovery', subtitle: 'Restoring Balance', color: 'rose' },
-  { phase: 2, name: 'Stability', subtitle: 'Fortifying Time', color: 'blue' },
-  { phase: 3, name: 'Momentum', subtitle: 'Multiplying Time', color: 'teal' },
-  { phase: 4, name: 'Mastery', subtitle: 'Owning Time', color: 'amber' },
-] as const
-
-const chronologyLevels: ChronologyLevel[] = [
-  { level: -2, name: 'Time Deficit', focus: 'Stop the Leak', metaphor: 'Je verliest actief tijd. Elke euro is al eigendom van iemand anders.', phase: 1 },
-  { level: -1, name: 'Time Drag', focus: 'Eliminate Drag', metaphor: 'Je sleept het verleden achter je aan. Rente vertraagt je snelheid.', phase: 1 },
-  { level: 0, name: 'The Reset', focus: 'Calibration', metaphor: 'Het nulpunt. De teller staat stil. Niet achteruit, nog niet vooruit.', phase: 1 },
-  { level: 1, name: 'The Anchor', focus: 'Secure Foundation', metaphor: 'Het anker is uitgeworpen. Je drijft niet meer af bij storm.', phase: 2 },
-  { level: 2, name: 'Time Shield', focus: 'Maximum Security', metaphor: 'Een schild van 3\u20136 maanden tijd. Externe schokken raken je niet meer.', phase: 2 },
-  { level: 3, name: 'Velocity', focus: 'Acceleration', metaphor: 'Je geld genereert zijn eigen tijd. Sneller dan je alleen kunt lopen.', phase: 3 },
-  { level: 4, name: 'Autonomous', focus: 'Gliding', metaphor: 'De motoren kunnen uit. Je huidige vaart bereikt de bestemming vanzelf.', phase: 3 },
-  { level: 5, name: 'Sovereign', focus: 'Independence', metaphor: 'Je bezit 100% van je eigen klok. Geen tijd meer ruilen voor geld.', phase: 4 },
-  { level: 6, name: 'Timeless', focus: 'Infinity', metaphor: 'Meer tijd dan je op kunt maken. Je bouwt aan de tijdlijnen van anderen.', phase: 4 },
-]
-
-// ── Phase color helpers ──────────────────────────────────────────────
-
-const phaseColors: Record<string, { dot: string; activeDot: string; line: string; badge: string; text: string }> = {
-  rose: { dot: 'bg-rose-200', activeDot: 'bg-rose-500', line: 'bg-rose-200', badge: 'bg-rose-50 text-rose-700 border-rose-200', text: 'text-rose-600' },
-  blue: { dot: 'bg-blue-200', activeDot: 'bg-blue-500', line: 'bg-blue-200', badge: 'bg-blue-50 text-blue-700 border-blue-200', text: 'text-blue-600' },
-  teal: { dot: 'bg-teal-200', activeDot: 'bg-teal-500', line: 'bg-teal-200', badge: 'bg-teal-50 text-teal-700 border-teal-200', text: 'text-teal-600' },
-  amber: { dot: 'bg-amber-200', activeDot: 'bg-amber-500', line: 'bg-amber-200', badge: 'bg-amber-50 text-amber-700 border-amber-200', text: 'text-amber-600' },
-}
-
-// ── Level criteria & progress ────────────────────────────────────────
-
-type LevelCriteria = {
-  label: string
-  criteria: string[]
-  progress: (data: { netWorth: number; monthsCovered: number; freedomPct: number; hasConsumerDebt: boolean }) => number
-}
-
-const levelCriteriaMap: Record<number, LevelCriteria> = {
-  [-2]: {
-    label: 'Voorbij',
-    criteria: ['Negatief vermogen', 'Actieve consumptieve schulden (creditcard, persoonlijke lening, etc.)'],
-    progress: (d) => d.netWorth < 0 && d.hasConsumerDebt ? 100 : 0,
-  },
-  [-1]: {
-    label: 'Voorbij',
-    criteria: ['Negatief vermogen', 'Geen consumptieve schulden'],
-    progress: (d) => d.netWorth < 0 && !d.hasConsumerDebt ? 100 : (d.netWorth >= 0 ? 0 : 0),
-  },
-  [0]: {
-    label: 'Nulpunt bereikt',
-    criteria: ['Vermogen \u2265 \u20AC0 (geen schulden meer)'],
-    progress: (d) => {
-      if (d.netWorth >= 0) return 100
-      // Show how close to 0 — assume starting from worst observed
-      return 0
-    },
-  },
-  [1]: {
-    label: '1 maand buffer',
-    criteria: ['Minimaal 1 maand aan uitgaven als buffer opzij'],
-    progress: (d) => Math.min(100, Math.round((Math.max(0, d.monthsCovered) / 1) * 100)),
-  },
-  [2]: {
-    label: '3\u20136 maanden noodfonds',
-    criteria: ['Minimaal 3 maanden aan uitgaven als noodfonds'],
-    progress: (d) => Math.min(100, Math.round((Math.max(0, d.monthsCovered) / 3) * 100)),
-  },
-  [3]: {
-    label: 'Groeiend vermogen',
-    criteria: ['Minimaal 6 maanden buffer', 'Vrijheidspercentage \u2265 10%'],
-    progress: (d) => {
-      const bufferPct = Math.min(100, (Math.max(0, d.monthsCovered) / 6) * 100)
-      const freedomPct = Math.min(100, (Math.max(0, d.freedomPct) / 10) * 100)
-      return Math.round((bufferPct + freedomPct) / 2)
-    },
-  },
-  [4]: {
-    label: 'Coast FIRE',
-    criteria: ['Vrijheidspercentage \u2265 25%'],
-    progress: (d) => Math.min(100, Math.round((Math.max(0, d.freedomPct) / 25) * 100)),
-  },
-  [5]: {
-    label: 'Bijna onafhankelijk',
-    criteria: ['Vrijheidspercentage \u2265 75%'],
-    progress: (d) => Math.min(100, Math.round((Math.max(0, d.freedomPct) / 75) * 100)),
-  },
-  [6]: {
-    label: 'Volledige onafhankelijkheid',
-    criteria: ['Vrijheidspercentage \u2265 100% (passief inkomen dekt alle uitgaven)'],
-    progress: (d) => Math.min(100, Math.round((Math.max(0, d.freedomPct) / 100) * 100)),
-  },
-}
-
-// ── Feature Roadmap helpers ───────────────────────────────────────────
-
-/** Determine the first phase where a feature becomes available */
-function getFeatureUnlockPhase(featureId: string): string | null {
-  const matrix = DEFAULT_MATRIX[featureId]
-  if (!matrix) return null
-  for (const phase of PHASES) {
-    if (matrix[phase.id]) return phase.id
-  }
-  return null
-}
-
-/** Map of feature icons (emoji) by feature id */
-const featureIcons: Record<string, string> = {
-  nibud_benchmark: '📊',
-  box3_belasting: '🏛️',
-  budget_optimalisatie: '💡',
-  schulden_aflosplan: '🔗',
-  asset_allocatie: '📈',
-  fire_projecties: '🔥',
-  monte_carlo: '🎲',
-  levensgebeurtenissen: '🎯',
-  withdrawal_strategie: '💸',
-  veerkracht_score: '🛡️',
-  vermogensprojectie_chart: '📉',
-  fire_scenario_analyse: '🔀',
-  fire_geavanceerde_params: '⚙️',
-  vermogensverloop: '📅',
-  snapshot_vergelijking: '🔍',
-  cashflow_sankey: '🌊',
-  data_export: '📤',
-  doelen_systeem: '🎯',
-  beslissingspatronen: '🧠',
-}
-
-/** Group features by the phase where they first unlock */
-function getFeaturesPerPhase(): Record<string, typeof FEATURES> {
-  const result: Record<string, typeof FEATURES> = {}
-  for (const phase of PHASES) {
-    result[phase.id] = []
-  }
-  for (const feature of FEATURES) {
-    const unlockPhase = getFeatureUnlockPhase(feature.id)
-    if (unlockPhase && result[unlockPhase]) {
-      result[unlockPhase].push(feature)
-    }
-  }
-  return result
-}
-
-// ── Component ────────────────────────────────────────────────────────
-
-type HouseholdType = 'solo' | 'samen' | 'gezin'
+import { computeSovereigntyLevel, PHASES, levelToPhaseId } from '@/lib/feature-phases'
+import { ChevronRight, User, Trophy, Share2, Settings } from 'lucide-react'
+import {
+  temporalLevels,
+  chronologyPhases,
+  chronologyLevels,
+  phaseColors,
+  levelCriteriaMap,
+  featureIcons,
+  getFeaturesPerPhase,
+} from '@/lib/identity-constants'
 
 export default function IdentityPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  // Profile state
+  // Profile state (minimal for overview)
   const [fullName, setFullName] = useState('')
-  const [dateOfBirth, setDateOfBirth] = useState('')
-  const [country, setCountry] = useState('NL')
-  const [householdType, setHouseholdType] = useState<HouseholdType>('solo')
+  const [householdType, setHouseholdType] = useState('solo')
   const [temporalBalance, setTemporalBalance] = useState(3)
-
-  // Household profile state (NIBUD matching)
-  const [numberOfChildren, setNumberOfChildren] = useState(0)
-  const [childrenAges, setChildrenAges] = useState<number[]>([])
-  const [housingType, setHousingType] = useState<string | null>(null)
-  const [energyLabel, setEnergyLabel] = useState<string | null>(null)
-  const [hasCar, setHasCar] = useState(false)
-  const [netMonthlyIncome, setNetMonthlyIncome] = useState<string>('')
-  const [childAgeInput, setChildAgeInput] = useState('')
 
   // Financial state for sovereignty level
   const [sovereigntyLevel, setSovereigntyLevel] = useState(0)
@@ -244,54 +33,49 @@ export default function IdentityPage() {
   const [expandedPhase, setExpandedPhase] = useState<string | null>(null)
   const featuresPerPhase = getFeaturesPerPhase()
 
+  // Preview card data
+  const [badgeCount, setBadgeCount] = useState(0)
+  const [activeNotifCount, setActiveNotifCount] = useState(0)
+
   // Demo user state
   const [isDemoUser, setIsDemoUser] = useState(false)
   const [showSwitchDialog, setShowSwitchDialog] = useState(false)
   const [switching, setSwitching] = useState(false)
+  const [switchError, setSwitchError] = useState<string | null>(null)
 
   // UI state
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [showResetDialog, setShowResetDialog] = useState(false)
-  const [resetting, setResetting] = useState(false)
 
-  // Load profile on mount
   useEffect(() => {
-    async function loadProfile() {
+    async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const { data } = await supabase
+      // Profile data
+      const { data: profile } = await supabase
         .from('profiles')
-        .select('*')
+        .select('full_name, household_type, temporal_balance, is_demo_user')
         .eq('id', user.id)
         .single()
 
-      if (data) {
-        setFullName(data.full_name ?? '')
-        setDateOfBirth(data.date_of_birth ?? '')
-        setCountry(data.country ?? 'NL')
-        setHouseholdType(data.household_type ?? 'solo')
-        setTemporalBalance(data.temporal_balance ?? 3)
-        setNumberOfChildren(data.number_of_children ?? 0)
-        setChildrenAges(data.children_ages ?? [])
-        setHousingType(data.housing_type ?? null)
-        setEnergyLabel(data.energy_label ?? null)
-        setHasCar(data.has_car ?? false)
-        setNetMonthlyIncome(data.net_monthly_income ? String(data.net_monthly_income) : '')
-        setIsDemoUser(data.is_demo_user ?? false)
+      if (profile) {
+        setFullName(profile.full_name ?? '')
+        setHouseholdType(profile.household_type ?? 'solo')
+        setTemporalBalance(profile.temporal_balance ?? 3)
+        setIsDemoUser(profile.is_demo_user ?? false)
       }
 
-      // Fetch financial data for sovereignty level calculation
+      // Financial data for sovereignty level
       const threeMonthsAgo = new Date()
       threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
       const dateStr = threeMonthsAgo.toISOString().split('T')[0]
 
-      const [assetsRes, debtsRes, txRes] = await Promise.all([
+      const [assetsRes, debtsRes, txRes, badgesRes, notifRes] = await Promise.all([
         supabase.from('assets').select('current_value').eq('is_active', true),
         supabase.from('debts').select('current_balance, debt_type').eq('is_active', true),
         supabase.from('transactions').select('amount, is_income').gte('date', dateStr),
+        supabase.from('user_badges').select('id', { count: 'exact', head: true }),
+        supabase.from('app_settings').select('value').eq('key', `notifications_preferences_${user.id}`).maybeSingle(),
       ])
 
       const totalAssets = (assetsRes.data ?? []).reduce((s, a) => s + Number(a.current_value), 0)
@@ -315,49 +99,27 @@ export default function IdentityPage() {
 
       setSovereigntyLevel(computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPct, hasConsumerDebt))
       setFinancialData({ netWorth, monthsCovered, freedomPct, hasConsumerDebt })
+
+      // Badge count
+      setBadgeCount(badgesRes.count ?? 0)
+
+      // Notification prefs count
+      if (notifRes.data?.value) {
+        try {
+          const parsed = JSON.parse(notifRes.data.value)
+          const active = Object.values(parsed).filter(v => v !== false).length
+          setActiveNotifCount(active)
+        } catch {
+          setActiveNotifCount(7)
+        }
+      } else {
+        setActiveNotifCount(7)
+      }
+
       setLoading(false)
     }
-    loadProfile()
+    loadData()
   }, [supabase])
-
-  // Save personal details
-  const saveProfile = useCallback(async () => {
-    setSaving(true)
-    setSaveMessage(null)
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setSaveMessage({ type: 'error', text: 'Niet ingelogd.' })
-      setSaving(false)
-      return
-    }
-
-    const { error } = await supabase
-      .from('profiles')
-      .upsert({
-        id: user.id,
-        full_name: fullName || null,
-        date_of_birth: dateOfBirth || null,
-        country: country || 'NL',
-        household_type: householdType,
-        temporal_balance: temporalBalance,
-        number_of_children: numberOfChildren,
-        children_ages: childrenAges,
-        housing_type: housingType,
-        energy_label: energyLabel,
-        has_car: hasCar,
-        net_monthly_income: netMonthlyIncome ? Number(netMonthlyIncome) : null,
-        updated_at: new Date().toISOString(),
-      })
-
-    if (error) {
-      setSaveMessage({ type: 'error', text: 'Opslaan mislukt. Probeer opnieuw.' })
-    } else {
-      setSaveMessage({ type: 'success', text: 'Opgeslagen!' })
-      setTimeout(() => setSaveMessage(null), 3000)
-    }
-    setSaving(false)
-  }, [supabase, fullName, dateOfBirth, country, householdType, temporalBalance, numberOfChildren, childrenAges, housingType, energyLabel, hasCar, netMonthlyIncome])
 
   // Save temporal balance immediately on change
   const updateTemporalBalance = useCallback(async (value: number) => {
@@ -387,36 +149,38 @@ export default function IdentityPage() {
     )
   }
 
+  const householdLabel = householdType === 'solo' ? 'Solo' : householdType === 'samen' ? 'Samen' : 'Gezin'
+
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
       {/* Page header */}
       <div className="mb-10">
         <h1 className="text-3xl font-bold text-zinc-900">Identiteit</h1>
         <p className="mt-2 text-zinc-500">
-          Wie ben je en hoe sta je in het leven? Deze instellingen vormen je persoonlijke profiel.
+          Wie ben je en hoe sta je in het leven? Jouw positie op de reis naar vrijheid.
         </p>
       </div>
 
       {/* ── Demo user banner ──────────────────────────────────────── */}
       {isDemoUser && (
-        <section className="mb-6 rounded-2xl border-2 border-teal-200 bg-teal-50/50 p-6">
+        <section className="mb-6 rounded-2xl border-2 border-wil-200 bg-wil-50/50 p-6">
           <div className="flex items-start gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-100">
-              <svg className="h-5 w-5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wil-100">
+              <svg className="h-5 w-5 text-wil-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="text-sm font-semibold text-teal-800">
+              <h3 className="text-sm font-semibold text-wil-800">
                 Je verkent de app met voorbeelddata
               </h3>
-              <p className="mt-1 text-sm text-teal-700">
+              <p className="mt-1 text-sm text-wil-700">
                 Klaar om je eigen gegevens in te voeren? Je demo data wordt gewist en je doorloopt de onboarding met je eigen informatie.
               </p>
               <button
                 onClick={() => setShowSwitchDialog(true)}
                 disabled={switching}
-                className="mt-3 rounded-lg bg-teal-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-700 disabled:opacity-50"
+                className="mt-3 rounded-lg bg-wil-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-700 disabled:opacity-50"
               >
                 {switching ? 'Bezig...' : 'Eigen data invoeren'}
               </button>
@@ -450,10 +214,10 @@ export default function IdentityPage() {
                     router.push('/onboarding')
                   } catch {
                     setSwitching(false)
-                    setSaveMessage({ type: 'error', text: 'Overstappen mislukt. Probeer opnieuw.' })
+                    setSwitchError('Overstappen mislukt. Probeer opnieuw.')
                   }
                 }}
-                className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 transition-colors"
+                className="rounded-lg bg-wil-600 px-4 py-2 text-sm font-medium text-white hover:bg-wil-700 transition-colors"
               >
                 Overstappen
               </button>
@@ -462,288 +226,94 @@ export default function IdentityPage() {
         </div>
       )}
 
-      {/* ── A. Persoonlijke Gegevens ─────────────────────────────────── */}
-      <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-          Persoonlijke Gegevens
-        </h2>
-        <p className="mt-1 mb-6 text-sm text-zinc-500">
-          Basisinformatie over jou en je huishouden.
-        </p>
+      {switchError && (
+        <p className="mb-4 text-sm text-red-600">{switchError}</p>
+      )}
 
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          {/* Naam */}
-          <div>
-            <label htmlFor="fullName" className="mb-1.5 block text-sm font-medium text-zinc-700">
-              Volledige naam
-            </label>
-            <input
-              id="fullName"
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Je naam"
-              className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
-            />
-          </div>
-
-          {/* Geboortedatum */}
-          <div>
-            <label htmlFor="dob" className="mb-1.5 block text-sm font-medium text-zinc-700">
-              Geboortedatum
-            </label>
-            <input
-              id="dob"
-              type="date"
-              value={dateOfBirth}
-              onChange={(e) => setDateOfBirth(e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
-            />
-          </div>
-
-          {/* Land */}
-          <div>
-            <label htmlFor="country" className="mb-1.5 block text-sm font-medium text-zinc-700">
-              Land
-            </label>
-            <input
-              id="country"
-              type="text"
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-              placeholder="NL"
-              className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
-            />
-          </div>
-
-          {/* Huishoudtype */}
-          <div>
-            <span className="mb-1.5 block text-sm font-medium text-zinc-700">
-              Huishouden
-            </span>
-            <div className="flex gap-2">
-              {(['solo', 'samen', 'gezin'] as const).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setHouseholdType(type)}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                    householdType === type
-                      ? 'border-zinc-900 bg-zinc-900 text-white'
-                      : 'border-zinc-300 bg-zinc-50 text-zinc-600 hover:border-zinc-400'
-                  }`}
-                >
-                  {type === 'solo' ? 'Solo' : type === 'samen' ? 'Samen' : 'Gezin'}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Save button */}
-        <div className="mt-6 flex items-center gap-3">
-          <button
-            onClick={saveProfile}
-            disabled={saving}
-            className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
-          >
-            {saving ? 'Opslaan...' : 'Opslaan'}
-          </button>
-          {saveMessage && (
-            <span className={`text-sm ${saveMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-              {saveMessage.text}
-            </span>
-          )}
-        </div>
-      </section>
-
-      {/* ── A2. Huishoudprofiel (NIBUD matching) ─────────────────────── */}
-      <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-          Huishoudprofiel
-        </h2>
-        <p className="mt-1 mb-6 text-sm text-zinc-500">
-          Deze gegevens worden gebruikt voor je NIBUD Budget Gezondheidscheck.
-        </p>
-
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          {/* Aantal kinderen */}
-          <div>
-            <label htmlFor="numChildren" className="mb-1.5 block text-sm font-medium text-zinc-700">
-              Aantal kinderen
-            </label>
-            <input
-              id="numChildren"
-              type="number"
-              min={0}
-              max={10}
-              value={numberOfChildren}
-              onChange={(e) => {
-                const n = Math.max(0, Number(e.target.value))
-                setNumberOfChildren(n)
-                if (n < childrenAges.length) setChildrenAges(childrenAges.slice(0, n))
-              }}
-              className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
-            />
-          </div>
-
-          {/* Leeftijden kinderen */}
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-zinc-700">
-              Leeftijden kinderen
-            </label>
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {childrenAges.map((age, i) => (
-                <span
-                  key={i}
-                  className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700"
-                >
-                  {age} jaar
-                  <button
-                    onClick={() => setChildrenAges(childrenAges.filter((_, idx) => idx !== i))}
-                    className="ml-0.5 text-zinc-400 hover:text-zinc-600"
-                  >
-                    &times;
-                  </button>
-                </span>
-              ))}
-            </div>
-            {childrenAges.length < numberOfChildren && (
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  min={0}
-                  max={25}
-                  value={childAgeInput}
-                  onChange={(e) => setChildAgeInput(e.target.value)}
-                  placeholder="Leeftijd"
-                  className="w-24 rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && childAgeInput) {
-                      e.preventDefault()
-                      setChildrenAges([...childrenAges, Math.max(0, Number(childAgeInput))])
-                      setChildAgeInput('')
-                    }
-                  }}
-                />
-                <button
-                  onClick={() => {
-                    if (childAgeInput) {
-                      setChildrenAges([...childrenAges, Math.max(0, Number(childAgeInput))])
-                      setChildAgeInput('')
-                    }
-                  }}
-                  className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50"
-                >
-                  Toevoegen
-                </button>
+      {/* ── Preview-kaarten ──────────────────────────────────────── */}
+      <div className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Link
+          href="/identity/profiel"
+          className="group rounded-2xl border border-zinc-200 bg-white p-6 transition-all hover:border-wil-300 hover:shadow-sm"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-wil-50">
+                <User className="h-4 w-4 text-wil-600" />
               </div>
-            )}
-          </div>
-
-          {/* Woningtype */}
-          <div>
-            <label htmlFor="housingType" className="mb-1.5 block text-sm font-medium text-zinc-700">
-              Woningtype
-            </label>
-            <select
-              id="housingType"
-              value={housingType ?? ''}
-              onChange={(e) => setHousingType(e.target.value || null)}
-              className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
-            >
-              <option value="">Selecteer...</option>
-              <option value="huur_sociaal">Huur (sociaal)</option>
-              <option value="huur_vrij">Huur (vrije sector)</option>
-              <option value="koop">Koopwoning</option>
-            </select>
-          </div>
-
-          {/* Energielabel */}
-          <div>
-            <label htmlFor="energyLabel" className="mb-1.5 block text-sm font-medium text-zinc-700">
-              Energielabel
-            </label>
-            <select
-              id="energyLabel"
-              value={energyLabel ?? ''}
-              onChange={(e) => setEnergyLabel(e.target.value || null)}
-              className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
-            >
-              <option value="">Selecteer...</option>
-              {['A++', 'A+', 'A', 'B', 'C', 'D', 'E', 'F', 'G'].map(label => (
-                <option key={label} value={label}>{label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Auto */}
-          <div>
-            <span className="mb-1.5 block text-sm font-medium text-zinc-700">Auto</span>
-            <div className="flex gap-2">
-              {[
-                { value: false, label: 'Nee' },
-                { value: true, label: 'Ja' },
-              ].map((opt) => (
-                <button
-                  key={String(opt.value)}
-                  onClick={() => setHasCar(opt.value)}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                    hasCar === opt.value
-                      ? 'border-zinc-900 bg-zinc-900 text-white'
-                      : 'border-zinc-300 bg-zinc-50 text-zinc-600 hover:border-zinc-400'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-900">Profiel</h3>
+                <p className="text-xs text-zinc-400">
+                  {fullName || 'Geen naam'} &middot; {householdLabel}
+                </p>
+              </div>
             </div>
+            <ChevronRight className="h-4 w-4 text-zinc-300 transition-colors group-hover:text-wil-500" />
           </div>
+        </Link>
 
-          {/* Netto maandinkomen */}
-          <div>
-            <label htmlFor="netIncome" className="mb-1.5 block text-sm font-medium text-zinc-700">
-              Netto maandinkomen
-              <span className="ml-1 text-xs font-normal text-zinc-400">(optioneel)</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
-              <input
-                id="netIncome"
-                type="number"
-                min={0}
-                step={50}
-                value={netMonthlyIncome}
-                onChange={(e) => setNetMonthlyIncome(e.target.value)}
-                placeholder="0"
-                className="w-full rounded-lg border border-zinc-300 bg-zinc-50 py-2 pr-3 pl-7 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
-              />
+        <Link
+          href="/identity/voortgang"
+          className="group rounded-2xl border border-zinc-200 bg-white p-6 transition-all hover:border-wil-300 hover:shadow-sm"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-wil-50">
+                <Trophy className="h-4 w-4 text-wil-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-900">Voortgang</h3>
+                <p className="text-xs text-zinc-400">
+                  {badgeCount} badge{badgeCount !== 1 ? 's' : ''} behaald
+                </p>
+              </div>
             </div>
-            <p className="mt-1 text-[10px] text-zinc-400">
-              Wordt gebruikt voor gepersonaliseerde NIBUD-berekeningen.
-            </p>
+            <ChevronRight className="h-4 w-4 text-zinc-300 transition-colors group-hover:text-wil-500" />
           </div>
-        </div>
+        </Link>
 
-        <div className="mt-6 flex items-center gap-3">
-          <button
-            onClick={saveProfile}
-            disabled={saving}
-            className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
-          >
-            {saving ? 'Opslaan...' : 'Opslaan'}
-          </button>
-          {saveMessage && (
-            <span className={`text-sm ${saveMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-              {saveMessage.text}
-            </span>
-          )}
-        </div>
-      </section>
+        <Link
+          href="/identity/delen"
+          className="group rounded-2xl border border-zinc-200 bg-white p-6 transition-all hover:border-wil-300 hover:shadow-sm"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-wil-50">
+                <Share2 className="h-4 w-4 text-wil-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-900">Delen</h3>
+                <p className="text-xs text-zinc-400">
+                  Vrijheidskaart & Jaaroverzicht
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-zinc-300 transition-colors group-hover:text-wil-500" />
+          </div>
+        </Link>
 
-      {/* ── A3. Huishouden Management ────────────────────────────────── */}
-      <HouseholdSection />
+        <Link
+          href="/identity/instellingen"
+          className="group rounded-2xl border border-zinc-200 bg-white p-6 transition-all hover:border-wil-300 hover:shadow-sm"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-wil-50">
+                <Settings className="h-4 w-4 text-wil-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-900">Instellingen</h3>
+                <p className="text-xs text-zinc-400">
+                  {activeNotifCount} van 7 notificaties actief
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-zinc-300 transition-colors group-hover:text-wil-500" />
+          </div>
+        </Link>
+      </div>
 
-      {/* ── B. The Temporal Balance ──────────────────────────────────── */}
+      {/* ── The Temporal Balance ──────────────────────────────────── */}
       <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
         <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
           The Temporal Balance
@@ -793,7 +363,7 @@ export default function IdentityPage() {
         </div>
       </section>
 
-      {/* ── C. The Chronology Scale ──────────────────────────────────── */}
+      {/* ── The Chronology Scale ──────────────────────────────────── */}
       <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
         <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
           The Chronology Scale
@@ -809,14 +379,11 @@ export default function IdentityPage() {
             <span>Lvl {chronologyLevels[chronologyLevels.length - 1].level}: {chronologyLevels[chronologyLevels.length - 1].name}</span>
           </div>
           <div className="relative h-3 w-full overflow-hidden rounded-full bg-zinc-200">
-            {/* Phase segments */}
             {chronologyPhases.map((phase, pi) => {
               const levels = chronologyLevels.filter(l => l.phase === phase.phase)
               const startIdx = chronologyLevels.indexOf(levels[0])
               const endIdx = chronologyLevels.indexOf(levels[levels.length - 1])
-              const total = chronologyLevels.length
-              const step = total - 1
-              // Extend segments to midpoints between phases so they're contiguous
+              const step = chronologyLevels.length - 1
               const left = pi === 0 ? 0 : ((startIdx - 0.5) / step) * 100
               const right = pi === chronologyPhases.length - 1 ? 100 : ((endIdx + 0.5) / step) * 100
               const activeIdx = chronologyLevels.findIndex(l => l.level === sovereigntyLevel)
@@ -830,7 +397,6 @@ export default function IdentityPage() {
                 />
               )
             })}
-            {/* Current position indicator */}
             {(() => {
               const idx = chronologyLevels.findIndex(l => l.level === sovereigntyLevel)
               const pct = idx >= 0 ? (idx / (chronologyLevels.length - 1)) * 100 : 0
@@ -877,7 +443,6 @@ export default function IdentityPage() {
           {chronologyPhases.map((phase) => {
             const levels = chronologyLevels.filter((l) => l.phase === phase.phase)
             const colors = phaseColors[phase.color]
-            // Find matching PHASES entry for feature lookup
             const phaseId = PHASES.find(p => p.color === phase.color)?.id ?? ''
             const phaseFeatures = featuresPerPhase[phaseId] ?? []
             const currentPhaseId = levelToPhaseId(sovereigntyLevel)
@@ -905,24 +470,24 @@ export default function IdentityPage() {
                       className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-zinc-500 hover:text-zinc-700 transition-colors"
                       data-testid={`feature-roadmap-toggle-${phaseId}`}
                     >
-                      <span className="text-xs">{isPhaseExpanded ? '▼' : '▶'}</span>
+                      <span className="text-xs">{isPhaseExpanded ? '\u25BC' : '\u25B6'}</span>
                       <span>{phaseFeatures.length} feature{phaseFeatures.length !== 1 ? 's' : ''} worden ontgrendeld</span>
                       {isPhaseUnlocked && (
                         <span className="ml-1 inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 border border-emerald-200">
-                          ✓ Beschikbaar
+                          \u2713 Beschikbaar
                         </span>
                       )}
                       {!isPhaseUnlocked && (
                         <span className="ml-1 inline-flex items-center rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400 border border-zinc-200">
-                          🔒 Vergrendeld
+                          \uD83D\uDD12 Vergrendeld
                         </span>
                       )}
                     </button>
 
-                    {/* Feature icon pills (always visible as compact icons) */}
+                    {/* Feature icon pills */}
                     <div className="flex flex-wrap gap-1.5 mb-2">
                       {phaseFeatures.map((feature) => {
-                        const icon = featureIcons[feature.id] ?? '⚡'
+                        const icon = featureIcons[feature.id] ?? '\u26A1'
                         return (
                           <div
                             key={feature.id}
@@ -936,15 +501,14 @@ export default function IdentityPage() {
                           >
                             <span className="text-xs">{icon}</span>
                             <span className="hidden sm:inline">{feature.label}</span>
-                            {!isPhaseUnlocked && <span className="text-[9px] ml-0.5">🔒</span>}
-                            {/* Tooltip */}
+                            {!isPhaseUnlocked && <span className="text-[9px] ml-0.5">\uD83D\uDD12</span>}
                             <div className="pointer-events-none absolute left-1/2 bottom-full z-20 mb-2 -translate-x-1/2 w-48 rounded-lg border border-zinc-200 bg-white p-2 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
                               <p className="text-[11px] font-semibold text-zinc-700">{feature.label}</p>
                               <p className="text-[10px] text-zinc-500">{feature.description}</p>
                               {isPhaseUnlocked ? (
-                                <p className="mt-1 text-[10px] font-semibold text-emerald-600">✓ Ontgrendeld</p>
+                                <p className="mt-1 text-[10px] font-semibold text-emerald-600">\u2713 Ontgrendeld</p>
                               ) : (
-                                <p className="mt-1 text-[10px] font-semibold text-zinc-400">🔒 Beschikbaar vanaf {phase.name}</p>
+                                <p className="mt-1 text-[10px] font-semibold text-zinc-400">\uD83D\uDD12 Beschikbaar vanaf {phase.name}</p>
                               )}
                             </div>
                           </div>
@@ -960,7 +524,7 @@ export default function IdentityPage() {
                         </p>
                         <div className="space-y-1.5">
                           {phaseFeatures.map((feature) => {
-                            const icon = featureIcons[feature.id] ?? '⚡'
+                            const icon = featureIcons[feature.id] ?? '\u26A1'
                             return (
                               <div
                                 key={feature.id}
@@ -974,9 +538,9 @@ export default function IdentityPage() {
                                   <div className="flex items-center gap-1.5">
                                     <span className="text-xs font-semibold text-zinc-700">{feature.label}</span>
                                     {isPhaseUnlocked ? (
-                                      <span className="text-[10px] text-emerald-600 font-medium">✓</span>
+                                      <span className="text-[10px] text-emerald-600 font-medium">\u2713</span>
                                     ) : (
-                                      <span className="text-[10px] text-zinc-400">🔒</span>
+                                      <span className="text-[10px] text-zinc-400">\uD83D\uDD12</span>
                                     )}
                                   </div>
                                   <p className="text-[11px] text-zinc-500 leading-snug">{feature.description}</p>
@@ -1004,7 +568,6 @@ export default function IdentityPage() {
                         key={lvl.level}
                         className={`relative mb-4 last:mb-0 ${isFuture ? 'opacity-40' : ''}`}
                       >
-                        {/* Dot on the timeline */}
                         <div
                           className={`absolute -left-[calc(1.5rem+5px)] top-1.5 h-2.5 w-2.5 rounded-full ${
                             isActive ? colors.activeDot : isPast ? colors.dot : 'bg-zinc-200'
@@ -1025,7 +588,6 @@ export default function IdentityPage() {
                                 Huidige positie
                               </span>
                             )}
-                            {/* Info tooltip */}
                             {criteria && (
                               <div className="group relative ml-auto shrink-0">
                                 <div className="flex h-5 w-5 cursor-help items-center justify-center rounded-full border border-zinc-300 text-[10px] font-bold text-zinc-400 transition-colors group-hover:border-zinc-500 group-hover:text-zinc-600">
@@ -1083,100 +645,6 @@ export default function IdentityPage() {
         </div>
       </section>
 
-      {/* ── D. Streak Records ──────────────────────────────────────────── */}
-      <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8" data-testid="identity-streak-records">
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-          Streaks & Consistentie
-        </h2>
-        <p className="mt-1 mb-6 text-sm text-zinc-500">
-          Houd bij hoe consistent je bent. Elke week telt!
-        </p>
-
-        <StreakRecords />
-      </section>
-
-      {/* ── E. Prestaties & Badges ───────────────────────────────────── */}
-      <BadgeEvaluator force={true} />
-      <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-          Prestaties & Badges
-        </h2>
-        <p className="mt-1 mb-6 text-sm text-zinc-500">
-          Verdien badges naarmate je groeit op je reis naar financiele vrijheid.
-        </p>
-
-        <BadgeGrid />
-      </section>
-
-      {/* ── E. Vrijheidskaart (Share) ──────────────────────────────── */}
-      <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-          Vrijheidskaart Delen
-        </h2>
-        <p className="mt-1 mb-6 text-sm text-zinc-500">
-          Genereer een deelbare kaart met je vrijheidsvoortgang. Kies je privacyniveau
-          om te bepalen welke informatie zichtbaar is.
-        </p>
-
-        <FreedomCardGenerator />
-      </section>
-
-      {/* ── F. Gegevens resetten ──────────────────────────────────── */}
-      <section className="mb-10 rounded-2xl border border-red-200 bg-white p-6 sm:p-8">
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-red-400 uppercase">
-          Gegevens Resetten
-        </h2>
-        <p className="mt-1 mb-6 text-sm text-zinc-500">
-          Wis al je financiele gegevens en doorloop de onboarding opnieuw.
-          Dit verwijdert al je bankrekeningen, transacties, budgetten, doelen en overige data.
-        </p>
-
-        <button
-          onClick={() => setShowResetDialog(true)}
-          disabled={resetting}
-          className="rounded-lg border border-red-300 bg-red-50 px-5 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
-        >
-          {resetting ? 'Bezig met wissen...' : 'Alle gegevens wissen'}
-        </button>
-      </section>
-
-      {/* Reset confirmation dialog */}
-      {showResetDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-zinc-900">Weet je het zeker?</h3>
-            <p className="mt-2 text-sm text-zinc-600">
-              Dit wist <span className="font-semibold text-red-600">al je financiele data</span> permanent.
-              Je wordt teruggeleid naar de onboarding om opnieuw te beginnen.
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                onClick={() => setShowResetDialog(false)}
-                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
-              >
-                Annuleren
-              </button>
-              <button
-                onClick={async () => {
-                  setShowResetDialog(false)
-                  setResetting(true)
-                  try {
-                    const res = await fetch('/api/onboarding/reset', { method: 'POST' })
-                    if (!res.ok) throw new Error('Reset failed')
-                    router.push('/onboarding')
-                  } catch {
-                    setResetting(false)
-                    setSaveMessage({ type: 'error', text: 'Reset mislukt. Probeer opnieuw.' })
-                  }
-                }}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors"
-              >
-                Alles wissen
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

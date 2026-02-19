@@ -424,7 +424,7 @@ export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) 
               <div key={seg.id}>
                 <button
                   className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all ${
-                    isActive ? 'ring-2 ring-amber-400' : ''
+                    isActive ? 'ring-2 ring-kern-400' : ''
                   }`}
                   style={{
                     borderColor: isActive ? c.border : '#e4e4e7',

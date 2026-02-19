@@ -425,7 +425,7 @@ export default function BeheerTestdataPage() {
           <button
             onClick={() => mobilePreview.setEnabled(!mobilePreview.enabled)}
             className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-              mobilePreview.enabled ? 'bg-amber-500' : 'bg-zinc-300'
+              mobilePreview.enabled ? 'bg-kern-500' : 'bg-zinc-300'
             }`}
           >
             <span
@@ -448,7 +448,7 @@ export default function BeheerTestdataPage() {
                 onClick={() => mobilePreview.setDevice(d)}
                 className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
                   mobilePreview.device.name === d.name
-                    ? 'border-amber-400 bg-amber-50 text-amber-700'
+                    ? 'border-kern-400 bg-kern-50 text-kern-700'
                     : 'border-zinc-200 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50'
                 }`}
               >
@@ -460,7 +460,7 @@ export default function BeheerTestdataPage() {
         </div>
 
         {mobilePreview.enabled && (
-          <p className="mt-4 text-xs text-amber-600">
+          <p className="mt-4 text-xs text-kern-600">
             Preview is actief. Navigeer naar een pagina (bijv. /core) om de mobile weergave te testen.
           </p>
         )}

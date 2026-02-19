@@ -37,8 +37,8 @@ const MODULE_FEATURES: Record<string, string[]> = {
 
 const MODULE_COLORS: Record<string, { gradient: string; text: string; border: string; bg: string; dot: string }> = {
   kern:    { gradient: 'from-amber-50 to-amber-100/50', text: 'text-amber-700', border: 'border-amber-200', bg: 'bg-amber-50', dot: 'bg-amber-400' },
-  wil:     { gradient: 'from-teal-50 to-teal-100/50',   text: 'text-teal-700',  border: 'border-teal-200',  bg: 'bg-teal-50',  dot: 'bg-teal-400' },
-  horizon: { gradient: 'from-purple-50 to-purple-100/50', text: 'text-purple-700', border: 'border-purple-200', bg: 'bg-purple-50', dot: 'bg-purple-400' },
+  wil:     { gradient: 'from-wil-50 to-wil-100/50',   text: 'text-wil-700',  border: 'border-wil-200',  bg: 'bg-wil-50',  dot: 'bg-wil-400' },
+  horizon: { gradient: 'from-horizon-50 to-horizon-100/50', text: 'text-horizon-700', border: 'border-horizon-200', bg: 'bg-horizon-50', dot: 'bg-horizon-400' },
 }
 
 interface LockedFeaturesFooterProps {

@@ -45,9 +45,9 @@ function Divider() {
 // ── Feature card ────────────────────────────────────────────
 
 const domainStyles = {
-  kern: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-600', hoverBorder: 'hover:border-amber-300', hoverShadow: 'hover:shadow-amber-50' },
-  wil: { bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-600', hoverBorder: 'hover:border-teal-300', hoverShadow: 'hover:shadow-teal-50' },
-  horizon: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-600', hoverBorder: 'hover:border-purple-300', hoverShadow: 'hover:shadow-purple-50' },
+  kern: { bg: 'bg-kern-50', border: 'border-kern-200', text: 'text-kern-600', hoverBorder: 'hover:border-kern-300', hoverShadow: 'hover:shadow-kern-50' },
+  wil: { bg: 'bg-wil-50', border: 'border-wil-200', text: 'text-wil-600', hoverBorder: 'hover:border-wil-300', hoverShadow: 'hover:shadow-wil-50' },
+  horizon: { bg: 'bg-horizon-50', border: 'border-horizon-200', text: 'text-horizon-600', hoverBorder: 'hover:border-horizon-300', hoverShadow: 'hover:shadow-horizon-50' },
 }
 
 function FeatureCard({ icon, title, description, domain }: {
@@ -78,7 +78,7 @@ export function Features() {
         <Reveal className="mx-auto max-w-2xl text-center">
           <h2 className="text-2xl font-bold leading-snug tracking-tight text-zinc-900 md:text-3xl lg:text-4xl mb-6">
             Je financiele leven is{' '}
-            <span className="text-teal-600">versnipperd</span>
+            <span className="text-wil-600">versnipperd</span>
           </h2>
           <div className="grid gap-4 text-left sm:grid-cols-3 mb-8">
             <div className="rounded-xl border border-zinc-200 bg-white p-5">
@@ -126,11 +126,11 @@ export function Features() {
           <Reveal>
             <div className="grid gap-12 md:grid-cols-2 mb-10 items-start">
               <div>
-                <p className="mb-2 text-xs font-medium tracking-widest uppercase text-amber-600">
+                <p className="mb-2 text-xs font-medium tracking-widest uppercase text-kern-600">
                   De Kern — Je fundament
                 </p>
                 <h3 className="text-2xl font-bold tracking-tight text-zinc-900 mb-4 md:text-3xl">
-                  Je volledige <span className="text-amber-600">vermogen</span> in een oogopslag
+                  Je volledige <span className="text-kern-600">vermogen</span> in een oogopslag
                 </h3>
                 <p className="text-sm leading-relaxed text-zinc-500">
                   Rekeningen, beleggingen, pensioen, vastgoed, schulden — alles samengebracht
@@ -139,11 +139,11 @@ export function Features() {
                 </p>
               </div>
               <div className="flex items-center">
-                <div className="w-full rounded-xl border border-amber-200 bg-amber-50 p-6">
+                <div className="w-full rounded-xl border border-kern-200 bg-kern-50 p-6">
                   <p className="text-sm leading-relaxed text-zinc-700 italic">
                     &ldquo;Je vermogen is 14 jaar en 3 maanden vrijheid waard. Je vaste lasten kosten je 23 dagen per maand. Je spaarquote geeft je 8 dagen per maand terug.&rdquo;
                   </p>
-                  <span className="mt-3 block text-xs font-medium uppercase tracking-wider text-amber-600">
+                  <span className="mt-3 block text-xs font-medium uppercase tracking-wider text-kern-600">
                     — Hoe TriFinity spreekt
                   </span>
                 </div>
@@ -167,21 +167,21 @@ export function Features() {
           <Reveal>
             <div className="grid gap-12 md:grid-cols-2 mb-10 items-start">
               <div className="order-2 md:order-1 flex items-center">
-                <div className="w-full rounded-xl border border-teal-200 bg-teal-50 p-6">
+                <div className="w-full rounded-xl border border-wil-200 bg-wil-50 p-6">
                   <p className="text-sm leading-relaxed text-zinc-700 italic">
                     &ldquo;Die abonnementen kosten je 7 dagen vrijheid per jaar. Halveer ze, beleg het verschil, en je koopt jezelf een halfjaar eerder vrij. Wat kies je?&rdquo;
                   </p>
-                  <span className="mt-3 block text-xs font-medium uppercase tracking-wider text-teal-600">
+                  <span className="mt-3 block text-xs font-medium uppercase tracking-wider text-wil-600">
                     — Hoe Will je uitdaagt
                   </span>
                 </div>
               </div>
               <div className="order-1 md:order-2">
-                <p className="mb-2 text-xs font-medium tracking-widest uppercase text-teal-600">
+                <p className="mb-2 text-xs font-medium tracking-widest uppercase text-wil-600">
                   De Wil — Laat Will je helpen
                 </p>
                 <h3 className="text-2xl font-bold tracking-tight text-zinc-900 mb-4 md:text-3xl">
-                  Persoonlijke <span className="text-teal-600">AI-coaching</span> die je vrijheid versnelt
+                  Persoonlijke <span className="text-wil-600">AI-coaching</span> die je vrijheid versnelt
                 </h3>
                 <p className="text-sm leading-relaxed text-zinc-500">
                   Geen generieke tips uit een spreadsheet. Will is je AI-coach die je volledige
@@ -208,11 +208,11 @@ export function Features() {
           <Reveal>
             <div className="grid gap-12 md:grid-cols-2 mb-10 items-start">
               <div>
-                <p className="mb-2 text-xs font-medium tracking-widest uppercase text-purple-600">
+                <p className="mb-2 text-xs font-medium tracking-widest uppercase text-horizon-600">
                   De Horizon — Jouw toekomst
                 </p>
                 <h3 className="text-2xl font-bold tracking-tight text-zinc-900 mb-4 md:text-3xl">
-                  <span className="text-purple-600">NL-specifiek</span> plannen naar financiele vrijheid
+                  <span className="text-horizon-600">NL-specifiek</span> plannen naar financiele vrijheid
                 </h3>
                 <p className="text-sm leading-relaxed text-zinc-500">
                   Geen internationale tool die het Nederlandse systeem niet snapt.
@@ -221,11 +221,11 @@ export function Features() {
                 </p>
               </div>
               <div className="flex items-center">
-                <div className="w-full rounded-xl border border-purple-200 bg-purple-50 p-6">
+                <div className="w-full rounded-xl border border-horizon-200 bg-horizon-50 p-6">
                   <p className="text-sm leading-relaxed text-zinc-700 italic">
                     &ldquo;Je bent op koers voor vrijheid op je 52e. Met je Box 3 optimalisatie bespaar je 14 maanden. Met je huidige acties haal je het op je 51e.&rdquo;
                   </p>
-                  <span className="mt-3 block text-xs font-medium uppercase tracking-wider text-purple-600">
+                  <span className="mt-3 block text-xs font-medium uppercase tracking-wider text-horizon-600">
                     — Hoe Will navigeert
                   </span>
                 </div>
@@ -252,7 +252,7 @@ export function Features() {
             Je persoonlijke AI-coach
           </p>
           <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-900 mb-4 md:text-3xl">
-            Maak kennis met <span className="text-teal-600">Will</span>
+            Maak kennis met <span className="text-wil-600">Will</span>
           </h2>
           <p className="mx-auto mb-10 max-w-xl text-center text-sm text-zinc-500 leading-relaxed">
             Will is je AI-coach die je volledige financiele context kent. Geen generieke tips,
@@ -260,25 +260,25 @@ export function Features() {
             Stel een vraag in gewoon Nederlands — Will vertaalt het naar inzicht en actie.
           </p>
           <div className="grid gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-amber-200 bg-white p-5">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wider text-amber-600">De Kern</p>
-              <div className="rounded-lg bg-amber-50 p-4">
+            <div className="rounded-xl border border-kern-200 bg-white p-5">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wider text-kern-600">De Kern</p>
+              <div className="rounded-lg bg-kern-50 p-4">
                 <p className="text-sm text-zinc-600 italic leading-relaxed">
                   &ldquo;Je vermogen is 14 maanden vrijheid waard — 2 maanden meer dan vorig kwartaal.&rdquo;
                 </p>
               </div>
             </div>
-            <div className="rounded-xl border border-teal-200 bg-white p-5">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wider text-teal-600">De Wil</p>
-              <div className="rounded-lg bg-teal-50 p-4">
+            <div className="rounded-xl border border-wil-200 bg-white p-5">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wider text-wil-600">De Wil</p>
+              <div className="rounded-lg bg-wil-50 p-4">
                 <p className="text-sm text-zinc-600 italic leading-relaxed">
                   &ldquo;Schrap twee streaming-abonnementen en beleg het verschil — 12 dagen vrijheid per jaar.&rdquo;
                 </p>
               </div>
             </div>
-            <div className="rounded-xl border border-purple-200 bg-white p-5">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wider text-purple-600">De Horizon</p>
-              <div className="rounded-lg bg-purple-50 p-4">
+            <div className="rounded-xl border border-horizon-200 bg-white p-5">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wider text-horizon-600">De Horizon</p>
+              <div className="rounded-lg bg-horizon-50 p-4">
                 <p className="text-sm text-zinc-600 italic leading-relaxed">
                   &ldquo;Met je huidige tempo bereik je FIRE op je 51e. Die extra aflossing versnelt dat 8 maanden.&rdquo;
                 </p>
@@ -334,7 +334,7 @@ export function Features() {
           </p>
           <div className="grid gap-6 md:grid-cols-2">
             <div className="rounded-xl border border-zinc-200 bg-white p-6 transition-all hover:shadow-md">
-              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-lg">
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-kern-50 text-lg">
                 <span>&#128293;</span>
               </div>
               <h4 className="font-bold text-zinc-900 mb-2">FIRE-strijder</h4>
@@ -344,7 +344,7 @@ export function Features() {
               </p>
             </div>
             <div className="rounded-xl border border-zinc-200 bg-white p-6 transition-all hover:shadow-md">
-              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 text-lg">
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-wil-50 text-lg">
                 <span>&#128188;</span>
               </div>
               <h4 className="font-bold text-zinc-900 mb-2">Bewuste professional</h4>
@@ -354,7 +354,7 @@ export function Features() {
               </p>
             </div>
             <div className="rounded-xl border border-zinc-200 bg-white p-6 transition-all hover:shadow-md">
-              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-lg">
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-horizon-50 text-lg">
                 <span>&#127758;</span>
               </div>
               <h4 className="font-bold text-zinc-900 mb-2">Expat in Nederland</h4>
@@ -380,7 +380,7 @@ export function Features() {
       {/* ── INFINITY ───────────────────────────────────────── */}
       <section className="px-6 py-24 text-center bg-zinc-50">
         <Reveal>
-          <div className="mb-6 text-7xl font-bold leading-none bg-gradient-to-r from-amber-500 via-teal-500 to-purple-500 bg-clip-text text-transparent animate-[infinity-pulse_4s_ease-in-out_infinite] md:text-9xl">
+          <div className="mb-6 text-7xl font-bold leading-none bg-gradient-to-r from-kern-500 via-wil-500 to-horizon-500 bg-clip-text text-transparent animate-[infinity-pulse_4s_ease-in-out_infinite] md:text-9xl">
             &#8734;
           </div>
           <h2 className="text-2xl font-bold tracking-tight text-zinc-900 max-w-lg mx-auto mb-4 md:text-3xl">
@@ -399,11 +399,11 @@ export function Features() {
           {/* 5 unieke pijlers */}
           <div className="mx-auto mb-10 max-w-2xl grid grid-cols-2 gap-x-6 gap-y-3 text-left sm:grid-cols-3 md:flex md:justify-center md:gap-8 md:text-center">
             <div className="flex items-center gap-2 text-sm text-zinc-600">
-              <div className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+              <div className="h-1.5 w-1.5 rounded-full bg-kern-500 shrink-0" />
               Tijd-perspectief
             </div>
             <div className="flex items-center gap-2 text-sm text-zinc-600">
-              <div className="h-1.5 w-1.5 rounded-full bg-teal-500 shrink-0" />
+              <div className="h-1.5 w-1.5 rounded-full bg-wil-500 shrink-0" />
               AI-coaching
             </div>
             <div className="flex items-center gap-2 text-sm text-zinc-600">
@@ -411,7 +411,7 @@ export function Features() {
               NL-specifiek
             </div>
             <div className="flex items-center gap-2 text-sm text-zinc-600">
-              <div className="h-1.5 w-1.5 rounded-full bg-purple-500 shrink-0" />
+              <div className="h-1.5 w-1.5 rounded-full bg-horizon-500 shrink-0" />
               Drie domeinen
             </div>
             <div className="flex items-center gap-2 text-sm text-zinc-600">
@@ -422,7 +422,7 @@ export function Features() {
 
           <h2 className="text-3xl font-bold tracking-tight text-zinc-900 max-w-2xl mx-auto mb-4 md:text-4xl lg:text-5xl">
             Klaar om te ontdekken hoeveel{' '}
-            <span className="bg-gradient-to-r from-amber-500 via-teal-500 to-purple-500 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-kern-500 via-wil-500 to-horizon-500 bg-clip-text text-transparent">
               vrijheid
             </span>{' '}
             je al hebt?

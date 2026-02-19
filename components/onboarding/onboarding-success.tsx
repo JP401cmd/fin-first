@@ -18,14 +18,14 @@ export function OnboardingSuccess({ onDashboard }: { onDashboard: () => void }) 
           <p className="mt-2 text-sm font-semibold text-amber-700">De Kern</p>
           <p className="mt-1 text-xs text-zinc-500">Je financiele fundament</p>
         </div>
-        <div className="flex flex-col items-center rounded-2xl border-2 border-teal-200 bg-teal-50/50 p-5">
+        <div className="flex flex-col items-center rounded-2xl border-2 border-wil-200 bg-wil-50/50 p-5">
           <FinnAvatar size={48} />
-          <p className="mt-2 text-sm font-semibold text-teal-700">De Wil</p>
+          <p className="mt-2 text-sm font-semibold text-wil-700">De Wil</p>
           <p className="mt-1 text-xs text-zinc-500">Bewuste keuzes. Ik ben bereikbaar via het chatknopje</p>
         </div>
-        <div className="flex flex-col items-center rounded-2xl border-2 border-purple-200 bg-purple-50/50 p-5">
+        <div className="flex flex-col items-center rounded-2xl border-2 border-horizon-200 bg-horizon-50/50 p-5">
           <FfinAvatar size={48} />
-          <p className="mt-2 text-sm font-semibold text-purple-700">De Horizon</p>
+          <p className="mt-2 text-sm font-semibold text-horizon-700">De Horizon</p>
           <p className="mt-1 text-xs text-zinc-500">Je pad naar het &infin;-symbool</p>
         </div>
       </div>
@@ -39,7 +39,7 @@ export function OnboardingSuccess({ onDashboard }: { onDashboard: () => void }) 
 
       <button
         onClick={onDashboard}
-        className="mt-8 rounded-lg bg-teal-600 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-teal-700"
+        className="mt-8 rounded-lg bg-wil-600 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-wil-700"
       >
         Ontdek je dashboard
       </button>

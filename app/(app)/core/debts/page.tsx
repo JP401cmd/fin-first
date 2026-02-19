@@ -234,7 +234,7 @@ export default function DebtsPage() {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
         <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
         </div>
       </div>
     )
@@ -256,7 +256,7 @@ export default function DebtsPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* Header with totals */}
-      <section className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-6">
+      <section className="rounded-2xl border border-kern-200 bg-gradient-to-br from-kern-50 to-white p-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-zinc-900">Schulden</h1>
@@ -266,7 +266,7 @@ export default function DebtsPage() {
           </div>
           <button
             onClick={() => { setEditDebt(null); setShowForm(true) }}
-            className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+            className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
           >
             <Plus className="h-4 w-4" />
             Schuld toevoegen
@@ -278,7 +278,7 @@ export default function DebtsPage() {
             <p className="text-xs font-medium text-zinc-500 uppercase">Totale schuld</p>
             <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalBalance)}</p>
             {totalDebtFreedom && (
-              <p className="mt-0.5 text-xs text-amber-600/80" data-testid="debt-freedom-time">
+              <p className="mt-0.5 text-xs text-kern-600/80" data-testid="debt-freedom-time">
                 je koopt deze tijd terug in {formatFreedomTimeString(totalDebtFreedom, 'long')}
               </p>
             )}
@@ -287,7 +287,7 @@ export default function DebtsPage() {
             <p className="text-xs font-medium text-zinc-500 uppercase">Maandelijkse aflossing</p>
             <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalMonthlyPayments)}</p>
             {monthlyPaymentFreedomDays > 0 && (
-              <p className="mt-0.5 text-xs text-amber-600/80" data-testid="payment-freedom-days">
+              <p className="mt-0.5 text-xs text-kern-600/80" data-testid="payment-freedom-days">
                 je wint {monthlyPaymentFreedomDays} {monthlyPaymentFreedomDays === 1 ? 'dag' : 'dagen'} per maand terug
               </p>
             )}
@@ -325,7 +325,7 @@ export default function DebtsPage() {
               onClick={() => setStrategy(s)}
               className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
                 strategy === s
-                  ? 'border-amber-300 bg-amber-50 text-amber-700'
+                  ? 'border-kern-300 bg-kern-50 text-kern-700'
                   : 'border-zinc-200 text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'
               }`}
             >
@@ -358,7 +358,7 @@ export default function DebtsPage() {
                 : 'Niet mogelijk'}
             </p>
             {summary.payoffDate && (
-              <p className="mt-0.5 text-[10px] text-amber-600/80" data-testid="strategy-payoff-freedom">
+              <p className="mt-0.5 text-[10px] text-kern-600/80" data-testid="strategy-payoff-freedom">
                 Schuldenvrij in {new Date(summary.payoffDate).getFullYear()} — dan verdien je 100% voor jezelf
               </p>
             )}
@@ -429,12 +429,12 @@ export default function DebtsPage() {
           return (
             <div
               key={debt.id}
-              className="flex cursor-pointer items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 transition-colors hover:border-amber-200 hover:bg-amber-50/30"
+              className="flex cursor-pointer items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 transition-colors hover:border-kern-200 hover:bg-kern-50/30"
               onClick={() => openDebtModal(debt)}
               data-testid={`debt-card-${debt.id}`}
             >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-50">
-                <BudgetIcon name={icon} className="h-4 w-4 text-amber-600" />
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-kern-50">
+                <BudgetIcon name={icon} className="h-4 w-4 text-kern-600" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
@@ -457,7 +457,7 @@ export default function DebtsPage() {
                     <p className="text-sm font-semibold text-zinc-900">{formatCurrency(balance)}</p>
                     <p className="text-xs text-zinc-400">van {formatCurrency(original)}</p>
                     {dailyExpenses > 0 && balance >= 100 && (
-                      <p className="text-[10px] text-amber-600/70">
+                      <p className="text-[10px] text-kern-600/70">
                         {formatFreedomTimeString(calculateFreedomTime(balance, dailyExpenses), 'short')} terug te winnen
                       </p>
                     )}
@@ -465,7 +465,7 @@ export default function DebtsPage() {
                 </div>
                 <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
                   <div
-                    className="h-full rounded-full bg-amber-500 transition-all"
+                    className="h-full rounded-full bg-kern-500 transition-all"
                     style={{ width: `${Math.min(pct, 100)}%` }}
                   />
                 </div>
@@ -594,8 +594,8 @@ function DebtDetailModal({
       >
         {/* Header */}
         <div className="flex items-center gap-3 border-b border-zinc-200 px-6 py-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-50">
-            <BudgetIcon name={icon} className="h-5 w-5 text-amber-600" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-kern-50">
+            <BudgetIcon name={icon} className="h-5 w-5 text-kern-600" />
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="font-semibold text-zinc-900">{debt.name}</h2>
@@ -616,13 +616,13 @@ function DebtDetailModal({
         <div className="border-b border-zinc-100 px-6 py-4 text-center">
           <p className="text-3xl font-bold text-zinc-900" data-testid="modal-debt-balance">{formatCurrency(balance)}</p>
           {dailyExpenses > 0 && balance >= 100 && (
-            <p className="mt-0.5 text-sm text-amber-600" data-testid="modal-debt-freedom-time">
+            <p className="mt-0.5 text-sm text-kern-600" data-testid="modal-debt-freedom-time">
               je koopt deze tijd terug in {formatFreedomTimeString(calculateFreedomTime(balance, dailyExpenses), 'long')}
             </p>
           )}
           <p className="mt-1 text-sm text-zinc-500">van {formatCurrency(original)} ({pct.toFixed(1)}% afgelost)</p>
           <div className="mx-auto mt-2 h-2 w-48 overflow-hidden rounded-full bg-zinc-100">
-            <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
+            <div className="h-full rounded-full bg-kern-500 transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
           </div>
           {/* Badges */}
           <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
@@ -644,12 +644,12 @@ function DebtDetailModal({
         <div className="space-y-4 px-6 py-4">
           {/* Payoff timeline highlight */}
           {debt.repayment_type !== 'aflossingsvrij' && proj.isPayable && proj.monthsToPayoff > 0 && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-center" data-testid="payoff-timeline">
-              <p className="text-xs font-medium text-amber-700/60 uppercase">Aflostijd</p>
-              <p className="mt-1 text-2xl font-bold text-amber-700" data-testid="months-to-payoff">
+            <div className="rounded-xl border border-kern-200 bg-kern-50 p-3 text-center" data-testid="payoff-timeline">
+              <p className="text-xs font-medium text-kern-700/60 uppercase">Aflostijd</p>
+              <p className="mt-1 text-2xl font-bold text-kern-700" data-testid="months-to-payoff">
                 {proj.monthsToPayoff} maanden
               </p>
-              <p className="mt-0.5 text-xs text-amber-600" data-testid="payoff-freedom-message">
+              <p className="mt-0.5 text-xs text-kern-600" data-testid="payoff-freedom-message">
                 {proj.payoffDate
                   ? `Schuldenvrij in ${new Date(proj.payoffDate).getFullYear()} — dan verdien je 100% voor jezelf`
                   : ''}
@@ -666,7 +666,7 @@ function DebtDetailModal({
               <p className="text-xs text-zinc-500">Maandelijkse betaling</p>
               <p className="mt-0.5 text-sm font-medium text-zinc-900">{formatCurrency(Number(debt.monthly_payment))}</p>
               {dailyExpenses > 0 && Number(debt.monthly_payment) > 0 && (
-                <p className="mt-0.5 text-[10px] text-amber-600/80" data-testid="modal-payment-freedom-days">
+                <p className="mt-0.5 text-[10px] text-kern-600/80" data-testid="modal-payment-freedom-days">
                   je wint {Math.round(Number(debt.monthly_payment) / dailyExpenses)} {Math.round(Number(debt.monthly_payment) / dailyExpenses) === 1 ? 'dag' : 'dagen'} per maand terug
                 </p>
               )}
@@ -705,8 +705,8 @@ function DebtDetailModal({
             return (
               <div className="grid grid-cols-2 gap-3">
                 {details.map((d) => (
-                  <div key={d.label} className="rounded-lg bg-amber-50/50 p-3">
-                    <p className="text-xs text-amber-700/60">{d.label}</p>
+                  <div key={d.label} className="rounded-lg bg-kern-50/50 p-3">
+                    <p className="text-xs text-kern-700/60">{d.label}</p>
                     <p className="mt-0.5 text-sm font-medium text-zinc-900">{d.value}</p>
                   </div>
                 ))}
@@ -759,14 +759,14 @@ function DebtDetailModal({
         <div className="flex gap-2 border-t border-zinc-200 px-6 py-4">
           <button
             onClick={onRevalue}
-            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-amber-200 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-50"
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-kern-200 px-3 py-2 text-xs font-medium text-kern-700 hover:bg-kern-50"
           >
             <RefreshCw className="h-3.5 w-3.5" />
             Saldo bijwerken
           </button>
           <button
             onClick={onEdit}
-            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-700"
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-kern-600 px-3 py-2 text-xs font-medium text-white hover:bg-kern-700"
           >
             <Edit3 className="h-3.5 w-3.5" />
             Bewerken
@@ -1202,7 +1202,7 @@ function StrategyComparisonMessage({
     >
       <p className={`text-sm font-medium ${textClass}`} data-testid="strategy-comparison-text">
         {message}
-        {freedomNote && <span className="font-normal text-amber-600">{freedomNote}</span>}
+        {freedomNote && <span className="font-normal text-kern-600">{freedomNote}</span>}
       </p>
       {!sameTime && (
         <div className="mt-2 flex items-center justify-center gap-6 text-xs text-zinc-500">
@@ -1534,8 +1534,8 @@ function DebtForm({
 
           {/* Type-specific fields */}
           {visibleFields.length > 0 && visibleFields.some((f) => f !== 'subtype') && (
-            <div className="space-y-3 rounded-lg border border-amber-100 bg-amber-50/30 p-3">
-              <p className="text-xs font-semibold text-amber-700/60 uppercase">Details</p>
+            <div className="space-y-3 rounded-lg border border-kern-100 bg-kern-50/30 p-3">
+              <p className="text-xs font-semibold text-kern-700/60 uppercase">Details</p>
               <div className="grid grid-cols-2 gap-3">
                 {visibleFields.includes('repayment_type') && (
                   <div>
@@ -1653,7 +1653,7 @@ function DebtForm({
           <button
             onClick={handleSave}
             disabled={saving || !name || !currentBalance}
-            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+            className="rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
           >
             {saving ? 'Opslaan...' : isEdit ? 'Bijwerken' : 'Toevoegen'}
           </button>
@@ -1798,7 +1798,7 @@ function ValuationModal({
           <button
             onClick={handleSave}
             disabled={saving || !value}
-            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+            className="rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
           >
             {saving ? 'Opslaan...' : 'Opslaan'}
           </button>

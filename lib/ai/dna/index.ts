@@ -16,9 +16,11 @@ const DOMAIN_PROMPTS: Record<AIDomain, string> = {
   horizon: HORIZON_PROMPT,
 }
 
+/**
+ * Build the system prompt for a domain.
+ * If an override exists in app_settings, it replaces the FULL prompt (base + domain).
+ */
 export async function buildSystemPrompt(domain: AIDomain, supabase?: SupabaseClient): Promise<string> {
-  let basePrompt = BASE_SYSTEM_PROMPT
-
   if (supabase) {
     const { data } = await supabase
       .from('app_settings')
@@ -27,9 +29,17 @@ export async function buildSystemPrompt(domain: AIDomain, supabase?: SupabaseCli
       .single()
 
     if (data?.value) {
-      basePrompt = data.value
+      return data.value // Override = volledig prompt
     }
   }
 
-  return basePrompt + '\n' + DOMAIN_PROMPTS[domain]
+  return BASE_SYSTEM_PROMPT + '\n' + DOMAIN_PROMPTS[domain]
+}
+
+/**
+ * Get the default full prompt for a domain (base + domain-specific).
+ * Used by the admin UI to show what the default looks like.
+ */
+export function getDefaultFullPrompt(domain: AIDomain): string {
+  return BASE_SYSTEM_PROMPT + '\n' + DOMAIN_PROMPTS[domain]
 }

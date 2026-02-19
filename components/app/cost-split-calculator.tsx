@@ -150,10 +150,10 @@ const MODE_ICONS: Record<SplitMode, typeof Scale> = {
 }
 
 const MODE_COLORS: Record<SplitMode, { bg: string; text: string; border: string; accent: string }> = {
-  equal: { bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200', accent: 'bg-teal-500' },
+  equal: { bg: 'bg-wil-50', text: 'text-wil-700', border: 'border-wil-200', accent: 'bg-wil-500' },
   income_ratio: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', accent: 'bg-blue-500' },
-  custom: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', accent: 'bg-amber-500' },
-  one_carries_all: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', accent: 'bg-purple-500' },
+  custom: { bg: 'bg-kern-50', text: 'text-kern-700', border: 'border-kern-200', accent: 'bg-kern-500' },
+  one_carries_all: { bg: 'bg-horizon-50', text: 'text-horizon-700', border: 'border-horizon-200', accent: 'bg-horizon-500' },
 }
 
 // ─── Per-Partner Contribution Bar ─────────────────────────────
@@ -175,7 +175,7 @@ function ContributionBar({
         {partner.isCurrentUser ? (
           <User className="h-3.5 w-3.5 text-zinc-600" />
         ) : (
-          <Users className="h-3.5 w-3.5 text-teal-600" />
+          <Users className="h-3.5 w-3.5 text-wil-600" />
         )}
         <span className="text-xs font-medium text-zinc-700 truncate">
           {partner.isCurrentUser ? 'Jij' : partner.name || 'Partner'}
@@ -290,7 +290,7 @@ export function PartnerContributionSummary({
     <div className="rounded-xl border border-zinc-200 bg-white p-4" data-testid="partner-contribution-summary">
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-sm font-semibold text-zinc-800 flex items-center gap-1.5">
-          <Users className="h-4 w-4 text-teal-600" />
+          <Users className="h-4 w-4 text-wil-600" />
           Kostenverdeling
         </h4>
         <span className={`text-[10px] font-medium rounded-full px-2 py-0.5 ${colors.bg} ${colors.text}`}>
@@ -320,8 +320,8 @@ export function PartnerContributionSummary({
                   <User className="h-3 w-3 text-zinc-600" />
                 </div>
               ) : (
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-100">
-                  <Users className="h-3 w-3 text-teal-600" />
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-wil-100">
+                  <Users className="h-3 w-3 text-wil-600" />
                 </div>
               )}
               <div>
@@ -391,7 +391,7 @@ export function SharedBudgetSplitList({
     <div className="rounded-xl border border-zinc-200 bg-white" data-testid="shared-budget-split-list">
       <div className="flex items-center justify-between p-4 pb-2">
         <h4 className="text-sm font-semibold text-zinc-800 flex items-center gap-1.5">
-          <Wallet className="h-4 w-4 text-amber-500" />
+          <Wallet className="h-4 w-4 text-kern-500" />
           Gedeelde budgetten
         </h4>
         <span className={`text-[10px] font-medium rounded-full px-2 py-0.5 ${colors.bg} ${colors.text}`}>
@@ -667,7 +667,7 @@ export function CostSplitCalculator({
             <button
               type="button"
               onClick={() => setShowAllModes(!showAllModes)}
-              className="flex items-center gap-1 text-[10px] font-medium text-teal-600 hover:text-teal-700"
+              className="flex items-center gap-1 text-[10px] font-medium text-wil-600 hover:text-wil-700"
               data-testid="toggle-all-modes"
             >
               {showAllModes ? 'Minder' : 'Vergelijk alle modi'}
@@ -708,8 +708,8 @@ export function CostSplitCalculator({
 
           {/* Custom percentage slider */}
           {activeMode === 'custom' && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4" data-testid="custom-pct-editor">
-              <label className="block text-xs font-medium text-amber-700 mb-2">
+            <div className="rounded-xl border border-kern-200 bg-kern-50 p-4" data-testid="custom-pct-editor">
+              <label className="block text-xs font-medium text-kern-700 mb-2">
                 Jouw aandeel: {localCustomPct}%
               </label>
               <input
@@ -718,18 +718,18 @@ export function CostSplitCalculator({
                 max="100"
                 value={localCustomPct}
                 onChange={(e) => handleCustomPctChange(Number(e.target.value))}
-                className="w-full h-2 bg-amber-200 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                className="w-full h-2 bg-kern-200 rounded-lg appearance-none cursor-pointer accent-kern-500"
                 data-testid="custom-pct-slider"
               />
-              <div className="flex justify-between mt-1 text-[10px] text-amber-600">
+              <div className="flex justify-between mt-1 text-[10px] text-kern-600">
                 <span>0% (partner betaalt alles)</span>
                 <span>100% (jij betaalt alles)</span>
               </div>
               <div className="flex justify-between mt-2 text-xs">
-                <span className="font-medium text-amber-700">
+                <span className="font-medium text-kern-700">
                   Jij: {formatCurrency(totalAmount * (localCustomPct / 100))}
                 </span>
-                <span className="font-medium text-amber-700">
+                <span className="font-medium text-kern-700">
                   Partner: {formatCurrency(totalAmount * ((100 - localCustomPct) / 100))}
                 </span>
               </div>

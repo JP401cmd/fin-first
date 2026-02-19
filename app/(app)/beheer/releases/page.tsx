@@ -5,9 +5,9 @@ import { RELEASE_NOTES, type ReleaseNote, type ReleaseSection } from '@/lib/rele
 import { ChevronDown, ChevronUp, Tag } from 'lucide-react'
 
 const MODULE_COLORS: Record<string, { badge: string; dot: string }> = {
-  amber: { badge: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' },
-  teal: { badge: 'bg-teal-50 text-teal-700 border-teal-200', dot: 'bg-teal-500' },
-  purple: { badge: 'bg-purple-50 text-purple-700 border-purple-200', dot: 'bg-purple-500' },
+  amber: { badge: 'bg-kern-50 text-kern-700 border-kern-200', dot: 'bg-kern-500' },
+  teal: { badge: 'bg-wil-50 text-wil-700 border-wil-200', dot: 'bg-wil-500' },
+  purple: { badge: 'bg-horizon-50 text-horizon-700 border-horizon-200', dot: 'bg-horizon-500' },
   blue: { badge: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-500' },
   zinc: { badge: 'bg-zinc-100 text-zinc-700 border-zinc-200', dot: 'bg-zinc-500' },
   rose: { badge: 'bg-rose-50 text-rose-700 border-rose-200', dot: 'bg-rose-500' },

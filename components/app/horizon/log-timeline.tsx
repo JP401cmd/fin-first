@@ -110,7 +110,7 @@ export function LogTimeline({
 
       {/* Current position marker */}
       <circle cx={x(currentAge)} cy={Y_LINE} r="6" fill="#8B5CB8" />
-      <text x={x(currentAge)} y={Y_LINE + 20} textAnchor="middle" style={{ fontSize: 9, fontWeight: 600 }} className="fill-purple-600">
+      <text x={x(currentAge)} y={Y_LINE + 20} textAnchor="middle" style={{ fontSize: 9, fontWeight: 600 }} className="fill-horizon-600">
         {currentAge}j
       </text>
 
@@ -164,10 +164,10 @@ export function LogTimeline({
           <g key={ev.id}>
             <line x1={px} y1={Y_EVENT + 8} x2={px} y2={Y_LINE - 6} stroke="#8B5CB8" strokeWidth="1.5" strokeDasharray="3" />
             <circle cx={px} cy={Y_EVENT - 2} r="8" fill="#8B5CB8" opacity="0.15" stroke="#8B5CB8" strokeWidth="1" />
-            <text x={px} y={Y_EVENT + 2} textAnchor="middle" style={{ fontSize: 7, fontWeight: 500 }} className="fill-purple-700">
+            <text x={px} y={Y_EVENT + 2} textAnchor="middle" style={{ fontSize: 7, fontWeight: 500 }} className="fill-horizon-700">
               {ev.name.substring(0, 4)}
             </text>
-            <text x={px} y={Y_EVENT - 10} textAnchor="middle" style={{ fontSize: 8 }} className="fill-purple-500">
+            <text x={px} y={Y_EVENT - 10} textAnchor="middle" style={{ fontSize: 8 }} className="fill-horizon-500">
               {ev.target_age}j
             </text>
             {impact && impact.fireDelayMonths > 0 && (

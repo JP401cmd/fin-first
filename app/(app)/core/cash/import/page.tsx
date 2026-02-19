@@ -580,7 +580,7 @@ export default function ImportPage() {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
         <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
         </div>
       </div>
     )
@@ -641,7 +641,7 @@ export default function ImportPage() {
             <div key={i} className="flex items-center gap-2">
               {i > 0 && <ChevronRight className="h-4 w-4 text-zinc-300" />}
               <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
-                isActive ? 'bg-amber-100 text-amber-700' :
+                isActive ? 'bg-kern-100 text-kern-700' :
                 isDone ? 'bg-emerald-100 text-emerald-700' :
                 'bg-zinc-100 text-zinc-400'
               }`}>
@@ -714,7 +714,7 @@ export default function ImportPage() {
               id="import-account"
               value={selectedAccountId}
               onChange={(e) => setSelectedAccountId(e.target.value)}
-              className="w-full max-w-sm rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+              className="w-full max-w-sm rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
             >
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>{a.name}{a.iban ? ` (${a.iban})` : ''}</option>
@@ -726,10 +726,10 @@ export default function ImportPage() {
           <div
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
-            className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-zinc-300 bg-zinc-50 p-12 hover:border-amber-400 hover:bg-amber-50/30"
+            className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-zinc-300 bg-zinc-50 p-12 hover:border-kern-400 hover:bg-kern-50/30"
           >
             {parsing ? (
-              <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
+              <Loader2 className="h-8 w-8 animate-spin text-kern-500" />
             ) : (
               <>
                 <FileText className="h-10 w-10 text-zinc-400" />
@@ -737,7 +737,7 @@ export default function ImportPage() {
                   Sleep een MT940-bestand hierheen
                 </p>
                 <p className="mt-1 text-xs text-zinc-500">of</p>
-                <label className="mt-3 cursor-pointer rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700">
+                <label className="mt-3 cursor-pointer rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700">
                   <Upload className="mr-2 inline h-4 w-4" />
                   Bestand kiezen
                   <input
@@ -757,11 +757,11 @@ export default function ImportPage() {
           {/* CSV Column Mapping */}
           {showColumnMapping && (
             <div className="space-y-4">
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                <p className="text-sm font-medium text-amber-800">
+              <div className="rounded-lg border border-kern-200 bg-kern-50 p-4">
+                <p className="text-sm font-medium text-kern-800">
                   CSV-bestand gedetecteerd: <strong>{fileName}</strong>
                 </p>
-                <p className="mt-1 text-xs text-amber-600">Kies een preset of wijs kolommen handmatig toe.</p>
+                <p className="mt-1 text-xs text-kern-600">Kies een preset of wijs kolommen handmatig toe.</p>
               </div>
 
               <div>
@@ -769,7 +769,7 @@ export default function ImportPage() {
                 <select
                   value={csvPreset.id}
                   onChange={(e) => updateCSVPreset(e.target.value)}
-                  className="w-full max-w-sm rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                  className="w-full max-w-sm rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 >
                   {CSV_PRESETS.map((p) => (
                     <option key={p.id} value={p.id}>{p.label}</option>
@@ -785,7 +785,7 @@ export default function ImportPage() {
                       <select
                         value={csvPreset.dateColumn}
                         onChange={(e) => setCsvPreset(prev => ({ ...prev, dateColumn: parseInt(e.target.value) }))}
-                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-amber-500"
+                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-kern-500"
                       >
                         {csvHeaders.map((h, i) => (
                           <option key={i} value={i}>{h || `Kolom ${i + 1}`}</option>
@@ -797,7 +797,7 @@ export default function ImportPage() {
                       <select
                         value={csvPreset.amountColumn}
                         onChange={(e) => setCsvPreset(prev => ({ ...prev, amountColumn: parseInt(e.target.value) }))}
-                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-amber-500"
+                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-kern-500"
                       >
                         {csvHeaders.map((h, i) => (
                           <option key={i} value={i}>{h || `Kolom ${i + 1}`}</option>
@@ -809,7 +809,7 @@ export default function ImportPage() {
                       <select
                         value={csvPreset.descriptionColumn}
                         onChange={(e) => setCsvPreset(prev => ({ ...prev, descriptionColumn: parseInt(e.target.value) }))}
-                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-amber-500"
+                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-kern-500"
                       >
                         {csvHeaders.map((h, i) => (
                           <option key={i} value={i}>{h || `Kolom ${i + 1}`}</option>
@@ -821,7 +821,7 @@ export default function ImportPage() {
                       <select
                         value={csvPreset.dateFormat}
                         onChange={(e) => setCsvPreset(prev => ({ ...prev, dateFormat: e.target.value }))}
-                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-amber-500"
+                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-kern-500"
                       >
                         <option value="YYYY-MM-DD">YYYY-MM-DD</option>
                         <option value="YYYYMMDD">YYYYMMDD</option>
@@ -839,7 +839,7 @@ export default function ImportPage() {
                           const v = parseInt(e.target.value)
                           setCsvPreset(prev => ({ ...prev, counterpartyColumn: v === -1 ? null : v }))
                         }}
-                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-amber-500"
+                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-kern-500"
                       >
                         <option value={-1}>-- Niet beschikbaar --</option>
                         {csvHeaders.map((h, i) => (
@@ -855,7 +855,7 @@ export default function ImportPage() {
                           const v = parseInt(e.target.value)
                           setCsvPreset(prev => ({ ...prev, ibanColumn: v === -1 ? null : v }))
                         }}
-                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-amber-500"
+                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-kern-500"
                       >
                         <option value={-1}>-- Niet beschikbaar --</option>
                         {csvHeaders.map((h, i) => (
@@ -871,7 +871,7 @@ export default function ImportPage() {
                           const v = parseInt(e.target.value)
                           setCsvPreset(prev => ({ ...prev, referenceColumn: v === -1 ? null : v }))
                         }}
-                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-amber-500"
+                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-kern-500"
                       >
                         <option value={-1}>-- Niet beschikbaar --</option>
                         {csvHeaders.map((h, i) => (
@@ -894,9 +894,9 @@ export default function ImportPage() {
                           {csvHeaders.map((h, i) => (
                             <th key={i} className="px-3 py-1.5 text-left font-medium text-zinc-500">
                               {h || `Kolom ${i + 1}`}
-                              {i === csvPreset.dateColumn && <span className="ml-1 text-amber-500">[D]</span>}
-                              {i === csvPreset.amountColumn && <span className="ml-1 text-amber-500">[B]</span>}
-                              {i === csvPreset.descriptionColumn && <span className="ml-1 text-amber-500">[O]</span>}
+                              {i === csvPreset.dateColumn && <span className="ml-1 text-kern-500">[D]</span>}
+                              {i === csvPreset.amountColumn && <span className="ml-1 text-kern-500">[B]</span>}
+                              {i === csvPreset.descriptionColumn && <span className="ml-1 text-kern-500">[O]</span>}
                               {i === csvPreset.counterpartyColumn && <span className="ml-1 text-teal-500">[T]</span>}
                               {i === csvPreset.ibanColumn && <span className="ml-1 text-teal-500">[I]</span>}
                               {i === csvPreset.referenceColumn && <span className="ml-1 text-teal-500">[R]</span>}
@@ -910,7 +910,7 @@ export default function ImportPage() {
                             {row.map((cell, ci) => (
                               <td key={ci} className={`max-w-[150px] truncate px-3 py-1.5 ${
                                 ci === csvPreset.dateColumn || ci === csvPreset.amountColumn || ci === csvPreset.descriptionColumn
-                                  ? 'bg-amber-50/50 font-medium text-zinc-900'
+                                  ? 'bg-kern-50/50 font-medium text-zinc-900'
                                   : ci === csvPreset.counterpartyColumn || ci === csvPreset.ibanColumn || ci === csvPreset.referenceColumn
                                     ? 'bg-teal-50/50 font-medium text-zinc-900'
                                     : 'text-zinc-600'
@@ -929,7 +929,7 @@ export default function ImportPage() {
               <button
                 onClick={handleCSVParse}
                 disabled={parsing}
-                className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
               >
                 {parsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ChevronRight className="h-4 w-4" />}
                 Transacties importeren
@@ -948,7 +948,7 @@ export default function ImportPage() {
             </p>
             <button
               onClick={checkDuplicates}
-              className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+              className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
             >
               Volgende: dubbelingen checken
               <ChevronRight className="h-4 w-4" />
@@ -987,7 +987,7 @@ export default function ImportPage() {
                       <select
                         value={row.budget_id ?? ''}
                         onChange={(e) => updateRowBudget(idx, e.target.value)}
-                        className="w-full max-w-[200px] rounded border border-zinc-200 px-2 py-1 text-xs outline-none focus:border-amber-500"
+                        className="w-full max-w-[200px] rounded border border-zinc-200 px-2 py-1 text-xs outline-none focus:border-kern-500"
                       >
                         <option value="">Niet gecategoriseerd</option>
                         {budgetGroups
@@ -1029,7 +1029,7 @@ export default function ImportPage() {
             <button
               onClick={() => handleImport()}
               disabled={importing || toImportCount === 0}
-              className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
             >
               {importing ? (
                 <>
@@ -1046,14 +1046,14 @@ export default function ImportPage() {
           </div>
 
           {importing && importProgress.total > 0 && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-              <div className="flex justify-between text-xs text-amber-700 mb-1">
+            <div className="rounded-lg border border-kern-200 bg-kern-50 p-4">
+              <div className="flex justify-between text-xs text-kern-700 mb-1">
                 <span>Importeren: {importProgress.current} van {importProgress.total} transacties...</span>
                 <span>{Math.round((importProgress.current / importProgress.total) * 100)}%</span>
               </div>
-              <div className="h-2 rounded-full bg-amber-200">
+              <div className="h-2 rounded-full bg-kern-200">
                 <div
-                  className="h-2 rounded-full bg-amber-500 transition-all"
+                  className="h-2 rounded-full bg-kern-500 transition-all"
                   style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
                 />
               </div>
@@ -1086,7 +1086,7 @@ export default function ImportPage() {
                         type="checkbox"
                         checked={!row.skipImport}
                         onChange={() => toggleSkip(idx)}
-                        className="h-4 w-4 rounded border-zinc-300 text-amber-600 focus:ring-amber-500"
+                        className="h-4 w-4 rounded border-zinc-300 text-kern-600 focus:ring-kern-500"
                       />
                     </td>
                     <td className="whitespace-nowrap px-4 py-2 text-zinc-700">
@@ -1139,7 +1139,7 @@ export default function ImportPage() {
           <div className="mt-6">
             <Link
               href="/core/cash"
-              className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-6 py-2 text-sm font-medium text-white hover:bg-amber-700"
+              className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-6 py-2 text-sm font-medium text-white hover:bg-kern-700"
             >
               Naar Cash overzicht
             </Link>

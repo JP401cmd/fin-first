@@ -92,7 +92,7 @@ export function NetWorthProjectionChart({
       <div
         className={`mb-4 flex items-start gap-2.5 rounded-xl border p-3.5 ${
           isGrowing
-            ? 'border-amber-200 bg-amber-50/60'
+            ? 'border-kern-200 bg-kern-50/60'
             : current === projection.year5
               ? 'border-zinc-200 bg-zinc-50/60'
               : 'border-red-200 bg-red-50/60'
@@ -100,14 +100,14 @@ export function NetWorthProjectionChart({
         data-testid="projection-context-message"
       >
         {isGrowing ? (
-          <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" />
         ) : projection.year5 < current ? (
           <TrendingDown className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
         ) : (
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" />
         )}
         <p className={`text-sm font-medium ${
-          isGrowing ? 'text-amber-800' : projection.year5 < current ? 'text-red-800' : 'text-zinc-700'
+          isGrowing ? 'text-kern-800' : projection.year5 < current ? 'text-red-800' : 'text-zinc-700'
         }`}>
           {message}
         </p>
@@ -171,7 +171,7 @@ export function NetWorthProjectionChart({
             <text
               x={W - PAD_RIGHT + 2}
               y={fireY! + 3}
-              className="fill-purple-500"
+              className="fill-horizon-500"
               style={{ fontSize: 8, fontWeight: 600 }}
             >
               FIRE
@@ -345,9 +345,9 @@ export function NetWorthProjectionChart({
           delta={projection.year5 - current}
         />
         {fireReachedMonth !== null && (
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-1 text-xs">
-            <Target className="h-3 w-3 text-purple-500" />
-            <span className="font-medium text-purple-700">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-horizon-200 bg-horizon-50 px-2.5 py-1 text-xs">
+            <Target className="h-3 w-3 text-horizon-500" />
+            <span className="font-medium text-horizon-700">
               FIRE in {Math.floor(fireReachedMonth / 12)}j{fireReachedMonth % 12 > 0 ? ` ${fireReachedMonth % 12}m` : ''}
             </span>
           </div>

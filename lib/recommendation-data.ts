@@ -121,35 +121,35 @@ export function getRecommendationTypeColor(type: RecommendationType): {
 } {
   switch (type) {
     case 'budget_optimization':
-      return { bg: 'bg-teal-500', bgLight: 'bg-teal-50', text: 'text-teal-600', border: 'border-teal-200' }
+      return { bg: 'bg-wil-500', bgLight: 'bg-wil-50', text: 'text-wil-600', border: 'border-wil-200' }
     case 'asset_reallocation':
-      return { bg: 'bg-amber-500', bgLight: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' }
+      return { bg: 'bg-kern-500', bgLight: 'bg-kern-50', text: 'text-kern-600', border: 'border-kern-200' }
     case 'debt_acceleration':
       return { bg: 'bg-red-500', bgLight: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' }
     case 'income_increase':
       return { bg: 'bg-emerald-500', bgLight: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' }
     case 'savings_boost':
-      return { bg: 'bg-purple-500', bgLight: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' }
+      return { bg: 'bg-horizon-500', bgLight: 'bg-horizon-50', text: 'text-horizon-600', border: 'border-horizon-200' }
     default:
-      return { bg: 'bg-teal-500', bgLight: 'bg-teal-50', text: 'text-teal-600', border: 'border-teal-200' }
+      return { bg: 'bg-wil-500', bgLight: 'bg-wil-50', text: 'text-wil-600', border: 'border-wil-200' }
   }
 }
 
 export function getActionStatusColor(status: ActionStatus): string {
   switch (status) {
-    case 'open': return 'border-l-teal-500'
-    case 'postponed': return 'border-l-amber-500'
+    case 'open': return 'border-l-wil-500'
+    case 'postponed': return 'border-l-amber-500'  // amber = warning context, not module
     case 'completed': return 'border-l-emerald-500'
     case 'rejected': return 'border-l-red-300'
-    default: return 'border-l-teal-500'
+    default: return 'border-l-wil-500'
   }
 }
 
 export function getSourceBadgeClasses(source: ActionSource): string {
   switch (source) {
-    case 'ai': return 'bg-teal-100 text-teal-700'
+    case 'ai': return 'bg-wil-100 text-wil-700'
     case 'manual': return 'bg-zinc-100 text-zinc-700'
-    case 'chat': return 'bg-teal-50 text-teal-600 ring-1 ring-teal-200'
+    case 'chat': return 'bg-wil-50 text-wil-600 ring-1 ring-wil-200'
     default: return 'bg-zinc-100 text-zinc-700'
   }
 }

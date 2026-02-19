@@ -330,12 +330,12 @@ function PaceMessageBanner({
 
   const bgClass = status === 'ahead' ? 'bg-emerald-50 border-emerald-200'
     : status === 'behind' ? 'bg-red-50 border-red-200'
-    : status === 'on_track' ? 'bg-teal-50 border-teal-200'
+    : status === 'on_track' ? 'bg-wil-50 border-wil-200'
     : 'bg-zinc-50 border-zinc-200'
 
   const textClass = status === 'ahead' ? 'text-emerald-700'
     : status === 'behind' ? 'text-red-700'
-    : status === 'on_track' ? 'text-teal-700'
+    : status === 'on_track' ? 'text-wil-700'
     : 'text-zinc-600'
 
   const Icon = status === 'ahead' ? TrendingUp

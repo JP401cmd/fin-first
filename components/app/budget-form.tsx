@@ -442,9 +442,9 @@ export function BudgetForm({
 
       {/* Dirty indicator */}
       {isDirty && !showNavWarning && !showDraftNotice && (
-        <div className="mb-4 flex items-center gap-1.5 rounded-md bg-amber-50 px-3 py-1.5 border border-amber-200" data-testid="dirty-indicator">
-          <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-          <span className="text-xs font-medium text-amber-700">Onopgeslagen wijzigingen</span>
+        <div className="mb-4 flex items-center gap-1.5 rounded-md bg-kern-50 px-3 py-1.5 border border-kern-200" data-testid="dirty-indicator">
+          <div className="h-2 w-2 rounded-full bg-kern-500 animate-pulse" />
+          <span className="text-xs font-medium text-kern-700">Onopgeslagen wijzigingen</span>
         </div>
       )}
 
@@ -471,7 +471,7 @@ export function BudgetForm({
                 type="text"
                 value={categoryName}
                 onChange={(e) => setCategoryName(e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 placeholder="bijv. Abonnementen"
                 required
               />
@@ -491,7 +491,7 @@ export function BudgetForm({
               type="text"
               value={form.name}
               onChange={(e) => update('name', e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               placeholder={needsAutoParent ? 'bijv. Streaming' : 'bijv. Boodschappen'}
               required
               data-testid="budget-name-input"
@@ -519,7 +519,7 @@ export function BudgetForm({
                     onClick={() => update('icon', iconName)}
                     className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-colors ${
                       isSelected
-                        ? 'border-amber-500 bg-amber-50 text-amber-600'
+                        ? 'border-kern-500 bg-kern-50 text-kern-600'
                         : 'border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'
                     }`}
                     title={iconName}
@@ -540,7 +540,7 @@ export function BudgetForm({
               id="description"
               value={form.description}
               onChange={(e) => update('description', e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               rows={2}
               placeholder="Optionele beschrijving..."
             />
@@ -575,7 +575,7 @@ export function BudgetForm({
               id="budget_type"
               value={form.budget_type}
               onChange={(e) => update('budget_type', e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               data-testid="budget-type-select"
             >
               <option value="expense">Uitgave</option>
@@ -597,7 +597,7 @@ export function BudgetForm({
               step="0.01"
               value={form.default_limit}
               onChange={(e) => update('default_limit', e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               placeholder="0"
               data-testid="budget-limit-input"
             />
@@ -612,7 +612,7 @@ export function BudgetForm({
               id="interval"
               value={form.interval}
               onChange={(e) => update('interval', e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               data-testid="budget-interval-select"
             >
               <option value="monthly">Maandelijks</option>
@@ -630,7 +630,7 @@ export function BudgetForm({
               id="rollover_type"
               value={form.rollover_type}
               onChange={(e) => update('rollover_type', e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               data-testid="budget-rollover-select"
             >
               <option value="reset">Reset</option>
@@ -657,7 +657,7 @@ export function BudgetForm({
                 id="limit_type"
                 value={form.limit_type}
                 onChange={(e) => update('limit_type', e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 data-testid="budget-limit-type-select"
               >
                 <option value="soft">Zacht (waarschuwing)</option>
@@ -677,7 +677,7 @@ export function BudgetForm({
                 step="0.01"
                 value={form.max_single_transaction_amount}
                 onChange={(e) => update('max_single_transaction_amount', e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 placeholder="0 = geen limiet"
                 data-testid="budget-max-transaction-input"
               />
@@ -696,7 +696,7 @@ export function BudgetForm({
               max="100"
               value={form.alert_threshold}
               onChange={(e) => update('alert_threshold', parseInt(e.target.value))}
-              className="w-full accent-amber-500"
+              className="w-full accent-kern-500"
               data-testid="budget-alert-threshold"
             />
             <div className="mt-1 flex justify-between text-xs text-zinc-400">
@@ -724,7 +724,7 @@ export function BudgetForm({
               type="button"
               onClick={() => update('is_essential', !form.is_essential)}
               className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                form.is_essential ? 'bg-amber-500' : 'bg-zinc-300'
+                form.is_essential ? 'bg-kern-500' : 'bg-zinc-300'
               }`}
             >
               <span
@@ -748,7 +748,7 @@ export function BudgetForm({
                   onClick={() => update('priority_score', score)}
                   className={`flex h-10 w-10 items-center justify-center rounded-lg border text-sm font-medium transition-colors ${
                     form.priority_score === score
-                      ? 'border-amber-500 bg-amber-50 text-amber-700'
+                      ? 'border-kern-500 bg-kern-50 text-kern-700'
                       : 'border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300'
                   }`}
                 >
@@ -771,7 +771,7 @@ export function BudgetForm({
               type="button"
               onClick={() => update('is_inflation_indexed', !form.is_inflation_indexed)}
               className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                form.is_inflation_indexed ? 'bg-amber-500' : 'bg-zinc-300'
+                form.is_inflation_indexed ? 'bg-kern-500' : 'bg-zinc-300'
               }`}
             >
               <span
@@ -797,7 +797,7 @@ export function BudgetForm({
             id="parent_id"
             value={form.parent_id}
             onChange={(e) => update('parent_id', e.target.value)}
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
             data-testid="budget-parent-select"
           >
             <option value="">Nieuwe categorie aanmaken</option>
@@ -829,7 +829,7 @@ export function BudgetForm({
         <button
           type="submit"
           disabled={saving}
-          className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-5 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-5 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
           data-testid="budget-submit-btn"
         >
           <Save className="h-4 w-4" />

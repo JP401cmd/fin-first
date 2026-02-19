@@ -20,7 +20,7 @@ export default function AppNotFound() {
           </Link>
           <Link
             href="/core"
-            className="inline-flex items-center justify-center rounded-lg border border-amber-300 bg-white px-6 py-2.5 text-sm font-medium text-amber-700 hover:bg-amber-50 transition-colors"
+            className="inline-flex items-center justify-center rounded-lg border border-kern-300 bg-white px-6 py-2.5 text-sm font-medium text-kern-700 hover:bg-kern-50 transition-colors"
           >
             Naar De Kern
           </Link>

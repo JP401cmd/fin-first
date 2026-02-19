@@ -9,7 +9,7 @@ import { DEBT_TYPE_LABELS } from '@/lib/debt-data'
 function Tooltip({ text }: { text: string }) {
   return (
     <div className="group relative inline-block">
-      <Info className="h-3.5 w-3.5 cursor-help text-zinc-300 transition-colors group-hover:text-amber-500" />
+      <Info className="h-3.5 w-3.5 cursor-help text-zinc-300 transition-colors group-hover:text-kern-500" />
       <div className="pointer-events-none absolute right-0 z-10 mt-1 w-52 rounded-lg border border-zinc-200 bg-white p-2.5 text-xs leading-relaxed text-zinc-600 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
         {text}
       </div>

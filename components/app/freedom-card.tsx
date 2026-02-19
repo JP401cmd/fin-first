@@ -328,8 +328,8 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
       id="freedom-card"
     >
       {/* Background decorations */}
-      <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-gradient-to-br from-amber-500/20 to-teal-500/20 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-gradient-to-br from-purple-500/20 to-teal-500/20 blur-3xl" />
+      <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-gradient-to-br from-kern-500/20 to-wil-500/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-gradient-to-br from-horizon-500/20 to-wil-500/20 blur-3xl" />
 
       {/* Header */}
       <div className="relative mb-6 flex items-center justify-between">
@@ -342,9 +342,9 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
           )}
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="h-2 w-2 rounded-full bg-amber-400" />
-          <div className="h-2 w-2 rounded-full bg-teal-400" />
-          <div className="h-2 w-2 rounded-full bg-purple-400" />
+          <div className="h-2 w-2 rounded-full bg-kern-400" />
+          <div className="h-2 w-2 rounded-full bg-wil-400" />
+          <div className="h-2 w-2 rounded-full bg-horizon-400" />
           <span className="ml-1 text-xs font-bold tracking-wider text-zinc-400">
             TriFinity
           </span>
@@ -361,7 +361,7 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
         </div>
         <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-zinc-700/60">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-amber-400 via-teal-400 to-purple-500 transition-all duration-1000"
+            className="h-full rounded-full bg-gradient-to-r from-kern-400 via-wil-400 to-horizon-500 transition-all duration-1000"
             style={{ width: `${hasFreedomPct ? Math.min(freedomPctDisplay, 100) : 0}%` }}
           />
         </div>
@@ -382,10 +382,10 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
         {/* Days won this month */}
         <div className="rounded-xl bg-zinc-800/80 p-3">
           <div className="mb-1 flex items-center gap-1.5">
-            <Target className="h-3.5 w-3.5 text-teal-400" />
+            <Target className="h-3.5 w-3.5 text-wil-400" />
             <span className="text-[10px] font-medium text-zinc-400 uppercase">Dagen deze maand</span>
           </div>
-          <p className="text-xl font-bold text-teal-400">
+          <p className="text-xl font-bold text-wil-400">
             {daysWonDisplay > 0 ? `+${daysWonDisplay}` : '0'}
           </p>
         </div>
@@ -393,10 +393,10 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
         {/* FIRE countdown */}
         <div className="rounded-xl bg-zinc-800/80 p-3">
           <div className="mb-1 flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5 text-purple-400" />
+            <Clock className="h-3.5 w-3.5 text-horizon-400" />
             <span className="text-[10px] font-medium text-zinc-400 uppercase">FIRE countdown</span>
           </div>
-          <p className="text-xl font-bold text-purple-400">
+          <p className="text-xl font-bold text-horizon-400">
             {countdownText}
           </p>
         </div>
@@ -404,10 +404,10 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
         {/* Freedom time */}
         <div className="rounded-xl bg-zinc-800/80 p-3">
           <div className="mb-1 flex items-center gap-1.5">
-            <Shield className="h-3.5 w-3.5 text-amber-400" />
+            <Shield className="h-3.5 w-3.5 text-kern-400" />
             <span className="text-[10px] font-medium text-zinc-400 uppercase">Vrijheidstijd</span>
           </div>
-          <p className="text-xl font-bold text-amber-400">
+          <p className="text-xl font-bold text-kern-400">
             {freedomTimeText}
           </p>
         </div>
@@ -596,12 +596,12 @@ export function FreedomCardGenerator() {
               onClick={() => handlePrivacyChange(opt.value)}
               className={`rounded-xl border p-3 text-left transition-all ${
                 privacyLevel === opt.value
-                  ? 'border-teal-500 bg-teal-50 ring-1 ring-teal-500'
+                  ? 'border-wil-500 bg-wil-50 ring-1 ring-wil-500'
                   : 'border-zinc-200 bg-white hover:border-zinc-300'
               }`}
             >
               <p className={`text-sm font-medium ${
-                privacyLevel === opt.value ? 'text-teal-700' : 'text-zinc-700'
+                privacyLevel === opt.value ? 'text-wil-700' : 'text-zinc-700'
               }`}>
                 {opt.label}
               </p>
@@ -652,7 +652,7 @@ export function FreedomCardGenerator() {
       <button
         onClick={generateCard}
         disabled={loading}
-        className="w-full rounded-xl bg-gradient-to-r from-amber-500 via-teal-500 to-purple-500 px-6 py-3 font-semibold text-white shadow-lg transition-all hover:shadow-xl disabled:opacity-50"
+        className="w-full rounded-xl bg-gradient-to-r from-kern-500 via-wil-500 to-horizon-500 px-6 py-3 font-semibold text-white shadow-lg transition-all hover:shadow-xl disabled:opacity-50"
       >
         {loading ? 'Genereren...' : 'Genereer vrijheidskaart'}
       </button>
@@ -682,7 +682,7 @@ export function FreedomCardGenerator() {
             </button>
             <button
               onClick={handleOpenShareDialog}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal-500 to-purple-500 px-4 py-2.5 text-sm font-medium text-white transition-all hover:shadow-lg"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-wil-500 to-horizon-500 px-4 py-2.5 text-sm font-medium text-white transition-all hover:shadow-lg"
               data-testid="freedom-card-share"
             >
               <Share2 className="h-4 w-4" />

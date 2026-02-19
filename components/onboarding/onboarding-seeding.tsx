@@ -43,7 +43,7 @@ export function OnboardingSeeding({
           <div className="mx-auto mt-6 max-w-md">
             <div className="h-2.5 w-full overflow-hidden rounded-full bg-zinc-100">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-teal-400 to-teal-600 transition-all duration-300"
+                className="h-full rounded-full bg-gradient-to-r from-wil-400 to-wil-600 transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
             </div>

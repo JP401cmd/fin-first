@@ -309,7 +309,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {/* Toast container — fixed top-right */}
       {toasts.length > 0 && (
         <div
-          className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"
+          className="fixed top-4 z-[100] flex flex-col gap-2 pointer-events-none transition-[right] duration-300"
+          style={{ right: 'calc(1rem + var(--chat-sidebar-width, 0px))' }}
           aria-live="polite"
           aria-atomic="false"
           data-testid="toast-container"

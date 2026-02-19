@@ -25,7 +25,7 @@ export function PostponeForm({ mode, onSubmit, onCancel }: PostponeFormProps) {
   }
 
   return (
-    <div className="mt-3 space-y-3 rounded-lg border border-teal-100 bg-teal-50/50 p-3">
+    <div className="mt-3 space-y-3 rounded-lg border border-wil-100 bg-wil-50/50 p-3">
       {mode === 'recommendation' ? (
         <div>
           <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-zinc-600">
@@ -37,7 +37,7 @@ export function PostponeForm({ mode, onSubmit, onCancel }: PostponeFormProps) {
             value={date}
             onChange={(e) => setDate(e.target.value)}
             min={new Date().toISOString().split('T')[0]}
-            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-900 focus:border-teal-300 focus:outline-none focus:ring-1 focus:ring-teal-300"
+            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-900 focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300"
           />
         </div>
       ) : (
@@ -54,8 +54,8 @@ export function PostponeForm({ mode, onSubmit, onCancel }: PostponeFormProps) {
                 onClick={() => setWeeks(w)}
                 className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                   weeks === w
-                    ? 'bg-teal-500 text-white'
-                    : 'bg-white text-zinc-600 ring-1 ring-zinc-200 hover:bg-teal-50'
+                    ? 'bg-wil-500 text-white'
+                    : 'bg-white text-zinc-600 ring-1 ring-zinc-200 hover:bg-wil-50'
                 }`}
               >
                 {w} {w === 1 ? 'week' : 'weken'}
@@ -74,7 +74,7 @@ export function PostponeForm({ mode, onSubmit, onCancel }: PostponeFormProps) {
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           placeholder="Waarom stel je dit uit?"
-          className="w-full rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-teal-300 focus:outline-none focus:ring-1 focus:ring-teal-300"
+          className="w-full rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300"
         />
       </div>
 
@@ -82,7 +82,7 @@ export function PostponeForm({ mode, onSubmit, onCancel }: PostponeFormProps) {
         <button
           type="button"
           onClick={handleSubmit}
-          className="flex items-center gap-1.5 rounded-md bg-teal-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-teal-600"
+          className="flex items-center gap-1.5 rounded-md bg-wil-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-wil-600"
         >
           <Send className="h-3 w-3" />
           Bevestigen

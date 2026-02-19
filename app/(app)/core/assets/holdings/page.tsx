@@ -333,7 +333,7 @@ export default function HoldingsPage() {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
         <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
         </div>
       </div>
     )
@@ -342,11 +342,11 @@ export default function HoldingsPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* Header */}
-      <section className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-6">
+      <section className="rounded-2xl border border-kern-200 bg-gradient-to-br from-kern-50 to-white p-6">
         <div className="flex items-center gap-3 mb-4">
           <Link
             href="/core/assets"
-            className="inline-flex items-center gap-1 text-sm text-amber-600 hover:text-amber-700"
+            className="inline-flex items-center gap-1 text-sm text-kern-600 hover:text-kern-700"
           >
             <ArrowLeft className="h-4 w-4" />
             Assets
@@ -363,7 +363,7 @@ export default function HoldingsPage() {
             <button
               onClick={handleRefreshPrices}
               disabled={refreshing}
-              className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg border border-kern-200 bg-kern-50 px-3 py-2 text-sm font-medium text-kern-700 hover:bg-kern-100 disabled:opacity-50"
               title="Prijzen vernieuwen"
               data-testid="refresh-prices-btn"
             >
@@ -372,7 +372,7 @@ export default function HoldingsPage() {
             </button>
             <button
               onClick={() => setShowForm(true)}
-              className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+              className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
             >
               <Plus className="h-4 w-4" />
               Holding toevoegen
@@ -382,9 +382,9 @@ export default function HoldingsPage() {
 
         {/* Stale price warning banner */}
         {staleCount > 0 && (
-          <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3" data-testid="stale-price-warning">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
-            <p className="text-xs text-amber-700">
+          <div className="mt-4 flex items-center gap-2 rounded-lg border border-kern-200 bg-kern-50 p-3" data-testid="stale-price-warning">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-kern-500" />
+            <p className="text-xs text-kern-700">
               <span className="font-semibold">{staleCount} holding{staleCount !== 1 ? 's' : ''}</span> met verouderde prijzen.
               Gebruik &quot;Prijzen vernieuwen&quot; of werk de prijs handmatig bij via het bewerk-icoon.
             </p>
@@ -397,17 +397,17 @@ export default function HoldingsPage() {
             refreshResult.type === 'success'
               ? 'border-emerald-200 bg-emerald-50'
               : refreshResult.type === 'warning'
-                ? 'border-amber-200 bg-amber-50'
+                ? 'border-kern-200 bg-kern-50'
                 : 'border-red-200 bg-red-50'
           }`} data-testid="refresh-result">
             {refreshResult.type === 'success' && <CheckCircle className="h-4 w-4 shrink-0 text-emerald-500" />}
-            {refreshResult.type === 'warning' && <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />}
+            {refreshResult.type === 'warning' && <AlertTriangle className="h-4 w-4 shrink-0 text-kern-500" />}
             {refreshResult.type === 'error' && <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />}
             <p className={`text-xs ${
               refreshResult.type === 'success'
                 ? 'text-emerald-700'
                 : refreshResult.type === 'warning'
-                  ? 'text-amber-700'
+                  ? 'text-kern-700'
                   : 'text-red-700'
             }`}>
               {refreshResult.message}
@@ -451,7 +451,7 @@ export default function HoldingsPage() {
       {holdingsForAllocation.length > 0 && (
         <section className="mt-6 rounded-2xl border border-zinc-200 bg-white p-6" data-testid="portfolio-allocation">
           <div className="flex items-center gap-2 mb-4">
-            <PieChart className="h-4 w-4 text-amber-600" />
+            <PieChart className="h-4 w-4 text-kern-600" />
             <h2 className="text-sm font-semibold text-zinc-700">Portfolio verdeling</h2>
           </div>
           <PortfolioAllocationVisualization
@@ -504,7 +504,7 @@ export default function HoldingsPage() {
             </p>
             <button
               onClick={() => setShowForm(true)}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
             >
               <Plus className="h-4 w-4" />
               Eerste holding toevoegen
@@ -526,9 +526,9 @@ export default function HoldingsPage() {
           return (
             <div
               key={holding.id}
-              className={`flex items-center gap-3 rounded-xl border bg-white p-3 transition-colors hover:border-amber-200 hover:bg-amber-50/30 ${
+              className={`flex items-center gap-3 rounded-xl border bg-white p-3 transition-colors hover:border-kern-200 hover:bg-kern-50/30 ${
                 soldOut ? 'border-zinc-300 bg-zinc-50/50 opacity-75' :
-                stale ? 'border-amber-300 bg-amber-50/20' : 'border-zinc-200'
+                stale ? 'border-kern-300 bg-kern-50/20' : 'border-zinc-200'
               }`}
               data-testid={`holding-item-${holding.id}`}
               data-sold-out={soldOut ? 'true' : 'false'}
@@ -542,14 +542,14 @@ export default function HoldingsPage() {
               >
               <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
                 soldOut ? 'bg-zinc-100' :
-                stale ? 'bg-amber-100' : 'bg-amber-50'
+                stale ? 'bg-kern-100' : 'bg-kern-50'
               }`}>
                 {soldOut ? (
                   <CheckCircle className="h-4 w-4 text-zinc-400" />
                 ) : stale ? (
-                  <Clock className="h-4 w-4 text-amber-500" />
+                  <Clock className="h-4 w-4 text-kern-500" />
                 ) : (
-                  <TrendingUp className="h-4 w-4 text-amber-600" />
+                  <TrendingUp className="h-4 w-4 text-kern-600" />
                 )}
               </div>
               <div className="min-w-0 flex-1">
@@ -566,7 +566,7 @@ export default function HoldingsPage() {
                   )}
                   {stale && !soldOut && (
                     <span
-                      className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
+                      className="inline-flex items-center gap-1 rounded-full bg-kern-100 px-1.5 py-0.5 text-[10px] font-semibold text-kern-700"
                       title={`Laatste update: ${formatLastUpdate(holding.last_price_update)}`}
                       data-testid="stale-indicator"
                     >
@@ -576,25 +576,25 @@ export default function HoldingsPage() {
                   )}
                 </div>
                 <p className="truncate text-xs text-zinc-500">
-                  {holding.ticker && <span className={`font-medium ${soldOut ? 'text-zinc-400' : 'text-amber-600'}`}>{holding.ticker}</span>}
+                  {holding.ticker && <span className={`font-medium ${soldOut ? 'text-zinc-400' : 'text-kern-600'}`}>{holding.ticker}</span>}
                   {holding.ticker && ' · '}
                   {soldOut ? <span className="text-zinc-400">0 eenheden</span> : `${holding.units} eenheden`}
                   {holding.institution && ` · ${holding.institution}`}
                   {holding.purchase_date && ` · ${new Date(holding.purchase_date).toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' })}`}
                   {stale && holding.last_price_update && (
-                    <span className="ml-1 text-amber-500">
+                    <span className="ml-1 text-kern-500">
                       · Prijs van {formatLastUpdate(holding.last_price_update)}
                     </span>
                   )}
                   {stale && !holding.last_price_update && (
-                    <span className="ml-1 text-amber-500">· Prijs nooit bijgewerkt</span>
+                    <span className="ml-1 text-kern-500">· Prijs nooit bijgewerkt</span>
                   )}
                 </p>
               </div>
               <div className="shrink-0 text-right">
-                <p className={`text-sm font-semibold ${soldOut ? 'text-zinc-400' : stale ? 'text-amber-700' : 'text-zinc-900'}`} data-testid={`holding-value-${holding.id}`}>
+                <p className={`text-sm font-semibold ${soldOut ? 'text-zinc-400' : stale ? 'text-kern-700' : 'text-zinc-900'}`} data-testid={`holding-value-${holding.id}`}>
                   {formatCurrency(Math.max(0, value))}
-                  {stale && !soldOut && <span className="text-[10px] font-normal text-amber-500 block">laatste bekende prijs</span>}
+                  {stale && !soldOut && <span className="text-[10px] font-normal text-kern-500 block">laatste bekende prijs</span>}
                 </p>
                 {/* Daily change from price feed */}
                 {dailyPct !== null && !soldOut && !stale && (
@@ -617,7 +617,7 @@ export default function HoldingsPage() {
                 {stale && (
                   <button
                     onClick={() => setOverrideHolding(holding)}
-                    className="rounded-lg p-1.5 text-amber-500 hover:bg-amber-50 hover:text-amber-700"
+                    className="rounded-lg p-1.5 text-kern-500 hover:bg-kern-50 hover:text-kern-700"
                     title="Prijs handmatig bijwerken"
                     data-testid="manual-override-btn"
                   >
@@ -633,7 +633,7 @@ export default function HoldingsPage() {
                 </button>
                 <button
                   onClick={() => setEditHolding(holding)}
-                  className="rounded-lg p-1.5 text-zinc-400 hover:bg-amber-50 hover:text-amber-600"
+                  className="rounded-lg p-1.5 text-zinc-400 hover:bg-kern-50 hover:text-kern-600"
                   title="Bewerken"
                 >
                   <Edit3 className="h-4 w-4" />
@@ -796,16 +796,16 @@ function ManualPriceOverrideModal({
         </div>
 
         {/* Stale price notice */}
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
-          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-kern-200 bg-kern-50 p-3">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-kern-500 mt-0.5" />
           <div>
-            <p className="text-xs font-medium text-amber-700">Prijsfeed niet beschikbaar</p>
-            <p className="text-xs text-amber-600 mt-0.5">
+            <p className="text-xs font-medium text-kern-700">Prijsfeed niet beschikbaar</p>
+            <p className="text-xs text-kern-600 mt-0.5">
               De automatische prijsfeed is momenteel niet bereikbaar voor deze holding.
               Je kunt de huidige prijs handmatig invoeren.
             </p>
             {holding.last_price_update && (
-              <p className="text-xs text-amber-500 mt-1">
+              <p className="text-xs text-kern-500 mt-1">
                 Laatste automatische update: {new Date(holding.last_price_update).toLocaleDateString('nl-NL', {
                   day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
                 })}
@@ -838,9 +838,9 @@ function ManualPriceOverrideModal({
           </div>
 
           {/* Value preview */}
-          <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+          <div className="rounded-lg border border-kern-200 bg-kern-50/50 p-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-amber-700">
+              <span className="text-xs font-medium text-kern-700">
                 Nieuwe waarde ({holding.units} eenheden)
               </span>
               <span className="text-sm font-bold text-zinc-900">{formatCurrency(currentValue)}</span>
@@ -870,7 +870,7 @@ function ManualPriceOverrideModal({
           <button
             onClick={handleSave}
             disabled={saving || !price}
-            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+            className="rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
             data-testid="override-save-btn"
           >
             {saving ? 'Bijwerken...' : 'Prijs bijwerken'}
@@ -1089,16 +1089,16 @@ function HoldingForm({
         )}
 
         {duplicateWarning && (
-          <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3" data-testid="duplicate-warning">
+          <div className="mb-4 rounded-lg border border-kern-300 bg-kern-50 p-3" data-testid="duplicate-warning">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" />
               <div className="flex-1">
-                <p className="text-xs font-semibold text-amber-800">Dubbele ticker gedetecteerd</p>
-                <p className="mt-1 text-xs text-amber-700">{duplicateWarning.message}</p>
+                <p className="text-xs font-semibold text-kern-800">Dubbele ticker gedetecteerd</p>
+                <p className="mt-1 text-xs text-kern-700">{duplicateWarning.message}</p>
                 {duplicateWarning.existing.length > 0 && (
                   <ul className="mt-1.5 space-y-0.5">
                     {duplicateWarning.existing.map((h) => (
-                      <li key={h.id} className="text-xs text-amber-700">
+                      <li key={h.id} className="text-xs text-kern-700">
                         • {h.name} ({h.ticker})
                       </li>
                     ))}
@@ -1108,14 +1108,14 @@ function HoldingForm({
                   <button
                     onClick={() => handleSave(true)}
                     disabled={saving}
-                    className="rounded-md bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                    className="rounded-md bg-kern-600 px-3 py-1 text-xs font-medium text-white hover:bg-kern-700 disabled:opacity-50"
                     data-testid="force-duplicate-btn"
                   >
                     {saving ? 'Opslaan...' : 'Toch toevoegen'}
                   </button>
                   <button
                     onClick={() => setDuplicateWarning(null)}
-                    className="rounded-md border border-amber-300 px-3 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100"
+                    className="rounded-md border border-kern-300 px-3 py-1 text-xs font-medium text-kern-700 hover:bg-kern-100"
                     data-testid="cancel-duplicate-btn"
                   >
                     Annuleren
@@ -1239,7 +1239,7 @@ function HoldingForm({
           <button
             onClick={() => handleSave()}
             disabled={saving || submitted || !name}
-            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+            className="rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
             data-testid="holding-submit-btn"
           >
             {submitted ? 'Opgeslagen ✓' : saving ? 'Opslaan...' : 'Toevoegen'}
@@ -1515,9 +1515,9 @@ function HoldingEditForm({
 
         {/* Unsaved changes indicator */}
         {isDirty && !showCloseConfirm && !showDraftNotice && (
-          <div className="mb-3 flex items-center gap-1.5 rounded-md bg-amber-50 px-3 py-1.5 border border-amber-200" data-testid="dirty-indicator">
-            <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-            <span className="text-[11px] font-medium text-amber-700">Onopgeslagen wijzigingen</span>
+          <div className="mb-3 flex items-center gap-1.5 rounded-md bg-kern-50 px-3 py-1.5 border border-kern-200" data-testid="dirty-indicator">
+            <div className="h-2 w-2 rounded-full bg-kern-500 animate-pulse" />
+            <span className="text-[11px] font-medium text-kern-700">Onopgeslagen wijzigingen</span>
           </div>
         )}
 
@@ -1529,15 +1529,15 @@ function HoldingEditForm({
 
         {/* Concurrent edit conflict warning */}
         {conflictData && (
-          <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3" data-testid="conflict-warning">
+          <div className="mb-4 rounded-lg border border-kern-300 bg-kern-50 p-3" data-testid="conflict-warning">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" />
               <div className="flex-1">
-                <p className="text-xs font-semibold text-amber-800">Bewerkingsconflict</p>
-                <p className="mt-1 text-xs text-amber-700">{conflictData.message}</p>
+                <p className="text-xs font-semibold text-kern-800">Bewerkingsconflict</p>
+                <p className="mt-1 text-xs text-kern-700">{conflictData.message}</p>
                 {conflictData.server_state && (
-                  <div className="mt-2 rounded border border-amber-200 bg-white/60 p-2">
-                    <p className="text-[10px] font-medium text-amber-600 mb-1">Huidige waarden op de server:</p>
+                  <div className="mt-2 rounded border border-kern-200 bg-white/60 p-2">
+                    <p className="text-[10px] font-medium text-kern-600 mb-1">Huidige waarden op de server:</p>
                     <p className="text-xs text-zinc-600">
                       Naam: <span className="font-medium">{String(conflictData.server_state.name || '-')}</span>
                       {' · '}Eenheden: <span className="font-medium">{String(conflictData.server_state.units || '-')}</span>
@@ -1548,7 +1548,7 @@ function HoldingEditForm({
                 <div className="mt-2 flex gap-2">
                   <button
                     onClick={handleReloadFromServer}
-                    className="rounded-md bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700"
+                    className="rounded-md bg-kern-600 px-3 py-1 text-xs font-medium text-white hover:bg-kern-700"
                     data-testid="conflict-reload-btn"
                   >
                     Serverwaarden laden
@@ -1556,7 +1556,7 @@ function HoldingEditForm({
                   <button
                     onClick={() => handleSave(true)}
                     disabled={saving}
-                    className="rounded-md border border-amber-300 px-3 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                    className="rounded-md border border-kern-300 px-3 py-1 text-xs font-medium text-kern-700 hover:bg-kern-100 disabled:opacity-50"
                     data-testid="conflict-overwrite-btn"
                   >
                     {saving ? 'Overschrijven...' : 'Toch overschrijven'}
@@ -1621,9 +1621,9 @@ function HoldingEditForm({
           </div>
 
           {/* Live value preview */}
-          <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+          <div className="rounded-lg border border-kern-200 bg-kern-50/50 p-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-amber-700">Portfolio waarde (deze holding)</span>
+              <span className="text-xs font-medium text-kern-700">Portfolio waarde (deze holding)</span>
               <span className="text-sm font-bold text-zinc-900">{formatCurrency(newValue)}</span>
             </div>
             {newValue !== oldValue && (
@@ -1654,7 +1654,7 @@ function HoldingEditForm({
           <button
             onClick={() => handleSave()}
             disabled={saving || !name}
-            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+            className="rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
           >
             {saving ? 'Bijwerken...' : 'Bijwerken'}
           </button>
@@ -1776,7 +1776,7 @@ function HoldingTransactionForm({
   const typeConfig = {
     buy: { label: 'Koop', icon: ArrowDownRight, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', ring: 'ring-emerald-500' },
     sell: { label: 'Verkoop', icon: ArrowUpRight, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', ring: 'ring-red-500' },
-    dividend: { label: 'Dividend', icon: DollarSign, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', ring: 'ring-amber-500' },
+    dividend: { label: 'Dividend', icon: DollarSign, color: 'text-kern-600', bg: 'bg-kern-50', border: 'border-kern-200', ring: 'ring-kern-500' },
   }
 
   return (
@@ -1800,13 +1800,13 @@ function HoldingTransactionForm({
         <div className="flex border-b border-zinc-100 px-6">
           <button
             onClick={() => setTab('new')}
-            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'new' ? 'border-amber-500 text-amber-700' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}
+            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'new' ? 'border-kern-500 text-kern-700' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}
           >
             Nieuwe transactie
           </button>
           <button
             onClick={() => setTab('history')}
-            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'history' ? 'border-amber-500 text-amber-700' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}
+            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'history' ? 'border-kern-500 text-kern-700' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}
           >
             Geschiedenis {transactions.length > 0 && `(${transactions.length})`}
           </button>
@@ -1941,8 +1941,8 @@ function HoldingTransactionForm({
 
               {/* Preview: holding after transaction */}
               {Number(units) > 0 && txType !== 'dividend' && !sellExceedsOwned && !sellFromZero && (
-                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
-                  <p className="text-xs font-medium text-amber-700 mb-1">Na transactie:</p>
+                <div className="mt-4 rounded-lg border border-kern-200 bg-kern-50/50 p-3">
+                  <p className="text-xs font-medium text-kern-700 mb-1">Na transactie:</p>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-zinc-600">
                       {currentUnits} <span className="text-zinc-400">→</span> {previewUnits.toFixed(3)} eenheden
@@ -1971,7 +1971,7 @@ function HoldingTransactionForm({
                   className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${
                     txType === 'buy' ? 'bg-emerald-600 hover:bg-emerald-700' :
                     txType === 'sell' ? 'bg-red-600 hover:bg-red-700' :
-                    'bg-amber-600 hover:bg-amber-700'
+                    'bg-kern-600 hover:bg-kern-700'
                   }`}
                 >
                   {saving ? 'Opslaan...' : `${typeConfig[txType].label} registreren`}
@@ -1984,7 +1984,7 @@ function HoldingTransactionForm({
             <div className="max-h-80 overflow-y-auto">
               {loadingHistory && (
                 <div className="flex items-center justify-center py-8">
-                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
                 </div>
               )}
 
@@ -2003,17 +2003,17 @@ function HoldingTransactionForm({
                     const totalDividendIncome = dividendTxs.reduce((sum, tx) => sum + tx.total_amount, 0)
                     if (dividendTxs.length > 0) {
                       return (
-                        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50/50 p-3" data-testid="dividend-summary">
+                        <div className="mb-3 rounded-lg border border-kern-200 bg-kern-50/50 p-3" data-testid="dividend-summary">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <DollarSign className="h-4 w-4 text-amber-600" />
-                              <span className="text-xs font-medium text-amber-700">Totaal dividend inkomen</span>
+                              <DollarSign className="h-4 w-4 text-kern-600" />
+                              <span className="text-xs font-medium text-kern-700">Totaal dividend inkomen</span>
                             </div>
-                            <span className="text-sm font-bold text-amber-700" data-testid="total-dividend-income">
+                            <span className="text-sm font-bold text-kern-700" data-testid="total-dividend-income">
                               {formatCurrency(totalDividendIncome)}
                             </span>
                           </div>
-                          <p className="mt-1 text-xs text-amber-600/70">{dividendTxs.length} dividend uitkering{dividendTxs.length !== 1 ? 'en' : ''}</p>
+                          <p className="mt-1 text-xs text-kern-600/70">{dividendTxs.length} dividend uitkering{dividendTxs.length !== 1 ? 'en' : ''}</p>
                         </div>
                       )
                     }

@@ -17,28 +17,28 @@ const colorMap: Record<string, {
   ring: string
 }> = {
   amber: {
-    bg: 'bg-amber-50',
-    bgEarned: 'bg-amber-100',
+    bg: 'bg-kern-50',
+    bgEarned: 'bg-kern-100',
     border: 'border-zinc-200',
-    borderEarned: 'border-amber-300',
-    text: 'text-amber-700',
-    ring: 'ring-amber-200',
+    borderEarned: 'border-kern-300',
+    text: 'text-kern-700',
+    ring: 'ring-kern-200',
   },
   teal: {
-    bg: 'bg-teal-50',
-    bgEarned: 'bg-teal-100',
+    bg: 'bg-wil-50',
+    bgEarned: 'bg-wil-100',
     border: 'border-zinc-200',
-    borderEarned: 'border-teal-300',
-    text: 'text-teal-700',
-    ring: 'ring-teal-200',
+    borderEarned: 'border-wil-300',
+    text: 'text-wil-700',
+    ring: 'ring-wil-200',
   },
   purple: {
-    bg: 'bg-purple-50',
-    bgEarned: 'bg-purple-100',
+    bg: 'bg-horizon-50',
+    bgEarned: 'bg-horizon-100',
     border: 'border-zinc-200',
-    borderEarned: 'border-purple-300',
-    text: 'text-purple-700',
-    ring: 'ring-purple-200',
+    borderEarned: 'border-horizon-300',
+    text: 'text-horizon-700',
+    ring: 'ring-horizon-200',
   },
   emerald: {
     bg: 'bg-emerald-50',
@@ -374,7 +374,7 @@ function BadgeDetail({
         {badge.earned && onShare && (
           <button
             onClick={() => onShare(badge)}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm font-medium text-teal-700 transition-all hover:bg-teal-100 hover:border-teal-300 active:scale-[0.98]"
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-wil-200 bg-wil-50 px-4 py-2.5 text-sm font-medium text-wil-700 transition-all hover:bg-wil-100 hover:border-wil-300 active:scale-[0.98]"
             data-testid="badge-share-button"
           >
             <Share2 className="h-4 w-4" />
@@ -592,7 +592,7 @@ export function BadgeGrid() {
         <div className="flex-1">
           <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
             <div
-              className="h-full rounded-full bg-amber-400 animate-progress-fill"
+              className="h-full rounded-full bg-kern-400 animate-progress-fill"
               data-testid="badge-overall-progress-bar"
               style={{
                 width: `${totalCount > 0 ? (earnedCount / totalCount) * 100 : 0}%`,

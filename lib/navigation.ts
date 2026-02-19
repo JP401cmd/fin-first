@@ -44,3 +44,16 @@ export const horizonNav: ModuleNavConfig = {
     { label: 'Overzicht', href: '/horizon' },
   ],
 }
+
+export const identityNav: ModuleNavConfig = {
+  module: 'Identiteit',
+  basePath: '/identity',
+  color: 'teal',
+  items: [
+    { label: 'Overzicht', href: '/identity' },
+    { label: 'Profiel', href: '/identity/profiel' },
+    { label: 'Voortgang', href: '/identity/voortgang' },
+    { label: 'Delen', href: '/identity/delen' },
+    { label: 'Instellingen', href: '/identity/instellingen' },
+  ],
+}

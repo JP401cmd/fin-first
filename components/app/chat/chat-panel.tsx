@@ -3,18 +3,16 @@
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useChatContext } from './chat-provider'
-import { FhinAvatar, FinnAvatar, FfinAvatar } from '@/components/app/avatars'
+import { FinnAvatar } from '@/components/app/avatars'
 import { ActionEditModal } from '@/components/app/action-edit-modal'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
-import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw } from 'lucide-react'
-import type { AIDomain } from '@/lib/ai/dna/types'
+import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff } from 'lucide-react'
 
 /* ── Domain config per module ─────────────────────────────────────── */
 
 type DomainConfig = {
-  domain: AIDomain
   name: string
   subtitle: string
   placeholder: string
@@ -29,63 +27,19 @@ type DomainConfig = {
   sendHoverBg: string
 }
 
-const DOMAIN_CONFIGS: Record<AIDomain, DomainConfig> = {
-  kern: {
-    domain: 'kern',
-    name: 'FHIN',
-    subtitle: 'Financieel bewaker',
-    placeholder: 'Vraag FHIN iets over je financien...',
-    greeting: 'Hoi, ik ben FHIN',
-    greetingDescription: 'Ik bewaar je financiele waarheid — vermogen, budgetten, transacties en vrijheidstijd.',
-    fabBg: 'bg-amber-600',
-    fabAvatar: (size: number) => <FhinAvatar size={size} />,
-    headerColor: 'text-amber-600',
-    bubbleBg: 'bg-amber-50',
-    accentColor: 'text-amber-600',
-    sendBg: 'bg-amber-600',
-    sendHoverBg: 'hover:bg-amber-700',
-  },
-  wil: {
-    domain: 'wil',
-    name: 'Will',
-    subtitle: 'Financieel assistent',
-    placeholder: 'Vraag Will iets...',
-    greeting: 'Hoi, ik ben Will',
-    greetingDescription: 'Ik help je met al je financiele vragen — van budgetten tot FIRE-projecties.',
-    fabBg: 'bg-teal-600',
-    fabAvatar: (size: number) => <FinnAvatar size={size} />,
-    headerColor: 'text-teal-600',
-    bubbleBg: 'bg-teal-50',
-    accentColor: 'text-teal-600',
-    sendBg: 'bg-teal-600',
-    sendHoverBg: 'hover:bg-teal-700',
-  },
-  horizon: {
-    domain: 'horizon',
-    name: 'FFIN',
-    subtitle: 'Strateeg van De Horizon',
-    placeholder: 'Vraag FFIN iets over je toekomst...',
-    greeting: 'Hoi, ik ben FFIN',
-    greetingDescription: 'Ik analyseer je pad naar financiele vrijheid — projecties, scenario\'s en simulaties.',
-    fabBg: 'bg-purple-600',
-    fabAvatar: (size: number) => <FfinAvatar size={size} />,
-    headerColor: 'text-purple-600',
-    bubbleBg: 'bg-purple-50',
-    accentColor: 'text-purple-600',
-    sendBg: 'bg-purple-600',
-    sendHoverBg: 'hover:bg-purple-700',
-  },
-}
-
-/**
- * Determine the AI domain based on the current route.
- */
-function routeToDomain(pathname: string): AIDomain {
-  if (pathname.startsWith('/core')) return 'kern'
-  if (pathname.startsWith('/will')) return 'wil'
-  if (pathname.startsWith('/horizon')) return 'horizon'
-  // Default to 'wil' for dashboard and other pages
-  return 'wil'
+const WILL_CONFIG: DomainConfig = {
+  name: 'Will',
+  subtitle: 'Financieel assistent',
+  placeholder: 'Vraag Will iets...',
+  greeting: 'Hoi, ik ben Will',
+  greetingDescription: 'Ik help je met al je financiele vragen — van budgetten tot FIRE-projecties.',
+  fabBg: 'bg-wil-600',
+  fabAvatar: (size: number) => <FinnAvatar size={size} />,
+  headerColor: 'text-wil-600',
+  bubbleBg: 'bg-wil-50',
+  accentColor: 'text-wil-600',
+  sendBg: 'bg-wil-600',
+  sendHoverBg: 'hover:bg-wil-700',
 }
 
 /* ── Types ─────────────────────────────────────────────────────────── */
@@ -211,13 +165,13 @@ function ActionSuggestionCard({
       className={`mt-2 w-full rounded-xl border text-left transition-all ${
         added
           ? 'border-emerald-200 bg-emerald-50'
-          : 'border-teal-200 bg-white hover:border-teal-400 hover:shadow-sm active:scale-[0.98]'
+          : 'border-wil-200 bg-white hover:border-wil-400 hover:shadow-sm active:scale-[0.98]'
       }`}
     >
       <div className="px-3 py-2.5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-1.5">
-            <Zap className={`h-3.5 w-3.5 shrink-0 ${added ? 'text-emerald-500' : 'text-teal-500'}`} />
+            <Zap className={`h-3.5 w-3.5 shrink-0 ${added ? 'text-emerald-500' : 'text-wil-500'}`} />
             <span className="text-xs font-semibold text-zinc-800">{data.title}</span>
           </div>
           {added ? (
@@ -225,9 +179,9 @@ function ActionSuggestionCard({
               <Check className="h-3 w-3" /> Toegevoegd
             </span>
           ) : loading ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-teal-500" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-wil-500" />
           ) : (
-            <span className="rounded-full bg-teal-100 px-1.5 py-0.5 text-xs font-medium text-teal-700">
+            <span className="rounded-full bg-wil-100 px-1.5 py-0.5 text-xs font-medium text-wil-700">
               + Toevoegen
             </span>
           )}
@@ -236,7 +190,7 @@ function ActionSuggestionCard({
           <p className="mt-1 text-xs leading-snug text-zinc-500">{data.description}</p>
         )}
         <div className="mt-1.5 flex items-center gap-3 text-xs text-zinc-500">
-          <span className="font-medium text-teal-600">
+          <span className="font-medium text-wil-600">
             +{data.freedom_days_impact} {data.freedom_days_impact === 1 ? 'dag' : 'dagen'} vrijheid
           </span>
           {data.euro_impact_monthly != null && data.euro_impact_monthly > 0 && (
@@ -251,16 +205,14 @@ function ActionSuggestionCard({
 /* ── Main ChatPanel ────────────────────────────────────────────────── */
 
 export function ChatPanel() {
-  const { isOpen, close, toggle } = useChatContext()
+  const { isOpen, close, toggle, pendingMessage, clearPendingMessage, isPinned, togglePin } = useChatContext()
   const router = useRouter()
-  const pathname = usePathname()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [input, setInput] = useState('')
 
-  // Determine domain from current route
-  const domain = routeToDomain(pathname)
-  const config = DOMAIN_CONFIGS[domain]
+  // Will is the sole assistant — no domain switching
+  const config = WILL_CONFIG
 
   // Track which suggestions have been added (by toolInvocationId)
   const [addedActions, setAddedActions] = useState<Set<string>>(new Set())
@@ -270,12 +222,12 @@ export function ChatPanel() {
   const [editAction, setEditAction] = useState<Action | null>(null)
 
   const transport = useMemo(
-    () => new DefaultChatTransport({ api: '/api/ai/chat', body: { domain } }),
-    [domain],
+    () => new DefaultChatTransport({ api: '/api/ai/chat', body: { domain: 'wil' } }),
+    [],
   )
 
   const { messages, sendMessage, status, error, clearError, regenerate } = useChat({
-    id: `chat-${domain}`,
+    id: 'chat-will',
     transport,
   })
 
@@ -291,6 +243,14 @@ export function ChatPanel() {
       setTimeout(() => inputRef.current?.focus(), 100)
     }
   }, [isOpen])
+
+  // Auto-send pending message from notification "Vraag AI"
+  useEffect(() => {
+    if (isOpen && pendingMessage && !isStreaming) {
+      sendMessage({ text: pendingMessage })
+      clearPendingMessage()
+    }
+  }, [isOpen, pendingMessage, isStreaming, sendMessage, clearPendingMessage])
 
   const submit = () => {
     const text = input.trim()
@@ -418,9 +378,9 @@ export function ChatPanel() {
 
         if (isLoading) {
           elements.push(
-            <div key={`action-loading-${action.toolCallId}`} className="mt-2 w-full rounded-xl border border-teal-100 bg-white px-3 py-2.5">
+            <div key={`action-loading-${action.toolCallId}`} className="mt-2 w-full rounded-xl border border-wil-100 bg-white px-3 py-2.5">
               <div className="flex items-center gap-2">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-teal-400" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-wil-400" />
                 <span className="text-xs text-zinc-400">Actie wordt voorbereid...</span>
               </div>
             </div>
@@ -480,7 +440,8 @@ export function ChatPanel() {
     return (
       <button
         onClick={toggle}
-        className={`fixed bottom-[calc(var(--bottom-nav-height)+1.5rem)] right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full ${config.fabBg} text-white shadow-lg transition-transform hover:scale-105 active:scale-95 md:bottom-6`}
+        className={`fixed bottom-[calc(var(--bottom-nav-height)+1.5rem)] z-50 flex h-14 w-14 items-center justify-center rounded-full ${config.fabBg} text-white shadow-lg transition-all hover:scale-105 active:scale-95 md:bottom-6`}
+        style={{ right: 'calc(1.5rem + var(--chat-sidebar-width, 0px))' }}
         aria-label={`Open chat met ${config.name}`}
       >
         {config.fabAvatar(36)}
@@ -488,13 +449,20 @@ export function ChatPanel() {
     )
   }
 
+  // Panel classes differ between floating (default) and pinned (sidebar) mode
+  const panelClasses = isPinned
+    ? 'fixed top-0 right-0 z-50 flex h-screen w-[420px] flex-col bg-white shadow-2xl border-l border-zinc-200'
+    : 'fixed bottom-0 right-0 z-50 flex h-[100dvh] w-full flex-col bg-white shadow-2xl md:bottom-6 md:right-6 md:h-[700px] md:w-[480px] md:rounded-2xl md:border md:border-zinc-200'
+
   return (
     <>
-      {/* Mobile backdrop */}
-      <div className="fixed inset-0 z-40 bg-black/20 md:hidden" onClick={close} />
+      {/* Mobile backdrop (not shown when pinned) */}
+      {!isPinned && (
+        <div className="fixed inset-0 z-40 bg-black/20 md:hidden" onClick={close} />
+      )}
 
       {/* Panel */}
-      <div className="fixed bottom-0 right-0 z-50 flex h-[100dvh] w-full flex-col bg-white shadow-2xl md:bottom-6 md:right-6 md:h-[600px] md:w-[400px] md:rounded-2xl md:border md:border-zinc-200">
+      <div className={panelClasses}>
 
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
@@ -505,9 +473,20 @@ export function ChatPanel() {
               <span className="ml-1 text-xs text-zinc-400">{config.subtitle}</span>
             </div>
           </div>
-          <button onClick={close} className="touch-target rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            {/* Pin toggle — desktop only */}
+            <button
+              onClick={togglePin}
+              className="hidden touch-target rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 md:flex md:items-center md:justify-center"
+              aria-label={isPinned ? 'Losmaken' : 'Vastzetten'}
+              title={isPinned ? 'Losmaken' : 'Vastzetten'}
+            >
+              {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+            </button>
+            <button onClick={close} className="touch-target rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         {/* Messages */}

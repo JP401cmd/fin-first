@@ -83,7 +83,7 @@ export function OnboardingExtras({
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-zinc-800">{label}</span>
                   {count > 0 && (
-                    <span className="rounded-full bg-teal-100 px-1.5 py-0.5 text-[10px] font-bold text-teal-700">
+                    <span className="rounded-full bg-wil-100 px-1.5 py-0.5 text-[10px] font-bold text-wil-700">
                       {count}
                     </span>
                   )}
@@ -124,7 +124,7 @@ export function OnboardingExtras({
           onClick={onNext}
           disabled={saving}
           data-testid="onboarding-save-next"
-          className="flex-1 rounded-lg bg-teal-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex-1 rounded-lg bg-wil-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-wil-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {saving ? 'Opslaan...' : 'Opslaan & verder'}
         </button>

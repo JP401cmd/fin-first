@@ -123,8 +123,8 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
                   onClick={() => setStrategy(key)}
                   className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                     strategy === key
-                      ? 'bg-purple-600 text-white'
-                      : 'border border-zinc-200 bg-white text-zinc-600 hover:border-purple-200 hover:bg-purple-50'
+                      ? 'bg-horizon-600 text-white'
+                      : 'border border-zinc-200 bg-white text-zinc-600 hover:border-horizon-200 hover:bg-horizon-50'
                   }`}
                 >
                   {val.label}
@@ -142,7 +142,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
                 <input
                   type="range" min={40} max={70} step={1} value={retirementAge}
                   onChange={e => setRetirementAge(Number(e.target.value))}
-                  className="mt-1 w-full accent-purple-600"
+                  className="mt-1 w-full accent-horizon-600"
                 />
                 <div className="flex justify-between text-[10px] text-zinc-400">
                   <span>40 jaar</span><span>70 jaar</span>
@@ -153,7 +153,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
                 <input
                   type="range" min={75} max={100} step={1} value={targetAge}
                   onChange={e => setTargetAge(Number(e.target.value))}
-                  className="mt-1 w-full accent-purple-600"
+                  className="mt-1 w-full accent-horizon-600"
                 />
                 <div className="flex justify-between text-[10px] text-zinc-400">
                   <span>75 jaar</span><span>100 jaar</span>
@@ -167,7 +167,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
             <section>
               <button
                 onClick={() => setShowStrategySettings(!showStrategySettings)}
-                className="flex items-center gap-1 text-xs font-medium text-purple-600 hover:text-purple-700"
+                className="flex items-center gap-1 text-xs font-medium text-horizon-600 hover:text-horizon-700"
               >
                 Strategie-instellingen
                 {showStrategySettings ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -181,7 +181,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
                       <input
                         type="range" min={50} max={100} step={5} value={grFloor}
                         onChange={e => setGrFloor(Number(e.target.value))}
-                        className="mt-1 w-full accent-purple-600"
+                        className="mt-1 w-full accent-horizon-600"
                       />
                       <div className="flex justify-between text-[10px] text-zinc-400">
                         <span>50%</span><span>100%</span>
@@ -192,7 +192,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
                       <input
                         type="range" min={100} max={150} step={5} value={grCeiling}
                         onChange={e => setGrCeiling(Number(e.target.value))}
-                        className="mt-1 w-full accent-purple-600"
+                        className="mt-1 w-full accent-horizon-600"
                       />
                       <div className="flex justify-between text-[10px] text-zinc-400">
                         <span>100%</span><span>150%</span>
@@ -203,7 +203,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
                       <input
                         type="range" min={5} max={20} step={1} value={grRaise}
                         onChange={e => setGrRaise(Number(e.target.value))}
-                        className="mt-1 w-full accent-purple-600"
+                        className="mt-1 w-full accent-horizon-600"
                       />
                       <div className="flex justify-between text-[10px] text-zinc-400">
                         <span>5%</span><span>20%</span>
@@ -214,7 +214,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
                       <input
                         type="range" min={5} max={20} step={1} value={grCut}
                         onChange={e => setGrCut(Number(e.target.value))}
-                        className="mt-1 w-full accent-purple-600"
+                        className="mt-1 w-full accent-horizon-600"
                       />
                       <div className="flex justify-between text-[10px] text-zinc-400">
                         <span>5%</span><span>20%</span>
@@ -237,8 +237,8 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
                         <p className="text-xs text-zinc-500">Obligaties</p>
                         <p className="text-lg font-bold text-zinc-900">{bkBond}%</p>
                       </div>
-                      <div className="rounded-lg bg-purple-50 p-3 text-center">
-                        <p className="text-xs text-purple-600">Aandelen</p>
+                      <div className="rounded-lg bg-horizon-50 p-3 text-center">
+                        <p className="text-xs text-horizon-600">Aandelen</p>
                         <p className="text-lg font-bold text-zinc-900">{bkStock}%</p>
                       </div>
                     </div>
@@ -252,7 +252,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
                           const v = Number(e.target.value)
                           if (v + bkBond <= 95) setBkCash(v)
                         }}
-                        className="mt-1 w-full accent-purple-600"
+                        className="mt-1 w-full accent-horizon-600"
                       />
                     </div>
                     <div>
@@ -263,7 +263,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
                           const v = Number(e.target.value)
                           if (bkCash + v <= 95) setBkBond(v)
                         }}
-                        className="mt-1 w-full accent-purple-600"
+                        className="mt-1 w-full accent-horizon-600"
                       />
                     </div>
                     <div>
@@ -271,7 +271,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
                       <input
                         type="range" min={1} max={6} step={0.5} value={bkBondReturn}
                         onChange={e => setBkBondReturn(Number(e.target.value))}
-                        className="mt-1 w-full accent-purple-600"
+                        className="mt-1 w-full accent-horizon-600"
                       />
                       <div className="flex justify-between text-[10px] text-zinc-400">
                         <span>1%</span><span>6%</span>
@@ -282,7 +282,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
                       <input
                         type="range" min={1} max={5} step={1} value={bkCashYears}
                         onChange={e => setBkCashYears(Number(e.target.value))}
-                        className="mt-1 w-full accent-purple-600"
+                        className="mt-1 w-full accent-horizon-600"
                       />
                       <div className="flex justify-between text-[10px] text-zinc-400">
                         <span>1 jaar</span><span>5 jaar</span>
@@ -298,7 +298,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="rounded-xl border border-zinc-200 bg-white p-5 text-center">
               <p className="text-xs font-medium text-zinc-500">Maandelijkse opname</p>
-              <p className="mt-1 text-3xl font-bold text-purple-700">{formatCurrency(result.monthlyWithdrawal)}</p>
+              <p className="mt-1 text-3xl font-bold text-horizon-700">{formatCurrency(result.monthlyWithdrawal)}</p>
               <p className="mt-1 text-xs text-zinc-400">per maand</p>
             </div>
             <div className="rounded-xl border border-zinc-200 bg-white p-5 text-center">
@@ -320,11 +320,11 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
           </div>
 
           {/* NL-specific AOW info */}
-          <div className="rounded-xl border border-purple-200 bg-purple-50 p-5">
+          <div className="rounded-xl border border-horizon-200 bg-horizon-50 p-5">
             <div className="flex items-start gap-3">
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-purple-600" />
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-horizon-600" />
               <div>
-                <p className="text-sm font-medium text-purple-700">AOW en je opnamestrategie</p>
+                <p className="text-sm font-medium text-horizon-700">AOW en je opnamestrategie</p>
                 <p className="mt-1 text-sm text-zinc-600">
                   Tot {NL_AOW_AGE}: volledig uit vermogen. Vanaf {NL_AOW_AGE}: AOW ({formatCurrency(NL_AOW_MONTHLY)}/mnd alleenstaand)
                   + aanvulling uit je portfolio. Dit verlaagt je opname aanzienlijk.
@@ -349,7 +349,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
           <section>
             <button
               onClick={() => setShowTable(!showTable)}
-              className="flex items-center gap-1 text-sm font-medium text-purple-600 hover:text-purple-700"
+              className="flex items-center gap-1 text-sm font-medium text-horizon-600 hover:text-horizon-700"
             >
               Jaar-voor-jaar overzicht
               {showTable ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}

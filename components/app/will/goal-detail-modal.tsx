@@ -100,7 +100,7 @@ export function GoalDetailModal({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 transition-[right] duration-300" style={{ right: 'var(--chat-sidebar-width, 0px)' }}>
       <div className="w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl" style={{ maxHeight: '90vh' }}>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
@@ -115,7 +115,7 @@ export function GoalDetailModal({
           <div className="flex items-center gap-2">
             <button
               onClick={() => { setEditGoal(null); setShowForm(true) }}
-              className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700"
+              className="inline-flex items-center gap-2 rounded-lg bg-wil-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-wil-700"
             >
               <Plus className="h-4 w-4" />
               Nieuw doel
@@ -133,10 +133,10 @@ export function GoalDetailModal({
         <div className="p-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-wil-500 border-t-transparent" />
             </div>
           ) : goals.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-teal-300 bg-teal-50/50 p-8 text-center">
+            <div className="rounded-xl border border-dashed border-wil-300 bg-wil-50/50 p-8 text-center">
               <h3 className="text-lg font-bold text-zinc-900">Geen doelen ingesteld</h3>
               <p className="mt-2 text-sm text-zinc-500">
                 Begin met het instellen van je eerste financiele doel. Koppel het aan je assets of schulden voor live voortgang.
@@ -449,7 +449,7 @@ function GoalCard({
             if (!showTimeline) loadTimeline()
             setShowTimeline(v => !v)
           }}
-          className="flex items-center gap-1 text-[10px] font-medium text-teal-600 hover:text-teal-700"
+          className="flex items-center gap-1 text-[10px] font-medium text-wil-600 hover:text-wil-700"
         >
           <BarChart3 className="h-3 w-3" />
           Voortgang over tijd
@@ -460,7 +460,7 @@ function GoalCard({
           <div className="mt-2" onClick={(e) => e.stopPropagation()}>
             {timelineLoading ? (
               <div className="flex items-center justify-center py-4">
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-wil-500 border-t-transparent" />
               </div>
             ) : (
               <GoalProgressTimeline goal={goal} history={timelineHistory} />
@@ -478,7 +478,7 @@ function GoalCard({
               if (!showContrib) loadContributions()
               setShowContrib(v => !v)
             }}
-            className="flex items-center gap-1 text-[10px] font-medium text-teal-600 hover:text-teal-700"
+            className="flex items-center gap-1 text-[10px] font-medium text-wil-600 hover:text-wil-700"
           >
             <Plus className="h-3 w-3" />
             Bijdrage registreren
@@ -493,7 +493,7 @@ function GoalCard({
                   placeholder="Bedrag"
                   value={contribAmount}
                   onChange={(e) => setContribAmount(e.target.value)}
-                  className="w-28 rounded-lg border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-teal-500"
+                  className="w-28 rounded-lg border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-wil-500"
                   min="0"
                   step="0.01"
                 />
@@ -502,12 +502,12 @@ function GoalCard({
                   placeholder="Notitie (optioneel)"
                   value={contribNotes}
                   onChange={(e) => setContribNotes(e.target.value)}
-                  className="flex-1 rounded-lg border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-teal-500"
+                  className="flex-1 rounded-lg border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-wil-500"
                 />
                 <button
                   onClick={addContribution}
                   disabled={saving || !contribAmount}
-                  className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-teal-700 disabled:opacity-50"
+                  className="rounded-lg bg-wil-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-wil-700 disabled:opacity-50"
                 >
                   {saving ? '...' : '+'}
                 </button>

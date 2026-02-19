@@ -5,8 +5,8 @@ export default function HoldingNotFound() {
   return (
     <div className="mx-auto flex max-w-6xl flex-col items-center justify-center px-6 py-20" data-testid="holding-not-found-page">
       <div className="text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/50">
-          <AlertTriangle className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-kern-100 dark:bg-kern-900/50">
+          <AlertTriangle className="h-8 w-8 text-kern-600 dark:text-kern-400" />
         </div>
         <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100" data-testid="holding-not-found-title">
           Holding niet gevonden
@@ -17,7 +17,7 @@ export default function HoldingNotFound() {
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Link
             href="/core/assets/holdings"
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-amber-700 transition-colors"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-kern-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-kern-700 transition-colors"
             data-testid="back-to-holdings-link"
           >
             <ArrowLeft className="h-4 w-4" />

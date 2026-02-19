@@ -6,8 +6,13 @@ import Link from 'next/link'
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Plus, Upload, ArrowUpRight, ArrowDownLeft,
   Wallet, Tag, Settings2, Trash2, X, Building2, Repeat, Calendar, Search, Filter, RotateCcw,
+  Link2,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { CashFlowForecastChart, type ForecastPoint, type ForecastAlert } from '@/components/app/cashflow-forecast-chart'
+import { FeatureGate } from '@/components/app/feature-gate'
+import { LineChart } from 'lucide-react'
+import { ConnectedAccountCard } from '@/components/app/gocardless/connected-account-card'
 import { getDefaultBudgets, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
 import { TransactionForm } from '@/components/app/transaction-form'
 import { BudgetIcon, formatCurrency as formatCurrencyShort, formatCurrencyDecimals as formatCurrency, getTypeColors } from '@/components/app/budget-shared'
@@ -60,6 +65,32 @@ export default function CashPage() {
   const [editAccount, setEditAccount] = useState<Account | null>(null)
   const [recurrings, setRecurrings] = useState<RecurringTransaction[]>([])
   const [showRecurring, setShowRecurring] = useState(true)
+
+  // GoCardless state
+  const [gcEnabled, setGcEnabled] = useState(false)
+  const [gcAccounts, setGcAccounts] = useState<Array<{
+    id: string
+    gc_account_id: string
+    iban: string | null
+    last_synced_at: string | null
+    daily_requests: number
+    rate_limit_reset_date: string | null
+    is_active: boolean
+    bank_account_id: string | null
+    gocardless_requisitions: {
+      institution_name: string
+      institution_logo: string | null
+      expires_at: string | null
+      status: string
+    }
+  }>>([])
+  const [showBankConnections, setShowBankConnections] = useState(true)
+
+  // Cashflow forecast state
+  const [cashFlowForecast, setCashFlowForecast] = useState<ForecastPoint[]>([])
+  const [cashFlowAlerts, setCashFlowAlerts] = useState<ForecastAlert[]>([])
+  const [cashFlowBalance, setCashFlowBalance] = useState(0)
+  const [cashFlowHasData, setCashFlowHasData] = useState(false)
 
   // Filter state
   const [filterSearch, setFilterSearch] = useState('')
@@ -159,10 +190,53 @@ export default function CashPage() {
   }, [loadTransactions])
 
 
+  const loadGcAccounts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/gocardless/status')
+      if (!res.ok) return
+      const { enabled } = await res.json()
+      setGcEnabled(enabled)
+      if (!enabled) return
+
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('gocardless_accounts')
+        .select('*, gocardless_requisitions(institution_name, institution_logo, expires_at, status)')
+        .eq('is_active', true)
+        .order('iban', { ascending: true })
+
+      if (data) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setGcAccounts(data as any)
+      }
+    } catch {
+      // Silently fail — GoCardless is optional
+    }
+  }, [])
+
+  const loadCashFlowForecast = useCallback(async () => {
+    try {
+      const res = await fetch('/api/cashflow-forecast')
+      if (res.ok) {
+        const data = await res.json()
+        if (data.hasData) {
+          setCashFlowForecast(data.forecast ?? [])
+          setCashFlowAlerts(data.alerts ?? [])
+          setCashFlowBalance(data.currentBalance ?? 0)
+          setCashFlowHasData(true)
+        }
+      }
+    } catch {
+      // Cash flow forecast is non-critical
+    }
+  }, [])
+
   useEffect(() => {
     loadBudgets()
     loadAccounts()
-  }, [loadBudgets, loadAccounts])
+    loadGcAccounts()
+    loadCashFlowForecast()
+  }, [loadBudgets, loadAccounts, loadGcAccounts, loadCashFlowForecast])
 
   useEffect(() => {
     if (selectedAccountId) {
@@ -542,7 +616,7 @@ export default function CashPage() {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
         <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
         </div>
       </div>
     )
@@ -564,11 +638,11 @@ export default function CashPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* Account header */}
-      <section className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-6">
+      <section className="rounded-2xl border border-kern-200 bg-gradient-to-br from-kern-50 to-white p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100">
-              <Wallet className="h-5 w-5 text-amber-600" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-kern-100">
+              <Wallet className="h-5 w-5 text-kern-600" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -587,7 +661,7 @@ export default function CashPage() {
                 )}
                 <button
                   onClick={() => { setEditAccount(selectedAccount ?? null); setShowAccountForm(true) }}
-                  className="rounded-lg p-1.5 text-zinc-400 hover:bg-amber-100 hover:text-amber-600"
+                  className="rounded-lg p-1.5 text-zinc-400 hover:bg-kern-100 hover:text-kern-600"
                   title="Rekening bewerken"
                 >
                   <Settings2 className="h-4 w-4" />
@@ -608,7 +682,7 @@ export default function CashPage() {
           <div className="flex items-center gap-4">
             <button
               onClick={() => { setEditAccount(null); setShowAccountForm(true) }}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-kern-200 px-3 py-1.5 text-xs font-medium text-kern-700 hover:bg-kern-50"
             >
               <Plus className="h-3.5 w-3.5" />
               Rekening toevoegen
@@ -635,7 +709,7 @@ export default function CashPage() {
           </Link>
           <button
             onClick={() => { setEditTransaction(null); setShowForm(true) }}
-            className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+            className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
           >
             <Plus className="h-4 w-4" />
             Nieuwe transactie
@@ -661,6 +735,52 @@ export default function CashPage() {
           </button>
         </div>
       </div>
+
+      {/* GoCardless bank connections */}
+      {gcEnabled && (
+        <section className="mt-6">
+          <button
+            onClick={() => setShowBankConnections((v) => !v)}
+            className="flex w-full items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-left transition-colors hover:bg-zinc-50"
+          >
+            {showBankConnections ? (
+              <ChevronUp className="h-4 w-4 text-zinc-400" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-zinc-400" />
+            )}
+            <Link2 className="h-4 w-4 text-kern-500" />
+            <span className="text-sm font-semibold text-zinc-700">Bankverbindingen</span>
+            <span className="ml-auto text-xs text-zinc-500">
+              {gcAccounts.length} gekoppeld
+            </span>
+          </button>
+
+          {showBankConnections && (
+            <div className="mt-2 space-y-3">
+              {gcAccounts.map((acc) => (
+                <ConnectedAccountCard
+                  key={acc.id}
+                  account={acc}
+                  onSync={() => {
+                    loadAccounts()
+                    loadGcAccounts()
+                  }}
+                  onDisconnect={() => loadGcAccounts()}
+                  onReauthorize={() => router.push('/core/cash/connect')}
+                />
+              ))}
+
+              <Link
+                href="/core/cash/connect"
+                className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-3 text-sm font-medium text-zinc-600 transition-colors hover:border-kern-300 hover:bg-kern-50 hover:text-kern-700"
+              >
+                <Plus className="h-4 w-4" />
+                Bank koppelen
+              </Link>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Monthly overview */}
       <section className="mt-6 grid grid-cols-3 gap-4" data-testid="monthly-summary">
@@ -713,7 +833,7 @@ export default function CashPage() {
             ) : (
               <ChevronDown className="h-4 w-4 text-zinc-400" />
             )}
-            <Repeat className="h-4 w-4 text-amber-500" />
+            <Repeat className="h-4 w-4 text-kern-500" />
             <span className="text-sm font-semibold text-zinc-700">Terugkerende boekingen</span>
             <span className="ml-auto text-xs text-zinc-500">
               Verwacht: {formatCurrencyShort(getExpectedMonthlyTotal(recurrings))}/mnd
@@ -811,6 +931,28 @@ export default function CashPage() {
         </section>
       )}
 
+      {/* Cashflow Prognose */}
+      <FeatureGate featureId="cashflow_forecast" fallback="locked">
+        {cashFlowHasData && cashFlowForecast.length >= 2 && (
+          <section className="mt-6" data-testid="cashflow-forecast-section">
+            <div className="rounded-xl border border-zinc-200 bg-white p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <LineChart className="h-4 w-4 text-kern-600" />
+                <h3 className="text-sm font-semibold text-zinc-700">Cashflow Prognose</h3>
+                <span className="ml-auto text-xs text-zinc-400">
+                  {cashFlowForecast.length - 1} maanden vooruit
+                </span>
+              </div>
+              <CashFlowForecastChart
+                forecast={cashFlowForecast}
+                alerts={cashFlowAlerts}
+                currentBalance={cashFlowBalance}
+              />
+            </div>
+          </section>
+        )}
+      </FeatureGate>
+
       {/* Transaction filters */}
       <section className="mt-6" data-testid="transaction-filters">
         <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 sm:flex-row sm:items-center">
@@ -822,7 +964,7 @@ export default function CashPage() {
               value={filterSearch}
               onChange={(e) => setFilterSearch(e.target.value)}
               placeholder="Zoek op omschrijving of tegenpartij..."
-              className="w-full rounded-lg border border-zinc-200 py-2 pl-9 pr-3 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+              className="w-full rounded-lg border border-zinc-200 py-2 pl-9 pr-3 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               data-testid="filter-search"
             />
           </div>
@@ -831,7 +973,7 @@ export default function CashPage() {
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value as 'all' | 'income' | 'expense')}
-            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
             data-testid="filter-type"
           >
             <option value="all">Alle types</option>
@@ -843,7 +985,7 @@ export default function CashPage() {
           <select
             value={filterBudgetId}
             onChange={(e) => setFilterBudgetId(e.target.value)}
-            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
             data-testid="filter-budget"
           >
             <option value="all">Alle categorieën</option>
@@ -861,7 +1003,7 @@ export default function CashPage() {
           {hasActiveFilters && (
             <button
               onClick={resetFilters}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-kern-200 bg-kern-50 px-3 py-2 text-sm font-medium text-kern-700 hover:bg-kern-100 transition-colors"
               data-testid="filter-reset"
             >
               <RotateCcw className="h-3.5 w-3.5" />
@@ -892,7 +1034,7 @@ export default function CashPage() {
                 <p className="mt-1 text-xs text-zinc-400">Geen transacties komen overeen met de huidige filters.</p>
                 <button
                   onClick={resetFilters}
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
                   data-testid="filter-reset-empty"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
@@ -1084,7 +1226,7 @@ function AccountFormModal({
       >
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-amber-600" />
+            <Building2 className="h-5 w-5 text-kern-600" />
             <h2 className="text-lg font-bold text-zinc-900">
               {account ? 'Rekening bewerken' : 'Nieuwe rekening'}
             </h2>
@@ -1102,7 +1244,7 @@ function AccountFormModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Bijv. Hoofdrekening"
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               required
               autoFocus
             />
@@ -1116,7 +1258,7 @@ function AccountFormModal({
                 value={iban}
                 onChange={(e) => setIban(e.target.value.toUpperCase())}
                 placeholder="NL91ABNA..."
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               />
             </div>
             <div>
@@ -1126,7 +1268,7 @@ function AccountFormModal({
                 value={bankName}
                 onChange={(e) => setBankName(e.target.value)}
                 placeholder="Bijv. ING"
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               />
             </div>
           </div>
@@ -1137,7 +1279,7 @@ function AccountFormModal({
               <select
                 value={accountType}
                 onChange={(e) => setAccountType(e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               >
                 {ACCOUNT_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>{t.label}</option>
@@ -1152,7 +1294,7 @@ function AccountFormModal({
                 value={balance}
                 onChange={(e) => setBalance(e.target.value)}
                 placeholder="0,00"
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               />
             </div>
           </div>
@@ -1201,7 +1343,7 @@ function AccountFormModal({
               </button>
               <button
                 type="submit"
-                className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+                className="rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
               >
                 {account ? 'Opslaan' : 'Toevoegen'}
               </button>

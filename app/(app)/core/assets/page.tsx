@@ -226,7 +226,7 @@ export default function AssetsPage() {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
         <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
         </div>
       </div>
     )
@@ -248,7 +248,7 @@ export default function AssetsPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* Header */}
-      <section className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-6">
+      <section className="rounded-2xl border border-kern-200 bg-gradient-to-br from-kern-50 to-white p-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-zinc-900">Bezittingen</h1>
@@ -259,14 +259,14 @@ export default function AssetsPage() {
           <div className="flex items-center gap-2">
             <Link
               href="/core/assets/holdings"
-              className="inline-flex items-center gap-2 rounded-lg border border-amber-200 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50"
+              className="inline-flex items-center gap-2 rounded-lg border border-kern-200 px-4 py-2 text-sm font-medium text-kern-700 hover:bg-kern-50"
             >
               <BarChart3 className="h-4 w-4" />
               Holdings
             </Link>
             <button
               onClick={() => { setEditAsset(null); setShowForm(true) }}
-              className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+              className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
             >
               <Plus className="h-4 w-4" />
               Asset toevoegen
@@ -279,7 +279,7 @@ export default function AssetsPage() {
             <p className="text-xs font-medium text-zinc-500 uppercase">Totale waarde</p>
             <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalValue)}</p>
             {dailyExpenses > 0 && totalValue > 0 && (
-              <p className="mt-0.5 text-xs text-amber-600/70" data-testid="total-value-freedom">
+              <p className="mt-0.5 text-xs text-kern-600/70" data-testid="total-value-freedom">
                 {formatFreedomTimeString(calculateFreedomTime(totalValue, dailyExpenses), 'long')} vrijheid
               </p>
             )}
@@ -361,7 +361,7 @@ export default function AssetsPage() {
                   data-testid={`projection-year-${y}`}
                   className={`rounded-md px-2 py-1 text-xs font-medium ${
                     projectionYears === y
-                      ? 'bg-amber-100 text-amber-700'
+                      ? 'bg-kern-100 text-kern-700'
                       : 'text-zinc-400 hover:text-zinc-600'
                   }`}
                 >
@@ -398,7 +398,7 @@ export default function AssetsPage() {
       <section className="mt-6 space-y-2">
         {assets.length === 0 && (
           <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
-            <TrendingUp className="mx-auto h-8 w-8 text-amber-400" />
+            <TrendingUp className="mx-auto h-8 w-8 text-kern-400" />
             <p className="mt-2 text-sm font-medium text-zinc-600">Geen assets geregistreerd</p>
             <p className="mt-1 text-xs text-zinc-400">Voeg een asset toe om je vermogen te volgen.</p>
           </div>
@@ -413,7 +413,7 @@ export default function AssetsPage() {
           return (
             <div
               key={asset.id}
-              className="flex cursor-pointer items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 transition-colors hover:border-amber-200 hover:bg-amber-50/30"
+              className="flex cursor-pointer items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 transition-colors hover:border-kern-200 hover:bg-kern-50/30"
               onClick={() => openAssetModal(asset)}
             >
               <div
@@ -447,7 +447,7 @@ export default function AssetsPage() {
               <div className="shrink-0 text-right">
                 <p className="text-sm font-semibold text-zinc-900">{formatCurrency(value)}</p>
                 {dailyExpenses > 0 && value > 0 && (
-                  <p className="text-[10px] text-amber-500/70" data-testid="asset-card-freedom">
+                  <p className="text-[10px] text-kern-500/70" data-testid="asset-card-freedom">
                     {formatFreedomTimeString(calculateFreedomTime(value, dailyExpenses), 'short', true)} vrijheid
                   </p>
                 )}
@@ -610,7 +610,7 @@ function AssetDetailModal({
           {isEigenHuis && <p className="mb-1 text-xs font-medium text-zinc-500 uppercase">Marktwaarde</p>}
           <p className="text-3xl font-bold text-zinc-900">{formatCurrency(value)}</p>
           {dailyExpenses > 0 && value > 0 && (
-            <p className="mt-0.5 text-xs text-amber-600/70" data-testid="detail-value-freedom">
+            <p className="mt-0.5 text-xs text-kern-600/70" data-testid="detail-value-freedom">
               {formatFreedomTimeString(calculateFreedomTime(value, dailyExpenses), 'long')} vrijheid
             </p>
           )}
@@ -632,7 +632,7 @@ function AssetDetailModal({
             {asset.risk_profile && (
               <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${
                 asset.risk_profile === 'laag' ? 'bg-emerald-100 text-emerald-700' :
-                asset.risk_profile === 'middel' ? 'bg-amber-100 text-amber-700' :
+                asset.risk_profile === 'middel' ? 'bg-kern-100 text-kern-700' :
                 'bg-red-100 text-red-700'
               }`}>
                 Risico: {RISK_PROFILE_LABELS[asset.risk_profile]}
@@ -681,15 +681,15 @@ function AssetDetailModal({
 
           {/* Hypotheek + overwaarde (eigen woning) */}
           {isEigenHuis && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 space-y-2">
-              <p className="text-xs font-semibold text-amber-700/60 uppercase">Hypotheek</p>
+            <div className="rounded-lg border border-kern-200 bg-kern-50/50 p-3 space-y-2">
+              <p className="text-xs font-semibold text-kern-700/60 uppercase">Hypotheek</p>
               {mortgage ? (
                 <>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-zinc-600">{mortgage.name}</span>
                     <span className="text-sm font-medium text-zinc-900">{formatCurrency(mortgage.balance)}</span>
                   </div>
-                  <div className="flex items-center justify-between border-t border-amber-200/60 pt-2">
+                  <div className="flex items-center justify-between border-t border-kern-200/60 pt-2">
                     <span className="text-xs font-medium text-zinc-700">Overwaarde</span>
                     {(() => {
                       const overwaarde = value - mortgage.balance
@@ -721,8 +721,8 @@ function AssetDetailModal({
             return (
               <div className="grid grid-cols-2 gap-3">
                 {details.map((d) => (
-                  <div key={d.label} className="rounded-lg bg-amber-50/50 p-3">
-                    <p className="text-xs text-amber-700/60">{d.label}</p>
+                  <div key={d.label} className="rounded-lg bg-kern-50/50 p-3">
+                    <p className="text-xs text-kern-700/60">{d.label}</p>
                     <p className="mt-0.5 text-sm font-medium text-zinc-900">{d.value}</p>
                   </div>
                 ))}
@@ -753,9 +753,9 @@ function AssetDetailModal({
 
         {/* Holdings source-of-truth banner */}
         {hasActiveHoldings && (
-          <div className="mx-6 mb-0 mt-2 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2" data-testid="holdings-source-of-truth-banner">
-            <Briefcase className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-            <p className="text-xs text-amber-700">
+          <div className="mx-6 mb-0 mt-2 flex items-start gap-2 rounded-lg bg-kern-50 border border-kern-200 px-3 py-2" data-testid="holdings-source-of-truth-banner">
+            <Briefcase className="mt-0.5 h-3.5 w-3.5 shrink-0 text-kern-600" />
+            <p className="text-xs text-kern-700">
               <strong>Portfolio tracker actief</strong> ({holdingsCount} holding{holdingsCount !== 1 ? 's' : ''}): de waarde van deze asset wordt automatisch berekend uit de holdings. Handmatig herwaarderen is uitgeschakeld.
             </p>
           </div>
@@ -770,7 +770,7 @@ function AssetDetailModal({
             className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium ${
               hasActiveHoldings
                 ? 'border-zinc-200 text-zinc-400 cursor-not-allowed bg-zinc-50'
-                : 'border-amber-200 text-amber-700 hover:bg-amber-50'
+                : 'border-kern-200 text-kern-700 hover:bg-kern-50'
             }`}
             data-testid="revalue-btn"
           >
@@ -779,7 +779,7 @@ function AssetDetailModal({
           </button>
           <button
             onClick={onEdit}
-            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-700"
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-kern-600 px-3 py-2 text-xs font-medium text-white hover:bg-kern-700"
           >
             <Edit3 className="h-3.5 w-3.5" />
             Bewerken
@@ -1054,7 +1054,7 @@ function ValuationTrendSection({ valuations }: { valuations: Valuation[] }) {
       {hasMore && (
         <button
           onClick={() => setShowAll(!showAll)}
-          className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-50/50"
+          className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-medium text-kern-600 hover:bg-kern-50/50"
           data-testid="valuation-show-more"
         >
           {showAll ? (
@@ -1250,11 +1250,11 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
       {/* Toggle header */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center justify-between rounded-lg bg-amber-50/50 px-3 py-2 text-left hover:bg-amber-50"
+        className="flex w-full items-center justify-between rounded-lg bg-kern-50/50 px-3 py-2 text-left hover:bg-kern-50"
         data-testid="holdings-toggle"
       >
         <div className="flex items-center gap-2">
-          <Briefcase className="h-4 w-4 text-amber-600" />
+          <Briefcase className="h-4 w-4 text-kern-600" />
           <span className="text-xs font-semibold text-zinc-700">
             Holdings ({loading ? '…' : holdings.length})
           </span>
@@ -1275,7 +1275,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
         <div className="mt-2 space-y-2" data-testid="holdings-list-expanded">
           {loading && (
             <div className="flex justify-center py-4">
-              <Loader2 className="h-5 w-5 animate-spin text-amber-500" />
+              <Loader2 className="h-5 w-5 animate-spin text-kern-500" />
             </div>
           )}
 
@@ -1291,7 +1291,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
               <p className="text-xs text-zinc-400">Nog geen holdings voor dit vermogensobject.</p>
               <button
                 onClick={openCreateForm}
-                className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-amber-600 hover:text-amber-700"
+                className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-kern-600 hover:text-kern-700"
                 data-testid="add-first-holding-btn"
               >
                 <Plus className="h-3 w-3" />
@@ -1402,7 +1402,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
               {/* Add holding button */}
               <button
                 onClick={openCreateForm}
-                className="flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-amber-200 py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-50"
+                className="flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-kern-200 py-1.5 text-xs font-medium text-kern-600 hover:bg-kern-50"
                 data-testid="add-holding-btn"
               >
                 <Plus className="h-3 w-3" />
@@ -1413,7 +1413,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
 
           {/* Create / Edit form */}
           {showForm && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50/30 p-3 space-y-2" data-testid="holding-form">
+            <div className="rounded-lg border border-kern-200 bg-kern-50/30 p-3 space-y-2" data-testid="holding-form">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-semibold text-zinc-700">
                   {editHolding ? 'Holding bewerken' : 'Nieuwe holding'}
@@ -1434,7 +1434,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
                     placeholder="bijv. Vanguard FTSE All-World"
-                    className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                    className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
                     data-testid="holding-name-input"
                     autoFocus
                   />
@@ -1446,7 +1446,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                     value={formTicker}
                     onChange={(e) => setFormTicker(e.target.value.toUpperCase())}
                     placeholder="bijv. VWRL"
-                    className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                    className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
                     data-testid="holding-ticker-input"
                   />
                 </div>
@@ -1457,7 +1457,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                     value={formIsin}
                     onChange={(e) => setFormIsin(e.target.value.toUpperCase())}
                     placeholder="bijv. IE00B3RBWM25"
-                    className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                    className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
                     data-testid="holding-isin-input"
                   />
                 </div>
@@ -1470,7 +1470,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                     placeholder="bijv. 50"
                     step="any"
                     min="0"
-                    className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                    className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
                     data-testid="holding-units-input"
                   />
                 </div>
@@ -1483,7 +1483,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                     placeholder="bijv. 80.00"
                     step="0.01"
                     min="0"
-                    className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                    className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
                     data-testid="holding-avg-price-input"
                   />
                 </div>
@@ -1494,7 +1494,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                       type="date"
                       value={formPurchaseDate}
                       onChange={(e) => setFormPurchaseDate(e.target.value)}
-                      className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                      className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
                       data-testid="holding-purchase-date-input"
                     />
                   </div>
@@ -1518,7 +1518,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                 <button
                   onClick={handleSave}
                   disabled={saving || !formName.trim()}
-                  className="inline-flex items-center gap-1 rounded bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                  className="inline-flex items-center gap-1 rounded bg-kern-600 px-3 py-1 text-xs font-medium text-white hover:bg-kern-700 disabled:opacity-50"
                   data-testid="holding-save-btn"
                 >
                   {saving && <Loader2 className="h-3 w-3 animate-spin" />}
@@ -1935,9 +1935,9 @@ function AssetForm({
 
           {/* Warning when holdings are active */}
           {hasActiveHoldings && (
-            <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2" data-testid="asset-form-holdings-warning">
-              <Briefcase className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-              <p className="text-xs text-amber-700">
+            <div className="flex items-start gap-2 rounded-lg bg-kern-50 border border-kern-200 px-3 py-2" data-testid="asset-form-holdings-warning">
+              <Briefcase className="mt-0.5 h-3.5 w-3.5 shrink-0 text-kern-600" />
+              <p className="text-xs text-kern-700">
                 Deze asset heeft {holdingsCount} actieve holding{holdingsCount !== 1 ? 's' : ''}. De waarde wordt automatisch berekend uit de portfolio tracker. Het veld &ldquo;Huidige waarde&rdquo; kan niet handmatig worden gewijzigd.
               </p>
             </div>
@@ -1961,7 +1961,7 @@ function AssetForm({
                 title={hasActiveHoldings ? 'Waarde wordt automatisch berekend uit holdings' : undefined}
               />
               {hasActiveHoldings && (
-                <p className="mt-1 text-[10px] text-amber-600">Automatisch gesynchroniseerd vanuit holdings</p>
+                <p className="mt-1 text-[10px] text-kern-600">Automatisch gesynchroniseerd vanuit holdings</p>
               )}
             </div>
             <div>
@@ -2024,8 +2024,8 @@ function AssetForm({
 
           {/* Type-specific fields */}
           {visibleFields.length > 0 && visibleFields.some((f) => f !== 'subtype') && (
-            <div className="space-y-3 rounded-lg border border-amber-100 bg-amber-50/30 p-3">
-              <p className="text-xs font-semibold text-amber-700/60 uppercase">Details</p>
+            <div className="space-y-3 rounded-lg border border-kern-100 bg-kern-50/30 p-3">
+              <p className="text-xs font-semibold text-kern-700/60 uppercase">Details</p>
               <div className="grid grid-cols-2 gap-3">
                 {visibleFields.includes('risk_profile') && (
                   <div>
@@ -2126,7 +2126,7 @@ function AssetForm({
                         type="button"
                         onClick={handleWozLookup}
                         disabled={wozLoading || !addressPostcode || !addressHouseNumber}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-kern-600 px-3 py-2 text-xs font-medium text-white hover:bg-kern-700 disabled:opacity-50"
                       >
                         {wozLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
                         WOZ
@@ -2217,7 +2217,7 @@ function AssetForm({
           <button
             onClick={handleSave}
             disabled={saving || !name || !currentValue}
-            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+            className="rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
           >
             {saving ? 'Opslaan...' : isEdit ? 'Bijwerken' : 'Toevoegen'}
           </button>
@@ -2327,9 +2327,9 @@ function ValuationModal({
 
         {/* Warning when holdings are active */}
         {hasActiveHoldings && (
-          <div className="mb-4 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2" data-testid="valuation-holdings-warning">
-            <Briefcase className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-            <p className="text-xs text-amber-700">
+          <div className="mb-4 flex items-start gap-2 rounded-lg bg-kern-50 border border-kern-200 px-3 py-2" data-testid="valuation-holdings-warning">
+            <Briefcase className="mt-0.5 h-3.5 w-3.5 shrink-0 text-kern-600" />
+            <p className="text-xs text-kern-700">
               Deze asset heeft {holdingsCount} actieve holding{holdingsCount !== 1 ? 's' : ''}. De waarde wordt automatisch berekend uit de portfolio tracker. Handmatig herwaarderen is niet mogelijk.
             </p>
           </div>
@@ -2381,7 +2381,7 @@ function ValuationModal({
           <button
             onClick={handleSave}
             disabled={saving || !value}
-            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+            className="rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
           >
             {saving ? 'Opslaan...' : 'Opslaan'}
           </button>

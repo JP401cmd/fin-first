@@ -162,7 +162,7 @@ export function GoalForm({
                 type="text"
                 value={form.name}
                 onChange={(e) => update('name', e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                 placeholder="bijv. Noodfonds opbouwen"
                 required
               />
@@ -177,7 +177,7 @@ export function GoalForm({
                 id="goal-type"
                 value={form.goal_type}
                 onChange={(e) => update('goal_type', e.target.value as GoalType)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
               >
                 {(Object.keys(GOAL_TYPE_LABELS) as GoalType[]).map((type) => (
                   <option key={type} value={type}>{GOAL_TYPE_LABELS[type]}</option>
@@ -198,7 +198,7 @@ export function GoalForm({
                   step={form.goal_type === 'freedom_days' ? '1' : '0.01'}
                   value={form.target_value}
                   onChange={(e) => update('target_value', e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                   placeholder="0"
                   required
                 />
@@ -214,7 +214,7 @@ export function GoalForm({
                   step={form.goal_type === 'freedom_days' ? '1' : '0.01'}
                   value={form.current_value}
                   onChange={(e) => update('current_value', e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                   placeholder="0"
                 />
               </div>
@@ -230,7 +230,7 @@ export function GoalForm({
                 type="date"
                 value={form.target_date}
                 onChange={(e) => update('target_date', e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
               />
             </div>
 
@@ -244,7 +244,7 @@ export function GoalForm({
                   id="goal-asset"
                   value={form.linked_asset_id}
                   onChange={(e) => handleAssetLink(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                 >
                   <option value="">Niet gekoppeld</option>
                   {assets.map((a) => (
@@ -264,7 +264,7 @@ export function GoalForm({
                   id="goal-debt"
                   value={form.linked_debt_id}
                   onChange={(e) => handleDebtLink(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                 >
                   <option value="">Selecteer schuld</option>
                   {debts.map((d) => (
@@ -298,7 +298,7 @@ export function GoalForm({
                   id="goal-icon"
                   value={form.icon}
                   onChange={(e) => update('icon', e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                 >
                   {iconOptions.map((name) => (
                     <option key={name} value={name}>{name}</option>
@@ -316,7 +316,7 @@ export function GoalForm({
                 id="goal-desc"
                 value={form.description}
                 onChange={(e) => update('description', e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                 rows={2}
                 placeholder="Waarom is dit doel belangrijk?"
               />
@@ -335,7 +335,7 @@ export function GoalForm({
             <button
               type="submit"
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg bg-wil-600 px-4 py-2 text-sm font-medium text-white hover:bg-wil-700 disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
               {saving ? 'Opslaan...' : 'Opslaan'}

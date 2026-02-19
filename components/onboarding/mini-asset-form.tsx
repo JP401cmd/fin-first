@@ -146,7 +146,7 @@ export function MiniAssetForm({
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <button onClick={() => openEdit(i)} className="text-xs font-medium text-teal-600 hover:text-teal-800">Bewerk</button>
+            <button onClick={() => openEdit(i)} className="text-xs font-medium text-wil-600 hover:text-wil-800">Bewerk</button>
             <button onClick={() => remove(i)} className="text-xs text-red-500 hover:text-red-700">Verwijder</button>
           </div>
         </div>
@@ -327,7 +327,7 @@ export function MiniAssetForm({
                     type="checkbox"
                     checked={draft.tax_benefit}
                     onChange={(e) => updateDraft({ tax_benefit: e.target.checked })}
-                    className="h-4 w-4 rounded border-zinc-300 text-teal-600 focus:ring-teal-500"
+                    className="h-4 w-4 rounded border-zinc-300 text-wil-600 focus:ring-wil-500"
                   />
                   <span className="text-sm text-zinc-700">Fiscaal voordeel</span>
                 </label>
@@ -340,7 +340,7 @@ export function MiniAssetForm({
                     type="checkbox"
                     checked={draft.is_liquid}
                     onChange={(e) => updateDraft({ is_liquid: e.target.checked })}
-                    className="h-4 w-4 rounded border-zinc-300 text-teal-600 focus:ring-teal-500"
+                    className="h-4 w-4 rounded border-zinc-300 text-wil-600 focus:ring-wil-500"
                   />
                   <span className="text-sm text-zinc-700">Vrij opneembaar</span>
                 </label>
@@ -482,7 +482,7 @@ export function MiniAssetForm({
               <button
                 onClick={save}
                 disabled={!draft.name || !draft.current_value}
-                className="flex-1 rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-teal-700 disabled:opacity-40"
+                className="flex-1 rounded-lg bg-wil-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-wil-700 disabled:opacity-40"
               >
                 {editingIndex === -1 ? 'Toevoegen' : 'Opslaan'}
               </button>

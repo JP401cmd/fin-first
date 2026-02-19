@@ -59,7 +59,7 @@ export function ActionCard({ action, onStatusChange, onUpdate }: ActionCardProps
           <div className="flex shrink-0 items-center gap-2">
             {/* Compact meta */}
             {action.freedom_days_impact != null && action.freedom_days_impact > 0 && (
-              <span className="hidden sm:inline-flex rounded-full bg-teal-50 px-2 py-px text-xs font-medium text-teal-700">
+              <span className="hidden sm:inline-flex rounded-full bg-wil-50 px-2 py-px text-xs font-medium text-wil-700">
                 {Math.round(action.freedom_days_impact)}d
               </span>
             )}
@@ -120,7 +120,7 @@ export function ActionCard({ action, onStatusChange, onUpdate }: ActionCardProps
                   onClick={() => handleStatus('open')}
                   disabled={isLoading}
                   title="Heropenen"
-                  className="touch-target rounded text-teal-500 transition-colors hover:bg-teal-50 disabled:opacity-50"
+                  className="touch-target rounded text-wil-500 transition-colors hover:bg-wil-50 disabled:opacity-50"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                 </button>

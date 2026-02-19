@@ -9,7 +9,7 @@ import { BOX3_TOOLTIPS } from '@/lib/box3-data'
 function Tooltip({ text }: { text: string }) {
   return (
     <div className="group relative inline-block">
-      <Info className="h-3.5 w-3.5 cursor-help text-zinc-300 transition-colors group-hover:text-amber-500" />
+      <Info className="h-3.5 w-3.5 cursor-help text-zinc-300 transition-colors group-hover:text-kern-500" />
       <div className="pointer-events-none absolute right-0 z-10 mt-1 w-52 rounded-lg border border-zinc-200 bg-white p-2.5 text-xs leading-relaxed text-zinc-600 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
         {text}
       </div>
@@ -37,7 +37,7 @@ function Step({ label, value, tooltip, highlight, indent, negative }: StepProps)
       </div>
       <span className={`text-sm font-medium tabular-nums ${
         negative ? 'text-red-600' :
-        highlight ? 'text-amber-700' :
+        highlight ? 'text-kern-700' :
         'text-zinc-900'
       }`}>
         {value}
@@ -139,8 +139,8 @@ export function Box3Calculation({ result }: { result: Box3Result }) {
           </div>
 
           {/* Section: Belasting */}
-          <div className="rounded-lg bg-amber-50 p-3">
-            <p className="mb-1 text-[10px] font-semibold tracking-[0.15em] text-amber-700/60 uppercase">
+          <div className="rounded-lg bg-kern-50 p-3">
+            <p className="mb-1 text-[10px] font-semibold tracking-[0.15em] text-kern-700/60 uppercase">
               Belasting
             </p>
             <Step
@@ -150,7 +150,7 @@ export function Box3Calculation({ result }: { result: Box3Result }) {
             />
             <Step label="Box 3 inkomen" value={formatCurrency(result.box3Inkomen)} />
             <Step label={`Tarief (${pct(result.params.tarief)})`} value="" />
-            <div className="my-2 border-t border-dashed border-amber-200" />
+            <div className="my-2 border-t border-dashed border-kern-200" />
             <Step
               label="Te betalen Box 3 belasting"
               value={formatCurrency(result.belasting)}

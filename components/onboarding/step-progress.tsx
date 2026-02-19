@@ -19,7 +19,7 @@ export function StepProgress({ current }: { current: StepKey }) {
             {i > 0 && (
               <div
                 className={`h-0.5 w-6 rounded-full transition-colors ${
-                  isDone ? 'bg-teal-500' : 'bg-zinc-200'
+                  isDone ? 'bg-wil-500' : 'bg-zinc-200'
                 }`}
               />
             )}
@@ -27,9 +27,9 @@ export function StepProgress({ current }: { current: StepKey }) {
               <div
                 className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold transition-colors ${
                   isDone
-                    ? 'bg-teal-500 text-white'
+                    ? 'bg-wil-500 text-white'
                     : isActive
-                      ? 'border-2 border-teal-500 text-teal-600'
+                      ? 'border-2 border-wil-500 text-wil-600'
                       : 'border border-zinc-300 text-zinc-400'
                 }`}
               >
@@ -43,7 +43,7 @@ export function StepProgress({ current }: { current: StepKey }) {
               </div>
               <span
                 className={`text-xs font-medium ${
-                  isActive ? 'text-teal-700' : isDone ? 'text-zinc-600' : 'text-zinc-400'
+                  isActive ? 'text-wil-700' : isDone ? 'text-zinc-600' : 'text-zinc-400'
                 }`}
               >
                 {step.label}

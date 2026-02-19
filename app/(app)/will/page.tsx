@@ -158,7 +158,7 @@ export default function WillPage() {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
         <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-wil-500 border-t-transparent" />
         </div>
       </div>
     )
@@ -268,13 +268,13 @@ export default function WillPage() {
     <FreedomDaysAnimationProvider>
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* === 1. Hero (Gradient) === */}
-      <section data-testid="wil-hero" className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-950 via-teal-900 to-teal-950 p-5 text-white sm:p-8 md:p-10">
-        <div className="pointer-events-none absolute -top-24 right-1/4 h-64 w-64 rounded-full bg-teal-500/10 blur-3xl" />
+      <section data-testid="wil-hero" className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-wil-950 via-wil-900 to-wil-950 p-5 text-white sm:p-8 md:p-10">
+        <div className="pointer-events-none absolute -top-24 right-1/4 h-64 w-64 rounded-full bg-wil-500/10 blur-3xl" />
 
         <div className="relative">
           <div className="mb-6 flex items-center gap-3">
             <FinnAvatar size={40} />
-            <p className="text-xs font-semibold tracking-[0.2em] text-teal-300/80 uppercase">
+            <p className="text-xs font-semibold tracking-[0.2em] text-wil-300/80 uppercase">
               Jouw wilskracht in actie
             </p>
           </div>
@@ -283,7 +283,7 @@ export default function WillPage() {
             <span className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl" data-testid="wil-hero-freedom-days-value">
               {totalFreedomDaysWon > 0 ? `+${totalFreedomDaysWon}` : '0'}
             </span>
-            <span className="ml-3 text-lg text-teal-200/70" data-testid="wil-hero-freedom-days-label">
+            <span className="ml-3 text-lg text-wil-200/70" data-testid="wil-hero-freedom-days-label">
               {totalFreedomDaysWon === 1 ? 'vrijheidsdag gewonnen' : 'vrijheidsdagen gewonnen'}
             </span>
             <HeroTooltip text="Gewonnen vrijheidsdagen komen uitsluitend van voltooide acties in De Wil. Elke afgeronde actie levert concrete vrijheidsdagen op." />
@@ -291,9 +291,9 @@ export default function WillPage() {
 
           {/* Weekly freedom days summary */}
           <div className="mb-6 flex items-center gap-3" data-testid="wil-hero-weekly-summary">
-            <div className="inline-flex items-center gap-2 rounded-full bg-teal-800/50 px-3 py-1.5 backdrop-blur-sm">
-              <Sparkles className="h-3.5 w-3.5 text-teal-300" />
-              <span className="text-sm font-medium text-teal-200" data-testid="weekly-freedom-days-value">
+            <div className="inline-flex items-center gap-2 rounded-full bg-wil-800/50 px-3 py-1.5 backdrop-blur-sm">
+              <Sparkles className="h-3.5 w-3.5 text-wil-300" />
+              <span className="text-sm font-medium text-wil-200" data-testid="weekly-freedom-days-value">
                 Deze week: +{weeklyFreedomDaysWon % 1 === 0 ? weeklyFreedomDaysWon : weeklyFreedomDaysWon.toFixed(1)} {weeklyFreedomDaysWon === 1 ? 'vrijheidsdag' : 'vrijheidsdagen'} gewonnen
               </span>
             </div>
@@ -301,13 +301,13 @@ export default function WillPage() {
 
           {/* Progress bar: completion ratio */}
           <div className="mb-8">
-            <div className="h-3 w-full overflow-hidden rounded-full bg-teal-950/60">
+            <div className="h-3 w-full overflow-hidden rounded-full bg-wil-950/60">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-teal-600 via-teal-400 to-teal-300 transition-all duration-1000"
+                className="h-full rounded-full bg-gradient-to-r from-wil-600 via-wil-400 to-wil-300 transition-all duration-1000"
                 style={{ width: `${Math.min(completionRatio, 100)}%` }}
               />
             </div>
-            <div className="mt-2 flex justify-between text-xs text-teal-300/50">
+            <div className="mt-2 flex justify-between text-xs text-wil-300/50">
               <span>0% acties voltooid</span>
               <span>{completionRatio}% afgerond</span>
               <span>100%</span>
@@ -317,28 +317,28 @@ export default function WillPage() {
           {/* Sub KPIs */}
           <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-3" data-testid="wil-hero-sub-kpis">
             <div data-testid="wil-hero-acties-voltooid">
-              <p className="text-xs font-medium text-teal-300/60 uppercase">Acties voltooid</p>
+              <p className="text-xs font-medium text-wil-300/60 uppercase">Acties voltooid</p>
               <p className="mt-1 text-2xl font-bold">
                 {completedActions.length} van {totalActions}
               </p>
-              <p className="text-sm text-teal-200/50">bewuste keuzes gemaakt</p>
+              <p className="text-sm text-wil-200/50">bewuste keuzes gemaakt</p>
             </div>
             <div data-testid="wil-hero-open-potentieel">
               <div className="flex items-center gap-1.5">
-                <p className="text-xs font-medium text-teal-300/60 uppercase">Open potentieel</p>
+                <p className="text-xs font-medium text-wil-300/60 uppercase">Open potentieel</p>
                 <HeroTooltip text="Open potentieel toont vrijheidsdagen die je kunt winnen door openstaande acties en aanbevelingen in De Wil af te ronden." />
               </div>
               <p className="mt-1 text-2xl font-bold">
                 +{openPotential} dagen
               </p>
-              <p className="text-sm text-teal-200/50">nog te winnen</p>
+              <p className="text-sm text-wil-200/50">nog te winnen</p>
             </div>
             <div data-testid="wil-hero-beslissnelheid">
-              <p className="text-xs font-medium text-teal-300/60 uppercase">Beslissnelheid</p>
+              <p className="text-xs font-medium text-wil-300/60 uppercase">Beslissnelheid</p>
               <p className="mt-1 text-2xl font-bold">
                 {decisionDays.length > 0 ? `${avgDecisionDays} dagen` : '-'}
               </p>
-              <p className="text-sm text-teal-200/50">gem. tijd tot beslissing</p>
+              <p className="text-sm text-wil-200/50">gem. tijd tot beslissing</p>
             </div>
           </div>
         </div>
@@ -361,8 +361,8 @@ export default function WillPage() {
       <section data-testid="wil-kpi-grid" className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-voltooide-acties">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-50">
-              <CheckCircle className="h-5 w-5 text-teal-600" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-wil-50">
+              <CheckCircle className="h-5 w-5 text-wil-600" />
             </div>
             <KpiTooltip text="Hoeveel acties je hebt afgerond. Elke actie brengt je dichter bij vrijheid." />
           </div>
@@ -370,15 +370,15 @@ export default function WillPage() {
           <p className="mt-1 text-3xl font-bold text-zinc-900">
             {completedActions.length}/{totalActions}
           </p>
-          <p className="mt-1 text-xs text-teal-600">
+          <p className="mt-1 text-xs text-wil-600">
             {completionRatio}% afgerond
           </p>
         </div>
 
         <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-open-potentieel">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-50">
-              <Sparkles className="h-5 w-5 text-teal-600" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-wil-50">
+              <Sparkles className="h-5 w-5 text-wil-600" />
             </div>
             <KpiTooltip text="Open potentieel — exclusief De Wil. Vrijheidsdagen die je kunt winnen door openstaande acties en aanbevelingen af te ronden. Dit verschilt van 'Vrije Dagen per Jaar' in De Kern, dat gebaseerd is op passief inkomen." />
           </div>
@@ -391,8 +391,8 @@ export default function WillPage() {
 
         <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-doelvoortgang">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-50">
-              <Target className="h-5 w-5 text-teal-600" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-wil-50">
+              <Target className="h-5 w-5 text-wil-600" />
             </div>
             <KpiTooltip text="Gemiddelde voortgang over al je actieve financiele doelen." />
           </div>
@@ -407,13 +407,13 @@ export default function WillPage() {
 
         <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-wilskrachtscore">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-50">
-              <Flame className="h-5 w-5 text-teal-600" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-wil-50">
+              <Flame className="h-5 w-5 text-wil-600" />
             </div>
             <KpiTooltip text="Hoe actief je bent in het nemen en afronden van beslissingen." />
           </div>
           <p className="text-sm font-medium text-zinc-500">Wilskrachtscore</p>
-          <p className="mt-1 text-3xl font-bold text-teal-600">{willpowerScore}</p>
+          <p className="mt-1 text-3xl font-bold text-wil-600">{willpowerScore}</p>
           <p className="mt-1 text-xs text-zinc-400">{willpowerLabel[willpowerScore]}</p>
         </div>
       </section>
@@ -501,7 +501,7 @@ export default function WillPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowGoalForm(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 px-3 py-1.5 text-sm font-medium text-teal-600 hover:bg-teal-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-wil-200 px-3 py-1.5 text-sm font-medium text-wil-600 hover:bg-wil-50"
             >
               <Plus className="h-3.5 w-3.5" />
               Nieuw doel
@@ -547,7 +547,7 @@ export default function WillPage() {
           storageKey="wil_beslissingspatronen"
           title="Beslissingspatronen"
           summary={impactEntries.length > 0 ? `${impactEntries.length} categorie${impactEntries.length !== 1 ? 'en' : ''} — vrijheidsdagen per type actie` : 'Nog geen acties afgerond'}
-          icon={<Flame className="h-5 w-5 text-teal-600" />}
+          icon={<Flame className="h-5 w-5 text-wil-600" />}
         >
           {impactEntries.length > 0 ? (
             <ImpactChart entries={impactEntries} maxImpact={maxImpact} getBarColor={getBarColor} getTypeLabel={getTypeLabel} />
@@ -555,7 +555,7 @@ export default function WillPage() {
             <div className="py-4 text-center">
               <p className="text-sm text-zinc-500">
                 Nog geen acties afgerond. Scroll naar de{' '}
-                <button onClick={() => scrollToSection('section-suggesties')} className="font-medium text-teal-600 hover:underline">
+                <button onClick={() => scrollToSection('section-suggesties')} className="font-medium text-wil-600 hover:underline">
                   suggesties
                 </button>{' '}
                 om je eerste voorstellen te ontvangen.
@@ -576,7 +576,7 @@ export default function WillPage() {
               ? `12-maandtrend — ${completedActions.filter(a => a.completed_at).length} voltooide acties`
               : 'Nog geen voltooide acties'
           }
-          icon={<BarChart3 className="h-5 w-5 text-teal-600" />}
+          icon={<BarChart3 className="h-5 w-5 text-wil-600" />}
         >
           <FreedomDaysMonthlyTrend completedActions={completedActions} />
         </CollapsibleSection>
@@ -626,11 +626,11 @@ function HeroTooltip({ text }: { text: string }) {
         onBlur={() => setOpen(false)}
         className="touch-target"
       >
-        <Info className={`h-4 w-4 cursor-help transition-colors ${open ? 'text-teal-300' : 'text-teal-400/50'} group-hover:text-teal-300`} />
+        <Info className={`h-4 w-4 cursor-help transition-colors ${open ? 'text-wil-300' : 'text-wil-400/50'} group-hover:text-wil-300`} />
       </button>
       <div
         role="tooltip"
-        className={`absolute left-0 z-10 mt-1 w-64 rounded-lg border border-teal-700/50 bg-teal-900/95 p-3 text-xs leading-relaxed text-teal-100 shadow-lg backdrop-blur-sm transition-opacity ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}
+        className={`absolute left-0 z-10 mt-1 w-64 rounded-lg border border-wil-700/50 bg-wil-900/95 p-3 text-xs leading-relaxed text-wil-100 shadow-lg backdrop-blur-sm transition-opacity ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}
       >
         {text}
       </div>
@@ -649,7 +649,7 @@ function KpiTooltip({ text }: { text: string }) {
         onBlur={() => setOpen(false)}
         className="touch-target"
       >
-        <Info className={`h-4 w-4 cursor-help transition-colors ${open ? 'text-teal-500' : 'text-zinc-300'} group-hover:text-teal-500`} />
+        <Info className={`h-4 w-4 cursor-help transition-colors ${open ? 'text-wil-500' : 'text-zinc-300'} group-hover:text-wil-500`} />
       </button>
       <div role="tooltip" className={`absolute right-0 z-10 mt-1 w-56 rounded-lg border border-zinc-200 bg-white p-3 text-xs leading-relaxed text-zinc-600 shadow-lg transition-opacity ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}>
         {text}

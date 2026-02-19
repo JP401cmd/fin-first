@@ -2,22 +2,22 @@ import Link from 'next/link'
 
 const colorClasses: Record<string, { bg: string; border: string; text: string; button: string }> = {
   amber: {
-    bg: 'bg-amber-50',
-    border: 'border-amber-200',
-    text: 'text-amber-600',
-    button: 'bg-amber-600 hover:bg-amber-700',
+    bg: 'bg-kern-50',
+    border: 'border-kern-200',
+    text: 'text-kern-600',
+    button: 'bg-kern-600 hover:bg-kern-700',
   },
   teal: {
-    bg: 'bg-teal-50',
-    border: 'border-teal-200',
-    text: 'text-teal-600',
-    button: 'bg-teal-600 hover:bg-teal-700',
+    bg: 'bg-wil-50',
+    border: 'border-wil-200',
+    text: 'text-wil-600',
+    button: 'bg-wil-600 hover:bg-wil-700',
   },
   purple: {
-    bg: 'bg-purple-50',
-    border: 'border-purple-200',
-    text: 'text-purple-600',
-    button: 'bg-purple-600 hover:bg-purple-700',
+    bg: 'bg-horizon-50',
+    border: 'border-horizon-200',
+    text: 'text-horizon-600',
+    button: 'bg-horizon-600 hover:bg-horizon-700',
   },
 }
 

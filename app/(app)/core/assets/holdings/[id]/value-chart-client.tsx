@@ -56,7 +56,7 @@ export default function HoldingValueChartClient({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12" data-testid="value-chart-loading">
-        <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
+        <Loader2 className="h-6 w-6 animate-spin text-kern-500" />
       </div>
     )
   }
@@ -170,12 +170,12 @@ function ValueChart({ data }: { data: ValueHistoryResponse }) {
     <div className="rounded-xl border border-zinc-200 bg-white p-4" data-testid="value-chart">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-amber-600" />
+          <TrendingUp className="h-4 w-4 text-kern-600" />
           <h3 className="text-sm font-semibold text-zinc-700">Waardeverloop</h3>
         </div>
         <div className="flex items-center gap-3 text-xs">
           <span className="flex items-center gap-1.5">
-            <span className="inline-block h-2 w-6 rounded-full bg-amber-500" />
+            <span className="inline-block h-2 w-6 rounded-full bg-kern-500" />
             <span className="text-zinc-500">Waarde</span>
           </span>
           <span className="flex items-center gap-1.5">
@@ -324,7 +324,7 @@ function ValueChart({ data }: { data: ValueHistoryResponse }) {
           const eventColors: Record<string, string> = {
             'Koop': 'bg-emerald-100 text-emerald-700',
             'Verkoop': 'bg-red-100 text-red-700',
-            'Dividend': 'bg-amber-100 text-amber-700',
+            'Dividend': 'bg-kern-100 text-kern-700',
             'Aankoop': 'bg-emerald-100 text-emerald-700',
             'Huidig': 'bg-zinc-100 text-zinc-600',
           }

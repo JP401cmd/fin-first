@@ -17,7 +17,6 @@ import { BudgetTree } from '@/components/app/budget-tree'
 import { BudgetBlob } from '@/components/app/budget-blob'
 import { BudgetSankey } from '@/components/app/budget-sankey'
 import { BudgetDonut } from '@/components/app/budget-donut'
-import { BudgetAlert, shouldAlert } from '@/components/app/budget-alert'
 import { useDailyExpenseRate, eurToFreedomTime } from '@/components/app/freedom-time-label'
 import { BudgetSparkline, SparklineWithLabel, type SparklineDataPoint } from '@/components/app/budget-sparkline'
 import { computeBudgetForecast, getConfidenceLabel, getConfidenceColors, type BudgetForecast } from '@/lib/budget-forecast'
@@ -349,7 +348,7 @@ export default function BudgetsPage() {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
         <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
         </div>
       </div>
     )
@@ -398,7 +397,7 @@ export default function BudgetsPage() {
             <p className="text-xs text-zinc-400">{formatCurrency(totalIncomeActual)} ontvangen</p>
           </div>
           <div>
-            <p className="text-xs font-medium text-amber-600 uppercase">Uitgaven</p>
+            <p className="text-xs font-medium text-kern-600 uppercase">Uitgaven</p>
             <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalExpenseBudget)}</p>
             <p className="text-xs text-zinc-400">{formatCurrency(totalExpenseSpent)} besteed</p>
           </div>
@@ -416,52 +415,6 @@ export default function BudgetsPage() {
           </div>
         </div>
       </section>
-
-      {/* Budget alerts — shown when budgets are nearing or exceeding limit */}
-      {(() => {
-        const alertItems: { budget: Budget; parent: BudgetWithChildren; spent: number; limit: number }[] = []
-        for (const group of [...expenseBudgets, ...savingsBudgets, ...debtBudgets]) {
-          if (group.children.length > 0) {
-            for (const child of group.children) {
-              const childSpent = getSpent(child)
-              const childLimit = getEffectiveLimit(child)
-              const bt = (child.budget_type ?? group.budget_type ?? 'expense') as 'income' | 'expense' | 'savings' | 'debt'
-              if (shouldAlert(childSpent, childLimit, Number(child.alert_threshold ?? 80), bt)) {
-                alertItems.push({ budget: child, parent: group, spent: childSpent, limit: childLimit })
-              }
-            }
-          } else {
-            const groupSpent = getSpent(group)
-            const groupLimit = getEffectiveLimit(group)
-            const bt = (group.budget_type ?? 'expense') as 'income' | 'expense' | 'savings' | 'debt'
-            if (shouldAlert(groupSpent, groupLimit, Number(group.alert_threshold ?? 80), bt)) {
-              alertItems.push({ budget: group, parent: group, spent: groupSpent, limit: groupLimit })
-            }
-          }
-        }
-        if (alertItems.length === 0) return null
-        return (
-          <section className="mt-6">
-            <h3 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-              Aandachtspunten
-            </h3>
-            <div className="space-y-2">
-              {alertItems.map(({ budget, spent, limit }) => (
-                <BudgetAlert
-                  key={budget.id}
-                  budgetName={budget.name}
-                  budgetId={budget.id}
-                  spent={spent}
-                  limit={limit}
-                  threshold={Number(budget.alert_threshold ?? 80)}
-                  budgetType={(budget.budget_type ?? 'expense') as 'income' | 'expense' | 'savings' | 'debt'}
-                  onNavigate={(id) => openBudgetModal(id)}
-                />
-              ))}
-            </div>
-          </section>
-        )
-      })()}
 
       {/* View toggle + New budget button */}
       <div className="mt-6 flex items-center justify-between">
@@ -514,7 +467,7 @@ export default function BudgetsPage() {
 
         <Link
           href="/core/budgets/new"
-          className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+          className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
         >
           <Plus className="h-4 w-4" />
           Nieuw budget
@@ -690,7 +643,7 @@ function BudgetLegend({
           <div key={seg.id}>
             <button
               className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all ${
-                isExpanded ? 'ring-2 ring-amber-400' : ''
+                isExpanded ? 'ring-2 ring-kern-400' : ''
               }`}
               style={{
                 borderColor: isExpanded ? c.border : '#e4e4e7',
@@ -1061,7 +1014,7 @@ function BudgetDetailModal({
                     <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100">
                       <div
                         className={`h-full rounded-full transition-all ${
-                          forecast.exceedsLimit ? 'bg-red-500' : forecast.predicted / limit > 0.8 ? 'bg-amber-400' : 'bg-purple-400'
+                          forecast.exceedsLimit ? 'bg-red-500' : forecast.predicted / limit > 0.8 ? 'bg-kern-400' : 'bg-purple-400'
                         }`}
                         style={{ width: `${Math.min((forecast.predicted / limit) * 100, 100)}%` }}
                       />
@@ -1334,7 +1287,7 @@ function BudgetDetailModal({
         <div className="flex gap-2 border-t border-zinc-200 px-6 py-4">
           <button
             onClick={onEdit}
-            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-700"
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-kern-600 px-3 py-2 text-xs font-medium text-white hover:bg-kern-700"
           >
             <Pencil className="h-3.5 w-3.5" />
             Bewerken
@@ -1523,7 +1476,7 @@ function BudgetEditModal({
   }
 
   const SelectedIcon = iconMap[icon] ?? iconMap['Circle']
-  const inputCls = 'w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500'
+  const inputCls = 'w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={handleClose}>
@@ -1575,9 +1528,9 @@ function BudgetEditModal({
 
           {/* Dirty indicator */}
           {isDirty && !showCloseConfirm && (
-            <div className="flex items-center gap-1.5 rounded-md bg-amber-50 px-3 py-1.5 border border-amber-200" data-testid="modal-dirty-indicator">
-              <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-              <span className="text-[11px] font-medium text-amber-700">Onopgeslagen wijzigingen</span>
+            <div className="flex items-center gap-1.5 rounded-md bg-kern-50 px-3 py-1.5 border border-kern-200" data-testid="modal-dirty-indicator">
+              <div className="h-2 w-2 rounded-full bg-kern-500 animate-pulse" />
+              <span className="text-[11px] font-medium text-kern-700">Onopgeslagen wijzigingen</span>
             </div>
           )}
           {/* Name + Icon */}
@@ -1585,7 +1538,7 @@ function BudgetEditModal({
             <button
               type="button"
               onClick={() => setShowIcons(!showIcons)}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-zinc-200 text-zinc-500 hover:border-amber-300 hover:bg-amber-50"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-zinc-200 text-zinc-500 hover:border-kern-300 hover:bg-kern-50"
             >
               <SelectedIcon className="h-5 w-5" />
             </button>
@@ -1608,7 +1561,7 @@ function BudgetEditModal({
                     onClick={() => { setIcon(iconName); setShowIcons(false) }}
                     className={`flex h-8 w-8 items-center justify-center rounded-lg border text-xs transition-colors ${
                       icon === iconName
-                        ? 'border-amber-500 bg-amber-50 text-amber-600'
+                        ? 'border-kern-500 bg-kern-50 text-kern-600'
                         : 'border-zinc-200 text-zinc-400 hover:border-zinc-300 hover:text-zinc-600'
                     }`}
                   >
@@ -1701,7 +1654,7 @@ function BudgetEditModal({
                 type="range" min="0" max="100"
                 value={alertThreshold}
                 onChange={(e) => setAlertThreshold(parseInt(e.target.value))}
-                className="w-full accent-amber-500"
+                className="w-full accent-kern-500"
               />
             </div>
             <div>
@@ -1721,7 +1674,7 @@ function BudgetEditModal({
                   onClick={() => setPriorityScore(score)}
                   className={`flex h-8 w-8 items-center justify-center rounded-lg border text-xs font-medium transition-colors ${
                     priorityScore === score
-                      ? 'border-amber-500 bg-amber-50 text-amber-700'
+                      ? 'border-kern-500 bg-kern-50 text-kern-700'
                       : 'border-zinc-200 text-zinc-400 hover:border-zinc-300'
                   }`}
                 >
@@ -1737,7 +1690,7 @@ function BudgetEditModal({
               <button
                 type="button"
                 onClick={() => setIsEssential(!isEssential)}
-                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${isEssential ? 'bg-amber-500' : 'bg-zinc-300'}`}
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${isEssential ? 'bg-kern-500' : 'bg-zinc-300'}`}
               >
                 <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${isEssential ? 'translate-x-4' : 'translate-x-0.5'}`} />
               </button>
@@ -1747,7 +1700,7 @@ function BudgetEditModal({
               <button
                 type="button"
                 onClick={() => setIsInflationIndexed(!isInflationIndexed)}
-                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${isInflationIndexed ? 'bg-amber-500' : 'bg-zinc-300'}`}
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${isInflationIndexed ? 'bg-kern-500' : 'bg-zinc-300'}`}
               >
                 <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${isInflationIndexed ? 'translate-x-4' : 'translate-x-0.5'}`} />
               </button>
@@ -1769,7 +1722,7 @@ function BudgetEditModal({
           <button
             onClick={handleSave}
             disabled={saving || !name.trim()}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
             {saving ? 'Opslaan...' : 'Opslaan'}

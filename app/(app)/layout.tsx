@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { AppHeader } from '@/components/app/app-header'
 import { ChatProvider } from '@/components/app/chat/chat-provider'
 import { ChatPanel } from '@/components/app/chat/chat-panel'
+import { ChatLayoutWrapper } from '@/components/app/chat/chat-layout-wrapper'
 import { FeatureAccessProvider } from '@/components/app/feature-access-provider'
 import { BottomNav } from '@/components/app/bottom-nav'
 import { MobilePreviewProvider } from '@/components/app/beheer/mobile-preview-provider'
@@ -13,8 +14,13 @@ import { SessionMonitor } from '@/components/app/session-monitor'
 import { AutoSnapshotTrigger } from '@/components/app/auto-snapshot-trigger'
 import { DailyExpenseProvider } from '@/components/app/freedom-time-label'
 import { PerspectiveProvider } from '@/components/app/perspective-provider'
+import { NotificationProvider } from '@/components/app/notifications/notification-provider'
+import { NotificationModal } from '@/components/app/notifications/notification-panel'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
 import { PHASES } from '@/lib/feature-phases'
+import { ModuleColorProvider } from '@/components/app/module-color-provider'
+import { generateModuleColorVars, DEFAULT_MODULE_COLORS } from '@/lib/color-palette'
+import type { ModuleColorConfig } from '@/lib/color-palette'
 
 export default async function AppLayout({
   children,
@@ -35,7 +41,7 @@ export default async function AppLayout({
   const dateStr = threeMonthsAgo.toISOString().split('T')[0]
 
   const [profileRes, assetsRes, debtsRes, txRes, matrixRes] = await Promise.all([
-    supabase.from('profiles').select('role, onboarding_completed, last_known_phase').eq('id', user.id).single(),
+    supabase.from('profiles').select('role, onboarding_completed, last_known_phase, module_colors').eq('id', user.id).single(),
     supabase.from('assets').select('current_value').eq('is_active', true),
     supabase.from('debts').select('current_balance, debt_type').eq('is_active', true),
     supabase.from('transactions').select('amount, is_income').gte('date', dateStr),
@@ -73,6 +79,14 @@ export default async function AppLayout({
     supabase.from('profiles').update({ last_known_phase: featureAccess.phase }).eq('id', user.id).then(() => {})
   }
 
+  // ── Module colors (SSR) ────────────────────────────────
+  const moduleColors: ModuleColorConfig = {
+    kern: (profile?.module_colors as Record<string, string> | null)?.kern || DEFAULT_MODULE_COLORS.kern,
+    wil: (profile?.module_colors as Record<string, string> | null)?.wil || DEFAULT_MODULE_COLORS.wil,
+    horizon: (profile?.module_colors as Record<string, string> | null)?.horizon || DEFAULT_MODULE_COLORS.horizon,
+  }
+  const colorVars = generateModuleColorVars(moduleColors)
+
   return (
     <MobilePreviewProvider>
       <MobilePreviewFrame>
@@ -81,18 +95,25 @@ export default async function AppLayout({
           <AutoSnapshotTrigger />
           <BadgeNotifier />
           <PerspectiveProvider>
-            <div className="min-h-screen bg-zinc-50">
-              <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
-              <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation}>
-                <DailyExpenseProvider>
-                  <main className="pb-20 md:pb-0">{children}</main>
-                  <BottomNav />
-                  <ChatProvider>
+            <ChatProvider>
+              <NotificationProvider>
+                <ModuleColorProvider initialConfig={moduleColors}>
+                  <div className="min-h-screen bg-zinc-50" style={colorVars as React.CSSProperties}>
+                    <ChatLayoutWrapper>
+                      <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
+                      <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation}>
+                        <DailyExpenseProvider>
+                          <main className="pb-20 md:pb-0">{children}</main>
+                          <BottomNav />
+                        </DailyExpenseProvider>
+                      </FeatureAccessProvider>
+                    </ChatLayoutWrapper>
                     <ChatPanel />
-                  </ChatProvider>
-                </DailyExpenseProvider>
-              </FeatureAccessProvider>
-            </div>
+                  </div>
+                </ModuleColorProvider>
+                <NotificationModal />
+              </NotificationProvider>
+            </ChatProvider>
           </PerspectiveProvider>
         </ToastProvider>
       </MobilePreviewFrame>

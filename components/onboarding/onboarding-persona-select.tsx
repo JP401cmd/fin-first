@@ -37,9 +37,9 @@ export function OnboardingPersonaSelect({
           const meta = PERSONAS[key].meta
           const colorClasses: Record<string, { bg: string; border: string; text: string }> = {
             red: { bg: 'bg-red-50', border: 'border-red-200 hover:border-red-400', text: 'text-red-700' },
-            teal: { bg: 'bg-teal-50', border: 'border-teal-200 hover:border-teal-400', text: 'text-teal-700' },
-            amber: { bg: 'bg-amber-50', border: 'border-amber-200 hover:border-amber-400', text: 'text-amber-700' },
-            purple: { bg: 'bg-purple-50', border: 'border-purple-200 hover:border-purple-400', text: 'text-purple-700' },
+            teal: { bg: 'bg-wil-50', border: 'border-wil-200 hover:border-wil-400', text: 'text-wil-700' },
+            amber: { bg: 'bg-kern-50', border: 'border-kern-200 hover:border-kern-400', text: 'text-kern-700' },
+            purple: { bg: 'bg-horizon-50', border: 'border-horizon-200 hover:border-horizon-400', text: 'text-horizon-700' },
           }
           const colors = colorClasses[meta.color] ?? colorClasses.amber
 

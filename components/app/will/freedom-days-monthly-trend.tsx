@@ -66,7 +66,7 @@ export function FreedomDaysMonthlyTrend({ completedActions }: FreedomDaysMonthly
         className="mb-4 flex flex-wrap gap-3 text-sm"
         data-testid="freedom-days-trend-summary"
       >
-        <span className="rounded-full bg-teal-50 px-3 py-1 font-medium text-teal-700" data-testid="trend-summary-current">
+        <span className="rounded-full bg-wil-50 px-3 py-1 font-medium text-wil-700" data-testid="trend-summary-current">
           Deze maand: +{formatDays(stats.current)} dagen
         </span>
         <span className="rounded-full bg-zinc-100 px-3 py-1 font-medium text-zinc-600" data-testid="trend-summary-average">
@@ -139,7 +139,7 @@ export function FreedomDaysMonthlyTrend({ completedActions }: FreedomDaysMonthly
                     x={x + barW / 2}
                     y={y - 4}
                     textAnchor="middle"
-                    className="fill-teal-700"
+                    className="fill-wil-700"
                     style={{ fontSize: 9, fontWeight: 600 }}
                   >
                     +{formatDays(m.days)}

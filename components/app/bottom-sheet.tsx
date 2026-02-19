@@ -37,7 +37,8 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 md:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 md:items-center transition-[right] duration-300"
+      style={{ right: 'var(--chat-sidebar-width, 0px)' }}
       onClick={handleBackdrop}
     >
       <div className="w-full max-h-[92vh] overflow-y-auto bg-white rounded-t-2xl md:mx-4 md:max-w-lg md:rounded-2xl safe-bottom">

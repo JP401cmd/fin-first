@@ -64,7 +64,7 @@ export function SimulationsModal({ input, open, onClose }: Props) {
     return (
       <BottomSheet open={true} onClose={onClose}>
           <div className="flex flex-col items-center justify-center p-12 py-10">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-horizon-500 border-t-transparent" />
             <p className="mt-4 text-sm text-zinc-500">
               Monte Carlo simulaties berekenen ({simCount.toLocaleString('nl-NL')} paden)...
             </p>
@@ -81,7 +81,7 @@ export function SimulationsModal({ input, open, onClose }: Props) {
           {/* Settings */}
           <button
             onClick={() => setShowSettings(!showSettings)}
-            className="flex items-center gap-1 text-xs font-medium text-purple-600 hover:text-purple-700"
+            className="flex items-center gap-1 text-xs font-medium text-horizon-600 hover:text-horizon-700"
           >
             Instellingen
             {showSettings ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -95,7 +95,7 @@ export function SimulationsModal({ input, open, onClose }: Props) {
                   <input
                     type="range" min={100} max={5000} step={100} value={simCount}
                     onChange={e => setSimCount(Number(e.target.value))}
-                    className="mt-1 w-full accent-purple-600"
+                    className="mt-1 w-full accent-horizon-600"
                   />
                   <div className="flex justify-between text-[10px] text-zinc-400">
                     <span>100</span><span>5.000</span>
@@ -106,7 +106,7 @@ export function SimulationsModal({ input, open, onClose }: Props) {
                   <input
                     type="range" min={10} max={60} step={5} value={projYears}
                     onChange={e => setProjYears(Number(e.target.value))}
-                    className="mt-1 w-full accent-purple-600"
+                    className="mt-1 w-full accent-horizon-600"
                   />
                   <div className="flex justify-between text-[10px] text-zinc-400">
                     <span>10 jaar</span><span>60 jaar</span>
@@ -119,10 +119,10 @@ export function SimulationsModal({ input, open, onClose }: Props) {
           {/* Confidence summary */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div
-              className="cursor-pointer rounded-xl border border-purple-200 bg-purple-50 p-5 text-center transition-colors hover:border-purple-300"
+              className="cursor-pointer rounded-xl border border-horizon-200 bg-horizon-50 p-5 text-center transition-colors hover:border-horizon-300"
               onClick={() => setSelectedMetric('fire_prob')}
             >
-              <p className="text-xs font-medium text-purple-600 uppercase">FIRE kans</p>
+              <p className="text-xs font-medium text-horizon-600 uppercase">FIRE kans</p>
               <p className="mt-1 text-4xl font-bold text-zinc-900">
                 {Math.round(mc.fireProb * 100)}%
               </p>
@@ -131,10 +131,10 @@ export function SimulationsModal({ input, open, onClose }: Props) {
               </p>
             </div>
             <div
-              className="cursor-pointer rounded-xl border border-purple-200 bg-purple-50 p-5 text-center transition-colors hover:border-purple-300"
+              className="cursor-pointer rounded-xl border border-horizon-200 bg-horizon-50 p-5 text-center transition-colors hover:border-horizon-300"
               onClick={() => setSelectedMetric('p50')}
             >
-              <p className="text-xs font-medium text-purple-600 uppercase">Verwachte FIRE leeftijd (P50)</p>
+              <p className="text-xs font-medium text-horizon-600 uppercase">Verwachte FIRE leeftijd (P50)</p>
               <p className="mt-1 text-4xl font-bold text-zinc-900">
                 {mc.p50FireAge !== null ? Math.round(mc.p50FireAge) : '-'}
               </p>
@@ -145,10 +145,10 @@ export function SimulationsModal({ input, open, onClose }: Props) {
               </p>
             </div>
             <div
-              className="cursor-pointer rounded-xl border border-purple-200 bg-purple-50 p-5 text-center transition-colors hover:border-purple-300"
+              className="cursor-pointer rounded-xl border border-horizon-200 bg-horizon-50 p-5 text-center transition-colors hover:border-horizon-300"
               onClick={() => setSelectedMetric('p10')}
             >
-              <p className="text-xs font-medium text-purple-600 uppercase">Beste scenario (P10)</p>
+              <p className="text-xs font-medium text-horizon-600 uppercase">Beste scenario (P10)</p>
               <p className="mt-1 text-4xl font-bold text-zinc-900">
                 {mc.p10FireAge !== null ? Math.round(mc.p10FireAge) : '-'}
               </p>
@@ -189,7 +189,7 @@ export function SimulationsModal({ input, open, onClose }: Props) {
             </div>
 
             {hoveredYear !== null && (
-              <div className="mt-3 rounded-lg border border-purple-200 bg-purple-50 p-4">
+              <div className="mt-3 rounded-lg border border-horizon-200 bg-horizon-50 p-4">
                 <p className="text-sm font-medium text-zinc-700">
                   {currentAge !== null ? `Leeftijd ${currentAge + hoveredYear}` : `Over ${hoveredYear} jaar`}
                 </p>
@@ -200,7 +200,7 @@ export function SimulationsModal({ input, open, onClose }: Props) {
                   </div>
                   <div>
                     <p className="text-xs text-zinc-500">P50 (mediaan)</p>
-                    <p className="text-sm font-bold text-purple-700">{formatCurrency(mc.percentiles.p50[hoveredYear])}</p>
+                    <p className="text-sm font-bold text-horizon-700">{formatCurrency(mc.percentiles.p50[hoveredYear])}</p>
                   </div>
                   <div>
                     <p className="text-xs text-zinc-500">P90 (best)</p>
@@ -313,7 +313,7 @@ function ConeChart({
       {fireInRange && (
         <>
           <line x1={PAD} y1={fireY} x2={W - PAD} y2={fireY} stroke="#8B5CB8" strokeWidth="1.5" strokeDasharray="6 3" />
-          <text x={W - PAD + 4} y={fireY + 3} className="fill-purple-500" style={{ fontSize: 9, fontWeight: 600 }}>FIRE</text>
+          <text x={W - PAD + 4} y={fireY + 3} className="fill-horizon-500" style={{ fontSize: 9, fontWeight: 600 }}>FIRE</text>
         </>
       )}
 
@@ -414,7 +414,7 @@ function SimulationDetailModal({
 
   return (
     <BottomSheet open={true} onClose={onClose}>
-        <div className="flex items-center justify-between border-b border-purple-200 bg-purple-50 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-horizon-200 bg-horizon-50 px-6 py-4">
           <h2 className="text-lg font-semibold text-zinc-900">{titles[metric]}</h2>
           <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
             <X className="h-5 w-5" />
@@ -452,8 +452,8 @@ function SimulationDetailModal({
                     {mc.p10FireAge !== null ? Math.round(mc.p10FireAge) : '-'}
                   </p>
                 </div>
-                <div className="rounded-lg bg-purple-50 p-3 text-center">
-                  <p className="text-xs text-purple-600">P50 (mediaan)</p>
+                <div className="rounded-lg bg-horizon-50 p-3 text-center">
+                  <p className="text-xs text-horizon-600">P50 (mediaan)</p>
                   <p className="mt-0.5 text-lg font-bold text-zinc-900">
                     {mc.p50FireAge !== null ? Math.round(mc.p50FireAge) : '-'}
                   </p>
@@ -501,7 +501,7 @@ function SimulationDetailModal({
                     </span>
                     <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100">
                       <div
-                        className="h-full rounded-full bg-purple-500 transition-all"
+                        className="h-full rounded-full bg-horizon-500 transition-all"
                         style={{ width: `${Math.min(pctOfFire, 100)}%` }}
                       />
                     </div>

@@ -36,9 +36,9 @@ const DISCOVER_ITEMS: DiscoverItem[] = [
 ]
 
 const MODULE_COLORS: Record<string, { bg: string; border: string; text: string; dot: string }> = {
-  kern:    { bg: 'bg-amber-50',  border: 'border-amber-200', text: 'text-amber-700',  dot: 'bg-amber-400' },
-  wil:     { bg: 'bg-teal-50',   border: 'border-teal-200',  text: 'text-teal-700',   dot: 'bg-teal-400' },
-  horizon: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', dot: 'bg-purple-400' },
+  kern:    { bg: 'bg-kern-50',  border: 'border-kern-200', text: 'text-kern-700',  dot: 'bg-kern-400' },
+  wil:     { bg: 'bg-wil-50',   border: 'border-wil-200',  text: 'text-wil-700',   dot: 'bg-wil-400' },
+  horizon: { bg: 'bg-horizon-50', border: 'border-horizon-200', text: 'text-horizon-700', dot: 'bg-horizon-400' },
 }
 
 const STORAGE_KEY = 'discover_visited_features'
@@ -216,7 +216,7 @@ export function DiscoverCarousel({ module }: DiscoverCarouselProps) {
               className={`group flex w-[260px] shrink-0 flex-col rounded-xl border p-4 transition-all hover:shadow-md ${
                 isVisited
                   ? 'border-zinc-100 bg-zinc-50/50 opacity-60 hover:opacity-80'
-                  : `${colors.border} ${colors.bg} hover:shadow-${item.module === 'kern' ? 'amber' : item.module === 'wil' ? 'teal' : 'purple'}-100`
+                  : `${colors.border} ${colors.bg} hover:shadow-${item.module === 'kern' ? 'kern' : item.module === 'wil' ? 'wil' : 'horizon'}-100`
               }`}
             >
               <div className="mb-2 flex items-center gap-2">

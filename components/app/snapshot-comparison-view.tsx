@@ -258,7 +258,7 @@ function MonthSelector({
         <select
           value={selectedKey}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full appearance-none rounded-lg border border-zinc-200 bg-white px-3 py-2 pr-8 text-sm font-medium text-zinc-800 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
+          className="w-full appearance-none rounded-lg border border-zinc-200 bg-white px-3 py-2 pr-8 text-sm font-medium text-zinc-800 focus:border-kern-400 focus:outline-none focus:ring-2 focus:ring-kern-100"
           data-testid={testId}
         >
           {monthKeys.map(key => (
@@ -353,8 +353,8 @@ export function SnapshotComparisonView({ snapshots }: SnapshotComparisonViewProp
 
       {/* Same month warning */}
       {monthA === monthB && (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
-          <p className="text-sm text-amber-700">
+        <div className="mb-4 rounded-lg border border-kern-200 bg-kern-50 p-3 text-center">
+          <p className="text-sm text-kern-700">
             Je vergelijkt dezelfde maand. Kies twee verschillende maanden voor een zinvolle vergelijking.
           </p>
         </div>

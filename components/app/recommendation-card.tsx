@@ -24,7 +24,7 @@ export function RecommendationCard({ recommendation, onClick }: RecommendationCa
     <button
       type="button"
       onClick={onClick}
-      className={`relative w-full cursor-pointer overflow-hidden rounded-xl border ${colors.border} bg-gradient-to-br from-teal-50 via-white to-amber-50/30 px-4 py-3 text-left transition-all hover:shadow-md`}
+      className={`relative w-full cursor-pointer overflow-hidden rounded-xl border ${colors.border} bg-gradient-to-br from-wil-50 via-white to-kern-50/30 px-4 py-3 text-left transition-all hover:shadow-md`}
     >
       <div className="flex items-center gap-3">
         {/* Type icon */}
@@ -54,7 +54,7 @@ export function RecommendationCard({ recommendation, onClick }: RecommendationCa
         {/* Freedom days */}
         {recommendation.freedom_days_per_year != null && recommendation.freedom_days_per_year > 0 && (
           <div className="shrink-0 text-right">
-            <div className="text-sm font-bold text-teal-600">
+            <div className="text-sm font-bold text-wil-600">
               {Math.round(recommendation.freedom_days_per_year)} dagen
             </div>
           </div>
@@ -64,7 +64,7 @@ export function RecommendationCard({ recommendation, onClick }: RecommendationCa
         {recommendation.priority_score != null && recommendation.priority_score > 0 && (
           <div className="flex shrink-0 items-center gap-0.5">
             {Array.from({ length: recommendation.priority_score }).map((_, i) => (
-              <Sparkles key={i} className="h-3 w-3 text-amber-400" />
+              <Sparkles key={i} className="h-3 w-3 text-kern-400" />
             ))}
           </div>
         )}

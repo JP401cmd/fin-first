@@ -24,7 +24,7 @@ export function Box3ScenarioModal({
   const [tab, setTab] = useState<'shift' | 'compare'>('shift')
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 transition-[right] duration-300" style={{ right: 'var(--chat-sidebar-width, 0px)' }} onClick={onClose}>
       <div
         className="w-full max-w-xl rounded-2xl bg-white shadow-xl overflow-y-auto"
         style={{ maxHeight: '90vh' }}
@@ -43,7 +43,7 @@ export function Box3ScenarioModal({
           <button
             onClick={() => setTab('shift')}
             className={`flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-              tab === 'shift' ? 'border-amber-500 text-amber-700' : 'border-transparent text-zinc-400 hover:text-zinc-600'
+              tab === 'shift' ? 'border-kern-500 text-kern-700' : 'border-transparent text-zinc-400 hover:text-zinc-600'
             }`}
           >
             <ArrowRightLeft className="h-3.5 w-3.5" />
@@ -52,7 +52,7 @@ export function Box3ScenarioModal({
           <button
             onClick={() => setTab('compare')}
             className={`flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-              tab === 'compare' ? 'border-amber-500 text-amber-700' : 'border-transparent text-zinc-400 hover:text-zinc-600'
+              tab === 'compare' ? 'border-kern-500 text-kern-700' : 'border-transparent text-zinc-400 hover:text-zinc-600'
             }`}
           >
             <GitCompare className="h-3.5 w-3.5" />
@@ -95,7 +95,7 @@ function ShiftTab({ input, result }: { input: Box3Input; result: Box3Result }) {
       <div className="mb-6">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-xs text-zinc-500">Beleggingen &rarr; Spaargeld</span>
-          <span className="text-sm font-semibold text-amber-700">{formatCurrency(shiftAmount)}</span>
+          <span className="text-sm font-semibold text-kern-700">{formatCurrency(shiftAmount)}</span>
         </div>
         <input
           type="range"
@@ -104,7 +104,7 @@ function ShiftTab({ input, result }: { input: Box3Input; result: Box3Result }) {
           step={1000}
           value={shiftAmount}
           onChange={e => setShiftAmount(Number(e.target.value))}
-          className="w-full accent-amber-500"
+          className="w-full accent-kern-500"
         />
         <div className="mt-1 flex justify-between text-[10px] text-zinc-400">
           <span>{formatCurrency(0)}</span>
@@ -166,8 +166,8 @@ function CompareTab({ input, result }: { input: Box3Input; result: Box3Result })
       </p>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <p className="text-xs font-semibold text-amber-700">{result.year}</p>
+        <div className="rounded-xl border border-kern-200 bg-kern-50 p-4">
+          <p className="text-xs font-semibold text-kern-700">{result.year}</p>
           <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(result.belasting)}</p>
           <div className="mt-3 space-y-1 text-xs text-zinc-500">
             <p>Forfait spaargeld: {(params1.forfaitSpaargeld * 100).toFixed(2)}%</p>

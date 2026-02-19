@@ -39,9 +39,9 @@ export const GOAL_TYPE_ICONS: Record<GoalType, string> = {
 }
 
 export const GOAL_COLORS = [
-  { value: 'teal', label: 'Teal', class: 'bg-teal-500' },
-  { value: 'amber', label: 'Amber', class: 'bg-amber-500' },
-  { value: 'purple', label: 'Paars', class: 'bg-purple-500' },
+  { value: 'teal', label: 'Teal', class: 'bg-wil-500' },
+  { value: 'amber', label: 'Amber', class: 'bg-kern-500' },
+  { value: 'purple', label: 'Paars', class: 'bg-horizon-500' },
   { value: 'emerald', label: 'Groen', class: 'bg-emerald-500' },
   { value: 'red', label: 'Rood', class: 'bg-red-500' },
   { value: 'blue', label: 'Blauw', class: 'bg-blue-500' },
@@ -99,9 +99,9 @@ export function getGoalColorClasses(color: string): {
 } {
   switch (color) {
     case 'amber':
-      return { bg: 'bg-amber-500', bgLight: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200', bar: 'bg-amber-500' }
+      return { bg: 'bg-kern-500', bgLight: 'bg-kern-50', text: 'text-kern-600', border: 'border-kern-200', bar: 'bg-kern-500' }
     case 'purple':
-      return { bg: 'bg-purple-500', bgLight: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200', bar: 'bg-purple-500' }
+      return { bg: 'bg-horizon-500', bgLight: 'bg-horizon-50', text: 'text-horizon-600', border: 'border-horizon-200', bar: 'bg-horizon-500' }
     case 'emerald':
       return { bg: 'bg-emerald-500', bgLight: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200', bar: 'bg-emerald-500' }
     case 'red':
@@ -110,6 +110,6 @@ export function getGoalColorClasses(color: string): {
       return { bg: 'bg-blue-500', bgLight: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200', bar: 'bg-blue-500' }
     case 'teal':
     default:
-      return { bg: 'bg-teal-500', bgLight: 'bg-teal-50', text: 'text-teal-600', border: 'border-teal-200', bar: 'bg-teal-500' }
+      return { bg: 'bg-wil-500', bgLight: 'bg-wil-50', text: 'text-wil-600', border: 'border-wil-200', bar: 'bg-wil-500' }
   }
 }

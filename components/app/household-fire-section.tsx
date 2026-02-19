@@ -119,13 +119,13 @@ export function HouseholdFireSection() {
     return (
       <section className="mt-10" data-testid="household-fire-section">
         <div className="mb-3 flex items-center gap-2">
-          <Users className="h-4 w-4 text-purple-500" />
+          <Users className="h-4 w-4 text-horizon-500" />
           <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
             Huishouden FIRE Projecties
           </h2>
         </div>
         <div className="flex items-center justify-center rounded-xl border border-zinc-200 bg-white p-12">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-horizon-500 border-t-transparent" />
         </div>
       </section>
     )
@@ -141,7 +141,7 @@ export function HouseholdFireSection() {
       {/* Section Header */}
       <div className="mb-5">
         <div className="flex items-center gap-2">
-          <Users className="h-4 w-4 text-purple-500" />
+          <Users className="h-4 w-4 text-horizon-500" />
           <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
             {householdName} — FIRE Projecties
           </h2>
@@ -152,46 +152,46 @@ export function HouseholdFireSection() {
       </div>
 
       {/* Combined Household Hero Card */}
-      <div className="rounded-xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-white p-6" data-testid="household-combined-card">
+      <div className="rounded-xl border-2 border-horizon-200 bg-gradient-to-br from-horizon-50 to-white p-6" data-testid="household-combined-card">
         <div className="mb-4 flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100">
-            <Users className="h-4 w-4 text-purple-600" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-horizon-100">
+            <Users className="h-4 w-4 text-horizon-600" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-purple-900">Gedeeld FIRE-doel</p>
-            <p className="text-xs text-purple-600/60">Gecombineerde projectie voor het huishouden</p>
+            <p className="text-sm font-semibold text-horizon-900">Gedeeld FIRE-doel</p>
+            <p className="text-xs text-horizon-600/60">Gecombineerde projectie voor het huishouden</p>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4" data-testid="household-combined-kpis">
           {/* Combined Freedom % */}
           <div>
-            <p className="text-[10px] font-medium text-purple-600/50 uppercase">Vrijheid</p>
-            <p className="text-2xl font-bold text-purple-700" data-testid="combined-freedom-pct">
+            <p className="text-[10px] font-medium text-horizon-600/50 uppercase">Vrijheid</p>
+            <p className="text-2xl font-bold text-horizon-700" data-testid="combined-freedom-pct">
               {combined.projection.freedomPercentage.toFixed(1)}%
             </p>
           </div>
 
           {/* Combined FIRE Age */}
           <div>
-            <p className="text-[10px] font-medium text-purple-600/50 uppercase">FIRE leeftijd</p>
-            <p className="text-2xl font-bold text-purple-700" data-testid="combined-fire-age">
+            <p className="text-[10px] font-medium text-horizon-600/50 uppercase">FIRE leeftijd</p>
+            <p className="text-2xl font-bold text-horizon-700" data-testid="combined-fire-age">
               {combined.projection.fireAge !== null ? Math.round(combined.projection.fireAge) : '-'}
             </p>
           </div>
 
           {/* Combined FIRE Target */}
           <div>
-            <p className="text-[10px] font-medium text-purple-600/50 uppercase">FIRE-doel</p>
-            <p className="text-lg font-bold text-purple-700" data-testid="combined-fire-target">
+            <p className="text-[10px] font-medium text-horizon-600/50 uppercase">FIRE-doel</p>
+            <p className="text-lg font-bold text-horizon-700" data-testid="combined-fire-target">
               {formatCurrency(combined.projection.fireTarget)}
             </p>
           </div>
 
           {/* Combined Freedom Time */}
           <div>
-            <p className="text-[10px] font-medium text-purple-600/50 uppercase">Vrijheidstijd</p>
-            <p className="text-lg font-bold text-purple-700" data-testid="combined-freedom-time">
+            <p className="text-[10px] font-medium text-horizon-600/50 uppercase">Vrijheidstijd</p>
+            <p className="text-lg font-bold text-horizon-700" data-testid="combined-freedom-time">
               {combined.projection.freedomYears}j {combined.projection.freedomMonths}mnd
             </p>
           </div>
@@ -199,14 +199,14 @@ export function HouseholdFireSection() {
 
         {/* Progress bar */}
         <div className="mt-4">
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-purple-100">
+          <div className="h-2.5 w-full overflow-hidden rounded-full bg-horizon-100">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-purple-600 to-purple-400 transition-all duration-1000"
+              className="h-full rounded-full bg-gradient-to-r from-horizon-600 to-horizon-400 transition-all duration-1000"
               style={{ width: `${Math.max(Math.min(combined.projection.freedomPercentage, 100), 0)}%` }}
               data-testid="combined-progress-bar"
             />
           </div>
-          <div className="mt-1 flex justify-between text-[10px] text-purple-400">
+          <div className="mt-1 flex justify-between text-[10px] text-horizon-400">
             <span>0%</span>
             <span>{combined.projection.fireDate}</span>
             <span>100%</span>
@@ -217,7 +217,7 @@ export function HouseholdFireSection() {
       {/* Combined Financial Summary */}
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" data-testid="household-combined-financials">
         <FinancialCard
-          icon={<PiggyBank className="h-4 w-4 text-purple-600" />}
+          icon={<PiggyBank className="h-4 w-4 text-horizon-600" />}
           label="Gecomb. vermogen"
           value={formatCurrency(comparison.combinedNetWorth)}
           testId="combined-net-worth"
@@ -329,12 +329,12 @@ export function HouseholdFireSection() {
           </div>
 
           {/* Combined vs Individual insight */}
-          <div className="mt-4 rounded-xl border border-purple-100 bg-purple-50/50 p-4" data-testid="household-insight">
+          <div className="mt-4 rounded-xl border border-horizon-100 bg-horizon-50/50 p-4" data-testid="household-insight">
             <div className="flex items-start gap-3">
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-purple-500" />
-              <div className="text-sm text-purple-800">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-horizon-500" />
+              <div className="text-sm text-horizon-800">
                 <p className="font-medium">Samen sterker</p>
-                <p className="mt-1 text-purple-700/80">
+                <p className="mt-1 text-horizon-700/80">
                   {combined.projection.fireAge !== null && partners.every(p => p.projection.fireAge !== null) ? (
                     (() => {
                       const avgIndividual = partners.reduce((sum, p) => sum + (p.projection.fireAge ?? 0), 0) / partners.length
@@ -408,8 +408,8 @@ function PartnerCard({
   otherPartner: PartnerProjection | null
 }) {
   const colors = partnerIndex === 0
-    ? { border: 'border-purple-200', bg: 'bg-purple-50/30', accent: 'text-purple-700', icon: 'bg-purple-100 text-purple-600', bar: 'from-purple-600 to-purple-400' }
-    : { border: 'border-teal-200', bg: 'bg-teal-50/30', accent: 'text-teal-700', icon: 'bg-teal-100 text-teal-600', bar: 'from-teal-600 to-teal-400' }
+    ? { border: 'border-horizon-200', bg: 'bg-horizon-50/30', accent: 'text-horizon-700', icon: 'bg-horizon-100 text-horizon-600', bar: 'from-horizon-600 to-horizon-400' }
+    : { border: 'border-wil-200', bg: 'bg-wil-50/30', accent: 'text-wil-700', icon: 'bg-wil-100 text-wil-600', bar: 'from-wil-600 to-wil-400' }
 
   const name = partner.fullName ?? (partner.isCurrentUser ? 'Jij' : 'Partner')
 
@@ -489,7 +489,7 @@ function PartnerCard({
           <span className="font-medium">{formatCurrency(partner.financials.monthlyExpenses)}</span>
         </div>
         {partner.financials.sharedAssetsValue > 0 && (
-          <div className="flex justify-between text-purple-600/70">
+          <div className="flex justify-between text-horizon-600/70">
             <span>Gedeeld vermogen (aandeel)</span>
             <span className="font-medium">{formatCurrency(partner.financials.sharedAssetsValue)}</span>
           </div>
@@ -521,7 +521,7 @@ function ComparisonBar({
           const isLeading = Math.abs(v.value) >= Math.abs(values[1 - i]?.value ?? 0)
           const barColor = invertColors
             ? (isLeading ? 'bg-amber-400' : 'bg-emerald-400')
-            : (i === 0 ? 'bg-purple-400' : 'bg-teal-400')
+            : (i === 0 ? 'bg-horizon-400' : 'bg-wil-400')
 
           return (
             <div key={v.name} className="flex items-center gap-2">

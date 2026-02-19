@@ -44,6 +44,105 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'fin_prod_0.7',
+    date: '2026-02-19',
+    title: 'Identiteit, bankkoppeling & dynamische kleuren',
+    sections: [
+      {
+        module: 'Identiteit',
+        color: 'teal',
+        items: [
+          {
+            title: 'Identiteit-module compleet herontworpen',
+            description: 'Nieuwe modulehub met subpagina\'s voor Profiel, Voortgang, Delen en Instellingen. Inclusief module-navigatie en breadcrumbs.',
+          },
+          {
+            title: 'Profielpagina met huishoudprofiel',
+            description: 'Beheer je persoonlijke gegevens (naam, geboortedatum, land), huishoudtype en NIBUD-profiel (kinderen, woningtype, energielabel, auto, netto inkomen).',
+          },
+          {
+            title: 'Voortgang: streaks, badges & prestaties',
+            description: 'Overzicht van je actiestreaks, verdiende badges en sovereignty-voortgang op een centrale voortgangspagina.',
+          },
+          {
+            title: 'Delen: vrijheidskaart & jaaroverzicht',
+            description: 'Deel je financiële vrijheidsvoortgang via een visuele kaart of bekijk je jaaroverzicht.',
+          },
+          {
+            title: 'Instellingen: notificatievoorkeuren & databeheer',
+            description: 'Toggle notificaties per type (budget, streaks, syncs, aanbevelingen, inzichten, badges, level-ups). Reset-knop om alle data te wissen.',
+          },
+          {
+            title: 'Vrije kleurenwaaier per module',
+            description: 'Kies op de profielpagina een eigen accentkleur per module. Het systeem genereert automatisch een 11-staps kleurenpalet via OKLCH met live preview.',
+          },
+        ],
+      },
+      {
+        module: 'De Kern',
+        color: 'amber',
+        items: [
+          {
+            title: 'GoCardless automatische bankkoppeling',
+            description: 'Koppel je Nederlandse bankrekening via GoCardless. Selecteer je bank, doorloop de OAuth-autorisatie en importeer transacties automatisch met deduplicatie.',
+          },
+          {
+            title: 'Verbonden rekeningen met sync-status',
+            description: 'Overzicht van gekoppelde bankrekeningen met laatste sync-tijd, dagelijks quotum (10/dag), herautoresatie-waarschuwingen en sync/ontkoppel-acties.',
+          },
+          {
+            title: 'Kassabon-modals voor KPI-berekeningen',
+            description: 'Klikbare KPI-kaarten openen kassabon-breakdowns voor Geschat Jaarinkomen, Must Uitgaven, Spaarquote en FIRE-bedrag met formules en regelitems.',
+          },
+        ],
+      },
+      {
+        module: 'De Wil',
+        color: 'teal',
+        items: [
+          {
+            title: 'Slimmere AI-aanbevelingen zonder duplicaten',
+            description: 'AI controleert nu actief op bestaande acties (open, afgerond, afgewezen) en aanbevelingen voordat het nieuwe suggesties doet. Voorkomt dubbele aanbevelingen.',
+          },
+          {
+            title: 'Chat standaard op De Wil',
+            description: 'De AI-chat opent nu standaard in De Wil-context in plaats van De Kern, passend bij de coachende rol van de module.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Dynamisch kleursysteem',
+            description: 'Alle 80+ bestanden omgezet van hardcoded amber/teal/purple naar semantische tokens (kern-*, wil-*, horizon-*). Ondersteunt alle Tailwind utilities inclusief opacity-modifiers.',
+          },
+          {
+            title: 'OKLCH palette generator',
+            description: 'Pure TypeScript kleurengenerator (~170 regels, nul dependencies) die vanuit één hex-kleur alle 11 tinten berekent met correcte lightness-curve, chroma bell-curve en sRGB gamut clamping.',
+          },
+          {
+            title: 'Server-side kleurinjectie (flash-preventie)',
+            description: 'Module-kleuren worden server-side opgehaald en als inline CSS-variabelen geïnjecteerd. Juiste kleuren direct zichtbaar bij eerste render.',
+          },
+          {
+            title: 'Notificatie-API',
+            description: 'Centrale notificatie-endpoint die budget-alerts, streak-waarschuwingen, badge-notificaties, sync-updates en aanbevelingen aggregeert met leesmarkering en voorkeuren.',
+          },
+          {
+            title: 'GoCardless beheer-paneel',
+            description: 'Admin-pagina voor GoCardless-configuratie: API-credentials, sandbox/productie-omgeving, feature toggle en verbindingstest.',
+          },
+          {
+            title: 'Nieuwe standaardkleuren',
+            description: 'Bruin (#6b4339) voor De Kern, paars (#3d3048) voor De Wil en zandgoud (#c4a06b) voor De Horizon — gekozen voor aarde, daadkracht en licht.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: 'fin_prod_0.6',
     date: '2026-02-18',
     title: 'Voorspellingen, trendgrafieken & holdings-beheer',

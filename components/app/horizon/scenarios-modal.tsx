@@ -109,8 +109,8 @@ export function ScenariosModal({ input, debts = [], open, onClose }: Props) {
                   onClick={() => setWeather(key)}
                   className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                     weather === key
-                      ? 'bg-purple-600 text-white'
-                      : 'border border-zinc-200 bg-white text-zinc-600 hover:border-purple-200 hover:bg-purple-50'
+                      ? 'bg-horizon-600 text-white'
+                      : 'border border-zinc-200 bg-white text-zinc-600 hover:border-horizon-200 hover:bg-horizon-50'
                   }`}
                 >
                   {val.label}
@@ -170,10 +170,10 @@ function ScenarioCard({
 }: {
   title: string; subtitle: string; color: 'red' | 'purple' | 'green'; fireAge: number | null; description: string; onClick?: () => void
 }) {
-  const borderClass = color === 'red' ? 'border-red-200' : color === 'green' ? 'border-emerald-200' : 'border-purple-200'
-  const bgClass = color === 'red' ? 'bg-red-50' : color === 'green' ? 'bg-emerald-50' : 'bg-purple-50'
-  const textClass = color === 'red' ? 'text-red-600' : color === 'green' ? 'text-emerald-600' : 'text-purple-600'
-  const hoverClass = color === 'red' ? 'hover:border-red-300' : color === 'green' ? 'hover:border-emerald-300' : 'hover:border-purple-300'
+  const borderClass = color === 'red' ? 'border-red-200' : color === 'green' ? 'border-emerald-200' : 'border-horizon-200'
+  const bgClass = color === 'red' ? 'bg-red-50' : color === 'green' ? 'bg-emerald-50' : 'bg-horizon-50'
+  const textClass = color === 'red' ? 'text-red-600' : color === 'green' ? 'text-emerald-600' : 'text-horizon-600'
+  const hoverClass = color === 'red' ? 'hover:border-red-300' : color === 'green' ? 'hover:border-emerald-300' : 'hover:border-horizon-300'
 
   return (
     <div className={`cursor-pointer rounded-xl border ${borderClass} ${bgClass} ${hoverClass} p-5 transition-colors`} onClick={onClick}>
@@ -198,7 +198,7 @@ function ScenarioDetailModal({
 }) {
   const colorMap: Record<string, { border: string; text: string; bg: string }> = {
     drifter: { border: 'border-red-200', text: 'text-red-600', bg: 'bg-red-50' },
-    current: { border: 'border-purple-200', text: 'text-purple-600', bg: 'bg-purple-50' },
+    current: { border: 'border-horizon-200', text: 'text-horizon-600', bg: 'bg-horizon-50' },
     optimizer: { border: 'border-emerald-200', text: 'text-emerald-600', bg: 'bg-emerald-50' },
   }
   const c = colorMap[scenario.name] ?? colorMap.current
@@ -285,7 +285,7 @@ function ResilienceBar({ label, value, max }: { label: string; value: number; ma
       <span className="w-24 text-xs text-zinc-500">{label}</span>
       <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100">
         <div
-          className="h-full rounded-full bg-purple-500 transition-all duration-500"
+          className="h-full rounded-full bg-horizon-500 transition-all duration-500"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -343,7 +343,7 @@ function DivergingPathsChart({ scenarios, fireTarget }: { scenarios: ScenarioPat
       {fireInRange && (
         <>
           <line x1={PAD} y1={fireY} x2={W - PAD} y2={fireY} stroke="#8B5CB8" strokeWidth="1" strokeDasharray="6 3" opacity="0.5" />
-          <text x={W - PAD + 4} y={fireY + 3} className="fill-purple-400" style={{ fontSize: 9 }}>FIRE</text>
+          <text x={W - PAD + 4} y={fireY + 3} className="fill-horizon-400" style={{ fontSize: 9 }}>FIRE</text>
         </>
       )}
 
@@ -394,7 +394,7 @@ function DebtStrategyComparison({ debts }: { debts: Debt[] }) {
   return (
     <section>
       <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-        <TrendingDown className="mr-1.5 inline h-3.5 w-3.5 text-purple-500" />
+        <TrendingDown className="mr-1.5 inline h-3.5 w-3.5 text-horizon-500" />
         Aflossingsstrategieën vergelijken
       </h2>
       <p className="mb-4 text-sm text-zinc-500">
@@ -413,7 +413,7 @@ function DebtStrategyComparison({ debts }: { debts: Debt[] }) {
           step={25}
           value={extraMonthly}
           onChange={(e) => setExtraMonthly(Number(e.target.value))}
-          className="mt-2 w-full accent-purple-600"
+          className="mt-2 w-full accent-horizon-600"
         />
         <div className="flex justify-between text-[10px] text-zinc-400">
           <span>{formatCurrency(0)}</span>
@@ -582,7 +582,7 @@ function StrategyDetail({
         <div className="space-y-2">
           {payoffOrder.map((debt, i) => (
             <div key={debt.name} className="flex items-center gap-3">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-purple-100 text-xs font-bold text-purple-700">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-horizon-100 text-xs font-bold text-horizon-700">
                 {i + 1}
               </span>
               <div className="min-w-0 flex-1">

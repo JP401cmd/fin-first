@@ -5,12 +5,53 @@
   --foreground: #171717;
   --header-height: 57px;
 
-  --color-kern: #D4A843;
-  --color-kern-light: #FFF8E1;
-  --color-wil: #3CC8C8;
-  --color-wil-light: #E0FFFF;
-  --color-horizon: #8B5CB8;
-  --color-horizon-light: #EDE0FF;
+  /* Legacy module colors (kept for backward compat) */
+  --color-kern: #6b4339;
+  --color-kern-light: #f0e8e5;
+  --color-wil: #3d3048;
+  --color-wil-light: #ebe7ef;
+  --color-horizon: #c4a06b;
+  --color-horizon-light: #f7f0e4;
+
+  /* ── Module color palettes (overridden by user preferences) ── */
+  /* Kern: Bruin #6b4339 — aarde, stabiliteit, waarheid */
+  --color-kern-50: oklch(0.902 0.0036 34.7);
+  --color-kern-100: oklch(0.855 0.0088 34.7);
+  --color-kern-200: oklch(0.771 0.0175 34.7);
+  --color-kern-300: oklch(0.666 0.0311 34.7);
+  --color-kern-400: oklch(0.538 0.0467 34.7);
+  --color-kern-500: oklch(0.427 0.0584 34.7);
+  --color-kern-600: oklch(0.386 0.0649 34.7);
+  --color-kern-700: oklch(0.345 0.0571 34.7);
+  --color-kern-800: oklch(0.315 0.0474 34.7);
+  --color-kern-900: oklch(0.301 0.0383 34.7);
+  --color-kern-950: oklch(0.202 0.026 34.7);
+
+  /* Wil: Paars #3d3048 — daadkracht, intentie */
+  --color-wil-50: oklch(0.875 0.0027 308.8);
+  --color-wil-100: oklch(0.82 0.0067 308.8);
+  --color-wil-200: oklch(0.721 0.0134 308.8);
+  --color-wil-300: oklch(0.602 0.0238 308.8);
+  --color-wil-400: oklch(0.46 0.0357 308.8);
+  --color-wil-500: oklch(0.334 0.0446 308.8);
+  --color-wil-600: oklch(0.308 0.0496 308.8);
+  --color-wil-700: oklch(0.281 0.0436 308.8);
+  --color-wil-800: oklch(0.265 0.0362 308.8);
+  --color-wil-900: oklch(0.266 0.0293 308.8);
+  --color-wil-950: oklch(0.175 0.0198 308.8);
+
+  /* Horizon: Zandgoud #c4a06b — toekomst, licht */
+  --color-horizon-50: oklch(0.992 0.005 76.6);
+  --color-horizon-100: oklch(0.968 0.0123 76.6);
+  --color-horizon-200: oklch(0.93 0.0246 76.6);
+  --color-horizon-300: oklch(0.872 0.0437 76.6);
+  --color-horizon-400: oklch(0.791 0.0655 76.6);
+  --color-horizon-500: oklch(0.726 0.0819 76.6);
+  --color-horizon-600: oklch(0.639 0.091 76.6);
+  --color-horizon-700: oklch(0.551 0.08 76.6);
+  --color-horizon-800: oklch(0.474 0.0664 76.6);
+  --color-horizon-900: oklch(0.414 0.0537 76.6);
+  --color-horizon-950: oklch(0.292 0.0364 76.6);
 
   --safe-area-top: env(safe-area-inset-top, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
@@ -25,6 +66,43 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-serif: var(--font-cormorant);
+
+  /* ── Module color tokens (enables bg-kern-500, text-wil-700, etc.) ── */
+  --color-kern-50: var(--color-kern-50);
+  --color-kern-100: var(--color-kern-100);
+  --color-kern-200: var(--color-kern-200);
+  --color-kern-300: var(--color-kern-300);
+  --color-kern-400: var(--color-kern-400);
+  --color-kern-500: var(--color-kern-500);
+  --color-kern-600: var(--color-kern-600);
+  --color-kern-700: var(--color-kern-700);
+  --color-kern-800: var(--color-kern-800);
+  --color-kern-900: var(--color-kern-900);
+  --color-kern-950: var(--color-kern-950);
+
+  --color-wil-50: var(--color-wil-50);
+  --color-wil-100: var(--color-wil-100);
+  --color-wil-200: var(--color-wil-200);
+  --color-wil-300: var(--color-wil-300);
+  --color-wil-400: var(--color-wil-400);
+  --color-wil-500: var(--color-wil-500);
+  --color-wil-600: var(--color-wil-600);
+  --color-wil-700: var(--color-wil-700);
+  --color-wil-800: var(--color-wil-800);
+  --color-wil-900: var(--color-wil-900);
+  --color-wil-950: var(--color-wil-950);
+
+  --color-horizon-50: var(--color-horizon-50);
+  --color-horizon-100: var(--color-horizon-100);
+  --color-horizon-200: var(--color-horizon-200);
+  --color-horizon-300: var(--color-horizon-300);
+  --color-horizon-400: var(--color-horizon-400);
+  --color-horizon-500: var(--color-horizon-500);
+  --color-horizon-600: var(--color-horizon-600);
+  --color-horizon-700: var(--color-horizon-700);
+  --color-horizon-800: var(--color-horizon-800);
+  --color-horizon-900: var(--color-horizon-900);
+  --color-horizon-950: var(--color-horizon-950);
 }
 
 /* Landing page animations */

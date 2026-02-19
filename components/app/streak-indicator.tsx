@@ -249,7 +249,7 @@ export function StreakIndicator() {
                 <span className="text-sm font-medium text-zinc-800">Acties</span>
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-sm font-bold text-teal-600" data-testid="streak-action-count">{actionCount}</span>
+                <span className="text-sm font-bold text-wil-600" data-testid="streak-action-count">{actionCount}</span>
                 <span className="text-xs text-zinc-400">{actionCount === 1 ? 'week' : 'weken'}</span>
               </div>
             </div>

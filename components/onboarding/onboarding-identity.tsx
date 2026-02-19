@@ -276,7 +276,7 @@ export function OnboardingIdentity({
         {/* Next button */}
         <button
           onClick={handleNext}
-          className="w-full rounded-lg bg-teal-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-lg bg-wil-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-wil-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Volgende
         </button>

@@ -7,19 +7,19 @@ import { useFeatureAccess } from '@/components/app/feature-access-provider'
 
 const colorStyles: Record<DomainColor, { active: string; hover: string; border: string }> = {
   amber: {
-    active: 'text-amber-700 border-amber-500',
-    hover: 'hover:text-amber-600 hover:border-amber-300',
-    border: 'border-b-amber-100',
+    active: 'text-kern-700 border-kern-500',
+    hover: 'hover:text-kern-600 hover:border-kern-300',
+    border: 'border-b-kern-100',
   },
   teal: {
-    active: 'text-teal-700 border-teal-500',
-    hover: 'hover:text-teal-600 hover:border-teal-300',
-    border: 'border-b-teal-100',
+    active: 'text-wil-700 border-wil-500',
+    hover: 'hover:text-wil-600 hover:border-wil-300',
+    border: 'border-b-wil-100',
   },
   purple: {
-    active: 'text-purple-700 border-purple-500',
-    hover: 'hover:text-purple-600 hover:border-purple-300',
-    border: 'border-b-purple-100',
+    active: 'text-horizon-700 border-horizon-500',
+    hover: 'hover:text-horizon-600 hover:border-horizon-300',
+    border: 'border-b-horizon-100',
   },
 }
 

@@ -50,7 +50,7 @@ export function ActionForm({ onSubmit, onCancel }: ActionFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-xl border border-teal-200 bg-teal-50/50 p-4">
+    <form onSubmit={handleSubmit} className="rounded-xl border border-wil-200 bg-wil-50/50 p-4">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-zinc-900">Nieuwe actie</h3>
         <button
@@ -70,7 +70,7 @@ export function ActionForm({ onSubmit, onCancel }: ActionFormProps) {
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Wat ga je doen? *"
             required
-            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-teal-300 focus:outline-none focus:ring-1 focus:ring-teal-300"
+            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300"
           />
         </div>
 
@@ -80,7 +80,7 @@ export function ActionForm({ onSubmit, onCancel }: ActionFormProps) {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Beschrijving (optioneel)"
-            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-teal-300 focus:outline-none focus:ring-1 focus:ring-teal-300"
+            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300"
           />
         </div>
 
@@ -97,7 +97,7 @@ export function ActionForm({ onSubmit, onCancel }: ActionFormProps) {
               required
               min="0"
               step="0.1"
-              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-teal-300 focus:outline-none focus:ring-1 focus:ring-teal-300"
+              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300"
             />
           </div>
           <div>
@@ -111,7 +111,7 @@ export function ActionForm({ onSubmit, onCancel }: ActionFormProps) {
               placeholder="Bijv. 50"
               min="0"
               step="1"
-              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-teal-300 focus:outline-none focus:ring-1 focus:ring-teal-300"
+              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300"
             />
           </div>
         </div>
@@ -123,7 +123,7 @@ export function ActionForm({ onSubmit, onCancel }: ActionFormProps) {
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-teal-300 focus:outline-none focus:ring-1 focus:ring-teal-300"
+              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300"
             />
           </div>
           <div>
@@ -138,8 +138,8 @@ export function ActionForm({ onSubmit, onCancel }: ActionFormProps) {
                   onClick={() => setPriority(p)}
                   className={`flex-1 rounded-md py-2 text-xs font-medium transition-colors ${
                     priority >= p
-                      ? 'bg-teal-500 text-white'
-                      : 'bg-white text-zinc-400 ring-1 ring-zinc-200 hover:bg-teal-50'
+                      ? 'bg-wil-500 text-white'
+                      : 'bg-white text-zinc-400 ring-1 ring-zinc-200 hover:bg-wil-50'
                   }`}
                 >
                   {p}
@@ -154,7 +154,7 @@ export function ActionForm({ onSubmit, onCancel }: ActionFormProps) {
         <button
           type="submit"
           disabled={isSubmitting || !title.trim() || !freedomDays}
-          className="flex items-center gap-1.5 rounded-lg bg-teal-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-600 disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg bg-wil-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-600 disabled:opacity-50"
         >
           <Plus className="h-4 w-4" />
           Toevoegen

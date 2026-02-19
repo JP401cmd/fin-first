@@ -199,7 +199,7 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
     <div className="space-y-8">
       <div>
         <h2 className="text-lg font-semibold text-zinc-900 flex items-center gap-2">
-          <Database className="h-5 w-5 text-amber-600" />
+          <Database className="h-5 w-5 text-kern-600" />
           Database Migratie
         </h2>
         <p className="mt-1 text-sm text-zinc-500">
@@ -214,7 +214,7 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
           <button
             onClick={checkSchema}
             disabled={loading}
-            className="text-sm text-amber-600 hover:text-amber-700 disabled:opacity-50"
+            className="text-sm text-kern-600 hover:text-kern-700 disabled:opacity-50"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Vernieuwen'}
           </button>
@@ -228,7 +228,7 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
         ) : schemaStatus ? (
           <div className="space-y-4">
             <div className={`flex items-center gap-2 text-sm font-medium ${
-              schemaStatus.status === 'complete' ? 'text-green-600' : 'text-amber-600'
+              schemaStatus.status === 'complete' ? 'text-green-600' : 'text-kern-600'
             }`}>
               {schemaStatus.status === 'complete' ? (
                 <><CheckCircle className="h-4 w-4" /> Schema is compleet</>
@@ -289,12 +289,12 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
               value={dbPassword}
               onChange={(e) => setDbPassword(e.target.value)}
               placeholder="Database wachtwoord"
-              className="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none"
+              className="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-kern-500 focus:ring-1 focus:ring-kern-500 focus:outline-none"
             />
             <button
               onClick={applyMigration}
               disabled={migrating || !dbPassword.trim()}
-              className="flex items-center gap-2 rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+              className="flex items-center gap-2 rounded-md bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
             >
               {migrating ? (
                 <><Loader2 className="h-4 w-4 animate-spin" /> Bezig...</>
@@ -331,7 +331,7 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
             <h3 className="font-medium text-zinc-900">Handmatig via SQL Editor</h3>
             <button
               onClick={copySQL}
-              className="flex items-center gap-1 text-sm text-amber-600 hover:text-amber-700"
+              className="flex items-center gap-1 text-sm text-kern-600 hover:text-kern-700"
             >
               <Copy className="h-3.5 w-3.5" />
               {copied ? 'Gekopieerd!' : 'Kopieer SQL'}
@@ -343,7 +343,7 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
               href="https://supabase.com/dashboard/project/pnnuqwdcgoympgddrvze/sql/new"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-amber-600 underline hover:text-amber-700"
+              className="text-kern-600 underline hover:text-kern-700"
             >
               Supabase SQL Editor
             </a>

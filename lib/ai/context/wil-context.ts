@@ -12,7 +12,9 @@ export async function buildWilContext(supabase: SupabaseClient): Promise<string>
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
 
-  const [budgetsRes, transactionsRes, goalsRes, recsRes, actionsRes] = await Promise.all([
+  const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).toISOString()
+
+  const [budgetsRes, transactionsRes, goalsRes, recsRes, actionsRes, pastActionsRes, pastRecsRes] = await Promise.all([
     supabase
       .from('budgets')
       .select('id, name, slug, budget_type, default_limit, is_essential, parent_id')
@@ -40,6 +42,22 @@ export async function buildWilContext(supabase: SupabaseClient): Promise<string>
       .in('status', ['open', 'postponed'])
       .order('priority_score', { ascending: false })
       .limit(10),
+    // Fetch completed/rejected actions from the past year to prevent duplicate suggestions
+    supabase
+      .from('actions')
+      .select('title, status')
+      .in('status', ['completed', 'rejected'])
+      .gte('updated_at', oneYearAgo)
+      .order('updated_at', { ascending: false })
+      .limit(30),
+    // Fetch dismissed/completed recommendations from the past year to prevent duplicates
+    supabase
+      .from('recommendations')
+      .select('title, status')
+      .in('status', ['dismissed', 'completed'])
+      .gte('updated_at', oneYearAgo)
+      .order('updated_at', { ascending: false })
+      .limit(30),
   ])
 
   const budgets = budgetsRes.data ?? []
@@ -47,6 +65,8 @@ export async function buildWilContext(supabase: SupabaseClient): Promise<string>
   const goals = goalsRes.data ?? []
   const recommendations = recsRes.data ?? []
   const actions = actionsRes.data ?? []
+  const pastActions = pastActionsRes.data ?? []
+  const pastRecommendations = pastRecsRes.data ?? []
 
   // Calculate spending per budget from real transactions
   const spendingByBudget: Record<string, number> = {}
@@ -152,6 +172,18 @@ export async function buildWilContext(supabase: SupabaseClient): Promise<string>
       `"${a.title}" — ${Math.round(a.freedom_days_impact || 0)} dagen — status: ${a.status} (${a.source})`
     )
     parts.push(section('OPENSTAANDE ACTIES', bulletList(actionLines)))
+  }
+
+  // Past actions and recommendations — to prevent duplicate suggestions
+  const pastItems: string[] = [
+    ...pastActions.map(a => `Actie: "${a.title}" (${a.status})`),
+    ...pastRecommendations.map(r => `Aanbeveling: "${r.title}" (${r.status})`),
+  ]
+  if (pastItems.length > 0) {
+    parts.push(section(
+      'EERDER VOORGESTELDE ACTIES & AANBEVELINGEN (niet opnieuw voorstellen)',
+      'Deze acties en aanbevelingen zijn al afgerond, afgewezen of weggestuurd. Stel ze NIET opnieuw voor, ook niet in andere bewoordingen.\n' + bulletList(pastItems),
+    ))
   }
 
   return parts.join('\n')

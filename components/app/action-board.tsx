@@ -111,9 +111,9 @@ export function ActionBoard({ initialActions }: ActionBoardProps) {
 
   if (actions.length === 0 && !showForm) {
     return (
-      <div className="rounded-2xl border border-teal-200 bg-teal-50 p-8 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-teal-100">
-          <Sparkles className="h-6 w-6 text-teal-600" />
+      <div className="rounded-2xl border border-wil-200 bg-wil-50 p-8 text-center">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-wil-100">
+          <Sparkles className="h-6 w-6 text-wil-600" />
         </div>
         <h2 className="mb-2 text-xl font-bold text-zinc-900">Nog geen acties</h2>
         <p className="mb-6 text-zinc-500">
@@ -122,7 +122,7 @@ export function ActionBoard({ initialActions }: ActionBoardProps) {
         <button
           type="button"
           onClick={() => setShowForm(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-teal-500 px-6 py-3 font-medium text-white transition-colors hover:bg-teal-600"
+          className="inline-flex items-center gap-2 rounded-lg bg-wil-500 px-6 py-3 font-medium text-white transition-colors hover:bg-wil-600"
         >
           <Plus className="h-5 w-5" />
           Nieuwe actie
@@ -140,7 +140,7 @@ export function ActionBoard({ initialActions }: ActionBoardProps) {
         <button
           type="button"
           onClick={() => setShowForm(true)}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-teal-200 px-4 py-3 text-sm font-medium text-teal-600 transition-colors hover:border-teal-300 hover:bg-teal-50"
+          className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-wil-200 px-4 py-3 text-sm font-medium text-wil-600 transition-colors hover:border-wil-300 hover:bg-wil-50"
         >
           <Plus className="h-4 w-4" />
           Nieuwe actie
@@ -155,7 +155,7 @@ export function ActionBoard({ initialActions }: ActionBoardProps) {
               Open ({openActions.length})
             </h3>
             {totalOpenDays > 0 && (
-              <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-xs font-medium text-teal-700">
+              <span className="rounded-full bg-wil-100 px-2.5 py-0.5 text-xs font-medium text-wil-700">
                 {Math.round(totalOpenDays)} dagen potentieel
               </span>
             )}

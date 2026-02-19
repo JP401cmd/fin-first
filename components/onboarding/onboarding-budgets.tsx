@@ -100,11 +100,11 @@ export function OnboardingBudgets({
         <div className="space-y-3">
           <button
             onClick={() => setSubChoice('ai')}
-            className="group w-full rounded-xl border-2 border-zinc-200 bg-white p-5 text-left transition-all hover:border-purple-300 hover:shadow-md"
+            className="group w-full rounded-xl border-2 border-zinc-200 bg-white p-5 text-left transition-all hover:border-horizon-300 hover:shadow-md"
           >
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-purple-50 group-hover:bg-purple-100">
-                <svg className="h-5 w-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-horizon-50 group-hover:bg-horizon-100">
+                <svg className="h-5 w-5 text-horizon-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
                 </svg>
               </div>
@@ -119,11 +119,11 @@ export function OnboardingBudgets({
 
           <button
             onClick={() => setSubChoice('manual')}
-            className="group w-full rounded-xl border-2 border-zinc-200 bg-white p-5 text-left transition-all hover:border-teal-300 hover:shadow-md"
+            className="group w-full rounded-xl border-2 border-zinc-200 bg-white p-5 text-left transition-all hover:border-wil-300 hover:shadow-md"
           >
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-50 group-hover:bg-teal-100">
-                <svg className="h-5 w-5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-wil-50 group-hover:bg-wil-100">
+                <svg className="h-5 w-5 text-wil-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
                 </svg>
               </div>
@@ -164,7 +164,7 @@ export function OnboardingBudgets({
             <button
               onClick={handleAISuggest}
               disabled={aiLoading}
-              className="flex-1 rounded-lg bg-purple-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-purple-700 disabled:opacity-50"
+              className="flex-1 rounded-lg bg-horizon-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-horizon-700 disabled:opacity-50"
             >
               {aiLoading ? 'AI denkt na...' : 'Genereer suggestie'}
             </button>
@@ -190,7 +190,7 @@ export function OnboardingBudgets({
             </button>
             <button
               onClick={onNext}
-              className="flex-1 rounded-lg bg-teal-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-teal-700"
+              className="flex-1 rounded-lg bg-wil-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-wil-700"
             >
               Volgende
             </button>

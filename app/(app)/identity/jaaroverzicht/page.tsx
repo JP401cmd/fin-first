@@ -391,9 +391,9 @@ export default function JaaroverzichtPage() {
             Terug
           </Link>
           <div className="flex items-center gap-1.5">
-            <div className="h-2 w-2 rounded-full bg-amber-400" />
-            <div className="h-2 w-2 rounded-full bg-teal-400" />
-            <div className="h-2 w-2 rounded-full bg-purple-400" />
+            <div className="h-2 w-2 rounded-full bg-kern-400" />
+            <div className="h-2 w-2 rounded-full bg-wil-400" />
+            <div className="h-2 w-2 rounded-full bg-horizon-400" />
             <span className="ml-1 text-xs font-bold tracking-wider text-zinc-500">TriFinity</span>
           </div>
         </div>
@@ -412,7 +412,7 @@ export default function JaaroverzichtPage() {
                 onClick={() => setSelectedYear(y)}
                 className={`rounded-xl px-4 py-2 text-lg font-bold transition-all ${
                   selectedYear === y
-                    ? 'bg-gradient-to-r from-amber-500/20 via-teal-500/20 to-purple-500/20 text-white ring-1 ring-teal-500/40'
+                    ? 'bg-gradient-to-r from-kern-500/20 via-wil-500/20 to-horizon-500/20 text-white ring-1 ring-wil-500/40'
                     : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
                 }`}
                 data-testid={`year-btn-${y}`}
@@ -426,7 +426,7 @@ export default function JaaroverzichtPage() {
         {/* Loading state */}
         {loading && (
           <div className="flex flex-col items-center justify-center gap-4 py-24">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-teal-400/30 border-t-teal-400" />
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-wil-400/30 border-t-wil-400" />
             <p className="text-sm text-zinc-400">Jaaroverzicht genereren...</p>
           </div>
         )}
@@ -458,14 +458,14 @@ export default function JaaroverzichtPage() {
             </div>
 
             {/* ═══ Section 1: Freedom Days Won ═══ */}
-            <section className="rounded-2xl bg-gradient-to-br from-teal-500/10 to-teal-500/5 p-6 ring-1 ring-teal-500/20" data-testid="section-freedom-days">
+            <section className="rounded-2xl bg-gradient-to-br from-wil-500/10 to-wil-500/5 p-6 ring-1 ring-wil-500/20" data-testid="section-freedom-days">
               <div className="mb-4 flex items-center gap-2">
-                <Target className="h-5 w-5 text-teal-400" />
-                <h2 className="text-lg font-bold text-teal-400">Vrijheidsdagen gewonnen</h2>
+                <Target className="h-5 w-5 text-wil-400" />
+                <h2 className="text-lg font-bold text-wil-400">Vrijheidsdagen gewonnen</h2>
               </div>
 
               <div className="mb-4 text-center">
-                <p className="text-5xl font-bold text-teal-400" data-testid="freedom-days-total">
+                <p className="text-5xl font-bold text-wil-400" data-testid="freedom-days-total">
                   +{data.freedomDaysWon}
                 </p>
                 <p className="mt-1 text-sm text-zinc-400">dagen financiele vrijheid verdiend</p>
@@ -480,7 +480,7 @@ export default function JaaroverzichtPage() {
                     <div key={m.month} className="flex flex-1 flex-col items-center gap-1">
                       <div
                         className={`w-full rounded-t-md transition-all ${
-                          m.days > 0 ? 'bg-teal-400/70' : 'bg-zinc-700/30'
+                          m.days > 0 ? 'bg-wil-400/70' : 'bg-zinc-700/30'
                         }`}
                         style={{ height: `${height}%` }}
                         title={`${m.label}: ${m.days} dagen`}
@@ -493,17 +493,17 @@ export default function JaaroverzichtPage() {
 
               {data.bestFreedomMonth && (
                 <p className="mt-3 text-xs text-zinc-400">
-                  <Star className="mr-1 inline h-3 w-3 text-amber-400" />
-                  Beste maand: <span className="font-semibold text-teal-300">{data.bestFreedomMonth.label}</span> met {data.bestFreedomMonth.days} dagen
+                  <Star className="mr-1 inline h-3 w-3 text-kern-400" />
+                  Beste maand: <span className="font-semibold text-wil-300">{data.bestFreedomMonth.label}</span> met {data.bestFreedomMonth.days} dagen
                 </p>
               )}
             </section>
 
             {/* ═══ Section 2: Net Worth Growth ═══ */}
-            <section className="rounded-2xl bg-gradient-to-br from-amber-500/10 to-amber-500/5 p-6 ring-1 ring-amber-500/20" data-testid="section-net-worth">
+            <section className="rounded-2xl bg-gradient-to-br from-kern-500/10 to-kern-500/5 p-6 ring-1 ring-kern-500/20" data-testid="section-net-worth">
               <div className="mb-4 flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-amber-400" />
-                <h2 className="text-lg font-bold text-amber-400">Vermogensgroei</h2>
+                <TrendingUp className="h-5 w-5 text-kern-400" />
+                <h2 className="text-lg font-bold text-kern-400">Vermogensgroei</h2>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -579,15 +579,15 @@ export default function JaaroverzichtPage() {
             </section>
 
             {/* ═══ Section 3: Badges Earned ═══ */}
-            <section className="rounded-2xl bg-gradient-to-br from-amber-500/10 via-purple-500/5 to-purple-500/10 p-6 ring-1 ring-amber-500/20" data-testid="section-badges">
+            <section className="rounded-2xl bg-gradient-to-br from-kern-500/10 via-horizon-500/5 to-horizon-500/10 p-6 ring-1 ring-kern-500/20" data-testid="section-badges">
               <div className="mb-4 flex items-center gap-2">
-                <Award className="h-5 w-5 text-amber-400" />
-                <h2 className="text-lg font-bold text-amber-400">Badges verdiend</h2>
+                <Award className="h-5 w-5 text-kern-400" />
+                <h2 className="text-lg font-bold text-kern-400">Badges verdiend</h2>
               </div>
 
               {data.badgesEarned.length > 0 ? (
                 <>
-                  <p className="mb-3 text-center text-3xl font-bold text-amber-400" data-testid="badges-count">
+                  <p className="mb-3 text-center text-3xl font-bold text-kern-400" data-testid="badges-count">
                     {data.totalBadgesEarned}
                   </p>
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
@@ -703,10 +703,10 @@ export default function JaaroverzichtPage() {
             </section>
 
             {/* ═══ Section 5: FIRE Progress ═══ */}
-            <section className="rounded-2xl bg-gradient-to-br from-purple-500/10 to-purple-500/5 p-6 ring-1 ring-purple-500/20" data-testid="section-fire">
+            <section className="rounded-2xl bg-gradient-to-br from-horizon-500/10 to-horizon-500/5 p-6 ring-1 ring-horizon-500/20" data-testid="section-fire">
               <div className="mb-4 flex items-center gap-2">
-                <Flame className="h-5 w-5 text-purple-400" />
-                <h2 className="text-lg font-bold text-purple-400">FIRE voortgang</h2>
+                <Flame className="h-5 w-5 text-horizon-400" />
+                <h2 className="text-lg font-bold text-horizon-400">FIRE voortgang</h2>
               </div>
 
               {data.fireStart && data.fireEnd ? (
@@ -720,7 +720,7 @@ export default function JaaroverzichtPage() {
                       </div>
                       <div className="h-4 w-full overflow-hidden rounded-full bg-zinc-700/50">
                         <div
-                          className="h-full rounded-full bg-purple-500/50 transition-all"
+                          className="h-full rounded-full bg-horizon-500/50 transition-all"
                           style={{ width: `${Math.min(data.fireStart.percentage, 100)}%` }}
                         />
                       </div>
@@ -732,7 +732,7 @@ export default function JaaroverzichtPage() {
                       </div>
                       <div className="h-4 w-full overflow-hidden rounded-full bg-zinc-700/50">
                         <div
-                          className="h-full rounded-full bg-gradient-to-r from-purple-500 to-teal-400 transition-all"
+                          className="h-full rounded-full bg-gradient-to-r from-horizon-500 to-wil-400 transition-all"
                           style={{ width: `${Math.min(data.fireEnd.percentage, 100)}%` }}
                         />
                       </div>
@@ -740,9 +740,9 @@ export default function JaaroverzichtPage() {
                   </div>
 
                   {data.fireProgressDelta != null && (
-                    <div className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-purple-500/10 p-3">
-                      <Flame className="h-5 w-5 text-purple-400" />
-                      <span className="text-xl font-bold text-purple-400" data-testid="fire-delta">
+                    <div className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-horizon-500/10 p-3">
+                      <Flame className="h-5 w-5 text-horizon-400" />
+                      <span className="text-xl font-bold text-horizon-400" data-testid="fire-delta">
                         {formatPct(data.fireProgressDelta)}
                       </span>
                       <span className="text-sm text-zinc-400">FIRE voortgang</span>
@@ -770,17 +770,17 @@ export default function JaaroverzichtPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-3 rounded-xl bg-zinc-800/50 p-3">
-                  <Clock className="h-5 w-5 text-teal-400 flex-shrink-0" />
+                  <Clock className="h-5 w-5 text-wil-400 flex-shrink-0" />
                   <div>
                     <p className="text-[10px] text-zinc-500 uppercase">Vrijheidsdagen</p>
-                    <p className="text-lg font-bold text-teal-400">+{data.freedomDaysWon}</p>
+                    <p className="text-lg font-bold text-wil-400">+{data.freedomDaysWon}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 rounded-xl bg-zinc-800/50 p-3">
-                  <Target className="h-5 w-5 text-amber-400 flex-shrink-0" />
+                  <Target className="h-5 w-5 text-kern-400 flex-shrink-0" />
                   <div>
                     <p className="text-[10px] text-zinc-500 uppercase">Acties</p>
-                    <p className="text-lg font-bold text-amber-400">{data.actionsCompleted}</p>
+                    <p className="text-lg font-bold text-kern-400">{data.actionsCompleted}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 rounded-xl bg-zinc-800/50 p-3">
@@ -793,10 +793,10 @@ export default function JaaroverzichtPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 rounded-xl bg-zinc-800/50 p-3">
-                  <Award className="h-5 w-5 text-purple-400 flex-shrink-0" />
+                  <Award className="h-5 w-5 text-horizon-400 flex-shrink-0" />
                   <div>
                     <p className="text-[10px] text-zinc-500 uppercase">Badges</p>
-                    <p className="text-lg font-bold text-purple-400">{data.totalBadgesEarned}</p>
+                    <p className="text-lg font-bold text-horizon-400">{data.totalBadgesEarned}</p>
                   </div>
                 </div>
               </div>
@@ -814,7 +814,7 @@ export default function JaaroverzichtPage() {
               </button>
               <button
                 onClick={() => setShowShareDialog(true)}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal-500 to-purple-500 px-4 py-3 text-sm font-medium text-white transition-all hover:shadow-lg hover:shadow-teal-500/20"
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-wil-500 to-horizon-500 px-4 py-3 text-sm font-medium text-white transition-all hover:shadow-lg hover:shadow-wil-500/20"
                 data-testid="share-btn"
               >
                 <Share2 className="h-4 w-4" />

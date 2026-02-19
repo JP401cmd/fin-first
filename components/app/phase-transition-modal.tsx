@@ -194,6 +194,7 @@ export function PhaseTransitionModal({ oldPhase, newPhase, onClose }: Props) {
       className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-500 ${
         isVisible ? 'bg-black/50' : 'bg-black/0'
       }`}
+      style={{ right: 'var(--chat-sidebar-width, 0px)' }}
       onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"

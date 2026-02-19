@@ -7,40 +7,41 @@ import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, BudgetIcon } from '@/components/app/budget-shared'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { BudgetAlert, shouldAlert } from '@/components/app/budget-alert'
+import { shouldAlert } from '@/lib/budget-alerts'
 import type { Budget } from '@/lib/budget-data'
 import type { NetWorthSnapshot } from '@/lib/net-worth-data'
 import {
-  Calendar, TrendingUp, Sun, Star, Wallet, ShoppingCart,
-  PiggyBank, Building2, ArrowRight, Info, Camera, Download, ChevronDown, Receipt, Flag, BarChart3,
-  CheckCircle2, AlertTriangle, TrendingDown, ArrowUpRight, ArrowDownRight, Minus, LineChart, Sparkles,
+  TrendingUp, Wallet, ShoppingCart,
+  PiggyBank, Building2, ArrowRight, Info, Camera, Download, ChevronDown, Receipt, Flag,
+  CheckCircle2, AlertTriangle, TrendingDown, ArrowUpRight, ArrowDownRight, Minus,
 } from 'lucide-react'
 import { FeatureGate } from '@/components/app/feature-gate'
-import { CollapsibleSection } from '@/components/app/collapsible-section'
 import { DiscoverCarousel } from '@/components/app/discover-carousel'
 import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
 import { NextStepSection, computeAllKernSteps } from '@/components/app/next-step-card'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { SparklineWithLabel, type SparklineDataPoint } from '@/components/app/budget-sparkline'
-import { CashFlowForecastChart, type ForecastPoint, type ForecastAlert } from '@/components/app/cashflow-forecast-chart'
 import { NetWorthProjectionChart } from '@/components/app/net-worth-projection-chart'
 import { computeNetWorthProjection, type NetWorthProjectionResult } from '@/lib/net-worth-projection'
 import { SpendingInsightsSection, type SpendingInsight } from '@/components/app/spending-insight-card'
 import { SnapshotComparisonView } from '@/components/app/snapshot-comparison-view'
+import { buildSegments, groupColor, childColor } from '@/components/app/budget-donut'
+import type { BudgetWithChildren } from '@/lib/budget-data'
 import { FullScreenModal } from '@/components/app/full-screen-modal'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import dynamic from 'next/dynamic'
 
 const DynCashPage = dynamic(() => import('@/app/(app)/core/cash/page'), {
-  loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" /></div>,
+  loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" /></div>,
 })
 const DynBudgetsPage = dynamic(() => import('@/app/(app)/core/budgets/page'), {
-  loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" /></div>,
+  loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" /></div>,
 })
 const DynAssetsPage = dynamic(() => import('@/app/(app)/core/assets/page'), {
-  loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" /></div>,
+  loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" /></div>,
 })
 const DynDebtsPage = dynamic(() => import('@/app/(app)/core/debts/page'), {
-  loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" /></div>,
+  loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" /></div>,
 })
 
 export default function CorePage() {
@@ -57,15 +58,10 @@ export default function CorePage() {
   const [budgetCount, setBudgetCount] = useState(0)
   const [hasTransactions, setHasTransactions] = useState(false)
   const [earnedBadges, setEarnedBadges] = useState<{ slug: string; earned_at: string }[]>([])
-  const [netWorthGrowth, setNetWorthGrowth] = useState<{ amount: number; percentage: number; period: string } | null>(null)
   const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalCurrent: number; progressPct: number } | null>(null)
   const [assetGrowthDirection, setAssetGrowthDirection] = useState<'up' | 'down' | 'flat'>('flat')
   const [overBudgetCount, setOverBudgetCount] = useState(0)
   const [budgetSparklines, setBudgetSparklines] = useState<{ id: string; name: string; icon: string; budgetType: string; data: SparklineDataPoint[] }[]>([])
-  const [cashFlowForecast, setCashFlowForecast] = useState<ForecastPoint[]>([])
-  const [cashFlowAlerts, setCashFlowAlerts] = useState<ForecastAlert[]>([])
-  const [cashFlowBalance, setCashFlowBalance] = useState(0)
-  const [cashFlowHasData, setCashFlowHasData] = useState(false)
   const [nwProjection, setNwProjection] = useState<NetWorthProjectionResult | null>(null)
   const [spendingInsights, setSpendingInsights] = useState<SpendingInsight[]>([])
   const [spendingInsightsLoading, setSpendingInsightsLoading] = useState(false)
@@ -83,6 +79,19 @@ export default function CorePage() {
   // Modal state
   const [activeModal, setActiveModal] = useState<'cash' | 'budgets' | 'assets' | 'debts' | null>(null)
   const [showProjectionModal, setShowProjectionModal] = useState(false)
+  // Kassabon modal state
+  const [incomeByMonth, setIncomeByMonth] = useState<{month: string; amount: number}[]>([])
+  const [mustExpenseItems, setMustExpenseItems] = useState<{name: string; monthlyAmount: number; annualAmount: number; interval: string}[]>([])
+  const [showIncomeReceipt, setShowIncomeReceipt] = useState(false)
+  const [showExpenseReceipt, setShowExpenseReceipt] = useState(false)
+  const [showSavingsReceipt, setShowSavingsReceipt] = useState(false)
+  const [showFireReceipt, setShowFireReceipt] = useState(false)
+  // Budget legend state (overview)
+  const [overviewBudgetGroups, setOverviewBudgetGroups] = useState<BudgetWithChildren[]>([])
+  const [overviewSpending, setOverviewSpending] = useState<Record<string, number>>({})
+  const [expandedOverviewGroupId, setExpandedOverviewGroupId] = useState<string | null>(null)
+  // Savings rate kassabon data
+  const [savingsReceiptData, setSavingsReceiptData] = useState<{extYearlyIncome: number; extYearlyExpenses: number; yearlySavings: number; last12Income: number; last12Expenses: number}>({extYearlyIncome: 0, extYearlyExpenses: 0, yearlySavings: 0, last12Income: 0, last12Expenses: 0})
 
   const loadData = useCallback(async () => {
     try {
@@ -111,13 +120,13 @@ export default function CorePage() {
           .eq('is_active', true),
         supabase
           .from('transactions')
-          .select('amount')
+          .select('amount, date')
           .gt('amount', 0)
           .gte('date', twelveMonthsAgo)
           .lt('date', monthEnd),
         supabase
           .from('budgets')
-          .select('id, default_limit, interval, budget_type, is_essential')
+          .select('id, name, default_limit, interval, budget_type, is_essential')
           .eq('is_essential', true)
           .in('budget_type', ['expense'])
           .is('parent_id', null),
@@ -130,7 +139,7 @@ export default function CorePage() {
           .limit(1),
         supabase
           .from('budgets')
-          .select('id, parent_id, default_limit')
+          .select('id, name, parent_id, default_limit')
           .not('parent_id', 'is', null),
         supabase
           .from('transactions')
@@ -183,6 +192,18 @@ export default function CorePage() {
       }
       setIncomeMonths(actualIncomeMonths)
 
+      // Group income by month for kassabon
+      const incomeMonthMap: Record<string, number> = {}
+      for (const tx of income12Result.data) {
+        const d = new Date(tx.date)
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        incomeMonthMap[key] = (incomeMonthMap[key] ?? 0) + Number(tx.amount)
+      }
+      const sortedIncomeMonths = Object.entries(incomeMonthMap)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([month, amount]) => ({ month, amount }))
+      setIncomeByMonth(sortedIncomeMonths)
+
       // Last 12 months expenses & savings rate
       const last12MonthsExpenses = Math.abs(expense12Result.data.reduce((s, t) => s + Number(t.amount), 0))
       const earliestTxDate = earliestTxResult.data?.[0]?.date
@@ -204,19 +225,30 @@ export default function CorePage() {
       const yearlySavings = extYearlyIncome - extYearlyExpenses
       setSavingsRate12(extYearlyIncome > 0 ? (yearlySavings / extYearlyIncome) * 100 : 0)
       setSavingsRateMonths(savingsRateDataMonths)
+      setSavingsReceiptData({ extYearlyIncome, extYearlyExpenses, yearlySavings, last12Income: last12MonthsIncome, last12Expenses: last12MonthsExpenses })
 
       // Yearly must expenses from essential budgets (sum of children per parent)
       const allChildren = childBudgetsResult.data ?? []
       let yearlyMustExpenses = 0
+      const expenseItems: {name: string; monthlyAmount: number; annualAmount: number; interval: string}[] = []
       for (const b of essentialBudgetsResult.data) {
         const children = allChildren.filter(c => c.parent_id === b.id)
         const limit = children.length > 0
           ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
           : Number(b.default_limit)
-        if (b.interval === 'monthly') yearlyMustExpenses += limit * 12
-        else if (b.interval === 'quarterly') yearlyMustExpenses += limit * 4
-        else yearlyMustExpenses += limit
+        let annual = 0
+        if (b.interval === 'monthly') annual = limit * 12
+        else if (b.interval === 'quarterly') annual = limit * 4
+        else annual = limit
+        yearlyMustExpenses += annual
+        expenseItems.push({
+          name: b.name ?? 'Onbekend budget',
+          monthlyAmount: annual / 12,
+          annualAmount: annual,
+          interval: b.interval ?? 'monthly',
+        })
       }
+      setMustExpenseItems(expenseItems)
 
       // Total assets
       const totalAssets = assetsResult.data.reduce((s, a) => s + Number(a.current_value), 0)
@@ -336,6 +368,13 @@ export default function CorePage() {
         }
         setTotalBudgetLimit(heroLimit)
         setTotalBudgetSpent(heroSpent)
+
+        // Store data for budget legend overview
+        setOverviewSpending(spendMap)
+        const allBudgets = budgetResult.data as Budget[]
+        const parents = allBudgets.filter(b => !b.parent_id)
+        const allChildren = allBudgets.filter(b => !!b.parent_id)
+        setOverviewBudgetGroups(parents.map(p => ({ ...p, children: allChildren.filter(c => c.parent_id === p.id) })))
       }
 
       // Compute debt payoff progress
@@ -368,36 +407,6 @@ export default function CorePage() {
         const snaps = snapshotResult.data as NetWorthSnapshot[]
         setSnapshots(snaps)
 
-        // Calculate net worth growth trend from snapshots
-        if (snaps.length >= 2) {
-          const latest = snaps[snaps.length - 1]
-          const latestNW = Number(latest.net_worth)
-          // Try to find snapshot ~3 months ago for quarterly trend, else use earliest
-          const threeMonthsAgo = new Date()
-          threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
-          const threeMonthsAgoStr = threeMonthsAgo.toISOString().split('T')[0]
-          let compareSnap = snaps[0] // default: earliest
-          let periodLabel = ''
-          // Find closest snapshot to 3 months ago
-          for (const s of snaps) {
-            if (s.snapshot_date <= threeMonthsAgoStr) {
-              compareSnap = s
-            }
-          }
-          const compareNW = Number(compareSnap.net_worth)
-          const growthAmount = latestNW - compareNW
-          const growthPct = compareNW !== 0 ? ((latestNW - compareNW) / Math.abs(compareNW)) * 100 : 0
-          // Determine period label
-          const compareDate = new Date(compareSnap.snapshot_date)
-          const latestDate = new Date(latest.snapshot_date)
-          const diffMs = latestDate.getTime() - compareDate.getTime()
-          const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
-          if (diffDays <= 40) periodLabel = 'afgelopen maand'
-          else if (diffDays <= 100) periodLabel = 'afgelopen kwartaal'
-          else if (diffDays <= 200) periodLabel = `afgelopen ${Math.round(diffDays / 30)} maanden`
-          else periodLabel = `afgelopen ${Math.round(diffDays / 30)} maanden`
-          setNetWorthGrowth({ amount: growthAmount, percentage: growthPct, period: periodLabel })
-        }
       }
 
       // Fetch earned badges for milestone markers on net worth chart
@@ -500,22 +509,6 @@ export default function CorePage() {
         // Budget sparklines are non-critical
       }
 
-      // Load cash flow forecast
-      try {
-        const forecastRes = await fetch('/api/cashflow-forecast')
-        if (forecastRes.ok) {
-          const forecastData = await forecastRes.json()
-          if (forecastData.hasData) {
-            setCashFlowForecast(forecastData.forecast ?? [])
-            setCashFlowAlerts(forecastData.alerts ?? [])
-            setCashFlowBalance(forecastData.currentBalance ?? 0)
-            setCashFlowHasData(true)
-          }
-        }
-      } catch {
-        // Cash flow forecast is non-critical
-      }
-
       // Load spending pattern insights
       try {
         setSpendingInsightsLoading(true)
@@ -545,11 +538,12 @@ export default function CorePage() {
     loadData()
   }, [loadData])
 
+
   if (loading) {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
         <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
         </div>
       </div>
     )
@@ -596,13 +590,13 @@ export default function CorePage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* === 1. Hero (Gradient) === */}
-      <section data-testid="kern-hero" className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-950 via-amber-900 to-amber-950 p-5 text-white sm:p-8 md:p-10">
-        <div className="pointer-events-none absolute -top-24 right-1/4 h-64 w-64 rounded-full bg-amber-500/10 blur-3xl" />
+      <section data-testid="kern-hero" className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-kern-950 via-kern-900 to-kern-950 p-5 text-white sm:p-8 md:p-10">
+        <div className="pointer-events-none absolute -top-24 right-1/4 h-64 w-64 rounded-full bg-kern-500/10 blur-3xl" />
 
         <div className="relative">
           <div className="mb-6 flex items-center gap-3">
             <FhinAvatar size={40} />
-            <p className="text-xs font-semibold tracking-[0.2em] text-amber-300/80 uppercase">
+            <p className="text-xs font-semibold tracking-[0.2em] text-kern-300/80 uppercase">
               Jouw tijdlijn naar vrijheid
             </p>
           </div>
@@ -611,22 +605,22 @@ export default function CorePage() {
             <span className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
               {data.freedomPercentage.toFixed(1)}%
             </span>
-            <span className="ml-3 text-lg text-amber-200/70">vrijheid bereikt</span>
+            <span className="ml-3 text-lg text-kern-200/70">vrijheid bereikt</span>
           </div>
 
-          <div className="mb-8">
-            <div className="h-3 w-full overflow-hidden rounded-full bg-amber-950/60">
+          <button type="button" onClick={() => setShowFireReceipt(true)} className="mb-8 w-full text-left transition-opacity hover:opacity-80">
+            <div className="h-3 w-full overflow-hidden rounded-full bg-kern-950/60">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-amber-600 via-amber-400 to-amber-300 transition-all duration-1000"
+                className="h-full rounded-full bg-gradient-to-r from-kern-600 via-kern-400 to-kern-300 transition-all duration-1000"
                 style={{ width: `${Math.max(Math.min(data.freedomPercentage, 100), 0)}%` }}
               />
             </div>
-            <div className="mt-2 flex justify-between text-xs text-amber-300/50">
+            <div className="mt-2 flex justify-between text-xs text-kern-300/50">
               <span>0%</span>
               <span>{formatCurrency(data.fireTarget)} — volledige vrijheid</span>
               <span>100%</span>
             </div>
-          </div>
+          </button>
 
           <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-3">
             <button
@@ -634,9 +628,9 @@ export default function CorePage() {
               onClick={() => setShowProjectionModal(true)}
               className="cursor-pointer text-left transition-opacity hover:opacity-80"
             >
-              <p className="text-xs font-medium text-amber-300/60 uppercase">Netto vermogen</p>
+              <p className="text-xs font-medium text-kern-300/60 uppercase">Netto vermogen</p>
               <p className="mt-1 text-2xl font-bold">{formatCurrency(data.netWorth)}</p>
-              <p className="mt-1 text-sm text-amber-200/70" data-testid="net-worth-freedom-subtitle">
+              <p className="mt-1 text-sm text-kern-200/70" data-testid="net-worth-freedom-subtitle">
                 dat is {data.freedomYears > 0 ? `${data.freedomYears} jaar en ` : ''}{data.freedomMonths} maanden vrijheid
               </p>
               <NetWorthSparkline snapshots={snapshots} projection={nwProjection} />
@@ -647,24 +641,24 @@ export default function CorePage() {
               className="cursor-pointer text-left transition-opacity hover:opacity-80"
               data-testid="hero-deze-maand"
             >
-              <p className="text-xs font-medium text-amber-300/60 uppercase">Deze maand</p>
+              <p className="text-xs font-medium text-kern-300/60 uppercase">Deze maand</p>
 
               {/* Budget voortgang */}
               {totalBudgetLimit > 0 && (
                 <div className="mt-2">
                   <div className="flex items-baseline justify-between">
-                    <span className="text-sm text-amber-200/70">Budget</span>
-                    <span className={`text-sm font-semibold ${totalBudgetSpent <= totalBudgetLimit ? 'text-emerald-400' : 'text-red-400'}`}>
+                    <span className="text-sm text-kern-200/70">Budget</span>
+                    <span className={`text-sm font-semibold ${totalBudgetSpent <= totalBudgetLimit ? 'text-kern-300' : 'text-red-400'}`}>
                       {Math.round((totalBudgetSpent / totalBudgetLimit) * 100)}%
                     </span>
                   </div>
-                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-amber-950/60">
+                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-kern-950/60">
                     <div
-                      className={`h-full rounded-full transition-all duration-500 ${totalBudgetSpent <= totalBudgetLimit ? 'bg-emerald-400' : 'bg-red-400'}`}
+                      className={`h-full rounded-full transition-all duration-500 ${totalBudgetSpent <= totalBudgetLimit ? 'bg-gradient-to-r from-kern-600 via-kern-400 to-kern-300' : 'bg-red-400'}`}
                       style={{ width: `${Math.min((totalBudgetSpent / totalBudgetLimit) * 100, 100)}%` }}
                     />
                   </div>
-                  <p className="mt-0.5 text-[10px] text-amber-300/40">
+                  <p className="mt-0.5 text-[10px] text-kern-300/40">
                     {formatCurrency(totalBudgetSpent)} / {formatCurrency(totalBudgetLimit)}
                   </p>
                 </div>
@@ -674,17 +668,17 @@ export default function CorePage() {
               <BudgetSpendingSparkline data={budgetSpendingHistory} budgetLimit={totalBudgetLimit} />
             </button>
             <div data-testid="hero-kerngetallen">
-              <p className="text-xs font-medium text-amber-300/60 uppercase">Kerngetallen</p>
+              <p className="text-xs font-medium text-kern-300/60 uppercase">Kerngetallen</p>
 
               {/* Spaarquote */}
               <div className="mt-2 flex items-center gap-1.5">
                 <p className={`text-2xl font-bold ${savingsRate12 >= 0 ? 'text-white' : 'text-red-400'}`}>
                   {savingsRate12.toFixed(1)}%
                 </p>
-                <span className="text-sm text-amber-200/60">spaarquote</span>
+                <span className="text-sm text-kern-200/60">spaarquote</span>
                 <HeroTooltip text="Percentage van je inkomen dat je spaart over de afgelopen 12 maanden. Bij minder data wordt geëxtrapoleerd." />
               </div>
-              <p className="text-[10px] text-amber-300/40">
+              <p className="text-[10px] text-kern-300/40">
                 {savingsRateMonths < 12
                   ? `${savingsRateMonths} maand${savingsRateMonths > 1 ? 'en' : ''} data`
                   : 'laatste 12 maanden'}
@@ -693,10 +687,10 @@ export default function CorePage() {
               {/* Vrije dagen per jaar */}
               <div className="mt-3 flex items-center gap-1.5">
                 <p className="text-2xl font-bold text-white">{data.freeDaysPerYear}</p>
-                <span className="text-sm text-amber-200/60">vrije dagen/jaar</span>
+                <span className="text-sm text-kern-200/60">vrije dagen/jaar</span>
                 <HeroTooltip text="Hoeveel dagen per jaar je passief inkomen (4% SWR op vermogen) je dagelijkse uitgaven dekt." />
               </div>
-              <p className="text-[10px] text-amber-300/40">gedekt door passief inkomen</p>
+              <p className="text-[10px] text-kern-300/40">gedekt door passief inkomen</p>
             </div>
           </div>
         </div>
@@ -712,7 +706,7 @@ export default function CorePage() {
           <MissionControlCard
             href="/core/cash"
             onClick={() => setActiveModal('cash')}
-            icon={<Wallet className="h-5 w-5 text-amber-600" />}
+            icon={<Wallet className="h-5 w-5 text-kern-600" />}
             title="Cash"
             metric={formatCurrency(data.monthlyIncome - data.monthlyExpenses)}
             metricColor={data.monthlyIncome >= data.monthlyExpenses ? 'text-emerald-600' : 'text-red-600'}
@@ -730,7 +724,7 @@ export default function CorePage() {
           <MissionControlCard
             href="/core/budgets"
             onClick={() => setActiveModal('budgets')}
-            icon={<ShoppingCart className="h-5 w-5 text-amber-600" />}
+            icon={<ShoppingCart className="h-5 w-5 text-kern-600" />}
             title="Budgetten"
             metric={overBudgetCount > 0 ? `${overBudgetCount} over budget` : 'Op koers'}
             metricColor={overBudgetCount > 0 ? 'text-red-600' : 'text-emerald-600'}
@@ -791,21 +785,45 @@ export default function CorePage() {
           <div className="mt-4">
             <Link
               href="/core/belasting"
-              className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition-colors hover:border-amber-200 hover:bg-amber-50/30"
+              className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition-colors hover:border-kern-200 hover:bg-kern-50/30"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-amber-50">
-                <Receipt className="h-5 w-5 text-amber-600" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-kern-50">
+                <Receipt className="h-5 w-5 text-kern-600" />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium text-zinc-500">Box 3 Belasting</p>
                 <p className="text-lg font-bold text-zinc-900">Berekenen</p>
                 <p className="text-xs text-zinc-400">vermogensrendementsheffing</p>
               </div>
-              <ArrowRight className="h-4 w-4 shrink-0 text-zinc-300 group-hover:text-amber-500" />
+              <ArrowRight className="h-4 w-4 shrink-0 text-zinc-300 group-hover:text-kern-500" />
             </Link>
           </div>
         </FeatureGate>
       </section>
+
+      {/* === Budget overzicht === */}
+      {overviewBudgetGroups.length > 0 && (
+        <section className="mt-6">
+          <div className="rounded-xl border border-zinc-200 bg-white p-4">
+            <div className="mb-1 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-zinc-700">Budget overzicht</h3>
+              <Link
+                href="/core/budgets"
+                className="text-xs font-medium text-kern-600 hover:text-kern-700"
+              >
+                Bekijk budgetten →
+              </Link>
+            </div>
+            <BudgetLegendOverview
+              groups={overviewBudgetGroups}
+              spending={overviewSpending}
+              expandedGroupId={expandedOverviewGroupId}
+              onToggleGroup={(id) => setExpandedOverviewGroupId(prev => prev === id ? null : id)}
+              onNavigate={(id) => router.push(`/core/budgets?budget=${id}`)}
+            />
+          </div>
+        </section>
+      )}
 
       {/* === 1b. Next Step Card === */}
       {data && (
@@ -828,276 +846,6 @@ export default function CorePage() {
         </section>
       )}
 
-      {/* === 2. KPI Stat Cards (White cards, subtle borders) === */}
-      <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5" data-testid="kern-kpi-grid">
-        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-dagen-gewonnen">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
-              <Calendar className="h-5 w-5 text-amber-600" />
-            </div>
-            <KpiTooltip text="Dagen gewonnen deze maand — exclusief De Kern. Berekend als maandelijkse besparing gedeeld door dagelijkse uitgaven. Dit verschilt van 'vrijheidsdagen gewonnen' in De Wil, dat gebaseerd is op voltooide acties." />
-          </div>
-          <p className="text-sm font-medium text-zinc-500">Dagen Gewonnen</p>
-          <p className="mt-1 text-3xl font-bold text-zinc-900">
-            {data.daysWonPerMonth > 0 ? `+${data.daysWonPerMonth}` : data.daysWonPerMonth}
-          </p>
-          <p className="mt-1 text-xs text-emerald-600">deze maand</p>
-        </div>
-
-        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-spaarquote">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
-              <TrendingUp className="h-5 w-5 text-amber-600" />
-            </div>
-            <KpiTooltip text="Percentage van je netto inkomen dat je spaart/belegt over de afgelopen 12 maanden. Bij minder dan 12 maanden data wordt het gemiddelde geëxtrapoleerd naar een jaar." />
-          </div>
-          <p className="text-sm font-medium text-zinc-500">Spaarquote</p>
-          <p className="mt-1 text-3xl font-bold text-zinc-900">{savingsRate12.toFixed(1)}%</p>
-          <p className="mt-1 text-xs text-zinc-400">
-            {savingsRateMonths < 12
-              ? `geëxtrapoleerd vanuit ${savingsRateMonths} maand${savingsRateMonths > 1 ? 'en' : ''}`
-              : 'laatste 12 maanden'}
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-vrije-dagen">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
-              <Sun className="h-5 w-5 text-amber-600" />
-            </div>
-            <KpiTooltip text="Vrije dagen per jaar — exclusief De Kern. Hoeveel dagen per jaar je passief inkomen je kosten dekt. Berekening: (netto vermogen × 4% / jaarlijkse uitgaven) × 365. Dit verschilt van 'Open potentieel' in De Wil, dat gebaseerd is op openstaande acties." />
-          </div>
-          <p className="text-sm font-medium text-zinc-500">Vrije Dagen per Jaar</p>
-          <p className="mt-1 text-3xl font-bold text-zinc-900">{data.freeDaysPerYear}</p>
-          <p className="mt-1 text-xs text-zinc-400">gedekt door passief inkomen</p>
-        </div>
-
-        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-autonomie-score">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
-              <Star className="h-5 w-5 text-amber-600" />
-            </div>
-            <KpiTooltip text="Hoe dicht je bij financiële vrijheid bent. A+ = vrij, E = begin van de reis. Gebaseerd op je vrijheidspercentage." />
-          </div>
-          <p className="text-sm font-medium text-zinc-500">Autonomie Score</p>
-          <p className="mt-1 text-3xl font-bold text-amber-600">{data.autonomyScore}</p>
-          <p className="mt-1 text-xs text-zinc-400">
-            {data.autonomyScore === 'A+' ? 'financieel vrij!' :
-             data.autonomyScore === 'A' ? 'bijna vrij' :
-             data.autonomyScore === 'B' ? 'halverwege — goed bezig' :
-             data.autonomyScore === 'C' ? 'kwart bereikt — momentum groeit' :
-             data.autonomyScore === 'D' ? 'vroeg stadium — groei zit erin' :
-             'begin je reis'}
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-vermogensgroei">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
-              <BarChart3 className="h-5 w-5 text-amber-600" />
-            </div>
-            <KpiTooltip text="De groei van je netto vermogen over tijd. Gebaseerd op je snapshots. Positieve groei = je bouwt vrijheid op." />
-          </div>
-          <p className="text-sm font-medium text-zinc-500">Vermogensgroei</p>
-          {netWorthGrowth ? (
-            <>
-              <p className={`mt-1 text-3xl font-bold ${netWorthGrowth.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                {netWorthGrowth.amount >= 0 ? '+' : ''}{netWorthGrowth.percentage.toFixed(1)}%
-              </p>
-              <p className="mt-1 text-xs text-zinc-400">
-                {netWorthGrowth.amount >= 0 ? '+' : ''}{formatCurrency(netWorthGrowth.amount)} {netWorthGrowth.period}
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="mt-1 text-3xl font-bold text-zinc-400">&mdash;</p>
-              <p className="mt-1 text-xs text-zinc-400">maak minimaal 2 snapshots</p>
-            </>
-          )}
-        </div>
-      </section>
-
-      {/* === 3. Alerts (Budget Alerts) === */}
-      {alertBudgets.length > 0 && (
-        <section className="mt-8" data-testid="kern-alerts">
-          <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-            Aandachtspunten
-          </h2>
-          <div className="space-y-2">
-            {alertBudgets.map(({ budget, spent, limit }) => (
-              <BudgetAlert
-                key={budget.id}
-                budgetName={budget.name}
-                budgetId={budget.id}
-                spent={spent}
-                limit={limit}
-                threshold={Number(budget.alert_threshold)}
-                budgetType={(budget.budget_type ?? 'expense') as 'income' | 'expense' | 'savings' | 'debt'}
-                onNavigate={(id) => router.push(`/core/budgets?budget=${id}`)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-      {/* === 4b. Budget Category Spending Trends (Sparklines) === */}
-      {budgetSparklines.length > 0 && (
-        <section className="mt-8" data-testid="kern-budget-sparklines">
-          <CollapsibleSection
-            storageKey="kern_budget_trends"
-            title="Uitgaventrend per categorie"
-            summary={`${budgetSparklines.length} categorie${budgetSparklines.length !== 1 ? 'ën' : ''} — 12 maanden`}
-            icon={<BarChart3 className="h-5 w-5 text-amber-600" />}
-          >
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {budgetSparklines.map((cat) => (
-                <Link
-                  key={cat.id}
-                  href={`/core/budgets?budget=${cat.id}`}
-                  className="group flex items-center gap-3 rounded-xl border border-zinc-100 bg-white p-3 transition-all hover:border-amber-200 hover:bg-amber-50/20 hover:shadow-sm"
-                  data-testid={`kern-sparkline-${cat.id}`}
-                >
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-50">
-                    <BudgetIcon name={cat.icon} className="h-4 w-4 text-amber-600" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-medium text-zinc-700">{cat.name}</p>
-                    <p className="text-[10px] text-zinc-400">
-                      {formatCurrency(cat.data[cat.data.length - 1]?.spent ?? 0)} deze maand
-                    </p>
-                  </div>
-                  <SparklineWithLabel
-                    data={cat.data}
-                    width={80}
-                    height={24}
-                    isIncome={cat.budgetType === 'income'}
-                    testId={`kern-sparkline-chart-${cat.id}`}
-                  />
-                </Link>
-              ))}
-            </div>
-          </CollapsibleSection>
-        </section>
-      )}
-
-      {/* === 4b2. Spending Pattern Insights (Feature-gated: Stability+) === */}
-      <FeatureGate featureId="spending_patterns" fallback="locked">
-        {(spendingInsightsLoading || spendingInsights.length > 0 || spendingInsightsHasData) && (
-          <section className="mt-8" data-testid="spending-patterns-section">
-            <CollapsibleSection
-              storageKey="kern_spending_patterns"
-              title="Uitgavenpatronen"
-              summary={
-                spendingInsightsLoading
-                  ? 'Patronen analyseren...'
-                  : spendingInsights.length > 0
-                    ? `${spendingInsights.length} patroon${spendingInsights.length !== 1 ? 'en' : ''} gedetecteerd`
-                    : 'Geen opvallende patronen'
-              }
-              icon={<Sparkles className="h-5 w-5 text-amber-600" />}
-            >
-              <SpendingInsightsSection
-                insights={spendingInsights}
-                dataMonths={spendingInsightsDataMonths}
-                message={spendingInsightsMessage}
-                isLoading={spendingInsightsLoading}
-              />
-            </CollapsibleSection>
-          </section>
-        )}
-      </FeatureGate>
-
-      {/* === 4c. Cash Flow Forecast (Feature-gated: Stability+) === */}
-      <FeatureGate featureId="cashflow_forecast" fallback="locked">
-        {cashFlowHasData && cashFlowForecast.length >= 2 && (
-          <section className="mt-8" data-testid="cashflow-forecast-section">
-            <CollapsibleSection
-              storageKey="kern_cashflow_forecast"
-              title="Cashflow Prognose"
-              summary={`${cashFlowForecast.length - 1} maanden vooruit — banksaldo projectie`}
-              icon={<LineChart className="h-5 w-5 text-amber-600" />}
-            >
-              <CashFlowForecastChart
-                forecast={cashFlowForecast}
-                alerts={cashFlowAlerts}
-                currentBalance={cashFlowBalance}
-              />
-            </CollapsibleSection>
-          </section>
-        )}
-      </FeatureGate>
-
-      {/* === 4d. Net Worth Growth Projection (Short-term 1-5 year view) === */}
-      <FeatureGate featureId="vermogensprognose_kern" fallback="locked">
-        {nwProjection && nwProjection.points.length >= 2 && (
-          <section className="mt-8" data-testid="kern-nw-projection-section">
-            <CollapsibleSection
-              storageKey="kern_nw_projection"
-              title="Vermogensprognose"
-              summary="Op dit tempo bereik je... — 5-jarenprognose"
-              icon={<TrendingUp className="h-5 w-5 text-amber-600" />}
-            >
-              <NetWorthProjectionChart projection={nwProjection} />
-            </CollapsibleSection>
-          </section>
-        )}
-      </FeatureGate>
-
-      {/* === 5. Net Worth Chart (Deep Dive) === */}
-      <FeatureGate featureId="vermogensverloop" fallback="locked">
-      <section className="mt-10">
-        <CollapsibleSection
-          storageKey="kern_vermogensverloop"
-          title="Vermogensverloop"
-          summary={snapshots.length > 0 ? `${snapshots.length} snapshots — netto vermogen over tijd` : 'Maak je eerste snapshot'}
-          icon={<TrendingUp className="h-5 w-5 text-amber-600" />}
-        >
-          {snapshots.length > 0 ? (
-            <>
-              <div className="mb-4 flex items-center justify-end">
-                <button
-                  onClick={createSnapshot}
-                  disabled={snapshotLoading}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
-                >
-                  <Camera className="h-3.5 w-3.5" />
-                  {snapshotLoading ? 'Bezig...' : 'Snapshot nu'}
-                </button>
-              </div>
-              <NetWorthChart snapshots={snapshots} fireTarget={data.fireTarget} earnedBadges={earnedBadges} />
-            </>
-          ) : (
-            <div className="text-center py-4">
-              <p className="text-sm text-zinc-500">Nog geen snapshots. Maak je eerste snapshot om je vermogensverloop te zien.</p>
-              <button
-                onClick={createSnapshot}
-                disabled={snapshotLoading}
-                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
-              >
-                <Camera className="h-4 w-4" />
-                {snapshotLoading ? 'Bezig...' : 'Eerste snapshot maken'}
-              </button>
-            </div>
-          )}
-        </CollapsibleSection>
-      </section>
-      </FeatureGate>
-
-      {/* === 6. Snapshot Comparison (Deep Dive) === */}
-      <FeatureGate featureId="snapshot_vergelijking" fallback="locked">
-      {snapshots.length >= 2 && (
-        <section className="mt-10">
-          <CollapsibleSection
-            storageKey="kern_snapshot_vergelijking"
-            title="Vergelijking snapshots"
-            summary={`Vergelijk ${snapshots.length} snapshots — alle metrics naast elkaar`}
-            icon={<Camera className="h-5 w-5 text-amber-600" />}
-          >
-            <SnapshotComparisonView snapshots={snapshots} />
-          </CollapsibleSection>
-        </section>
-      )}
-      </FeatureGate>
-
       {/* === 7. Financiële Kerngetallen (Deep Dive) === */}
       <section className="mt-10">
         <div className="mb-5 flex items-end justify-between">
@@ -1115,7 +863,7 @@ export default function CorePage() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="rounded-xl border border-zinc-200 bg-white p-6">
+          <button type="button" onClick={() => setShowIncomeReceipt(true)} className="rounded-xl border border-zinc-200 bg-white p-6 text-left transition-all hover:border-emerald-300 hover:shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50">
                 <TrendingUp className="h-6 w-6 text-emerald-600" />
@@ -1130,9 +878,9 @@ export default function CorePage() {
                 ? `geextrapoleerd vanuit ${incomeMonths} maand${incomeMonths > 1 ? 'en' : ''}`
                 : 'laatste 12 maanden'}
             </p>
-          </div>
+          </button>
 
-          <div className="rounded-xl border border-zinc-200 bg-white p-6">
+          <button type="button" onClick={() => setShowExpenseReceipt(true)} className="rounded-xl border border-zinc-200 bg-white p-6 text-left transition-all hover:border-zinc-300 hover:shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-100">
                 <ShoppingCart className="h-6 w-6 text-zinc-500" />
@@ -1143,7 +891,7 @@ export default function CorePage() {
             <p className="mt-1 text-2xl font-bold text-zinc-900">{formatCurrency(data.yearlyMustExpenses)}</p>
             <FreedomTimeBadge amount={data.yearlyMustExpenses} className="mt-1" />
             <p className="mt-1 text-xs text-zinc-400">essentiële kosten per jaar</p>
-          </div>
+          </button>
         </div>
       </section>
 
@@ -1224,6 +972,14 @@ export default function CorePage() {
               </p>
             )}
           </section>
+
+          {/* Vergelijking snapshots */}
+          {snapshots.length >= 2 && (
+            <section>
+              <h3 className="mb-3 text-sm font-semibold text-zinc-700">Vergelijking snapshots</h3>
+              <SnapshotComparisonView snapshots={snapshots} />
+            </section>
+          )}
         </div>
       </FullScreenModal>
 
@@ -1245,10 +1001,10 @@ export default function CorePage() {
                     key={cat.id}
                     href={`/core/budgets?budget=${cat.id}`}
                     onClick={() => setShowBudgetModal(false)}
-                    className="group flex items-center gap-3 rounded-xl border border-zinc-100 bg-white p-3 transition-all hover:border-amber-200 hover:bg-amber-50/20 hover:shadow-sm"
+                    className="group flex items-center gap-3 rounded-xl border border-zinc-100 bg-white p-3 transition-all hover:border-kern-200 hover:bg-kern-50/20 hover:shadow-sm"
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-50">
-                      <BudgetIcon name={cat.icon} className="h-4 w-4 text-amber-600" />
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-kern-50">
+                      <BudgetIcon name={cat.icon} className="h-4 w-4 text-kern-600" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-medium text-zinc-700">{cat.name}</p>
@@ -1288,6 +1044,232 @@ export default function CorePage() {
           )}
         </div>
       </FullScreenModal>
+
+      {/* === Kassabon Modal: Inkomen === */}
+      <BottomSheet open={showIncomeReceipt} onClose={() => setShowIncomeReceipt(false)} title="Kassabon: Geschat Jaarinkomen">
+        <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50/50 p-4 font-mono text-sm">
+          <div className="mb-3 text-center">
+            <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Inkomen overzicht</p>
+            <p className="mt-0.5 text-[10px] text-zinc-400">
+              {incomeMonths < 12
+                ? `${incomeMonths} maand${incomeMonths > 1 ? 'en' : ''} data beschikbaar`
+                : 'Laatste 12 maanden'}
+            </p>
+          </div>
+
+          <div className="mb-1 border-b border-dashed border-zinc-300 pb-2 text-[11px] text-zinc-400 leading-relaxed">
+            Je geschat jaarinkomen is de basis voor veel berekeningen, zoals je spaarquote en vrijheidspercentage. We tellen alle positieve transacties op over de afgelopen 12 maanden.
+          </div>
+
+          <div className="border-b border-dashed border-zinc-300 mb-2 pb-2 mt-2">
+            {incomeByMonth.map(({ month, amount }) => {
+              const [y, m] = month.split('-')
+              const label = new Date(Number(y), Number(m) - 1).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
+              return (
+                <div key={month} className="flex justify-between py-0.5">
+                  <span className="text-zinc-600 capitalize">{label}</span>
+                  <span className="tabular-nums text-zinc-900">{formatCurrency(amount)}</span>
+                </div>
+              )
+            })}
+          </div>
+          <div className="flex justify-between py-1">
+            <span className="text-zinc-500">Subtotaal werkelijk</span>
+            <span className="tabular-nums font-medium text-zinc-900">
+              {formatCurrency(incomeByMonth.reduce((s, i) => s + i.amount, 0))}
+            </span>
+          </div>
+          {incomeMonths < 12 && data && (
+            <div className="mt-2 border-t border-dashed border-zinc-300 pt-2">
+              <p className="text-[11px] leading-relaxed text-zinc-400">
+                Gemiddeld per maand: {formatCurrency(incomeByMonth.reduce((s, i) => s + i.amount, 0) / incomeMonths)}
+                {' '}({incomeMonths} mnd) &rarr; geëxtrapoleerd naar 12 maanden
+              </p>
+            </div>
+          )}
+          <div className="mt-2 border-t-2 border-zinc-900 pt-2 flex justify-between">
+            <span className="font-bold text-zinc-900">Geschat Jaarinkomen</span>
+            <span className="tabular-nums font-bold text-zinc-900">{data ? formatCurrency(data.estimatedYearlyIncome) : '—'}</span>
+          </div>
+          {data && (
+            <div className="mt-2 flex justify-center">
+              <FreedomTimeBadge amount={data.estimatedYearlyIncome} />
+            </div>
+          )}
+
+          <div className="mt-3 border-t border-dashed border-zinc-300 pt-2 text-[11px] text-zinc-400 leading-relaxed">
+            <p><strong className="text-zinc-500">Formule:</strong> som van alle positieve transacties over {incomeMonths < 12 ? `${incomeMonths} maanden, gedeeld door ${incomeMonths} en vermenigvuldigd met 12` : 'de laatste 12 maanden'}</p>
+          </div>
+
+          <p className="mt-3 text-center text-[10px] text-zinc-400">Berekend op basis van werkelijke transacties</p>
+        </div>
+      </BottomSheet>
+
+      {/* === Kassabon Modal: Spaarquote === */}
+      <BottomSheet open={showSavingsReceipt} onClose={() => setShowSavingsReceipt(false)} title="Kassabon: Spaarquote">
+        <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50/50 p-4 font-mono text-sm">
+          <div className="mb-3 text-center">
+            <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Spaarquote berekening</p>
+            <p className="mt-0.5 text-[10px] text-zinc-400">
+              {savingsRateMonths < 12
+                ? `${savingsRateMonths} maand${savingsRateMonths > 1 ? 'en' : ''} data, geëxtrapoleerd naar 12`
+                : 'Laatste 12 maanden'}
+            </p>
+          </div>
+
+          <div className="mb-1 border-b border-dashed border-zinc-300 pb-2 text-[11px] text-zinc-400 leading-relaxed">
+            Je spaarquote laat zien welk deel van je inkomen je overhoudt. Hoe hoger dit percentage, hoe sneller je financiële vrijheid groeit.
+          </div>
+
+          <div className="border-b border-dashed border-zinc-300 mb-2 pb-2 mt-2">
+            <div className="flex justify-between py-0.5">
+              <span className="text-zinc-600">Jaarinkomen{savingsRateMonths < 12 ? ' (geëxtrapoleerd)' : ''}</span>
+              <span className="tabular-nums text-zinc-900">{formatCurrency(savingsReceiptData.extYearlyIncome)}</span>
+            </div>
+            <div className="flex justify-between py-0.5">
+              <span className="text-zinc-600">Jaaruitgaven{savingsRateMonths < 12 ? ' (geëxtrapoleerd)' : ''}</span>
+              <span className="tabular-nums text-red-600">- {formatCurrency(savingsReceiptData.extYearlyExpenses)}</span>
+            </div>
+          </div>
+          <div className="flex justify-between py-1">
+            <span className="font-medium text-zinc-700">Jaarlijkse besparing</span>
+            <span className={`tabular-nums font-medium ${savingsReceiptData.yearlySavings >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              {savingsReceiptData.yearlySavings >= 0 ? '+' : ''}{formatCurrency(savingsReceiptData.yearlySavings)}
+            </span>
+          </div>
+          <div className="mt-2 border-t-2 border-zinc-900 pt-2 flex justify-between">
+            <span className="font-bold text-zinc-900">Spaarquote</span>
+            <span className={`tabular-nums font-bold ${savingsRate12 >= 0 ? 'text-zinc-900' : 'text-red-600'}`}>{savingsRate12.toFixed(1)}%</span>
+          </div>
+
+          {savingsRateMonths < 12 && (
+            <div className="mt-2 border-t border-dashed border-zinc-300 pt-2">
+              <p className="text-[11px] leading-relaxed text-zinc-400">
+                Werkelijk inkomen: {formatCurrency(savingsReceiptData.last12Income)} over {savingsRateMonths} mnd.
+                Werkelijke uitgaven: {formatCurrency(savingsReceiptData.last12Expenses)} over {savingsRateMonths} mnd.
+                Beide geëxtrapoleerd naar 12 maanden.
+              </p>
+            </div>
+          )}
+
+          <div className="mt-3 border-t border-dashed border-zinc-300 pt-2 text-[11px] text-zinc-400 leading-relaxed">
+            <p><strong className="text-zinc-500">Formule:</strong> (inkomen − uitgaven) / inkomen × 100%</p>
+            <p className="mt-1">Een spaarquote van 50% betekent dat je voor elke gewerkte dag ook één dag vrijheid opbouwt.</p>
+          </div>
+
+          <p className="mt-3 text-center text-[10px] text-zinc-400">Berekend op basis van werkelijke transacties</p>
+        </div>
+      </BottomSheet>
+
+      {/* === Kassabon Modal: FIRE Target === */}
+      <BottomSheet open={showFireReceipt} onClose={() => setShowFireReceipt(false)} title="Kassabon: Volledige Vrijheid">
+        <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50/50 p-4 font-mono text-sm">
+          <div className="mb-3 text-center">
+            <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Benodigd voor volledige vrijheid</p>
+            <p className="mt-0.5 text-[10px] text-zinc-400">FIRE-berekening op basis van de 4%-regel</p>
+          </div>
+
+          <div className="mb-1 border-b border-dashed border-zinc-300 pb-2 text-[11px] text-zinc-400 leading-relaxed">
+            Het FIRE-bedrag is het vermogen waarmee je voor altijd van de opbrengsten kunt leven, zonder je kapitaal aan te spreken. Dit is gebaseerd op de &ldquo;4%-regel&rdquo;: je onttrekt jaarlijks 4% van je vermogen.
+          </div>
+
+          {data && (
+            <>
+              <div className="border-b border-dashed border-zinc-300 mb-2 pb-2 mt-2">
+                <div className="flex justify-between py-0.5">
+                  <span className="text-zinc-600">Maandelijkse uitgaven</span>
+                  <span className="tabular-nums text-zinc-900">{formatCurrency(data.monthlyExpenses)}</span>
+                </div>
+                <div className="flex justify-between py-0.5">
+                  <span className="text-zinc-600">× 12 maanden</span>
+                  <span className="tabular-nums text-zinc-900">{formatCurrency(data.monthlyExpenses * 12)}</span>
+                </div>
+                <div className="flex justify-between py-0.5">
+                  <span className="text-zinc-600">÷ opnamepercentage (4%)</span>
+                  <span className="tabular-nums text-zinc-400">÷ 0,04</span>
+                </div>
+              </div>
+              <div className="border-b-2 border-zinc-900 pb-2 flex justify-between">
+                <span className="font-bold text-zinc-900">FIRE-bedrag</span>
+                <span className="tabular-nums font-bold text-zinc-900">{formatCurrency(data.fireTarget)}</span>
+              </div>
+
+              <div className="mt-3 border-b border-dashed border-zinc-300 pb-2">
+                <div className="flex justify-between py-0.5">
+                  <span className="text-zinc-600">Huidig netto vermogen</span>
+                  <span className="tabular-nums text-zinc-900">{formatCurrency(data.netWorth)}</span>
+                </div>
+                <div className="flex justify-between py-0.5">
+                  <span className="text-zinc-600">Nog nodig</span>
+                  <span className="tabular-nums text-zinc-900">{formatCurrency(Math.max(0, data.fireTarget - data.netWorth))}</span>
+                </div>
+                <div className="flex justify-between py-0.5">
+                  <span className="text-zinc-600">Voortgang</span>
+                  <span className="tabular-nums font-medium text-kern-600">{data.freedomPercentage.toFixed(1)}%</span>
+                </div>
+              </div>
+
+              <div className="mt-2 flex justify-center">
+                <FreedomTimeBadge amount={data.fireTarget} />
+              </div>
+
+              <div className="mt-3 border-t border-dashed border-zinc-300 pt-2 text-[11px] text-zinc-400 leading-relaxed">
+                <p><strong className="text-zinc-500">De 4%-regel:</strong> Onderzoek (de &ldquo;Trinity Study&rdquo;) toont aan dat je 4% per jaar kunt onttrekken aan een gediversifieerde portefeuille zonder dat het kapitaal opraakt over 30+ jaar.</p>
+                <p className="mt-1"><strong className="text-zinc-500">Formule:</strong> jaarlijkse uitgaven ÷ 0,04 = benodigd vermogen</p>
+              </div>
+
+              <p className="mt-3 text-center text-[10px] text-zinc-400">Berekend op basis van je huidige maandelijkse uitgaven</p>
+            </>
+          )}
+        </div>
+      </BottomSheet>
+
+      {/* === Kassabon Modal: Must Uitgaven === */}
+      <BottomSheet open={showExpenseReceipt} onClose={() => setShowExpenseReceipt(false)} title="Kassabon: Essentiële Uitgaven">
+        <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50/50 p-4 font-mono text-sm">
+          <div className="mb-3 text-center">
+            <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Essentiële uitgaven</p>
+            <p className="mt-0.5 text-[10px] text-zinc-400">Vaste lasten op jaarbasis</p>
+          </div>
+
+          <div className="mb-1 border-b border-dashed border-zinc-300 pb-2 text-[11px] text-zinc-400 leading-relaxed">
+            Dit zijn de kosten die je sowieso maakt — vaste lasten, dagelijkse boodschappen en vervoer. Dit bedrag bepaalt hoeveel vermogen je nodig hebt voor volledige vrijheid.
+          </div>
+
+          <div className="border-b border-dashed border-zinc-300 mb-2 pb-2 mt-2">
+            {mustExpenseItems.map((item) => {
+              const intervalLabel = item.interval === 'monthly' ? '/mnd' : item.interval === 'quarterly' ? '/kwt' : '/jr'
+              return (
+                <div key={item.name} className="flex justify-between py-0.5">
+                  <span className="text-zinc-600">
+                    {item.name} <span className="text-[10px] text-zinc-400">{intervalLabel}</span>
+                  </span>
+                  <span className="tabular-nums text-zinc-900">{formatCurrency(item.annualAmount)}</span>
+                </div>
+              )
+            })}
+          </div>
+          <div className="mt-1 border-t-2 border-zinc-900 pt-2 flex justify-between">
+            <span className="font-bold text-zinc-900">Totaal per jaar</span>
+            <span className="tabular-nums font-bold text-zinc-900">{data ? formatCurrency(data.yearlyMustExpenses) : '—'}</span>
+          </div>
+          <div className="mt-1 flex justify-between text-zinc-500">
+            <span>Gemiddeld per maand</span>
+            <span className="tabular-nums">{data ? formatCurrency(data.yearlyMustExpenses / 12) : '—'}</span>
+          </div>
+          {data && (
+            <div className="mt-2 flex justify-center">
+              <FreedomTimeBadge amount={data.yearlyMustExpenses} />
+            </div>
+          )}
+
+          <div className="mt-3 border-t border-dashed border-zinc-300 pt-2 text-[11px] text-zinc-400 leading-relaxed">
+            <p><strong className="text-zinc-500">Formule:</strong> per budget het limietbedrag omgerekend naar jaarbasis (maandelijks × 12, per kwartaal × 4, of jaarlijks × 1), alles opgeteld</p>
+          </div>
+
+          <p className="mt-3 text-center text-[10px] text-zinc-400">Berekend op basis van essentiële budgetinstellingen</p>
+        </div>
+      </BottomSheet>
     </div>
   )
 }
@@ -1302,10 +1284,10 @@ function HeroTooltip({ text }: { text: string }) {
         onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
         onBlur={() => setOpen(false)}
       >
-        <Info className={`h-3.5 w-3.5 cursor-help transition-colors ${open ? 'text-amber-300' : 'text-amber-300/40'} hover:text-amber-300`} />
+        <Info className={`h-3.5 w-3.5 cursor-help transition-colors ${open ? 'text-kern-300' : 'text-kern-300/40'} hover:text-kern-300`} />
       </button>
       {open && (
-        <div className="absolute bottom-full left-1/2 z-10 mb-2 w-52 -translate-x-1/2 rounded-lg border border-amber-700/50 bg-amber-950 p-2.5 text-xs leading-relaxed text-amber-200/80 shadow-lg">
+        <div className="absolute bottom-full left-1/2 z-10 mb-2 w-52 -translate-x-1/2 rounded-lg border border-kern-700/50 bg-kern-950 p-2.5 text-xs leading-relaxed text-kern-200/80 shadow-lg">
           {text}
         </div>
       )}
@@ -1387,7 +1369,7 @@ function BudgetSpendingSparkline({
         {/* Projection line (dashed) */}
         {projPath && <path d={projPath} fill="none" stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="3,2" opacity="0.5" />}
       </svg>
-      <div className="flex justify-between text-[10px] text-amber-300/40" style={{ maxWidth: 200 }}>
+      <div className="flex justify-between text-[10px] text-kern-300/40" style={{ maxWidth: 200 }}>
         <span>-12m</span>
         <span>nu</span>
         <span>+6m</span>
@@ -1480,7 +1462,7 @@ function NetWorthSparkline({
         {/* Projection line (dashed) */}
         {projPath && <path d={projPath} fill="none" stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="3,2" opacity="0.6" />}
       </svg>
-      <div className="flex justify-between text-[10px] text-amber-300/40" style={{ maxWidth: 200 }}>
+      <div className="flex justify-between text-[10px] text-kern-300/40" style={{ maxWidth: 200 }}>
         <span>-12m</span>
         <span>nu</span>
         <span>+6m</span>
@@ -1493,15 +1475,17 @@ function KpiTooltip({ text }: { text: string }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="group relative">
-      <button
-        type="button"
+      <span
+        role="button"
+        tabIndex={0}
         aria-label="Meer informatie"
-        onClick={() => setOpen(!open)}
+        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setOpen(!open) } }}
         onBlur={() => setOpen(false)}
         className="touch-target"
       >
-        <Info className={`h-4 w-4 cursor-help transition-colors ${open ? 'text-amber-500' : 'text-zinc-300'} group-hover:text-amber-500`} />
-      </button>
+        <Info className={`h-4 w-4 cursor-help transition-colors ${open ? 'text-kern-500' : 'text-zinc-300'} group-hover:text-kern-500`} />
+      </span>
       <div role="tooltip" className={`absolute right-0 z-10 mt-1 w-56 rounded-lg border border-zinc-200 bg-white p-3 text-xs leading-relaxed text-zinc-600 shadow-lg transition-opacity ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}>
         {text}
       </div>
@@ -1543,12 +1527,12 @@ function MissionControlCard({
       type="button"
       onClick={onClick ?? (() => { window.location.href = href })}
       data-testid={testId}
-      className="group flex flex-col rounded-xl border border-zinc-200 bg-white p-5 text-left transition-all hover:border-amber-200 hover:bg-amber-50/20 hover:shadow-sm"
+      className="group flex flex-col rounded-xl border border-zinc-200 bg-white p-5 text-left transition-all hover:border-kern-200 hover:bg-kern-50/20 hover:shadow-sm"
     >
       {/* Header: icon + title + status */}
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-amber-50">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-kern-50">
             {icon}
           </div>
           <p className="text-sm font-semibold text-zinc-700">{title}</p>
@@ -1557,7 +1541,7 @@ function MissionControlCard({
           {status === 'healthy' ? (
             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
           ) : (
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <AlertTriangle className="h-4 w-4 text-kern-500" />
           )}
         </div>
       </div>
@@ -1580,7 +1564,7 @@ function MissionControlCard({
       <div className={`mb-3 inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${
         status === 'healthy'
           ? 'bg-emerald-50 text-emerald-700'
-          : 'bg-amber-50 text-amber-700'
+          : 'bg-kern-50 text-kern-700'
       }`} data-testid={`${testId}-status-label`}>
         {status === 'healthy' ? (
           <CheckCircle2 className="h-3 w-3" />
@@ -1617,8 +1601,8 @@ function MissionControlCard({
 
       {/* CTA */}
       <div className="mt-3 flex items-center justify-between">
-        <span className="text-xs font-medium text-amber-600 opacity-0 transition-opacity group-hover:opacity-100">{cta}</span>
-        <ArrowRight className="h-4 w-4 text-zinc-300 transition-colors group-hover:text-amber-500" />
+        <span className="text-xs font-medium text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">{cta}</span>
+        <ArrowRight className="h-4 w-4 text-zinc-300 transition-colors group-hover:text-kern-500" />
       </div>
     </button>
   )
@@ -2023,6 +2007,126 @@ function NetWorthChart({ snapshots, fireTarget = 0, earnedBadges = [] }: {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Budget legend overview (compact category list) ────────────────
+
+function BudgetLegendOverview({
+  groups,
+  spending,
+  expandedGroupId,
+  onToggleGroup,
+  onNavigate,
+}: {
+  groups: BudgetWithChildren[]
+  spending: Record<string, number>
+  expandedGroupId: string | null
+  onToggleGroup: (id: string) => void
+  onNavigate: (id: string) => void
+}) {
+  const segments = buildSegments(groups, spending)
+  if (segments.length === 0) return null
+
+  return (
+    <div className="mt-4 space-y-2">
+      {/* Header swatches */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs text-zinc-500">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-6 rounded-sm bg-zinc-600" />
+          Besteed
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-6 rounded-sm bg-zinc-300" />
+          Budget
+        </span>
+      </div>
+
+      {segments.map((seg) => {
+        const c = groupColor(seg.colorIdx)
+        const pct = seg.limit > 0 ? Math.round((seg.spent / seg.limit) * 100) : 0
+        const isOver = seg.spent > seg.limit && seg.limit > 0
+        const isExpanded = expandedGroupId === seg.id
+
+        return (
+          <div key={seg.id}>
+            <button
+              className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all ${
+                isExpanded ? 'ring-2 ring-kern-400' : ''
+              }`}
+              style={{
+                borderColor: isExpanded ? c.border : '#e4e4e7',
+                backgroundColor: isExpanded ? c.bg : 'white',
+              }}
+              onClick={() => onToggleGroup(seg.id)}
+            >
+              {/* Color swatch: spent (dark) + budget (light) */}
+              <div className="flex items-center gap-0.5">
+                <span className="block h-5 w-2.5 rounded-l-sm" style={{ backgroundColor: c.spent }} />
+                <span className="block h-5 w-2.5 rounded-r-sm" style={{ backgroundColor: c.budget }} />
+              </div>
+
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: c.bg }}>
+                <BudgetIcon name={seg.icon} className="h-4 w-4" />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-zinc-900">{seg.name}</p>
+                <p className="text-xs text-zinc-500">
+                  <span className={isOver ? 'font-semibold text-red-600' : ''}>
+                    {formatCurrency(seg.spent)}
+                  </span>
+                  {' / '}
+                  {formatCurrency(seg.limit)}
+                </p>
+              </div>
+
+              <span className={`shrink-0 text-xs font-bold ${isOver ? 'text-red-600' : 'text-zinc-600'}`}>
+                {pct}%
+              </span>
+            </button>
+
+            {/* Subcategories when expanded */}
+            {isExpanded && seg.children.length > 0 && (
+              <div className="ml-5 mt-1 mb-1 space-y-0.5">
+                {seg.children.map((child, ci) => {
+                  const childPct = child.limit > 0 ? Math.round((child.spent / child.limit) * 100) : 0
+                  const childOver = child.spent > child.limit && child.limit > 0
+                  const cc = childColor(c.h, ci, seg.children.length)
+
+                  return (
+                    <button
+                      key={child.id}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left transition-colors hover:bg-zinc-50"
+                      onClick={() => onNavigate(child.id)}
+                    >
+                      <div className="flex items-center gap-0.5">
+                        <span className="block h-3 w-1.5 rounded-l-sm" style={{ backgroundColor: cc.spent }} />
+                        <span className="block h-3 w-1.5 rounded-r-sm" style={{ backgroundColor: cc.budget }} />
+                      </div>
+                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded" style={{ backgroundColor: c.bg }}>
+                        <BudgetIcon name={child.icon} className="h-3 w-3" />
+                      </div>
+                      <span className="min-w-0 flex-1 truncate text-xs text-zinc-700">{child.name}</span>
+                      <span className="text-xs text-zinc-500">
+                        <span className={childOver ? 'font-semibold text-red-600' : ''}>
+                          {formatCurrency(child.spent)}
+                        </span>
+                        {' / '}
+                        {formatCurrency(child.limit)}
+                      </span>
+                      <span className={`w-8 text-right text-xs font-medium ${childOver ? 'text-red-600' : 'text-zinc-400'}`}>
+                        {childPct}%
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

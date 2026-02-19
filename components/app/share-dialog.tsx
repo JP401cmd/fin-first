@@ -345,7 +345,8 @@ export function ShareDialog({
 
   return (
     <div
-      className={`fixed inset-0 z-[90] flex items-end sm:items-center justify-center ${className || ''}`}
+      className={`fixed inset-0 z-[90] flex items-end sm:items-center justify-center transition-[right] duration-300 ${className || ''}`}
+      style={{ right: 'var(--chat-sidebar-width, 0px)' }}
       role="dialog"
       aria-modal="true"
       aria-label="Delen"
@@ -367,7 +368,7 @@ export function ShareDialog({
         {/* Header */}
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Share2 className="h-5 w-5 text-teal-600" />
+            <Share2 className="h-5 w-5 text-wil-600" />
             <h2 className="text-lg font-semibold text-zinc-900">Delen</h2>
           </div>
           <button
@@ -384,7 +385,7 @@ export function ShareDialog({
         <div className="mb-5 rounded-xl bg-zinc-50 p-3 text-sm text-zinc-600 leading-relaxed" data-testid="share-preview-text">
           <p className="line-clamp-3">{shareText}</p>
           {shareUrl && (
-            <p className="mt-1 text-xs text-teal-600 truncate">{shareUrl}</p>
+            <p className="mt-1 text-xs text-wil-600 truncate">{shareUrl}</p>
           )}
         </div>
 
@@ -398,7 +399,7 @@ export function ShareDialog({
                 className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-50 hover:border-zinc-300 active:scale-[0.98]"
                 data-testid="share-target-native"
               >
-                <ExternalLink className="h-5 w-5 text-teal-500" />
+                <ExternalLink className="h-5 w-5 text-wil-500" />
                 <span>Delen via...</span>
               </button>
             ) : (
@@ -459,7 +460,7 @@ export function ShareDialog({
               className="flex w-full items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-50 hover:border-zinc-300 active:scale-[0.98] disabled:opacity-50"
               data-testid="share-target-download"
             >
-              <Download className="h-5 w-5 text-purple-500" />
+              <Download className="h-5 w-5 text-horizon-500" />
               <span>{downloading ? 'Downloaden...' : 'Download als afbeelding'}</span>
             </button>
           )}

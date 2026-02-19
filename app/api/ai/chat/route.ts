@@ -16,13 +16,13 @@ export async function POST(req: Request) {
     return new Response('Unauthorized', { status: 401 })
   }
 
-  const { messages, domain = 'kern' } = await req.json() as {
+  const { messages, domain = 'wil' } = await req.json() as {
     messages: UIMessage[]
     domain?: AIDomain
   }
 
   const validDomains: AIDomain[] = ['kern', 'wil', 'horizon']
-  const safeDomain = validDomains.includes(domain) ? domain : 'kern'
+  const safeDomain = validDomains.includes(domain) ? domain : 'wil'
 
   let model
   try {

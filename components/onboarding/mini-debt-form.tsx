@@ -126,7 +126,7 @@ export function MiniDebtForm({
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <button onClick={() => openEdit(i)} className="text-xs font-medium text-teal-600 hover:text-teal-800">Bewerk</button>
+            <button onClick={() => openEdit(i)} className="text-xs font-medium text-wil-600 hover:text-wil-800">Bewerk</button>
             <button onClick={() => remove(i)} className="text-xs text-red-500 hover:text-red-700">Verwijder</button>
           </div>
         </div>
@@ -316,7 +316,7 @@ export function MiniDebtForm({
                     type="checkbox"
                     checked={draft.is_tax_deductible}
                     onChange={(e) => updateDraft({ is_tax_deductible: e.target.checked })}
-                    className="h-4 w-4 rounded border-zinc-300 text-teal-600 focus:ring-teal-500"
+                    className="h-4 w-4 rounded border-zinc-300 text-wil-600 focus:ring-wil-500"
                   />
                   <span className="text-sm text-zinc-700">Hypotheekrenteaftrek</span>
                 </label>
@@ -329,7 +329,7 @@ export function MiniDebtForm({
                     type="checkbox"
                     checked={draft.nhg}
                     onChange={(e) => updateDraft({ nhg: e.target.checked })}
-                    className="h-4 w-4 rounded border-zinc-300 text-teal-600 focus:ring-teal-500"
+                    className="h-4 w-4 rounded border-zinc-300 text-wil-600 focus:ring-wil-500"
                   />
                   <span className="text-sm text-zinc-700">Nationale Hypotheek Garantie (NHG)</span>
                 </label>
@@ -391,7 +391,7 @@ export function MiniDebtForm({
               <button
                 onClick={save}
                 disabled={!draft.name || !draft.current_balance}
-                className="flex-1 rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-teal-700 disabled:opacity-40"
+                className="flex-1 rounded-lg bg-wil-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-wil-700 disabled:opacity-40"
               >
                 {editingIndex === -1 ? 'Toevoegen' : 'Opslaan'}
               </button>

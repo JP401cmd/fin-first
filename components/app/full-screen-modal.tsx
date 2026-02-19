@@ -37,7 +37,8 @@ export function FullScreenModal({ open, onClose, title, href, children }: FullSc
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 transition-[right] duration-300"
+      style={{ right: 'var(--chat-sidebar-width, 0px)' }}
       onClick={handleBackdrop}
     >
       <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">

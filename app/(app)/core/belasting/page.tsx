@@ -27,7 +27,7 @@ import { FeatureGate } from '@/components/app/feature-gate'
 function KpiTooltip({ text }: { text: string }) {
   return (
     <div className="group relative">
-      <Info className="h-4 w-4 cursor-help text-zinc-300 transition-colors group-hover:text-amber-500" />
+      <Info className="h-4 w-4 cursor-help text-zinc-300 transition-colors group-hover:text-kern-500" />
       <div className="pointer-events-none absolute right-0 z-10 mt-1 w-56 rounded-lg border border-zinc-200 bg-white p-3 text-xs leading-relaxed text-zinc-600 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
         {text}
       </div>
@@ -110,7 +110,7 @@ export default function BelastingPage() {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
         <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
         </div>
       </div>
     )
@@ -155,28 +155,28 @@ export default function BelastingPage() {
     <FeatureGate featureId="box3_belasting" fallback="locked">
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* === A. Hero Banner === */}
-      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-950 via-amber-900 to-amber-950 p-5 text-white sm:p-8 md:p-10">
-        <div className="pointer-events-none absolute -top-24 right-1/4 h-64 w-64 rounded-full bg-amber-500/10 blur-3xl" />
+      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-kern-950 via-kern-900 to-kern-950 p-5 text-white sm:p-8 md:p-10">
+        <div className="pointer-events-none absolute -top-24 right-1/4 h-64 w-64 rounded-full bg-kern-500/10 blur-3xl" />
 
         <div className="relative">
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <FhinAvatar size={40} />
-              <p className="text-xs font-semibold tracking-[0.2em] text-amber-300/80 uppercase">
+              <p className="text-xs font-semibold tracking-[0.2em] text-kern-300/80 uppercase">
                 Box 3 Vermogensrendementsheffing
               </p>
             </div>
             <div className="flex items-center gap-2">
               {/* Year toggle */}
-              <div className="flex overflow-hidden rounded-lg border border-amber-700/50">
+              <div className="flex overflow-hidden rounded-lg border border-kern-700/50">
                 {([2025, 2026] as TaxYear[]).map(y => (
                   <button
                     key={y}
                     onClick={() => setYear(y)}
                     className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                       year === y
-                        ? 'bg-amber-600 text-white'
-                        : 'text-amber-300/70 hover:text-amber-200'
+                        ? 'bg-kern-600 text-white'
+                        : 'text-kern-300/70 hover:text-kern-200'
                     }`}
                   >
                     {y}
@@ -188,8 +188,8 @@ export default function BelastingPage() {
                 onClick={() => setHasPartner(v => !v)}
                 className={`flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
                   hasPartner
-                    ? 'border-amber-500 bg-amber-600 text-white'
-                    : 'border-amber-700/50 text-amber-300/70 hover:text-amber-200'
+                    ? 'border-kern-500 bg-kern-600 text-white'
+                    : 'border-kern-700/50 text-kern-300/70 hover:text-kern-200'
                 }`}
               >
                 <Users className="h-3.5 w-3.5" />
@@ -205,19 +205,19 @@ export default function BelastingPage() {
           </div>
 
           <div className="mb-1 flex items-center gap-3">
-            <p className="text-lg text-amber-200/70" data-testid="belasting-hero-freedom-days">
-              Box 3 kost je <span className="font-semibold text-amber-300">{result.vrijheidsdagen} vrijheidsdagen</span>
+            <p className="text-lg text-kern-200/70" data-testid="belasting-hero-freedom-days">
+              Box 3 kost je <span className="font-semibold text-kern-300">{result.vrijheidsdagen} vrijheidsdagen</span>
             </p>
             <KpiTooltip text={BOX3_TOOLTIPS.box3} />
           </div>
           {result.belasting >= 100 && (
-            <p className="mb-6 text-sm text-amber-300/50" data-testid="belasting-hero-freedom-time">
+            <p className="mb-6 text-sm text-kern-300/50" data-testid="belasting-hero-freedom-time">
               {formatWithFreedom(result.belasting, dailyExpenses, { includeCurrency: false })} verloren aan belasting
             </p>
           )}
           {result.belasting < 100 && <div className="mb-6" />}
 
-          <div className="flex items-center gap-2 text-xs text-amber-300/50">
+          <div className="flex items-center gap-2 text-xs text-kern-300/50">
             <CalendarDays className="h-3.5 w-3.5" />
             <span>Peildatum: 1 januari {year}</span>
             <KpiTooltip text={BOX3_TOOLTIPS.peildatum} />
@@ -229,8 +229,8 @@ export default function BelastingPage() {
       <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-totale-belasting">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
-              <Receipt className="h-5 w-5 text-amber-600" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-kern-50">
+              <Receipt className="h-5 w-5 text-kern-600" />
             </div>
             <KpiTooltip text="De totale Box 3 belasting die je verschuldigd bent, berekend op basis van je vermogen op de peildatum." />
           </div>
@@ -243,8 +243,8 @@ export default function BelastingPage() {
 
         <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-effectief-tarief">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
-              <Percent className="h-5 w-5 text-amber-600" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-kern-50">
+              <Percent className="h-5 w-5 text-kern-600" />
             </div>
             <KpiTooltip text={BOX3_TOOLTIPS.effectiefTarief} />
           </div>
@@ -257,8 +257,8 @@ export default function BelastingPage() {
 
         <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-vrijheidsdagen">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
-              <Clock className="h-5 w-5 text-amber-600" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-kern-50">
+              <Clock className="h-5 w-5 text-kern-600" />
             </div>
             <KpiTooltip text="Hoeveel vrijheidsdagen je verliest aan Box 3 belasting. Berekening: belasting / dagelijkse uitgaven." />
           </div>
@@ -273,8 +273,8 @@ export default function BelastingPage() {
 
         <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-heffingsvrij">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50">
-              <ShieldCheck className="h-5 w-5 text-amber-600" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-kern-50">
+              <ShieldCheck className="h-5 w-5 text-kern-600" />
             </div>
             <KpiTooltip text={BOX3_TOOLTIPS.heffingsvrijVermogen} />
           </div>
@@ -320,10 +320,10 @@ export default function BelastingPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <button
             onClick={() => setShowScenarioModal(true)}
-            className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 text-left transition-colors hover:border-amber-200 hover:bg-amber-50/30"
+            className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 text-left transition-colors hover:border-kern-200 hover:bg-kern-50/30"
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-amber-50">
-              <ArrowRightLeft className="h-5 w-5 text-amber-600" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-kern-50">
+              <ArrowRightLeft className="h-5 w-5 text-kern-600" />
             </div>
             <div>
               <p className="text-sm font-medium text-zinc-900">Vermogen verschuiven</p>
@@ -333,10 +333,10 @@ export default function BelastingPage() {
 
           <button
             onClick={() => setShowScenarioModal(true)}
-            className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 text-left transition-colors hover:border-amber-200 hover:bg-amber-50/30"
+            className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 text-left transition-colors hover:border-kern-200 hover:bg-kern-50/30"
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-amber-50">
-              <CalendarDays className="h-5 w-5 text-amber-600" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-kern-50">
+              <CalendarDays className="h-5 w-5 text-kern-600" />
             </div>
             <div>
               <p className="text-sm font-medium text-zinc-900">Vergelijk jaren</p>
@@ -346,10 +346,10 @@ export default function BelastingPage() {
 
           <button
             onClick={() => setShowPartnerModal(true)}
-            className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 text-left transition-colors hover:border-amber-200 hover:bg-amber-50/30"
+            className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 text-left transition-colors hover:border-kern-200 hover:bg-kern-50/30"
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-amber-50">
-              <Users className="h-5 w-5 text-amber-600" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-kern-50">
+              <Users className="h-5 w-5 text-kern-600" />
             </div>
             <div>
               <p className="text-sm font-medium text-zinc-900">Verdeling partner</p>
@@ -374,11 +374,11 @@ export default function BelastingPage() {
             {optimizations.map(tip => (
               <div
                 key={tip.id}
-                className="rounded-xl border border-zinc-200 bg-white p-5 transition-colors hover:border-amber-200"
+                className="rounded-xl border border-zinc-200 bg-white p-5 transition-colors hover:border-kern-200"
               >
                 <div className="flex items-start gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-50">
-                    <Lightbulb className="h-5 w-5 text-amber-600" />
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-kern-50">
+                    <Lightbulb className="h-5 w-5 text-kern-600" />
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-zinc-900">{tip.title}</p>
@@ -389,7 +389,7 @@ export default function BelastingPage() {
                           Besparing: {tip.besparing >= 100 ? formatWithFreedom(tip.besparing, dailyExpenses) : formatCurrency(tip.besparing)}
                         </span>
                         {tip.vrijheidsdagen > 0 && (
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700" data-testid={`optimization-${tip.id}-freedom`}>
+                          <span className="rounded-full bg-kern-100 px-2 py-0.5 text-[10px] font-medium text-kern-700" data-testid={`optimization-${tip.id}-freedom`}>
                             +{tip.vrijheidsdagen} vrijheidsdagen teruggewonnen
                           </span>
                         )}

@@ -136,15 +136,15 @@ export default async function DashboardPage() {
         {/* De Kern */}
         <Link
           href="/core"
-          className="group rounded-2xl border border-amber-200 bg-white p-6 transition-all hover:border-amber-300 hover:shadow-lg hover:shadow-amber-50 active:scale-[0.98] transition-transform"
+          className="group rounded-2xl border border-kern-200 bg-white p-6 transition-all hover:border-kern-300 hover:shadow-lg hover:shadow-kern-50 active:scale-[0.98] transition-transform"
         >
           <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-kern-50">
               <FhinAvatar size={36} />
             </div>
             <div>
               <h2 className="font-bold text-zinc-900">De Kern</h2>
-              <p className="text-xs text-amber-600">Waar sta je echt?</p>
+              <p className="text-xs text-kern-600">Waar sta je echt?</p>
             </div>
           </div>
           <p className="mb-5 text-sm leading-relaxed text-zinc-500">
@@ -160,7 +160,7 @@ export default async function DashboardPage() {
               <p className="text-sm font-semibold text-zinc-900" data-testid="kern-preview-value">
                 {monthlyGrowth >= 0 ? '+' : ''}{formatCurrency(monthlyGrowth)}
                 {growthDaysStr && (
-                  <span className="ml-1 font-normal text-amber-600">
+                  <span className="ml-1 font-normal text-kern-600">
                     ({monthlyGrowth >= 0 ? '+' : '-'}{growthDaysStr})
                   </span>
                 )}
@@ -168,7 +168,7 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          <div className="mt-5 flex items-center gap-1 text-xs font-medium text-amber-600 opacity-0 transition-opacity group-hover:opacity-100">
+          <div className="mt-5 flex items-center gap-1 text-xs font-medium text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">
             Bekijken <ArrowRight className="h-3 w-3" />
           </div>
         </Link>
@@ -176,15 +176,15 @@ export default async function DashboardPage() {
         {/* De Wil */}
         <Link
           href="/will"
-          className={`group rounded-2xl border border-teal-200 bg-white p-6 transition-all hover:border-teal-300 hover:shadow-lg hover:shadow-teal-50 active:scale-[0.98] transition-transform ${!activated ? 'opacity-75' : ''}`}
+          className={`group rounded-2xl border border-wil-200 bg-white p-6 transition-all hover:border-wil-300 hover:shadow-lg hover:shadow-wil-50 active:scale-[0.98] transition-transform ${!activated ? 'opacity-75' : ''}`}
         >
             <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-50">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-wil-50">
                 <FinnAvatar size={36} />
               </div>
               <div>
                 <h2 className="font-bold text-zinc-900">De Wil</h2>
-                <p className="text-xs text-teal-600">Wat ga je doen?</p>
+                <p className="text-xs text-wil-600">Wat ga je doen?</p>
               </div>
             </div>
             <p className="mb-5 text-sm leading-relaxed text-zinc-500">
@@ -200,14 +200,14 @@ export default async function DashboardPage() {
                 <p className="text-sm font-semibold text-zinc-900" data-testid="wil-preview-value">
                   {openActions.length} {openActions.length === 1 ? 'actie' : 'acties'} open
                   <span className="mx-1 text-zinc-400">—</span>
-                  <span className="text-teal-600">
+                  <span className="text-wil-600">
                     {Math.round(totalFreedomDaysOpen)} {Math.round(totalFreedomDaysOpen) === 1 ? 'dag' : 'dagen'} te winnen
                   </span>
                 </p>
               </div>
             </div>
 
-            <div className="mt-5 flex items-center gap-1 text-xs font-medium text-teal-600 opacity-0 transition-opacity group-hover:opacity-100">
+            <div className="mt-5 flex items-center gap-1 text-xs font-medium text-wil-600 opacity-0 transition-opacity group-hover:opacity-100">
               Bekijken <ArrowRight className="h-3 w-3" />
             </div>
         </Link>
@@ -215,15 +215,15 @@ export default async function DashboardPage() {
         {/* De Horizon */}
         <Link
           href="/horizon"
-          className={`group rounded-2xl border border-purple-200 bg-white p-6 transition-all hover:border-purple-300 hover:shadow-lg hover:shadow-purple-50 active:scale-[0.98] transition-transform ${!activated ? 'opacity-75' : ''}`}
+          className={`group rounded-2xl border border-horizon-200 bg-white p-6 transition-all hover:border-horizon-300 hover:shadow-lg hover:shadow-horizon-50 active:scale-[0.98] transition-transform ${!activated ? 'opacity-75' : ''}`}
         >
             <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-horizon-50">
                 <FfinAvatar size={36} />
               </div>
               <div>
                 <h2 className="font-bold text-zinc-900">De Horizon</h2>
-                <p className="text-xs text-purple-600">Waar ga je naartoe?</p>
+                <p className="text-xs text-horizon-600">Waar ga je naartoe?</p>
               </div>
             </div>
             <p className="mb-5 text-sm leading-relaxed text-zinc-500">
@@ -238,16 +238,16 @@ export default async function DashboardPage() {
                 </div>
                 <p className="text-sm font-semibold text-zinc-900" data-testid="horizon-preview-value">
                   {fireProjResult.fireDate === 'Bereikt!'
-                    ? <span className="text-purple-600">Bereikt! 🎉</span>
+                    ? <span className="text-horizon-600">Bereikt! 🎉</span>
                     : fireProjResult.countdownDays > 0
-                      ? <>Countdown: <span className="text-purple-600">{fireProjResult.countdownYears} jaar, {fireProjResult.countdownMonths} maanden</span></>
+                      ? <>Countdown: <span className="text-horizon-600">{fireProjResult.countdownYears} jaar, {fireProjResult.countdownMonths} maanden</span></>
                       : <span className="text-zinc-400">-</span>
                   }
                 </p>
               </div>
             </div>
 
-            <div className="mt-5 flex items-center gap-1 text-xs font-medium text-purple-600 opacity-0 transition-opacity group-hover:opacity-100">
+            <div className="mt-5 flex items-center gap-1 text-xs font-medium text-horizon-600 opacity-0 transition-opacity group-hover:opacity-100">
               Bekijken <ArrowRight className="h-3 w-3" />
             </div>
         </Link>
@@ -270,7 +270,7 @@ export default async function DashboardPage() {
               <div className="mt-2 flex items-center gap-3">
                 <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-amber-400 via-teal-400 to-purple-500 transition-all duration-1000"
+                    className="h-full rounded-full bg-gradient-to-r from-kern-400 via-wil-400 to-horizon-500 transition-all duration-1000"
                     style={{ width: `${Math.min(freedomPct, 100)}%` }}
                   />
                 </div>

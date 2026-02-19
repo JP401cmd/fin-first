@@ -40,10 +40,10 @@ export function Hero() {
         <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
           Box 3 optimalisatie
         </span>
-        <span className="rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-medium text-teal-700">
+        <span className="rounded-full border border-wil-200 bg-wil-50 px-3 py-1 text-xs font-medium text-wil-700">
           AI-coaching
         </span>
-        <span className="rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-xs font-medium text-purple-700">
+        <span className="rounded-full border border-horizon-200 bg-horizon-50 px-3 py-1 text-xs font-medium text-horizon-700">
           FIRE-tracking
         </span>
       </div>

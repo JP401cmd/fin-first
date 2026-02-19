@@ -26,17 +26,17 @@ export function OnboardingIntro({ onNext }: { onNext: () => void }) {
             <p className="text-xs text-zinc-500">Je financiele fundament</p>
           </div>
         </div>
-        <div className="flex items-center gap-3 rounded-xl border border-teal-200 bg-teal-50/50 p-3">
+        <div className="flex items-center gap-3 rounded-xl border border-wil-200 bg-wil-50/50 p-3">
           <div className="shrink-0"><FinnAvatar size={32} /></div>
           <div className="text-left">
-            <p className="text-xs font-semibold text-teal-700">De Wil</p>
+            <p className="text-xs font-semibold text-wil-700">De Wil</p>
             <p className="text-xs text-zinc-500">Bewuste keuzes maken</p>
           </div>
         </div>
-        <div className="flex items-center gap-3 rounded-xl border border-purple-200 bg-purple-50/50 p-3">
+        <div className="flex items-center gap-3 rounded-xl border border-horizon-200 bg-horizon-50/50 p-3">
           <div className="shrink-0"><FfinAvatar size={32} /></div>
           <div className="text-left">
-            <p className="text-xs font-semibold text-purple-700">De Horizon</p>
+            <p className="text-xs font-semibold text-horizon-700">De Horizon</p>
             <p className="text-xs text-zinc-500">Je pad naar vrijheid</p>
           </div>
         </div>
@@ -44,7 +44,7 @@ export function OnboardingIntro({ onNext }: { onNext: () => void }) {
 
       <button
         onClick={onNext}
-        className="mt-8 rounded-lg bg-teal-600 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-teal-700"
+        className="mt-8 rounded-lg bg-wil-600 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-wil-700"
       >
         Laten we beginnen
       </button>

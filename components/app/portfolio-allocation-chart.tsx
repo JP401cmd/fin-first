@@ -117,7 +117,7 @@ function ComparisonBar({
       <div className="flex items-center justify-between text-xs">
         <span className="font-medium text-zinc-700 truncate">{label}</span>
         <span className="shrink-0 ml-2">
-          <span className={`font-semibold ${isOver ? 'text-red-600' : isUnder ? 'text-amber-600' : 'text-zinc-900'}`}>
+          <span className={`font-semibold ${isOver ? 'text-red-600' : isUnder ? 'text-kern-600' : 'text-zinc-900'}`}>
             {currentPct.toFixed(1)}%
           </span>
           <span className="text-zinc-400 mx-1">→</span>
@@ -138,7 +138,7 @@ function ComparisonBar({
         />
       </div>
       {Math.abs(drift) > 2 && (
-        <p className={`text-[10px] ${isOver ? 'text-red-500' : 'text-amber-500'}`}>
+        <p className={`text-[10px] ${isOver ? 'text-red-500' : 'text-kern-500'}`}>
           {isOver ? `+${drift.toFixed(1)}% boven doel` : `${drift.toFixed(1)}% onder doel`}
         </p>
       )}
@@ -244,7 +244,7 @@ function TargetEditor({
           <button
             onClick={handleSave}
             disabled={!isValid}
-            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+            className="rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
             data-testid="target-save-btn"
           >
             Opslaan
@@ -319,7 +319,7 @@ export default function PortfolioAllocationVisualization({
               data-testid={`view-tab-${mode}`}
               className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                 viewMode === mode
-                  ? 'bg-amber-100 text-amber-700'
+                  ? 'bg-kern-100 text-kern-700'
                   : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'
               }`}
             >
@@ -346,9 +346,9 @@ export default function PortfolioAllocationVisualization({
 
       {/* No classification data notice */}
       {!hasClassificationData && (
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3" data-testid="no-classification-notice">
-          <Info className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
-          <p className="text-xs text-amber-700">
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-kern-200 bg-kern-50 p-3" data-testid="no-classification-notice">
+          <Info className="h-4 w-4 shrink-0 text-kern-500 mt-0.5" />
+          <p className="text-xs text-kern-700">
             Je holdings hebben nog geen {VIEW_MODE_LABELS[viewMode].toLowerCase()}-classificatie.
             Alle holdings staan onder &quot;Overig&quot;. Classificeer je holdings via de API of bewerk ze om een betere verdeling te zien.
           </p>
@@ -430,9 +430,9 @@ export default function PortfolioAllocationVisualization({
 
       {/* Rebalancing suggestions */}
       {showTargetComparison && suggestions.length > 0 && (
-        <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50/30 p-4" data-testid="rebalancing-section">
+        <div className="mt-4 rounded-xl border border-kern-100 bg-kern-50/30 p-4" data-testid="rebalancing-section">
           <div className="flex items-center gap-2 mb-3">
-            <ArrowRightLeft className="h-4 w-4 text-amber-600" />
+            <ArrowRightLeft className="h-4 w-4 text-kern-600" />
             <h3 className="text-sm font-semibold text-zinc-700">Herbalanceringsuggesties</h3>
           </div>
           <div className="space-y-2">

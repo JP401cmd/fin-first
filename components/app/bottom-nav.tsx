@@ -12,15 +12,15 @@ const tabs = [
 ] as const
 
 const activeColors: Record<string, string> = {
-  amber: 'text-amber-600',
-  teal: 'text-teal-600',
-  purple: 'text-purple-600',
+  amber: 'text-kern-600',
+  teal: 'text-wil-600',
+  purple: 'text-horizon-600',
 }
 
 const pillColors: Record<string, string> = {
-  amber: 'bg-amber-100',
-  teal: 'bg-teal-100',
-  purple: 'bg-purple-100',
+  amber: 'bg-kern-100',
+  teal: 'bg-wil-100',
+  purple: 'bg-horizon-100',
 }
 
 export function BottomNav() {

@@ -310,7 +310,7 @@ export function FreedomTimeBadge({
   const freedom = eurToFreedomTime(Math.abs(amount), dailyExpenseRate)
 
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ${className}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full bg-kern-50 px-2 py-0.5 text-xs font-medium text-kern-700 ${className}`}>
       {showIcon && <Clock className="h-3 w-3" />}
       {freedom.formatted} vrijheid
     </span>

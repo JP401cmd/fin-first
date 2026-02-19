@@ -67,10 +67,10 @@ const typeConfig = {
   dividend: {
     label: 'Dividend',
     icon: DollarSign,
-    color: 'text-amber-600',
-    bg: 'bg-amber-50',
-    border: 'border-amber-200',
-    badgeBg: 'bg-amber-100',
+    color: 'text-kern-600',
+    bg: 'bg-kern-50',
+    border: 'border-kern-200',
+    badgeBg: 'bg-kern-100',
     sign: '+',
   },
 }
@@ -113,7 +113,7 @@ export default function HoldingTransactionLog({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12" data-testid="transaction-log-loading">
-        <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
+        <Loader2 className="h-6 w-6 animate-spin text-kern-500" />
       </div>
     )
   }
@@ -185,7 +185,7 @@ export default function HoldingTransactionLog({
         </h3>
         <button
           onClick={() => setShowNewTxForm(!showNewTxForm)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-kern-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-kern-700"
           data-testid="new-transaction-btn"
         >
           <Plus className="h-3.5 w-3.5" />
@@ -229,7 +229,7 @@ export default function HoldingTransactionLog({
             return (
               <div
                 key={tx.id}
-                className={`rounded-xl border bg-white transition-colors ${isExpanded ? 'border-amber-200' : 'border-zinc-100'}`}
+                className={`rounded-xl border bg-white transition-colors ${isExpanded ? 'border-kern-200' : 'border-zinc-100'}`}
                 data-testid={`transaction-item-${tx.id}`}
               >
                 {/* Transaction row */}
@@ -350,7 +350,7 @@ function SummaryCard({
     <div
       className={`rounded-xl border p-3 ${
         highlight
-          ? 'border-amber-200 bg-amber-50/50'
+          ? 'border-kern-200 bg-kern-50/50'
           : 'border-zinc-100 bg-white'
       }`}
       data-testid={testId}
@@ -450,7 +450,7 @@ function InlineTransactionForm({
   }
 
   return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50/30 p-4" data-testid="inline-transaction-form">
+    <div className="rounded-xl border border-kern-200 bg-kern-50/30 p-4" data-testid="inline-transaction-form">
       {error && (
         <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-2">
           <p className="text-xs text-red-600">{error}</p>
@@ -572,7 +572,7 @@ function InlineTransactionForm({
           className={`rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 ${
             txType === 'buy' ? 'bg-emerald-600 hover:bg-emerald-700' :
             txType === 'sell' ? 'bg-red-600 hover:bg-red-700' :
-            'bg-amber-600 hover:bg-amber-700'
+            'bg-kern-600 hover:bg-kern-700'
           }`}
           data-testid="tx-save-btn"
         >

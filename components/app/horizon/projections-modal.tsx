@@ -62,13 +62,13 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
     <BottomSheet open={true} onClose={onClose} title="FIRE Voorspelling">
         <div className="space-y-6 px-6 py-6">
           {/* Range display */}
-          <section className="rounded-2xl border border-purple-200 bg-purple-50 p-6">
+          <section className="rounded-2xl border border-horizon-200 bg-horizon-50 p-6">
             <div>
               {range.optimistic.fireAge !== null && range.pessimistic.fireAge !== null ? (
                 <>
                   <p className="text-sm text-zinc-600">
-                    FIRE tussen <span className="font-bold text-purple-700">{Math.round(range.optimistic.fireAge)}</span> en{' '}
-                    <span className="font-bold text-purple-700">{Math.round(range.pessimistic.fireAge)}</span> jaar
+                    FIRE tussen <span className="font-bold text-horizon-700">{Math.round(range.optimistic.fireAge)}</span> en{' '}
+                    <span className="font-bold text-horizon-700">{Math.round(range.pessimistic.fireAge)}</span> jaar
                     {fire.fireAge !== null && (
                       <span className="text-zinc-500"> (meest waarschijnlijk: <span className="font-bold">{Math.round(fire.fireAge)}</span>)</span>
                     )}
@@ -77,7 +77,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
                   <div className="mt-3 flex items-center gap-2">
                     <span className="text-xs text-zinc-400">{Math.round(range.optimistic.fireAge!)}</span>
                     <div className="relative h-4 flex-1 overflow-hidden rounded-full bg-zinc-200">
-                      <div className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-400 via-purple-500 to-purple-300" />
+                      <div className="absolute inset-0 rounded-full bg-gradient-to-r from-horizon-400 via-horizon-500 to-horizon-300" />
                       {fire.fireAge !== null && (() => {
                         const min = Math.round(range.optimistic.fireAge!)
                         const max = Math.round(range.pessimistic.fireAge!)
@@ -102,7 +102,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
             {/* Countdown */}
             <div className="mt-6 rounded-xl bg-white p-6 text-center">
               <p className="text-sm font-medium text-zinc-500">Aftellen tot FIRE</p>
-              <p className="mt-2 text-5xl font-bold text-purple-700">
+              <p className="mt-2 text-5xl font-bold text-horizon-700">
                 {fire.countdownDays > 0 ? fire.countdownDays.toLocaleString('nl-NL') : '0'}
               </p>
               <p className="mt-1 text-sm text-zinc-400">dagen</p>
@@ -120,7 +120,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
                 <input
                   type="range" min={1} max={5} step={1} value={workDays}
                   onChange={e => setWorkDays(Number(e.target.value))}
-                  className="mt-1 w-full accent-purple-600"
+                  className="mt-1 w-full accent-horizon-600"
                 />
                 <div className="flex justify-between text-[10px] text-zinc-400">
                   <span>1 dag</span><span>5 dagen</span>
@@ -134,7 +134,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
                 <input
                   type="range" min={0} max={2000} step={50} value={extraMonthly}
                   onChange={e => setExtraMonthly(Number(e.target.value))}
-                  className="mt-1 w-full accent-purple-600"
+                  className="mt-1 w-full accent-horizon-600"
                 />
                 <div className="flex justify-between text-[10px] text-zinc-400">
                   <span>{formatCurrency(0)}</span><span>{formatCurrency(2000)}</span>
@@ -146,7 +146,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
             <FeatureGate featureId="fire_geavanceerde_params" fallback="locked">
             <button
               onClick={() => setShowParams(!showParams)}
-              className="mt-4 flex items-center gap-1 text-xs font-medium text-purple-600 hover:text-purple-700"
+              className="mt-4 flex items-center gap-1 text-xs font-medium text-horizon-600 hover:text-horizon-700"
             >
               Geavanceerde parameters
               {showParams ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -159,7 +159,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
                   <input
                     type="range" min={3} max={5} step={0.5} value={swr}
                     onChange={e => setSwr(Number(e.target.value))}
-                    className="mt-1 w-full accent-purple-600"
+                    className="mt-1 w-full accent-horizon-600"
                   />
                 </div>
                 <div>
@@ -167,7 +167,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
                   <input
                     type="range" min={2} max={12} step={0.5} value={returnRate}
                     onChange={e => setReturnRate(Number(e.target.value))}
-                    className="mt-1 w-full accent-purple-600"
+                    className="mt-1 w-full accent-horizon-600"
                   />
                 </div>
                 <div>
@@ -175,7 +175,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
                   <input
                     type="range" min={1} max={4} step={0.5} value={inflation}
                     onChange={e => setInflation(Number(e.target.value))}
-                    className="mt-1 w-full accent-purple-600"
+                    className="mt-1 w-full accent-horizon-600"
                   />
                 </div>
               </div>
@@ -272,7 +272,7 @@ function ThreeLineChart({
       {fireInRange && (
         <>
           <line x1={PAD} y1={fireY} x2={W - PAD} y2={fireY} stroke="#8B5CB8" strokeWidth="1.5" strokeDasharray="6 3" />
-          <text x={W - PAD + 4} y={fireY + 3} className="fill-purple-500" style={{ fontSize: 9, fontWeight: 600 }}>FIRE</text>
+          <text x={W - PAD + 4} y={fireY + 3} className="fill-horizon-500" style={{ fontSize: 9, fontWeight: 600 }}>FIRE</text>
         </>
       )}
 

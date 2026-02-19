@@ -51,7 +51,7 @@ export function Box3PartnerModal({
   const besparingVsSingle = result.belasting - manualSplit.totalTax
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 transition-[right] duration-300" style={{ right: 'var(--chat-sidebar-width, 0px)' }} onClick={onClose}>
       <div
         className="w-full max-w-xl rounded-2xl bg-white shadow-xl overflow-y-auto"
         style={{ maxHeight: '90vh' }}
@@ -73,7 +73,7 @@ export function Box3PartnerModal({
           {/* Optimal allocation button */}
           <button
             onClick={applyOptimal}
-            className="mb-5 flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-amber-700"
+            className="mb-5 flex w-full items-center justify-center gap-2 rounded-lg bg-kern-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-kern-700"
           >
             <Sparkles className="h-4 w-4" />
             Optimale verdeling toepassen
@@ -132,8 +132,8 @@ export function Box3PartnerModal({
           </div>
 
           {/* Total */}
-          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-center">
-            <p className="text-xs font-semibold text-amber-700/60 uppercase">Totaal met partner</p>
+          <div className="mt-4 rounded-xl border border-kern-200 bg-kern-50 p-4 text-center">
+            <p className="text-xs font-semibold text-kern-700/60 uppercase">Totaal met partner</p>
             <p className="mt-1 text-2xl font-bold text-zinc-900">{formatCurrency(manualSplit.totalTax)}</p>
             {besparingVsSingle > 0 && (
               <p className="mt-1 text-sm text-emerald-600">
@@ -183,7 +183,7 @@ function SliderRow({
         step={5}
         value={p1Pct}
         onChange={e => onChange(Number(e.target.value))}
-        className="w-full accent-amber-500"
+        className="w-full accent-kern-500"
       />
       <div className="mt-0.5 flex justify-between text-[10px] text-zinc-400">
         <span>P1: {formatCurrency(p1Val)}</span>

@@ -108,20 +108,20 @@ export default async function HoldingDetailPage({
       </Link>
 
       {/* Holding header with KPIs */}
-      <section className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-6">
+      <section className="rounded-2xl border border-kern-200 bg-gradient-to-br from-kern-50 to-white p-6">
         <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100">
-            <Briefcase className="h-6 w-6 text-amber-600" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-kern-100">
+            <Briefcase className="h-6 w-6 text-kern-600" />
           </div>
           <div className="flex-1">
             <h1 className="text-xl font-bold text-zinc-900" data-testid="holding-name">{name}</h1>
             {ticker && (
-              <p className="mt-0.5 text-sm font-medium text-amber-600" data-testid="holding-ticker">{ticker}</p>
+              <p className="mt-0.5 text-sm font-medium text-kern-600" data-testid="holding-ticker">{ticker}</p>
             )}
           </div>
           <Link
             href="/core/assets/holdings"
-            className="rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50"
+            className="rounded-lg border border-kern-200 bg-white px-3 py-1.5 text-xs font-medium text-kern-700 hover:bg-kern-50"
           >
             Alle holdings
           </Link>

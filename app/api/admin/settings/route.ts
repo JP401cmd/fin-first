@@ -24,7 +24,7 @@ export async function GET() {
 
   const settings: Record<string, string | object> = {}
   for (const row of data ?? []) {
-    if (row.key === 'anthropic_api_key' || row.key === 'openai_api_key') {
+    if (row.key === 'anthropic_api_key' || row.key === 'openai_api_key' || row.key === 'gocardless_secret_id' || row.key === 'gocardless_secret_key') {
       settings[row.key] = row.value ? maskApiKey(row.value) : ''
     } else if (row.key === 'feature_phase_matrix') {
       try { settings[row.key] = JSON.parse(row.value) } catch { settings[row.key] = row.value }
@@ -44,6 +44,10 @@ const ALLOWED_KEYS = [
   'openai_api_key',
   'ai_system_prompt_override',
   'feature_phase_matrix',
+  'gocardless_enabled',
+  'gocardless_secret_id',
+  'gocardless_secret_key',
+  'gocardless_environment',
 ]
 
 export async function PUT(req: Request) {
@@ -61,7 +65,7 @@ export async function PUT(req: Request) {
     let value = body[key]
 
     // Don't overwrite API keys if the masked value is sent back
-    if ((key === 'anthropic_api_key' || key === 'openai_api_key') && typeof value === 'string' && value.includes('***')) {
+    if ((key === 'anthropic_api_key' || key === 'openai_api_key' || key === 'gocardless_secret_id' || key === 'gocardless_secret_key') && typeof value === 'string' && value.includes('***')) {
       continue
     }
 

@@ -82,7 +82,7 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
 
   if (pending.length === 0 && !isGenerating) {
     return (
-      <div className="rounded-2xl border border-teal-200 bg-teal-50 p-8 text-center">
+      <div className="rounded-2xl border border-wil-200 bg-wil-50 p-8 text-center">
         <div className="mx-auto mb-4 flex justify-center">
           <FinnAvatar size={64} />
         </div>
@@ -100,7 +100,7 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
           type="button"
           onClick={generateRecommendations}
           disabled={isGenerating}
-          className="inline-flex items-center gap-2 rounded-lg bg-teal-500 px-6 py-3 font-medium text-white transition-colors hover:bg-teal-600 disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-lg bg-wil-500 px-6 py-3 font-medium text-white transition-colors hover:bg-wil-600 disabled:opacity-50"
         >
           <Sparkles className="h-5 w-5" />
           Genereer suggesties
@@ -113,13 +113,13 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
     <div className="space-y-6">
       {/* Summary bar */}
       {totalFreedomDays > 0 && (
-        <div className="rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 p-4 text-white">
+        <div className="rounded-xl bg-gradient-to-r from-wil-500 to-wil-600 p-4 text-white">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-teal-100">Potentieel te winnen</div>
+              <div className="text-sm font-medium text-wil-100">Potentieel te winnen</div>
               <div className="text-2xl font-bold">{Math.round(totalFreedomDays)} vrijheidsdagen/jaar</div>
             </div>
-            <div className="text-right text-sm text-teal-100">
+            <div className="text-right text-sm text-wil-100">
               {pending.length} {pending.length === 1 ? 'voorstel' : 'voorstellen'} open
             </div>
           </div>
@@ -133,7 +133,7 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
           type="button"
           onClick={generateRecommendations}
           disabled={isGenerating}
-          className="inline-flex items-center gap-2 rounded-lg border border-teal-200 px-4 py-2 text-sm font-medium text-teal-600 transition-colors hover:bg-teal-50 disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-lg border border-wil-200 px-4 py-2 text-sm font-medium text-wil-600 transition-colors hover:bg-wil-50 disabled:opacity-50"
         >
           {isGenerating ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -152,14 +152,14 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
       {isGenerating && (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse rounded-xl border border-teal-100 bg-teal-50/30 px-4 py-3">
+            <div key={i} className="animate-pulse rounded-xl border border-wil-100 bg-wil-50/30 px-4 py-3">
               <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-lg bg-teal-100" />
+                <div className="h-8 w-8 rounded-lg bg-wil-100" />
                 <div className="flex-1">
                   <div className="mb-1 h-4 w-3/4 rounded bg-zinc-200" />
                   <div className="h-3 w-1/2 rounded bg-zinc-100" />
                 </div>
-                <div className="h-4 w-16 rounded bg-teal-100" />
+                <div className="h-4 w-16 rounded bg-wil-100" />
               </div>
             </div>
           ))}
