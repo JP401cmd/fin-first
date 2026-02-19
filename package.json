@@ -40,6 +40,6 @@
     "postgres": "^3.4.8",
     "supabase": "^2.76.8",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "5.9.3"
   }
 }
