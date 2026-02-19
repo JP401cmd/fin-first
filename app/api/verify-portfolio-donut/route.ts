@@ -233,7 +233,7 @@ export async function GET() {
     } catch (e) {
       results.push({ name: 'Live CRUD test', pass: false, detail: `Exception: ${e}` })
       for (const id of createdIds) {
-        await supabase.from('holdings').delete().eq('id', id).catch(() => {})
+        try { await supabase.from('holdings').delete().eq('id', id) } catch { /* cleanup */ }
       }
     }
   } else {
