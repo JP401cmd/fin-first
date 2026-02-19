@@ -100,11 +100,11 @@ export default function TestHouseholdFirePage() {
             {apiError}
           </div>
         )}
-        {apiResponse && (
+        {apiResponse != null ? (
           <pre className="mt-2 max-h-96 overflow-auto rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-xs text-zinc-700">
             {JSON.stringify(apiResponse, null, 2)}
           </pre>
-        )}
+        ) : null}
       </section>
 
       {/* Feature Steps */}

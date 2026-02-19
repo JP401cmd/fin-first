@@ -119,7 +119,7 @@ export default function TestAssetCrudPage() {
       addResult(
         '1. Create asset (savings, €42.000)',
         step1Pass ? 'pass' : 'fail',
-        `Created: id=${assetId.slice(0, 8)}..., name=${created.name}, type=${created.asset_type}, value=${formatCurrency(Number(created.current_value))}, institution=${created.institution}`
+        `Created: id=${assetId!.slice(0, 8)}..., name=${created.name}, type=${created.asset_type}, value=${formatCurrency(Number(created.current_value))}, institution=${created.institution}`
       )
 
       // ── Step 2: READ — Verify asset appears in list query ──
@@ -314,7 +314,8 @@ export default function TestAssetCrudPage() {
     setRunning(false)
   }, [])
 
-  async function cleanup(supabase: ReturnType<typeof createClient>, id: string) {
+  async function cleanup(supabase: ReturnType<typeof createClient>, id: string | null) {
+    if (!id) return
     try {
       await supabase.from('assets').delete().eq('id', id)
     } catch {

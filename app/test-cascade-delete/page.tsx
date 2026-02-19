@@ -134,11 +134,11 @@ export default function TestCascadeDeletePage() {
               <span className="font-medium text-gray-900 dark:text-white">{r.test}</span>
             </div>
             <p className="ml-8 mt-1 text-sm text-gray-600 dark:text-gray-400">{r.details}</p>
-            {r.data && (
+            {r.data != null ? (
               <pre className="ml-8 mt-2 max-h-32 overflow-auto rounded bg-gray-100 p-2 text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300">
                 {JSON.stringify(r.data, null, 2)}
               </pre>
-            )}
+            ) : null}
           </div>
         ))}
       </div>

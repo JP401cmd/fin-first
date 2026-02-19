@@ -174,6 +174,18 @@ You: I'll create that feature now.
 [calls feature_create with appropriate parameters]
 You: Done! I've added "S3 Sync Integration" to your backlog. It's now visible on the kanban board.
 
+## Git Workflow: Pre-push Build Check
+
+This project uses a **Husky pre-push hook** that runs `next build` before every push. This catches TypeScript errors, SSR issues, and build failures before they reach Vercel.
+
+When the user asks you to **commit and push**:
+1. Stage and commit as normal
+2. Before pushing, run `npm run build:check` to verify the build passes
+3. If the build fails, **fix the errors first** before pushing — do NOT use `--no-verify` to skip the hook
+4. Once the build succeeds, push normally
+
+**NEVER use `--no-verify` on push commands.** The pre-push hook exists to prevent deploy failures on Vercel. If the build fails, that means the push *should* be blocked until the errors are resolved.
+
 ## Guidelines
 
 1. Be concise and helpful

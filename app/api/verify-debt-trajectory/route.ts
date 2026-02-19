@@ -71,6 +71,7 @@ export async function GET() {
       created_at: '', updated_at: '', subtype: null, is_tax_deductible: null,
       fixed_rate_end_date: null, nhg: null, linked_asset_id: null, credit_limit: null,
       repayment_type: null, draagkrachtmeting_date: null,
+      ownership: 'personal', household_id: null,
     }
     const proj = debtProjection(debt)
     tests.push({
@@ -92,6 +93,7 @@ export async function GET() {
       created_at: '', updated_at: '', subtype: 'aflossingsvrij', is_tax_deductible: false,
       fixed_rate_end_date: null, nhg: true, linked_asset_id: null, credit_limit: null,
       repayment_type: 'aflossingsvrij', draagkrachtmeting_date: null,
+      ownership: 'personal', household_id: null,
     }
     const proj = debtProjection(debt)
     tests.push({

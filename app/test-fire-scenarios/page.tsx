@@ -67,6 +67,8 @@ const FIXTURE_DEBTS: Debt[] = [
     credit_limit: 10000,
     repayment_type: 'annuiteit',
     draagkrachtmeting_date: null,
+    ownership: 'personal',
+    household_id: null,
   },
   {
     id: 'debt-2',
@@ -94,6 +96,8 @@ const FIXTURE_DEBTS: Debt[] = [
     credit_limit: null,
     repayment_type: 'annuiteit',
     draagkrachtmeting_date: null,
+    ownership: 'personal',
+    household_id: null,
   },
   {
     id: 'debt-3',
@@ -121,6 +125,8 @@ const FIXTURE_DEBTS: Debt[] = [
     credit_limit: null,
     repayment_type: 'annuiteit',
     draagkrachtmeting_date: null,
+    ownership: 'personal',
+    household_id: null,
   },
 ]
 

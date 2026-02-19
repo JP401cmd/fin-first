@@ -87,11 +87,11 @@ export default function TestBudgetCategoryDeletePage() {
                 <div className="flex-1">
                   <p className="font-medium text-zinc-900">{r.test}</p>
                   <p className="mt-1 text-sm text-zinc-600">{r.details}</p>
-                  {r.data && (
+                  {r.data != null ? (
                     <pre className="mt-2 max-h-40 overflow-auto rounded bg-zinc-800 p-2 text-xs text-zinc-200">
                       {JSON.stringify(r.data, null, 2)}
                     </pre>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </div>

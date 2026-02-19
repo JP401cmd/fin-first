@@ -165,6 +165,8 @@ export async function GET() {
         credit_limit: null,
         repayment_type: null,
         draagkrachtmeting_date: null,
+        ownership: 'personal',
+        household_id: null,
       }
 
       const projection = debtProjection(zeroDept as any)

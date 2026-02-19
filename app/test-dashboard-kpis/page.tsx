@@ -102,7 +102,7 @@ export default function TestDashboardKPIs() {
                     Test {idx + 1}: {result.test}
                   </h3>
                   <p className="mt-1 text-sm text-zinc-600">{result.details}</p>
-                  {result.data && (
+                  {result.data != null ? (
                     <details className="mt-2">
                       <summary className="text-xs text-zinc-400 cursor-pointer hover:text-zinc-600">
                         Show raw data
@@ -111,7 +111,7 @@ export default function TestDashboardKPIs() {
                         {JSON.stringify(result.data, null, 2)}
                       </pre>
                     </details>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </div>

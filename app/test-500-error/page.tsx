@@ -18,7 +18,7 @@ type TestResult = {
   detail: string
 }
 
-function ErrorThrower() {
+function ErrorThrower(): React.ReactNode {
   // This component will throw when rendered, testing the error boundary
   throw new Error('Simulated render error for testing error boundary')
 }

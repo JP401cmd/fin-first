@@ -246,6 +246,8 @@ export default function TestDebtTrajectoryPage() {
     credit_limit: null,
     repayment_type: null, // annuity
     draagkrachtmeting_date: null,
+    ownership: 'personal',
+    household_id: null,
   }), [])
 
   // Create simulated valuation history
@@ -285,6 +287,8 @@ export default function TestDebtTrajectoryPage() {
     credit_limit: null,
     repayment_type: 'aflossingsvrij',
     draagkrachtmeting_date: null,
+    ownership: 'personal',
+    household_id: null,
   }), [])
 
   // Linear debt test
@@ -314,6 +318,8 @@ export default function TestDebtTrajectoryPage() {
     credit_limit: null,
     repayment_type: 'lineair',
     draagkrachtmeting_date: null,
+    ownership: 'personal',
+    household_id: null,
   }), [])
 
   useEffect(() => {

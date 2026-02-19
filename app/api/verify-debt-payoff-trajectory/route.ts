@@ -25,7 +25,7 @@ export async function GET() {
       created_at: '', updated_at: '', subtype: 'aflopend',
       is_tax_deductible: null, fixed_rate_end_date: null, nhg: null,
       linked_asset_id: null, credit_limit: null, repayment_type: null,
-      draagkrachtmeting_date: null,
+      draagkrachtmeting_date: null, ownership: 'personal', household_id: null,
     },
     {
       id: 'test-2', user_id: 'test', name: 'Studielening DUO',
@@ -36,7 +36,7 @@ export async function GET() {
       created_at: '', updated_at: '', subtype: 'oud_stelsel',
       is_tax_deductible: null, fixed_rate_end_date: null, nhg: null,
       linked_asset_id: null, credit_limit: null, repayment_type: null,
-      draagkrachtmeting_date: null,
+      draagkrachtmeting_date: null, ownership: 'personal', household_id: null,
     },
   ]
 

@@ -50,6 +50,8 @@ export default function TestDebtPayoffPage() {
     credit_limit: null,
     repayment_type: null, // default = annuity
     draagkrachtmeting_date: null,
+    ownership: 'personal',
+    household_id: null,
   }), [balance, interestRate, monthlyPayment])
 
   const projection = useMemo(() => debtProjection(debt), [debt])
