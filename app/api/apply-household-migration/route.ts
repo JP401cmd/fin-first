@@ -210,7 +210,7 @@ export async function POST(request: NextRequest) {
         AND table_name IN ('households', 'household_members', 'household_invitations')
         ORDER BY table_name
       `
-      const tables = verifyTables.map((r: { table_name: string }) => r.table_name)
+      const tables = verifyTables.map((r: any) => r.table_name)
 
       // Verify ownership columns on key tables
       const verifyColumns = await sql`
@@ -257,7 +257,7 @@ export async function POST(request: NextRequest) {
         },
         household_tables: tables,
         ownership_columns: verifyColumns,
-        functions: verifyFunctions.map((r: { routine_name: string }) => r.routine_name),
+        functions: verifyFunctions.map((r: any) => r.routine_name),
         rls_enabled: verifyRLS,
         policies: verifyPolicies,
         results,
