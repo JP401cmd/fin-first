@@ -134,7 +134,7 @@ export async function GET() {
       pageSource.includes('return') &&
       !pageSource.includes('setLoading(false)') === false // setLoading is after the redirect check
     // More precise check: the redirect block returns before setLoading(false)
-    const redirectBeforeRender = /if\s*\(profile\?\.onboarding_completed\)\s*\{[^}]*router\.replace[^}]*return/s.test(pageSource)
+    const redirectBeforeRender = /if\s*\(profile\?\.onboarding_completed\)\s*\{[\s\S]*?router\.replace[\s\S]*?return/.test(pageSource)
     results.push({
       name: 'Onboarded user never sees onboarding UI (early return)',
       pass: redirectBeforeRender,
