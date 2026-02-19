@@ -315,7 +315,8 @@ export function patternsToInsights(
 
   // Limit to top 5 insights
   for (const pattern of sorted.slice(0, 5)) {
-    const id = `pattern-${pattern.type}-${pattern.category.replace(/\s+/g, '-').toLowerCase()}`
+    const months = pattern.monthsAffected?.join('-') ?? ''
+    const id = `pattern-${pattern.type}-${pattern.category.replace(/\s+/g, '-').toLowerCase()}${months ? `-${months}` : ''}`
 
     let title: string
     let icon: string
