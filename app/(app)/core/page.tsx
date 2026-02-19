@@ -27,6 +27,21 @@ import { NetWorthProjectionChart } from '@/components/app/net-worth-projection-c
 import { computeNetWorthProjection, type NetWorthProjectionResult } from '@/lib/net-worth-projection'
 import { SpendingInsightsSection, type SpendingInsight } from '@/components/app/spending-insight-card'
 import { SnapshotComparisonView } from '@/components/app/snapshot-comparison-view'
+import { FullScreenModal } from '@/components/app/full-screen-modal'
+import dynamic from 'next/dynamic'
+
+const DynCashPage = dynamic(() => import('@/app/(app)/core/cash/page'), {
+  loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" /></div>,
+})
+const DynBudgetsPage = dynamic(() => import('@/app/(app)/core/budgets/page'), {
+  loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" /></div>,
+})
+const DynAssetsPage = dynamic(() => import('@/app/(app)/core/assets/page'), {
+  loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" /></div>,
+})
+const DynDebtsPage = dynamic(() => import('@/app/(app)/core/debts/page'), {
+  loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" /></div>,
+})
 
 export default function CorePage() {
   const router = useRouter()
@@ -60,6 +75,14 @@ export default function CorePage() {
   // Smart prioritization state (Feature #255)
   const [hasGoals, setHasGoals] = useState(false)
   const [fireUnreachable, setFireUnreachable] = useState(false)
+  // Budget progress for hero
+  const [totalBudgetLimit, setTotalBudgetLimit] = useState(0)
+  const [totalBudgetSpent, setTotalBudgetSpent] = useState(0)
+  const [budgetSpendingHistory, setBudgetSpendingHistory] = useState<{ label: string; spent: number; isProjection: boolean }[]>([])
+  const [showBudgetModal, setShowBudgetModal] = useState(false)
+  // Modal state
+  const [activeModal, setActiveModal] = useState<'cash' | 'budgets' | 'assets' | 'debts' | null>(null)
+  const [showProjectionModal, setShowProjectionModal] = useState(false)
 
   const loadData = useCallback(async () => {
     try {
@@ -296,6 +319,23 @@ export default function CorePage() {
           if (limit > 0 && spent > limit) overCount++
         }
         setOverBudgetCount(overCount)
+
+        // Compute total budget progress for hero (expense budgets only)
+        let heroLimit = 0
+        let heroSpent = 0
+        for (const b of expenseParents) {
+          const children = (budgetResult.data as Budget[]).filter(c => c.parent_id === b.id)
+          const spent = children.length > 0
+            ? children.reduce((sum, c) => sum + (spendMap[c.id] ?? 0), 0)
+            : (spendMap[b.id] ?? 0)
+          const limit = children.length > 0
+            ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
+            : Number(b.default_limit)
+          heroLimit += limit
+          heroSpent += spent
+        }
+        setTotalBudgetLimit(heroLimit)
+        setTotalBudgetSpent(heroSpent)
       }
 
       // Compute debt payoff progress
@@ -430,6 +470,30 @@ export default function CorePage() {
             }
 
             setBudgetSparklines(sparklines)
+
+            // Compute total budget spending per month for hero sparkline
+            const monthlyTotals = sparkMonths.map(m => {
+              const monthSpent = sparkTxData
+                .filter(t => t.date >= m.start && t.date < m.end && Number(t.amount) < 0)
+                .reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
+              return { label: m.label, spent: monthSpent, isProjection: false }
+            })
+            // Project next 6 months based on average of historical months with data
+            const monthsWithData = monthlyTotals.filter(m => m.spent > 0)
+            const avgSpent = monthsWithData.length > 0
+              ? monthsWithData.reduce((s, m) => s + m.spent, 0) / monthsWithData.length
+              : 0
+            if (avgSpent > 0) {
+              for (let i = 1; i <= 6; i++) {
+                const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+                monthlyTotals.push({
+                  label: d.toLocaleDateString('nl-NL', { month: 'short' }),
+                  spent: avgSpent,
+                  isProjection: true,
+                })
+              }
+            }
+            setBudgetSpendingHistory(monthlyTotals)
           }
         }
       } catch {
@@ -565,29 +629,182 @@ export default function CorePage() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-3">
-            <div>
+            <button
+              type="button"
+              onClick={() => setShowProjectionModal(true)}
+              className="cursor-pointer text-left transition-opacity hover:opacity-80"
+            >
               <p className="text-xs font-medium text-amber-300/60 uppercase">Netto vermogen</p>
               <p className="mt-1 text-2xl font-bold">{formatCurrency(data.netWorth)}</p>
               <p className="mt-1 text-sm text-amber-200/70" data-testid="net-worth-freedom-subtitle">
                 dat is {data.freedomYears > 0 ? `${data.freedomYears} jaar en ` : ''}{data.freedomMonths} maanden vrijheid
               </p>
-            </div>
-            <div data-testid="vrijheidstijd-opgebouwd">
-              <p className="text-xs font-medium text-amber-300/60 uppercase">Vrijheidstijd opgebouwd</p>
-              <p className="mt-1 text-2xl font-bold">
-                {data.freedomYears}j {data.freedomMonths}mnd
+              <NetWorthSparkline snapshots={snapshots} projection={nwProjection} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowBudgetModal(true)}
+              className="cursor-pointer text-left transition-opacity hover:opacity-80"
+              data-testid="hero-deze-maand"
+            >
+              <p className="text-xs font-medium text-amber-300/60 uppercase">Deze maand</p>
+
+              {/* Budget voortgang */}
+              {totalBudgetLimit > 0 && (
+                <div className="mt-2">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-sm text-amber-200/70">Budget</span>
+                    <span className={`text-sm font-semibold ${totalBudgetSpent <= totalBudgetLimit ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {Math.round((totalBudgetSpent / totalBudgetLimit) * 100)}%
+                    </span>
+                  </div>
+                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-amber-950/60">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${totalBudgetSpent <= totalBudgetLimit ? 'bg-emerald-400' : 'bg-red-400'}`}
+                      style={{ width: `${Math.min((totalBudgetSpent / totalBudgetLimit) * 100, 100)}%` }}
+                    />
+                  </div>
+                  <p className="mt-0.5 text-[10px] text-amber-300/40">
+                    {formatCurrency(totalBudgetSpent)} / {formatCurrency(totalBudgetLimit)}
+                  </p>
+                </div>
+              )}
+
+              {/* Budget spending sparkline (-12m + 6m prognose) */}
+              <BudgetSpendingSparkline data={budgetSpendingHistory} budgetLimit={totalBudgetLimit} />
+            </button>
+            <div data-testid="hero-kerngetallen">
+              <p className="text-xs font-medium text-amber-300/60 uppercase">Kerngetallen</p>
+
+              {/* Spaarquote */}
+              <div className="mt-2 flex items-center gap-1.5">
+                <p className={`text-2xl font-bold ${savingsRate12 >= 0 ? 'text-white' : 'text-red-400'}`}>
+                  {savingsRate12.toFixed(1)}%
+                </p>
+                <span className="text-sm text-amber-200/60">spaarquote</span>
+                <HeroTooltip text="Percentage van je inkomen dat je spaart over de afgelopen 12 maanden. Bij minder data wordt geëxtrapoleerd." />
+              </div>
+              <p className="text-[10px] text-amber-300/40">
+                {savingsRateMonths < 12
+                  ? `${savingsRateMonths} maand${savingsRateMonths > 1 ? 'en' : ''} data`
+                  : 'laatste 12 maanden'}
               </p>
-              <p className="text-sm text-amber-200/50">vrijheid die je bezit</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-amber-300/60 uppercase">Autonomiescore</p>
-              <p className="mt-1 text-2xl font-bold">{data.autonomyScore}</p>
-              <p className="text-sm text-amber-200/50">
-                {data.freeDaysPerYear > 0 ? `${data.freeDaysPerYear} vrije dagen/jaar` : 'bouw je vrijheid op'}
-              </p>
+
+              {/* Vrije dagen per jaar */}
+              <div className="mt-3 flex items-center gap-1.5">
+                <p className="text-2xl font-bold text-white">{data.freeDaysPerYear}</p>
+                <span className="text-sm text-amber-200/60">vrije dagen/jaar</span>
+                <HeroTooltip text="Hoeveel dagen per jaar je passief inkomen (4% SWR op vermogen) je dagelijkse uitgaven dekt." />
+              </div>
+              <p className="text-[10px] text-amber-300/40">gedekt door passief inkomen</p>
             </div>
           </div>
         </div>
+      </section>
+
+      {/* === Missie Controle (direct onder hero) === */}
+      <section className="mt-8" data-testid="mission-control-section">
+        <h2 className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          Missie Controle
+        </h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Cash Card */}
+          <MissionControlCard
+            href="/core/cash"
+            onClick={() => setActiveModal('cash')}
+            icon={<Wallet className="h-5 w-5 text-amber-600" />}
+            title="Cash"
+            metric={formatCurrency(data.monthlyIncome - data.monthlyExpenses)}
+            metricColor={data.monthlyIncome >= data.monthlyExpenses ? 'text-emerald-600' : 'text-red-600'}
+            status={data.monthlyIncome >= data.monthlyExpenses ? 'healthy' : 'attention'}
+            statusLabel={data.monthlyIncome >= data.monthlyExpenses ? 'Gezond' : 'Aandacht nodig'}
+            details={[
+              { label: 'Inkomen', value: formatCurrency(data.monthlyIncome), color: 'text-emerald-600' },
+              { label: 'Uitgaven', value: formatCurrency(data.monthlyExpenses), color: 'text-zinc-600' },
+            ]}
+            cta="Bekijk transacties"
+            testId="mission-cash"
+          />
+
+          {/* Budgetten Card */}
+          <MissionControlCard
+            href="/core/budgets"
+            onClick={() => setActiveModal('budgets')}
+            icon={<ShoppingCart className="h-5 w-5 text-amber-600" />}
+            title="Budgetten"
+            metric={overBudgetCount > 0 ? `${overBudgetCount} over budget` : 'Op koers'}
+            metricColor={overBudgetCount > 0 ? 'text-red-600' : 'text-emerald-600'}
+            status={overBudgetCount === 0 ? 'healthy' : 'attention'}
+            statusLabel={overBudgetCount === 0 ? 'Alles op schema' : `${overBudgetCount} overschreden`}
+            details={[
+              { label: 'Uitgaven', value: formatCurrency(data.monthlyExpenses), color: 'text-zinc-600' },
+              { label: 'Budgetten', value: `${budgetCount} actief`, color: 'text-zinc-500' },
+            ]}
+            cta="Beheer budgetten"
+            testId="mission-budgetten"
+          />
+
+          {/* Assets Card */}
+          <MissionControlCard
+            href="/core/assets"
+            onClick={() => setActiveModal('assets')}
+            icon={<PiggyBank className="h-5 w-5 text-emerald-600" />}
+            title="Assets"
+            metric={formatCurrency(data.totalAssets)}
+            metricColor="text-emerald-600"
+            status="healthy"
+            statusLabel={
+              assetGrowthDirection === 'up' ? 'Groeiend' :
+              assetGrowthDirection === 'down' ? 'Dalend' : 'Stabiel'
+            }
+            growthDirection={assetGrowthDirection}
+            details={[
+              { label: 'Totaal', value: formatCurrency(data.totalAssets), color: 'text-emerald-600' },
+              { label: 'Richting', value: assetGrowthDirection === 'up' ? '↑ Omhoog' : assetGrowthDirection === 'down' ? '↓ Omlaag' : '→ Stabiel', color: assetGrowthDirection === 'up' ? 'text-emerald-600' : assetGrowthDirection === 'down' ? 'text-red-500' : 'text-zinc-500' },
+            ]}
+            cta="Bekijk portfolio"
+            testId="mission-assets"
+          />
+
+          {/* Schulden Card */}
+          <MissionControlCard
+            href="/core/debts"
+            onClick={() => setActiveModal('debts')}
+            icon={<Building2 className="h-5 w-5 text-red-500" />}
+            title="Schulden"
+            metric={data.totalDebts > 0 ? formatCurrency(data.totalDebts) : 'Schuldvrij'}
+            metricColor={data.totalDebts > 0 ? 'text-red-600' : 'text-emerald-600'}
+            status={data.totalDebts === 0 ? 'healthy' : debtProgress && debtProgress.progressPct > 50 ? 'healthy' : 'attention'}
+            statusLabel={data.totalDebts === 0 ? 'Schuldvrij!' : debtProgress ? `${debtProgress.progressPct.toFixed(0)}% afgelost` : 'Vrijheid terugkopen'}
+            debtProgress={debtProgress ?? undefined}
+            details={[
+              { label: 'Openstaand', value: formatCurrency(data.totalDebts), color: 'text-red-600' },
+              { label: 'Afgelost', value: debtProgress ? `${debtProgress.progressPct.toFixed(0)}%` : '—', color: debtProgress && debtProgress.progressPct > 0 ? 'text-emerald-600' : 'text-zinc-400' },
+            ]}
+            cta="Beheer schulden"
+            testId="mission-schulden"
+          />
+        </div>
+
+        {/* Box 3 stays as a separate gated quick link */}
+        <FeatureGate featureId="box3_belasting" fallback="locked">
+          <div className="mt-4">
+            <Link
+              href="/core/belasting"
+              className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition-colors hover:border-amber-200 hover:bg-amber-50/30"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-amber-50">
+                <Receipt className="h-5 w-5 text-amber-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-zinc-500">Box 3 Belasting</p>
+                <p className="text-lg font-bold text-zinc-900">Berekenen</p>
+                <p className="text-xs text-zinc-400">vermogensrendementsheffing</p>
+              </div>
+              <ArrowRight className="h-4 w-4 shrink-0 text-zinc-300 group-hover:text-amber-500" />
+            </Link>
+          </div>
+        </FeatureGate>
       </section>
 
       {/* === 1b. Next Step Card === */}
@@ -722,108 +939,6 @@ export default function CorePage() {
           </div>
         </section>
       )}
-
-      {/* === 4. Mission Control Cards (Primary Content) === */}
-      <section className="mt-8" data-testid="mission-control-section">
-        <h2 className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-          Missie Controle
-        </h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Cash Card */}
-          <MissionControlCard
-            href="/core/cash"
-            icon={<Wallet className="h-5 w-5 text-amber-600" />}
-            title="Cash"
-            metric={formatCurrency(data.monthlyIncome - data.monthlyExpenses)}
-            metricColor={data.monthlyIncome >= data.monthlyExpenses ? 'text-emerald-600' : 'text-red-600'}
-            status={data.monthlyIncome >= data.monthlyExpenses ? 'healthy' : 'attention'}
-            statusLabel={data.monthlyIncome >= data.monthlyExpenses ? 'Gezond' : 'Aandacht nodig'}
-            details={[
-              { label: 'Inkomen', value: formatCurrency(data.monthlyIncome), color: 'text-emerald-600' },
-              { label: 'Uitgaven', value: formatCurrency(data.monthlyExpenses), color: 'text-zinc-600' },
-            ]}
-            cta="Bekijk transacties"
-            testId="mission-cash"
-          />
-
-          {/* Budgetten Card */}
-          <MissionControlCard
-            href="/core/budgets"
-            icon={<ShoppingCart className="h-5 w-5 text-amber-600" />}
-            title="Budgetten"
-            metric={overBudgetCount > 0 ? `${overBudgetCount} over budget` : 'Op koers'}
-            metricColor={overBudgetCount > 0 ? 'text-red-600' : 'text-emerald-600'}
-            status={overBudgetCount === 0 ? 'healthy' : 'attention'}
-            statusLabel={overBudgetCount === 0 ? 'Alles op schema' : `${overBudgetCount} overschreden`}
-            details={[
-              { label: 'Uitgaven', value: formatCurrency(data.monthlyExpenses), color: 'text-zinc-600' },
-              { label: 'Budgetten', value: `${budgetCount} actief`, color: 'text-zinc-500' },
-            ]}
-            cta="Beheer budgetten"
-            testId="mission-budgetten"
-          />
-
-          {/* Assets Card */}
-          <MissionControlCard
-            href="/core/assets"
-            icon={<PiggyBank className="h-5 w-5 text-emerald-600" />}
-            title="Assets"
-            metric={formatCurrency(data.totalAssets)}
-            metricColor="text-emerald-600"
-            status="healthy"
-            statusLabel={
-              assetGrowthDirection === 'up' ? 'Groeiend' :
-              assetGrowthDirection === 'down' ? 'Dalend' : 'Stabiel'
-            }
-            growthDirection={assetGrowthDirection}
-            details={[
-              { label: 'Totaal', value: formatCurrency(data.totalAssets), color: 'text-emerald-600' },
-              { label: 'Richting', value: assetGrowthDirection === 'up' ? '↑ Omhoog' : assetGrowthDirection === 'down' ? '↓ Omlaag' : '→ Stabiel', color: assetGrowthDirection === 'up' ? 'text-emerald-600' : assetGrowthDirection === 'down' ? 'text-red-500' : 'text-zinc-500' },
-            ]}
-            cta="Bekijk portfolio"
-            testId="mission-assets"
-          />
-
-          {/* Schulden Card */}
-          <MissionControlCard
-            href="/core/debts"
-            icon={<Building2 className="h-5 w-5 text-red-500" />}
-            title="Schulden"
-            metric={data.totalDebts > 0 ? formatCurrency(data.totalDebts) : 'Schuldvrij'}
-            metricColor={data.totalDebts > 0 ? 'text-red-600' : 'text-emerald-600'}
-            status={data.totalDebts === 0 ? 'healthy' : debtProgress && debtProgress.progressPct > 50 ? 'healthy' : 'attention'}
-            statusLabel={data.totalDebts === 0 ? 'Schuldvrij!' : debtProgress ? `${debtProgress.progressPct.toFixed(0)}% afgelost` : 'Vrijheid terugkopen'}
-            debtProgress={debtProgress ?? undefined}
-            details={[
-              { label: 'Openstaand', value: formatCurrency(data.totalDebts), color: 'text-red-600' },
-              { label: 'Afgelost', value: debtProgress ? `${debtProgress.progressPct.toFixed(0)}%` : '—', color: debtProgress && debtProgress.progressPct > 0 ? 'text-emerald-600' : 'text-zinc-400' },
-            ]}
-            cta="Beheer schulden"
-            testId="mission-schulden"
-          />
-        </div>
-
-        {/* Box 3 stays as a separate gated quick link */}
-        <FeatureGate featureId="box3_belasting" fallback="locked">
-          <div className="mt-4">
-            <Link
-              href="/core/belasting"
-              className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition-colors hover:border-amber-200 hover:bg-amber-50/30"
-            >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-amber-50">
-                <Receipt className="h-5 w-5 text-amber-600" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-zinc-500">Box 3 Belasting</p>
-                <p className="text-lg font-bold text-zinc-900">Berekenen</p>
-                <p className="text-xs text-zinc-400">vermogensrendementsheffing</p>
-              </div>
-              <ArrowRight className="h-4 w-4 shrink-0 text-zinc-300 group-hover:text-amber-500" />
-            </Link>
-          </div>
-        </FeatureGate>
-      </section>
-
       {/* === 4b. Budget Category Spending Trends (Sparklines) === */}
       {budgetSparklines.length > 0 && (
         <section className="mt-8" data-testid="kern-budget-sparklines">
@@ -1037,6 +1152,339 @@ export default function CorePage() {
 
       {/* === 9. Discover Carousel === */}
       <DiscoverCarousel module="kern" />
+
+      {/* === Mission Control Modals === */}
+      <FullScreenModal
+        open={activeModal === 'cash'}
+        onClose={() => setActiveModal(null)}
+        title="Cash"
+        href="/core/cash"
+      >
+        <DynCashPage />
+      </FullScreenModal>
+      <FullScreenModal
+        open={activeModal === 'budgets'}
+        onClose={() => setActiveModal(null)}
+        title="Budgetten"
+        href="/core/budgets"
+      >
+        <DynBudgetsPage />
+      </FullScreenModal>
+      <FullScreenModal
+        open={activeModal === 'assets'}
+        onClose={() => setActiveModal(null)}
+        title="Assets"
+        href="/core/assets"
+      >
+        <DynAssetsPage />
+      </FullScreenModal>
+      <FullScreenModal
+        open={activeModal === 'debts'}
+        onClose={() => setActiveModal(null)}
+        title="Schulden"
+        href="/core/debts"
+      >
+        <DynDebtsPage />
+      </FullScreenModal>
+
+      {/* === Vermogen Modal (verloop + prognose) === */}
+      <FullScreenModal
+        open={showProjectionModal}
+        onClose={() => setShowProjectionModal(false)}
+        title="Netto Vermogen"
+        href="/core"
+      >
+        <div className="space-y-8 p-6">
+          {/* Vermogensverloop */}
+          {snapshots.length > 0 && (
+            <section>
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-zinc-700">Vermogensverloop</h3>
+                <button
+                  onClick={createSnapshot}
+                  disabled={snapshotLoading}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
+                >
+                  <Camera className="h-3.5 w-3.5" />
+                  {snapshotLoading ? 'Bezig...' : 'Snapshot nu'}
+                </button>
+              </div>
+              <NetWorthChart snapshots={snapshots} fireTarget={data.fireTarget} earnedBadges={earnedBadges} />
+            </section>
+          )}
+
+          {/* Vermogensprognose */}
+          <section>
+            <h3 className="mb-3 text-sm font-semibold text-zinc-700">Vermogensprognose</h3>
+            {nwProjection && nwProjection.points.length >= 2 ? (
+              <NetWorthProjectionChart projection={nwProjection} />
+            ) : (
+              <p className="py-8 text-center text-sm text-zinc-500">
+                Nog niet genoeg data voor een vermogensprognose.
+              </p>
+            )}
+          </section>
+        </div>
+      </FullScreenModal>
+
+      {/* === Budget Uitgaven Modal === */}
+      <FullScreenModal
+        open={showBudgetModal}
+        onClose={() => setShowBudgetModal(false)}
+        title="Uitgaven"
+        href="/core/budgets"
+      >
+        <div className="space-y-8 p-6">
+          {/* Uitgaventrend per categorie */}
+          {budgetSparklines.length > 0 && (
+            <section>
+              <h3 className="mb-3 text-sm font-semibold text-zinc-700">Uitgaventrend per categorie</h3>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {budgetSparklines.map((cat) => (
+                  <Link
+                    key={cat.id}
+                    href={`/core/budgets?budget=${cat.id}`}
+                    onClick={() => setShowBudgetModal(false)}
+                    className="group flex items-center gap-3 rounded-xl border border-zinc-100 bg-white p-3 transition-all hover:border-amber-200 hover:bg-amber-50/20 hover:shadow-sm"
+                  >
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-50">
+                      <BudgetIcon name={cat.icon} className="h-4 w-4 text-amber-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-medium text-zinc-700">{cat.name}</p>
+                      <p className="text-[10px] text-zinc-400">
+                        {formatCurrency(cat.data[cat.data.length - 1]?.spent ?? 0)} deze maand
+                      </p>
+                    </div>
+                    <SparklineWithLabel
+                      data={cat.data}
+                      width={80}
+                      height={24}
+                      isIncome={cat.budgetType === 'income'}
+                    />
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Uitgavenpatronen */}
+          {(spendingInsightsLoading || spendingInsights.length > 0 || spendingInsightsHasData) && (
+            <section>
+              <h3 className="mb-3 text-sm font-semibold text-zinc-700">Uitgavenpatronen</h3>
+              <SpendingInsightsSection
+                insights={spendingInsights}
+                dataMonths={spendingInsightsDataMonths}
+                message={spendingInsightsMessage}
+                isLoading={spendingInsightsLoading}
+              />
+            </section>
+          )}
+
+          {budgetSparklines.length === 0 && !spendingInsightsLoading && spendingInsights.length === 0 && (
+            <p className="py-8 text-center text-sm text-zinc-500">
+              Nog niet genoeg data voor uitgaventrends.
+            </p>
+          )}
+        </div>
+      </FullScreenModal>
+    </div>
+  )
+}
+
+function HeroTooltip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        aria-label="Meer informatie"
+        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
+        onBlur={() => setOpen(false)}
+      >
+        <Info className={`h-3.5 w-3.5 cursor-help transition-colors ${open ? 'text-amber-300' : 'text-amber-300/40'} hover:text-amber-300`} />
+      </button>
+      {open && (
+        <div className="absolute bottom-full left-1/2 z-10 mb-2 w-52 -translate-x-1/2 rounded-lg border border-amber-700/50 bg-amber-950 p-2.5 text-xs leading-relaxed text-amber-200/80 shadow-lg">
+          {text}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BudgetSpendingSparkline({
+  data,
+  budgetLimit,
+}: {
+  data: { label: string; spent: number; isProjection: boolean }[]
+  budgetLimit: number
+}) {
+  if (data.length < 2) return null
+
+  const W = 180
+  const H = 32
+  const PAD_X = 2
+  const PAD_Y = 3
+
+  const values = data.map(d => d.spent)
+  const maxVal = Math.max(...values, budgetLimit, 1)
+  const minVal = 0
+  const valRange = maxVal - minVal || 1
+
+  // Find split index: last historical point
+  const lastHistIdx = data.reduce((last, d, i) => d.isProjection ? last : i, 0)
+
+  function x(i: number) { return PAD_X + (i / (data.length - 1)) * (W - PAD_X * 2) }
+  function y(val: number) { return H - PAD_Y - ((val - minVal) / valRange) * (H - PAD_Y * 2) }
+
+  // Historical path
+  const histData = data.filter(d => !d.isProjection)
+  const histPath = histData
+    .map((_, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(data[i].spent).toFixed(1)}`)
+    .join(' ')
+
+  // Fill under historical
+  const histFill = histData.length >= 2
+    ? histPath + ` L${x(lastHistIdx).toFixed(1)},${(H - PAD_Y).toFixed(1)} L${x(0).toFixed(1)},${(H - PAD_Y).toFixed(1)} Z`
+    : ''
+
+  // Projection path (from last hist point)
+  const projData = data.filter(d => d.isProjection)
+  let projPath = ''
+  if (projData.length > 0) {
+    const projWithStart = [data[lastHistIdx], ...projData]
+    projPath = projWithStart
+      .map((_, i) => {
+        const idx = lastHistIdx + i
+        return `${i === 0 ? 'M' : 'L'}${x(idx).toFixed(1)},${y(data[idx].spent).toFixed(1)}`
+      })
+      .join(' ')
+  }
+
+  // Budget limit line y
+  const limitY = budgetLimit > 0 ? y(budgetLimit) : -1
+
+  return (
+    <div className="mt-2" data-testid="budget-spending-sparkline">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxWidth: 200, height: 32 }}>
+        <defs>
+          <linearGradient id="budget-spark-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="#fbbf24" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* Budget limit line */}
+        {limitY >= 0 && limitY <= H && (
+          <line x1={PAD_X} y1={limitY} x2={W - PAD_X} y2={limitY} stroke="#ef4444" strokeWidth="0.5" strokeDasharray="3,2" opacity="0.5" />
+        )}
+        {/* Fill under historical */}
+        {histFill && <path d={histFill} fill="url(#budget-spark-fill)" />}
+        {/* Historical line */}
+        {histPath && <path d={histPath} fill="none" stroke="#fbbf24" strokeWidth="1.5" />}
+        {/* Divider dot */}
+        <circle cx={x(lastHistIdx)} cy={y(data[lastHistIdx].spent)} r="2" fill="#fbbf24" />
+        {/* Projection line (dashed) */}
+        {projPath && <path d={projPath} fill="none" stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="3,2" opacity="0.5" />}
+      </svg>
+      <div className="flex justify-between text-[10px] text-amber-300/40" style={{ maxWidth: 200 }}>
+        <span>-12m</span>
+        <span>nu</span>
+        <span>+6m</span>
+      </div>
+    </div>
+  )
+}
+
+function NetWorthSparkline({
+  snapshots,
+  projection,
+}: {
+  snapshots: NetWorthSnapshot[]
+  projection: NetWorthProjectionResult | null
+}) {
+  // Build historical points: last 12 months from snapshots
+  const now = new Date()
+  const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 12, 1)
+
+  const histPoints = snapshots
+    .filter(s => new Date(s.snapshot_date) >= twelveMonthsAgo)
+    .map(s => ({ date: new Date(s.snapshot_date).getTime(), value: Number(s.net_worth) }))
+
+  // Build projection points: next 6 months
+  const projPoints = projection
+    ? projection.points
+        .filter(p => p.month >= 1 && p.month <= 6)
+        .map(p => ({ date: new Date(p.date).getTime(), value: p.netWorth }))
+    : []
+
+  const allPoints = [...histPoints, ...projPoints]
+  if (allPoints.length < 2) return null
+
+  const values = allPoints.map(p => p.value)
+  const minVal = Math.min(...values)
+  const maxVal = Math.max(...values)
+  const valRange = maxVal - minVal || 1
+  const minDate = allPoints[0].date
+  const maxDate = allPoints[allPoints.length - 1].date
+  const dateRange = maxDate - minDate || 1
+
+  const W = 160
+  const H = 32
+  const PAD_X = 2
+  const PAD_Y = 3
+
+  function x(date: number) { return PAD_X + ((date - minDate) / dateRange) * (W - PAD_X * 2) }
+  function y(val: number) { return H - PAD_Y - ((val - minVal) / valRange) * (H - PAD_Y * 2) }
+
+  // Historical line path
+  const histPath = histPoints
+    .map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.date).toFixed(1)},${y(p.value).toFixed(1)}`)
+    .join(' ')
+
+  // Projection line path (starts from last historical point)
+  let projPath = ''
+  if (projPoints.length > 0 && histPoints.length > 0) {
+    const lastHist = histPoints[histPoints.length - 1]
+    const projWithStart = [{ date: lastHist.date, value: lastHist.value }, ...projPoints]
+    projPath = projWithStart
+      .map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.date).toFixed(1)},${y(p.value).toFixed(1)}`)
+      .join(' ')
+  }
+
+  // Gradient fill under historical line
+  const histFill = histPoints.length >= 2
+    ? histPath + ` L${x(histPoints[histPoints.length - 1].date).toFixed(1)},${H} L${x(histPoints[0].date).toFixed(1)},${H} Z`
+    : ''
+
+  // Divider x position (where history ends and projection begins)
+  const dividerX = histPoints.length > 0 ? x(histPoints[histPoints.length - 1].date) : 0
+
+  return (
+    <div className="mt-2" data-testid="net-worth-sparkline">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxWidth: 200, height: 32 }}>
+        <defs>
+          <linearGradient id="nw-spark-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#fbbf24" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* Fill under historical line */}
+        {histFill && <path d={histFill} fill="url(#nw-spark-fill)" />}
+        {/* Historical line */}
+        {histPath && <path d={histPath} fill="none" stroke="#fbbf24" strokeWidth="1.5" />}
+        {/* Divider dot */}
+        {histPoints.length > 0 && (
+          <circle cx={dividerX} cy={y(histPoints[histPoints.length - 1].value)} r="2" fill="#fbbf24" />
+        )}
+        {/* Projection line (dashed) */}
+        {projPath && <path d={projPath} fill="none" stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="3,2" opacity="0.6" />}
+      </svg>
+      <div className="flex justify-between text-[10px] text-amber-300/40" style={{ maxWidth: 200 }}>
+        <span>-12m</span>
+        <span>nu</span>
+        <span>+6m</span>
+      </div>
     </div>
   )
 }
@@ -1063,6 +1511,7 @@ function KpiTooltip({ text }: { text: string }) {
 
 function MissionControlCard({
   href,
+  onClick,
   icon,
   title,
   metric,
@@ -1076,6 +1525,7 @@ function MissionControlCard({
   growthDirection,
 }: {
   href: string
+  onClick?: () => void
   icon: React.ReactNode
   title: string
   metric: string
@@ -1089,10 +1539,11 @@ function MissionControlCard({
   growthDirection?: 'up' | 'down' | 'flat'
 }) {
   return (
-    <Link
-      href={href}
+    <button
+      type="button"
+      onClick={onClick ?? (() => { window.location.href = href })}
       data-testid={testId}
-      className="group flex flex-col rounded-xl border border-zinc-200 bg-white p-5 transition-all hover:border-amber-200 hover:bg-amber-50/20 hover:shadow-sm"
+      className="group flex flex-col rounded-xl border border-zinc-200 bg-white p-5 text-left transition-all hover:border-amber-200 hover:bg-amber-50/20 hover:shadow-sm"
     >
       {/* Header: icon + title + status */}
       <div className="mb-3 flex items-center justify-between">
@@ -1169,7 +1620,7 @@ function MissionControlCard({
         <span className="text-xs font-medium text-amber-600 opacity-0 transition-opacity group-hover:opacity-100">{cta}</span>
         <ArrowRight className="h-4 w-4 text-zinc-300 transition-colors group-hover:text-amber-500" />
       </div>
-    </Link>
+    </button>
   )
 }
 
