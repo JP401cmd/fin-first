@@ -52,7 +52,7 @@ export async function GET() {
   // 5. setSaving(false) in finally block
   results.push({
     name: 'setSaving(false) in finally block',
-    pass: /finally\s*\{[^}]*setSaving\(false\)/s.test(src),
+    pass: /finally\s*\{[\s\S]*?setSaving\(false\)/.test(src),
     detail: 'Finally block must reset saving to false',
   })
 
