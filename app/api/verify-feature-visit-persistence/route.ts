@@ -174,7 +174,7 @@ export async function GET() {
           .select('id')
           .limit(1)
 
-        const rlsActive = error || !data || data.length === 0
+        const rlsActive = !!(error || !data || data.length === 0)
         results.push({
           name: 'RLS enforced: user_id scoped queries',
           pass: rlsActive,

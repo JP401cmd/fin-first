@@ -63,7 +63,7 @@ export async function GET() {
 
   // Test 4: debtProjection handles annuity correctly
   try {
-    const debt: Debt = {
+    const debt: any = {
       id: 'test', user_id: 'test', name: 'Test', debt_type: 'personal_loan',
       original_amount: 10000, current_balance: 6000, interest_rate: 5,
       minimum_payment: 300, monthly_payment: 300, start_date: '2024-01-01',
@@ -84,7 +84,7 @@ export async function GET() {
 
   // Test 5: debtProjection handles aflossingsvrij correctly
   try {
-    const debt: Debt = {
+    const debt: any = {
       id: 'test', user_id: 'test', name: 'Hypotheek', debt_type: 'mortgage',
       original_amount: 285000, current_balance: 285000, interest_rate: 3.8,
       minimum_payment: 750, monthly_payment: 750, start_date: '2020-06-01',

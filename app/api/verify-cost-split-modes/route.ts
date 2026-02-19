@@ -139,8 +139,8 @@ export async function GET() {
   // ─── Test 6: Custom percentage for non-primary ─────────────
   try {
     const customPct = 70
-    const userId = 'user-2'
-    const primaryPayerId = 'user-1'
+    const userId: string = 'user-2'
+    const primaryPayerId: string = 'user-1'
     const myPct = primaryPayerId === userId ? customPct : 100 - customPct
 
     addTest(
@@ -169,8 +169,8 @@ export async function GET() {
 
   // ─── Test 8: One-pays-all for non-primary ──────────────────
   try {
-    const userId = 'user-2'
-    const primaryPayerId = 'user-1'
+    const userId: string = 'user-2'
+    const primaryPayerId: string = 'user-1'
     const myPct = primaryPayerId === userId ? 100 : 0
 
     addTest(

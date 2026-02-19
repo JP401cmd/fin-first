@@ -15,7 +15,7 @@ export async function GET() {
   const tests: { name: string; pass: boolean; detail: string }[] = []
 
   // Test debts for simulation
-  const testDebts: Debt[] = [
+  const testDebts: any[] = [
     {
       id: 'test-1', user_id: 'test', name: 'Persoonlijke lening',
       debt_type: 'personal_loan', original_amount: 5000, current_balance: 2800,

@@ -185,7 +185,7 @@ export async function GET() {
 
   // Step 12: All 8 categories are represented
   {
-    const categories = new Set(BADGE_DEFINITIONS.map(b => b.category))
+    const categories = new Set(BADGE_DEFINITIONS.map(b => b.category) as string[])
     const expectedCategories = ['onboarding', 'consistency', 'financial_health', 'fire_milestones', 'actions', 'budget', 'exploration', 'sovereignty']
     const allPresent = expectedCategories.every(c => categories.has(c))
     results.push({

@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
       }
 
       const verifyResult = await sql`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name`
-      const tables = verifyResult.map((r: { table_name: string }) => r.table_name)
+      const tables = verifyResult.map((r: any) => r.table_name)
       const columnsResult = await sql`SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'net_worth_snapshots' ORDER BY ordinal_position`
       await sql.end()
 
@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
         summary: { total: results.length, success: results.filter(r => r.status === 'ok').length, skipped: results.filter(r => r.status === 'skip').length, errors: results.filter(r => r.status === 'error').length },
         results,
         tables,
-        net_worth_snapshots_columns: columnsResult.map((r: { column_name: string; data_type: string }) => ({ name: r.column_name, type: r.data_type })),
+        net_worth_snapshots_columns: columnsResult.map((r: any) => ({ name: r.column_name, type: r.data_type })),
       })
     }
 

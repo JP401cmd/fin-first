@@ -81,7 +81,7 @@ export async function GET() {
   const isServerComponent = dashboardSource && !dashboardSource.includes("'use client'")
   results.push({
     name: 'Dashboard is server component (fresh data on each visit)',
-    passed: isServerComponent,
+    passed: !!isServerComponent,
     detail: isServerComponent
       ? 'No "use client" directive — dashboard is a server component that queries fresh data from Supabase on every page load'
       : 'Dashboard is a client component — may cache data',

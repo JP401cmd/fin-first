@@ -168,7 +168,7 @@ export async function GET() {
 
   // The loadValuations and loadAllValuations should not have .limit()
   // Check that the client-side functions don't artificially limit
-  const loadValuationsCode = src.match(/const loadValuations = useCallback\(async.*?\n.*?\n.*?\n.*?\n.*?\n.*?\n.*?\n.*?\n.*?\n/s)
+  const loadValuationsCode = src.match(/const loadValuations = useCallback\(async[\s\S]*?\n[\s\S]*?\n[\s\S]*?\n[\s\S]*?\n[\s\S]*?\n[\s\S]*?\n[\s\S]*?\n[\s\S]*?\n[\s\S]*?\n/)
   const hasNoLimitOnLoadValuations = src.includes('loadValuations') && !loadValuationsCode?.[0]?.includes('.limit(')
   results.push({
     name: 'no_record_limit_on_load_valuations',

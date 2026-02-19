@@ -59,7 +59,7 @@ function makeSyntheticDebt(overrides: Partial<Debt>): Debt {
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     repayment_type: 'annuity',
-  } as Debt
+  } as unknown as Debt
 }
 
 export async function GET(request: Request) {

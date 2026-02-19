@@ -60,7 +60,9 @@
       "Bash(head:*)",
       "Bash(npx supabase:*)",
       "Bash(curl:*)",
-      "Skill(playwright-cli)"
+      "Skill(playwright-cli)",
+      "Bash(gh run list:*)",
+      "Bash(gh api:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -257,7 +257,7 @@ export async function GET() {
           .select('id')
           .limit(1)
 
-        const rlsActive = error || !data || data.length === 0
+        const rlsActive = !!(error || !data || data.length === 0)
         results.push({
           name: 'Step 6b: RLS blocks unauthenticated access',
           pass: rlsActive,

@@ -116,7 +116,7 @@ export async function GET() {
     })
 
     // Test 10: formatFreedomTimeString() long vs short
-    const bd10 = { years: 5, months: 7, days: 15, totalDays: 2075 }
+    const bd10 = { years: 5, months: 7, days: 15, totalDays: 2075, isDeficit: false, isInfinite: false }
     const longStr = formatFreedomTimeString(bd10, 'long')
     const shortStr = formatFreedomTimeString(bd10, 'short')
     const longCorrect = longStr === '5 jaar en 7 maanden'
@@ -128,7 +128,7 @@ export async function GET() {
     })
 
     // Test 11: 1 maand singular
-    const bd11 = { years: 0, months: 1, days: 5, totalDays: 35 }
+    const bd11 = { years: 0, months: 1, days: 5, totalDays: 35, isDeficit: false, isInfinite: false }
     const singularMonth = formatFreedomTimeString(bd11, 'long')
     const isSingular = singularMonth.includes('1 maand') && !singularMonth.includes('maanden')
     results.push({

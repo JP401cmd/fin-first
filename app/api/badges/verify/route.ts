@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { BADGE_DEFINITIONS, type BadgeWithStatus } from '@/lib/badges'
+import { BADGE_DEFINITIONS, type BadgeWithStatus, type BadgeCategory } from '@/lib/badges'
 
 type TestResult = {
   name: string
@@ -111,16 +111,13 @@ export async function GET() {
           (userBadges ?? []).map((ub: { badge_id: string; earned_at: string }) => [ub.badge_id, ub.earned_at])
         )
 
-        apiBadges = dbBadges.map((badge: {
-          id: string; slug: string; name: string; description: string;
-          icon: string; color: string; category: string; sort_order: number
-        }) => ({
+        apiBadges = dbBadges.map((badge: any) => ({
           slug: badge.slug,
           name: badge.name,
           description: badge.description,
           icon: badge.icon,
           color: badge.color,
-          category: badge.category,
+          category: badge.category as BadgeCategory,
           sort_order: badge.sort_order,
           id: badge.id,
           earned: earnedMap.has(badge.id),
@@ -192,11 +189,12 @@ export async function GET() {
 
   // Test 2c: All 8 categories present
   const categories = new Set(BADGE_DEFINITIONS.map((b) => b.category))
-  const expectedCategories = [
+  const expectedCategories: string[] = [
     'onboarding', 'consistency', 'financial_health', 'fire_milestones',
     'actions', 'budget', 'exploration', 'sovereignty',
   ]
-  const missingCats = expectedCategories.filter((c) => !categories.has(c))
+  const categoriesStr = new Set([...categories] as string[])
+  const missingCats = expectedCategories.filter((c) => !categoriesStr.has(c))
   results.push({
     name: 'Step 2c: All 8 badge categories present',
     status: missingCats.length === 0 ? 'pass' : 'fail',

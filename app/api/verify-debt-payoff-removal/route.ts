@@ -167,7 +167,7 @@ export async function GET() {
         draagkrachtmeting_date: null,
       }
 
-      const projection = debtProjection(zeroDept)
+      const projection = debtProjection(zeroDept as any)
       const isCorrect = projection.monthsToPayoff === 0 &&
         projection.totalInterest === 0 &&
         projection.isPayable === true

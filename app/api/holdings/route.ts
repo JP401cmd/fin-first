@@ -547,7 +547,7 @@ export async function PATCH(request: NextRequest) {
       name: asset.name,
       units: body.units || 1,
       avg_purchase_price: Number(asset.purchase_value) || 0,
-      current_price: Number(asset.current_value) / (body.units || 1),
+      current_price: Number(asset.current_value) / (Number(body.units) || 1),
       purchase_date: asset.purchase_date,
       notes: asset.notes,
       is_active: true,

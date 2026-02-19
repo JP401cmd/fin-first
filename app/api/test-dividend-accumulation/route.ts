@@ -62,7 +62,7 @@ export async function GET() {
     }
 
     holdingId = asset.id
-    results.push({ step: '1. Create test holding', status: 'pass', detail: `Created DIVIDEND_TEST_76_API: ${holdingId.slice(0, 8)}... (100 units @ EUR 25)` })
+    results.push({ step: '1. Create test holding', status: 'pass', detail: `Created DIVIDEND_TEST_76_API: ${holdingId!.slice(0, 8)}... (100 units @ EUR 25)` })
 
     // ── Step 2: Record first dividend of EUR 50 ──
     // Use valuations table directly (holding_transactions table doesn't exist)
@@ -81,7 +81,7 @@ export async function GET() {
 
     if (div1Error) {
       results.push({ step: '2. Record dividend of EUR 50', status: 'fail', detail: `Failed: ${div1Error.message}` })
-      await cleanup(supabase, user.id, holdingId)
+      if (holdingId) if (holdingId) await cleanup(supabase, user.id, holdingId)
       return NextResponse.json({ results, allPassed: false })
     }
 
@@ -120,7 +120,7 @@ export async function GET() {
 
     if (div2Error) {
       results.push({ step: '4. Record second dividend of EUR 75', status: 'fail', detail: `Failed: ${div2Error.message}` })
-      await cleanup(supabase, user.id, holdingId)
+      if (holdingId) await cleanup(supabase, user.id, holdingId)
       return NextResponse.json({ results, allPassed: false })
     }
 
@@ -177,13 +177,13 @@ export async function GET() {
     })
 
     // ── Cleanup ──
-    await cleanup(supabase, user.id, holdingId)
+    if (holdingId) await cleanup(supabase, user.id, holdingId)
     results.push({ step: 'Cleanup', status: 'pass', detail: 'Test data deleted' })
 
   } catch (err) {
     results.push({ step: 'Error', status: 'fail', detail: err instanceof Error ? err.message : 'Unknown error' })
     if (holdingId) {
-      await cleanup(supabase, user.id, holdingId)
+      if (holdingId) await cleanup(supabase, user.id, holdingId)
     }
   }
 

@@ -105,9 +105,9 @@ export async function GET() {
       const hasFeature = phasesFile.includes("'cashflow_forecast'") || phasesFile.includes('"cashflow_forecast"')
       const hasMatrix = phasesFile.includes('cashflow_forecast')
       const stabilityTrue = phasesFile.includes('cashflow_forecast') &&
-        (phasesFile.match(/cashflow_forecast.*stability:\s*true/s) !== null)
+        (phasesFile.match(/cashflow_forecast[\s\S]*stability:\s*true/) !== null)
       const recoveryFalse = phasesFile.includes('cashflow_forecast') &&
-        (phasesFile.match(/cashflow_forecast.*recovery:\s*false/s) !== null)
+        (phasesFile.match(/cashflow_forecast[\s\S]*recovery:\s*false/) !== null)
       check(
         '7. Feature-gated to Stability+',
         hasFeature && hasMatrix && stabilityTrue && recoveryFalse,
