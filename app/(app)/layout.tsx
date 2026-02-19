@@ -39,7 +39,7 @@ export default async function AppLayout({
     supabase.from('assets').select('current_value').eq('is_active', true),
     supabase.from('debts').select('current_balance, debt_type').eq('is_active', true),
     supabase.from('transactions').select('amount, is_income').gte('date', dateStr),
-    supabase.from('app_settings').select('value').eq('key', 'feature_phase_matrix').single(),
+    supabase.from('app_settings').select('value').eq('key', 'feature_phase_matrix').maybeSingle(),
   ])
 
   const profile = profileRes.data

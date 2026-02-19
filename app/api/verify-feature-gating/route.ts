@@ -27,7 +27,7 @@ export async function GET() {
     supabase.from('assets').select('current_value, is_active').eq('user_id', user.id).eq('is_active', true),
     supabase.from('debts').select('current_balance, debt_type, is_active').eq('user_id', user.id).eq('is_active', true),
     supabase.from('transactions').select('amount, is_income').eq('user_id', user.id).gte('date', dateStr),
-    supabase.from('app_settings').select('value').eq('key', 'feature_phase_matrix').single(),
+    supabase.from('app_settings').select('value').eq('key', 'feature_phase_matrix').maybeSingle(),
   ])
 
   const profile = profileRes.data
