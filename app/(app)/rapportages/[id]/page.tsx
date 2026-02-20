@@ -80,6 +80,18 @@ export default function ReportViewerPage() {
 
       <LeadStory kern={data.kern} />
 
+      {/* AI Editorial Introduction */}
+      {data.aiIntroduction && (
+        <div className="report-section mb-8">
+          <p className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-wil-600 mb-2">
+            Redactionele Inleiding — Finn
+          </p>
+          <blockquote className="border-l-[3px] border-wil-400 pl-4 font-source-serif text-[15px] italic leading-[1.65] text-[var(--ink-2)]">
+            {data.aiIntroduction}
+          </blockquote>
+        </div>
+      )}
+
       {/* Three-column grid: Kern | Wil | Horizon */}
       <div className="grid gap-8 md:grid-cols-[2fr_1.5fr_1.5fr]">
         <KernColumn kern={data.kern} />

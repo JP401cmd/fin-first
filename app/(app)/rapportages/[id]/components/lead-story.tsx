@@ -2,45 +2,7 @@ import type { ReportKernSection } from '@/lib/report-data'
 import { formatCurrency } from '@/lib/format'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
-
-function MiniSparkline({ data }: { data: { date: string; value: number }[] }) {
-  if (data.length < 2) return null
-
-  const values = data.map(d => d.value)
-  const min = Math.min(...values)
-  const max = Math.max(...values)
-  const range = max - min || 1
-
-  const w = 400
-  const h = 60
-  const points = data.map((d, i) => {
-    const x = (i / (data.length - 1)) * w
-    const y = h - ((d.value - min) / range) * (h - 8) - 4
-    return `${x},${y}`
-  })
-
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-16 mt-4" preserveAspectRatio="none">
-      <polyline
-        points={points.join(' ')}
-        fill="none"
-        stroke="var(--color-kern-500)"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {/* End dot */}
-      {data.length > 0 && (
-        <circle
-          cx={(data.length - 1) / (data.length - 1) * w}
-          cy={h - ((values[values.length - 1] - min) / range) * (h - 8) - 4}
-          r="4"
-          fill="var(--color-kern-500)"
-        />
-      )}
-    </svg>
-  )
-}
+import { ReportSparkline } from './report-sparkline'
 
 export function LeadStory({ kern }: { kern: ReportKernSection }) {
   const growth = kern.netWorthGrowth ?? 0
@@ -82,7 +44,28 @@ export function LeadStory({ kern }: { kern: ReportKernSection }) {
       )}
 
       {kern.netWorthByPeriod.length >= 2 && (
-        <MiniSparkline data={kern.netWorthByPeriod} />
+        <ReportSparkline
+          values={kern.netWorthByPeriod.map(d => d.value)}
+          color="#6b4339"
+          height={64}
+          showFill={true}
+          className="mt-4"
+        />
+      )}
+
+      {/* Savings rate sparkline */}
+      {kern.savingsRateByPeriod && kern.savingsRateByPeriod.length >= 2 && (
+        <div className="mt-3">
+          <p className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)] mb-1">
+            Spaarquote per maand
+          </p>
+          <ReportSparkline
+            values={kern.savingsRateByPeriod.map(d => d.rate)}
+            color="#6b4339"
+            height={40}
+            showFill={false}
+          />
+        </div>
       )}
 
       {kern.netWorthEnd != null && kern.netWorthEnd >= 100 && (

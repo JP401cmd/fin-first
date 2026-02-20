@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { computeFireProjection, type HorizonInput } from '@/lib/horizon-data'
 import { computeNetWorthProjection } from '@/lib/net-worth-projection'
 import { buildCategorySpending, patternsToInsights, detectSeasonalPatterns, detectTrends, detectAnomalies } from '@/lib/spending-patterns'
+import { generateText } from 'ai'
+import { getModel } from '@/lib/ai/config'
 import type { ReportData, ReportConfig } from '@/lib/report-data'
 
 const MONTH_LABELS_NL: Record<number, string> = {
@@ -193,6 +195,13 @@ export async function GET(request: Request) {
           savings: Math.round(data.income - data.expenses),
         }
       })
+
+    // Savings rate per month
+    const savingsRateByPeriod = monthlyOverview.map(m => ({
+      month: m.month,
+      label: m.label,
+      rate: m.income > 0 ? Math.round((m.savings / m.income) * 1000) / 10 : 0,
+    }))
 
     const totalSaved = Math.round(totalIncome - totalExpenses)
     const savingsRate = totalIncome > 0 ? Math.round((totalSaved / totalIncome) * 1000) / 10 : null
@@ -398,12 +407,17 @@ export async function GET(request: Request) {
     let projectedNetWorth1y: number | null = null
     let projectedNetWorth3y: number | null = null
     let projectedNetWorth5y: number | null = null
+    let projectionPoints: { month: number; netWorth: number }[] = []
 
     if (currentNetWorth > 0 || monthlySavings > 0) {
       const projection = computeNetWorthProjection(currentNetWorth, monthlySavings, fireTarget)
       projectedNetWorth1y = Math.round(projection.year1)
       projectedNetWorth3y = Math.round(projection.year3)
       projectedNetWorth5y = Math.round(projection.year5)
+      // Keep every 2nd month for chart (30 points)
+      projectionPoints = projection.points
+        .filter(p => p.month % 2 === 0)
+        .map(p => ({ month: p.month, netWorth: Math.round(p.netWorth) }))
     }
 
     // FIRE date & age
@@ -439,6 +453,32 @@ export async function GET(request: Request) {
       // FIRE computation may fail with edge case data
     }
 
+    // ── AI INTRODUCTION ──
+    let aiIntroduction: string | null = null
+    try {
+      const model = await getModel(supabase)
+      const periodLabel = formatPeriodName(periodType, dateFrom, dateTo)
+      const prompt = `Je bent Finn, de financieel adviseur van TriFinity. Schrijf een bondige redactionele inleiding (3-4 zinnen, max 200 tokens) voor het financieel rapport "${periodLabel}".
+
+Kerndata:
+- Netto vermogen: €${netWorthEnd != null ? Math.round(netWorthEnd) : '?'} (${netWorthGrowthPct != null ? (netWorthGrowthPct >= 0 ? '+' : '') + netWorthGrowthPct + '%' : 'onbekend'})
+- Inkomen: €${Math.round(totalIncome)}, Uitgaven: €${Math.round(totalExpenses)}, Gespaard: €${totalSaved}
+- Spaarquote: ${savingsRate != null ? savingsRate + '%' : 'onbekend'}
+- FIRE-voortgang: ${firePercentage != null ? firePercentage + '%' : 'onbekend'}
+- Acties voltooid: ${actions.length}, Vrijheidsdagen gewonnen: ${Math.round(totalFreedomDays * 10) / 10}
+
+Schrijf in het Nederlands, persoonlijk en bemoedigend. Gebruik de filosofie "geld is opgeslagen tijd". Geen opsommingen, geen bullets — vloeiende tekst.`
+
+      const result = await generateText({
+        model,
+        prompt,
+        maxOutputTokens: 200,
+      })
+      aiIntroduction = result.text?.trim() || null
+    } catch {
+      // AI introduction is optional — report should never fail because of it
+    }
+
     // ── BUILD RESPONSE ──
 
     const reportData: ReportData = {
@@ -460,6 +500,7 @@ export async function GET(request: Request) {
         totalAssets: Math.round(totalAssets),
         totalDebts: Math.round(totalDebts),
         savingsRate,
+        savingsRateByPeriod,
         totalIncome: Math.round(totalIncome),
         totalExpenses: Math.round(totalExpenses),
         totalSaved,
@@ -493,7 +534,10 @@ export async function GET(request: Request) {
         fireDate,
         fireAge,
         monthlyPassiveIncome,
+        projectionPoints,
       },
+
+      aiIntroduction,
 
       aiInsights: [],
     }

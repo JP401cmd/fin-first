@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { computeSovereigntyLevel, PHASES, levelToPhaseId } from '@/lib/feature-phases'
-import { ChevronRight, User, Trophy, Share2, Settings } from 'lucide-react'
+import { ChevronRight, User, Trophy, Share2, Settings, FileText } from 'lucide-react'
 import {
   temporalLevels,
   chronologyPhases,
@@ -309,6 +309,26 @@ export default function IdentityPage() {
               </div>
             </div>
             <ChevronRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />
+          </div>
+        </Link>
+
+        <Link
+          href="/rapportages"
+          className="group rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6 transition-all hover:border-kern-300 hover:shadow-sm"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-kern-50">
+                <FileText className="h-4 w-4 text-kern-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--ink)]">Rapportages</h3>
+                <p className="text-xs text-[var(--ink-3)]">
+                  Financieel Archief
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
           </div>
         </Link>
       </div>

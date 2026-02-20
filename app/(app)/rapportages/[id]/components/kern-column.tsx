@@ -2,11 +2,29 @@ import type { ReportKernSection } from '@/lib/report-data'
 import { formatCurrency } from '@/lib/format'
 import { SectionKicker } from './section-kicker'
 import { KassabonTable } from './kassabon-table'
+import { ReportSparkline } from './report-sparkline'
 
 export function KernColumn({ kern }: { kern: ReportKernSection }) {
+  const cashflowValues = kern.monthlyOverview.map(m => m.savings)
+
   return (
     <div className="space-y-6">
       <SectionKicker module="kern" title="De Kern" subtitle="Financieel Fundament" />
+
+      {/* Netto kasstroom sparkline */}
+      {cashflowValues.length >= 2 && (
+        <div className="report-section">
+          <p className="report-kicker font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)] mb-2">
+            Netto kasstroom
+          </p>
+          <ReportSparkline
+            values={cashflowValues}
+            color="#6b4339"
+            height={32}
+            showFill={true}
+          />
+        </div>
+      )}
 
       {/* Budget breakdown */}
       {kern.budgetBreakdown.length > 0 && (

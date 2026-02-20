@@ -1,6 +1,7 @@
 import type { ReportHorizonSection } from '@/lib/report-data'
 import { formatCurrency } from '@/lib/format'
 import { SectionKicker } from './section-kicker'
+import { ReportSparkline } from './report-sparkline'
 import { Flame, Calendar, TrendingUp } from 'lucide-react'
 
 export function HorizonColumn({ horizon }: { horizon: ReportHorizonSection }) {
@@ -75,14 +76,39 @@ export function HorizonColumn({ horizon }: { horizon: ReportHorizonSection }) {
           <p className="report-kicker font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)] mb-3">
             Projectie
           </p>
-          <div className="space-y-2">
+
+          {/* Projection sparkline chart */}
+          {horizon.projectionPoints && horizon.projectionPoints.length >= 2 && (() => {
+            const values = horizon.projectionPoints.map(p => p.netWorth)
+            // Year boundary markers (every 12 months in the filtered-to-every-2nd-month array)
+            const yearMarkers = [6, 12, 18, 24, 30]
+              .filter(i => i < values.length)
+              .map(i => ({ index: i, label: `${Math.round(horizon.projectionPoints[i].month / 12)}j` }))
+            const fireTarget = horizon.fireEnd?.fireTarget
+
+            return (
+              <ReportSparkline
+                values={values}
+                color="#c4a06b"
+                height={80}
+                showFill={true}
+                thresholdValue={fireTarget && fireTarget > 0 ? fireTarget : undefined}
+                thresholdColor="#c4a06b"
+                markers={yearMarkers}
+                className="mb-3"
+              />
+            )
+          })()}
+
+          {/* Scalar annotations */}
+          <div className="flex justify-between border-t border-dashed border-[var(--border-ed)] pt-2">
             {[
-              { label: '1 jaar', value: horizon.projectedNetWorth1y },
-              { label: '3 jaar', value: horizon.projectedNetWorth3y },
-              { label: '5 jaar', value: horizon.projectedNetWorth5y },
+              { label: '1j', value: horizon.projectedNetWorth1y },
+              { label: '3j', value: horizon.projectedNetWorth3y },
+              { label: '5j', value: horizon.projectedNetWorth5y },
             ].filter(p => p.value != null).map(p => (
-              <div key={p.label} className="flex items-baseline justify-between">
-                <span className="font-inter text-xs text-[var(--ink-2)]">{p.label}</span>
+              <div key={p.label} className="text-center">
+                <span className="block font-inter text-[10px] text-[var(--ink-3)]">{p.label}</span>
                 <span className="font-dm-mono text-xs tabular-nums font-medium text-horizon-700">
                   {formatCurrency(p.value!)}
                 </span>

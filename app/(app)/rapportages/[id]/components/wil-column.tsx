@@ -1,5 +1,6 @@
 import type { ReportWilSection } from '@/lib/report-data'
 import { SectionKicker } from './section-kicker'
+import { ReportSparkline } from './report-sparkline'
 import { CheckCircle2, AlertTriangle, Info, TrendingUp, Target } from 'lucide-react'
 
 export function WilColumn({ wil }: { wil: ReportWilSection }) {
@@ -17,6 +18,17 @@ export function WilColumn({ wil }: { wil: ReportWilSection }) {
           <span className="font-inter text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)]">Vrijheidsdagen gewonnen</span>
           <span className="font-dm-mono text-lg tabular-nums font-bold text-wil-600">{wil.freedomDaysWon}</span>
         </div>
+
+        {/* Vrijheidsdagen sparkline */}
+        {wil.freedomDaysByPeriod.length >= 2 && (
+          <ReportSparkline
+            values={wil.freedomDaysByPeriod.map(p => p.days)}
+            color="#3d3048"
+            height={40}
+            showFill={true}
+            className="mt-2"
+          />
+        )}
 
         {wil.topActions.length > 0 && (
           <div className="mt-3 space-y-1.5 border-t border-dashed border-[var(--border-ed)] pt-3">

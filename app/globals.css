@@ -349,7 +349,7 @@ body {
 @media print {
   @page {
     size: A4 portrait;
-    margin: 16mm 14mm;
+    margin: 12mm 12mm;
   }
 
   /* Hide app chrome */
@@ -362,21 +362,45 @@ body {
     display: none !important;
   }
 
-  /* Reset page background */
+  /* ── Page & body reset ── */
   html, body {
     background: white !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    font-size: 12px !important;
   }
 
-  /* Remove shadows and transitions */
+  /* Remove shadows, transitions, animations */
   * {
     box-shadow: none !important;
     text-shadow: none !important;
     transition: none !important;
+    animation: none !important;
   }
 
-  /* Prevent page breaks inside report sections */
+  /* ── Layout: fit report to A4 printable width ──
+     With 12mm margins on A4 (210mm), printable width = 186mm.
+     Remove max-width constraints so the content fills the page
+     instead of shrinking everything down. */
+  main {
+    padding-bottom: 0 !important;
+  }
+
+  /* Report container: fill page width, no horizontal padding (page margins handle it) */
+  main > div {
+    max-width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    padding-top: 0 !important;
+  }
+
+  /* App layout wrapper: clean background for print */
+  .min-h-screen {
+    min-height: auto !important;
+    background: white !important;
+  }
+
+  /* ── Page break control ── */
   .report-section,
   .kassabon-block,
   .pull-quote {
@@ -384,13 +408,41 @@ body {
     page-break-inside: avoid;
   }
 
-  /* Section kickers should stay with their content */
   .report-kicker {
     break-after: avoid;
     page-break-after: avoid;
   }
 
-  /* OKLCH fallback colors for print engines */
+  /* Keep masthead on first page, AI intro with grid */
+  .report-masthead {
+    border-bottom: 2px solid #1a1916 !important;
+    break-after: avoid;
+  }
+
+  /* Monthly table: avoid break in the middle of the table */
+  table {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Footer stays at end */
+  footer {
+    break-before: avoid;
+    margin-top: 24px !important;
+  }
+
+  /* ── 3-column grid: keep layout but tighten gaps ── */
+  .grid {
+    gap: 16px !important;
+  }
+
+  /* ── SVG sparklines: ensure they render and scale correctly ── */
+  svg {
+    overflow: visible !important;
+    display: block;
+  }
+
+  /* ── OKLCH fallback colors for print engines ── */
   .report-kern-accent {
     color: #6b4339 !important;
     border-color: #6b4339 !important;
@@ -404,9 +456,39 @@ body {
     border-color: #c4a06b !important;
   }
 
-  /* Keep masthead border */
-  .report-masthead {
-    border-bottom: 2px solid #1a1916 !important;
+  /* ── Explicit print colors (CSS var fallbacks for Chromium print) ── */
+  .bg-\[var\(--bg\)\] {
+    background: white !important;
+  }
+  .bg-\[var\(--paper\)\] {
+    background: white !important;
+  }
+  .bg-\[var\(--subtle\)\] {
+    background: #f3f2ee !important;
+  }
+  .text-\[var\(--ink\)\] {
+    color: #1a1916 !important;
+  }
+  .text-\[var\(--ink-2\)\] {
+    color: #4a4840 !important;
+  }
+  .text-\[var\(--ink-3\)\] {
+    color: #888070 !important;
+  }
+  .text-\[var\(--ink-4\)\] {
+    color: #bbb8b0 !important;
+  }
+  .border-\[var\(--ink\)\] {
+    border-color: #1a1916 !important;
+  }
+  .border-\[var\(--border-ed\)\] {
+    border-color: #e2e0d8 !important;
+  }
+
+  /* ── Blockquote (AI introduction) ── */
+  blockquote {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   /* Links print as plain text */

@@ -37,6 +37,9 @@ export interface ReportData {
   // ── DE HORIZON ──
   horizon: ReportHorizonSection
 
+  // ── AI Introduction ──
+  aiIntroduction: string | null
+
   // ── AI Pullquotes ──
   aiInsights: ReportAiInsight[]
 }
@@ -50,6 +53,7 @@ export interface ReportKernSection {
   totalAssets: number
   totalDebts: number
   savingsRate: number | null
+  savingsRateByPeriod: { month: string; label: string; rate: number }[]
   totalIncome: number
   totalExpenses: number
   totalSaved: number
@@ -140,6 +144,7 @@ export interface ReportHorizonSection {
   fireDate: string | null
   fireAge: number | null
   monthlyPassiveIncome: number | null
+  projectionPoints: { month: number; netWorth: number }[]
 }
 
 export interface ReportAiInsight {

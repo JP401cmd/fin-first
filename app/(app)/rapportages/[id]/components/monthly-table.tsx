@@ -1,5 +1,6 @@
 import type { ReportMonthRow } from '@/lib/report-data'
 import { formatCurrency } from '@/lib/format'
+import { ReportSparkline } from './report-sparkline'
 
 export function MonthlyTable({
   rows,
@@ -18,9 +19,20 @@ export function MonthlyTable({
 
   return (
     <div className="report-section kassabon-block mt-8 rounded-lg border border-dashed border-[var(--border-ed)] bg-[var(--subtle)] p-4">
-      <p className="mb-4 text-center font-inter text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+      <p className="mb-2 text-center font-inter text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
         Maandoverzicht
       </p>
+
+      {/* Spaarlijn sparkline */}
+      {rows.length >= 2 && (
+        <ReportSparkline
+          values={rows.map(r => r.savings)}
+          color="#6b4339"
+          height={28}
+          showFill={false}
+          className="mb-3"
+        />
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
