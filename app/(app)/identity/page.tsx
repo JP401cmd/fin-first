@@ -143,7 +143,7 @@ export default function IdentityPage() {
     return (
       <div className="mx-auto max-w-4xl px-6 py-12">
         <div className="flex items-center justify-center py-24">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--border-md)] border-t-zinc-900" />
         </div>
       </div>
     )
@@ -155,15 +155,15 @@ export default function IdentityPage() {
     <div className="mx-auto max-w-4xl px-6 py-8">
       {/* Page header */}
       <div className="mb-10">
-        <h1 className="text-3xl font-bold text-zinc-900">Identiteit</h1>
-        <p className="mt-2 text-zinc-500">
+        <h1 className="text-3xl font-bold text-[var(--ink)]">Identiteit</h1>
+        <p className="mt-2 text-[var(--ink-3)]">
           Wie ben je en hoe sta je in het leven? Jouw positie op de reis naar vrijheid.
         </p>
       </div>
 
       {/* ── Demo user banner ──────────────────────────────────────── */}
       {isDemoUser && (
-        <section className="mb-6 rounded-2xl border-2 border-wil-200 bg-wil-50/50 p-6">
+        <section className="mb-6 rounded-[var(--r-lg)] border-2 border-wil-200 bg-wil-50/50 p-6">
           <div className="flex items-start gap-4">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wil-100">
               <svg className="h-5 w-5 text-wil-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -192,15 +192,15 @@ export default function IdentityPage() {
       {/* Switch from demo dialog */}
       {showSwitchDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-zinc-900">Overstappen naar eigen data?</h3>
-            <p className="mt-2 text-sm text-zinc-600">
+          <div className="mx-4 w-full max-w-md rounded-xl bg-[var(--paper)] p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-[var(--ink)]">Overstappen naar eigen data?</h3>
+            <p className="mt-2 text-sm text-[var(--ink-2)]">
               Alle demo data wordt gewist. Je doorloopt de onboarding opnieuw met je eigen informatie.
             </p>
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => setShowSwitchDialog(false)}
-                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+                className="rounded-lg border border-[var(--border-md)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
               >
                 Annuleren
               </button>
@@ -234,7 +234,7 @@ export default function IdentityPage() {
       <div className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Link
           href="/identity/profiel"
-          className="group rounded-2xl border border-zinc-200 bg-white p-6 transition-all hover:border-wil-300 hover:shadow-sm"
+          className="group rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 transition-all hover:border-wil-300 hover:shadow-sm"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -242,19 +242,19 @@ export default function IdentityPage() {
                 <User className="h-4 w-4 text-wil-600" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-zinc-900">Profiel</h3>
-                <p className="text-xs text-zinc-400">
+                <h3 className="text-sm font-semibold text-[var(--ink)]">Profiel</h3>
+                <p className="text-xs text-[var(--ink-3)]">
                   {fullName || 'Geen naam'} &middot; {householdLabel}
                 </p>
               </div>
             </div>
-            <ChevronRight className="h-4 w-4 text-zinc-300 transition-colors group-hover:text-wil-500" />
+            <ChevronRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />
           </div>
         </Link>
 
         <Link
           href="/identity/voortgang"
-          className="group rounded-2xl border border-zinc-200 bg-white p-6 transition-all hover:border-wil-300 hover:shadow-sm"
+          className="group rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 transition-all hover:border-wil-300 hover:shadow-sm"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -262,19 +262,19 @@ export default function IdentityPage() {
                 <Trophy className="h-4 w-4 text-wil-600" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-zinc-900">Voortgang</h3>
-                <p className="text-xs text-zinc-400">
+                <h3 className="text-sm font-semibold text-[var(--ink)]">Voortgang</h3>
+                <p className="text-xs text-[var(--ink-3)]">
                   {badgeCount} badge{badgeCount !== 1 ? 's' : ''} behaald
                 </p>
               </div>
             </div>
-            <ChevronRight className="h-4 w-4 text-zinc-300 transition-colors group-hover:text-wil-500" />
+            <ChevronRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />
           </div>
         </Link>
 
         <Link
           href="/identity/delen"
-          className="group rounded-2xl border border-zinc-200 bg-white p-6 transition-all hover:border-wil-300 hover:shadow-sm"
+          className="group rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 transition-all hover:border-wil-300 hover:shadow-sm"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -282,19 +282,19 @@ export default function IdentityPage() {
                 <Share2 className="h-4 w-4 text-wil-600" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-zinc-900">Delen</h3>
-                <p className="text-xs text-zinc-400">
+                <h3 className="text-sm font-semibold text-[var(--ink)]">Delen</h3>
+                <p className="text-xs text-[var(--ink-3)]">
                   Vrijheidskaart & Jaaroverzicht
                 </p>
               </div>
             </div>
-            <ChevronRight className="h-4 w-4 text-zinc-300 transition-colors group-hover:text-wil-500" />
+            <ChevronRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />
           </div>
         </Link>
 
         <Link
           href="/identity/instellingen"
-          className="group rounded-2xl border border-zinc-200 bg-white p-6 transition-all hover:border-wil-300 hover:shadow-sm"
+          className="group rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 transition-all hover:border-wil-300 hover:shadow-sm"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -302,23 +302,23 @@ export default function IdentityPage() {
                 <Settings className="h-4 w-4 text-wil-600" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-zinc-900">Instellingen</h3>
-                <p className="text-xs text-zinc-400">
+                <h3 className="text-sm font-semibold text-[var(--ink)]">Instellingen</h3>
+                <p className="text-xs text-[var(--ink-3)]">
                   {activeNotifCount} van 7 notificaties actief
                 </p>
               </div>
             </div>
-            <ChevronRight className="h-4 w-4 text-zinc-300 transition-colors group-hover:text-wil-500" />
+            <ChevronRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />
           </div>
         </Link>
       </div>
 
       {/* ── The Temporal Balance ──────────────────────────────────── */}
-      <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+      <section className="mb-10 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 sm:p-8">
+        <h2 className="label-editorial text-[var(--ink-2)]">
           The Temporal Balance
         </h2>
-        <p className="mt-1 mb-8 text-sm text-zinc-500">
+        <p className="mt-1 mb-8 text-sm text-[var(--ink-3)]">
           How much &lsquo;Now&rsquo; are you willing to trade for &lsquo;Later&rsquo;?
         </p>
 
@@ -333,11 +333,11 @@ export default function IdentityPage() {
             onChange={(e) => updateTemporalBalance(Number(e.target.value))}
             className="w-full cursor-pointer accent-zinc-900"
           />
-          <div className="mt-2 flex justify-between text-xs text-zinc-400">
+          <div className="mt-2 flex justify-between text-xs text-[var(--ink-3)]">
             {temporalLevels.map((l) => (
               <span
                 key={l.level}
-                className={temporalBalance === l.level ? 'font-semibold text-zinc-900' : ''}
+                className={temporalBalance === l.level ? 'font-semibold text-[var(--ink)]' : ''}
               >
                 {l.icon}
               </span>
@@ -346,16 +346,16 @@ export default function IdentityPage() {
         </div>
 
         {/* Active level card */}
-        <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-5">
+        <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] p-5">
           <div className="flex items-start gap-4">
             <span className="text-4xl">{activeLevel.icon}</span>
             <div>
-              <h3 className="text-lg font-bold text-zinc-900">{activeLevel.name}</h3>
-              <p className="text-sm font-medium text-zinc-500">{activeLevel.nameNl}</p>
-              <p className="mt-1 text-sm font-semibold italic text-zinc-700">
+              <h3 className="text-lg font-bold text-[var(--ink)]">{activeLevel.name}</h3>
+              <p className="text-sm font-medium text-[var(--ink-3)]">{activeLevel.nameNl}</p>
+              <p className="mt-1 text-sm font-semibold italic text-[var(--ink-2)]">
                 &ldquo;{activeLevel.tagline}&rdquo;
               </p>
-              <p className="mt-2 text-sm leading-relaxed text-zinc-600">
+              <p className="mt-2 text-sm leading-relaxed text-[var(--ink-2)]">
                 {activeLevel.description}
               </p>
             </div>
@@ -364,17 +364,17 @@ export default function IdentityPage() {
       </section>
 
       {/* ── The Chronology Scale ──────────────────────────────────── */}
-      <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+      <section className="mb-10 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 sm:p-8">
+        <h2 className="label-editorial text-[var(--ink-2)]">
           The Chronology Scale
         </h2>
-        <p className="mt-1 mb-6 text-sm text-zinc-500">
+        <p className="mt-1 mb-6 text-sm text-[var(--ink-3)]">
           Jouw positie op de reis naar financiele soevereiniteit.
         </p>
 
         {/* Progress overview bar */}
-        <div className="mb-6 rounded-xl bg-zinc-50 p-4">
-          <div className="mb-2 flex items-center justify-between text-xs text-zinc-500">
+        <div className="mb-6 rounded-xl bg-[var(--subtle)] p-4">
+          <div className="mb-2 flex items-center justify-between text-xs text-[var(--ink-3)]">
             <span>Lvl {chronologyLevels[0].level}: {chronologyLevels[0].name}</span>
             <span>Lvl {chronologyLevels[chronologyLevels.length - 1].level}: {chronologyLevels[chronologyLevels.length - 1].name}</span>
           </div>
@@ -427,7 +427,7 @@ export default function IdentityPage() {
           const nextPhase = chronologyPhases.find(p => p.phase === nextLevel.phase)
           const colors = nextPhase ? phaseColors[nextPhase.color] : phaseColors.teal
           return (
-            <div className={`mb-6 rounded-xl border p-4 ${colors.badge}`}>
+            <div className={`mb-6 rounded-[var(--r-lg)] border p-4 ${colors.badge}`}>
               <p className="text-xs font-bold uppercase">Volgende mijlpaal</p>
               <p className="mt-1 text-sm font-semibold">
                 Lvl {nextLevel.level}: {nextLevel.name}
@@ -458,8 +458,8 @@ export default function IdentityPage() {
                   <span className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ${colors.badge}`}>
                     Phase {phase.phase}
                   </span>
-                  <span className="text-sm font-semibold text-zinc-700">{phase.name}</span>
-                  <span className="text-xs text-zinc-400">&mdash; {phase.subtitle}</span>
+                  <span className="text-sm font-semibold text-[var(--ink-2)]">{phase.name}</span>
+                  <span className="text-xs text-[var(--ink-3)]">&mdash; {phase.subtitle}</span>
                 </div>
 
                 {/* Feature roadmap icons for this phase */}
@@ -467,7 +467,7 @@ export default function IdentityPage() {
                   <div className="mb-3 ml-3" data-testid={`feature-roadmap-${phaseId}`}>
                     <button
                       onClick={() => setExpandedPhase(isPhaseExpanded ? null : phaseId)}
-                      className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-zinc-500 hover:text-zinc-700 transition-colors"
+                      className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors"
                       data-testid={`feature-roadmap-toggle-${phaseId}`}
                     >
                       <span className="text-xs">{isPhaseExpanded ? '\u25BC' : '\u25B6'}</span>
@@ -478,7 +478,7 @@ export default function IdentityPage() {
                         </span>
                       )}
                       {!isPhaseUnlocked && (
-                        <span className="ml-1 inline-flex items-center rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400 border border-zinc-200">
+                        <span className="ml-1 inline-flex items-center rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--ink-3)] border border-[var(--border-ed)]">
                           \uD83D\uDD12 Vergrendeld
                         </span>
                       )}
@@ -494,7 +494,7 @@ export default function IdentityPage() {
                             className={`group relative inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium border transition-all ${
                               isPhaseUnlocked
                                 ? `${colors.badge} opacity-100`
-                                : 'bg-zinc-50 text-zinc-400 border-zinc-200 opacity-60'
+                                : 'bg-[var(--subtle)] text-[var(--ink-3)] border-[var(--border-ed)] opacity-60'
                             }`}
                             data-testid={`feature-pill-${feature.id}`}
                             data-unlocked={isPhaseUnlocked ? 'true' : 'false'}
@@ -502,13 +502,13 @@ export default function IdentityPage() {
                             <span className="text-xs">{icon}</span>
                             <span className="hidden sm:inline">{feature.label}</span>
                             {!isPhaseUnlocked && <span className="text-[9px] ml-0.5">\uD83D\uDD12</span>}
-                            <div className="pointer-events-none absolute left-1/2 bottom-full z-20 mb-2 -translate-x-1/2 w-48 rounded-lg border border-zinc-200 bg-white p-2 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
-                              <p className="text-[11px] font-semibold text-zinc-700">{feature.label}</p>
-                              <p className="text-[10px] text-zinc-500">{feature.description}</p>
+                            <div className="pointer-events-none absolute left-1/2 bottom-full z-20 mb-2 -translate-x-1/2 w-48 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-2 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+                              <p className="text-[11px] font-semibold text-[var(--ink-2)]">{feature.label}</p>
+                              <p className="text-[10px] text-[var(--ink-3)]">{feature.description}</p>
                               {isPhaseUnlocked ? (
                                 <p className="mt-1 text-[10px] font-semibold text-emerald-600">\u2713 Ontgrendeld</p>
                               ) : (
-                                <p className="mt-1 text-[10px] font-semibold text-zinc-400">\uD83D\uDD12 Beschikbaar vanaf {phase.name}</p>
+                                <p className="mt-1 text-[10px] font-semibold text-[var(--ink-3)]">\uD83D\uDD12 Beschikbaar vanaf {phase.name}</p>
                               )}
                             </div>
                           </div>
@@ -518,8 +518,8 @@ export default function IdentityPage() {
 
                     {/* Expanded feature list */}
                     {isPhaseExpanded && (
-                      <div className="rounded-lg border border-zinc-100 bg-zinc-50/50 p-3 mb-2" data-testid={`feature-list-${phaseId}`}>
-                        <p className="mb-2 text-[11px] font-semibold text-zinc-500 uppercase tracking-wide">
+                      <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/50 p-3 mb-2" data-testid={`feature-list-${phaseId}`}>
+                        <p className="mb-2 text-[11px] font-semibold text-[var(--ink-3)] uppercase tracking-wide">
                           Features in {phase.name}
                         </p>
                         <div className="space-y-1.5">
@@ -536,14 +536,14 @@ export default function IdentityPage() {
                                 <span className="text-sm shrink-0 mt-0.5">{icon}</span>
                                 <div className="min-w-0">
                                   <div className="flex items-center gap-1.5">
-                                    <span className="text-xs font-semibold text-zinc-700">{feature.label}</span>
+                                    <span className="text-xs font-semibold text-[var(--ink-2)]">{feature.label}</span>
                                     {isPhaseUnlocked ? (
                                       <span className="text-[10px] text-emerald-600 font-medium">\u2713</span>
                                     ) : (
-                                      <span className="text-[10px] text-zinc-400">\uD83D\uDD12</span>
+                                      <span className="text-[10px] text-[var(--ink-3)]">\uD83D\uDD12</span>
                                     )}
                                   </div>
-                                  <p className="text-[11px] text-zinc-500 leading-snug">{feature.description}</p>
+                                  <p className="text-[11px] text-[var(--ink-3)] leading-snug">{feature.description}</p>
                                 </div>
                               </div>
                             )
@@ -555,7 +555,7 @@ export default function IdentityPage() {
                 )}
 
                 {/* Levels in this phase */}
-                <div className="ml-3 border-l-2 border-zinc-100 pl-6 pb-6">
+                <div className="ml-3 border-l-2 border-[var(--border-ed)] pl-6 pb-6">
                   {levels.map((lvl) => {
                     const isActive = lvl.level === sovereigntyLevel
                     const isPast = lvl.level < sovereigntyLevel
@@ -575,12 +575,12 @@ export default function IdentityPage() {
                           style={isActive ? { boxShadow: `0 0 0 4px color-mix(in srgb, currentColor 20%, transparent)` } : {}}
                         />
 
-                        <div className={`rounded-lg p-3 ${isActive ? 'bg-zinc-50 border border-zinc-200' : ''}`}>
+                        <div className={`rounded-lg p-3 ${isActive ? 'bg-[var(--subtle)] border border-[var(--border-ed)]' : ''}`}>
                           <div className="flex items-center gap-2">
-                            <span className={`text-xs font-bold ${isActive ? colors.text : 'text-zinc-400'}`}>
+                            <span className={`text-xs font-bold ${isActive ? colors.text : 'text-[var(--ink-3)]'}`}>
                               Lvl {lvl.level}
                             </span>
-                            <span className={`text-sm font-semibold ${isActive ? 'text-zinc-900' : isPast ? 'text-zinc-700' : 'text-zinc-400'}`}>
+                            <span className={`text-sm font-semibold ${isActive ? 'text-[var(--ink)]' : isPast ? 'text-[var(--ink-2)]' : 'text-[var(--ink-3)]'}`}>
                               {lvl.name}
                             </span>
                             {isActive && (
@@ -590,16 +590,16 @@ export default function IdentityPage() {
                             )}
                             {criteria && (
                               <div className="group relative ml-auto shrink-0">
-                                <div className="flex h-5 w-5 cursor-help items-center justify-center rounded-full border border-zinc-300 text-[10px] font-bold text-zinc-400 transition-colors group-hover:border-zinc-500 group-hover:text-zinc-600">
+                                <div className="flex h-5 w-5 cursor-help items-center justify-center rounded-full border border-[var(--border-md)] text-[10px] font-bold text-[var(--ink-3)] transition-colors group-hover:border-zinc-500 group-hover:text-[var(--ink-2)]">
                                   i
                                 </div>
-                                <div className="pointer-events-none absolute right-0 bottom-full z-20 mb-2 w-64 rounded-lg border border-zinc-200 bg-white p-3 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
-                                  <p className="mb-1.5 text-[11px] font-semibold text-zinc-700">
+                                <div className="pointer-events-none absolute right-0 bottom-full z-20 mb-2 w-64 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-3 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+                                  <p className="mb-1.5 text-[11px] font-semibold text-[var(--ink-2)]">
                                     {criteria.label}
                                   </p>
                                   <ul className="mb-2 space-y-0.5">
                                     {criteria.criteria.map((c, i) => (
-                                      <li key={i} className="flex items-start gap-1.5 text-[11px] text-zinc-500">
+                                      <li key={i} className="flex items-start gap-1.5 text-[11px] text-[var(--ink-3)]">
                                         <span className="mt-0.5 shrink-0">
                                           {progressPct >= 100 ? '\u2705' : '\u25CB'}
                                         </span>
@@ -617,7 +617,7 @@ export default function IdentityPage() {
                                       />
                                     </div>
                                     <span className={`text-[11px] font-bold ${
-                                      progressPct >= 100 ? 'text-emerald-600' : 'text-zinc-500'
+                                      progressPct >= 100 ? 'text-emerald-600' : 'text-[var(--ink-3)]'
                                     }`}>
                                       {Math.min(100, progressPct)}%
                                     </span>
@@ -626,11 +626,11 @@ export default function IdentityPage() {
                               </div>
                             )}
                           </div>
-                          <p className={`mt-0.5 text-xs ${isActive ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                          <p className={`mt-0.5 text-xs ${isActive ? 'text-[var(--ink-3)]' : 'text-[var(--ink-3)]'}`}>
                             <span className="font-medium">Focus:</span> {lvl.focus}
                           </p>
                           {(isActive || isPast) && (
-                            <p className="mt-1 text-xs italic text-zinc-400">
+                            <p className="mt-1 text-xs italic text-[var(--ink-3)]">
                               {lvl.metaphor}
                             </p>
                           )}

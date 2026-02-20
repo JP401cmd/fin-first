@@ -162,10 +162,10 @@ function ActionSuggestionCard({
       type="button"
       onClick={onClick}
       disabled={added || loading}
-      className={`mt-2 w-full rounded-xl border text-left transition-all ${
+      className={`mt-2 w-full rounded-[var(--r-lg)] border text-left transition-all ${
         added
           ? 'border-emerald-200 bg-emerald-50'
-          : 'border-wil-200 bg-white hover:border-wil-400 hover:shadow-sm active:scale-[0.98]'
+          : 'border-wil-200 bg-[var(--paper)] hover:border-wil-400 hover:shadow-[var(--s0)] active:scale-[0.98]'
       }`}
     >
       <div className="px-3 py-2.5">
@@ -187,9 +187,9 @@ function ActionSuggestionCard({
           )}
         </div>
         {data.description && (
-          <p className="mt-1 text-xs leading-snug text-zinc-500">{data.description}</p>
+          <p className="mt-1 text-xs leading-snug text-[var(--ink-3)]">{data.description}</p>
         )}
-        <div className="mt-1.5 flex items-center gap-3 text-xs text-zinc-500">
+        <div className="mt-1.5 flex items-center gap-3 text-xs text-[var(--ink-3)]">
           <span className="font-medium text-wil-600">
             +{data.freedom_days_impact} {data.freedom_days_impact === 1 ? 'dag' : 'dagen'} vrijheid
           </span>
@@ -378,10 +378,10 @@ export function ChatPanel() {
 
         if (isLoading) {
           elements.push(
-            <div key={`action-loading-${action.toolCallId}`} className="mt-2 w-full rounded-xl border border-wil-100 bg-white px-3 py-2.5">
+            <div key={`action-loading-${action.toolCallId}`} className="mt-2 w-full rounded-[var(--r-lg)] border border-wil-100 bg-[var(--paper)] px-3 py-2.5">
               <div className="flex items-center gap-2">
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-wil-400" />
-                <span className="text-xs text-zinc-400">Actie wordt voorbereid...</span>
+                <span className="text-xs text-[var(--ink-3)]">Actie wordt voorbereid...</span>
               </div>
             </div>
           )
@@ -440,7 +440,7 @@ export function ChatPanel() {
     return (
       <button
         onClick={toggle}
-        className={`fixed bottom-[calc(var(--bottom-nav-height)+1.5rem)] z-50 flex h-14 w-14 items-center justify-center rounded-full ${config.fabBg} text-white shadow-lg transition-all hover:scale-105 active:scale-95 md:bottom-6`}
+        className={`fixed bottom-[calc(var(--bottom-nav-height)+1.5rem)] z-50 flex h-14 w-14 items-center justify-center rounded-full ${config.fabBg} text-white shadow-[var(--s2)] transition-all hover:scale-105 active:scale-95 md:bottom-6`}
         style={{ right: 'calc(1.5rem + var(--chat-sidebar-width, 0px))' }}
         aria-label={`Open chat met ${config.name}`}
       >
@@ -451,8 +451,8 @@ export function ChatPanel() {
 
   // Panel classes differ between floating (default) and pinned (sidebar) mode
   const panelClasses = isPinned
-    ? 'fixed top-0 right-0 z-50 flex h-screen w-[420px] flex-col bg-white shadow-2xl border-l border-zinc-200'
-    : 'fixed bottom-0 right-0 z-50 flex h-[100dvh] w-full flex-col bg-white shadow-2xl md:bottom-6 md:right-6 md:h-[700px] md:w-[480px] md:rounded-2xl md:border md:border-zinc-200'
+    ? 'fixed top-0 right-0 z-50 flex h-screen w-[420px] flex-col bg-[var(--paper)] shadow-2xl border-l border-[var(--border-ed)]'
+    : 'fixed bottom-0 right-0 z-50 flex h-[100dvh] w-full flex-col bg-[var(--paper)] shadow-2xl md:bottom-6 md:right-6 md:h-[700px] md:w-[480px] md:rounded-[var(--r-lg)] md:border md:border-[var(--border-ed)]'
 
   return (
     <>
@@ -465,25 +465,25 @@ export function ChatPanel() {
       <div className={panelClasses}>
 
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
+        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-4 py-3">
           <div className="flex items-center gap-2">
             {config.fabAvatar(32)}
             <div>
               <span className={`text-sm font-semibold ${config.headerColor}`}>{config.name}</span>
-              <span className="ml-1 text-xs text-zinc-400">{config.subtitle}</span>
+              <span className="ml-1 text-xs text-[var(--ink-3)]">{config.subtitle}</span>
             </div>
           </div>
           <div className="flex items-center gap-1">
             {/* Pin toggle — desktop only */}
             <button
               onClick={togglePin}
-              className="hidden touch-target rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 md:flex md:items-center md:justify-center"
+              className="hidden touch-target rounded-lg text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)] md:flex md:items-center md:justify-center"
               aria-label={isPinned ? 'Losmaken' : 'Vastzetten'}
               title={isPinned ? 'Losmaken' : 'Vastzetten'}
             >
               {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
             </button>
-            <button onClick={close} className="touch-target rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+            <button onClick={close} className="touch-target rounded-lg text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -497,7 +497,7 @@ export function ChatPanel() {
               <p className={`mt-3 text-sm font-medium ${config.accentColor}`}>
                 {config.greeting}
               </p>
-              <p className="mt-1 max-w-[260px] text-xs text-zinc-400">
+              <p className="mt-1 max-w-[260px] text-xs text-[var(--ink-3)]">
                 {config.greetingDescription}
               </p>
             </div>
@@ -516,7 +516,7 @@ export function ChatPanel() {
               if (!text) return null
               return (
                 <div key={msg.id} className="mb-3 flex justify-end">
-                  <div className="max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed bg-zinc-100 text-zinc-800">
+                  <div className="max-w-[80%] rounded-[var(--r-lg)] px-3 py-2 text-sm leading-relaxed bg-zinc-100 text-zinc-800">
                     {text}
                   </div>
                 </div>
@@ -535,7 +535,7 @@ export function ChatPanel() {
                 <div className="mr-2 mt-1 shrink-0">
                   {config.fabAvatar(24)}
                 </div>
-                <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${config.bubbleBg} text-zinc-700`}>
+                <div className={`max-w-[85%] rounded-[var(--r-lg)] px-3 py-2 text-sm leading-relaxed ${config.bubbleBg} text-[var(--ink-2)]`}>
                   {renderAssistantMessage(parts)}
                 </div>
               </div>
@@ -547,7 +547,7 @@ export function ChatPanel() {
               <div className="mr-2 mt-1 shrink-0">
                 {config.fabAvatar(24)}
               </div>
-              <div className={`rounded-2xl px-3 py-2 ${config.bubbleBg}`}>
+              <div className={`rounded-[var(--r-lg)] px-3 py-2 ${config.bubbleBg}`}>
                 <Loader2 className={`h-4 w-4 animate-spin ${config.accentColor}`} />
               </div>
             </div>
@@ -555,7 +555,7 @@ export function ChatPanel() {
 
           {/* Error banner with retry */}
           {hasError && (
-            <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-3" data-testid="chat-error-banner">
+            <div className="mb-3 rounded-[var(--r-lg)] border border-red-200 bg-red-50 px-3 py-3" data-testid="chat-error-banner">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
                 <div className="flex-1">
@@ -590,7 +590,7 @@ export function ChatPanel() {
         </div>
 
         {/* Input */}
-        <div className="border-t border-zinc-100 px-3 py-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+        <div className="border-t border-[var(--border-ed)] px-3 py-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
           <div className="flex items-end gap-2">
             <textarea
               ref={inputRef}
@@ -599,13 +599,13 @@ export function ChatPanel() {
               onKeyDown={onKeyDown}
               placeholder={config.placeholder}
               rows={1}
-              className="max-h-24 flex-1 resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-300 focus:ring-1 focus:ring-zinc-200"
+              className="max-h-24 flex-1 resize-none rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm outline-none placeholder:text-[var(--ink-3)] focus:border-[var(--border-md)] focus:ring-1 focus:ring-zinc-200"
             />
             <button
               type="button"
               onClick={submit}
               disabled={isStreaming || !input.trim()}
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${config.sendBg} text-white transition-colors ${config.sendHoverBg} disabled:bg-zinc-300 disabled:text-zinc-500`}
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] ${config.sendBg} text-white transition-colors ${config.sendHoverBg} disabled:bg-zinc-300 disabled:text-[var(--ink-3)]`}
             >
               <Send className="h-4 w-4" />
             </button>

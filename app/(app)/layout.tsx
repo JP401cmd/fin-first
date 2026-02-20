@@ -98,7 +98,7 @@ export default async function AppLayout({
             <ChatProvider>
               <NotificationProvider>
                 <ModuleColorProvider initialConfig={moduleColors}>
-                  <div className="min-h-screen bg-zinc-50" style={colorVars as React.CSSProperties}>
+                  <div className="min-h-screen bg-[var(--bg)]" style={colorVars as React.CSSProperties}>
                     <ChatLayoutWrapper>
                       <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
                       <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation}>

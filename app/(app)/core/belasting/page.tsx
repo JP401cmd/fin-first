@@ -27,8 +27,8 @@ import { FeatureGate } from '@/components/app/feature-gate'
 function KpiTooltip({ text }: { text: string }) {
   return (
     <div className="group relative">
-      <Info className="h-4 w-4 cursor-help text-zinc-300 transition-colors group-hover:text-kern-500" />
-      <div className="pointer-events-none absolute right-0 z-10 mt-1 w-56 rounded-lg border border-zinc-200 bg-white p-3 text-xs leading-relaxed text-zinc-600 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+      <Info className="h-4 w-4 cursor-help text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
+      <div className="pointer-events-none absolute right-0 z-10 mt-1 w-56 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 text-xs leading-relaxed text-[var(--ink-2)] opacity-0 shadow-[var(--s2)] transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
         {text}
       </div>
     </div>
@@ -119,11 +119,11 @@ export default function BelastingPage() {
   if (error) {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-700">{error}</p>
           <button
             onClick={() => { setError(null); setLoading(true); loadData() }}
-            className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            className="mt-3 rounded-[var(--r)] bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
           >
             Opnieuw proberen
           </button>
@@ -135,8 +135,8 @@ export default function BelastingPage() {
   if (!result) {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
-        <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
-          <p className="text-sm text-zinc-500">
+        <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-8 text-center">
+          <p className="text-sm text-[var(--ink-3)]">
             Geen assets of schulden gevonden. Voeg eerst je vermogen toe bij Assets en Schulden.
           </p>
         </div>
@@ -155,7 +155,7 @@ export default function BelastingPage() {
     <FeatureGate featureId="box3_belasting" fallback="locked">
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* === A. Hero Banner === */}
-      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-kern-950 via-kern-900 to-kern-950 p-5 text-white sm:p-8 md:p-10">
+      <section className="relative overflow-hidden rounded-[var(--r-lg)] bg-gradient-to-br from-kern-950 via-kern-900 to-kern-950 p-5 text-white sm:p-8 md:p-10">
         <div className="pointer-events-none absolute -top-24 right-1/4 h-64 w-64 rounded-full bg-kern-500/10 blur-3xl" />
 
         <div className="relative">
@@ -168,7 +168,7 @@ export default function BelastingPage() {
             </div>
             <div className="flex items-center gap-2">
               {/* Year toggle */}
-              <div className="flex overflow-hidden rounded-lg border border-kern-700/50">
+              <div className="flex overflow-hidden rounded-[var(--r)] border border-kern-700/50">
                 {([2025, 2026] as TaxYear[]).map(y => (
                   <button
                     key={y}
@@ -186,7 +186,7 @@ export default function BelastingPage() {
               {/* Partner toggle */}
               <button
                 onClick={() => setHasPartner(v => !v)}
-                className={`flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`flex items-center gap-1 rounded-[var(--r)] border px-3 py-1.5 text-xs font-medium transition-colors ${
                   hasPartner
                     ? 'border-kern-500 bg-kern-600 text-white'
                     : 'border-kern-700/50 text-kern-300/70 hover:text-kern-200'
@@ -227,42 +227,42 @@ export default function BelastingPage() {
 
       {/* === B. KPI Cards === */}
       <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-totale-belasting">
+        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5" data-testid="kpi-totale-belasting">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-kern-50">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-kern-50">
               <Receipt className="h-5 w-5 text-kern-600" />
             </div>
             <KpiTooltip text="De totale Box 3 belasting die je verschuldigd bent, berekend op basis van je vermogen op de peildatum." />
           </div>
-          <p className="text-sm font-medium text-zinc-500">Totale Belasting</p>
-          <p className="mt-1 text-3xl font-bold text-zinc-900">{formatCurrency(result.belasting)}</p>
+          <p className="text-sm font-medium text-[var(--ink-3)]">Totale Belasting</p>
+          <p className="mt-1 text-3xl font-bold text-[var(--ink)]">{formatCurrency(result.belasting)}</p>
           <p className="mt-1 text-xs text-red-500" data-testid="kpi-belasting-freedom">
             {result.vrijheidsdagen} vrijheidsdagen verloren
           </p>
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-effectief-tarief">
+        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5" data-testid="kpi-effectief-tarief">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-kern-50">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-kern-50">
               <Percent className="h-5 w-5 text-kern-600" />
             </div>
             <KpiTooltip text={BOX3_TOOLTIPS.effectiefTarief} />
           </div>
-          <p className="text-sm font-medium text-zinc-500">Effectief Tarief</p>
-          <p className="mt-1 text-3xl font-bold text-zinc-900">{effectiefTariefPct.toFixed(2)}%</p>
-          <p className="mt-1 text-xs text-zinc-400" data-testid="kpi-tarief-freedom">
+          <p className="text-sm font-medium text-[var(--ink-3)]">Effectief Tarief</p>
+          <p className="mt-1 text-3xl font-bold text-[var(--ink)]">{effectiefTariefPct.toFixed(2)}%</p>
+          <p className="mt-1 text-xs text-[var(--ink-3)]" data-testid="kpi-tarief-freedom">
             {formatCurrency(result.belasting)} belasting
           </p>
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-vrijheidsdagen">
+        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5" data-testid="kpi-vrijheidsdagen">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-kern-50">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-kern-50">
               <Clock className="h-5 w-5 text-kern-600" />
             </div>
             <KpiTooltip text="Hoeveel vrijheidsdagen je verliest aan Box 3 belasting. Berekening: belasting / dagelijkse uitgaven." />
           </div>
-          <p className="text-sm font-medium text-zinc-500">Vrijheidsdagen verloren</p>
+          <p className="text-sm font-medium text-[var(--ink-3)]">Vrijheidsdagen verloren</p>
           <p className="mt-1 text-3xl font-bold text-red-600">-{result.vrijheidsdagen}</p>
           {result.belasting >= 100 && (
             <p className="mt-1 text-xs text-red-400" data-testid="kpi-vrijheidsdagen-time">
@@ -271,16 +271,16 @@ export default function BelastingPage() {
           )}
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-heffingsvrij">
+        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5" data-testid="kpi-heffingsvrij">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-kern-50">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-kern-50">
               <ShieldCheck className="h-5 w-5 text-kern-600" />
             </div>
             <KpiTooltip text={BOX3_TOOLTIPS.heffingsvrijVermogen} />
           </div>
-          <p className="text-sm font-medium text-zinc-500">Heffingsvrij Benut</p>
-          <p className="mt-1 text-3xl font-bold text-zinc-900">{heffingsvrijBenut.toFixed(0)}%</p>
-          <p className="mt-1 text-xs text-zinc-400" data-testid="kpi-heffingsvrij-freedom">
+          <p className="text-sm font-medium text-[var(--ink-3)]">Heffingsvrij Benut</p>
+          <p className="mt-1 text-3xl font-bold text-[var(--ink)]">{heffingsvrijBenut.toFixed(0)}%</p>
+          <p className="mt-1 text-xs text-[var(--ink-3)]" data-testid="kpi-heffingsvrij-freedom">
             {formatWithFreedom(result.heffingsvrijVermogen, dailyExpenses, { format: 'short', includeCurrency: true })}
           </p>
         </div>
@@ -289,10 +289,10 @@ export default function BelastingPage() {
       {/* === C. Vermogensindeling === */}
       <section className="mt-10">
         <div className="mb-5">
-          <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          <h2 className="label-editorial text-[var(--ink-2)]">
             Vermogensindeling Box 3
           </h2>
-          <p className="mt-1 text-sm text-zinc-500">
+          <p className="mt-1 text-sm text-[var(--ink-3)]">
             Hoe je assets en schulden worden geclassificeerd voor de belastingaangifte.
           </p>
         </div>
@@ -310,50 +310,50 @@ export default function BelastingPage() {
       {/* === E. Wat-Als Scenario's === */}
       <section className="mt-10">
         <div className="mb-5">
-          <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          <h2 className="label-editorial text-[var(--ink-2)]">
             Wat-als scenario&apos;s
           </h2>
-          <p className="mt-1 text-sm text-zinc-500">
+          <p className="mt-1 text-sm text-[var(--ink-3)]">
             Ontdek hoe je Box 3 belasting verandert bij andere keuzes.
           </p>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <button
             onClick={() => setShowScenarioModal(true)}
-            className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 text-left transition-colors hover:border-kern-200 hover:bg-kern-50/30"
+            className="group flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-left transition-colors hover:border-kern-200 hover:bg-kern-50/30"
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-kern-50">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
               <ArrowRightLeft className="h-5 w-5 text-kern-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-zinc-900">Vermogen verschuiven</p>
-              <p className="text-xs text-zinc-500">Beleggingen &harr; spaargeld</p>
+              <p className="text-sm font-medium text-[var(--ink)]">Vermogen verschuiven</p>
+              <p className="text-xs text-[var(--ink-3)]">Beleggingen &harr; spaargeld</p>
             </div>
           </button>
 
           <button
             onClick={() => setShowScenarioModal(true)}
-            className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 text-left transition-colors hover:border-kern-200 hover:bg-kern-50/30"
+            className="group flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-left transition-colors hover:border-kern-200 hover:bg-kern-50/30"
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-kern-50">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
               <CalendarDays className="h-5 w-5 text-kern-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-zinc-900">Vergelijk jaren</p>
-              <p className="text-xs text-zinc-500">2025 vs 2026 side-by-side</p>
+              <p className="text-sm font-medium text-[var(--ink)]">Vergelijk jaren</p>
+              <p className="text-xs text-[var(--ink-3)]">2025 vs 2026 side-by-side</p>
             </div>
           </button>
 
           <button
             onClick={() => setShowPartnerModal(true)}
-            className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 text-left transition-colors hover:border-kern-200 hover:bg-kern-50/30"
+            className="group flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-left transition-colors hover:border-kern-200 hover:bg-kern-50/30"
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-kern-50">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
               <Users className="h-5 w-5 text-kern-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-zinc-900">Verdeling partner</p>
-              <p className="text-xs text-zinc-500">Optimale partnerverdeling</p>
+              <p className="text-sm font-medium text-[var(--ink)]">Verdeling partner</p>
+              <p className="text-xs text-[var(--ink-3)]">Optimale partnerverdeling</p>
             </div>
           </button>
         </div>
@@ -363,10 +363,10 @@ export default function BelastingPage() {
       {optimizations.length > 0 && (
         <section className="mt-10">
           <div className="mb-5">
-            <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+            <h2 className="label-editorial text-[var(--ink-2)]">
               Optimalisatietips
             </h2>
-            <p className="mt-1 text-sm text-zinc-500">
+            <p className="mt-1 text-sm text-[var(--ink-3)]">
               Concrete acties om je Box 3 belasting te verlagen.
             </p>
           </div>
@@ -374,15 +374,15 @@ export default function BelastingPage() {
             {optimizations.map(tip => (
               <div
                 key={tip.id}
-                className="rounded-xl border border-zinc-200 bg-white p-5 transition-colors hover:border-kern-200"
+                className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 transition-colors hover:border-kern-200"
               >
                 <div className="flex items-start gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-kern-50">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-kern-50">
                     <Lightbulb className="h-5 w-5 text-kern-600" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-zinc-900">{tip.title}</p>
-                    <p className="mt-1 text-xs text-zinc-500">{tip.description}</p>
+                    <p className="text-sm font-semibold text-[var(--ink)]">{tip.title}</p>
+                    <p className="mt-1 text-xs text-[var(--ink-3)]">{tip.description}</p>
                     {tip.besparing > 0 && (
                       <div className="mt-2 flex flex-wrap items-center gap-2" data-testid={`optimization-${tip.id}-savings`}>
                         <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">

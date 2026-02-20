@@ -115,13 +115,13 @@ function ComparisonBar({
   return (
     <div className="space-y-1" data-testid={`comparison-bar-${label}`}>
       <div className="flex items-center justify-between text-xs">
-        <span className="font-medium text-zinc-700 truncate">{label}</span>
+        <span className="font-medium text-[var(--ink-2)] truncate">{label}</span>
         <span className="shrink-0 ml-2">
-          <span className={`font-semibold ${isOver ? 'text-red-600' : isUnder ? 'text-kern-600' : 'text-zinc-900'}`}>
+          <span className={`font-semibold ${isOver ? 'text-red-600' : isUnder ? 'text-kern-600' : 'text-[var(--ink)]'}`}>
             {currentPct.toFixed(1)}%
           </span>
-          <span className="text-zinc-400 mx-1">→</span>
-          <span className="text-zinc-500">{targetPct.toFixed(0)}%</span>
+          <span className="text-[var(--ink-3)] mx-1">→</span>
+          <span className="text-[var(--ink-3)]">{targetPct.toFixed(0)}%</span>
         </span>
       </div>
       <div className="relative h-3 w-full rounded-full bg-zinc-100 overflow-hidden">
@@ -186,18 +186,18 @@ function TargetEditor({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
+        className="w-full max-w-md rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
         data-testid="target-editor-modal"
       >
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-lg font-bold text-zinc-900">Doelverdeling instellen</h3>
-            <p className="text-xs text-zinc-500 mt-0.5">
+            <h3 className="text-lg font-bold text-[var(--ink)]">Doelverdeling instellen</h3>
+            <p className="text-xs text-[var(--ink-3)] mt-0.5">
               {VIEW_MODE_LABELS[mode]} — percentages moeten optellen tot 100%
             </p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100">
+          <button onClick={onClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -205,7 +205,7 @@ function TargetEditor({
         <div className="space-y-2 max-h-72 overflow-y-auto">
           {allKeys.map((key) => (
             <div key={key} className="flex items-center gap-3">
-              <span className="flex-1 text-sm text-zinc-700 truncate">{labels[key]}</span>
+              <span className="flex-1 text-sm text-[var(--ink-2)] truncate">{labels[key]}</span>
               <div className="flex items-center gap-1">
                 <input
                   type="number"
@@ -214,10 +214,10 @@ function TargetEditor({
                   step="1"
                   value={draft[key] ?? ''}
                   onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
-                  className="w-16 rounded-lg border border-zinc-200 px-2 py-1.5 text-right text-sm"
+                  className="w-16 rounded-lg border border-[var(--border-ed)] px-2 py-1.5 text-right text-sm"
                   placeholder="0"
                 />
-                <span className="text-xs text-zinc-400">%</span>
+                <span className="text-xs text-[var(--ink-3)]">%</span>
               </div>
             </div>
           ))}
@@ -237,7 +237,7 @@ function TargetEditor({
         <div className="mt-4 flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+            className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
           >
             Annuleren
           </button>
@@ -300,7 +300,7 @@ export default function PortfolioAllocationVisualization({
 
   if (holdings.length === 0) {
     return (
-      <div className="text-center py-8 text-sm text-zinc-400" data-testid="allocation-empty">
+      <div className="text-center py-8 text-sm text-[var(--ink-3)]" data-testid="allocation-empty">
         Voeg holdings toe om de verdeling te zien.
       </div>
     )
@@ -320,7 +320,7 @@ export default function PortfolioAllocationVisualization({
               className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                 viewMode === mode
                   ? 'bg-kern-100 text-kern-700'
-                  : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'
+                  : 'text-[var(--ink-3)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)]'
               }`}
             >
               <Icon className="h-3.5 w-3.5" />
@@ -335,7 +335,7 @@ export default function PortfolioAllocationVisualization({
             className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
               showTargetComparison
                 ? 'bg-purple-100 text-purple-700'
-                : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'
+                : 'text-[var(--ink-3)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)]'
             }`}
           >
             <Target className="h-3.5 w-3.5" />
@@ -365,14 +365,14 @@ export default function PortfolioAllocationVisualization({
                 className="inline-block h-3 w-3 rounded-sm shrink-0"
                 style={{ backgroundColor: slice.color }}
               />
-              <span className="flex-1 text-xs text-zinc-600 truncate">
+              <span className="flex-1 text-xs text-[var(--ink-2)] truncate">
                 {slice.label}
-                <span className="ml-1 text-zinc-400">({slice.holdingCount})</span>
+                <span className="ml-1 text-[var(--ink-3)]">({slice.holdingCount})</span>
               </span>
-              <span className="text-xs font-medium text-zinc-900 shrink-0" data-testid={`slice-pct-${slice.key}`}>
+              <span className="text-xs font-medium text-[var(--ink)] shrink-0" data-testid={`slice-pct-${slice.key}`}>
                 {slice.pct.toFixed(1)}%
               </span>
-              <span className="text-xs text-zinc-400 shrink-0">{formatCurrency(slice.value)}</span>
+              <span className="text-xs text-[var(--ink-3)] shrink-0">{formatCurrency(slice.value)}</span>
             </div>
           ))}
         </div>
@@ -380,11 +380,11 @@ export default function PortfolioAllocationVisualization({
 
       {/* Target allocation comparison */}
       {showTargetComparison && (
-        <div className="mt-6 rounded-xl border border-purple-100 bg-purple-50/30 p-4" data-testid="target-comparison-section">
+        <div className="mt-6 rounded-[var(--r-lg)] border border-purple-100 bg-purple-50/30 p-4" data-testid="target-comparison-section">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Target className="h-4 w-4 text-purple-600" />
-              <h3 className="text-sm font-semibold text-zinc-700">Huidige vs. doelverdeling</h3>
+              <h3 className="text-sm font-semibold text-[var(--ink-2)]">Huidige vs. doelverdeling</h3>
             </div>
             <button
               onClick={() => setShowTargetEditor(true)}
@@ -398,7 +398,7 @@ export default function PortfolioAllocationVisualization({
 
           {targets.length === 0 ? (
             <div className="text-center py-4" data-testid="no-targets">
-              <p className="text-xs text-zinc-400 mb-2">
+              <p className="text-xs text-[var(--ink-3)] mb-2">
                 Geen doelverdeling ingesteld voor {VIEW_MODE_LABELS[viewMode].toLowerCase()}.
               </p>
               <button
@@ -430,10 +430,10 @@ export default function PortfolioAllocationVisualization({
 
       {/* Rebalancing suggestions */}
       {showTargetComparison && suggestions.length > 0 && (
-        <div className="mt-4 rounded-xl border border-kern-100 bg-kern-50/30 p-4" data-testid="rebalancing-section">
+        <div className="mt-4 rounded-[var(--r-lg)] border border-kern-100 bg-kern-50/30 p-4" data-testid="rebalancing-section">
           <div className="flex items-center gap-2 mb-3">
             <ArrowRightLeft className="h-4 w-4 text-kern-600" />
-            <h3 className="text-sm font-semibold text-zinc-700">Herbalanceringsuggesties</h3>
+            <h3 className="text-sm font-semibold text-[var(--ink-2)]">Herbalanceringsuggesties</h3>
           </div>
           <div className="space-y-2">
             {suggestions.map((s) => (
@@ -454,10 +454,10 @@ export default function PortfolioAllocationVisualization({
                   }`} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-zinc-900">
+                  <p className="text-xs font-medium text-[var(--ink)]">
                     {s.action === 'buy' ? 'Bijkopen' : 'Afbouwen'}: {s.label}
                   </p>
-                  <p className="text-[10px] text-zinc-500">
+                  <p className="text-[10px] text-[var(--ink-3)]">
                     {s.current_pct}% → {s.target_pct}% (drift: {s.drift > 0 ? '+' : ''}{s.drift}%)
                   </p>
                 </div>
@@ -469,7 +469,7 @@ export default function PortfolioAllocationVisualization({
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[10px] text-zinc-400">
+          <p className="mt-2 text-[10px] text-[var(--ink-3)]">
             * Suggesties zijn indicatief en gebaseerd op je doelverdeling. Drift-drempel: 2%.
           </p>
         </div>

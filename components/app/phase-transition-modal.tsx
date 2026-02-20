@@ -202,7 +202,7 @@ export function PhaseTransitionModal({ oldPhase, newPhase, onClose }: Props) {
     >
       <div
         data-testid="phase-transition-modal-content"
-        className={`mx-4 w-full max-w-lg rounded-2xl bg-white shadow-xl overflow-hidden transition-all duration-500 ${
+        className={`mx-4 w-full max-w-lg rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl overflow-hidden transition-all duration-500 ${
           isVisible ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-90 translate-y-4'
         }`}
       >
@@ -218,7 +218,7 @@ export function PhaseTransitionModal({ oldPhase, newPhase, onClose }: Props) {
           <button
             data-testid="phase-transition-close"
             onClick={onClose}
-            className="absolute top-3 right-3 rounded-full p-1.5 text-white/70 hover:text-white hover:bg-white/20 transition-colors z-10"
+            className="absolute top-3 right-3 rounded-full p-1.5 text-white/70 hover:text-white hover:bg-[var(--paper)]/20 transition-colors z-10"
             aria-label="Sluiten"
           >
             <X className="h-5 w-5" />
@@ -263,7 +263,7 @@ export function PhaseTransitionModal({ oldPhase, newPhase, onClose }: Props) {
         <div data-testid="phase-transition-body" className="px-6 py-5">
           {newFeatures.length > 0 && (
             <>
-              <h3 data-testid="phase-transition-unlocked-title" className="text-sm font-semibold text-zinc-700 mb-3">
+              <h3 data-testid="phase-transition-unlocked-title" className="text-sm font-semibold text-[var(--ink-2)] mb-3">
                 Nieuw ontgrendeld ({newFeatures.length})
               </h3>
               <div data-testid="phase-transition-feature-list" className="space-y-2 max-h-64 overflow-y-auto">
@@ -274,7 +274,7 @@ export function PhaseTransitionModal({ oldPhase, newPhase, onClose }: Props) {
                     className={`rounded-lg ${colors.bg} ${colors.border} border px-4 py-3`}
                   >
                     <p className={`text-sm font-medium ${colors.text}`}>{f.label}</p>
-                    <p className="text-xs text-zinc-500 mt-0.5">{f.description}</p>
+                    <p className="text-xs text-[var(--ink-3)] mt-0.5">{f.description}</p>
                   </div>
                 ))}
               </div>
@@ -282,14 +282,14 @@ export function PhaseTransitionModal({ oldPhase, newPhase, onClose }: Props) {
           )}
 
           {newFeatures.length === 0 && (
-            <p className="text-sm text-zinc-500 text-center py-2">
+            <p className="text-sm text-[var(--ink-3)] text-center py-2">
               Je bent klaar voor de volgende stap in je financiele reis.
             </p>
           )}
         </div>
 
         {/* Footer */}
-        <div className="border-t border-zinc-100 px-6 py-4">
+        <div className="border-t border-[var(--border-ed)] px-6 py-4">
           <button
             data-testid="phase-transition-cta"
             onClick={handleCtaClick}

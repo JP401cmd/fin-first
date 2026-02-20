@@ -53,20 +53,20 @@ export function Box3PartnerModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 transition-[right] duration-300" style={{ right: 'var(--chat-sidebar-width, 0px)' }} onClick={onClose}>
       <div
-        className="w-full max-w-xl rounded-2xl bg-white shadow-xl overflow-y-auto"
+        className="w-full max-w-xl rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl overflow-y-auto"
         style={{ maxHeight: '90vh' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
-          <h3 className="text-lg font-bold text-zinc-900">Verdeling fiscaal partner</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100">
+        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-6 py-4">
+          <h3 className="text-lg font-bold text-[var(--ink)]">Verdeling fiscaal partner</h3>
+          <button onClick={onClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <div className="px-6 py-5">
-          <p className="mb-5 text-sm text-zinc-600">
+          <p className="mb-5 text-sm text-[var(--ink-2)]">
             Verdeel het Box 3 vermogen over twee fiscaal partners. Elke partner heeft een eigen heffingsvrij vermogen.
           </p>
 
@@ -111,19 +111,19 @@ export function Box3PartnerModal({
 
           {/* Result */}
           <div className="mt-6 grid grid-cols-2 gap-3">
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-              <p className="text-[10px] font-semibold tracking-[0.15em] text-zinc-400 uppercase">Partner 1</p>
-              <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(manualSplit.partner1Tax)}</p>
-              <div className="mt-2 space-y-0.5 text-xs text-zinc-400">
+            <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+              <p className="text-[10px] font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">Partner 1</p>
+              <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(manualSplit.partner1Tax)}</p>
+              <div className="mt-2 space-y-0.5 text-xs text-[var(--ink-3)]">
                 <p>Spaargeld: {formatCurrency(p1S)}</p>
                 <p>Beleggingen: {formatCurrency(p1B)}</p>
                 <p>Schulden: {formatCurrency(p1Sch)}</p>
               </div>
             </div>
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-              <p className="text-[10px] font-semibold tracking-[0.15em] text-zinc-400 uppercase">Partner 2</p>
-              <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(manualSplit.partner2Tax)}</p>
-              <div className="mt-2 space-y-0.5 text-xs text-zinc-400">
+            <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+              <p className="text-[10px] font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">Partner 2</p>
+              <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(manualSplit.partner2Tax)}</p>
+              <div className="mt-2 space-y-0.5 text-xs text-[var(--ink-3)]">
                 <p>Spaargeld: {formatCurrency(p2S)}</p>
                 <p>Beleggingen: {formatCurrency(p2B)}</p>
                 <p>Schulden: {formatCurrency(p2Sch)}</p>
@@ -132,9 +132,9 @@ export function Box3PartnerModal({
           </div>
 
           {/* Total */}
-          <div className="mt-4 rounded-xl border border-kern-200 bg-kern-50 p-4 text-center">
+          <div className="mt-4 rounded-[var(--r-lg)] border border-kern-200 bg-kern-50 p-4 text-center">
             <p className="text-xs font-semibold text-kern-700/60 uppercase">Totaal met partner</p>
-            <p className="mt-1 text-2xl font-bold text-zinc-900">{formatCurrency(manualSplit.totalTax)}</p>
+            <p className="mt-1 text-2xl font-bold text-[var(--ink)]">{formatCurrency(manualSplit.totalTax)}</p>
             {besparingVsSingle > 0 && (
               <p className="mt-1 text-sm text-emerald-600">
                 {formatCurrency(besparingVsSingle)} besparing t.o.v. alleen
@@ -164,8 +164,8 @@ function SliderRow({
   if (total === 0) {
     return (
       <div>
-        <p className="mb-1 text-xs font-medium text-zinc-600">{label}</p>
-        <p className="text-xs text-zinc-400">Geen {label.toLowerCase()}</p>
+        <p className="mb-1 text-xs font-medium text-[var(--ink-2)]">{label}</p>
+        <p className="text-xs text-[var(--ink-3)]">Geen {label.toLowerCase()}</p>
       </div>
     )
   }
@@ -173,8 +173,8 @@ function SliderRow({
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <p className="text-xs font-medium text-zinc-600">{label} ({formatCurrency(total)})</p>
-        <p className="text-xs text-zinc-500">{p1Pct}% / {100 - p1Pct}%</p>
+        <p className="text-xs font-medium text-[var(--ink-2)]">{label} ({formatCurrency(total)})</p>
+        <p className="text-xs text-[var(--ink-3)]">{p1Pct}% / {100 - p1Pct}%</p>
       </div>
       <input
         type="range"
@@ -185,7 +185,7 @@ function SliderRow({
         onChange={e => onChange(Number(e.target.value))}
         className="w-full accent-kern-500"
       />
-      <div className="mt-0.5 flex justify-between text-[10px] text-zinc-400">
+      <div className="mt-0.5 flex justify-between text-[10px] text-[var(--ink-3)]">
         <span>P1: {formatCurrency(p1Val)}</span>
         <span>P2: {formatCurrency(p2Val)}</span>
       </div>

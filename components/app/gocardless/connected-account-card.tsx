@@ -91,7 +91,7 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
   }
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-4">
+    <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           {req.institution_logo ? (
@@ -103,13 +103,13 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
             />
           ) : (
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100">
-              <Building2 className="h-5 w-5 text-zinc-400" />
+              <Building2 className="h-5 w-5 text-[var(--ink-3)]" />
             </div>
           )}
           <div>
-            <p className="text-sm font-semibold text-zinc-900">{req.institution_name}</p>
+            <p className="text-sm font-semibold text-[var(--ink)]">{req.institution_name}</p>
             {account.iban && (
-              <p className="text-xs text-zinc-500">{account.iban}</p>
+              <p className="text-xs text-[var(--ink-3)]">{account.iban}</p>
             )}
           </div>
         </div>
@@ -136,7 +136,7 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
           </span>
           <button
             onClick={onReauthorize}
-            className="ml-auto shrink-0 rounded-md bg-white px-2 py-1 font-medium shadow-sm hover:bg-zinc-50"
+            className="ml-auto shrink-0 rounded-md bg-[var(--paper)] px-2 py-1 font-medium shadow-[var(--s0)] hover:bg-[var(--subtle)]"
           >
             Vernieuwen
           </button>
@@ -173,7 +173,7 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
             </button>
             <button
               onClick={() => setConfirmDisconnect(false)}
-              className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100"
+              className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-zinc-100"
             >
               Annuleer
             </button>
@@ -181,14 +181,14 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
         ) : (
           <button
             onClick={() => setConfirmDisconnect(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
           >
             <Unlink className="h-3.5 w-3.5" />
             Verbreken
           </button>
         )}
 
-        <span className="ml-auto text-xs text-zinc-400">
+        <span className="ml-auto text-xs text-[var(--ink-3)]">
           {dailyRequests}/10 verzoeken vandaag
         </span>
       </div>

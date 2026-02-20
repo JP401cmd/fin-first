@@ -69,7 +69,7 @@ export default function VerifyFeatureGatingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 pb-20">
+    <div className="min-h-screen bg-[var(--subtle)] pb-20">
       {/* Hero */}
       <div className={`bg-gradient-to-br ${PHASE_BG[featureAccess.phase] || 'from-zinc-600 to-zinc-800'} px-6 py-10 text-white`}>
         <div className="mx-auto max-w-4xl">
@@ -83,19 +83,19 @@ export default function VerifyFeatureGatingPage() {
 
           {/* Real sovereignty data from backend */}
           <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="sovereignty-stats">
-            <div className="rounded-lg bg-white/20 px-3 py-2 text-center">
+            <div className="rounded-lg bg-[var(--paper)]/20 px-3 py-2 text-center">
               <p className="text-xs text-white/70">Fase</p>
               <p className="text-lg font-bold" data-testid="current-phase">{currentPhaseObj?.label ?? featureAccess.phase}</p>
             </div>
-            <div className="rounded-lg bg-white/20 px-3 py-2 text-center">
+            <div className="rounded-lg bg-[var(--paper)]/20 px-3 py-2 text-center">
               <p className="text-xs text-white/70">Niveau</p>
               <p className="text-lg font-bold" data-testid="current-level">{featureAccess.level}</p>
             </div>
-            <div className="rounded-lg bg-white/20 px-3 py-2 text-center">
+            <div className="rounded-lg bg-[var(--paper)]/20 px-3 py-2 text-center">
               <p className="text-xs text-white/70">Vrijheid</p>
               <p className="text-lg font-bold" data-testid="freedom-pct">{featureAccess.freedomPct.toFixed(1)}%</p>
             </div>
-            <div className="rounded-lg bg-white/20 px-3 py-2 text-center">
+            <div className="rounded-lg bg-[var(--paper)]/20 px-3 py-2 text-center">
               <p className="text-xs text-white/70">Vermogen</p>
               <p className="text-lg font-bold" data-testid="net-worth">
                 {featureAccess.netWorth.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}
@@ -107,23 +107,23 @@ export default function VerifyFeatureGatingPage() {
 
       <div className="mx-auto max-w-4xl px-6 py-8 space-y-8">
         {/* Section 1: Backend API Verification */}
-        <section className="rounded-xl border border-zinc-200 bg-white overflow-hidden" data-testid="api-verification">
-          <div className="border-b border-zinc-200 bg-zinc-50 px-5 py-3 flex items-center justify-between">
+        <section className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden" data-testid="api-verification">
+          <div className="border-b border-[var(--border-ed)] bg-[var(--subtle)] px-5 py-3 flex items-center justify-between">
             <div>
               <h2 className="font-semibold text-zinc-800">1. Backend API Verification</h2>
-              <p className="text-xs text-zinc-500">Sovereignty level computed from real Supabase data</p>
+              <p className="text-xs text-[var(--ink-3)]">Sovereignty level computed from real Supabase data</p>
             </div>
             <button
               onClick={fetchApiData}
               disabled={apiLoading}
-              className="flex items-center gap-1 rounded-lg bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-200 disabled:opacity-50"
+              className="flex items-center gap-1 rounded-lg bg-zinc-100 px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-zinc-200 disabled:opacity-50"
             >
               <RefreshCw className={`h-3 w-3 ${apiLoading ? 'animate-spin' : ''}`} />
               Vernieuwen
             </button>
           </div>
           <div className="p-5">
-            {apiLoading && <p className="text-sm text-zinc-500">Laden...</p>}
+            {apiLoading && <p className="text-sm text-[var(--ink-3)]">Laden...</p>}
             {apiError && <p className="text-sm text-red-600">Fout: {apiError}</p>}
             {apiData && (
               <div className="space-y-4">
@@ -147,7 +147,7 @@ export default function VerifyFeatureGatingPage() {
                     </div>
                   </div>
                 ))}
-                <div className="flex items-center gap-2 pt-2 border-t border-zinc-100">
+                <div className="flex items-center gap-2 pt-2 border-t border-[var(--border-ed)]">
                   {(apiData as any).tests?.allPassing ? (
                     <CheckCircle className="h-5 w-5 text-green-600" />
                   ) : (
@@ -163,10 +163,10 @@ export default function VerifyFeatureGatingPage() {
         </section>
 
         {/* Section 2: Context Provider Verification */}
-        <section className="rounded-xl border border-zinc-200 bg-white overflow-hidden" data-testid="context-verification">
-          <div className="border-b border-zinc-200 bg-zinc-50 px-5 py-3">
+        <section className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden" data-testid="context-verification">
+          <div className="border-b border-[var(--border-ed)] bg-[var(--subtle)] px-5 py-3">
             <h2 className="font-semibold text-zinc-800">2. Context Provider Verification</h2>
-            <p className="text-xs text-zinc-500">FeatureAccessProvider passes real data to useFeatureAccess() hook</p>
+            <p className="text-xs text-[var(--ink-3)]">FeatureAccessProvider passes real data to useFeatureAccess() hook</p>
           </div>
           <div className="p-5 space-y-3">
             <div className={`flex items-start gap-2 rounded-lg px-3 py-2 text-sm ${
@@ -222,15 +222,15 @@ export default function VerifyFeatureGatingPage() {
         </section>
 
         {/* Section 3: Feature Access Matrix (current phase highlighted) */}
-        <section className="rounded-xl border border-zinc-200 bg-white overflow-hidden" data-testid="feature-matrix">
-          <div className="border-b border-zinc-200 bg-zinc-50 px-5 py-3">
+        <section className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden" data-testid="feature-matrix">
+          <div className="border-b border-[var(--border-ed)] bg-[var(--subtle)] px-5 py-3">
             <h2 className="font-semibold text-zinc-800">3. Feature-Phase Matrix</h2>
-            <p className="text-xs text-zinc-500">Current phase column highlighted — showing real feature access state</p>
+            <p className="text-xs text-[var(--ink-3)]">Current phase column highlighted — showing real feature access state</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-zinc-50 text-zinc-600">
+                <tr className="bg-[var(--subtle)] text-[var(--ink-2)]">
                   <th className="px-4 py-2 text-left font-medium">Feature</th>
                   {PHASES.map(p => (
                     <th
@@ -251,7 +251,7 @@ export default function VerifyFeatureGatingPage() {
                   const isAccessible = featureAccess.features[feat.id] === true
                   const matrixRow = DEFAULT_MATRIX[feat.id] || {}
                   return (
-                    <tr key={feat.id} className="border-t border-zinc-100 hover:bg-zinc-50/50" data-testid={`matrix-row-${feat.id}`}>
+                    <tr key={feat.id} className="border-t border-[var(--border-ed)] hover:bg-[var(--subtle)]/50" data-testid={`matrix-row-${feat.id}`}>
                       <td className="px-4 py-2">
                         <span className="font-medium text-zinc-800">{feat.label}</span>
                       </td>
@@ -289,10 +289,10 @@ export default function VerifyFeatureGatingPage() {
         </section>
 
         {/* Section 4: Live FeatureGate Demo */}
-        <section className="rounded-xl border border-zinc-200 bg-white overflow-hidden" data-testid="live-gate-demo">
-          <div className="border-b border-zinc-200 bg-zinc-50 px-5 py-3">
+        <section className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden" data-testid="live-gate-demo">
+          <div className="border-b border-[var(--border-ed)] bg-[var(--subtle)] px-5 py-3">
             <h2 className="font-semibold text-zinc-800">4. Live FeatureGate Demo</h2>
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-[var(--ink-3)]">
               Real FeatureGate components using backend sovereignty level (fallback=&quot;locked&quot;)
             </p>
           </div>
@@ -306,7 +306,7 @@ export default function VerifyFeatureGatingPage() {
               <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {expectedAccessible.map(feat => (
                   <FeatureGate key={feat.id} featureId={feat.id} fallback="locked">
-                    <div className="rounded-xl border border-green-200 bg-green-50 p-4" data-testid={`gate-open-${feat.id}`}>
+                    <div className="rounded-[var(--r-lg)] border border-green-200 bg-green-50 p-4" data-testid={`gate-open-${feat.id}`}>
                       <div className="flex items-center gap-2">
                         <Unlock className="h-4 w-4 text-green-600" />
                         <p className="font-medium text-green-800 text-sm">{feat.label}</p>
@@ -326,7 +326,7 @@ export default function VerifyFeatureGatingPage() {
               <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {expectedLocked.map(feat => (
                   <FeatureGate key={feat.id} featureId={feat.id} fallback="locked">
-                    <div className="rounded-xl border border-green-200 bg-green-50 p-4" data-testid={`gate-unexpected-open-${feat.id}`}>
+                    <div className="rounded-[var(--r-lg)] border border-green-200 bg-green-50 p-4" data-testid={`gate-unexpected-open-${feat.id}`}>
                       <div className="flex items-center gap-2">
                         <AlertCircle className="h-4 w-4 text-amber-600" />
                         <p className="font-medium text-amber-800 text-sm">{feat.label}</p>
@@ -340,18 +340,18 @@ export default function VerifyFeatureGatingPage() {
 
             {/* Hidden fallback demo */}
             <div>
-              <h3 className="text-sm font-semibold text-zinc-700 mb-3">
+              <h3 className="text-sm font-semibold text-[var(--ink-2)] mb-3">
                 Hidden Fallback Demo (mastery-only feature):
               </h3>
               <div className="grid gap-3 grid-cols-1 sm:grid-cols-2" data-testid="hidden-fallback-demo">
                 <FeatureGate featureId="withdrawal_strategie">
-                  <div className="rounded-xl border border-purple-200 bg-purple-50 p-4" data-testid="hidden-withdrawal">
+                  <div className="rounded-[var(--r-lg)] border border-purple-200 bg-purple-50 p-4" data-testid="hidden-withdrawal">
                     <p className="font-medium text-purple-800 text-sm">Withdrawal Strategieen (hidden fallback)</p>
                     <p className="text-xs text-purple-600">Alleen zichtbaar in Mastery fase</p>
                   </div>
                 </FeatureGate>
-                <div className="rounded-xl border border-zinc-200 bg-zinc-100 p-4">
-                  <p className="text-xs text-zinc-500">
+                <div className="rounded-xl border border-[var(--border-ed)] bg-zinc-100 p-4">
+                  <p className="text-xs text-[var(--ink-3)]">
                     {featureAccess.phase === 'mastery'
                       ? 'Je bent in Mastery fase — het paarse blok links zou zichtbaar moeten zijn.'
                       : 'Je bent NIET in Mastery fase — het paarse blok links zou onzichtbaar moeten zijn (hidden fallback).'}
@@ -363,7 +363,7 @@ export default function VerifyFeatureGatingPage() {
         </section>
 
         {/* Section 5: Phase Legend */}
-        <section className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="phase-legend">
+        <section className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-5" data-testid="phase-legend">
           <h2 className="text-lg font-semibold text-zinc-800 mb-3">5. Fases en Niveaus</h2>
           <div className="grid gap-2">
             {PHASES.map(p => (
@@ -371,8 +371,8 @@ export default function VerifyFeatureGatingPage() {
                 key={p.id}
                 className={`flex items-center gap-3 rounded-lg border px-4 py-2 ${
                   featureAccess.phase === p.id
-                    ? `${PHASE_BORDER[p.id]} bg-zinc-50 ring-2 ring-offset-1 ring-blue-300`
-                    : 'border-zinc-200'
+                    ? `${PHASE_BORDER[p.id]} bg-[var(--subtle)] ring-2 ring-offset-1 ring-blue-300`
+                    : 'border-[var(--border-ed)]'
                 }`}
                 data-testid={`phase-${p.id}`}
               >
@@ -384,7 +384,7 @@ export default function VerifyFeatureGatingPage() {
                 }`}>
                   {p.label}
                 </span>
-                <span className="text-sm text-zinc-600">Niveaus: {p.levels.join(', ')}</span>
+                <span className="text-sm text-[var(--ink-2)]">Niveaus: {p.levels.join(', ')}</span>
                 {featureAccess.phase === p.id && (
                   <span className="ml-auto text-xs font-bold text-blue-700">&#8592; Huidige fase</span>
                 )}

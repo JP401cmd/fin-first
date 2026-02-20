@@ -98,10 +98,10 @@ export default function DividendTracker() {
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-zinc-200 bg-white p-6" data-testid="dividend-tracker-loading">
+      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6" data-testid="dividend-tracker-loading">
         <div className="flex items-center gap-2 mb-4">
           <DollarSign className="h-4 w-4 text-emerald-600" />
-          <h2 className="text-sm font-semibold text-zinc-700">Dividend Tracker</h2>
+          <h2 className="text-sm font-semibold text-[var(--ink-2)]">Dividend Tracker</h2>
         </div>
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
@@ -112,7 +112,7 @@ export default function DividendTracker() {
 
   if (error) {
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-6" data-testid="dividend-tracker-error">
+      <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6" data-testid="dividend-tracker-error">
         <div className="flex items-center gap-2 mb-2">
           <DollarSign className="h-4 w-4 text-red-500" />
           <h2 className="text-sm font-semibold text-red-700">Dividend Tracker</h2>
@@ -130,15 +130,15 @@ export default function DividendTracker() {
 
   if (!data || data.aggregate.total_dividend_count === 0) {
     return (
-      <div className="rounded-2xl border border-zinc-200 bg-white p-6" data-testid="dividend-tracker-empty">
+      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6" data-testid="dividend-tracker-empty">
         <div className="flex items-center gap-2 mb-4">
           <DollarSign className="h-4 w-4 text-emerald-600" />
-          <h2 className="text-sm font-semibold text-zinc-700">Dividend Tracker</h2>
+          <h2 className="text-sm font-semibold text-[var(--ink-2)]">Dividend Tracker</h2>
         </div>
         <div className="text-center py-6">
-          <DollarSign className="mx-auto h-10 w-10 text-zinc-300" />
-          <p className="mt-3 text-sm font-medium text-zinc-600">Nog geen dividenden geregistreerd</p>
-          <p className="mt-1 text-xs text-zinc-400">
+          <DollarSign className="mx-auto h-10 w-10 text-[var(--ink-4)]" />
+          <p className="mt-3 text-sm font-medium text-[var(--ink-2)]">Nog geen dividenden geregistreerd</p>
+          <p className="mt-1 text-xs text-[var(--ink-3)]">
             Registreer een dividendtransactie bij een holding om je dividendinkomsten te volgen.
           </p>
         </div>
@@ -150,28 +150,28 @@ export default function DividendTracker() {
   const freedomDays = aggregate.freedom_days_per_year
 
   return (
-    <div className="rounded-2xl border border-emerald-200 bg-white p-6" data-testid="dividend-tracker">
+    <div className="rounded-[var(--r-lg)] border border-emerald-200 bg-[var(--paper)] p-6" data-testid="dividend-tracker">
       {/* Header */}
       <div className="flex items-center gap-2 mb-5">
         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100">
           <DollarSign className="h-4 w-4 text-emerald-600" />
         </div>
         <div>
-          <h2 className="text-sm font-semibold text-zinc-700">Dividend Tracker</h2>
-          <p className="text-[10px] text-zinc-400">Passief inkomen uit dividenden</p>
+          <h2 className="text-sm font-semibold text-[var(--ink-2)]">Dividend Tracker</h2>
+          <p className="text-[10px] text-[var(--ink-3)]">Passief inkomen uit dividenden</p>
         </div>
       </div>
 
       {/* Freedom-time banner */}
       <div
-        className="mb-5 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 p-4"
+        className="mb-5 rounded-[var(--r-lg)] bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 p-4"
         data-testid="dividend-freedom-banner"
       >
         <div className="flex items-center gap-2 mb-1">
           <Sun className="h-4 w-4 text-emerald-600" />
           <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Vrijheid door dividenden</p>
         </div>
-        <p className="text-lg font-bold text-zinc-900" data-testid="dividend-freedom-days">
+        <p className="text-lg font-bold text-[var(--ink)]" data-testid="dividend-freedom-days">
           {freedomDays >= 1
             ? `Je dividendinkomsten dekken ${Math.round(freedomDays)} ${Math.round(freedomDays) === 1 ? 'dag' : 'dagen'} vrijheid per jaar`
             : aggregate.daily_expenses > 0
@@ -188,57 +188,57 @@ export default function DividendTracker() {
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-5" data-testid="dividend-kpis">
-        <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-3">
-          <p className="text-[10px] font-medium text-zinc-500 uppercase">Totaal ontvangen</p>
-          <p className="mt-1 text-lg font-bold text-zinc-900" data-testid="dividend-total-income">
+        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
+          <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Totaal ontvangen</p>
+          <p className="mt-1 text-lg font-bold text-[var(--ink)]" data-testid="dividend-total-income">
             {formatCurrency(aggregate.total_dividend_income)}
           </p>
-          <p className="text-[10px] text-zinc-400">{aggregate.total_dividend_count} uitkeringen</p>
+          <p className="text-[10px] text-[var(--ink-3)]">{aggregate.total_dividend_count} uitkeringen</p>
         </div>
-        <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-3">
-          <p className="text-[10px] font-medium text-zinc-500 uppercase">Verwacht per jaar</p>
+        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
+          <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Verwacht per jaar</p>
           <p className="mt-1 text-lg font-bold text-emerald-600" data-testid="dividend-projected-annual">
             {formatCurrency(aggregate.total_projected_annual_income)}
           </p>
-          <p className="text-[10px] text-zinc-400">{formatCurrency(aggregate.monthly_dividend_income)} / maand</p>
+          <p className="text-[10px] text-[var(--ink-3)]">{formatCurrency(aggregate.monthly_dividend_income)} / maand</p>
         </div>
-        <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-3">
-          <p className="text-[10px] font-medium text-zinc-500 uppercase">Dividendrendement</p>
-          <p className="mt-1 text-lg font-bold text-zinc-900" data-testid="dividend-yield-aggregate">
+        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
+          <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Dividendrendement</p>
+          <p className="mt-1 text-lg font-bold text-[var(--ink)]" data-testid="dividend-yield-aggregate">
             {aggregate.weighted_dividend_yield.toFixed(2)}%
           </p>
-          <p className="text-[10px] text-zinc-400">gewogen gemiddeld</p>
+          <p className="text-[10px] text-[var(--ink-3)]">gewogen gemiddeld</p>
         </div>
-        <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-3">
-          <p className="text-[10px] font-medium text-zinc-500 uppercase">Vrijheidsdagen</p>
+        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
+          <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Vrijheidsdagen</p>
           <p className="mt-1 text-lg font-bold text-emerald-600" data-testid="dividend-freedom-days-kpi">
             {Math.round(freedomDays)}
           </p>
-          <p className="text-[10px] text-zinc-400">per jaar</p>
+          <p className="text-[10px] text-[var(--ink-3)]">per jaar</p>
         </div>
       </div>
 
       {/* Per-holding dividend list */}
       <div className="space-y-2" data-testid="dividend-holdings-list">
-        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">Per holding</p>
+        <p className="text-[10px] font-semibold text-[var(--ink-3)] uppercase tracking-wider mb-2">Per holding</p>
         {holdings
           .filter(h => h.dividend_count > 0 || h.projected_annual_income > 0)
           .map((holding) => (
-            <div key={holding.holding_id} className="rounded-xl border border-zinc-200 overflow-hidden">
+            <div key={holding.holding_id} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] overflow-hidden">
               {/* Holding summary row */}
               <button
                 onClick={() => setExpandedHolding(
                   expandedHolding === holding.holding_id ? null : holding.holding_id
                 )}
-                className="w-full flex items-center gap-3 p-3 hover:bg-zinc-50 transition-colors text-left"
+                className="w-full flex items-center gap-3 p-3 hover:bg-[var(--subtle)] transition-colors text-left"
                 data-testid={`dividend-holding-${holding.holding_id}`}
               >
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
                   <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-zinc-900 truncate">{holding.holding_name}</p>
-                  <p className="text-[11px] text-zinc-500">
+                  <p className="text-sm font-medium text-[var(--ink)] truncate">{holding.holding_name}</p>
+                  <p className="text-[11px] text-[var(--ink-3)]">
                     {holding.ticker && <span className="font-medium text-emerald-600">{holding.ticker}</span>}
                     {holding.ticker && ' · '}
                     {holding.dividend_count} uitkering{holding.dividend_count !== 1 ? 'en' : ''}
@@ -246,7 +246,7 @@ export default function DividendTracker() {
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="text-sm font-semibold text-zinc-900">
+                  <p className="text-sm font-semibold text-[var(--ink)]">
                     {formatCurrency(holding.total_dividend_income)}
                   </p>
                   <p className="text-[10px] text-emerald-600">
@@ -255,9 +255,9 @@ export default function DividendTracker() {
                 </div>
                 <div className="shrink-0">
                   {expandedHolding === holding.holding_id ? (
-                    <ChevronUp className="h-4 w-4 text-zinc-400" />
+                    <ChevronUp className="h-4 w-4 text-[var(--ink-3)]" />
                   ) : (
-                    <ChevronDown className="h-4 w-4 text-zinc-400" />
+                    <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" />
                   )}
                 </div>
               </button>
@@ -265,11 +265,11 @@ export default function DividendTracker() {
               {/* Expanded dividend history */}
               {expandedHolding === holding.holding_id && (
                 <div
-                  className="border-t border-zinc-100 bg-zinc-50 px-3 py-2 space-y-1"
+                  className="border-t border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 space-y-1"
                   data-testid={`dividend-history-${holding.holding_id}`}
                 >
                   {/* Holding dividend stats */}
-                  <div className="flex gap-3 py-2 text-[10px] text-zinc-500">
+                  <div className="flex gap-3 py-2 text-[10px] text-[var(--ink-3)]">
                     <span>Waarde: {formatCurrency(holding.holding_value)}</span>
                     <span>·</span>
                     <span>Yield: {holding.dividend_yield.toFixed(2)}%</span>
@@ -283,11 +283,11 @@ export default function DividendTracker() {
                       {holding.dividends.map((div, i) => (
                         <div
                           key={`${div.holding_id}-${div.date}-${i}`}
-                          className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-xs"
+                          className="flex items-center justify-between rounded-lg bg-[var(--paper)] px-3 py-2 text-xs"
                         >
                           <div className="flex items-center gap-2">
-                            <Calendar className="h-3 w-3 text-zinc-400" />
-                            <span className="text-zinc-600">
+                            <Calendar className="h-3 w-3 text-[var(--ink-3)]" />
+                            <span className="text-[var(--ink-2)]">
                               {new Date(div.date).toLocaleDateString('nl-NL', {
                                 day: 'numeric',
                                 month: 'short',
@@ -295,7 +295,7 @@ export default function DividendTracker() {
                               })}
                             </span>
                             {div.notes && (
-                              <span className="text-zinc-400 truncate max-w-[150px]">— {div.notes}</span>
+                              <span className="text-[var(--ink-3)] truncate max-w-[150px]">— {div.notes}</span>
                             )}
                           </div>
                           <span className="font-semibold text-emerald-600">
@@ -305,7 +305,7 @@ export default function DividendTracker() {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-xs text-zinc-400 py-2">Geen dividendhistorie</p>
+                    <p className="text-xs text-[var(--ink-3)] py-2">Geen dividendhistorie</p>
                   )}
                 </div>
               )}
@@ -314,13 +314,13 @@ export default function DividendTracker() {
 
         {/* Holdings without dividends */}
         {holdings.filter(h => h.dividend_count === 0 && h.projected_annual_income === 0).length > 0 && (
-          <div className="mt-3 rounded-xl border border-zinc-100 bg-zinc-50 p-3">
-            <p className="text-[10px] font-medium text-zinc-500 mb-1">Geen dividenden</p>
+          <div className="mt-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
+            <p className="text-[10px] font-medium text-[var(--ink-3)] mb-1">Geen dividenden</p>
             <div className="flex flex-wrap gap-1">
               {holdings
                 .filter(h => h.dividend_count === 0 && h.projected_annual_income === 0)
                 .map(h => (
-                  <span key={h.holding_id} className="inline-block rounded-full bg-zinc-200 px-2 py-0.5 text-[10px] text-zinc-600">
+                  <span key={h.holding_id} className="inline-block rounded-full bg-zinc-200 px-2 py-0.5 text-[10px] text-[var(--ink-2)]">
                     {h.holding_name}
                   </span>
                 ))}

@@ -362,18 +362,18 @@ export function ShareDialog({
       {/* Dialog panel */}
       <div
         ref={dialogRef}
-        className="relative z-10 w-full max-w-md rounded-t-2xl sm:rounded-2xl bg-white p-6 shadow-2xl animate-in slide-in-from-bottom sm:slide-in-from-bottom-0"
+        className="relative z-10 w-full max-w-md rounded-t-2xl sm:rounded-[var(--r-lg)] bg-[var(--paper)] p-6 shadow-2xl animate-in slide-in-from-bottom sm:slide-in-from-bottom-0"
         data-testid="share-dialog-panel"
       >
         {/* Header */}
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Share2 className="h-5 w-5 text-wil-600" />
-            <h2 className="text-lg font-semibold text-zinc-900">Delen</h2>
+            <h2 className="text-lg font-semibold text-[var(--ink)]">Delen</h2>
           </div>
           <button
             onClick={onClose}
-            className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+            className="rounded-full p-1.5 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)] transition-colors"
             aria-label="Sluiten"
             data-testid="share-dialog-close"
           >
@@ -382,7 +382,7 @@ export function ShareDialog({
         </div>
 
         {/* Preview text */}
-        <div className="mb-5 rounded-xl bg-zinc-50 p-3 text-sm text-zinc-600 leading-relaxed" data-testid="share-preview-text">
+        <div className="mb-5 rounded-[var(--r-lg)] bg-[var(--subtle)] p-3 text-sm text-[var(--ink-2)] leading-relaxed" data-testid="share-preview-text">
           <p className="line-clamp-3">{shareText}</p>
           {shareUrl && (
             <p className="mt-1 text-xs text-wil-600 truncate">{shareUrl}</p>
@@ -396,7 +396,7 @@ export function ShareDialog({
             {webShareSupported ? (
               <button
                 onClick={handleWebShare}
-                className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-50 hover:border-zinc-300 active:scale-[0.98]"
+                className="flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-sm font-medium text-[var(--ink-2)] transition-all hover:bg-[var(--subtle)] hover:border-[var(--border-md)] active:scale-[0.98]"
                 data-testid="share-target-native"
               >
                 <ExternalLink className="h-5 w-5 text-wil-500" />
@@ -405,13 +405,13 @@ export function ShareDialog({
             ) : (
               <button
                 onClick={handleCopyLink}
-                className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-50 hover:border-zinc-300 active:scale-[0.98]"
+                className="flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-sm font-medium text-[var(--ink-2)] transition-all hover:bg-[var(--subtle)] hover:border-[var(--border-md)] active:scale-[0.98]"
                 data-testid="share-target-copy-alt"
               >
                 {copied ? (
                   <Check className="h-5 w-5 text-emerald-500" />
                 ) : (
-                  <Copy className="h-5 w-5 text-zinc-500" />
+                  <Copy className="h-5 w-5 text-[var(--ink-3)]" />
                 )}
                 <span>{copied ? 'Gekopieerd!' : 'Kopieer tekst'}</span>
               </button>
@@ -419,7 +419,7 @@ export function ShareDialog({
 
             <button
               onClick={handleCopyLink}
-              className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-50 hover:border-zinc-300 active:scale-[0.98]"
+              className="flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-sm font-medium text-[var(--ink-2)] transition-all hover:bg-[var(--subtle)] hover:border-[var(--border-md)] active:scale-[0.98]"
               data-testid="share-target-copy"
             >
               {copied ? (
@@ -435,7 +435,7 @@ export function ShareDialog({
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={handleWhatsApp}
-              className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-emerald-50 hover:border-emerald-200 active:scale-[0.98]"
+              className="flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-sm font-medium text-[var(--ink-2)] transition-all hover:bg-emerald-50 hover:border-emerald-200 active:scale-[0.98]"
               data-testid="share-target-whatsapp"
             >
               <WhatsAppIcon className="h-5 w-5 text-[#25D366]" />
@@ -444,10 +444,10 @@ export function ShareDialog({
 
             <button
               onClick={handleTwitter}
-              className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-100 hover:border-zinc-300 active:scale-[0.98]"
+              className="flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-sm font-medium text-[var(--ink-2)] transition-all hover:bg-zinc-100 hover:border-[var(--border-md)] active:scale-[0.98]"
               data-testid="share-target-twitter"
             >
-              <XIcon className="h-5 w-5 text-zinc-900" />
+              <XIcon className="h-5 w-5 text-[var(--ink)]" />
               <span>Twitter/X</span>
             </button>
           </div>
@@ -457,7 +457,7 @@ export function ShareDialog({
             <button
               onClick={handleDownloadImage}
               disabled={downloading}
-              className="flex w-full items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-50 hover:border-zinc-300 active:scale-[0.98] disabled:opacity-50"
+              className="flex w-full items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-sm font-medium text-[var(--ink-2)] transition-all hover:bg-[var(--subtle)] hover:border-[var(--border-md)] active:scale-[0.98] disabled:opacity-50"
               data-testid="share-target-download"
             >
               <Download className="h-5 w-5 text-horizon-500" />
@@ -468,7 +468,7 @@ export function ShareDialog({
 
         {/* Fallback notice when Web Share API is not available */}
         {!webShareSupported && (
-          <p className="mt-4 text-center text-xs text-zinc-400" data-testid="share-fallback-notice">
+          <p className="mt-4 text-center text-xs text-[var(--ink-3)]" data-testid="share-fallback-notice">
             Tip: Op mobiel kun je direct delen via je favoriete apps
           </p>
         )}

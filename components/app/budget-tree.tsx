@@ -47,7 +47,7 @@ function ChildBar({
   return (
     <div
       className={`group flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 transition-colors ${
-        isHovered ? 'bg-zinc-100' : 'hover:bg-zinc-50'
+        isHovered ? 'bg-zinc-100' : 'hover:bg-[var(--subtle)]'
       }`}
       onClick={() => onNavigate(child.id)}
       onMouseEnter={() => onHover(child.id)}
@@ -60,7 +60,7 @@ function ChildBar({
       </div>
 
       {/* Name */}
-      <span className="w-28 shrink-0 truncate text-xs font-medium text-zinc-700 lg:w-36">
+      <span className="w-28 shrink-0 truncate text-xs font-medium text-[var(--ink-2)] lg:w-36">
         {child.name}
       </span>
 
@@ -108,11 +108,11 @@ function ChildBar({
 
       {/* Amount label + freedom days */}
       <div className="w-28 shrink-0 text-right lg:w-32">
-        <span className="text-xs text-zinc-500">
-          <span className={`font-medium ${overBudget ? 'text-red-600' : 'text-zinc-700'}`}>
+        <span className="text-xs text-[var(--ink-3)]">
+          <span className={`font-medium ${overBudget ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
             {formatCurrency(spent)}
           </span>
-          <span className="text-zinc-400"> / {formatCurrency(limit)}</span>
+          <span className="text-[var(--ink-3)]"> / {formatCurrency(limit)}</span>
         </span>
         <FreedomDaysLabel spent={spent} limit={limit} overBudget={overBudget} />
       </div>
@@ -132,7 +132,7 @@ function FreedomDaysLabel({ spent, limit, overBudget }: { spent: number; limit: 
     if (overAmount < 100) return null
     const freedom = eurToFreedomTime(overAmount, dailyExpenseRate)
     return (
-      <p className="text-sm italic text-zinc-500" data-testid="freedom-days-over">
+      <p className="text-sm italic text-[var(--ink-3)]" data-testid="freedom-days-over">
         <span className="text-red-500">{formatCurrency(overAmount)} over — {freedom.formattedDagen} ingeleverd</span>
       </p>
     )
@@ -142,7 +142,7 @@ function FreedomDaysLabel({ spent, limit, overBudget }: { spent: number; limit: 
   if (remaining < 100) return null
   const freedom = eurToFreedomTime(remaining, dailyExpenseRate)
   return (
-    <p className="text-sm italic text-zinc-500" data-testid="freedom-days-remaining">
+    <p className="text-sm italic text-[var(--ink-3)]" data-testid="freedom-days-remaining">
       nog {freedom.formattedDagen} deze maand
     </p>
   )
@@ -168,7 +168,7 @@ function ParentNode({
 
   return (
     <div
-      className="flex w-40 cursor-pointer flex-col items-center gap-2 rounded-xl border border-zinc-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md"
+      className="flex w-40 cursor-pointer flex-col items-center gap-2 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 shadow-[var(--s0)] transition-shadow hover:shadow-md"
       onClick={() => onNavigate(parent.id)}
       data-parent-id={parent.id}
     >
@@ -178,9 +178,9 @@ function ParentNode({
       <p className="w-full truncate text-center text-xs font-semibold text-zinc-800">
         {parent.name}
       </p>
-      <p className="text-xs text-zinc-500">
-        <span className="font-medium text-zinc-700">{formatCurrency(totalSpent)}</span>
-        <span className="text-zinc-400"> / {formatCurrency(totalLimit)}</span>
+      <p className="text-xs text-[var(--ink-3)]">
+        <span className="font-medium text-[var(--ink-2)]">{formatCurrency(totalSpent)}</span>
+        <span className="text-[var(--ink-3)]"> / {formatCurrency(totalLimit)}</span>
       </p>
       {/* Mini progress bar */}
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
@@ -330,15 +330,15 @@ function TreeGroup({
     // No children — show single card
     return (
       <div
-        className="flex cursor-pointer items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition-shadow hover:shadow-md"
+        className="flex cursor-pointer items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 transition-shadow hover:shadow-md"
         onClick={() => onNavigate(parent.id)}
       >
         <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${getTypeColors(budgetType).bg}`}>
           <BudgetIcon name={parent.icon} className={`h-5 w-5 ${getTypeColors(budgetType).text}`} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium text-zinc-900">{parent.name}</p>
-          <p className="text-xs text-zinc-500">
+          <p className="truncate font-medium text-[var(--ink)]">{parent.name}</p>
+          <p className="text-xs text-[var(--ink-3)]">
             {formatCurrency(totalSpent)} / {formatCurrency(totalLimit)}
           </p>
         </div>
@@ -392,7 +392,7 @@ function TreeGroup({
       <div className="md:hidden">
         {/* Parent as header */}
         <div
-          className={`flex cursor-pointer items-center gap-3 rounded-t-xl border border-zinc-200 bg-gradient-to-r p-3 ${getTypeColors(budgetType).headerGradient}`}
+          className={`flex cursor-pointer items-center gap-3 rounded-t-xl border border-[var(--border-ed)] bg-gradient-to-r p-3 ${getTypeColors(budgetType).headerGradient}`}
           onClick={() => onNavigate(parent.id)}
         >
           <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${getTypeColors(budgetType).bgDark}`}>
@@ -400,14 +400,14 @@ function TreeGroup({
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-zinc-800">{parent.name}</p>
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-[var(--ink-3)]">
               {formatCurrency(totalSpent)} / {formatCurrency(totalLimit)}
             </p>
           </div>
         </div>
 
         {/* Children indented */}
-        <div className="rounded-b-xl border border-t-0 border-zinc-200 bg-white">
+        <div className="rounded-b-xl border border-t-0 border-[var(--border-ed)] bg-[var(--paper)]">
           {parent.children.map((child) => (
             <ChildBar
               key={child.id}

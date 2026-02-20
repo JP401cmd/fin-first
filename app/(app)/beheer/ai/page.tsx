@@ -90,7 +90,7 @@ export default function BeheerAIPage() {
     return (
       <div className="animate-pulse space-y-4">
         <div className="h-8 w-48 rounded bg-zinc-200" />
-        <div className="h-64 rounded-xl bg-zinc-200" />
+        <div className="h-64 rounded-[var(--r-lg)] bg-zinc-200" />
       </div>
     )
   }
@@ -113,8 +113,8 @@ export default function BeheerAIPage() {
       )}
 
       {/* AI Provider */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6">
-        <h2 className="mb-4 text-lg font-semibold text-zinc-900">AI Provider</h2>
+      <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">
+        <h2 className="mb-4 text-lg font-semibold text-[var(--ink)]">AI Provider</h2>
 
         <div className="mb-4 flex gap-4">
           <label className="flex items-center gap-2 cursor-pointer">
@@ -126,7 +126,7 @@ export default function BeheerAIPage() {
               onChange={() => setSettings({ ...settings, ai_provider: 'anthropic' })}
               className="accent-kern-600"
             />
-            <span className="text-sm font-medium text-zinc-700">Anthropic</span>
+            <span className="text-sm font-medium text-[var(--ink-2)]">Anthropic</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -137,12 +137,12 @@ export default function BeheerAIPage() {
               onChange={() => setSettings({ ...settings, ai_provider: 'openai' })}
               className="accent-kern-600"
             />
-            <span className="text-sm font-medium text-zinc-700">OpenAI</span>
+            <span className="text-sm font-medium text-[var(--ink-2)]">OpenAI</span>
           </label>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-zinc-700 mb-1">
+          <label className="block text-sm font-medium text-[var(--ink-2)] mb-1">
             Model ({settings.ai_provider === 'anthropic' ? 'Anthropic' : 'OpenAI'})
           </label>
           <input
@@ -160,19 +160,19 @@ export default function BeheerAIPage() {
                   : 'ai_model_openai']: e.target.value,
               })
             }
-            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500"
+            className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500"
             placeholder="Model ID"
           />
         </div>
       </div>
 
       {/* API Keys */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6">
-        <h2 className="mb-4 text-lg font-semibold text-zinc-900">API Keys</h2>
+      <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">
+        <h2 className="mb-4 text-lg font-semibold text-[var(--ink)]">API Keys</h2>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--ink-2)] mb-1">
               Anthropic API Key
             </label>
             <div className="flex items-center gap-2">
@@ -182,20 +182,20 @@ export default function BeheerAIPage() {
                 onChange={(e) =>
                   setSettings({ ...settings, anthropic_api_key: e.target.value })
                 }
-                className="flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500"
+                className="flex-1 rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500"
                 placeholder="sk-ant-..."
               />
               <StatusBadge configured={settings.anthropic_api_key !== '' && !settings.anthropic_api_key.includes('***')} />
             </div>
             {settings.anthropic_api_key.includes('***') && (
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="mt-1 text-xs text-[var(--ink-3)]">
                 Key is geconfigureerd. Laat leeg om niet te wijzigen, of voer een nieuwe key in.
               </p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--ink-2)] mb-1">
               OpenAI API Key
             </label>
             <div className="flex items-center gap-2">
@@ -205,13 +205,13 @@ export default function BeheerAIPage() {
                 onChange={(e) =>
                   setSettings({ ...settings, openai_api_key: e.target.value })
                 }
-                className="flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500"
+                className="flex-1 rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500"
                 placeholder="sk-..."
               />
               <StatusBadge configured={settings.openai_api_key !== '' && !settings.openai_api_key.includes('***')} />
             </div>
             {settings.openai_api_key.includes('***') && (
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="mt-1 text-xs text-[var(--ink-3)]">
                 Key is geconfigureerd. Laat leeg om niet te wijzigen, of voer een nieuwe key in.
               </p>
             )}
@@ -220,10 +220,10 @@ export default function BeheerAIPage() {
       </div>
 
       {/* Will's System Prompt */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6">
+      <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold text-zinc-900">Will&apos;s Systeem Prompt</h2>
+            <h2 className="text-lg font-semibold text-[var(--ink)]">Will&apos;s Systeem Prompt</h2>
             {hasOverride && (
               <span className="rounded-full bg-wil-100 px-2.5 py-0.5 text-xs font-medium text-wil-700">
                 Aangepast
@@ -234,7 +234,7 @@ export default function BeheerAIPage() {
             <button
               type="button"
               onClick={handleResetPrompt}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
             >
               <RotateCcw className="h-3 w-3" />
               Reset naar standaard
@@ -242,7 +242,7 @@ export default function BeheerAIPage() {
           )}
         </div>
 
-        <p className="mb-3 text-sm text-zinc-500">
+        <p className="mb-3 text-sm text-[var(--ink-3)]">
           {hasOverride
             ? 'Je gebruikt een aangepast prompt. Dit vervangt het volledige standaard prompt (inclusief persoonlijkheid).'
             : 'Dit is het standaard prompt van Will. Bewerk het om een aangepast prompt te gebruiken.'}
@@ -254,23 +254,23 @@ export default function BeheerAIPage() {
             setSettings({ ...settings, ai_system_prompt_override: e.target.value })
           }
           rows={16}
-          className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 font-mono focus:border-wil-500 focus:outline-none focus:ring-1 focus:ring-wil-500"
+          className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono focus:border-wil-500 focus:outline-none focus:ring-1 focus:ring-wil-500"
           placeholder="Leeg = standaard Will prompt wordt gebruikt..."
         />
 
         <div className="mt-1.5 flex items-center justify-between">
-          <span className="text-xs text-zinc-400">
+          <span className="text-xs text-[var(--ink-3)]">
             {promptValue.length.toLocaleString('nl-NL')} tekens
           </span>
         </div>
 
         {/* Default prompt preview when override is active */}
         {hasOverride && defaultPrompt && (
-          <div className="mt-4 rounded-lg border border-zinc-100 bg-zinc-50">
+          <div className="mt-4 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]">
             <button
               type="button"
               onClick={() => setShowDefaultPreview(!showDefaultPreview)}
-              className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-700"
+              className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)]"
             >
               <span>Standaard prompt bekijken</span>
               {showDefaultPreview ? (
@@ -280,8 +280,8 @@ export default function BeheerAIPage() {
               )}
             </button>
             {showDefaultPreview && (
-              <div className="border-t border-zinc-200 px-3 py-2">
-                <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs text-zinc-500 font-mono">
+              <div className="border-t border-[var(--border-ed)] px-3 py-2">
+                <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs text-[var(--ink-3)] font-mono">
                   {defaultPrompt}
                 </pre>
               </div>
@@ -310,7 +310,7 @@ function StatusBadge({ configured }: { configured: boolean }) {
       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
         configured
           ? 'bg-green-50 text-green-700'
-          : 'bg-zinc-100 text-zinc-500'
+          : 'bg-zinc-100 text-[var(--ink-3)]'
       }`}
     >
       <span className={`h-1.5 w-1.5 rounded-full ${configured ? 'bg-green-500' : 'bg-zinc-400'}`} />

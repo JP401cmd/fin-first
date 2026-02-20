@@ -37,7 +37,7 @@ export function CashFlowForecastChart({ forecast, alerts, currentBalance }: Prop
 
   if (!forecast || forecast.length < 2) {
     return (
-      <div className="py-6 text-center text-sm text-zinc-400" data-testid="cashflow-forecast-empty">
+      <div className="py-6 text-center text-sm text-[var(--ink-3)]" data-testid="cashflow-forecast-empty">
         Onvoldoende data om een cashflow prognose te maken.
       </div>
     )
@@ -354,18 +354,18 @@ export function CashFlowForecastChart({ forecast, alerts, currentBalance }: Prop
 
       {/* Summary stats below chart */}
       <div className="mt-3 grid grid-cols-3 gap-2 text-center" data-testid="cashflow-forecast-summary">
-        <div className="rounded-lg bg-zinc-50 p-2">
-          <p className="text-[10px] text-zinc-400">Huidig saldo</p>
-          <p className="text-sm font-bold text-zinc-900">{formatCurrency(currentBalance)}</p>
+        <div className="rounded-lg bg-[var(--subtle)] p-2">
+          <p className="text-[10px] text-[var(--ink-3)]">Huidig saldo</p>
+          <p className="text-sm font-bold text-[var(--ink)]">{formatCurrency(currentBalance)}</p>
         </div>
-        <div className="rounded-lg bg-zinc-50 p-2">
-          <p className="text-[10px] text-zinc-400">Over 3 maanden</p>
+        <div className="rounded-lg bg-[var(--subtle)] p-2">
+          <p className="text-[10px] text-[var(--ink-3)]">Over 3 maanden</p>
           <p className={`text-sm font-bold ${forecast.length >= 4 && forecast[3].projectedBalance >= currentBalance ? 'text-emerald-600' : 'text-red-600'}`}>
             {forecast.length >= 4 ? formatCurrency(forecast[3].projectedBalance) : '—'}
           </p>
         </div>
-        <div className="rounded-lg bg-zinc-50 p-2">
-          <p className="text-[10px] text-zinc-400">Over 6 maanden</p>
+        <div className="rounded-lg bg-[var(--subtle)] p-2">
+          <p className="text-[10px] text-[var(--ink-3)]">Over 6 maanden</p>
           <p className={`text-sm font-bold ${forecast.length >= 7 && forecast[6].projectedBalance >= currentBalance ? 'text-emerald-600' : 'text-red-600'}`}>
             {forecast.length >= 7 ? formatCurrency(forecast[6].projectedBalance) : '—'}
           </p>

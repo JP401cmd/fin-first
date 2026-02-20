@@ -357,7 +357,7 @@ export default function BudgetsPage() {
   if (error) {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-700">{error}</p>
           <button onClick={() => { setError(null); setLoading(true); loadBudgets() }} className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
             Opnieuw proberen
@@ -370,20 +370,20 @@ export default function BudgetsPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* Month selector */}
-      <section className="rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
+      <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 sm:p-8">
         <div className="mb-6 flex items-center justify-between">
           <button
             onClick={prevMonth}
-            className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+            className="rounded-lg p-2 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
-          <h2 className="text-lg font-semibold capitalize text-zinc-900">
+          <h2 className="text-lg font-semibold capitalize text-[var(--ink)]">
             {monthLabel}
           </h2>
           <button
             onClick={nextMonth}
-            className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+            className="rounded-lg p-2 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
           >
             <ChevronRight className="h-5 w-5" />
           </button>
@@ -393,24 +393,24 @@ export default function BudgetsPage() {
         <div className="grid grid-cols-2 gap-4 text-center sm:grid-cols-4">
           <div>
             <p className="text-xs font-medium text-emerald-600 uppercase">Inkomen</p>
-            <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalIncome)}</p>
-            <p className="text-xs text-zinc-400">{formatCurrency(totalIncomeActual)} ontvangen</p>
+            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalIncome)}</p>
+            <p className="text-xs text-[var(--ink-3)]">{formatCurrency(totalIncomeActual)} ontvangen</p>
           </div>
           <div>
             <p className="text-xs font-medium text-kern-600 uppercase">Uitgaven</p>
-            <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalExpenseBudget)}</p>
-            <p className="text-xs text-zinc-400">{formatCurrency(totalExpenseSpent)} besteed</p>
+            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalExpenseBudget)}</p>
+            <p className="text-xs text-[var(--ink-3)]">{formatCurrency(totalExpenseSpent)} besteed</p>
           </div>
           <div>
             <p className="text-xs font-medium text-blue-600 uppercase">Sparen</p>
-            <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalSavingsBudget)}</p>
-            <p className="text-xs text-zinc-400">{formatCurrency(totalSavingsActual)} gespaard</p>
+            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalSavingsBudget)}</p>
+            <p className="text-xs text-[var(--ink-3)]">{formatCurrency(totalSavingsActual)} gespaard</p>
             <p className="text-[10px] text-blue-500/70">vrijheid opbouwen</p>
           </div>
           <div>
             <p className="text-xs font-medium text-red-600 uppercase">Schulden</p>
-            <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalDebtBudget)}</p>
-            <p className="text-xs text-zinc-400">{formatCurrency(totalDebtActual)} afgelost</p>
+            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalDebtBudget)}</p>
+            <p className="text-xs text-[var(--ink-3)]">{formatCurrency(totalDebtActual)} afgelost</p>
             <p className="text-[10px] text-red-500/70">vrijheid terugkopen</p>
           </div>
         </div>
@@ -418,13 +418,13 @@ export default function BudgetsPage() {
 
       {/* View toggle + New budget button */}
       <div className="mt-6 flex items-center justify-between">
-        <div className="flex items-center gap-0.5 rounded-lg border border-zinc-200 bg-white p-0.5">
+        <div className="flex items-center gap-0.5 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-0.5">
           <button
             onClick={() => toggleViewMode('tree')}
             className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               viewMode === 'tree'
                 ? 'bg-zinc-900 text-white'
-                : 'text-zinc-500 hover:text-zinc-700'
+                : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
             }`}
           >
             <GitFork className="h-3.5 w-3.5" />
@@ -435,7 +435,7 @@ export default function BudgetsPage() {
             className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               viewMode === 'blob'
                 ? 'bg-zinc-900 text-white'
-                : 'text-zinc-500 hover:text-zinc-700'
+                : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
             }`}
           >
             <Fingerprint className="h-3.5 w-3.5" />
@@ -446,7 +446,7 @@ export default function BudgetsPage() {
             className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               viewMode === 'sankey'
                 ? 'bg-zinc-900 text-white'
-                : 'text-zinc-500 hover:text-zinc-700'
+                : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
             }`}
           >
             <Workflow className="h-3.5 w-3.5" />
@@ -457,7 +457,7 @@ export default function BudgetsPage() {
             className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               viewMode === 'donut'
                 ? 'bg-zinc-900 text-white'
-                : 'text-zinc-500 hover:text-zinc-700'
+                : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
             }`}
           >
             <CircleDot className="h-3.5 w-3.5" />
@@ -479,7 +479,7 @@ export default function BudgetsPage() {
         <>
           {incomeBudgets.length > 0 && (
             <div className="mt-8">
-              <h3 className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">Inkomen</h3>
+              <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Inkomen</h3>
               <BudgetTree
                 groups={incomeBudgets}
                 spending={spending}
@@ -490,7 +490,7 @@ export default function BudgetsPage() {
           )}
           {expenseBudgets.length > 0 && (
             <div className="mt-8">
-              <h3 className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">Uitgaven</h3>
+              <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Uitgaven</h3>
               <BudgetTree
                 groups={expenseBudgets}
                 spending={spending}
@@ -501,7 +501,7 @@ export default function BudgetsPage() {
           )}
           {savingsBudgets.length > 0 && (
             <div className="mt-8">
-              <h3 className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">Sparen <span className="ml-1 font-normal normal-case tracking-normal text-blue-400/70">— vrijheid opbouwen</span></h3>
+              <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Sparen <span className="ml-1 font-normal normal-case tracking-normal text-blue-400/70">— vrijheid opbouwen</span></h3>
               <BudgetTree
                 groups={savingsBudgets}
                 spending={spending}
@@ -512,7 +512,7 @@ export default function BudgetsPage() {
           )}
           {debtBudgets.length > 0 && (
             <div className="mt-8">
-              <h3 className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">Schulden <span className="ml-1 font-normal normal-case tracking-normal text-red-400/70">— vrijheid terugkopen</span></h3>
+              <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Schulden <span className="ml-1 font-normal normal-case tracking-normal text-red-400/70">— vrijheid terugkopen</span></h3>
               <BudgetTree
                 groups={debtBudgets}
                 spending={spending}
@@ -622,7 +622,7 @@ function BudgetLegend({
   return (
     <div className="mt-4 space-y-2">
       {/* Header swatches */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs text-zinc-500">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs text-[var(--ink-3)]">
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-3 w-6 rounded-sm bg-zinc-600" />
           Besteed
@@ -642,7 +642,7 @@ function BudgetLegend({
         return (
           <div key={seg.id}>
             <button
-              className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all ${
+              className={`flex w-full items-center gap-3 rounded-[var(--r-lg)] border px-3 py-2.5 text-left transition-all ${
                 isExpanded ? 'ring-2 ring-kern-400' : ''
               }`}
               style={{
@@ -662,8 +662,8 @@ function BudgetLegend({
               </div>
 
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-zinc-900">{seg.name}</p>
-                <p className="text-xs text-zinc-500">
+                <p className="truncate text-sm font-medium text-[var(--ink)]">{seg.name}</p>
+                <p className="text-xs text-[var(--ink-3)]">
                   <span className={isOver ? 'font-semibold text-red-600' : ''}>
                     {formatCurrency(seg.spent)}
                   </span>
@@ -672,7 +672,7 @@ function BudgetLegend({
                 </p>
               </div>
 
-              <span className={`shrink-0 text-xs font-bold ${isOver ? 'text-red-600' : 'text-zinc-600'}`}>
+              <span className={`shrink-0 text-xs font-bold ${isOver ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
                 {pct}%
               </span>
             </button>
@@ -688,7 +688,7 @@ function BudgetLegend({
                   return (
                     <button
                       key={child.id}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left transition-colors hover:bg-zinc-50"
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left transition-colors hover:bg-[var(--subtle)]"
                       onClick={() => onNavigate(child.id)}
                     >
                       <div className="flex items-center gap-0.5">
@@ -698,15 +698,15 @@ function BudgetLegend({
                       <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded" style={{ backgroundColor: c.bg }}>
                         <BudgetIcon name={child.icon} className="h-3 w-3" />
                       </div>
-                      <span className="min-w-0 flex-1 truncate text-xs text-zinc-700">{child.name}</span>
-                      <span className="text-xs text-zinc-500">
+                      <span className="min-w-0 flex-1 truncate text-xs text-[var(--ink-2)]">{child.name}</span>
+                      <span className="text-xs text-[var(--ink-3)]">
                         <span className={childOver ? 'font-semibold text-red-600' : ''}>
                           {formatCurrency(child.spent)}
                         </span>
                         {' / '}
                         {formatCurrency(child.limit)}
                       </span>
-                      <span className={`w-8 text-right text-xs font-medium ${childOver ? 'text-red-600' : 'text-zinc-400'}`}>
+                      <span className={`w-8 text-right text-xs font-medium ${childOver ? 'text-red-600' : 'text-[var(--ink-3)]'}`}>
                         {childPct}%
                       </span>
                     </button>
@@ -857,20 +857,20 @@ function BudgetDetailModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl"
+        className="w-full max-w-lg overflow-y-auto rounded-2xl bg-[var(--paper)] shadow-xl"
         style={{ maxHeight: '90vh' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className={`flex items-center gap-3 border-b border-zinc-200 bg-gradient-to-r ${colors.headerGradient} px-6 py-4`}>
+        <div className={`flex items-center gap-3 border-b border-[var(--border-ed)] bg-gradient-to-r ${colors.headerGradient} px-6 py-4`}>
           <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${colors.bgDark}`}>
             <BudgetIcon name={budget.icon} className={`h-5 w-5 ${colors.text}`} />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="font-semibold text-zinc-900">{budget.name}</h2>
-            {budget.description && <p className="truncate text-xs text-zinc-500">{budget.description}</p>}
+            <h2 className="font-semibold text-[var(--ink)]">{budget.name}</h2>
+            {budget.description && <p className="truncate text-xs text-[var(--ink-3)]">{budget.description}</p>}
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+          <button onClick={onClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -878,31 +878,31 @@ function BudgetDetailModal({
         {/* Spending summary */}
         <div className="px-6 py-4">
           <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="rounded-lg bg-zinc-50 p-3">
-              <p className="text-xs text-zinc-500">Limiet</p>
-              <p className="mt-0.5 text-lg font-bold text-zinc-900">{formatCurrency(limit)}</p>
+            <div className="rounded-lg bg-[var(--subtle)] p-3">
+              <p className="text-xs text-[var(--ink-3)]">Limiet</p>
+              <p className="mt-0.5 text-lg font-bold text-[var(--ink)]">{formatCurrency(limit)}</p>
               {hasFreedomData && limit >= 100 && (
-                <p className="text-sm italic text-zinc-500" data-testid="modal-limit-freedom">
+                <p className="text-sm italic text-[var(--ink-3)]" data-testid="modal-limit-freedom">
                   ≈ {eurToFreedomTime(limit, dailyExpenseRate).formattedDagen}
                 </p>
               )}
             </div>
-            <div className="rounded-lg bg-zinc-50 p-3">
-              <p className="text-xs text-zinc-500">Besteed</p>
-              <p className="mt-0.5 text-lg font-bold text-zinc-900">{formatCurrency(spent)}</p>
+            <div className="rounded-lg bg-[var(--subtle)] p-3">
+              <p className="text-xs text-[var(--ink-3)]">Besteed</p>
+              <p className="mt-0.5 text-lg font-bold text-[var(--ink)]">{formatCurrency(spent)}</p>
               {hasFreedomData && spent >= 100 && (
-                <p className="text-sm italic text-zinc-500" data-testid="modal-spent-freedom">
+                <p className="text-sm italic text-[var(--ink-3)]" data-testid="modal-spent-freedom">
                   ≈ {eurToFreedomTime(spent, dailyExpenseRate).formattedDagen}
                 </p>
               )}
             </div>
-            <div className="rounded-lg bg-zinc-50 p-3">
-              <p className="text-xs text-zinc-500">Resterend</p>
+            <div className="rounded-lg bg-[var(--subtle)] p-3">
+              <p className="text-xs text-[var(--ink-3)]">Resterend</p>
               <p className={`mt-0.5 text-lg font-bold ${remaining >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                 {formatCurrency(remaining)}
               </p>
               {hasFreedomData && Math.abs(remaining) >= 100 && (
-                <p className={`text-sm italic text-zinc-500`} data-testid="modal-remaining-freedom">
+                <p className={`text-sm italic text-[var(--ink-3)]`} data-testid="modal-remaining-freedom">
                   {remaining >= 0
                     ? `nog ${eurToFreedomTime(remaining, dailyExpenseRate).formattedDagen}`
                     : <span className="text-red-500">{eurToFreedomTime(Math.abs(remaining), dailyExpenseRate).formattedDagen} ingeleverd</span>
@@ -921,17 +921,17 @@ function BudgetDetailModal({
             </div>
             <div className="mt-1 flex items-center justify-between">
               {hasFreedomData && remaining >= 100 && (
-                <p className="text-sm italic text-zinc-500" data-testid="modal-bar-freedom">
+                <p className="text-sm italic text-[var(--ink-3)]" data-testid="modal-bar-freedom">
                   nog {eurToFreedomTime(remaining, dailyExpenseRate).formattedDagen} deze maand
                 </p>
               )}
               {hasFreedomData && remaining <= 0 && spent > limit && Math.abs(remaining) >= 100 && (
-                <p className="text-sm italic text-zinc-500" data-testid="modal-bar-freedom-over">
+                <p className="text-sm italic text-[var(--ink-3)]" data-testid="modal-bar-freedom-over">
                   <span className="text-red-500">{formatCurrency(Math.abs(remaining))} over — {eurToFreedomTime(Math.abs(remaining), dailyExpenseRate).formattedDagen} ingeleverd</span>
                 </p>
               )}
               {!hasFreedomData && <span />}
-              <p className="text-right text-xs text-zinc-400">{pct}% besteed</p>
+              <p className="text-right text-xs text-[var(--ink-3)]">{pct}% besteed</p>
             </div>
           </div>
 
@@ -949,12 +949,12 @@ function BudgetDetailModal({
 
           if (!forecast.hasSufficientData) {
             return (
-              <div className="border-t border-zinc-100 px-6 py-4" data-testid="budget-forecast-section">
+              <div className="border-t border-[var(--border-ed)] px-6 py-4" data-testid="budget-forecast-section">
                 <div className="flex items-center gap-2 mb-2">
-                  <TrendingUp className="h-4 w-4 text-zinc-400" />
-                  <p className="text-xs font-semibold text-zinc-500 uppercase">Voorspelling volgende maand</p>
+                  <TrendingUp className="h-4 w-4 text-[var(--ink-3)]" />
+                  <p className="text-xs font-semibold text-[var(--ink-3)] uppercase">Voorspelling volgende maand</p>
                 </div>
-                <p className="text-xs text-zinc-400 italic" data-testid="budget-forecast-insufficient">
+                <p className="text-xs text-[var(--ink-3)] italic" data-testid="budget-forecast-insufficient">
                   {forecast.message}
                 </p>
                 {/* Variance detail for insufficient data */}
@@ -967,22 +967,22 @@ function BudgetDetailModal({
           const confLabel = getConfidenceLabel(forecast.confidence)
 
           return (
-            <div className="border-t border-zinc-100 px-6 py-4" data-testid="budget-forecast-section">
+            <div className="border-t border-[var(--border-ed)] px-6 py-4" data-testid="budget-forecast-section">
               <div className="flex items-center gap-2 mb-3">
                 <TrendingUp className="h-4 w-4 text-purple-500" />
-                <p className="text-xs font-semibold text-zinc-500 uppercase">Voorspelling volgende maand</p>
+                <p className="text-xs font-semibold text-[var(--ink-3)] uppercase">Voorspelling volgende maand</p>
               </div>
 
               {/* Predicted amount */}
-              <div className="rounded-xl border border-purple-200 bg-gradient-to-r from-purple-50 to-white p-4" data-testid="budget-forecast-card">
+              <div className="rounded-[var(--r-lg)] border border-purple-200 bg-gradient-to-r from-purple-50 to-white p-4" data-testid="budget-forecast-card">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-xs text-purple-600 font-medium">Verwachte uitgaven</p>
-                    <p className="text-2xl font-bold text-zinc-900 mt-0.5" data-testid="budget-forecast-amount">
+                    <p className="text-2xl font-bold text-[var(--ink)] mt-0.5" data-testid="budget-forecast-amount">
                       {formatCurrency(forecast.predicted)}
                     </p>
                     {hasFreedomData && forecast.predicted >= 100 && (
-                      <p className="text-sm italic text-zinc-500 mt-0.5">
+                      <p className="text-sm italic text-[var(--ink-3)] mt-0.5">
                         ≈ {eurToFreedomTime(forecast.predicted, dailyExpenseRate).formattedDagen}
                       </p>
                     )}
@@ -993,12 +993,12 @@ function BudgetDetailModal({
                 </div>
 
                 {/* Contextual message */}
-                <p className="text-xs text-zinc-500 mt-2" data-testid="budget-forecast-message">
+                <p className="text-xs text-[var(--ink-3)] mt-2" data-testid="budget-forecast-message">
                   {forecast.message}
                 </p>
 
                 {/* Confidence detail */}
-                <div className="mt-2 flex items-center gap-3 text-[10px] text-zinc-400">
+                <div className="mt-2 flex items-center gap-3 text-[10px] text-[var(--ink-3)]">
                   <span>Gebaseerd op {forecast.monthsUsed} maanden</span>
                   <span>•</span>
                   <span>{forecast.confidencePercent}% betrouwbaarheid</span>
@@ -1007,7 +1007,7 @@ function BudgetDetailModal({
                 {/* Budget limit comparison bar */}
                 {limit > 0 && (
                   <div className="mt-3">
-                    <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1">
+                    <div className="flex items-center justify-between text-[10px] text-[var(--ink-3)] mb-1">
                       <span>Voorspeld vs limiet</span>
                       <span>{Math.round((forecast.predicted / limit) * 100)}%</span>
                     </div>
@@ -1046,8 +1046,8 @@ function BudgetDetailModal({
 
         {/* Children list */}
         {isParent && children.length > 0 && (
-          <div className="border-t border-zinc-100 px-6 py-4">
-            <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">Subbudgetten</p>
+          <div className="border-t border-[var(--border-ed)] px-6 py-4">
+            <p className="mb-2 text-xs font-semibold text-[var(--ink-3)] uppercase">Subbudgetten</p>
             <div className="space-y-1.5">
               {children.map((child) => {
                 const childSpent = getSpent(child)
@@ -1057,7 +1057,7 @@ function BudgetDetailModal({
                 return (
                   <div
                     key={child.id}
-                    className={`flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-100 p-2 transition-colors ${colors.hoverBg}`}
+                    className={`flex cursor-pointer items-center gap-2 rounded-lg border border-[var(--border-ed)] p-2 transition-colors ${colors.hoverBg}`}
                     onClick={() => onSelectChild(child.id)}
                   >
                     <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${colors.bg}`}>
@@ -1065,7 +1065,7 @@ function BudgetDetailModal({
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
-                        <p className="truncate text-xs font-medium text-zinc-700">{child.name}</p>
+                        <p className="truncate text-xs font-medium text-[var(--ink-2)]">{child.name}</p>
                         <div className="ml-2 flex shrink-0 items-center gap-2">
                           {/* Per-child sparkline */}
                           {childSparkData && childSparkData.length >= 2 && (
@@ -1079,16 +1079,16 @@ function BudgetDetailModal({
                             />
                           )}
                           <div className="text-right">
-                            <span className="text-xs text-zinc-500">
+                            <span className="text-xs text-[var(--ink-3)]">
                               {formatCurrency(childSpent)} / {formatCurrency(childLimit)}
                             </span>
                             {hasFreedomData && childLimit - childSpent >= 100 && (
-                              <p className="text-sm italic text-zinc-500" data-testid="child-freedom-remaining">
+                              <p className="text-sm italic text-[var(--ink-3)]" data-testid="child-freedom-remaining">
                                 nog {eurToFreedomTime(childLimit - childSpent, dailyExpenseRate).formattedDagen}
                               </p>
                             )}
                             {hasFreedomData && childSpent > childLimit && childSpent - childLimit >= 100 && (
-                              <p className="text-sm italic text-zinc-500" data-testid="child-freedom-over">
+                              <p className="text-sm italic text-[var(--ink-3)]" data-testid="child-freedom-over">
                                 <span className="text-red-500">{eurToFreedomTime(childSpent - childLimit, dailyExpenseRate).formattedDagen} ingeleverd</span>
                               </p>
                             )}
@@ -1111,18 +1111,18 @@ function BudgetDetailModal({
 
         {/* Transactions this month */}
         {budgetTx.length > 0 && (
-          <div className="border-t border-zinc-100 px-6 py-4">
-            <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">
+          <div className="border-t border-[var(--border-ed)] px-6 py-4">
+            <p className="mb-2 text-xs font-semibold text-[var(--ink-3)] uppercase">
               Transacties deze maand ({budgetTx.length})
             </p>
             <div className="max-h-48 space-y-1 overflow-y-auto">
               {budgetTx.map((tx, i) => (
-                <div key={i} className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-zinc-50">
+                <div key={i} className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-[var(--subtle)]">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-medium text-zinc-700">
+                    <p className="truncate text-xs font-medium text-[var(--ink-2)]">
                       {tx.counterparty_name || tx.description}
                     </p>
-                    <p className="text-[10px] text-zinc-400">
+                    <p className="text-[10px] text-[var(--ink-3)]">
                       {new Date(tx.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
                       {tx.counterparty_name && tx.description !== tx.counterparty_name && (
                         <span className="ml-1">{tx.description}</span>
@@ -1134,7 +1134,7 @@ function BudgetDetailModal({
                       {formatCurrency(Math.abs(Number(tx.amount)))}
                     </span>
                     {hasFreedomData && Math.abs(Number(tx.amount)) >= 100 && (
-                      <p className="text-sm italic text-zinc-500" data-testid="tx-freedom-time">
+                      <p className="text-sm italic text-[var(--ink-3)]" data-testid="tx-freedom-time">
                         {eurToFreedomTime(Math.abs(Number(tx.amount)), dailyExpenseRate).formattedDagen}
                       </p>
                     )}
@@ -1147,9 +1147,9 @@ function BudgetDetailModal({
 
         {/* 12-month spending sparkline trend */}
         {history.length >= 2 && (
-          <div className="border-t border-zinc-100 px-6 py-4" data-testid="budget-sparkline-section">
+          <div className="border-t border-[var(--border-ed)] px-6 py-4" data-testid="budget-sparkline-section">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-zinc-500 uppercase">Uitgaventrend</p>
+              <p className="text-xs font-semibold text-[var(--ink-3)] uppercase">Uitgaventrend</p>
               <SparklineWithLabel
                 data={history.map(h => ({ month: h.month, label: h.label, spent: h.spent }))}
                 width={100}
@@ -1163,8 +1163,8 @@ function BudgetDetailModal({
 
         {/* 12-month spending history */}
         {history.length > 0 && (
-          <div className="border-t border-zinc-100 px-6 py-4">
-            <p className="mb-3 text-xs font-semibold text-zinc-500 uppercase">Laatste 12 maanden</p>
+          <div className="border-t border-[var(--border-ed)] px-6 py-4">
+            <p className="mb-3 text-xs font-semibold text-[var(--ink-3)] uppercase">Laatste 12 maanden</p>
             <div className="flex items-end gap-1" style={{ height: 80 }}>
               {history.map((h) => {
                 const spentH = (h.spent / maxHistoryValue) * 100
@@ -1175,7 +1175,7 @@ function BudgetDetailModal({
                     {/* Limit indicator line */}
                     {h.limit > 0 && (
                       <div
-                        className="absolute w-full border-t border-dashed border-zinc-300"
+                        className="absolute w-full border-t border-dashed border-[var(--border-md)]"
                         style={{ bottom: `${limitH}%` }}
                       />
                     )}
@@ -1187,9 +1187,9 @@ function BudgetDetailModal({
                       />
                     </div>
                     {/* Month label */}
-                    <p className="mt-1 text-[9px] text-zinc-400">{h.label}</p>
+                    <p className="mt-1 text-[9px] text-[var(--ink-3)]">{h.label}</p>
                     {/* Tooltip */}
-                    <div className="pointer-events-none absolute -top-10 z-10 rounded bg-zinc-800 px-2 py-1 text-[10px] text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                    <div className="pointer-events-none absolute -top-10 z-10 rounded bg-zinc-800 px-2 py-1 text-[10px] text-white opacity-0 shadow-[var(--s2)] transition-opacity group-hover:opacity-100">
                       {formatCurrency(h.spent)} / {formatCurrency(h.limit)}
                     </div>
                   </div>
@@ -1201,19 +1201,19 @@ function BudgetDetailModal({
 
         {/* Limit change history */}
         {limitHistory.length > 1 && (
-          <div className="border-t border-zinc-100 px-6 py-4">
-            <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">Limiet wijzigingen</p>
+          <div className="border-t border-[var(--border-ed)] px-6 py-4">
+            <p className="mb-2 text-xs font-semibold text-[var(--ink-3)] uppercase">Limiet wijzigingen</p>
             <div className="space-y-1.5">
               {limitHistory.map((change, i) => {
                 const prev = i > 0 ? limitHistory[i - 1].amount : null
                 const delta = prev != null ? change.amount - prev : null
                 return (
-                  <div key={i} className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-zinc-50">
-                    <span className="text-xs text-zinc-500">
+                  <div key={i} className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-[var(--subtle)]">
+                    <span className="text-xs text-[var(--ink-3)]">
                       {new Date(change.date).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })}
                     </span>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-zinc-700">{formatCurrency(change.amount)}</span>
+                      <span className="text-xs font-medium text-[var(--ink-2)]">{formatCurrency(change.amount)}</span>
                       {delta != null && delta !== 0 && (
                         <span className={`text-[10px] font-medium ${delta > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                           {delta > 0 ? '+' : ''}{formatCurrency(delta)}
@@ -1284,7 +1284,7 @@ function BudgetDetailModal({
         )}
 
         {/* Actions */}
-        <div className="flex gap-2 border-t border-zinc-200 px-6 py-4">
+        <div className="flex gap-2 border-t border-[var(--border-ed)] px-6 py-4">
           <button
             onClick={onEdit}
             className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-kern-600 px-3 py-2 text-xs font-medium text-white hover:bg-kern-700"
@@ -1294,7 +1294,7 @@ function BudgetDetailModal({
           </button>
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 hover:border-red-300"
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-[var(--paper)] px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 hover:border-red-300"
             data-testid="budget-delete-btn"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -1476,18 +1476,18 @@ function BudgetEditModal({
   }
 
   const SelectedIcon = iconMap[icon] ?? iconMap['Circle']
-  const inputCls = 'w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500'
+  const inputCls = 'w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm text-[var(--ink)] focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={handleClose}>
       <div
-        className="w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl"
+        className="w-full max-w-lg overflow-y-auto rounded-2xl bg-[var(--paper)] shadow-xl"
         style={{ maxHeight: '90vh' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-zinc-900">Budget bewerken</h2>
-          <button onClick={handleClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-6 py-4">
+          <h2 className="text-lg font-semibold text-[var(--ink)]">Budget bewerken</h2>
+          <button onClick={handleClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -1538,7 +1538,7 @@ function BudgetEditModal({
             <button
               type="button"
               onClick={() => setShowIcons(!showIcons)}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-zinc-200 text-zinc-500 hover:border-kern-300 hover:bg-kern-50"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border-ed)] text-[var(--ink-3)] hover:border-kern-300 hover:bg-kern-50"
             >
               <SelectedIcon className="h-5 w-5" />
             </button>
@@ -1562,7 +1562,7 @@ function BudgetEditModal({
                     className={`flex h-8 w-8 items-center justify-center rounded-lg border text-xs transition-colors ${
                       icon === iconName
                         ? 'border-kern-500 bg-kern-50 text-kern-600'
-                        : 'border-zinc-200 text-zinc-400 hover:border-zinc-300 hover:text-zinc-600'
+                        : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
                     }`}
                   >
                     <Icon className="h-3.5 w-3.5" />
@@ -1583,7 +1583,7 @@ function BudgetEditModal({
           {/* Financial row: Type + Limit + Interval */}
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Type</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Type</label>
               <select value={budgetType} onChange={(e) => setBudgetType(e.target.value as 'income' | 'savings' | 'expense' | 'debt')} className={inputCls}>
                 <option value="expense">Uitgave</option>
                 <option value="income">Inkomen</option>
@@ -1592,18 +1592,18 @@ function BudgetEditModal({
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Limiet</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Limiet</label>
               {isParent ? (
-                <div className={`${inputCls} cursor-not-allowed bg-zinc-50 text-zinc-500`}>
+                <div className={`${inputCls} cursor-not-allowed bg-[var(--subtle)] text-[var(--ink-3)]`}>
                   {formatCurrency(childrenLimitSum ?? 0)}
-                  <p className="mt-0.5 text-[10px] text-zinc-400">Som van sub-budgetten</p>
+                  <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">Som van sub-budgetten</p>
                 </div>
               ) : (
                 <input type="number" min="0" step="0.01" value={defaultLimit} onChange={(e) => setDefaultLimit(e.target.value)} className={inputCls} />
               )}
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Interval</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Interval</label>
               <select value={interval} onChange={(e) => setInterval(e.target.value as 'monthly' | 'quarterly' | 'yearly')} className={inputCls}>
                 <option value="monthly">Maandelijks</option>
                 <option value="quarterly">Per kwartaal</option>
@@ -1615,13 +1615,13 @@ function BudgetEditModal({
           {/* Effective month — only shown when limit is changed */}
           {limitChanged && (
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Ingangsmaand</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Ingangsmaand</label>
               <select value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} className={`${inputCls} capitalize`}>
                 {monthOptions.map((opt) => (
                   <option key={opt.value} value={opt.value} className="capitalize">{opt.label}</option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-zinc-400">
+              <p className="mt-1 text-xs text-[var(--ink-3)]">
                 Eerdere maanden behouden de oude limiet van {formatCurrency(Number(budget.default_limit))}
               </p>
             </div>
@@ -1630,7 +1630,7 @@ function BudgetEditModal({
           {/* Control row: Rollover + Limit type */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Overschot-beheer</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Overschot-beheer</label>
               <select value={rolloverType} onChange={(e) => setRolloverType(e.target.value as 'reset' | 'carry-over' | 'invest-sweep')} className={inputCls}>
                 <option value="reset">Reset</option>
                 <option value="carry-over">Doorschuiven</option>
@@ -1638,7 +1638,7 @@ function BudgetEditModal({
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Limiet-type</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Limiet-type</label>
               <select value={limitType} onChange={(e) => setLimitType(e.target.value as 'soft' | 'hard')} className={inputCls}>
                 <option value="soft">Zacht (waarschuwing)</option>
                 <option value="hard">Hard (blokkering)</option>
@@ -1649,7 +1649,7 @@ function BudgetEditModal({
           {/* Alert threshold + Max single */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Notificatie: {alertThreshold}%</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notificatie: {alertThreshold}%</label>
               <input
                 type="range" min="0" max="100"
                 value={alertThreshold}
@@ -1658,14 +1658,14 @@ function BudgetEditModal({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Max transactie</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Max transactie</label>
               <input type="number" min="0" step="0.01" value={maxSingleAmount} onChange={(e) => setMaxSingleAmount(e.target.value)} className={inputCls} placeholder="0 = geen limiet" />
             </div>
           </div>
 
           {/* Priority */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-600">Prioriteit</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Prioriteit</label>
             <div className="flex gap-1.5">
               {[1, 2, 3, 4, 5].map((score) => (
                 <button
@@ -1675,7 +1675,7 @@ function BudgetEditModal({
                   className={`flex h-8 w-8 items-center justify-center rounded-lg border text-xs font-medium transition-colors ${
                     priorityScore === score
                       ? 'border-kern-500 bg-kern-50 text-kern-700'
-                      : 'border-zinc-200 text-zinc-400 hover:border-zinc-300'
+                      : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)]'
                   }`}
                 >
                   {score}
@@ -1692,9 +1692,9 @@ function BudgetEditModal({
                 onClick={() => setIsEssential(!isEssential)}
                 className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${isEssential ? 'bg-kern-500' : 'bg-zinc-300'}`}
               >
-                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${isEssential ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-[var(--paper)] transition-transform ${isEssential ? 'translate-x-4' : 'translate-x-0.5'}`} />
               </button>
-              <span className="text-xs text-zinc-600">Essentieel</span>
+              <span className="text-xs text-[var(--ink-2)]">Essentieel</span>
             </label>
             <label className="flex cursor-pointer items-center gap-2">
               <button
@@ -1702,21 +1702,21 @@ function BudgetEditModal({
                 onClick={() => setIsInflationIndexed(!isInflationIndexed)}
                 className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${isInflationIndexed ? 'bg-kern-500' : 'bg-zinc-300'}`}
               >
-                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${isInflationIndexed ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-[var(--paper)] transition-transform ${isInflationIndexed ? 'translate-x-4' : 'translate-x-0.5'}`} />
               </button>
-              <span className="text-xs text-zinc-600">Inflatie-indexatie</span>
+              <span className="text-xs text-[var(--ink-2)]">Inflatie-indexatie</span>
             </label>
           </div>
 
           {/* Description */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-600">Beschrijving (optioneel)</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Beschrijving (optioneel)</label>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={inputCls} />
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-zinc-200 px-6 py-4">
-          <button onClick={handleClose} className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50">
+        <div className="flex justify-end gap-2 border-t border-[var(--border-ed)] px-6 py-4">
+          <button onClick={handleClose} className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]">
             Annuleren
           </button>
           <button

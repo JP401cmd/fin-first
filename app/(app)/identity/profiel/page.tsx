@@ -113,7 +113,7 @@ export default function ProfielPage() {
     return (
       <div className="mx-auto max-w-4xl px-6 py-12">
         <div className="flex items-center justify-center py-24">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--border-md)] border-t-zinc-900" />
         </div>
       </div>
     )
@@ -122,24 +122,24 @@ export default function ProfielPage() {
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
       <div className="mb-10">
-        <h1 className="text-3xl font-bold text-zinc-900">Profiel</h1>
-        <p className="mt-2 text-zinc-500">
+        <h1 className="text-3xl font-bold text-[var(--ink)]">Profiel</h1>
+        <p className="mt-2 text-[var(--ink-3)]">
           Je persoonlijke gegevens en huishoudprofiel.
         </p>
       </div>
 
       {/* ── Persoonlijke Gegevens ─────────────────────────────────── */}
-      <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+      <section className="mb-10 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 sm:p-8">
+        <h2 className="label-editorial text-[var(--ink-2)]">
           Persoonlijke Gegevens
         </h2>
-        <p className="mt-1 mb-6 text-sm text-zinc-500">
+        <p className="mt-1 mb-6 text-sm text-[var(--ink-3)]">
           Basisinformatie over jou en je huishouden.
         </p>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <div>
-            <label htmlFor="fullName" className="mb-1.5 block text-sm font-medium text-zinc-700">
+            <label htmlFor="fullName" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
               Volledige naam
             </label>
             <input
@@ -148,12 +148,12 @@ export default function ProfielPage() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="Je naam"
-              className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+              className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
             />
           </div>
 
           <div>
-            <label htmlFor="dob" className="mb-1.5 block text-sm font-medium text-zinc-700">
+            <label htmlFor="dob" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
               Geboortedatum
             </label>
             <input
@@ -161,12 +161,12 @@ export default function ProfielPage() {
               type="date"
               value={dateOfBirth}
               onChange={(e) => setDateOfBirth(e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+              className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
             />
           </div>
 
           <div>
-            <label htmlFor="country" className="mb-1.5 block text-sm font-medium text-zinc-700">
+            <label htmlFor="country" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
               Land
             </label>
             <input
@@ -175,12 +175,12 @@ export default function ProfielPage() {
               value={country}
               onChange={(e) => setCountry(e.target.value)}
               placeholder="NL"
-              className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+              className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
             />
           </div>
 
           <div>
-            <span className="mb-1.5 block text-sm font-medium text-zinc-700">
+            <span className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
               Huishouden
             </span>
             <div className="flex gap-2">
@@ -191,7 +191,7 @@ export default function ProfielPage() {
                   className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                     householdType === type
                       ? 'border-zinc-900 bg-zinc-900 text-white'
-                      : 'border-zinc-300 bg-zinc-50 text-zinc-600 hover:border-zinc-400'
+                      : 'border-[var(--border-md)] bg-[var(--subtle)] text-[var(--ink-2)] hover:border-zinc-400'
                   }`}
                 >
                   {type === 'solo' ? 'Solo' : type === 'samen' ? 'Samen' : 'Gezin'}
@@ -218,17 +218,17 @@ export default function ProfielPage() {
       </section>
 
       {/* ── Huishoudprofiel (NIBUD matching) ─────────────────────── */}
-      <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+      <section className="mb-10 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 sm:p-8">
+        <h2 className="label-editorial text-[var(--ink-2)]">
           Huishoudprofiel
         </h2>
-        <p className="mt-1 mb-6 text-sm text-zinc-500">
+        <p className="mt-1 mb-6 text-sm text-[var(--ink-3)]">
           Deze gegevens worden gebruikt voor je NIBUD Budget Gezondheidscheck.
         </p>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <div>
-            <label htmlFor="numChildren" className="mb-1.5 block text-sm font-medium text-zinc-700">
+            <label htmlFor="numChildren" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
               Aantal kinderen
             </label>
             <input
@@ -242,24 +242,24 @@ export default function ProfielPage() {
                 setNumberOfChildren(n)
                 if (n < childrenAges.length) setChildrenAges(childrenAges.slice(0, n))
               }}
-              className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+              className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
             />
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-zinc-700">
+            <label className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
               Leeftijden kinderen
             </label>
             <div className="mb-2 flex flex-wrap gap-1.5">
               {childrenAges.map((age, i) => (
                 <span
                   key={i}
-                  className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700"
+                  className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-[var(--ink-2)]"
                 >
                   {age} jaar
                   <button
                     onClick={() => setChildrenAges(childrenAges.filter((_, idx) => idx !== i))}
-                    className="ml-0.5 text-zinc-400 hover:text-zinc-600"
+                    className="ml-0.5 text-[var(--ink-3)] hover:text-[var(--ink-2)]"
                   >
                     &times;
                   </button>
@@ -275,7 +275,7 @@ export default function ProfielPage() {
                   value={childAgeInput}
                   onChange={(e) => setChildAgeInput(e.target.value)}
                   placeholder="Leeftijd"
-                  className="w-24 rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-1.5 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                  className="w-24 rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-1.5 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && childAgeInput) {
                       e.preventDefault()
@@ -291,7 +291,7 @@ export default function ProfielPage() {
                       setChildAgeInput('')
                     }
                   }}
-                  className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50"
+                  className="rounded-lg border border-[var(--border-md)] px-3 py-1.5 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)]"
                 >
                   Toevoegen
                 </button>
@@ -300,14 +300,14 @@ export default function ProfielPage() {
           </div>
 
           <div>
-            <label htmlFor="housingType" className="mb-1.5 block text-sm font-medium text-zinc-700">
+            <label htmlFor="housingType" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
               Woningtype
             </label>
             <select
               id="housingType"
               value={housingType ?? ''}
               onChange={(e) => setHousingType(e.target.value || null)}
-              className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+              className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
             >
               <option value="">Selecteer...</option>
               <option value="huur_sociaal">Huur (sociaal)</option>
@@ -317,14 +317,14 @@ export default function ProfielPage() {
           </div>
 
           <div>
-            <label htmlFor="energyLabel" className="mb-1.5 block text-sm font-medium text-zinc-700">
+            <label htmlFor="energyLabel" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
               Energielabel
             </label>
             <select
               id="energyLabel"
               value={energyLabel ?? ''}
               onChange={(e) => setEnergyLabel(e.target.value || null)}
-              className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+              className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
             >
               <option value="">Selecteer...</option>
               {['A++', 'A+', 'A', 'B', 'C', 'D', 'E', 'F', 'G'].map(label => (
@@ -334,7 +334,7 @@ export default function ProfielPage() {
           </div>
 
           <div>
-            <span className="mb-1.5 block text-sm font-medium text-zinc-700">Auto</span>
+            <span className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">Auto</span>
             <div className="flex gap-2">
               {[
                 { value: false, label: 'Nee' },
@@ -346,7 +346,7 @@ export default function ProfielPage() {
                   className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                     hasCar === opt.value
                       ? 'border-zinc-900 bg-zinc-900 text-white'
-                      : 'border-zinc-300 bg-zinc-50 text-zinc-600 hover:border-zinc-400'
+                      : 'border-[var(--border-md)] bg-[var(--subtle)] text-[var(--ink-2)] hover:border-zinc-400'
                   }`}
                 >
                   {opt.label}
@@ -356,12 +356,12 @@ export default function ProfielPage() {
           </div>
 
           <div>
-            <label htmlFor="netIncome" className="mb-1.5 block text-sm font-medium text-zinc-700">
+            <label htmlFor="netIncome" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
               Netto maandinkomen
-              <span className="ml-1 text-xs font-normal text-zinc-400">(optioneel)</span>
+              <span className="ml-1 text-xs font-normal text-[var(--ink-3)]">(optioneel)</span>
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-3)]">&euro;</span>
               <input
                 id="netIncome"
                 type="number"
@@ -370,10 +370,10 @@ export default function ProfielPage() {
                 value={netMonthlyIncome}
                 onChange={(e) => setNetMonthlyIncome(e.target.value)}
                 placeholder="0"
-                className="w-full rounded-lg border border-zinc-300 bg-zinc-50 py-2 pr-3 pl-7 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] py-2 pr-3 pl-7 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
               />
             </div>
-            <p className="mt-1 text-[10px] text-zinc-400">
+            <p className="mt-1 text-[10px] text-[var(--ink-3)]">
               Wordt gebruikt voor gepersonaliseerde NIBUD-berekeningen.
             </p>
           </div>
@@ -473,14 +473,14 @@ function ModuleColorSection() {
     && localColors.horizon === DEFAULT_MODULE_COLORS.horizon
 
   return (
-    <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
+    <section className="mb-10 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 sm:p-8">
       <div className="flex items-center gap-2">
-        <Palette className="h-4 w-4 text-zinc-400" />
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+        <Palette className="h-4 w-4 text-[var(--ink-3)]" />
+        <h2 className="label-editorial text-[var(--ink-2)]">
           Module Kleuren
         </h2>
       </div>
-      <p className="mt-1 mb-6 text-sm text-zinc-500">
+      <p className="mt-1 mb-6 text-sm text-[var(--ink-3)]">
         Kies een accentkleur per module. Alle tinten worden automatisch gegenereerd.
       </p>
 
@@ -495,7 +495,7 @@ function ModuleColorSection() {
               <div className="flex items-center gap-3 sm:w-44">
                 <label
                   htmlFor={`color-${key}`}
-                  className="relative flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-zinc-200 transition-shadow hover:shadow-md"
+                  className="relative flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-[var(--border-ed)] transition-shadow hover:shadow-md"
                   style={{ backgroundColor: hex }}
                 >
                   <input
@@ -507,9 +507,9 @@ function ModuleColorSection() {
                   />
                 </label>
                 <div>
-                  <span className="block text-sm font-medium text-zinc-700">{label}</span>
+                  <span className="block text-sm font-medium text-[var(--ink-2)]">{label}</span>
                   {key === 'wil' && (
-                    <span className="block text-[10px] text-zinc-400">Identiteit volgt De Wil</span>
+                    <span className="block text-[10px] text-[var(--ink-3)]">Identiteit volgt De Wil</span>
                   )}
                 </div>
               </div>
@@ -527,7 +527,7 @@ function ModuleColorSection() {
               </div>
 
               {/* Hex value */}
-              <span className="hidden text-[11px] font-mono text-zinc-400 sm:block">
+              <span className="hidden text-[11px] font-mono text-[var(--ink-3)] sm:block">
                 {hex}
               </span>
             </div>
@@ -546,7 +546,7 @@ function ModuleColorSection() {
         {!isDefault && (
           <button
             onClick={handleReset}
-            className="flex items-center gap-1.5 rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-600 transition-colors hover:bg-zinc-50"
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--border-md)] px-4 py-2 text-sm text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             Reset

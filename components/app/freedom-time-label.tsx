@@ -262,7 +262,7 @@ export function FreedomTimeLabel({
           </span>
         )}
         {timeAnnotation && !loading && (
-          <span className={`flex items-center gap-1 text-sm italic font-normal text-zinc-500 ${timeClassName}`} data-testid="freedom-time-label-time">
+          <span className={`flex items-center gap-1 text-sm italic font-normal text-[var(--ink-3)] ${timeClassName}`} data-testid="freedom-time-label-time">
             {showIcon && <Clock className="h-3 w-3" />}
             ≈ {timeAnnotation}
           </span>
@@ -279,7 +279,7 @@ export function FreedomTimeLabel({
         </span>
       )}
       {timeAnnotation && !loading && (
-        <span className={`inline-flex items-center gap-0.5 text-sm italic font-normal text-zinc-500 ${timeClassName}`} data-testid="freedom-time-label-time">
+        <span className={`inline-flex items-center gap-0.5 text-sm italic font-normal text-[var(--ink-3)] ${timeClassName}`} data-testid="freedom-time-label-time">
           {showIcon && <Clock className="h-3 w-3" />}
           <span>≈ {timeAnnotation}</span>
         </span>
@@ -312,7 +312,7 @@ export function FreedomTimeBadge({
   return (
     <span className={`inline-flex items-center gap-1 rounded-full bg-kern-50 px-2 py-0.5 text-xs font-medium text-kern-700 ${className}`}>
       {showIcon && <Clock className="h-3 w-3" />}
-      {freedom.formatted} vrijheid
+      <span className="font-mono">{freedom.formatted}</span> vrijheid
     </span>
   )
 }

@@ -62,20 +62,20 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
     <BottomSheet open={true} onClose={onClose} title="FIRE Voorspelling">
         <div className="space-y-6 px-6 py-6">
           {/* Range display */}
-          <section className="rounded-2xl border border-horizon-200 bg-horizon-50 p-6">
+          <section className="rounded-[var(--r-lg)] border border-horizon-200 bg-horizon-50 p-6">
             <div>
               {range.optimistic.fireAge !== null && range.pessimistic.fireAge !== null ? (
                 <>
-                  <p className="text-sm text-zinc-600">
+                  <p className="text-sm text-[var(--ink-2)]">
                     FIRE tussen <span className="font-bold text-horizon-700">{Math.round(range.optimistic.fireAge)}</span> en{' '}
                     <span className="font-bold text-horizon-700">{Math.round(range.pessimistic.fireAge)}</span> jaar
                     {fire.fireAge !== null && (
-                      <span className="text-zinc-500"> (meest waarschijnlijk: <span className="font-bold">{Math.round(fire.fireAge)}</span>)</span>
+                      <span className="text-[var(--ink-3)]"> (meest waarschijnlijk: <span className="font-bold">{Math.round(fire.fireAge)}</span>)</span>
                     )}
                   </p>
                   {/* Range bar */}
                   <div className="mt-3 flex items-center gap-2">
-                    <span className="text-xs text-zinc-400">{Math.round(range.optimistic.fireAge!)}</span>
+                    <span className="text-xs text-[var(--ink-3)]">{Math.round(range.optimistic.fireAge!)}</span>
                     <div className="relative h-4 flex-1 overflow-hidden rounded-full bg-zinc-200">
                       <div className="absolute inset-0 rounded-full bg-gradient-to-r from-horizon-400 via-horizon-500 to-horizon-300" />
                       {fire.fireAge !== null && (() => {
@@ -85,50 +85,50 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
                         const markerPos = ((Math.round(fire.fireAge) - min) / totalRange) * 100
                         return (
                           <div
-                            className="absolute top-0 h-full w-1 bg-white shadow"
+                            className="absolute top-0 h-full w-1 bg-[var(--paper)] shadow"
                             style={{ left: `${Math.min(Math.max(markerPos, 2), 98)}%` }}
                           />
                         )
                       })()}
                     </div>
-                    <span className="text-xs text-zinc-400">{Math.round(range.pessimistic.fireAge!)}</span>
+                    <span className="text-xs text-[var(--ink-3)]">{Math.round(range.pessimistic.fireAge!)}</span>
                   </div>
                 </>
               ) : (
-                <p className="text-sm text-zinc-600">{fire.fireDate}</p>
+                <p className="text-sm text-[var(--ink-2)]">{fire.fireDate}</p>
               )}
             </div>
 
             {/* Countdown */}
-            <div className="mt-6 rounded-xl bg-white p-6 text-center">
-              <p className="text-sm font-medium text-zinc-500">Aftellen tot FIRE</p>
+            <div className="mt-6 rounded-[var(--r-lg)] bg-[var(--paper)] p-6 text-center">
+              <p className="text-sm font-medium text-[var(--ink-3)]">Aftellen tot FIRE</p>
               <p className="mt-2 text-5xl font-bold text-horizon-700">
                 {fire.countdownDays > 0 ? fire.countdownDays.toLocaleString('nl-NL') : '0'}
               </p>
-              <p className="mt-1 text-sm text-zinc-400">dagen</p>
+              <p className="mt-1 text-sm text-[var(--ink-3)]">dagen</p>
             </div>
           </section>
 
           {/* Scenario sliders */}
-          <section className="rounded-xl border border-zinc-200 bg-white p-6">
-            <h2 className="text-sm font-semibold text-zinc-700">Alternatieve scenario&apos;s</h2>
-            <p className="mt-1 text-xs text-zinc-400">Pas aan en zie het effect op je FIRE-datum</p>
+          <section className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6">
+            <h2 className="text-sm font-semibold text-[var(--ink-2)]">Alternatieve scenario&apos;s</h2>
+            <p className="mt-1 text-xs text-[var(--ink-3)]">Pas aan en zie het effect op je FIRE-datum</p>
 
             <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
-                <label className="text-xs font-medium text-zinc-500">Werkweek: {workDays} dagen</label>
+                <label className="text-xs font-medium text-[var(--ink-3)]">Werkweek: {workDays} dagen</label>
                 <input
                   type="range" min={1} max={5} step={1} value={workDays}
                   onChange={e => setWorkDays(Number(e.target.value))}
                   className="mt-1 w-full accent-horizon-600"
                 />
-                <div className="flex justify-between text-[10px] text-zinc-400">
+                <div className="flex justify-between text-[10px] text-[var(--ink-3)]">
                   <span>1 dag</span><span>5 dagen</span>
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-medium text-zinc-500">
+                <label className="text-xs font-medium text-[var(--ink-3)]">
                   Extra maandelijkse inleg: {formatCurrency(extraMonthly)}
                 </label>
                 <input
@@ -136,7 +136,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
                   onChange={e => setExtraMonthly(Number(e.target.value))}
                   className="mt-1 w-full accent-horizon-600"
                 />
-                <div className="flex justify-between text-[10px] text-zinc-400">
+                <div className="flex justify-between text-[10px] text-[var(--ink-3)]">
                   <span>{formatCurrency(0)}</span><span>{formatCurrency(2000)}</span>
                 </div>
               </div>
@@ -153,9 +153,9 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
             </button>
 
             {showParams && (
-              <div className="mt-3 grid grid-cols-1 gap-4 border-t border-zinc-100 pt-4 sm:grid-cols-3">
+              <div className="mt-3 grid grid-cols-1 gap-4 border-t border-[var(--border-ed)] pt-4 sm:grid-cols-3">
                 <div>
-                  <label className="text-xs font-medium text-zinc-500">SWR: {swr}%</label>
+                  <label className="text-xs font-medium text-[var(--ink-3)]">SWR: {swr}%</label>
                   <input
                     type="range" min={3} max={5} step={0.5} value={swr}
                     onChange={e => setSwr(Number(e.target.value))}
@@ -163,7 +163,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-zinc-500">Verwacht rendement: {returnRate}%</label>
+                  <label className="text-xs font-medium text-[var(--ink-3)]">Verwacht rendement: {returnRate}%</label>
                   <input
                     type="range" min={2} max={12} step={0.5} value={returnRate}
                     onChange={e => setReturnRate(Number(e.target.value))}
@@ -171,7 +171,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-zinc-500">Inflatie: {inflation}%</label>
+                  <label className="text-xs font-medium text-[var(--ink-3)]">Inflatie: {inflation}%</label>
                   <input
                     type="range" min={1} max={4} step={0.5} value={inflation}
                     onChange={e => setInflation(Number(e.target.value))}
@@ -186,14 +186,14 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
           {/* Projection chart with 3 lines */}
           <section>
             <div className="mb-4">
-              <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+              <h2 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
                 Projectiegrafiek
               </h2>
-              <p className="mt-1 text-sm text-zinc-500">
+              <p className="mt-1 text-sm text-[var(--ink-3)]">
                 Optimistisch, verwacht en pessimistisch pad naar FIRE
               </p>
             </div>
-            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
+            <div className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
               <ThreeLineChart input={input} returnRate={returnRate} extraMonthly={extraMonthly} workDays={workDays} fireTarget={fire.fireTarget} swr={swr} />
             </div>
           </section>

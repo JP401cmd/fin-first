@@ -9,8 +9,8 @@ import { DEBT_TYPE_LABELS } from '@/lib/debt-data'
 function Tooltip({ text }: { text: string }) {
   return (
     <div className="group relative inline-block">
-      <Info className="h-3.5 w-3.5 cursor-help text-zinc-300 transition-colors group-hover:text-kern-500" />
-      <div className="pointer-events-none absolute right-0 z-10 mt-1 w-52 rounded-lg border border-zinc-200 bg-white p-2.5 text-xs leading-relaxed text-zinc-600 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+      <Info className="h-3.5 w-3.5 cursor-help text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
+      <div className="pointer-events-none absolute right-0 z-10 mt-1 w-52 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-2.5 text-xs leading-relaxed text-[var(--ink-2)] opacity-0 shadow-[var(--s2)] transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
         {text}
       </div>
     </div>
@@ -37,10 +37,10 @@ const CATEGORY_CONFIG = {
   uitgesloten: {
     label: 'Niet in Box 3',
     icon: Ban,
-    bg: 'bg-zinc-50',
-    text: 'text-zinc-500',
-    border: 'border-zinc-200',
-    badge: 'bg-zinc-100 text-zinc-600',
+    bg: 'bg-[var(--subtle)]',
+    text: 'text-[var(--ink-3)]',
+    border: 'border-[var(--border-ed)]',
+    badge: 'bg-zinc-100 text-[var(--ink-2)]',
   },
 } as const
 
@@ -71,7 +71,7 @@ export function Box3Classification({
         const config = CATEGORY_CONFIG[group.key]
         const Icon = config.icon
         return (
-          <div key={group.key} className={`rounded-xl border ${config.border} ${config.bg} p-4`}>
+          <div key={group.key} className={`rounded-[var(--r-lg)] border ${config.border} ${config.bg} p-4`}>
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Icon className={`h-4 w-4 ${config.text}`} />
@@ -80,26 +80,26 @@ export function Box3Classification({
                   {group.items.length} assets
                 </span>
               </div>
-              <span className="text-sm font-bold text-zinc-900">{formatCurrency(group.total)}</span>
+              <span className="text-sm font-bold text-[var(--ink)]">{formatCurrency(group.total)}</span>
             </div>
             {group.items.length === 0 ? (
-              <p className="text-xs text-zinc-400">Geen assets in deze categorie</p>
+              <p className="text-xs text-[var(--ink-3)]">Geen assets in deze categorie</p>
             ) : (
               <div className="space-y-1.5">
                 {group.items.map(ac => (
-                  <div key={ac.asset.id} className="flex items-center justify-between rounded-lg bg-white/60 px-3 py-2">
+                  <div key={ac.asset.id} className="flex items-center justify-between rounded-lg bg-[var(--paper)]/60 px-3 py-2">
                     <div className="flex items-center gap-2">
                       <div
                         className="h-2 w-2 rounded-full"
                         style={{ backgroundColor: ASSET_TYPE_COLORS[ac.asset.asset_type] }}
                       />
-                      <span className="text-sm text-zinc-700">{ac.asset.name}</span>
-                      <span className="text-[10px] text-zinc-400">
+                      <span className="text-sm text-[var(--ink-2)]">{ac.asset.name}</span>
+                      <span className="text-[10px] text-[var(--ink-3)]">
                         {ASSET_TYPE_LABELS[ac.asset.asset_type]}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-zinc-900">
+                      <span className="text-sm font-medium text-[var(--ink)]">
                         {formatCurrency(Number(ac.asset.current_value))}
                       </span>
                       {ac.exclusionReason && (
@@ -117,24 +117,24 @@ export function Box3Classification({
       {/* Debts */}
       {(box3Schulden.length > 0 || uitgeslSchulden.length > 0) && (
         <div className="mt-4">
-          <h4 className="mb-2 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          <h4 className="mb-2 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
             Schulden
           </h4>
           <div className="space-y-3">
             {box3Schulden.length > 0 && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+              <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-4">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-sm font-semibold text-red-700">In Box 3</span>
-                  <span className="text-sm font-bold text-zinc-900">
+                  <span className="text-sm font-bold text-[var(--ink)]">
                     {formatCurrency(box3Schulden.reduce((s, dc) => s + Number(dc.debt.current_balance), 0))}
                   </span>
                 </div>
                 <div className="space-y-1.5">
                   {box3Schulden.map(dc => (
-                    <div key={dc.debt.id} className="flex items-center justify-between rounded-lg bg-white/60 px-3 py-2">
+                    <div key={dc.debt.id} className="flex items-center justify-between rounded-lg bg-[var(--paper)]/60 px-3 py-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-zinc-700">{dc.debt.name}</span>
-                        <span className="text-[10px] text-zinc-400">
+                        <span className="text-sm text-[var(--ink-2)]">{dc.debt.name}</span>
+                        <span className="text-[10px] text-[var(--ink-3)]">
                           {DEBT_TYPE_LABELS[dc.debt.debt_type]}
                         </span>
                       </div>
@@ -148,24 +148,24 @@ export function Box3Classification({
             )}
 
             {uitgeslSchulden.length > 0 && (
-              <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+              <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-sm font-semibold text-zinc-500">Niet in Box 3</span>
-                  <span className="text-sm font-bold text-zinc-900">
+                  <span className="text-sm font-semibold text-[var(--ink-3)]">Niet in Box 3</span>
+                  <span className="text-sm font-bold text-[var(--ink)]">
                     {formatCurrency(uitgeslSchulden.reduce((s, dc) => s + Number(dc.debt.current_balance), 0))}
                   </span>
                 </div>
                 <div className="space-y-1.5">
                   {uitgeslSchulden.map(dc => (
-                    <div key={dc.debt.id} className="flex items-center justify-between rounded-lg bg-white/60 px-3 py-2">
+                    <div key={dc.debt.id} className="flex items-center justify-between rounded-lg bg-[var(--paper)]/60 px-3 py-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-zinc-700">{dc.debt.name}</span>
-                        <span className="text-[10px] text-zinc-400">
+                        <span className="text-sm text-[var(--ink-2)]">{dc.debt.name}</span>
+                        <span className="text-[10px] text-[var(--ink-3)]">
                           {DEBT_TYPE_LABELS[dc.debt.debt_type]}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-zinc-600">
+                        <span className="text-sm font-medium text-[var(--ink-2)]">
                           {formatCurrency(Number(dc.debt.current_balance))}
                         </span>
                         {dc.exclusionReason && (

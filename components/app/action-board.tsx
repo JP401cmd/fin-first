@@ -111,12 +111,12 @@ export function ActionBoard({ initialActions }: ActionBoardProps) {
 
   if (actions.length === 0 && !showForm) {
     return (
-      <div className="rounded-2xl border border-wil-200 bg-wil-50 p-8 text-center">
+      <div className="rounded-[var(--r-lg)] border border-wil-200 bg-wil-50 p-8 text-center">
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-wil-100">
           <Sparkles className="h-6 w-6 text-wil-600" />
         </div>
-        <h2 className="mb-2 text-xl font-bold text-zinc-900">Nog geen acties</h2>
-        <p className="mb-6 text-zinc-500">
+        <h2 className="mb-2 text-xl font-bold text-[var(--ink)]">Nog geen acties</h2>
+        <p className="mb-6 text-[var(--ink-3)]">
           Maak handmatig een actie aan of bekijk de suggesties hierboven.
         </p>
         <button
@@ -140,7 +140,7 @@ export function ActionBoard({ initialActions }: ActionBoardProps) {
         <button
           type="button"
           onClick={() => setShowForm(true)}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-wil-200 px-4 py-3 text-sm font-medium text-wil-600 transition-colors hover:border-wil-300 hover:bg-wil-50"
+          className="flex w-full items-center justify-center gap-2 rounded-[var(--r-lg)] border-2 border-dashed border-wil-200 px-4 py-3 text-sm font-medium text-wil-600 transition-colors hover:border-wil-300 hover:bg-wil-50"
         >
           <Plus className="h-4 w-4" />
           Nieuwe actie
@@ -151,7 +151,7 @@ export function ActionBoard({ initialActions }: ActionBoardProps) {
       {openActions.length > 0 && (
         <div>
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-zinc-900">
+            <h3 className="text-sm font-semibold text-[var(--ink)]">
               Open ({openActions.length})
             </h3>
             {totalOpenDays > 0 && (
@@ -217,7 +217,7 @@ export function ActionBoard({ initialActions }: ActionBoardProps) {
 
       {/* Rejected actions (always collapsed, subtle) */}
       {rejectedActions.length > 0 && (
-        <div className="text-xs text-zinc-400">
+        <div className="text-xs text-[var(--ink-3)]">
           {rejectedActions.length} {rejectedActions.length === 1 ? 'actie' : 'acties'} geweigerd
         </div>
       )}

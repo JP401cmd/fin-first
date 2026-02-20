@@ -363,14 +363,14 @@ export function BudgetForm({
         <a
           href="/core/budgets"
           onClick={(e) => handleNavClick(e, '/core/budgets')}
-          className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-700"
+          className="inline-flex items-center gap-1.5 text-sm text-[var(--ink-3)] hover:text-[var(--ink-2)]"
         >
           <ArrowLeft className="h-4 w-4" />
           Terug naar budgetten
         </a>
       </div>
 
-      <h1 className="mb-8 text-2xl font-bold text-zinc-900">
+      <h1 className="mb-8 text-2xl font-bold text-[var(--ink)]">
         {budget ? 'Budget bewerken' : 'Nieuw budget'}
       </h1>
 
@@ -456,14 +456,14 @@ export function BudgetForm({
 
       {/* === Identiteit === */}
       <fieldset className="mb-8">
-        <legend className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+        <legend className="mb-4 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
           Identiteit
         </legend>
         <div className="space-y-4">
           {/* Categorie-naam (alleen bij nieuw standalone budget) */}
           {needsAutoParent && (
             <div>
-              <label htmlFor="category_name" className="mb-1.5 block text-sm font-medium text-zinc-700">
+              <label htmlFor="category_name" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                 Categorie-naam
               </label>
               <input
@@ -471,11 +471,11 @@ export function BudgetForm({
                 type="text"
                 value={categoryName}
                 onChange={(e) => setCategoryName(e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 placeholder="bijv. Abonnementen"
                 required
               />
-              <p className="mt-1 text-xs text-zinc-400">
+              <p className="mt-1 text-xs text-[var(--ink-3)]">
                 De overkoepelende categorie (hoofdbudget)
               </p>
             </div>
@@ -483,7 +483,7 @@ export function BudgetForm({
 
           {/* Naam */}
           <div>
-            <label htmlFor="name" className="mb-1.5 block text-sm font-medium text-zinc-700">
+            <label htmlFor="name" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
               {needsAutoParent ? 'Sub-budget naam' : 'Naam'}
             </label>
             <input
@@ -491,13 +491,13 @@ export function BudgetForm({
               type="text"
               value={form.name}
               onChange={(e) => update('name', e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+              className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               placeholder={needsAutoParent ? 'bijv. Streaming' : 'bijv. Boodschappen'}
               required
               data-testid="budget-name-input"
             />
             {needsAutoParent && (
-              <p className="mt-1 text-xs text-zinc-400">
+              <p className="mt-1 text-xs text-[var(--ink-3)]">
                 Het specifieke sub-budget binnen de categorie
               </p>
             )}
@@ -505,7 +505,7 @@ export function BudgetForm({
 
           {/* Icoon */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-zinc-700">
+            <label className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
               Icoon
             </label>
             <div className="flex flex-wrap gap-1.5">
@@ -520,7 +520,7 @@ export function BudgetForm({
                     className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-colors ${
                       isSelected
                         ? 'border-kern-500 bg-kern-50 text-kern-600'
-                        : 'border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'
+                        : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
                     }`}
                     title={iconName}
                   >
@@ -533,14 +533,14 @@ export function BudgetForm({
 
           {/* Beschrijving */}
           <div>
-            <label htmlFor="description" className="mb-1.5 block text-sm font-medium text-zinc-700">
+            <label htmlFor="description" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
               Beschrijving
             </label>
             <textarea
               id="description"
               value={form.description}
               onChange={(e) => update('description', e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+              className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               rows={2}
               placeholder="Optionele beschrijving..."
             />
@@ -550,7 +550,7 @@ export function BudgetForm({
 
       {/* === Eigendom === */}
       <fieldset className="mb-8">
-        <legend className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+        <legend className="mb-4 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
           Eigendom
         </legend>
         <OwnershipToggle
@@ -562,20 +562,20 @@ export function BudgetForm({
 
       {/* === Financieel === */}
       <fieldset className="mb-8">
-        <legend className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+        <legend className="mb-4 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
           Financieel
         </legend>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {/* Type */}
           <div>
-            <label htmlFor="budget_type" className="mb-1.5 block text-sm font-medium text-zinc-700">
+            <label htmlFor="budget_type" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
               Type
             </label>
             <select
               id="budget_type"
               value={form.budget_type}
               onChange={(e) => update('budget_type', e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+              className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               data-testid="budget-type-select"
             >
               <option value="expense">Uitgave</option>
@@ -587,7 +587,7 @@ export function BudgetForm({
 
           {/* Limiet */}
           <div>
-            <label htmlFor="default_limit" className="mb-1.5 block text-sm font-medium text-zinc-700">
+            <label htmlFor="default_limit" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
               Limiet (&euro;)
             </label>
             <input
@@ -597,7 +597,7 @@ export function BudgetForm({
               step="0.01"
               value={form.default_limit}
               onChange={(e) => update('default_limit', e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+              className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               placeholder="0"
               data-testid="budget-limit-input"
             />
@@ -605,14 +605,14 @@ export function BudgetForm({
 
           {/* Interval */}
           <div>
-            <label htmlFor="interval" className="mb-1.5 block text-sm font-medium text-zinc-700">
+            <label htmlFor="interval" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
               Interval
             </label>
             <select
               id="interval"
               value={form.interval}
               onChange={(e) => update('interval', e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+              className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               data-testid="budget-interval-select"
             >
               <option value="monthly">Maandelijks</option>
@@ -623,14 +623,14 @@ export function BudgetForm({
 
           {/* Overschot-beheer */}
           <div>
-            <label htmlFor="rollover_type" className="mb-1.5 block text-sm font-medium text-zinc-700">
+            <label htmlFor="rollover_type" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
               Overschot-beheer
             </label>
             <select
               id="rollover_type"
               value={form.rollover_type}
               onChange={(e) => update('rollover_type', e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+              className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               data-testid="budget-rollover-select"
             >
               <option value="reset">Reset</option>
@@ -643,21 +643,21 @@ export function BudgetForm({
 
       {/* === Controle === */}
       <fieldset className="mb-8">
-        <legend className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+        <legend className="mb-4 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
           Controle
         </legend>
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* Limiet-type */}
             <div>
-              <label htmlFor="limit_type" className="mb-1.5 block text-sm font-medium text-zinc-700">
+              <label htmlFor="limit_type" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                 Limiet-type
               </label>
               <select
                 id="limit_type"
                 value={form.limit_type}
                 onChange={(e) => update('limit_type', e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 data-testid="budget-limit-type-select"
               >
                 <option value="soft">Zacht (waarschuwing)</option>
@@ -667,7 +667,7 @@ export function BudgetForm({
 
             {/* Max transactiebedrag */}
             <div>
-              <label htmlFor="max_single" className="mb-1.5 block text-sm font-medium text-zinc-700">
+              <label htmlFor="max_single" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                 Max transactiebedrag (&euro;)
               </label>
               <input
@@ -677,7 +677,7 @@ export function BudgetForm({
                 step="0.01"
                 value={form.max_single_transaction_amount}
                 onChange={(e) => update('max_single_transaction_amount', e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 placeholder="0 = geen limiet"
                 data-testid="budget-max-transaction-input"
               />
@@ -686,7 +686,7 @@ export function BudgetForm({
 
           {/* Notificatiedrempel */}
           <div>
-            <label htmlFor="alert_threshold" className="mb-1.5 block text-sm font-medium text-zinc-700">
+            <label htmlFor="alert_threshold" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
               Notificatiedrempel: {form.alert_threshold}%
             </label>
             <input
@@ -699,7 +699,7 @@ export function BudgetForm({
               className="w-full accent-kern-500"
               data-testid="budget-alert-threshold"
             />
-            <div className="mt-1 flex justify-between text-xs text-zinc-400">
+            <div className="mt-1 flex justify-between text-xs text-[var(--ink-3)]">
               <span>0%</span>
               <span>50%</span>
               <span>100%</span>
@@ -710,15 +710,15 @@ export function BudgetForm({
 
       {/* === Behandeling === */}
       <fieldset className="mb-8">
-        <legend className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+        <legend className="mb-4 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
           Behandeling
         </legend>
         <div className="space-y-4">
           {/* Essentieel toggle */}
-          <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3">
+          <div className="flex items-center justify-between rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3">
             <div>
-              <p className="text-sm font-medium text-zinc-700">Essentieel</p>
-              <p className="text-xs text-zinc-500">Deze uitgave is noodzakelijk voor het dagelijks leven</p>
+              <p className="text-sm font-medium text-[var(--ink-2)]">Essentieel</p>
+              <p className="text-xs text-[var(--ink-3)]">Deze uitgave is noodzakelijk voor het dagelijks leven</p>
             </div>
             <button
               type="button"
@@ -728,7 +728,7 @@ export function BudgetForm({
               }`}
             >
               <span
-                className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                className={`inline-block h-4 w-4 rounded-full bg-[var(--paper)] transition-transform ${
                   form.is_essential ? 'translate-x-6' : 'translate-x-1'
                 }`}
               />
@@ -737,7 +737,7 @@ export function BudgetForm({
 
           {/* Prioriteit */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-zinc-700">
+            <label className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
               Prioriteit
             </label>
             <div className="flex gap-2">
@@ -749,23 +749,23 @@ export function BudgetForm({
                   className={`flex h-10 w-10 items-center justify-center rounded-lg border text-sm font-medium transition-colors ${
                     form.priority_score === score
                       ? 'border-kern-500 bg-kern-50 text-kern-700'
-                      : 'border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300'
+                      : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-[var(--border-md)]'
                   }`}
                 >
                   {score}
                 </button>
               ))}
             </div>
-            <p className="mt-1.5 text-xs text-zinc-400">
+            <p className="mt-1.5 text-xs text-[var(--ink-3)]">
               1 = laagste prioriteit, 5 = hoogste prioriteit
             </p>
           </div>
 
           {/* Inflatie-indexatie toggle */}
-          <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3">
+          <div className="flex items-center justify-between rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3">
             <div>
-              <p className="text-sm font-medium text-zinc-700">Inflatie-indexatie</p>
-              <p className="text-xs text-zinc-500">Limiet jaarlijks automatisch corrigeren voor inflatie</p>
+              <p className="text-sm font-medium text-[var(--ink-2)]">Inflatie-indexatie</p>
+              <p className="text-xs text-[var(--ink-3)]">Limiet jaarlijks automatisch corrigeren voor inflatie</p>
             </div>
             <button
               type="button"
@@ -775,7 +775,7 @@ export function BudgetForm({
               }`}
             >
               <span
-                className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                className={`inline-block h-4 w-4 rounded-full bg-[var(--paper)] transition-transform ${
                   form.is_inflation_indexed ? 'translate-x-6' : 'translate-x-1'
                 }`}
               />
@@ -786,18 +786,18 @@ export function BudgetForm({
 
       {/* === Hiërarchie === */}
       <fieldset className="mb-8">
-        <legend className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+        <legend className="mb-4 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
           Hiërarchie
         </legend>
         <div>
-          <label htmlFor="parent_id" className="mb-1.5 block text-sm font-medium text-zinc-700">
+          <label htmlFor="parent_id" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
             Bestaande categorie
           </label>
           <select
             id="parent_id"
             value={form.parent_id}
             onChange={(e) => update('parent_id', e.target.value)}
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+            className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
             data-testid="budget-parent-select"
           >
             <option value="">Nieuwe categorie aanmaken</option>
@@ -810,7 +810,7 @@ export function BudgetForm({
               ))}
           </select>
           {!form.parent_id && !budget && (
-            <p className="mt-1 text-xs text-zinc-400">
+            <p className="mt-1 text-xs text-[var(--ink-3)]">
               Er wordt automatisch een nieuwe categorie aangemaakt met een sub-budget
             </p>
           )}
@@ -818,11 +818,11 @@ export function BudgetForm({
       </fieldset>
 
       {/* Submit */}
-      <div className="flex items-center justify-end gap-3 border-t border-zinc-200 pt-6">
+      <div className="flex items-center justify-end gap-3 border-t border-[var(--border-ed)] pt-6">
         <a
           href="/core/budgets"
           onClick={(e) => handleNavClick(e, '/core/budgets')}
-          className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
         >
           Annuleren
         </a>

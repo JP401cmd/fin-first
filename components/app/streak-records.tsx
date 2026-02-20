@@ -57,16 +57,16 @@ export function StreakRecords() {
     return (
       <div className="animate-pulse space-y-3" data-testid="streak-records-loading">
         <div className="h-4 w-32 bg-zinc-100 rounded" />
-        <div className="h-16 bg-zinc-50 rounded-lg" />
-        <div className="h-16 bg-zinc-50 rounded-lg" />
-        <div className="h-16 bg-zinc-50 rounded-lg" />
+        <div className="h-16 bg-[var(--subtle)] rounded-lg" />
+        <div className="h-16 bg-[var(--subtle)] rounded-lg" />
+        <div className="h-16 bg-[var(--subtle)] rounded-lg" />
       </div>
     )
   }
 
   if (error || !data) {
     return (
-      <div className="text-sm text-zinc-400" data-testid="streak-records-error">
+      <div className="text-sm text-[var(--ink-3)]" data-testid="streak-records-error">
         Kon streak-gegevens niet laden.
       </div>
     )
@@ -137,7 +137,7 @@ export function StreakRecords() {
         {streaks.map(s => (
           <div
             key={s.key}
-            className={`rounded-xl border ${s.borderColor} ${s.bgColor} p-4`}
+            className={`rounded-[var(--r-lg)] border ${s.borderColor} ${s.bgColor} p-4`}
             data-testid={`streak-record-${s.key}`}
           >
             <div className="flex items-center gap-2 mb-2">
@@ -149,14 +149,14 @@ export function StreakRecords() {
               <span className={`text-2xl font-bold ${s.accentColor}`} data-testid={`streak-record-${s.key}-current`}>
                 {s.data.current_count}
               </span>
-              <span className="text-xs text-zinc-500">
+              <span className="text-xs text-[var(--ink-3)]">
                 {s.data.current_count === 1 ? 'week' : 'weken'} huidig
               </span>
             </div>
 
-            <div className="flex items-center gap-1 text-xs text-zinc-500">
+            <div className="flex items-center gap-1 text-xs text-[var(--ink-3)]">
               <span>Langste:</span>
-              <span className="font-semibold text-zinc-700" data-testid={`streak-record-${s.key}-longest`}>
+              <span className="font-semibold text-[var(--ink-2)]" data-testid={`streak-record-${s.key}-longest`}>
                 {s.data.longest_count}
               </span>
               <span>{s.data.longest_count === 1 ? 'week' : 'weken'}</span>
@@ -169,7 +169,7 @@ export function StreakRecords() {
             )}
 
             {s.data.last_activity_date && (
-              <div className="mt-1 text-xs text-zinc-400">
+              <div className="mt-1 text-xs text-[var(--ink-3)]">
                 Laatst: {new Date(s.data.last_activity_date + 'T00:00:00Z').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
               </div>
             )}

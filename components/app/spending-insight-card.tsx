@@ -16,7 +16,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
 
 const SEVERITY_STYLES: Record<string, { bg: string; border: string; iconBg: string; iconColor: string; badge: string; badgeBg: string }> = {
   info: {
-    bg: 'bg-white',
+    bg: 'bg-[var(--paper)]',
     border: 'border-blue-100',
     iconBg: 'bg-blue-50',
     iconColor: 'text-blue-600',
@@ -24,7 +24,7 @@ const SEVERITY_STYLES: Record<string, { bg: string; border: string; iconBg: stri
     badgeBg: 'bg-blue-50',
   },
   positive: {
-    bg: 'bg-white',
+    bg: 'bg-[var(--paper)]',
     border: 'border-emerald-100',
     iconBg: 'bg-emerald-50',
     iconColor: 'text-emerald-600',
@@ -32,7 +32,7 @@ const SEVERITY_STYLES: Record<string, { bg: string; border: string; iconBg: stri
     badgeBg: 'bg-emerald-50',
   },
   warning: {
-    bg: 'bg-white',
+    bg: 'bg-[var(--paper)]',
     border: 'border-amber-100',
     iconBg: 'bg-amber-50',
     iconColor: 'text-amber-600',
@@ -50,7 +50,7 @@ function SpendingInsightCard({ insight }: { insight: SpendingInsight }) {
 
   return (
     <div
-      className={`rounded-xl border ${style.border} ${style.bg} p-4 transition-all hover:shadow-sm`}
+      className={`rounded-[var(--r-lg)] border ${style.border} ${style.bg} p-4 transition-all hover:shadow-[var(--s0)]`}
       data-testid={`spending-insight-${insight.id}`}
     >
       <div className="flex items-start gap-3">
@@ -69,10 +69,10 @@ function SpendingInsightCard({ insight }: { insight: SpendingInsight }) {
               </span>
             )}
           </div>
-          <p className="mt-1 text-sm leading-relaxed text-zinc-600">{insight.description}</p>
+          <p className="mt-1 text-sm leading-relaxed text-[var(--ink-2)]">{insight.description}</p>
 
           {/* Details row */}
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[var(--ink-3)]">
             {pattern.averageAmount && (
               <span>
                 Gem. €{Math.round(pattern.averageAmount).toLocaleString('nl-NL')}/mnd
@@ -121,7 +121,7 @@ export function SpendingInsightsSection({
     return (
       <div className="animate-pulse space-y-3" data-testid="spending-insights-loading">
         {[1, 2, 3].map(i => (
-          <div key={i} className="h-20 rounded-xl bg-zinc-100" />
+          <div key={i} className="h-20 rounded-[var(--r-lg)] bg-zinc-100" />
         ))}
       </div>
     )
@@ -129,10 +129,10 @@ export function SpendingInsightsSection({
 
   if (insights.length === 0 && dataMonths < 3) {
     return (
-      <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-6 text-center" data-testid="spending-insights-empty">
-        <Sparkles className="mx-auto h-8 w-8 text-zinc-300" />
-        <p className="mt-2 text-sm font-medium text-zinc-500">Nog niet genoeg data</p>
-        <p className="mt-1 text-xs text-zinc-400">
+      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-6 text-center" data-testid="spending-insights-empty">
+        <Sparkles className="mx-auto h-8 w-8 text-[var(--ink-4)]" />
+        <p className="mt-2 text-sm font-medium text-[var(--ink-3)]">Nog niet genoeg data</p>
+        <p className="mt-1 text-xs text-[var(--ink-3)]">
           {message || 'Minimaal 3 maanden transactiehistorie nodig voor patroonanalyse. Blijf je transacties importeren!'}
         </p>
       </div>
@@ -141,10 +141,10 @@ export function SpendingInsightsSection({
 
   if (insights.length === 0) {
     return (
-      <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-6 text-center" data-testid="spending-insights-none">
+      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-6 text-center" data-testid="spending-insights-none">
         <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-400" />
-        <p className="mt-2 text-sm font-medium text-zinc-600">Geen opvallende patronen</p>
-        <p className="mt-1 text-xs text-zinc-400">
+        <p className="mt-2 text-sm font-medium text-[var(--ink-2)]">Geen opvallende patronen</p>
+        <p className="mt-1 text-xs text-[var(--ink-3)]">
           Je uitgaven zijn consistent — geen seizoenspieken of trends gedetecteerd.
         </p>
       </div>
@@ -159,7 +159,7 @@ export function SpendingInsightsSection({
         ))}
       </div>
       {message && (
-        <p className="mt-3 text-center text-xs text-zinc-400" data-testid="spending-insights-message">
+        <p className="mt-3 text-center text-xs text-[var(--ink-3)]" data-testid="spending-insights-message">
           {message}
         </p>
       )}

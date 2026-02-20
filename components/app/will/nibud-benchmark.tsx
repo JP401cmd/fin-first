@@ -39,10 +39,10 @@ export function NibudBenchmarkSection() {
 
   if (loading) {
     return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-5">
+      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5">
         <div className="flex items-center gap-3">
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-wil-500 border-t-transparent" />
-          <span className="text-sm text-zinc-400">NIBUD benchmark laden...</span>
+          <span className="text-sm text-[var(--ink-3)]">NIBUD benchmark laden...</span>
         </div>
       </div>
     )
@@ -59,7 +59,7 @@ export function NibudBenchmarkSection() {
     <>
       <button
         onClick={() => setModalOpen(true)}
-        className="group w-full rounded-xl border border-zinc-200 bg-white p-5 text-left transition-colors hover:border-wil-200 hover:bg-wil-50/30"
+        className="group w-full rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 text-left transition-colors hover:border-wil-200 hover:bg-wil-50/30"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -67,8 +67,8 @@ export function NibudBenchmarkSection() {
               <BarChart3 className="h-4 w-4 text-wil-600" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-zinc-900">Budget Gezondheidscheck</h3>
-              <p className="text-[11px] text-zinc-400">
+              <h3 className="text-sm font-semibold text-[var(--ink)]">Budget Gezondheidscheck</h3>
+              <p className="text-[11px] text-[var(--ink-3)]">
                 NIBUD {data.year} &middot; {data.household_label.toLowerCase()}
               </p>
             </div>
@@ -84,12 +84,12 @@ export function NibudBenchmarkSection() {
               tabIndex={0}
               onClick={e => { e.stopPropagation(); handleRefresh() }}
               onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); handleRefresh() } }}
-              className="rounded-md p-1 text-zinc-300 transition-colors hover:bg-wil-50 hover:text-wil-500"
+              className="rounded-md p-1 text-[var(--ink-4)] transition-colors hover:bg-wil-50 hover:text-wil-500"
               title="Verversen"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
             </span>
-            <ArrowRight className="h-4 w-4 text-zinc-300 transition-colors group-hover:text-wil-500" />
+            <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />
           </div>
         </div>
 
@@ -101,14 +101,14 @@ export function NibudBenchmarkSection() {
           </div>
         )}
 
-        <div className="mt-2.5 flex items-center gap-3 text-[11px] text-zinc-400">
+        <div className="mt-2.5 flex items-center gap-3 text-[11px] text-[var(--ink-3)]">
           {aboveNorm.length > 0 && (
             <span><span className="font-medium text-amber-600">{aboveNorm.length}</span> boven norm</span>
           )}
           {onTrackCount > 0 && (
             <span><span className="font-medium text-wil-600">{onTrackCount}</span> op koers</span>
           )}
-          <span className="ml-auto text-zinc-300 group-hover:text-wil-400">Bekijk details</span>
+          <span className="ml-auto text-[var(--ink-4)] group-hover:text-wil-400">Bekijk details</span>
         </div>
       </button>
 
@@ -135,12 +135,12 @@ function MiniBar({ benchmark: b }: { benchmark: NibudBenchmark }) {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="w-28 shrink-0 truncate text-[11px] text-zinc-500">{b.nibud_category_name}</span>
+      <span className="w-28 shrink-0 truncate text-[11px] text-[var(--ink-3)]">{b.nibud_category_name}</span>
       <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100">
         <div className={`absolute left-0 top-0 h-full rounded-full ${barColor}`} style={{ width: `${Math.min(userPct, 100)}%` }} />
         <div className="absolute top-0 h-full w-0.5 bg-zinc-400" style={{ left: `${Math.min(refPct, 100)}%` }} />
       </div>
-      <span className="w-14 shrink-0 text-right text-[10px] font-medium text-zinc-400">
+      <span className="w-14 shrink-0 text-right text-[10px] font-medium text-[var(--ink-3)]">
         +&euro;{Math.abs(Math.round(b.delta))}
       </span>
     </div>
@@ -173,15 +173,15 @@ function NibudDetailModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl"
+        className="w-full max-w-2xl overflow-y-auto rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl"
         style={{ maxHeight: '90vh' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-6 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-zinc-900">Budget Gezondheidscheck</h2>
-            <p className="text-sm text-zinc-500">
+            <h2 className="text-lg font-semibold text-[var(--ink)]">Budget Gezondheidscheck</h2>
+            <p className="text-sm text-[var(--ink-3)]">
               NIBUD-referentie {data.year} voor {data.household_label.toLowerCase()}
             </p>
           </div>
@@ -189,12 +189,12 @@ function NibudDetailModal({
             <button
               onClick={onRefresh}
               disabled={refreshing}
-              className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-wil-50 hover:text-wil-600 disabled:opacity-50"
+              className="rounded-lg p-1.5 text-[var(--ink-3)] transition-colors hover:bg-wil-50 hover:text-wil-600 disabled:opacity-50"
               title="Verversen"
             >
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
-            <button onClick={onClose} className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+            <button onClick={onClose} className="rounded-lg p-1.5 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -203,7 +203,7 @@ function NibudDetailModal({
         <div className="space-y-5 px-6 py-5">
           {/* Total potential banner */}
           {data.total_freedom_days_potential > 0 && (
-            <div className="rounded-xl bg-wil-50 p-4">
+            <div className="rounded-[var(--r-lg)] bg-wil-50 p-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-wil-800">
                   Totaal potentieel bij NIBUD-niveau:
@@ -216,7 +216,7 @@ function NibudDetailModal({
           {/* Above norm — with budget adjustment */}
           {aboveNorm.length > 0 && (
             <div>
-              <h3 className="mb-3 text-xs font-semibold tracking-[0.12em] text-zinc-400 uppercase">
+              <h3 className="mb-3 text-xs font-semibold tracking-[0.12em] text-[var(--ink-3)] uppercase">
                 Optimalisatiekansen ({aboveNorm.length})
               </h3>
               <div className="space-y-2">
@@ -232,7 +232,7 @@ function NibudDetailModal({
             <div>
               <button
                 onClick={() => setShowBelow(!showBelow)}
-                className="flex w-full items-center gap-2 rounded-lg border border-zinc-100 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-500 transition-colors hover:bg-zinc-100"
+                className="flex w-full items-center gap-2 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-4 py-2.5 text-sm text-[var(--ink-3)] transition-colors hover:bg-zinc-100"
               >
                 {showBelow ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 <span>
@@ -251,12 +251,12 @@ function NibudDetailModal({
           )}
 
           {noData.length > 0 && (
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-[var(--ink-3)]">
               {noData.length} NIBUD-{noData.length === 1 ? 'categorie heeft' : 'categorien hebben'} nog geen transactiedata.
             </p>
           )}
 
-          <p className="text-[10px] leading-relaxed text-zinc-300">
+          <p className="text-[10px] leading-relaxed text-[var(--ink-4)]">
             Referentiebedragen zijn indicatief. Vergelijkbare huishoudens geven gemiddeld deze bedragen uit — jouw situatie kan bewust anders zijn.
           </p>
         </div>
@@ -293,9 +293,9 @@ function DetailRow({
   }
 
   return (
-    <div className={`rounded-xl border bg-white ${compact ? 'border-zinc-100 p-3' : 'border-zinc-200 p-4'}`}>
+    <div className={`rounded-[var(--r-lg)] border bg-[var(--paper)] ${compact ? 'border-[var(--border-ed)] p-3' : 'border-[var(--border-ed)] p-4'}`}>
       <div className="flex items-center justify-between">
-        <p className={`font-medium text-zinc-900 ${compact ? 'text-xs' : 'text-sm'}`}>
+        <p className={`font-medium text-[var(--ink)] ${compact ? 'text-xs' : 'text-sm'}`}>
           {b.nibud_category_name}
         </p>
         <div className="flex items-center gap-3">
@@ -324,7 +324,7 @@ function DetailRow({
             style={{ left: `${Math.min(refPct, 100)}%` }}
           />
         </div>
-        <div className="flex justify-between text-[10px] text-zinc-400">
+        <div className="flex justify-between text-[10px] text-[var(--ink-3)]">
           <span>Jij: &euro;{Math.round(b.user_spending)}/mnd</span>
           <span>NIBUD: &euro;{Math.round(referenceAmount)}/mnd</span>
         </div>
@@ -335,7 +335,7 @@ function DetailRow({
         <div className="mt-3">
           <a
             href={`/core/budgets?budget=${b.mapped_budget_id}`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 transition-colors hover:border-wil-200 hover:bg-wil-50 hover:text-wil-700"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-ed)] px-2.5 py-1 text-xs font-medium text-[var(--ink-2)] transition-colors hover:border-wil-200 hover:bg-wil-50 hover:text-wil-700"
           >
             <ArrowRight className="h-3 w-3" />
             Bekijk budget

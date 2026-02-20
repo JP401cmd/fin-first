@@ -70,37 +70,37 @@ export default function InstellingenPage() {
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
       <div className="mb-10">
-        <h1 className="text-3xl font-bold text-zinc-900">Instellingen</h1>
-        <p className="mt-2 text-zinc-500">
+        <h1 className="text-3xl font-bold text-[var(--ink)]">Instellingen</h1>
+        <p className="mt-2 text-[var(--ink-3)]">
           Notificatie-instellingen en gegevensbeheer.
         </p>
       </div>
 
       {/* ── Notificatie-instellingen ────────────────────────────── */}
-      <section className="mb-10 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+      <section className="mb-10 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 sm:p-8">
+        <h2 className="label-editorial text-[var(--ink-2)]">
           Notificatie-instellingen
         </h2>
-        <p className="mt-1 mb-6 text-sm text-zinc-500">
+        <p className="mt-1 mb-6 text-sm text-[var(--ink-3)]">
           Kies welke meldingen je wilt ontvangen.
         </p>
 
         {notifLoading ? (
           <div className="flex items-center justify-center py-8">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900" />
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--border-md)] border-t-zinc-900" />
           </div>
         ) : (
           <>
-            <div className="divide-y divide-zinc-100 rounded-xl border border-zinc-200">
+            <div className="divide-y divide-zinc-100 rounded-xl border border-[var(--border-ed)]">
               {NOTIFICATION_TYPES.map(({ type, label, description, icon: Icon }) => {
                 const enabled = notifPrefs[type] !== false
                 return (
                   <div key={type} className="flex items-center justify-between gap-4 px-4 py-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <Icon className="h-4 w-4 shrink-0 text-zinc-400" />
+                      <Icon className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-zinc-700">{label}</p>
-                        <p className="text-xs text-zinc-400">{description}</p>
+                        <p className="text-sm font-medium text-[var(--ink-2)]">{label}</p>
+                        <p className="text-xs text-[var(--ink-3)]">{description}</p>
                       </div>
                     </div>
                     <button
@@ -110,7 +110,7 @@ export default function InstellingenPage() {
                         enabled ? 'bg-zinc-900' : 'bg-zinc-300'
                       }`}
                     >
-                      <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                      <span className={`inline-block h-3.5 w-3.5 rounded-full bg-[var(--paper)] transition-transform ${
                         enabled ? 'translate-x-4' : 'translate-x-0.5'
                       }`} />
                     </button>
@@ -138,11 +138,11 @@ export default function InstellingenPage() {
       </section>
 
       {/* ── Gegevens Resetten ──────────────────────────────────── */}
-      <section className="mb-10 rounded-2xl border border-red-200 bg-white p-6 sm:p-8">
+      <section className="mb-10 rounded-2xl border border-red-200 bg-[var(--paper)] p-6 sm:p-8">
         <h2 className="text-xs font-semibold tracking-[0.15em] text-red-400 uppercase">
           Gegevens Resetten
         </h2>
-        <p className="mt-1 mb-6 text-sm text-zinc-500">
+        <p className="mt-1 mb-6 text-sm text-[var(--ink-3)]">
           Wis al je financiele gegevens en doorloop de onboarding opnieuw.
           Dit verwijdert al je bankrekeningen, transacties, budgetten, doelen en overige data.
         </p>
@@ -162,16 +162,16 @@ export default function InstellingenPage() {
       {/* Reset confirmation dialog */}
       {showResetDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-zinc-900">Weet je het zeker?</h3>
-            <p className="mt-2 text-sm text-zinc-600">
+          <div className="mx-4 w-full max-w-md rounded-xl bg-[var(--paper)] p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-[var(--ink)]">Weet je het zeker?</h3>
+            <p className="mt-2 text-sm text-[var(--ink-2)]">
               Dit wist <span className="font-semibold text-red-600">al je financiele data</span> permanent.
               Je wordt teruggeleid naar de onboarding om opnieuw te beginnen.
             </p>
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => setShowResetDialog(false)}
-                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+                className="rounded-lg border border-[var(--border-md)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
               >
                 Annuleren
               </button>

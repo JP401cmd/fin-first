@@ -101,12 +101,12 @@ export function GoalDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 transition-[right] duration-300" style={{ right: 'var(--chat-sidebar-width, 0px)' }}>
-      <div className="w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl" style={{ maxHeight: '90vh' }}>
+      <div className="w-full max-w-2xl overflow-y-auto rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl" style={{ maxHeight: '90vh' }}>
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-6 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-zinc-900">Alle doelen</h2>
-            <p className="text-sm text-zinc-500">
+            <h2 className="text-lg font-semibold text-[var(--ink)]">Alle doelen</h2>
+            <p className="text-sm text-[var(--ink-3)]">
               {goals.length === 0
                 ? 'Stel je eerste financiele doel en volg je voortgang.'
                 : `${completedGoals.length} van ${goals.length} doelen bereikt`}
@@ -122,7 +122,7 @@ export function GoalDetailModal({
             </button>
             <button
               onClick={handleClose}
-              className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+              className="rounded-lg p-1.5 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
             >
               <X className="h-5 w-5" />
             </button>
@@ -136,9 +136,9 @@ export function GoalDetailModal({
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-wil-500 border-t-transparent" />
             </div>
           ) : goals.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-wil-300 bg-wil-50/50 p-8 text-center">
-              <h3 className="text-lg font-bold text-zinc-900">Geen doelen ingesteld</h3>
-              <p className="mt-2 text-sm text-zinc-500">
+            <div className="rounded-[var(--r-lg)] border border-dashed border-wil-300 bg-wil-50/50 p-8 text-center">
+              <h3 className="text-lg font-bold text-[var(--ink)]">Geen doelen ingesteld</h3>
+              <p className="mt-2 text-sm text-[var(--ink-3)]">
                 Begin met het instellen van je eerste financiele doel. Koppel het aan je assets of schulden voor live voortgang.
               </p>
             </div>
@@ -147,7 +147,7 @@ export function GoalDetailModal({
               {/* Active goals */}
               {activeGoals.length > 0 && (
                 <section>
-                  <h3 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+                  <h3 className="mb-3 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
                     Actief ({activeGoals.length})
                   </h3>
                   <div className="space-y-3">
@@ -178,7 +178,7 @@ export function GoalDetailModal({
                 <section className="mt-6">
                   <button
                     onClick={() => setShowCompleted(v => !v)}
-                    className="flex items-center gap-2 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase hover:text-zinc-600"
+                    className="flex items-center gap-2 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase hover:text-[var(--ink-2)]"
                   >
                     {showCompleted ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                     Voltooid ({completedGoals.length})
@@ -341,8 +341,8 @@ function GoalCard({
 
   return (
     <div
-      className={`overflow-hidden rounded-xl border bg-white ${
-        goal.is_completed ? 'border-zinc-200 opacity-70' : `${colors.border}`
+      className={`overflow-hidden rounded-[var(--r-lg)] border bg-[var(--paper)] ${
+        goal.is_completed ? 'border-[var(--border-ed)] opacity-70' : `${colors.border}`
       }`}
     >
       <div className="flex items-start gap-3 p-4">
@@ -352,7 +352,7 @@ function GoalCard({
           className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
             goal.is_completed
               ? 'border-emerald-500 bg-emerald-500 text-white'
-              : `${colors.border} hover:bg-zinc-50`
+              : `${colors.border} hover:bg-[var(--subtle)]`
           }`}
         >
           {goal.is_completed && <Check className="h-3.5 w-3.5" />}
@@ -366,7 +366,7 @@ function GoalCard({
         {/* Content */}
         <div className="min-w-0 flex-1 cursor-pointer" onClick={onEdit}>
           <div className="flex items-center gap-2">
-            <h3 className={`font-medium ${goal.is_completed ? 'text-zinc-500 line-through' : 'text-zinc-900'}`}>
+            <h3 className={`font-medium ${goal.is_completed ? 'text-[var(--ink-3)] line-through' : 'text-[var(--ink)]'}`}>
               {goal.name}
             </h3>
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${colors.bgLight} ${colors.text}`}>
@@ -379,18 +379,18 @@ function GoalCard({
             )}
           </div>
           {goal.description && (
-            <p className="mt-0.5 truncate text-xs text-zinc-500">{goal.description}</p>
+            <p className="mt-0.5 truncate text-xs text-[var(--ink-3)]">{goal.description}</p>
           )}
 
           {/* Progress bar */}
           <div className="mt-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-medium text-zinc-700">
+              <span className="font-medium text-[var(--ink-2)]">
                 {isFreedm
                   ? `${Math.round(current)} / ${Math.round(target)} dagen`
                   : `${formatCurrency(current)} / ${formatCurrency(target)}`}
               </span>
-              <span className="text-zinc-500">
+              <span className="text-[var(--ink-3)]">
                 {pct}%
                 {eta && ` · ${eta}`}
               </span>
@@ -407,7 +407,7 @@ function GoalCard({
 
           {/* Linked entity info */}
           {isLinked && (
-            <p className="mt-1.5 text-[10px] text-zinc-400">
+            <p className="mt-1.5 text-[10px] text-[var(--ink-3)]">
               Gekoppeld · waarde wordt automatisch bijgewerkt
             </p>
           )}
@@ -425,7 +425,7 @@ function GoalCard({
               </button>
               <button
                 onClick={onCancelDelete}
-                className="rounded px-2 py-1 text-[10px] font-medium text-zinc-500 hover:bg-zinc-100"
+                className="rounded px-2 py-1 text-[10px] font-medium text-[var(--ink-3)] hover:bg-zinc-100"
               >
                 Annuleer
               </button>
@@ -433,7 +433,7 @@ function GoalCard({
           ) : (
             <button
               onClick={onDelete}
-              className="rounded p-1.5 text-zinc-300 hover:bg-red-50 hover:text-red-500"
+              className="rounded p-1.5 text-[var(--ink-4)] hover:bg-red-50 hover:text-red-500"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -442,7 +442,7 @@ function GoalCard({
       </div>
 
       {/* Timeline chart section */}
-      <div className="border-t border-zinc-100 px-4 py-2" data-testid={`goal-timeline-section-${goal.id}`}>
+      <div className="border-t border-[var(--border-ed)] px-4 py-2" data-testid={`goal-timeline-section-${goal.id}`}>
         <button
           onClick={(e) => {
             e.stopPropagation()
@@ -471,7 +471,7 @@ function GoalCard({
 
       {/* Contribution section — only for non-linked, non-completed goals */}
       {!isLinked && !goal.is_completed && (
-        <div className="border-t border-zinc-100 px-4 py-2">
+        <div className="border-t border-[var(--border-ed)] px-4 py-2">
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -493,7 +493,7 @@ function GoalCard({
                   placeholder="Bedrag"
                   value={contribAmount}
                   onChange={(e) => setContribAmount(e.target.value)}
-                  className="w-28 rounded-lg border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-wil-500"
+                  className="w-28 rounded-lg border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-wil-500"
                   min="0"
                   step="0.01"
                 />
@@ -502,7 +502,7 @@ function GoalCard({
                   placeholder="Notitie (optioneel)"
                   value={contribNotes}
                   onChange={(e) => setContribNotes(e.target.value)}
-                  className="flex-1 rounded-lg border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-wil-500"
+                  className="flex-1 rounded-lg border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-wil-500"
                 />
                 <button
                   onClick={addContribution}
@@ -516,10 +516,10 @@ function GoalCard({
               {contributions.length > 0 && (
                 <div className="max-h-24 space-y-1 overflow-y-auto">
                   {contributions.map((c) => (
-                    <div key={c.id} className="flex items-center justify-between rounded px-1 py-0.5 text-[10px] hover:bg-zinc-50">
-                      <span className="text-zinc-500">
+                    <div key={c.id} className="flex items-center justify-between rounded px-1 py-0.5 text-[10px] hover:bg-[var(--subtle)]">
+                      <span className="text-[var(--ink-3)]">
                         {new Date(c.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
-                        {c.notes && <span className="ml-1 text-zinc-400">· {c.notes}</span>}
+                        {c.notes && <span className="ml-1 text-[var(--ink-3)]">· {c.notes}</span>}
                       </span>
                       <span className="font-medium text-emerald-600">+{formatCurrency(Number(c.amount))}</span>
                     </div>

@@ -188,7 +188,7 @@ export function SessionMonitor() {
       aria-label="Sessie verlopen"
       data-testid="session-expired-modal"
     >
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="w-full max-w-md rounded-[var(--r-lg)] bg-[var(--paper)] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="bg-amber-50 border-b border-amber-100 px-6 py-5">
           <div className="flex items-center gap-3">
@@ -196,10 +196,10 @@ export function SessionMonitor() {
               <AlertTriangle className="h-5 w-5 text-amber-600" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-zinc-900">
+              <h2 className="text-lg font-semibold text-[var(--ink)]">
                 Sessie verlopen
               </h2>
-              <p className="text-sm text-zinc-600">
+              <p className="text-sm text-[var(--ink-2)]">
                 Je sessie is verlopen. Log opnieuw in om verder te gaan.
               </p>
             </div>
@@ -221,13 +221,13 @@ export function SessionMonitor() {
             </div>
           ) : (
             <>
-              <p className="mb-4 text-sm text-zinc-500">
+              <p className="mb-4 text-sm text-[var(--ink-3)]">
                 Je gegevens zijn veilig. Na het opnieuw inloggen ga je verder waar je gebleven was.
               </p>
 
               <form onSubmit={handleReLogin} className="space-y-3">
                 <div>
-                  <label htmlFor="session-email" className="block text-sm font-medium text-zinc-700">
+                  <label htmlFor="session-email" className="block text-sm font-medium text-[var(--ink-2)]">
                     E-mailadres
                   </label>
                   <input
@@ -238,13 +238,13 @@ export function SessionMonitor() {
                     required
                     autoComplete="email"
                     autoFocus
-                    className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 shadow-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    className="mt-1 block w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-[var(--ink)] shadow-[var(--s0)] focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
                     placeholder="naam@voorbeeld.nl"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="session-password" className="block text-sm font-medium text-zinc-700">
+                  <label htmlFor="session-password" className="block text-sm font-medium text-[var(--ink-2)]">
                     Wachtwoord
                   </label>
                   <div className="relative mt-1">
@@ -255,12 +255,12 @@ export function SessionMonitor() {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       autoComplete="current-password"
-                      className="block w-full rounded-lg border border-zinc-300 px-3 py-2 pr-10 text-zinc-900 shadow-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      className="block w-full rounded-lg border border-[var(--border-md)] px-3 py-2 pr-10 text-[var(--ink)] shadow-[var(--s0)] focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-zinc-600"
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-[var(--ink-3)] hover:text-[var(--ink-2)]"
                       aria-label={showPassword ? 'Wachtwoord verbergen' : 'Wachtwoord tonen'}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -284,11 +284,11 @@ export function SessionMonitor() {
                 </button>
               </form>
 
-              <div className="mt-4 flex items-center justify-between text-xs text-zinc-400">
+              <div className="mt-4 flex items-center justify-between text-xs text-[var(--ink-3)]">
                 <span>Of ga naar de inlogpagina:</span>
                 <button
                   onClick={handleGoToLogin}
-                  className="font-medium text-zinc-600 hover:text-zinc-900 underline transition-colors"
+                  className="font-medium text-[var(--ink-2)] hover:text-[var(--ink)] underline transition-colors"
                 >
                   Naar inlogpagina
                 </button>

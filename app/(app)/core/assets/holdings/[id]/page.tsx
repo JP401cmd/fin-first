@@ -100,7 +100,7 @@ export default async function HoldingDetailPage({
     <div className="mx-auto max-w-5xl px-4 py-8" data-testid="holding-detail-page">
       <Link
         href="/core/assets/holdings"
-        className="mb-6 inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-800 transition-colors"
+        className="mb-6 inline-flex items-center gap-2 text-sm text-[var(--ink-3)] hover:text-zinc-800 transition-colors"
         data-testid="back-to-holdings-link"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -108,20 +108,20 @@ export default async function HoldingDetailPage({
       </Link>
 
       {/* Holding header with KPIs */}
-      <section className="rounded-2xl border border-kern-200 bg-gradient-to-br from-kern-50 to-white p-6">
+      <section className="rounded-[var(--r-lg)] border border-kern-200 bg-gradient-to-br from-kern-50 to-white p-6">
         <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-kern-100">
+          <div className="flex h-12 w-12 items-center justify-center rounded-[var(--r-lg)] bg-kern-100">
             <Briefcase className="h-6 w-6 text-kern-600" />
           </div>
           <div className="flex-1">
-            <h1 className="text-xl font-bold text-zinc-900" data-testid="holding-name">{name}</h1>
+            <h1 className="text-xl font-bold text-[var(--ink)]" data-testid="holding-name">{name}</h1>
             {ticker && (
               <p className="mt-0.5 text-sm font-medium text-kern-600" data-testid="holding-ticker">{ticker}</p>
             )}
           </div>
           <Link
             href="/core/assets/holdings"
-            className="rounded-lg border border-kern-200 bg-white px-3 py-1.5 text-xs font-medium text-kern-700 hover:bg-kern-50"
+            className="rounded-lg border border-kern-200 bg-[var(--paper)] px-3 py-1.5 text-xs font-medium text-kern-700 hover:bg-kern-50"
           >
             Alle holdings
           </Link>
@@ -130,31 +130,31 @@ export default async function HoldingDetailPage({
         {/* KPI cards */}
         <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4" data-testid="holding-kpis">
           <div>
-            <p className="text-[10px] font-medium text-zinc-500 uppercase">Huidige waarde</p>
-            <p className="mt-1 text-lg font-bold text-zinc-900" data-testid="holding-value">
+            <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Huidige waarde</p>
+            <p className="mt-1 text-lg font-bold text-[var(--ink)]" data-testid="holding-value">
               {formatCurrency(holdingValue)}
             </p>
           </div>
           <div>
-            <p className="text-[10px] font-medium text-zinc-500 uppercase">Eenheden</p>
-            <p className="mt-1 text-lg font-bold text-zinc-900" data-testid="holding-units">
+            <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Eenheden</p>
+            <p className="mt-1 text-lg font-bold text-[var(--ink)]" data-testid="holding-units">
               {units}
             </p>
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-[var(--ink-3)]">
               @ {formatCurrency(currentPrice)} per eenheid
             </p>
           </div>
           <div>
-            <p className="text-[10px] font-medium text-zinc-500 uppercase">Gem. aankoopprijs</p>
-            <p className="mt-1 text-lg font-bold text-zinc-900" data-testid="holding-avg-price">
+            <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Gem. aankoopprijs</p>
+            <p className="mt-1 text-lg font-bold text-[var(--ink)]" data-testid="holding-avg-price">
               {formatCurrency(avgPrice)}
             </p>
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-[var(--ink-3)]">
               kostenbasis: {formatCurrency(costBasis)}
             </p>
           </div>
           <div>
-            <p className="text-[10px] font-medium text-zinc-500 uppercase">Rendement</p>
+            <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Rendement</p>
             {costBasis > 0 ? (
               <>
                 <p className={`mt-1 text-lg font-bold ${returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`} data-testid="holding-return">
@@ -165,7 +165,7 @@ export default async function HoldingDetailPage({
                 </p>
               </>
             ) : (
-              <p className="mt-1 text-lg font-bold text-zinc-400">-</p>
+              <p className="mt-1 text-lg font-bold text-[var(--ink-3)]">-</p>
             )}
           </div>
         </div>

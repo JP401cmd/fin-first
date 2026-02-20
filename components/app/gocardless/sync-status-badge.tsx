@@ -35,7 +35,7 @@ export function SyncStatusBadge({ lastSyncedAt, dailyRequests, expiresAt }: Sync
 
   if (!lastSyncedAt) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-500">
+      <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-[var(--ink-3)]">
         <Clock className="h-3 w-3" />
         Nog niet gesynchroniseerd
       </span>
@@ -57,7 +57,7 @@ export function SyncStatusBadge({ lastSyncedAt, dailyRequests, expiresAt }: Sync
         <CheckCircle2 className="h-3 w-3" />
         {timeLabel}
       </span>
-      <span className="text-xs text-zinc-400">{dailyRequests}/10</span>
+      <span className="text-xs text-[var(--ink-3)]">{dailyRequests}/10</span>
     </div>
   )
 }

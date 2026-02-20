@@ -342,7 +342,7 @@ export default function HoldingsPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* Header */}
-      <section className="rounded-2xl border border-kern-200 bg-gradient-to-br from-kern-50 to-white p-6">
+      <section className="rounded-[var(--r-lg)] border border-kern-200 bg-gradient-to-br from-kern-50 to-white p-6">
         <div className="flex items-center gap-3 mb-4">
           <Link
             href="/core/assets"
@@ -354,8 +354,8 @@ export default function HoldingsPage() {
         </div>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-zinc-900">Holdings</h1>
-            <p className="mt-1 text-sm text-zinc-500">
+            <h1 className="text-xl font-bold text-[var(--ink)]">Holdings</h1>
+            <p className="mt-1 text-sm text-[var(--ink-3)]">
               {holdings.length} actieve holding{holdings.length !== 1 ? 's' : ''} in je portfolio
             </p>
           </div>
@@ -416,7 +416,7 @@ export default function HoldingsPage() {
               onClick={() => setRefreshResult(null)}
               className="ml-auto shrink-0 rounded p-0.5 hover:bg-black/5"
             >
-              <X className="h-3 w-3 text-zinc-400" />
+              <X className="h-3 w-3 text-[var(--ink-3)]" />
             </button>
           </div>
         )}
@@ -424,15 +424,15 @@ export default function HoldingsPage() {
         {/* KPI Stats */}
         <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
           <div>
-            <p className="text-xs font-medium text-zinc-500 uppercase">Totale waarde</p>
-            <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalValue)}</p>
+            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Totale waarde</p>
+            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalValue)}</p>
           </div>
           <div>
-            <p className="text-xs font-medium text-zinc-500 uppercase">Totale kostprijs</p>
-            <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalCost)}</p>
+            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Totale kostprijs</p>
+            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalCost)}</p>
           </div>
           <div>
-            <p className="text-xs font-medium text-zinc-500 uppercase">Rendement</p>
+            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Rendement</p>
             {totalCost > 0 ? (
               <p className={`mt-1 text-xl font-bold ${totalReturn >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                 {totalReturn >= 0 ? '+' : ''}{totalReturn.toFixed(1)}%
@@ -441,7 +441,7 @@ export default function HoldingsPage() {
                 </span>
               </p>
             ) : (
-              <p className="mt-1 text-xl font-bold text-zinc-400">-</p>
+              <p className="mt-1 text-xl font-bold text-[var(--ink-3)]">-</p>
             )}
           </div>
         </div>
@@ -449,10 +449,10 @@ export default function HoldingsPage() {
 
       {/* Portfolio allocation visualization — donut chart with sector/geography/asset class views */}
       {holdingsForAllocation.length > 0 && (
-        <section className="mt-6 rounded-2xl border border-zinc-200 bg-white p-6" data-testid="portfolio-allocation">
+        <section className="mt-6 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6" data-testid="portfolio-allocation">
           <div className="flex items-center gap-2 mb-4">
             <PieChart className="h-4 w-4 text-kern-600" />
-            <h2 className="text-sm font-semibold text-zinc-700">Portfolio verdeling</h2>
+            <h2 className="text-sm font-semibold text-[var(--ink-2)]">Portfolio verdeling</h2>
           </div>
           <PortfolioAllocationVisualization
             holdings={holdingsForAllocation}
@@ -482,7 +482,7 @@ export default function HoldingsPage() {
 
       {/* Error */}
       {error && (
-        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4">
+        <div className="mt-4 rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-4">
           <p className="text-sm text-red-700">{error}</p>
           <button
             onClick={() => { setError(null); setLoading(true); loadHoldings() }}
@@ -496,10 +496,10 @@ export default function HoldingsPage() {
       {/* Holdings list */}
       <section className="mt-6 space-y-2">
         {holdings.length === 0 && !loading && (
-          <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center">
-            <Briefcase className="mx-auto h-10 w-10 text-zinc-300" />
-            <p className="mt-3 text-sm font-medium text-zinc-600">Nog geen holdings</p>
-            <p className="mt-1 text-xs text-zinc-400">
+          <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-8 text-center">
+            <Briefcase className="mx-auto h-10 w-10 text-[var(--ink-4)]" />
+            <p className="mt-3 text-sm font-medium text-[var(--ink-2)]">Nog geen holdings</p>
+            <p className="mt-1 text-xs text-[var(--ink-3)]">
               Voeg je eerste holding toe om je portfolio te volgen.
             </p>
             <button
@@ -526,9 +526,9 @@ export default function HoldingsPage() {
           return (
             <div
               key={holding.id}
-              className={`flex items-center gap-3 rounded-xl border bg-white p-3 transition-colors hover:border-kern-200 hover:bg-kern-50/30 ${
-                soldOut ? 'border-zinc-300 bg-zinc-50/50 opacity-75' :
-                stale ? 'border-kern-300 bg-kern-50/20' : 'border-zinc-200'
+              className={`flex items-center gap-3 rounded-xl border bg-[var(--paper)] p-3 transition-colors hover:border-kern-200 hover:bg-kern-50/30 ${
+                soldOut ? 'border-[var(--border-md)] bg-[var(--subtle)]/50 opacity-75' :
+                stale ? 'border-kern-300 bg-kern-50/20' : 'border-[var(--border-ed)]'
               }`}
               data-testid={`holding-item-${holding.id}`}
               data-sold-out={soldOut ? 'true' : 'false'}
@@ -545,7 +545,7 @@ export default function HoldingsPage() {
                 stale ? 'bg-kern-100' : 'bg-kern-50'
               }`}>
                 {soldOut ? (
-                  <CheckCircle className="h-4 w-4 text-zinc-400" />
+                  <CheckCircle className="h-4 w-4 text-[var(--ink-3)]" />
                 ) : stale ? (
                   <Clock className="h-4 w-4 text-kern-500" />
                 ) : (
@@ -554,10 +554,10 @@ export default function HoldingsPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <p className={`truncate text-sm font-medium ${soldOut ? 'text-zinc-500' : 'text-zinc-900'}`}>{holding.name}</p>
+                  <p className={`truncate text-sm font-medium ${soldOut ? 'text-[var(--ink-3)]' : 'text-[var(--ink)]'}`}>{holding.name}</p>
                   {soldOut && (
                     <span
-                      className="inline-flex items-center gap-1 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600"
+                      className="inline-flex items-center gap-1 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--ink-2)]"
                       data-testid="sold-out-indicator"
                     >
                       <CheckCircle className="h-2.5 w-2.5" />
@@ -575,10 +575,10 @@ export default function HoldingsPage() {
                     </span>
                   )}
                 </div>
-                <p className="truncate text-xs text-zinc-500">
-                  {holding.ticker && <span className={`font-medium ${soldOut ? 'text-zinc-400' : 'text-kern-600'}`}>{holding.ticker}</span>}
+                <p className="truncate text-xs text-[var(--ink-3)]">
+                  {holding.ticker && <span className={`font-medium ${soldOut ? 'text-[var(--ink-3)]' : 'text-kern-600'}`}>{holding.ticker}</span>}
                   {holding.ticker && ' · '}
-                  {soldOut ? <span className="text-zinc-400">0 eenheden</span> : `${holding.units} eenheden`}
+                  {soldOut ? <span className="text-[var(--ink-3)]">0 eenheden</span> : `${holding.units} eenheden`}
                   {holding.institution && ` · ${holding.institution}`}
                   {holding.purchase_date && ` · ${new Date(holding.purchase_date).toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' })}`}
                   {stale && holding.last_price_update && (
@@ -592,7 +592,7 @@ export default function HoldingsPage() {
                 </p>
               </div>
               <div className="shrink-0 text-right">
-                <p className={`text-sm font-semibold ${soldOut ? 'text-zinc-400' : stale ? 'text-kern-700' : 'text-zinc-900'}`} data-testid={`holding-value-${holding.id}`}>
+                <p className={`text-sm font-semibold ${soldOut ? 'text-[var(--ink-3)]' : stale ? 'text-kern-700' : 'text-[var(--ink)]'}`} data-testid={`holding-value-${holding.id}`}>
                   {formatCurrency(Math.max(0, value))}
                   {stale && !soldOut && <span className="text-[10px] font-normal text-kern-500 block">laatste bekende prijs</span>}
                 </p>
@@ -626,14 +626,14 @@ export default function HoldingsPage() {
                 )}
                 <button
                   onClick={() => setTxHolding(holding)}
-                  className="rounded-lg p-1.5 text-zinc-400 hover:bg-emerald-50 hover:text-emerald-600"
+                  className="rounded-lg p-1.5 text-[var(--ink-3)] hover:bg-emerald-50 hover:text-emerald-600"
                   title="Transactie registreren"
                 >
                   <Receipt className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => setEditHolding(holding)}
-                  className="rounded-lg p-1.5 text-zinc-400 hover:bg-kern-50 hover:text-kern-600"
+                  className="rounded-lg p-1.5 text-[var(--ink-3)] hover:bg-kern-50 hover:text-kern-600"
                   title="Bewerken"
                 >
                   <Edit3 className="h-4 w-4" />
@@ -651,7 +651,7 @@ export default function HoldingsPage() {
                     <button
                       onClick={() => setDeleteConfirm(null)}
                       disabled={deleting === holding.id}
-                      className="rounded-lg border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="rounded-lg border border-[var(--border-ed)] px-2 py-1 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Nee
                     </button>
@@ -659,7 +659,7 @@ export default function HoldingsPage() {
                 ) : (
                   <button
                     onClick={() => setDeleteConfirm(holding.id)}
-                    className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600"
+                    className="rounded-lg p-1.5 text-[var(--ink-3)] hover:bg-red-50 hover:text-red-600"
                     title="Verwijderen"
                     data-testid={`delete-trigger-${holding.id}`}
                   >
@@ -779,18 +779,18 @@ function ManualPriceOverrideModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
+        className="w-full max-w-md rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
         data-testid="manual-override-modal"
       >
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-bold text-zinc-900">Prijs handmatig bijwerken</h3>
-            <p className="text-xs text-zinc-500 mt-0.5">
+            <h3 className="text-lg font-bold text-[var(--ink)]">Prijs handmatig bijwerken</h3>
+            <p className="text-xs text-[var(--ink-3)] mt-0.5">
               {holding.name} {holding.ticker ? `(${holding.ticker})` : ''}
             </p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+          <button onClick={onClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -822,7 +822,7 @@ function ManualPriceOverrideModal({
 
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-600">
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
               Huidige prijs per eenheid (€) *
             </label>
             <input
@@ -830,7 +830,7 @@ function ManualPriceOverrideModal({
               step="0.01"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
               placeholder="0.00"
               autoFocus
               data-testid="override-price-input"
@@ -843,7 +843,7 @@ function ManualPriceOverrideModal({
               <span className="text-xs font-medium text-kern-700">
                 Nieuwe waarde ({holding.units} eenheden)
               </span>
-              <span className="text-sm font-bold text-zinc-900">{formatCurrency(currentValue)}</span>
+              <span className="text-sm font-bold text-[var(--ink)]">{formatCurrency(currentValue)}</span>
             </div>
             {currentValue !== oldValue && (
               <p className={`mt-1 text-xs font-medium ${currentValue >= oldValue ? 'text-emerald-600' : 'text-red-600'}`}>
@@ -852,8 +852,8 @@ function ManualPriceOverrideModal({
             )}
           </div>
 
-          <div className="rounded-lg border border-zinc-100 bg-zinc-50 p-2.5">
-            <p className="text-[10px] text-zinc-500">
+          <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-2.5">
+            <p className="text-[10px] text-[var(--ink-3)]">
               Vorige prijs: {holding.current_price != null ? formatCurrency(holding.current_price) : 'Niet ingesteld'}
               {' · '}Aankoopprijs: {formatCurrency(holding.avg_purchase_price)}
             </p>
@@ -863,7 +863,7 @@ function ManualPriceOverrideModal({
         <div className="mt-5 flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+            className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
           >
             Annuleren
           </button>
@@ -1072,12 +1072,12 @@ function HoldingForm({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
+        className="w-full max-w-lg rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-zinc-900">Nieuwe holding</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+          <h3 className="text-lg font-bold text-[var(--ink)]">Nieuwe holding</h3>
+          <button onClick={onClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -1129,21 +1129,21 @@ function HoldingForm({
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Naam *</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Naam *</label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
                 placeholder="VWRL ETF"
                 autoFocus
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Ticker / ISIN</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Ticker / ISIN</label>
               <input
                 value={ticker}
                 onChange={(e) => setTicker(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
                 placeholder="VWRL"
               />
             </div>
@@ -1151,36 +1151,36 @@ function HoldingForm({
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Aantal eenheden</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Aantal eenheden</label>
               <input
                 type="number"
                 step="0.001"
                 value={units}
                 onChange={(e) => setUnits(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
                 placeholder="0"
                 data-testid="holding-units-input"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Gem. aankoopprijs</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Gem. aankoopprijs</label>
               <input
                 type="number"
                 step="0.01"
                 value={avgPrice}
                 onChange={(e) => setAvgPrice(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
                 placeholder="0.00"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Huidige prijs</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Huidige prijs</label>
               <input
                 type="number"
                 step="0.01"
                 value={currentPrice}
                 onChange={(e) => setCurrentPrice(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
                 placeholder="0.00"
               />
             </div>
@@ -1188,28 +1188,28 @@ function HoldingForm({
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Aankoopdatum</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Aankoopdatum</label>
               <input
                 type="date"
                 value={purchaseDate}
                 onChange={(e) => setPurchaseDate(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
                 data-testid="holding-purchase-date-input"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Valuta</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Valuta</label>
               <div
-                className="flex items-center rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600"
+                className="flex items-center rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink-2)]"
                 data-testid="holding-currency-display"
               >
                 {currency}
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Status</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Status</label>
               <div
-                className="flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600"
+                className="flex items-center gap-1.5 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink-2)]"
                 data-testid="holding-is-active-display"
               >
                 <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
@@ -1219,12 +1219,12 @@ function HoldingForm({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-600">Notities (optioneel)</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notities (optioneel)</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
             />
           </div>
         </div>
@@ -1232,7 +1232,7 @@ function HoldingForm({
         <div className="mt-5 flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+            className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
           >
             Annuleren
           </button>
@@ -1440,13 +1440,13 @@ function HoldingEditForm({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={handleClose}>
       <div
-        className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
+        className="w-full max-w-lg rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
         data-testid="holding-edit-modal"
       >
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-zinc-900">Holding bewerken</h3>
-          <button onClick={handleClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600" data-testid="holding-edit-close-btn">
+          <h3 className="text-lg font-bold text-[var(--ink)]">Holding bewerken</h3>
+          <button onClick={handleClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]" data-testid="holding-edit-close-btn">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -1536,9 +1536,9 @@ function HoldingEditForm({
                 <p className="text-xs font-semibold text-kern-800">Bewerkingsconflict</p>
                 <p className="mt-1 text-xs text-kern-700">{conflictData.message}</p>
                 {conflictData.server_state && (
-                  <div className="mt-2 rounded border border-kern-200 bg-white/60 p-2">
+                  <div className="mt-2 rounded border border-kern-200 bg-[var(--paper)]/60 p-2">
                     <p className="text-[10px] font-medium text-kern-600 mb-1">Huidige waarden op de server:</p>
-                    <p className="text-xs text-zinc-600">
+                    <p className="text-xs text-[var(--ink-2)]">
                       Naam: <span className="font-medium">{String(conflictData.server_state.name || '-')}</span>
                       {' · '}Eenheden: <span className="font-medium">{String(conflictData.server_state.units || '-')}</span>
                       {' · '}Prijs: <span className="font-medium">{conflictData.server_state.current_price != null ? formatCurrency(Number(conflictData.server_state.current_price)) : '-'}</span>
@@ -1570,52 +1570,52 @@ function HoldingEditForm({
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Naam *</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Naam *</label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Ticker / ISIN</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Ticker / ISIN</label>
               <input
                 value={ticker}
                 onChange={(e) => setTicker(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Aantal eenheden</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Aantal eenheden</label>
               <input
                 type="number"
                 step="0.001"
                 value={units}
                 onChange={(e) => setUnits(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Gem. aankoopprijs</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Gem. aankoopprijs</label>
               <input
                 type="number"
                 step="0.01"
                 value={avgPrice}
                 onChange={(e) => setAvgPrice(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Huidige prijs</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Huidige prijs</label>
               <input
                 type="number"
                 step="0.01"
                 value={currentPrice}
                 onChange={(e) => setCurrentPrice(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
               />
             </div>
           </div>
@@ -1624,7 +1624,7 @@ function HoldingEditForm({
           <div className="rounded-lg border border-kern-200 bg-kern-50/50 p-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-kern-700">Portfolio waarde (deze holding)</span>
-              <span className="text-sm font-bold text-zinc-900">{formatCurrency(newValue)}</span>
+              <span className="text-sm font-bold text-[var(--ink)]">{formatCurrency(newValue)}</span>
             </div>
             {newValue !== oldValue && (
               <p className={`mt-1 text-xs font-medium ${newValue >= oldValue ? 'text-emerald-600' : 'text-red-600'}`}>
@@ -1634,12 +1634,12 @@ function HoldingEditForm({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-600">Notities (optioneel)</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notities (optioneel)</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
             />
           </div>
         </div>
@@ -1647,7 +1647,7 @@ function HoldingEditForm({
         <div className="mt-5 flex justify-end gap-2">
           <button
             onClick={handleClose}
-            className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+            className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
           >
             Annuleren
           </button>
@@ -1782,31 +1782,31 @@ function HoldingTransactionForm({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white shadow-xl"
+        className="w-full max-w-lg rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-100 px-6 pt-5 pb-3">
+        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-6 pt-5 pb-3">
           <div>
-            <h3 className="text-lg font-bold text-zinc-900">Transactie registreren</h3>
-            <p className="text-xs text-zinc-500">{holding.name} {holding.ticker ? `(${holding.ticker})` : ''}</p>
+            <h3 className="text-lg font-bold text-[var(--ink)]">Transactie registreren</h3>
+            <p className="text-xs text-[var(--ink-3)]">{holding.name} {holding.ticker ? `(${holding.ticker})` : ''}</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+          <button onClick={onClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-zinc-100 px-6">
+        <div className="flex border-b border-[var(--border-ed)] px-6">
           <button
             onClick={() => setTab('new')}
-            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'new' ? 'border-kern-500 text-kern-700' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}
+            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'new' ? 'border-kern-500 text-kern-700' : 'border-transparent text-[var(--ink-3)] hover:text-[var(--ink-2)]'}`}
           >
             Nieuwe transactie
           </button>
           <button
             onClick={() => setTab('history')}
-            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'history' ? 'border-kern-500 text-kern-700' : 'border-transparent text-zinc-400 hover:text-zinc-600'}`}
+            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'history' ? 'border-kern-500 text-kern-700' : 'border-transparent text-[var(--ink-3)] hover:text-[var(--ink-2)]'}`}
           >
             Geschiedenis {transactions.length > 0 && `(${transactions.length})`}
           </button>
@@ -1824,7 +1824,7 @@ function HoldingTransactionForm({
 
               {/* Transaction type selector */}
               <div className="mb-4">
-                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Type transactie</label>
+                <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">Type transactie</label>
                 <div className="grid grid-cols-3 gap-2">
                   {(['buy', 'sell', 'dividend'] as const).map((t) => {
                     const cfg = typeConfig[t]
@@ -1836,7 +1836,7 @@ function HoldingTransactionForm({
                         className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-all ${
                           txType === t
                             ? `${cfg.bg} ${cfg.border} ${cfg.color} ring-1 ${cfg.ring}`
-                            : 'border-zinc-200 text-zinc-500 hover:bg-zinc-50'
+                            : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
                         }`}
                       >
                         <Icon className="h-3.5 w-3.5" />
@@ -1852,7 +1852,7 @@ function HoldingTransactionForm({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <div className="mb-1 flex items-center justify-between">
-                      <label className="block text-xs font-medium text-zinc-600">
+                      <label className="block text-xs font-medium text-[var(--ink-2)]">
                         {txType === 'dividend' ? 'Bedrag per eenheid' : 'Aantal eenheden'} *
                       </label>
                       {txType === 'sell' && currentUnits > 0 && (
@@ -1873,20 +1873,20 @@ function HoldingTransactionForm({
                       value={units}
                       onChange={(e) => setUnits(e.target.value)}
                       className={`w-full rounded-lg border px-3 py-2 text-sm ${
-                        sellExceedsOwned || sellFromZero ? 'border-red-300 bg-red-50/50' : 'border-zinc-200'
+                        sellExceedsOwned || sellFromZero ? 'border-red-300 bg-red-50/50' : 'border-[var(--border-ed)]'
                       }`}
                       placeholder={txType === 'dividend' ? '1' : '10'}
                       autoFocus
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Prijs per eenheid *</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Prijs per eenheid *</label>
                     <input
                       type="number"
                       step="0.01"
                       value={pricePerUnit}
                       onChange={(e) => setPricePerUnit(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                      className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
                       placeholder="50.00"
                     />
                   </div>
@@ -1894,28 +1894,28 @@ function HoldingTransactionForm({
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Datum *</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Datum *</label>
                     <input
                       type="date"
                       value={date}
                       onChange={(e) => setDate(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                      className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Totaal bedrag</label>
-                    <div className="flex items-center rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2 text-sm font-medium text-zinc-700">
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Totaal bedrag</label>
+                    <div className="flex items-center rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm font-medium text-[var(--ink-2)]">
                       {formatCurrency(totalAmount)}
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-600">Notities (optioneel)</label>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notities (optioneel)</label>
                   <input
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
                     placeholder="Maandelijkse aankoop..."
                   />
                 </div>
@@ -1944,13 +1944,13 @@ function HoldingTransactionForm({
                 <div className="mt-4 rounded-lg border border-kern-200 bg-kern-50/50 p-3">
                   <p className="text-xs font-medium text-kern-700 mb-1">Na transactie:</p>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-zinc-600">
-                      {currentUnits} <span className="text-zinc-400">→</span> {previewUnits.toFixed(3)} eenheden
+                    <span className="text-[var(--ink-2)]">
+                      {currentUnits} <span className="text-[var(--ink-3)]">→</span> {previewUnits.toFixed(3)} eenheden
                       {previewUnits === 0 && txType === 'sell' && (
-                        <span className="ml-2 text-xs font-medium text-zinc-500">(volledig uitverkocht)</span>
+                        <span className="ml-2 text-xs font-medium text-[var(--ink-3)]">(volledig uitverkocht)</span>
                       )}
                     </span>
-                    <span className="font-medium text-zinc-900">
+                    <span className="font-medium text-[var(--ink)]">
                       Gem. prijs: {formatCurrency(previewAvg)}
                     </span>
                   </div>
@@ -1961,7 +1961,7 @@ function HoldingTransactionForm({
               <div className="mt-5 flex justify-end gap-2">
                 <button
                   onClick={onClose}
-                  className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+                  className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
                 >
                   Annuleren
                 </button>
@@ -1990,8 +1990,8 @@ function HoldingTransactionForm({
 
               {!loadingHistory && transactions.length === 0 && (
                 <div className="py-8 text-center">
-                  <Receipt className="mx-auto h-8 w-8 text-zinc-300" />
-                  <p className="mt-2 text-sm text-zinc-500">Nog geen transacties geregistreerd</p>
+                  <Receipt className="mx-auto h-8 w-8 text-[var(--ink-4)]" />
+                  <p className="mt-2 text-sm text-[var(--ink-3)]">Nog geen transacties geregistreerd</p>
                 </div>
               )}
 
@@ -2025,15 +2025,15 @@ function HoldingTransactionForm({
                       const cfg = typeConfig[tx.type] || typeConfig.buy
                       const Icon = cfg.icon
                       return (
-                        <div key={tx.id} className="flex items-center gap-3 rounded-lg border border-zinc-100 p-2.5">
+                        <div key={tx.id} className="flex items-center gap-3 rounded-lg border border-[var(--border-ed)] p-2.5">
                           <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${cfg.bg}`}>
                             <Icon className={`h-3.5 w-3.5 ${cfg.color}`} />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-xs font-medium text-zinc-900">
+                            <p className="text-xs font-medium text-[var(--ink)]">
                               {cfg.label}: {tx.units} eenhe{tx.units === 1 ? 'id' : 'den'} @ {formatCurrency(tx.price_per_unit)}
                             </p>
-                            <p className="text-xs text-zinc-400">
+                            <p className="text-xs text-[var(--ink-3)]">
                               {new Date(tx.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
                               {tx.notes && ` — ${tx.notes}`}
                             </p>

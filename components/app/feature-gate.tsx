@@ -88,28 +88,28 @@ export function LockedFeatureCard({ featureId, currentPhase }: { featureId: stri
     ? Math.min(Math.round((currentPhaseIndex / unlockPhaseIndex) * 100), 100)
     : 0
 
-  const badgeColorClass = unlockPhase ? (PHASE_BADGE_COLORS[unlockPhase.color] ?? 'bg-zinc-100 text-zinc-600') : 'bg-zinc-100 text-zinc-600'
+  const badgeColorClass = unlockPhase ? (PHASE_BADGE_COLORS[unlockPhase.color] ?? 'bg-zinc-100 text-[var(--ink-2)]') : 'bg-zinc-100 text-[var(--ink-2)]'
   const barColorClass = unlockPhase ? (PHASE_BAR_COLORS[unlockPhase.color] ?? 'bg-zinc-400') : 'bg-zinc-400'
 
   return (
     <div
-      className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50/80 p-6 opacity-75"
+      className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/80 p-6 opacity-75"
       data-testid="locked-feature-card"
       aria-disabled="true"
     >
       <div className="flex flex-col items-center gap-3 text-center">
         {/* Lock icon */}
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-200/60">
-          <Lock className="h-5 w-5 text-zinc-400" />
+          <Lock className="h-5 w-5 text-[var(--ink-3)]" />
         </div>
 
         {/* Feature name */}
-        <p className="text-sm font-medium text-zinc-600">
+        <p className="text-sm font-medium text-[var(--ink-2)]">
           {featureDef?.label ?? featureId}
         </p>
 
         {/* Feature description */}
-        <p className="text-xs text-zinc-400">
+        <p className="text-xs text-[var(--ink-3)]">
           {featureDef?.description ?? 'Deze feature is nog niet beschikbaar in je huidige fase.'}
         </p>
 
@@ -123,7 +123,7 @@ export function LockedFeatureCard({ featureId, currentPhase }: { featureId: stri
 
         {/* Mini progress bar toward unlock */}
         <div className="mt-1 w-full max-w-[200px]">
-          <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1">
+          <div className="flex items-center justify-between text-[10px] text-[var(--ink-3)] mb-1">
             <span>{PHASES[currentPhaseIndex]?.label ?? 'Start'}</span>
             <span>{unlockPhase?.label ?? '?'}</span>
           </div>
@@ -207,7 +207,7 @@ export function NewFeatureSpotlight({ featureId, children }: { featureId: string
       data-testid={`new-feature-spotlight-${featureId}`}
     >
       {/* Spotlight ring — animated subtle glow */}
-      <div className="absolute -inset-0.5 rounded-xl bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400 opacity-30 blur-sm animate-pulse pointer-events-none" />
+      <div className="absolute -inset-0.5 rounded-[var(--r-lg)] bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400 opacity-30 blur-sm animate-pulse pointer-events-none" />
 
       {/* "Nieuw" badge */}
       <div className="absolute -top-2 -right-2 z-10">
@@ -223,7 +223,7 @@ export function NewFeatureSpotlight({ featureId, children }: { featureId: string
           className="absolute -top-10 left-1/2 -translate-x-1/2 z-20 whitespace-nowrap pointer-events-none animate-fade-in"
           data-testid={`spotlight-tooltip-${featureId}`}
         >
-          <div className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white shadow-lg">
+          <div className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white shadow-[var(--s2)]">
             <span className="text-blue-300">Nieuw!</span>{' '}
             {featureLabel} is nu beschikbaar
           </div>
@@ -233,7 +233,7 @@ export function NewFeatureSpotlight({ featureId, children }: { featureId: string
       )}
 
       {/* The actual feature content, slightly elevated */}
-      <div className="relative rounded-xl ring-2 ring-blue-300/50">
+      <div className="relative rounded-[var(--r-lg)] ring-2 ring-blue-300/50">
         {children}
       </div>
     </div>

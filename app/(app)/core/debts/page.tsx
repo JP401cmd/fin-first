@@ -243,9 +243,9 @@ export default function DebtsPage() {
   if (error) {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-700">{error}</p>
-          <button onClick={() => { setError(null); setLoading(true); loadDebts() }} className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
+          <button onClick={() => { setError(null); setLoading(true); loadDebts() }} className="mt-3 rounded-[var(--r)] bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
             Opnieuw proberen
           </button>
         </div>
@@ -256,17 +256,17 @@ export default function DebtsPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* Header with totals */}
-      <section className="rounded-2xl border border-kern-200 bg-gradient-to-br from-kern-50 to-white p-6">
+      <section className="rounded-[var(--r-lg)] border border-kern-200 card-editorial p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-zinc-900">Schulden</h1>
-            <p className="mt-1 text-sm text-zinc-500">
+            <h1 className="text-xl font-bold text-[var(--ink)]">Schulden</h1>
+            <p className="mt-1 text-sm text-[var(--ink-3)]">
               {activeDebts.length} actieve schuld{activeDebts.length !== 1 ? 'en' : ''} — vrijheid die je terugkoopt
             </p>
           </div>
           <button
             onClick={() => { setEditDebt(null); setShowForm(true) }}
-            className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
+            className="inline-flex items-center gap-2 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
           >
             <Plus className="h-4 w-4" />
             Schuld toevoegen
@@ -275,8 +275,8 @@ export default function DebtsPage() {
 
         <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div data-testid="kpi-total-debt">
-            <p className="text-xs font-medium text-zinc-500 uppercase">Totale schuld</p>
-            <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalBalance)}</p>
+            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Totale schuld</p>
+            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalBalance)}</p>
             {totalDebtFreedom && (
               <p className="mt-0.5 text-xs text-kern-600/80" data-testid="debt-freedom-time">
                 je koopt deze tijd terug in {formatFreedomTimeString(totalDebtFreedom, 'long')}
@@ -284,8 +284,8 @@ export default function DebtsPage() {
             )}
           </div>
           <div data-testid="kpi-monthly-payment">
-            <p className="text-xs font-medium text-zinc-500 uppercase">Maandelijkse aflossing</p>
-            <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalMonthlyPayments)}</p>
+            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Maandelijkse aflossing</p>
+            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalMonthlyPayments)}</p>
             {monthlyPaymentFreedomDays > 0 && (
               <p className="mt-0.5 text-xs text-kern-600/80" data-testid="payment-freedom-days">
                 je wint {monthlyPaymentFreedomDays} {monthlyPaymentFreedomDays === 1 ? 'dag' : 'dagen'} per maand terug
@@ -293,7 +293,7 @@ export default function DebtsPage() {
             )}
           </div>
           <div data-testid="kpi-paid-off">
-            <p className="text-xs font-medium text-zinc-500 uppercase">Al afgelost</p>
+            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Al afgelost</p>
             <p className="mt-1 text-xl font-bold text-emerald-600">{formatCurrency(totalOriginal - totalBalance)}</p>
             {dailyExpenses > 0 && totalOriginal - totalBalance >= 100 && (
               <p className="mt-0.5 text-xs text-emerald-600/80">
@@ -302,8 +302,8 @@ export default function DebtsPage() {
             )}
           </div>
           <div>
-            <p className="text-xs font-medium text-zinc-500 uppercase">Voortgang</p>
-            <p className="mt-1 text-xl font-bold text-zinc-900">{paidOff.toFixed(1)}%</p>
+            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Voortgang</p>
+            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{paidOff.toFixed(1)}%</p>
             <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-zinc-100">
               <div
                 className="h-full rounded-full bg-emerald-500 transition-all duration-500"
@@ -316,17 +316,17 @@ export default function DebtsPage() {
 
       {/* Payoff strategy */}
       <FeatureGate featureId="schulden_aflosplan" fallback="locked">
-      <section className="mt-6 rounded-2xl border border-zinc-200 bg-white p-6">
-        <h2 className="text-sm font-semibold text-zinc-700">Aflosstrategie</h2>
+      <section className="mt-6 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6">
+        <h2 className="text-sm font-semibold text-[var(--ink-2)]">Aflosstrategie</h2>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           {(['avalanche', 'snowball', 'current'] as PayoffStrategy[]).map((s) => (
             <button
               key={s}
               onClick={() => setStrategy(s)}
-              className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+              className={`rounded-[var(--r)] border px-4 py-2 text-sm font-medium transition-colors ${
                 strategy === s
                   ? 'border-kern-300 bg-kern-50 text-kern-700'
-                  : 'border-zinc-200 text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'
+                  : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
               }`}
             >
               {s === 'avalanche' ? 'Avalanche (hoogste rente eerst)' :
@@ -336,23 +336,23 @@ export default function DebtsPage() {
           ))}
 
           <div className="flex items-center gap-2">
-            <label className="text-xs text-zinc-500">Extra p/m:</label>
+            <label className="text-xs text-[var(--ink-3)]">Extra p/m:</label>
             <input
               type="number"
               min={0}
               step={25}
               value={extraMonthly}
               onChange={(e) => setExtraMonthly(Math.max(0, Number(e.target.value)))}
-              className="w-20 rounded-lg border border-zinc-200 px-2 py-1.5 text-sm text-zinc-900"
+              className="w-20 rounded-[var(--r)] border border-[var(--border-ed)] px-2 py-1.5 text-sm text-[var(--ink)]"
             />
           </div>
         </div>
 
         {/* Strategy results */}
         <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-3" data-testid="strategy-payoff-date">
-            <p className="text-xs text-zinc-500">Schuldenvrij op</p>
-            <p className="mt-1 text-sm font-bold text-zinc-900">
+          <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-3" data-testid="strategy-payoff-date">
+            <p className="text-xs text-[var(--ink-3)]">Schuldenvrij op</p>
+            <p className="mt-1 text-sm font-bold text-[var(--ink)]">
               {summary.payoffDate
                 ? new Date(summary.payoffDate).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
                 : 'Niet mogelijk'}
@@ -363,8 +363,8 @@ export default function DebtsPage() {
               </p>
             )}
           </div>
-          <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-3">
-            <p className="text-xs text-zinc-500">Totale rente</p>
+          <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
+            <p className="text-xs text-[var(--ink-3)]">Totale rente</p>
             <p className="mt-1 text-sm font-bold text-red-600">{formatCurrency(summary.totalInterest)}</p>
             {dailyExpenses > 0 && summary.totalInterest >= 100 && (
               <p className="mt-0.5 text-[10px] text-red-500/80">
@@ -373,7 +373,7 @@ export default function DebtsPage() {
             )}
           </div>
           {interestSaved > 0 && (
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+            <div className="rounded-[var(--r-lg)] border border-emerald-100 bg-emerald-50 p-3">
               <p className="text-xs text-emerald-600">Rente bespaard</p>
               <p className="mt-1 text-sm font-bold text-emerald-700">{formatCurrency(interestSaved)}</p>
               {dailyExpenses > 0 && interestSaved >= 100 && (
@@ -384,7 +384,7 @@ export default function DebtsPage() {
             </div>
           )}
           {monthsSaved > 0 && (
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+            <div className="rounded-[var(--r-lg)] border border-emerald-100 bg-emerald-50 p-3">
               <p className="text-xs text-emerald-600">Maanden eerder vrij</p>
               <p className="mt-1 text-sm font-bold text-emerald-700">{monthsSaved} maanden</p>
             </div>
@@ -429,21 +429,21 @@ export default function DebtsPage() {
           return (
             <div
               key={debt.id}
-              className="flex cursor-pointer items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 transition-colors hover:border-kern-200 hover:bg-kern-50/30"
+              className="flex cursor-pointer items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 transition-colors hover:border-kern-200 hover:bg-kern-50/30"
               onClick={() => openDebtModal(debt)}
               data-testid={`debt-card-${debt.id}`}
             >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-kern-50">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-kern-50">
                 <BudgetIcon name={icon} className="h-4 w-4 text-kern-600" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-zinc-900 flex items-center gap-1.5">
+                    <p className="truncate text-sm font-medium text-[var(--ink)] flex items-center gap-1.5">
                       {debt.name}
                       <OwnershipBadge ownership={debt.ownership ?? 'personal'} />
                     </p>
-                    <p className="truncate text-xs text-zinc-500">
+                    <p className="truncate text-xs text-[var(--ink-3)]">
                       {DEBT_TYPE_LABELS[debt.debt_type]}
                       {debt.subtype && DEBT_SUBTYPE_LABELS[debt.debt_type]?.[debt.subtype]
                         ? ` \u2022 ${DEBT_SUBTYPE_LABELS[debt.debt_type]![debt.subtype]}`
@@ -454,8 +454,8 @@ export default function DebtsPage() {
                   {/* Mini sparkline showing balance trend */}
                   <DebtMiniSparkline debtId={debt.id} valuations={debtValuations} currentBalance={balance} />
                   <div className="shrink-0 text-right ml-3">
-                    <p className="text-sm font-semibold text-zinc-900">{formatCurrency(balance)}</p>
-                    <p className="text-xs text-zinc-400">van {formatCurrency(original)}</p>
+                    <p className="text-sm font-semibold text-[var(--ink)]">{formatCurrency(balance)}</p>
+                    <p className="text-xs text-[var(--ink-3)]">van {formatCurrency(original)}</p>
                     {dailyExpenses > 0 && balance >= 100 && (
                       <p className="text-[10px] text-kern-600/70">
                         {formatFreedomTimeString(calculateFreedomTime(balance, dailyExpenses), 'short')} terug te winnen
@@ -475,10 +475,10 @@ export default function DebtsPage() {
         })}
 
         {debts.length === 0 && (
-          <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
+          <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-8 text-center">
             <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-400" />
-            <p className="mt-2 text-sm font-medium text-zinc-600">Geen schulden geregistreerd</p>
-            <p className="mt-1 text-xs text-zinc-400">Voeg een schuld toe om je aflosplan te starten.</p>
+            <p className="mt-2 text-sm font-medium text-[var(--ink-2)]">Geen schulden geregistreerd</p>
+            <p className="mt-1 text-xs text-[var(--ink-3)]">Voeg een schuld toe om je aflosplan te starten.</p>
           </div>
         )}
       </section>
@@ -588,18 +588,18 @@ function DebtDetailModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl"
+        className="w-full max-w-lg overflow-y-auto rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl"
         style={{ maxHeight: '90vh' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center gap-3 border-b border-zinc-200 px-6 py-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-kern-50">
+        <div className="flex items-center gap-3 border-b border-[var(--border-ed)] px-6 py-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)] bg-kern-50">
             <BudgetIcon name={icon} className="h-5 w-5 text-kern-600" />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="font-semibold text-zinc-900">{debt.name}</h2>
-            <p className="text-xs text-zinc-500">
+            <h2 className="font-semibold text-[var(--ink)]">{debt.name}</h2>
+            <p className="text-xs text-[var(--ink-3)]">
               {DEBT_TYPE_LABELS[debt.debt_type]}
               {debt.subtype && DEBT_SUBTYPE_LABELS[debt.debt_type]?.[debt.subtype]
                 ? ` \u2022 ${DEBT_SUBTYPE_LABELS[debt.debt_type]![debt.subtype]}`
@@ -607,27 +607,27 @@ function DebtDetailModal({
               {debt.creditor ? ` \u2022 ${debt.creditor}` : ''}
             </p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+          <button onClick={onClose} className="rounded-[var(--r)] p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Balance highlight */}
-        <div className="border-b border-zinc-100 px-6 py-4 text-center">
-          <p className="text-3xl font-bold text-zinc-900" data-testid="modal-debt-balance">{formatCurrency(balance)}</p>
+        <div className="border-b border-[var(--border-ed)] px-6 py-4 text-center">
+          <p className="text-3xl font-bold text-[var(--ink)]" data-testid="modal-debt-balance">{formatCurrency(balance)}</p>
           {dailyExpenses > 0 && balance >= 100 && (
             <p className="mt-0.5 text-sm text-kern-600" data-testid="modal-debt-freedom-time">
               je koopt deze tijd terug in {formatFreedomTimeString(calculateFreedomTime(balance, dailyExpenses), 'long')}
             </p>
           )}
-          <p className="mt-1 text-sm text-zinc-500">van {formatCurrency(original)} ({pct.toFixed(1)}% afgelost)</p>
+          <p className="mt-1 text-sm text-[var(--ink-3)]">van {formatCurrency(original)} ({pct.toFixed(1)}% afgelost)</p>
           <div className="mx-auto mt-2 h-2 w-48 overflow-hidden rounded-full bg-zinc-100">
             <div className="h-full rounded-full bg-kern-500 transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
           </div>
           {/* Badges */}
           <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
             {debt.repayment_type && (
-              <span className="inline-block rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700">
+              <span className="inline-block rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-[var(--ink-2)]">
                 {REPAYMENT_TYPE_LABELS[debt.repayment_type]}
               </span>
             )}
@@ -644,7 +644,7 @@ function DebtDetailModal({
         <div className="space-y-4 px-6 py-4">
           {/* Payoff timeline highlight */}
           {debt.repayment_type !== 'aflossingsvrij' && proj.isPayable && proj.monthsToPayoff > 0 && (
-            <div className="rounded-xl border border-kern-200 bg-kern-50 p-3 text-center" data-testid="payoff-timeline">
+            <div className="rounded-[var(--r-lg)] border border-kern-200 bg-kern-50 p-3 text-center" data-testid="payoff-timeline">
               <p className="text-xs font-medium text-kern-700/60 uppercase">Aflostijd</p>
               <p className="mt-1 text-2xl font-bold text-kern-700" data-testid="months-to-payoff">
                 {proj.monthsToPayoff} maanden
@@ -658,22 +658,22 @@ function DebtDetailModal({
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-lg bg-zinc-50 p-3">
-              <p className="text-xs text-zinc-500">Rente</p>
-              <p className="mt-0.5 text-sm font-medium text-zinc-900">{Number(debt.interest_rate)}% p.j.</p>
+            <div className="rounded-[var(--r)] bg-[var(--subtle)] p-3">
+              <p className="text-xs text-[var(--ink-3)]">Rente</p>
+              <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">{Number(debt.interest_rate)}% p.j.</p>
             </div>
-            <div className="rounded-lg bg-zinc-50 p-3" data-testid="modal-monthly-payment">
-              <p className="text-xs text-zinc-500">Maandelijkse betaling</p>
-              <p className="mt-0.5 text-sm font-medium text-zinc-900">{formatCurrency(Number(debt.monthly_payment))}</p>
+            <div className="rounded-[var(--r)] bg-[var(--subtle)] p-3" data-testid="modal-monthly-payment">
+              <p className="text-xs text-[var(--ink-3)]">Maandelijkse betaling</p>
+              <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">{formatCurrency(Number(debt.monthly_payment))}</p>
               {dailyExpenses > 0 && Number(debt.monthly_payment) > 0 && (
                 <p className="mt-0.5 text-[10px] text-kern-600/80" data-testid="modal-payment-freedom-days">
                   je wint {Math.round(Number(debt.monthly_payment) / dailyExpenses)} {Math.round(Number(debt.monthly_payment) / dailyExpenses) === 1 ? 'dag' : 'dagen'} per maand terug
                 </p>
               )}
             </div>
-            <div className="rounded-lg bg-zinc-50 p-3">
-              <p className="text-xs text-zinc-500">Aflossing op</p>
-              <p className="mt-0.5 text-sm font-medium text-zinc-900">
+            <div className="rounded-[var(--r)] bg-[var(--subtle)] p-3">
+              <p className="text-xs text-[var(--ink-3)]">Aflossing op</p>
+              <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">
                 {debt.repayment_type === 'aflossingsvrij'
                   ? 'Aflossingsvrij'
                   : proj.isPayable && proj.payoffDate
@@ -681,8 +681,8 @@ function DebtDetailModal({
                     : 'Onbekend'}
               </p>
             </div>
-            <div className="rounded-lg bg-zinc-50 p-3">
-              <p className="text-xs text-zinc-500">Resterende rente</p>
+            <div className="rounded-[var(--r)] bg-[var(--subtle)] p-3">
+              <p className="text-xs text-[var(--ink-3)]">Resterende rente</p>
               <p className="mt-0.5 text-sm font-medium text-red-600">
                 {proj.isPayable ? formatCurrency(proj.totalInterest) : 'Onbetaalbaar'}
               </p>
@@ -705,9 +705,9 @@ function DebtDetailModal({
             return (
               <div className="grid grid-cols-2 gap-3">
                 {details.map((d) => (
-                  <div key={d.label} className="rounded-lg bg-kern-50/50 p-3">
+                  <div key={d.label} className="rounded-[var(--r)] bg-kern-50/50 p-3">
                     <p className="text-xs text-kern-700/60">{d.label}</p>
-                    <p className="mt-0.5 text-sm font-medium text-zinc-900">{d.value}</p>
+                    <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">{d.value}</p>
                   </div>
                 ))}
               </div>
@@ -715,7 +715,7 @@ function DebtDetailModal({
           })()}
 
           {!proj.isPayable && debt.repayment_type !== 'aflossingsvrij' && (
-            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
+            <div className="flex items-center gap-2 rounded-[var(--r)] border border-red-200 bg-red-50 p-3">
               <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
               <p className="text-xs text-red-700">
                 De maandelijkse betaling dekt de rente niet. Verhoog de betaling om deze schuld af te lossen.
@@ -723,7 +723,7 @@ function DebtDetailModal({
             </div>
           )}
 
-          {debt.notes && <p className="text-xs text-zinc-500">{debt.notes}</p>}
+          {debt.notes && <p className="text-xs text-[var(--ink-3)]">{debt.notes}</p>}
 
           {/* Debt trajectory chart: actual vs projected */}
           <DebtTrajectoryChart debt={debt} valuations={valuations} />
@@ -731,17 +731,17 @@ function DebtDetailModal({
           {/* Valuation history */}
           {valuations && valuations.length > 0 && (
             <div>
-              <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">Saldohistorie</p>
+              <p className="mb-2 text-xs font-semibold text-[var(--ink-3)] uppercase">Saldohistorie</p>
               <div className="space-y-1">
                 {valuations.slice(0, 5).map((v) => {
                   const prev = valuations.find((vv) => vv.valuation_date < v.valuation_date)
                   const diff = prev ? Number(v.value) - Number(prev.value) : null
                   return (
                     <div key={v.id} className="flex items-center gap-3 text-xs">
-                      <span className="w-20 shrink-0 text-zinc-400">
+                      <span className="w-20 shrink-0 text-[var(--ink-3)]">
                         {new Date(v.valuation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
                       </span>
-                      <span className="font-medium text-zinc-700">{formatCurrency(Number(v.value))}</span>
+                      <span className="font-medium text-[var(--ink-2)]">{formatCurrency(Number(v.value))}</span>
                       {diff !== null && (
                         <span className={`text-[10px] font-medium ${diff <= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                           {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
@@ -756,17 +756,17 @@ function DebtDetailModal({
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2 border-t border-zinc-200 px-6 py-4">
+        <div className="flex gap-2 border-t border-[var(--border-ed)] px-6 py-4">
           <button
             onClick={onRevalue}
-            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-kern-200 px-3 py-2 text-xs font-medium text-kern-700 hover:bg-kern-50"
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[var(--r)] border border-kern-200 px-3 py-2 text-xs font-medium text-kern-700 hover:bg-kern-50"
           >
             <RefreshCw className="h-3.5 w-3.5" />
             Saldo bijwerken
           </button>
           <button
             onClick={onEdit}
-            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-kern-600 px-3 py-2 text-xs font-medium text-white hover:bg-kern-700"
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-3 py-2 text-xs font-medium text-white hover:bg-kern-700"
           >
             <Edit3 className="h-3.5 w-3.5" />
             Bewerken
@@ -774,14 +774,14 @@ function DebtDetailModal({
           {confirmDelete ? (
             <button
               onClick={onDelete}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-xs font-medium text-white hover:bg-red-700"
+              className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] bg-red-600 px-3 py-2 text-xs font-medium text-white hover:bg-red-700"
             >
               Bevestigen
             </button>
           ) : (
             <button
               onClick={() => setConfirmDelete(true)}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+              className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -1009,7 +1009,7 @@ function DebtPayoffTrajectoryChart({
 
   return (
     <div data-testid="debt-payoff-trajectory-chart">
-      <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">Schuld-trajectvergelijking</p>
+      <p className="mb-2 text-xs font-semibold text-[var(--ink-3)] uppercase">Schuld-trajectvergelijking</p>
       <svg viewBox={`0 0 ${w} ${h}`} className="h-auto w-full" preserveAspectRatio="xMidYMid meet">
         <defs>
           <linearGradient id="snowball-fill-grad" x1="0" y1="0" x2="0" y2="1">
@@ -1166,8 +1166,8 @@ function StrategyComparisonMessage({
 
   if (sameTime && sameInterest) {
     message = 'Beide strategieën leiden tot hetzelfde resultaat voor jouw schulden.'
-    bgClass = 'border-zinc-200 bg-zinc-50'
-    textClass = 'text-zinc-700'
+    bgClass = 'border-[var(--border-ed)] bg-[var(--subtle)]'
+    textClass = 'text-[var(--ink-2)]'
   } else if (avalancheFaster && avalancheCheaper) {
     message = `Bij avalanche-strategie ben je ${monthDiff} ${monthDiff === 1 ? 'maand' : 'maanden'} eerder schuldenvrij en bespaar je ${formatCurrency(interestDiff)} aan rente.`
     bgClass = 'border-red-200 bg-red-50'
@@ -1197,7 +1197,7 @@ function StrategyComparisonMessage({
 
   return (
     <div
-      className={`mt-3 rounded-xl border p-3 text-center ${bgClass}`}
+      className={`mt-3 rounded-[var(--r-lg)] border p-3 text-center ${bgClass}`}
       data-testid="strategy-comparison-message"
     >
       <p className={`text-sm font-medium ${textClass}`} data-testid="strategy-comparison-text">
@@ -1205,7 +1205,7 @@ function StrategyComparisonMessage({
         {freedomNote && <span className="font-normal text-kern-600">{freedomNote}</span>}
       </p>
       {!sameTime && (
-        <div className="mt-2 flex items-center justify-center gap-6 text-xs text-zinc-500">
+        <div className="mt-2 flex items-center justify-center gap-6 text-xs text-[var(--ink-3)]">
           <span data-testid="snowball-months">
             <span className="inline-block h-2 w-2 rounded-full bg-blue-500 mr-1" />
             Sneeuwbal: {snowMonths} mnd
@@ -1388,14 +1388,14 @@ function DebtForm({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
+        className="w-full max-w-lg rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-zinc-900">
+          <h3 className="text-lg font-bold text-[var(--ink)]">
             {isEdit ? 'Schuld bewerken' : 'Nieuwe schuld'}
           </h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+          <button onClick={onClose} className="rounded-[var(--r)] p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -1403,20 +1403,20 @@ function DebtForm({
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Naam</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Naam</label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
                 placeholder="Hypotheek"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Type</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Type</label>
               <select
                 value={debtType}
                 onChange={(e) => handleTypeChange(e.target.value as DebtType)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
               >
                 {Object.entries(DEBT_TYPE_LABELS).map(([key, label]) => (
                   <option key={key} value={key}>{label}</option>
@@ -1435,11 +1435,11 @@ function DebtForm({
           {/* Subtype dropdown (conditional) */}
           {subtypeOptions && (
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Subtype</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Subtype</label>
               <select
                 value={subtype}
                 onChange={(e) => handleSubtypeChange(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
               >
                 <option value="">Selecteer subtype...</option>
                 {Object.entries(subtypeOptions).map(([key, label]) => (
@@ -1451,99 +1451,99 @@ function DebtForm({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Oorspronkelijk bedrag</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Oorspronkelijk bedrag</label>
               <input
                 type="number"
                 value={originalAmount}
                 onChange={(e) => setOriginalAmount(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Huidig saldo</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Huidig saldo</label>
               <input
                 type="number"
                 value={currentBalance}
                 onChange={(e) => setCurrentBalance(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Rente (% per jaar)</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Rente (% per jaar)</label>
               <input
                 type="number"
                 step="0.1"
                 value={interestRate}
                 onChange={(e) => setInterestRate(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Min. betaling p/m</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Min. betaling p/m</label>
               <input
                 type="number"
                 value={minimumPayment}
                 onChange={(e) => setMinimumPayment(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Werkelijke betaling p/m</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Werkelijke betaling p/m</label>
               <input
                 type="number"
                 value={monthlyPayment}
                 onChange={(e) => setMonthlyPayment(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Startdatum</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Startdatum</label>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Einddatum (optioneel)</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Einddatum (optioneel)</label>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
               />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-600">Kredietverstrekker</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Kredietverstrekker</label>
             <input
               value={creditor}
               onChange={(e) => setCreditor(e.target.value)}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
               placeholder="ABN AMRO, ING, DUO..."
             />
           </div>
 
           {/* Type-specific fields */}
           {visibleFields.length > 0 && visibleFields.some((f) => f !== 'subtype') && (
-            <div className="space-y-3 rounded-lg border border-kern-100 bg-kern-50/30 p-3">
+            <div className="space-y-3 rounded-[var(--r)] border border-kern-100 bg-kern-50/30 p-3">
               <p className="text-xs font-semibold text-kern-700/60 uppercase">Details</p>
               <div className="grid grid-cols-2 gap-3">
                 {visibleFields.includes('repayment_type') && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Aflossingstype</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Aflossingstype</label>
                     <select
                       value={repaymentType}
                       onChange={(e) => setRepaymentType(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
                     >
                       <option value="">-</option>
                       {Object.entries(REPAYMENT_TYPE_LABELS).map(([k, l]) => (
@@ -1553,45 +1553,45 @@ function DebtForm({
                   </div>
                 )}
                 {visibleFields.includes('is_tax_deductible') && (
-                  <label className="flex items-center gap-2 text-sm text-zinc-700">
+                  <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
                     <input
                       type="checkbox"
                       checked={isTaxDeductible}
                       onChange={(e) => setIsTaxDeductible(e.target.checked)}
-                      className="rounded border-zinc-300"
+                      className="rounded border-[var(--border-md)]"
                     />
                     Hypotheekrenteaftrek
                   </label>
                 )}
                 {visibleFields.includes('nhg') && (
-                  <label className="flex items-center gap-2 text-sm text-zinc-700">
+                  <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
                     <input
                       type="checkbox"
                       checked={nhg}
                       onChange={(e) => setNhg(e.target.checked)}
-                      className="rounded border-zinc-300"
+                      className="rounded border-[var(--border-md)]"
                     />
                     NHG
                   </label>
                 )}
                 {visibleFields.includes('fixed_rate_end_date') && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Rentevast tot</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Rentevast tot</label>
                     <input
                       type="date"
                       value={fixedRateEndDate}
                       onChange={(e) => setFixedRateEndDate(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
                     />
                   </div>
                 )}
                 {visibleFields.includes('linked_asset_id') && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Gekoppelde woning</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Gekoppelde woning</label>
                     <select
                       value={linkedAssetId}
                       onChange={(e) => setLinkedAssetId(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
                     >
                       <option value="">-</option>
                       {userAssets.filter((a) => a.asset_type === 'eigen_huis' || a.asset_type === 'real_estate').map((a) => (
@@ -1602,23 +1602,23 @@ function DebtForm({
                 )}
                 {visibleFields.includes('credit_limit') && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Kredietlimiet</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Kredietlimiet</label>
                     <input
                       type="number"
                       value={creditLimit}
                       onChange={(e) => setCreditLimit(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
                     />
                   </div>
                 )}
                 {visibleFields.includes('draagkrachtmeting_date') && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Draagkrachtmeting</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Draagkrachtmeting</label>
                     <input
                       type="date"
                       value={draagkrachtmetingDate}
                       onChange={(e) => setDraagkrachtmetingDate(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
                     />
                   </div>
                 )}
@@ -1627,18 +1627,18 @@ function DebtForm({
           )}
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-600">Notities (optioneel)</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notities (optioneel)</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
             />
           </div>
         </div>
 
         {validationError && (
-          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700" data-testid="debt-validation-error">
+          <div className="mt-3 rounded-[var(--r)] border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700" data-testid="debt-validation-error">
             {validationError}
           </div>
         )}
@@ -1646,14 +1646,14 @@ function DebtForm({
         <div className="mt-5 flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+            className="rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
           >
             Annuleren
           </button>
           <button
             onClick={handleSave}
             disabled={saving || !name || !currentBalance}
-            className="rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+            className="rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
           >
             {saving ? 'Opslaan...' : isEdit ? 'Bijwerken' : 'Toevoegen'}
           </button>
@@ -1740,30 +1740,30 @@ function ValuationModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
+        className="w-full max-w-md rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-zinc-900">{label}</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+          <h3 className="text-lg font-bold text-[var(--ink)]">{label}</h3>
+          <button onClick={onClose} className="rounded-[var(--r)] p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <p className="mb-4 text-sm text-zinc-500">{entityName}</p>
+        <p className="mb-4 text-sm text-[var(--ink-3)]">{entityName}</p>
 
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-600">Datum</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Datum</label>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-600">
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
               {entityType === 'asset' ? 'Nieuwe waarde' : 'Nieuw saldo'}
             </label>
             <input
@@ -1771,18 +1771,18 @@ function ValuationModal({
               step="0.01"
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
             />
-            <p className="mt-1 text-xs text-zinc-400">
+            <p className="mt-1 text-xs text-[var(--ink-3)]">
               Huidige waarde: {formatCurrency(currentValue)}
             </p>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-600">Notitie (optioneel)</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notitie (optioneel)</label>
             <input
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
               placeholder="Reden van waardewijziging..."
             />
           </div>
@@ -1791,14 +1791,14 @@ function ValuationModal({
         <div className="mt-5 flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+            className="rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
           >
             Annuleren
           </button>
           <button
             onClick={handleSave}
             disabled={saving || !value}
-            className="rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+            className="rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
           >
             {saving ? 'Opslaan...' : 'Opslaan'}
           </button>
@@ -1954,7 +1954,7 @@ function DebtTrajectoryChart({
 
   return (
     <div data-testid="debt-trajectory-chart">
-      <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">Schuldverloop</p>
+      <p className="mb-2 text-xs font-semibold text-[var(--ink-3)] uppercase">Schuldverloop</p>
       <svg viewBox={`0 0 ${w} ${h}`} className="h-auto w-full" preserveAspectRatio="xMidYMid meet">
         <defs>
           <linearGradient id={`actual-fill-${debt.id}`} x1="0" y1="0" x2="0" y2="1">
@@ -2093,25 +2093,25 @@ function ValuationHistory({
   if (!valuations || valuations.length === 0) return null
 
   return (
-    <div className="mt-4 border-t border-zinc-100 pt-3">
-      <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">Saldohistorie</p>
+    <div className="mt-4 border-t border-[var(--border-ed)] pt-3">
+      <p className="mb-2 text-xs font-semibold text-[var(--ink-3)] uppercase">Saldohistorie</p>
       <div className="space-y-1">
         {valuations.map((v) => {
           const prev = valuations.find((vv) => vv.valuation_date < v.valuation_date)
           const diff = prev ? Number(v.value) - Number(prev.value) : null
           return (
             <div key={v.id} className="flex items-center gap-3 text-xs">
-              <span className="w-20 shrink-0 text-zinc-400">
+              <span className="w-20 shrink-0 text-[var(--ink-3)]">
                 {new Date(v.valuation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
               </span>
-              <span className="font-medium text-zinc-700">{formatCurrency(Number(v.value))}</span>
+              <span className="font-medium text-[var(--ink-2)]">{formatCurrency(Number(v.value))}</span>
               {diff !== null && (
                 <span className={`text-[10px] font-medium ${diff <= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                   {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
                 </span>
               )}
               {v.notes && (
-                <span className="truncate text-zinc-400">{v.notes}</span>
+                <span className="truncate text-[var(--ink-3)]">{v.notes}</span>
               )}
             </div>
           )

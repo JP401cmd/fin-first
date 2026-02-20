@@ -173,11 +173,11 @@ function ContributionBar({
     <div className="flex items-center gap-3" data-testid={`contribution-${partner.isCurrentUser ? 'me' : 'partner'}`}>
       <div className="flex items-center gap-1.5 w-24 shrink-0">
         {partner.isCurrentUser ? (
-          <User className="h-3.5 w-3.5 text-zinc-600" />
+          <User className="h-3.5 w-3.5 text-[var(--ink-2)]" />
         ) : (
           <Users className="h-3.5 w-3.5 text-wil-600" />
         )}
-        <span className="text-xs font-medium text-zinc-700 truncate">
+        <span className="text-xs font-medium text-[var(--ink-2)] truncate">
           {partner.isCurrentUser ? 'Jij' : partner.name || 'Partner'}
         </span>
       </div>
@@ -220,8 +220,8 @@ function SplitModeCard({
         onClick={onSelect}
         className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all ${
           isActive
-            ? `${colors.bg} ${colors.border} ${colors.text} shadow-sm`
-            : 'border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300'
+            ? `${colors.bg} ${colors.border} ${colors.text} shadow-[var(--s0)]`
+            : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-[var(--border-md)]'
         }`}
         data-testid={`split-mode-${result.mode}`}
         data-active={isActive ? 'true' : 'false'}
@@ -236,17 +236,17 @@ function SplitModeCard({
     <button
       type="button"
       onClick={onSelect}
-      className={`flex flex-col gap-2 rounded-xl border-2 p-4 text-left transition-all ${
+      className={`flex flex-col gap-2 rounded-[var(--r-lg)] border-2 p-4 text-left transition-all ${
         isActive
-          ? `${colors.bg} ${colors.border} ${colors.text} shadow-sm ring-1 ring-${colors.border}`
-          : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50'
+          ? `${colors.bg} ${colors.border} ${colors.text} shadow-[var(--s0)] ring-1 ring-${colors.border}`
+          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] hover:border-[var(--border-md)] hover:bg-[var(--subtle)]'
       }`}
       data-testid={`split-mode-${result.mode}`}
       data-active={isActive ? 'true' : 'false'}
     >
       <div className="flex items-center gap-2">
         <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-          isActive ? colors.accent + ' text-white' : 'bg-zinc-100 text-zinc-500'
+          isActive ? colors.accent + ' text-white' : 'bg-zinc-100 text-[var(--ink-3)]'
         }`}>
           <Icon className="h-4 w-4" />
         </div>
@@ -254,7 +254,7 @@ function SplitModeCard({
           <p className={`text-sm font-semibold ${isActive ? colors.text : 'text-zinc-800'}`}>
             {result.label}
           </p>
-          <p className="text-[10px] text-zinc-400 truncate">
+          <p className="text-[10px] text-[var(--ink-3)] truncate">
             {result.description}
           </p>
         </div>
@@ -287,7 +287,7 @@ export function PartnerContributionSummary({
   const colors = MODE_COLORS[result.mode]
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-4" data-testid="partner-contribution-summary">
+    <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4" data-testid="partner-contribution-summary">
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-sm font-semibold text-zinc-800 flex items-center gap-1.5">
           <Users className="h-4 w-4 text-wil-600" />
@@ -299,9 +299,9 @@ export function PartnerContributionSummary({
       </div>
 
       {/* Total */}
-      <div className="flex items-center justify-between mb-3 pb-3 border-b border-zinc-100">
-        <span className="text-xs text-zinc-500">{itemLabel || 'Totaal gedeeld'}</span>
-        <span className="text-sm font-bold text-zinc-900" data-testid="split-total-amount">
+      <div className="flex items-center justify-between mb-3 pb-3 border-b border-[var(--border-ed)]">
+        <span className="text-xs text-[var(--ink-3)]">{itemLabel || 'Totaal gedeeld'}</span>
+        <span className="text-sm font-bold text-[var(--ink)]" data-testid="split-total-amount">
           {formatCurrency(result.totalAmount)}
         </span>
       </div>
@@ -311,13 +311,13 @@ export function PartnerContributionSummary({
         {result.partners.map((partner) => (
           <div
             key={partner.userId}
-            className="flex items-center justify-between rounded-lg bg-zinc-50 px-3 py-2"
+            className="flex items-center justify-between rounded-lg bg-[var(--subtle)] px-3 py-2"
             data-testid={`partner-row-${partner.isCurrentUser ? 'me' : 'partner'}`}
           >
             <div className="flex items-center gap-2">
               {partner.isCurrentUser ? (
                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-200">
-                  <User className="h-3 w-3 text-zinc-600" />
+                  <User className="h-3 w-3 text-[var(--ink-2)]" />
                 </div>
               ) : (
                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-wil-100">
@@ -328,17 +328,17 @@ export function PartnerContributionSummary({
                 <p className="text-xs font-medium text-zinc-800">
                   {partner.isCurrentUser ? 'Jij' : partner.name || 'Partner'}
                 </p>
-                <p className="text-[10px] text-zinc-400">
+                <p className="text-[10px] text-[var(--ink-3)]">
                   {partner.sharePct}% aandeel
                 </p>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-sm font-bold text-zinc-900 tabular-nums" data-testid={`partner-amount-${partner.isCurrentUser ? 'me' : 'partner'}`}>
+              <p className="text-sm font-bold text-[var(--ink)] tabular-nums" data-testid={`partner-amount-${partner.isCurrentUser ? 'me' : 'partner'}`}>
                 {formatCurrency(partner.shareAmount)}
               </p>
               {partner.income !== undefined && partner.income > 0 && (
-                <p className="text-[10px] text-zinc-400 tabular-nums">
+                <p className="text-[10px] text-[var(--ink-3)] tabular-nums">
                   Inkomen: {formatCurrency(partner.income)}/mnd
                 </p>
               )}
@@ -388,7 +388,7 @@ export function SharedBudgetSplitList({
   const colors = MODE_COLORS[splitResult.mode]
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white" data-testid="shared-budget-split-list">
+    <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)]" data-testid="shared-budget-split-list">
       <div className="flex items-center justify-between p-4 pb-2">
         <h4 className="text-sm font-semibold text-zinc-800 flex items-center gap-1.5">
           <Wallet className="h-4 w-4 text-kern-500" />
@@ -407,19 +407,19 @@ export function SharedBudgetSplitList({
           return (
             <div key={budget.id} className="px-4 py-3" data-testid={`budget-split-${budget.id}`}>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-medium text-zinc-700">{budget.name}</span>
-                <span className="text-xs font-semibold text-zinc-900 tabular-nums">
+                <span className="text-xs font-medium text-[var(--ink-2)]">{budget.name}</span>
+                <span className="text-xs font-semibold text-[var(--ink)] tabular-nums">
                   {formatCurrency(budget.totalAmount)}
                 </span>
               </div>
               <div className="flex gap-4">
-                <div className="flex items-center gap-1 text-[10px] text-zinc-500">
+                <div className="flex items-center gap-1 text-[10px] text-[var(--ink-3)]">
                   <User className="h-2.5 w-2.5" />
-                  Jij: <span className="font-medium text-zinc-700 tabular-nums">{formatCurrency(myAmount)}</span>
+                  Jij: <span className="font-medium text-[var(--ink-2)] tabular-nums">{formatCurrency(myAmount)}</span>
                 </div>
-                <div className="flex items-center gap-1 text-[10px] text-zinc-500">
+                <div className="flex items-center gap-1 text-[10px] text-[var(--ink-3)]">
                   <Users className="h-2.5 w-2.5" />
-                  Partner: <span className="font-medium text-zinc-700 tabular-nums">{formatCurrency(partnerAmount)}</span>
+                  Partner: <span className="font-medium text-[var(--ink-2)] tabular-nums">{formatCurrency(partnerAmount)}</span>
                 </div>
               </div>
             </div>
@@ -428,21 +428,21 @@ export function SharedBudgetSplitList({
       </div>
 
       {/* Totals row */}
-      <div className="border-t border-zinc-200 bg-zinc-50 px-4 py-3 rounded-b-xl">
+      <div className="border-t border-[var(--border-ed)] bg-[var(--subtle)] px-4 py-3 rounded-b-xl">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-semibold text-zinc-700">Totaal gedeeld</span>
-          <span className="text-sm font-bold text-zinc-900 tabular-nums">
+          <span className="text-xs font-semibold text-[var(--ink-2)]">Totaal gedeeld</span>
+          <span className="text-sm font-bold text-[var(--ink)] tabular-nums">
             {formatCurrency(sharedBudgets.reduce((s, b) => s + b.totalAmount, 0))}
           </span>
         </div>
         <div className="flex gap-4">
-          <span className="text-[10px] text-zinc-500">
-            Jij: <span className="font-medium text-zinc-700 tabular-nums">
+          <span className="text-[10px] text-[var(--ink-3)]">
+            Jij: <span className="font-medium text-[var(--ink-2)] tabular-nums">
               {formatCurrency(sharedBudgets.reduce((s, b) => s + b.totalAmount * (myPct / 100), 0))}
             </span> ({myPct}%)
           </span>
-          <span className="text-[10px] text-zinc-500">
-            Partner: <span className="font-medium text-zinc-700 tabular-nums">
+          <span className="text-[10px] text-[var(--ink-3)]">
+            Partner: <span className="font-medium text-[var(--ink-2)] tabular-nums">
               {formatCurrency(sharedBudgets.reduce((s, b) => s + b.totalAmount * (partnerPct / 100), 0))}
             </span> ({partnerPct}%)
           </span>
@@ -478,7 +478,7 @@ export function SharedDebtSplitList({
   const colors = MODE_COLORS[splitResult.mode]
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white" data-testid="shared-debt-split-list">
+    <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)]" data-testid="shared-debt-split-list">
       <div className="flex items-center justify-between p-4 pb-2">
         <h4 className="text-sm font-semibold text-zinc-800 flex items-center gap-1.5">
           <TrendingDown className="h-4 w-4 text-rose-500" />
@@ -499,36 +499,36 @@ export function SharedDebtSplitList({
           return (
             <div key={debt.id} className="px-4 py-3" data-testid={`debt-split-${debt.id}`}>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-medium text-zinc-700">{debt.name}</span>
+                <span className="text-xs font-medium text-[var(--ink-2)]">{debt.name}</span>
                 <span className="text-xs font-semibold text-rose-600 tabular-nums">
                   {formatCurrency(debt.currentBalance)}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <div className="text-[10px] text-zinc-500">
+                <div className="text-[10px] text-[var(--ink-3)]">
                   <div className="flex items-center gap-1">
                     <User className="h-2.5 w-2.5" />
                     Jij
                   </div>
-                  <div className="mt-0.5 font-medium text-zinc-700 tabular-nums">
+                  <div className="mt-0.5 font-medium text-[var(--ink-2)] tabular-nums">
                     Saldo: {formatCurrency(myBalance)}
                   </div>
                   {debt.monthlyPayment > 0 && (
-                    <div className="font-medium text-zinc-700 tabular-nums">
+                    <div className="font-medium text-[var(--ink-2)] tabular-nums">
                       Aflossing: {formatCurrency(myPayment)}/mnd
                     </div>
                   )}
                 </div>
-                <div className="text-[10px] text-zinc-500">
+                <div className="text-[10px] text-[var(--ink-3)]">
                   <div className="flex items-center gap-1">
                     <Users className="h-2.5 w-2.5" />
                     Partner
                   </div>
-                  <div className="mt-0.5 font-medium text-zinc-700 tabular-nums">
+                  <div className="mt-0.5 font-medium text-[var(--ink-2)] tabular-nums">
                     Saldo: {formatCurrency(partnerBalance)}
                   </div>
                   {debt.monthlyPayment > 0 && (
-                    <div className="font-medium text-zinc-700 tabular-nums">
+                    <div className="font-medium text-[var(--ink-2)] tabular-nums">
                       Aflossing: {formatCurrency(partnerPayment)}/mnd
                     </div>
                   )}
@@ -540,21 +540,21 @@ export function SharedDebtSplitList({
       </div>
 
       {/* Totals row */}
-      <div className="border-t border-zinc-200 bg-zinc-50 px-4 py-3 rounded-b-xl">
+      <div className="border-t border-[var(--border-ed)] bg-[var(--subtle)] px-4 py-3 rounded-b-xl">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-semibold text-zinc-700">Totaal gedeelde schuld</span>
+          <span className="text-xs font-semibold text-[var(--ink-2)]">Totaal gedeelde schuld</span>
           <span className="text-sm font-bold text-rose-600 tabular-nums">
             {formatCurrency(sharedDebts.reduce((s, d) => s + d.currentBalance, 0))}
           </span>
         </div>
         <div className="flex gap-4">
-          <span className="text-[10px] text-zinc-500">
-            Jij: <span className="font-medium text-zinc-700 tabular-nums">
+          <span className="text-[10px] text-[var(--ink-3)]">
+            Jij: <span className="font-medium text-[var(--ink-2)] tabular-nums">
               {formatCurrency(sharedDebts.reduce((s, d) => s + d.currentBalance * (myPct / 100), 0))}
             </span> ({myPct}%)
           </span>
-          <span className="text-[10px] text-zinc-500">
-            Partner: <span className="font-medium text-zinc-700 tabular-nums">
+          <span className="text-[10px] text-[var(--ink-3)]">
+            Partner: <span className="font-medium text-[var(--ink-2)] tabular-nums">
               {formatCurrency(sharedDebts.reduce((s, d) => s + d.currentBalance * (partnerPct / 100), 0))}
             </span> ({partnerPct}%)
           </span>
@@ -637,12 +637,12 @@ export function CostSplitCalculator({
 
     return (
       <div className="flex items-center gap-2 text-xs" data-testid="cost-split-calculator-compact">
-        <span className="text-zinc-400">{SPLIT_MODE_LABELS[activeMode]}:</span>
-        <span className="font-medium text-zinc-700 tabular-nums">
+        <span className="text-[var(--ink-3)]">{SPLIT_MODE_LABELS[activeMode]}:</span>
+        <span className="font-medium text-[var(--ink-2)] tabular-nums">
           Jij {me?.sharePct}% ({formatCurrency(me?.shareAmount ?? 0)})
         </span>
-        <ArrowRight className="h-3 w-3 text-zinc-300" />
-        <span className="font-medium text-zinc-700 tabular-nums">
+        <ArrowRight className="h-3 w-3 text-[var(--ink-4)]" />
+        <span className="font-medium text-[var(--ink-2)] tabular-nums">
           {partnerName} {partner?.sharePct}% ({formatCurrency(partner?.shareAmount ?? 0)})
         </span>
       </div>
@@ -660,8 +660,8 @@ export function CostSplitCalculator({
       {showModeSelector && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-zinc-700 flex items-center gap-1.5">
-              <Settings className="h-4 w-4 text-zinc-400" />
+            <h4 className="text-sm font-semibold text-[var(--ink-2)] flex items-center gap-1.5">
+              <Settings className="h-4 w-4 text-[var(--ink-3)]" />
               Verdelingsmodus
             </h4>
             <button
@@ -708,7 +708,7 @@ export function CostSplitCalculator({
 
           {/* Custom percentage slider */}
           {activeMode === 'custom' && (
-            <div className="rounded-xl border border-kern-200 bg-kern-50 p-4" data-testid="custom-pct-editor">
+            <div className="rounded-[var(--r-lg)] border border-kern-200 bg-kern-50 p-4" data-testid="custom-pct-editor">
               <label className="block text-xs font-medium text-kern-700 mb-2">
                 Jouw aandeel: {localCustomPct}%
               </label>

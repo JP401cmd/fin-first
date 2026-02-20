@@ -96,7 +96,7 @@ function FloatingDaysText({ days, x, y }: { days: number; x: number; y: number }
       data-testid="freedom-days-floating-text"
     >
       <div className="flex flex-col items-center">
-        <span className="whitespace-nowrap text-3xl font-bold text-wil-400 drop-shadow-lg sm:text-4xl md:text-5xl"
+        <span className="whitespace-nowrap text-3xl font-bold text-wil-400 drop-shadow-[var(--s2)] sm:text-4xl md:text-5xl"
           style={{
             textShadow: '0 0 20px rgba(20, 184, 166, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3)',
           }}
@@ -156,7 +156,7 @@ export function InlineFloatingDays({
       }}
       data-testid="inline-floating-days"
     >
-      <span className="whitespace-nowrap rounded-full bg-wil-500/90 px-2.5 py-1 text-sm font-bold text-white shadow-lg">
+      <span className="whitespace-nowrap rounded-full bg-wil-500/90 px-2.5 py-1 text-sm font-bold text-white shadow-[var(--s2)]">
         +{formattedDays} {days === 1 ? 'dag' : 'dagen'}
       </span>
     </span>

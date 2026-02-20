@@ -1,9 +1,26 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #faf9f6;
+  --foreground: #1a1916;
   --header-height: 57px;
+
+  /* Editorial design tokens */
+  --bg: #faf9f6;
+  --paper: #ffffff;
+  --subtle: #f3f2ee;
+  --border-ed: #e2e0d8;
+  --border-md: #c8c5ba;
+  --ink: #1a1916;
+  --ink-2: #4a4840;
+  --ink-3: #888070;
+  --ink-4: #bbb8b0;
+  --r: 8px;
+  --r-lg: 14px;
+  --r-sm: 5px;
+  --s0: 0 1px 3px rgba(26,25,22,.05);
+  --s1: 0 2px 10px rgba(26,25,22,.07), 0 1px 3px rgba(26,25,22,.04);
+  --s2: 0 4px 24px rgba(26,25,22,.09), 0 1px 4px rgba(26,25,22,.05);
 
   /* Legacy module colors (kept for backward compat) */
   --color-kern: #6b4339;
@@ -63,9 +80,16 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-serif: var(--font-cormorant);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-dm-mono);
+  --font-serif: var(--font-source-serif);
+  --font-display: var(--font-playfair);
+  --color-paper: #ffffff;
+  --color-subtle: #f3f2ee;
+  --color-ink: #1a1916;
+  --color-ink-2: #4a4840;
+  --color-ink-3: #888070;
+  --color-ink-4: #bbb8b0;
 
   /* ── Module color tokens (enables bg-kern-500, text-wil-700, etc.) ── */
   --color-kern-50: var(--color-kern-50);
@@ -125,13 +149,6 @@
 @keyframes infinity-pulse {
   0%, 100% { opacity: 0.7; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.015); }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 html {
@@ -289,4 +306,41 @@ body {
     transform: scale(0.97);
     transition: transform 0.1s ease;
   }
+}
+
+/* ── Editorial utility classes ─────────────────────────── */
+
+.card-editorial {
+  background: var(--paper);
+  border: 1px solid var(--border-ed);
+  border-radius: var(--r-lg);
+  box-shadow: var(--s0);
+  transition: all 0.2s ease;
+}
+.card-editorial:hover {
+  box-shadow: var(--s1);
+  transform: translateY(-1px);
+}
+
+.label-editorial {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ── Editorial animations ──────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fadeUp 0.4s ease-out both;
+}
+
+@keyframes progIn {
+  from { width: 0%; }
+}
+.animate-prog-in {
+  animation: progIn 1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }

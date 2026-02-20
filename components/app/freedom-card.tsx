@@ -324,7 +324,7 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
 
   return (
     <div
-      className="relative mx-auto w-full max-w-[420px] overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 p-6 text-white shadow-2xl"
+      className="relative mx-auto w-full max-w-[420px] overflow-hidden rounded-[var(--r-lg)] bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 p-6 text-white shadow-2xl"
       id="freedom-card"
     >
       {/* Background decorations */}
@@ -334,18 +334,18 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
       {/* Header */}
       <div className="relative mb-6 flex items-center justify-between">
         <div>
-          <p className="text-xs font-semibold tracking-[0.2em] text-zinc-400 uppercase">
+          <p className="text-xs font-semibold tracking-[0.2em] text-[var(--ink-3)] uppercase">
             Mijn Vrijheidskaart
           </p>
           {displayName && (
-            <p className="mt-0.5 text-sm font-medium text-zinc-300">{displayName}</p>
+            <p className="mt-0.5 text-sm font-medium text-[var(--ink-4)]">{displayName}</p>
           )}
         </div>
         <div className="flex items-center gap-1.5">
           <div className="h-2 w-2 rounded-full bg-kern-400" />
           <div className="h-2 w-2 rounded-full bg-wil-400" />
           <div className="h-2 w-2 rounded-full bg-horizon-400" />
-          <span className="ml-1 text-xs font-bold tracking-wider text-zinc-400">
+          <span className="ml-1 text-xs font-bold tracking-wider text-[var(--ink-3)]">
             TriFinity
           </span>
         </div>
@@ -357,7 +357,7 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
           <span className="text-5xl font-bold tracking-tight">
             {hasFreedomPct ? `${freedomPctDisplay.toFixed(1)}%` : 'N/B'}
           </span>
-          <span className="mb-1 text-sm text-zinc-400">financiele vrijheid</span>
+          <span className="mb-1 text-sm text-[var(--ink-3)]">financiele vrijheid</span>
         </div>
         <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-zinc-700/60">
           <div
@@ -366,12 +366,12 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
           />
         </div>
         {privacyLevel === 'full' && netWorth != null && fireTarget != null && fireTarget > 0 && (
-          <p className="mt-1.5 text-xs text-zinc-500">
+          <p className="mt-1.5 text-xs text-[var(--ink-3)]">
             {formatCurrencyNL(netWorth)} / {formatCurrencyNL(fireTarget)}
           </p>
         )}
         {!hasFreedomPct && (
-          <p className="mt-1.5 text-xs text-zinc-500">
+          <p className="mt-1.5 text-xs text-[var(--ink-3)]">
             Voeg transacties toe om je vrijheidspercentage te berekenen
           </p>
         )}
@@ -380,10 +380,10 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
       {/* Stats grid */}
       <div className="grid grid-cols-2 gap-3">
         {/* Days won this month */}
-        <div className="rounded-xl bg-zinc-800/80 p-3">
+        <div className="rounded-[var(--r-lg)] bg-zinc-800/80 p-3">
           <div className="mb-1 flex items-center gap-1.5">
             <Target className="h-3.5 w-3.5 text-wil-400" />
-            <span className="text-[10px] font-medium text-zinc-400 uppercase">Dagen deze maand</span>
+            <span className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Dagen deze maand</span>
           </div>
           <p className="text-xl font-bold text-wil-400">
             {daysWonDisplay > 0 ? `+${daysWonDisplay}` : '0'}
@@ -391,10 +391,10 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
         </div>
 
         {/* FIRE countdown */}
-        <div className="rounded-xl bg-zinc-800/80 p-3">
+        <div className="rounded-[var(--r-lg)] bg-zinc-800/80 p-3">
           <div className="mb-1 flex items-center gap-1.5">
             <Clock className="h-3.5 w-3.5 text-horizon-400" />
-            <span className="text-[10px] font-medium text-zinc-400 uppercase">FIRE countdown</span>
+            <span className="text-[10px] font-medium text-[var(--ink-3)] uppercase">FIRE countdown</span>
           </div>
           <p className="text-xl font-bold text-horizon-400">
             {countdownText}
@@ -402,10 +402,10 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
         </div>
 
         {/* Freedom time */}
-        <div className="rounded-xl bg-zinc-800/80 p-3">
+        <div className="rounded-[var(--r-lg)] bg-zinc-800/80 p-3">
           <div className="mb-1 flex items-center gap-1.5">
             <Shield className="h-3.5 w-3.5 text-kern-400" />
-            <span className="text-[10px] font-medium text-zinc-400 uppercase">Vrijheidstijd</span>
+            <span className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Vrijheidstijd</span>
           </div>
           <p className="text-xl font-bold text-kern-400">
             {freedomTimeText}
@@ -413,10 +413,10 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
         </div>
 
         {/* Savings rate */}
-        <div className="rounded-xl bg-zinc-800/80 p-3">
+        <div className="rounded-[var(--r-lg)] bg-zinc-800/80 p-3">
           <div className="mb-1 flex items-center gap-1.5">
             <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
-            <span className="text-[10px] font-medium text-zinc-400 uppercase">Spaarquote</span>
+            <span className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Spaarquote</span>
           </div>
           <p className="text-xl font-bold text-emerald-400">
             {savingsRateDisplay}
@@ -426,10 +426,10 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
 
       {/* Footer */}
       <div className="mt-5 flex items-center justify-between border-t border-zinc-700/50 pt-3">
-        <p className="text-[10px] text-zinc-500">
+        <p className="text-[10px] text-[var(--ink-3)]">
           Geld is opgeslagen tijd
         </p>
-        <p className="text-[10px] text-zinc-500">
+        <p className="text-[10px] text-[var(--ink-3)]">
           {new Date(data.generatedAt).toLocaleDateString('nl-NL', {
             day: 'numeric',
             month: 'short',
@@ -587,25 +587,25 @@ export function FreedomCardGenerator() {
     <div className="mx-auto max-w-2xl space-y-6">
       {/* Privacy level selector */}
       <div data-testid="privacy-level-selector">
-        <h3 className="mb-3 text-sm font-semibold text-zinc-700">Privacy niveau</h3>
+        <h3 className="mb-3 text-sm font-semibold text-[var(--ink-2)]">Privacy niveau</h3>
         <div className="grid grid-cols-3 gap-2">
           {privacyOptions.map((opt) => (
             <button
               key={opt.value}
               data-testid={`privacy-option-${opt.value}`}
               onClick={() => handlePrivacyChange(opt.value)}
-              className={`rounded-xl border p-3 text-left transition-all ${
+              className={`rounded-[var(--r-lg)] border p-3 text-left transition-all ${
                 privacyLevel === opt.value
                   ? 'border-wil-500 bg-wil-50 ring-1 ring-wil-500'
-                  : 'border-zinc-200 bg-white hover:border-zinc-300'
+                  : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
               }`}
             >
               <p className={`text-sm font-medium ${
-                privacyLevel === opt.value ? 'text-wil-700' : 'text-zinc-700'
+                privacyLevel === opt.value ? 'text-wil-700' : 'text-[var(--ink-2)]'
               }`}>
                 {opt.label}
               </p>
-              <p className="mt-0.5 text-xs text-zinc-500">{opt.description}</p>
+              <p className="mt-0.5 text-xs text-[var(--ink-3)]">{opt.description}</p>
             </button>
           ))}
         </div>
@@ -615,7 +615,7 @@ export function FreedomCardGenerator() {
       {showFullOptIn && (
         <div
           data-testid="full-optin-dialog"
-          className="rounded-xl border border-amber-300 bg-amber-50 p-4"
+          className="rounded-[var(--r-lg)] border border-amber-300 bg-amber-50 p-4"
         >
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
@@ -638,7 +638,7 @@ export function FreedomCardGenerator() {
                 <button
                   data-testid="full-optin-cancel"
                   onClick={cancelFullOptIn}
-                  className="rounded-lg border border-amber-300 bg-white px-4 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-50"
+                  className="rounded-lg border border-amber-300 bg-[var(--paper)] px-4 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-50"
                 >
                   Annuleren
                 </button>
@@ -652,7 +652,7 @@ export function FreedomCardGenerator() {
       <button
         onClick={generateCard}
         disabled={loading}
-        className="w-full rounded-xl bg-gradient-to-r from-kern-500 via-wil-500 to-horizon-500 px-6 py-3 font-semibold text-white shadow-lg transition-all hover:shadow-xl disabled:opacity-50"
+        className="w-full rounded-[var(--r-lg)] bg-gradient-to-r from-kern-500 via-wil-500 to-horizon-500 px-6 py-3 font-semibold text-white shadow-[var(--s2)] transition-all hover:shadow-xl disabled:opacity-50"
       >
         {loading ? 'Genereren...' : 'Genereer vrijheidskaart'}
       </button>
@@ -674,7 +674,7 @@ export function FreedomCardGenerator() {
           <div className="flex gap-3">
             <button
               onClick={downloadCard}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-50"
+              className="flex flex-1 items-center justify-center gap-2 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-2.5 text-sm font-medium text-[var(--ink-2)] transition-all hover:bg-[var(--subtle)]"
               data-testid="freedom-card-download"
             >
               <Download className="h-4 w-4" />
@@ -682,7 +682,7 @@ export function FreedomCardGenerator() {
             </button>
             <button
               onClick={handleOpenShareDialog}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-wil-500 to-horizon-500 px-4 py-2.5 text-sm font-medium text-white transition-all hover:shadow-lg"
+              className="flex flex-1 items-center justify-center gap-2 rounded-[var(--r-lg)] bg-gradient-to-r from-wil-500 to-horizon-500 px-4 py-2.5 text-sm font-medium text-white transition-all hover:shadow-[var(--s2)]"
               data-testid="freedom-card-share"
             >
               <Share2 className="h-4 w-4" />

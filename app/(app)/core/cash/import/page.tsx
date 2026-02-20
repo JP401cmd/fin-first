@@ -620,15 +620,15 @@ export default function ImportPage() {
       <div className="mb-6">
         <Link
           href="/core/cash"
-          className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-700"
+          className="inline-flex items-center gap-1.5 text-sm text-[var(--ink-3)] hover:text-[var(--ink-2)]"
         >
           <ArrowLeft className="h-4 w-4" />
           Terug naar Cash
         </Link>
       </div>
 
-      <h1 className="mb-2 text-2xl font-bold text-zinc-900">Transacties importeren</h1>
-      <p className="mb-8 text-sm text-zinc-500">Upload een bankbestand (MT940, CSV of OFX) van je bank.</p>
+      <h1 className="mb-2 text-2xl font-bold text-[var(--ink)]">Transacties importeren</h1>
+      <p className="mb-8 text-sm text-[var(--ink-3)]">Upload een bankbestand (MT940, CSV of OFX) van je bank.</p>
 
       {/* Steps indicator */}
       <div className="mb-8 flex items-center gap-2 text-sm">
@@ -639,11 +639,11 @@ export default function ImportPage() {
 
           return (
             <div key={i} className="flex items-center gap-2">
-              {i > 0 && <ChevronRight className="h-4 w-4 text-zinc-300" />}
+              {i > 0 && <ChevronRight className="h-4 w-4 text-[var(--ink-4)]" />}
               <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
                 isActive ? 'bg-kern-100 text-kern-700' :
                 isDone ? 'bg-emerald-100 text-emerald-700' :
-                'bg-zinc-100 text-zinc-400'
+                'bg-zinc-100 text-[var(--ink-3)]'
               }`}>
                 {isDone ? <Check className="h-3 w-3" /> : <span>{stepNum}</span>}
                 <span>{label}</span>
@@ -707,14 +707,14 @@ export default function ImportPage() {
         <div className="space-y-6">
           {/* Account selector */}
           <div>
-            <label htmlFor="import-account" className="mb-1.5 block text-sm font-medium text-zinc-700">
+            <label htmlFor="import-account" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
               Bankrekening
             </label>
             <select
               id="import-account"
               value={selectedAccountId}
               onChange={(e) => setSelectedAccountId(e.target.value)}
-              className="w-full max-w-sm rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+              className="w-full max-w-sm rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
             >
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>{a.name}{a.iban ? ` (${a.iban})` : ''}</option>
@@ -726,17 +726,17 @@ export default function ImportPage() {
           <div
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
-            className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-zinc-300 bg-zinc-50 p-12 hover:border-kern-400 hover:bg-kern-50/30"
+            className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-12 hover:border-kern-400 hover:bg-kern-50/30"
           >
             {parsing ? (
               <Loader2 className="h-8 w-8 animate-spin text-kern-500" />
             ) : (
               <>
-                <FileText className="h-10 w-10 text-zinc-400" />
-                <p className="mt-4 text-sm font-medium text-zinc-700">
+                <FileText className="h-10 w-10 text-[var(--ink-3)]" />
+                <p className="mt-4 text-sm font-medium text-[var(--ink-2)]">
                   Sleep een MT940-bestand hierheen
                 </p>
-                <p className="mt-1 text-xs text-zinc-500">of</p>
+                <p className="mt-1 text-xs text-[var(--ink-3)]">of</p>
                 <label className="mt-3 cursor-pointer rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700">
                   <Upload className="mr-2 inline h-4 w-4" />
                   Bestand kiezen
@@ -748,8 +748,8 @@ export default function ImportPage() {
                     className="hidden"
                   />
                 </label>
-                <p className="mt-3 text-xs text-zinc-400">Ondersteunde formaten: MT940 (.sta, .mt940), CSV (.csv), OFX (.ofx, .qfx)</p>
-                <p className="mt-1 text-xs text-zinc-400">Maximale bestandsgrootte: {MAX_FILE_SIZE_LABEL}</p>
+                <p className="mt-3 text-xs text-[var(--ink-3)]">Ondersteunde formaten: MT940 (.sta, .mt940), CSV (.csv), OFX (.ofx, .qfx)</p>
+                <p className="mt-1 text-xs text-[var(--ink-3)]">Maximale bestandsgrootte: {MAX_FILE_SIZE_LABEL}</p>
               </>
             )}
           </div>
@@ -765,11 +765,11 @@ export default function ImportPage() {
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zinc-700">Bank preset</label>
+                <label className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">Bank preset</label>
                 <select
                   value={csvPreset.id}
                   onChange={(e) => updateCSVPreset(e.target.value)}
-                  className="w-full max-w-sm rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                  className="w-full max-w-sm rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 >
                   {CSV_PRESETS.map((p) => (
                     <option key={p.id} value={p.id}>{p.label}</option>
@@ -781,11 +781,11 @@ export default function ImportPage() {
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-zinc-600">Datum kolom</label>
+                      <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Datum kolom</label>
                       <select
                         value={csvPreset.dateColumn}
                         onChange={(e) => setCsvPreset(prev => ({ ...prev, dateColumn: parseInt(e.target.value) }))}
-                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-kern-500"
+                        className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
                       >
                         {csvHeaders.map((h, i) => (
                           <option key={i} value={i}>{h || `Kolom ${i + 1}`}</option>
@@ -793,11 +793,11 @@ export default function ImportPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-zinc-600">Bedrag kolom</label>
+                      <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Bedrag kolom</label>
                       <select
                         value={csvPreset.amountColumn}
                         onChange={(e) => setCsvPreset(prev => ({ ...prev, amountColumn: parseInt(e.target.value) }))}
-                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-kern-500"
+                        className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
                       >
                         {csvHeaders.map((h, i) => (
                           <option key={i} value={i}>{h || `Kolom ${i + 1}`}</option>
@@ -805,11 +805,11 @@ export default function ImportPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-zinc-600">Beschrijving kolom</label>
+                      <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Beschrijving kolom</label>
                       <select
                         value={csvPreset.descriptionColumn}
                         onChange={(e) => setCsvPreset(prev => ({ ...prev, descriptionColumn: parseInt(e.target.value) }))}
-                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-kern-500"
+                        className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
                       >
                         {csvHeaders.map((h, i) => (
                           <option key={i} value={i}>{h || `Kolom ${i + 1}`}</option>
@@ -817,11 +817,11 @@ export default function ImportPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-zinc-600">Datum formaat</label>
+                      <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Datum formaat</label>
                       <select
                         value={csvPreset.dateFormat}
                         onChange={(e) => setCsvPreset(prev => ({ ...prev, dateFormat: e.target.value }))}
-                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-kern-500"
+                        className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
                       >
                         <option value="YYYY-MM-DD">YYYY-MM-DD</option>
                         <option value="YYYYMMDD">YYYYMMDD</option>
@@ -832,14 +832,14 @@ export default function ImportPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-zinc-600">Tegenpartij kolom</label>
+                      <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Tegenpartij kolom</label>
                       <select
                         value={csvPreset.counterpartyColumn ?? -1}
                         onChange={(e) => {
                           const v = parseInt(e.target.value)
                           setCsvPreset(prev => ({ ...prev, counterpartyColumn: v === -1 ? null : v }))
                         }}
-                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-kern-500"
+                        className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
                       >
                         <option value={-1}>-- Niet beschikbaar --</option>
                         {csvHeaders.map((h, i) => (
@@ -848,14 +848,14 @@ export default function ImportPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-zinc-600">IBAN kolom</label>
+                      <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">IBAN kolom</label>
                       <select
                         value={csvPreset.ibanColumn ?? -1}
                         onChange={(e) => {
                           const v = parseInt(e.target.value)
                           setCsvPreset(prev => ({ ...prev, ibanColumn: v === -1 ? null : v }))
                         }}
-                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-kern-500"
+                        className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
                       >
                         <option value={-1}>-- Niet beschikbaar --</option>
                         {csvHeaders.map((h, i) => (
@@ -864,14 +864,14 @@ export default function ImportPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-zinc-600">Referentie kolom</label>
+                      <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Referentie kolom</label>
                       <select
                         value={csvPreset.referenceColumn ?? -1}
                         onChange={(e) => {
                           const v = parseInt(e.target.value)
                           setCsvPreset(prev => ({ ...prev, referenceColumn: v === -1 ? null : v }))
                         }}
-                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-kern-500"
+                        className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
                       >
                         <option value={-1}>-- Niet beschikbaar --</option>
                         {csvHeaders.map((h, i) => (
@@ -886,13 +886,13 @@ export default function ImportPage() {
               {/* Preview */}
               {csvPreview.length > 0 && (
                 <div>
-                  <p className="mb-2 text-xs font-medium text-zinc-500">Preview (eerste {csvPreview.length} regels)</p>
-                  <div className="overflow-x-auto rounded-lg border border-zinc-200">
+                  <p className="mb-2 text-xs font-medium text-[var(--ink-3)]">Preview (eerste {csvPreview.length} regels)</p>
+                  <div className="overflow-x-auto rounded-lg border border-[var(--border-ed)]">
                     <table className="w-full text-xs">
-                      <thead className="bg-zinc-50">
+                      <thead className="bg-[var(--subtle)]">
                         <tr>
                           {csvHeaders.map((h, i) => (
-                            <th key={i} className="px-3 py-1.5 text-left font-medium text-zinc-500">
+                            <th key={i} className="px-3 py-1.5 text-left font-medium text-[var(--ink-3)]">
                               {h || `Kolom ${i + 1}`}
                               {i === csvPreset.dateColumn && <span className="ml-1 text-kern-500">[D]</span>}
                               {i === csvPreset.amountColumn && <span className="ml-1 text-kern-500">[B]</span>}
@@ -910,10 +910,10 @@ export default function ImportPage() {
                             {row.map((cell, ci) => (
                               <td key={ci} className={`max-w-[150px] truncate px-3 py-1.5 ${
                                 ci === csvPreset.dateColumn || ci === csvPreset.amountColumn || ci === csvPreset.descriptionColumn
-                                  ? 'bg-kern-50/50 font-medium text-zinc-900'
+                                  ? 'bg-kern-50/50 font-medium text-[var(--ink)]'
                                   : ci === csvPreset.counterpartyColumn || ci === csvPreset.ibanColumn || ci === csvPreset.referenceColumn
-                                    ? 'bg-teal-50/50 font-medium text-zinc-900'
-                                    : 'text-zinc-600'
+                                    ? 'bg-teal-50/50 font-medium text-[var(--ink)]'
+                                    : 'text-[var(--ink-2)]'
                               }`}>
                                 {cell}
                               </td>
@@ -943,7 +943,7 @@ export default function ImportPage() {
       {step === 2 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-zinc-600">
+            <p className="text-sm text-[var(--ink-2)]">
               <strong>{rows.length}</strong> transacties gevonden in <strong>{fileName}</strong>
             </p>
             <button
@@ -955,31 +955,31 @@ export default function ImportPage() {
             </button>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-zinc-200">
+          <div className="overflow-x-auto rounded-xl border border-[var(--border-ed)]">
             <table className="w-full text-sm">
-              <thead className="bg-zinc-50 text-left">
+              <thead className="bg-[var(--subtle)] text-left">
                 <tr>
-                  <th className="px-4 py-2 font-medium text-zinc-500">Datum</th>
-                  <th className="px-4 py-2 font-medium text-zinc-500">Beschrijving</th>
-                  <th className="px-4 py-2 font-medium text-zinc-500">Bedrag</th>
-                  <th className="px-4 py-2 font-medium text-zinc-500">Budget</th>
-                  <th className="px-4 py-2 font-medium text-zinc-500 text-center">Match</th>
+                  <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Datum</th>
+                  <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Beschrijving</th>
+                  <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Bedrag</th>
+                  <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Budget</th>
+                  <th className="px-4 py-2 font-medium text-[var(--ink-3)] text-center">Match</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
                 {rows.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-zinc-50">
-                    <td className="whitespace-nowrap px-4 py-2 text-zinc-700">
+                  <tr key={idx} className="hover:bg-[var(--subtle)]">
+                    <td className="whitespace-nowrap px-4 py-2 text-[var(--ink-2)]">
                       {new Date(row.date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
                     </td>
-                    <td className="max-w-[300px] truncate px-4 py-2 text-zinc-900">
+                    <td className="max-w-[300px] truncate px-4 py-2 text-[var(--ink)]">
                       {row.description}
                       {row.counterparty_name && (
-                        <span className="ml-1 text-xs text-zinc-500">({row.counterparty_name})</span>
+                        <span className="ml-1 text-xs text-[var(--ink-3)]">({row.counterparty_name})</span>
                       )}
                     </td>
                     <td className={`whitespace-nowrap px-4 py-2 font-medium ${
-                      row.amount > 0 ? 'text-emerald-600' : 'text-zinc-900'
+                      row.amount > 0 ? 'text-emerald-600' : 'text-[var(--ink)]'
                     }`}>
                       {row.amount > 0 ? '+' : ''}{formatCurrency(row.amount)}
                     </td>
@@ -987,7 +987,7 @@ export default function ImportPage() {
                       <select
                         value={row.budget_id ?? ''}
                         onChange={(e) => updateRowBudget(idx, e.target.value)}
-                        className="w-full max-w-[200px] rounded border border-zinc-200 px-2 py-1 text-xs outline-none focus:border-kern-500"
+                        className="w-full max-w-[200px] rounded border border-[var(--border-ed)] px-2 py-1 text-xs outline-none focus:border-kern-500"
                       >
                         <option value="">Niet gecategoriseerd</option>
                         {budgetGroups
@@ -1066,41 +1066,41 @@ export default function ImportPage() {
             </div>
           )}
 
-          <div className="overflow-x-auto rounded-xl border border-zinc-200">
+          <div className="overflow-x-auto rounded-xl border border-[var(--border-ed)]">
             <table className="w-full text-sm">
-              <thead className="bg-zinc-50 text-left">
+              <thead className="bg-[var(--subtle)] text-left">
                 <tr>
-                  <th className="px-4 py-2 font-medium text-zinc-500">Importeer</th>
-                  <th className="px-4 py-2 font-medium text-zinc-500">Datum</th>
-                  <th className="px-4 py-2 font-medium text-zinc-500">Beschrijving</th>
-                  <th className="px-4 py-2 font-medium text-zinc-500">Bedrag</th>
-                  <th className="px-4 py-2 font-medium text-zinc-500">Budget</th>
-                  <th className="px-4 py-2 font-medium text-zinc-500">Status</th>
+                  <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Importeer</th>
+                  <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Datum</th>
+                  <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Beschrijving</th>
+                  <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Bedrag</th>
+                  <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Budget</th>
+                  <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
                 {rows.map((row, idx) => (
-                  <tr key={idx} className={`${row.skipImport ? 'bg-zinc-50 opacity-60' : 'hover:bg-zinc-50'}`}>
+                  <tr key={idx} className={`${row.skipImport ? 'bg-[var(--subtle)] opacity-60' : 'hover:bg-[var(--subtle)]'}`}>
                     <td className="px-4 py-2">
                       <input
                         type="checkbox"
                         checked={!row.skipImport}
                         onChange={() => toggleSkip(idx)}
-                        className="h-4 w-4 rounded border-zinc-300 text-kern-600 focus:ring-kern-500"
+                        className="h-4 w-4 rounded border-[var(--border-md)] text-kern-600 focus:ring-kern-500"
                       />
                     </td>
-                    <td className="whitespace-nowrap px-4 py-2 text-zinc-700">
+                    <td className="whitespace-nowrap px-4 py-2 text-[var(--ink-2)]">
                       {new Date(row.date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
                     </td>
-                    <td className="max-w-[250px] truncate px-4 py-2 text-zinc-900">
+                    <td className="max-w-[250px] truncate px-4 py-2 text-[var(--ink)]">
                       {row.description}
                     </td>
                     <td className={`whitespace-nowrap px-4 py-2 font-medium ${
-                      row.amount > 0 ? 'text-emerald-600' : 'text-zinc-900'
+                      row.amount > 0 ? 'text-emerald-600' : 'text-[var(--ink)]'
                     }`}>
                       {row.amount > 0 ? '+' : ''}{formatCurrency(row.amount)}
                     </td>
-                    <td className="px-4 py-2 text-xs text-zinc-600">
+                    <td className="px-4 py-2 text-xs text-[var(--ink-2)]">
                       {row.budgetName ?? 'Niet gecategoriseerd'}
                     </td>
                     <td className="px-4 py-2">
@@ -1124,15 +1124,15 @@ export default function ImportPage() {
 
       {/* Step 4: Success */}
       {step === 4 && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-8 text-center">
+        <div className="rounded-[var(--r-lg)] border border-emerald-200 bg-emerald-50 p-8 text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
             <Check className="h-6 w-6 text-emerald-600" />
           </div>
-          <h2 className="text-xl font-bold text-zinc-900">Import geslaagd!</h2>
-          <p className="mt-2 text-sm text-zinc-600">
+          <h2 className="text-xl font-bold text-[var(--ink)]">Import geslaagd!</h2>
+          <p className="mt-2 text-sm text-[var(--ink-2)]">
             <strong>{toImportCount}</strong> transacties geïmporteerd.
           </p>
-          <div className="mt-2 flex justify-center gap-6 text-sm text-zinc-500">
+          <div className="mt-2 flex justify-center gap-6 text-sm text-[var(--ink-3)]">
             <span>Totaal bij: <strong className="text-emerald-600">{formatCurrency(totalBij)}</strong></span>
             <span>Totaal af: <strong className="text-red-600">{formatCurrency(Math.abs(totalAf))}</strong></span>
           </div>

@@ -126,7 +126,7 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
           className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all ${
             showOverspendOnly
               ? 'border-red-300 bg-red-50 text-red-700'
-              : 'border-zinc-300 text-zinc-500 hover:border-zinc-400'
+              : 'border-[var(--border-md)] text-[var(--ink-3)] hover:border-zinc-400'
           }`}
         >
           <span className={`inline-block h-2.5 w-2.5 rounded-full ${showOverspendOnly ? 'bg-red-500' : 'bg-zinc-400'}`} />
@@ -135,7 +135,7 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
       </div>
 
       {/* SVG organism */}
-      <div className="relative rounded-2xl border border-zinc-100 bg-zinc-50/30">
+      <div className="relative rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)]/30">
         <svg
           viewBox={`0 0 ${vbWidth} ${vbHeight}`}
           className="h-auto w-full"
@@ -495,7 +495,7 @@ function Tooltip({
 
   return (
     <div
-      className="pointer-events-none absolute z-50 rounded-xl border border-zinc-200 bg-white/95 p-3 shadow-xl backdrop-blur-sm"
+      className="pointer-events-none absolute z-50 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)]/95 p-3 shadow-xl backdrop-blur-sm"
       style={{
         left: flipX ? mousePos.x - tooltipWidth - 10 : mousePos.x + 14,
         top: flipY ? mousePos.y + 10 : mousePos.y - 10,
@@ -511,20 +511,20 @@ function Tooltip({
           {cell.parentName}
         </span>
       </div>
-      <p className="text-sm font-semibold text-zinc-900">{cell.name}</p>
+      <p className="text-sm font-semibold text-[var(--ink)]">{cell.name}</p>
       <div className="mt-2 space-y-1 text-xs">
         <div className="flex justify-between">
-          <span className="text-zinc-500">Budget</span>
-          <span className="font-medium text-zinc-700">{formatCurrency(cell.limit)}</span>
+          <span className="text-[var(--ink-3)]">Budget</span>
+          <span className="font-medium text-[var(--ink-2)]">{formatCurrency(cell.limit)}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-zinc-500">Besteed</span>
-          <span className={`font-medium ${isOver ? 'text-red-600' : 'text-zinc-700'}`}>
+          <span className="text-[var(--ink-3)]">Besteed</span>
+          <span className={`font-medium ${isOver ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
             {formatCurrency(cell.spent)}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-zinc-500">Resterend</span>
+          <span className="text-[var(--ink-3)]">Resterend</span>
           <span className={`font-medium ${remaining < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
             {formatCurrency(remaining)}
           </span>

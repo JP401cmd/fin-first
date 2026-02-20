@@ -41,14 +41,14 @@ export function DomainCard({
   return (
     <Link
       href={href}
-      className={`group block rounded-2xl border ${colors.border} ${colors.bg} p-8 transition-all hover:shadow-lg`}
+      className={`group block rounded-[var(--r-lg)] border ${colors.border} ${colors.bg} p-8 transition-all hover:shadow-[var(--s2)]`}
     >
       <div className="mb-4 flex justify-center">
         {icon}
       </div>
-      <h2 className="text-2xl font-bold text-zinc-900">{title}</h2>
+      <h2 className="text-2xl font-bold text-[var(--ink)]">{title}</h2>
       <p className={`mt-1 text-sm font-medium ${colors.text}`}>{subtitle}</p>
-      <p className="mt-3 text-sm leading-relaxed text-zinc-600">{description}</p>
+      <p className="mt-3 text-sm leading-relaxed text-[var(--ink-2)]">{description}</p>
       <div className={`mt-6 inline-flex items-center gap-2 rounded-lg ${colors.button} px-4 py-2 text-sm font-medium text-white transition-colors`}>
         Bekijken
         <svg className="h-4 w-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

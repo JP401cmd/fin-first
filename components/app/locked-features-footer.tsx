@@ -113,24 +113,24 @@ export function LockedFeaturesFooter({ module, featureIds }: LockedFeaturesFoote
       <section className="mt-10 mb-2">
         <button
           onClick={() => setShowPanel(true)}
-          className={`w-full rounded-xl border ${colors.border} bg-gradient-to-r ${colors.gradient} px-5 py-4 transition-all hover:shadow-md`}
+          className={`w-full rounded-[var(--r-lg)] border ${colors.border} bg-gradient-to-r ${colors.gradient} px-5 py-4 transition-all hover:shadow-md`}
           data-testid="locked-features-footer"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/80 shadow-sm">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--paper)]/80 shadow-[var(--s0)]">
                 <Lock className={`h-4 w-4 ${colors.text}`} />
               </div>
               <div className="text-left">
                 <p className={`text-sm font-semibold ${colors.text}`}>
                   {lockedFeatures.length} meer {lockedFeatures.length === 1 ? 'functie' : 'functies'} beschikbaar
                   {nextPhase && (
-                    <span className="font-normal text-zinc-500">
+                    <span className="font-normal text-[var(--ink-3)]">
                       {' '}op niveau {nextPhase.label}
                     </span>
                   )}
                 </p>
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-[var(--ink-3)]">
                   Klik om te zien welke functies je kunt ontgrendelen
                 </p>
               </div>
@@ -148,10 +148,10 @@ export function LockedFeaturesFooter({ module, featureIds }: LockedFeaturesFoote
       >
         <div className="px-5 pb-6 pt-4">
           {/* Current phase indicator */}
-          <div className="mb-5 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
+          <div className="mb-5 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-4 py-3">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-zinc-400" />
-              <p className="text-sm text-zinc-600">
+              <Sparkles className="h-4 w-4 text-[var(--ink-3)]" />
+              <p className="text-sm text-[var(--ink-2)]">
                 Je bent nu in de <span className="font-semibold">{PHASES.find(p => p.id === currentPhase)?.label ?? currentPhase}</span> fase
               </p>
             </div>
@@ -166,7 +166,7 @@ export function LockedFeaturesFooter({ module, featureIds }: LockedFeaturesFoote
                 teal: 'bg-teal-100 text-teal-700 border-teal-200',
                 amber: 'bg-amber-100 text-amber-700 border-amber-200',
               }
-              const badgeClass = phaseColorMap[phase.color] ?? 'bg-zinc-100 text-zinc-700 border-zinc-200'
+              const badgeClass = phaseColorMap[phase.color] ?? 'bg-zinc-100 text-[var(--ink-2)] border-[var(--border-ed)]'
 
               return (
                 <div key={phase.id}>
@@ -174,7 +174,7 @@ export function LockedFeaturesFooter({ module, featureIds }: LockedFeaturesFoote
                     <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${badgeClass}`}>
                       {phase.label}
                     </span>
-                    <span className="text-xs text-zinc-400">
+                    <span className="text-xs text-[var(--ink-3)]">
                       {phaseFeatures.length} {phaseFeatures.length === 1 ? 'functie' : 'functies'}
                     </span>
                   </div>
@@ -182,14 +182,14 @@ export function LockedFeaturesFooter({ module, featureIds }: LockedFeaturesFoote
                     {phaseFeatures.map(feat => (
                       <div
                         key={feat.id}
-                        className="flex items-start gap-3 rounded-lg border border-zinc-100 bg-white p-3"
+                        className="flex items-start gap-3 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-3"
                       >
                         <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-zinc-100">
-                          <Lock className="h-3.5 w-3.5 text-zinc-400" />
+                          <Lock className="h-3.5 w-3.5 text-[var(--ink-3)]" />
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-zinc-800">{feat.label}</p>
-                          <p className="text-xs text-zinc-500">{feat.description}</p>
+                          <p className="text-xs text-[var(--ink-3)]">{feat.description}</p>
                         </div>
                       </div>
                     ))}
@@ -200,8 +200,8 @@ export function LockedFeaturesFooter({ module, featureIds }: LockedFeaturesFoote
           </div>
 
           {/* Motivational message */}
-          <div className="mt-5 rounded-lg border border-dashed border-zinc-200 bg-zinc-50/50 px-4 py-3 text-center">
-            <p className="text-xs text-zinc-500">
+          <div className="mt-5 rounded-lg border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/50 px-4 py-3 text-center">
+            <p className="text-xs text-[var(--ink-3)]">
               Verbeter je financiele positie om meer functies te ontgrendelen.
               <br />
               Elke stap brengt je dichter bij volledige vrijheid.

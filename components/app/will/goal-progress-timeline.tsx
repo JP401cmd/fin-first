@@ -53,25 +53,25 @@ export function GoalProgressTimeline({ goal, history }: GoalProgressTimelineProp
   if (sorted.length < 2) {
     return (
       <div data-testid="goal-timeline-insufficient">
-        <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">
+        <p className="mb-2 text-xs font-semibold text-[var(--ink-3)] uppercase">
           Voortgang over tijd
         </p>
-        <div className="rounded-lg bg-zinc-50 p-4 text-center">
+        <div className="rounded-lg bg-[var(--subtle)] p-4 text-center">
           {sorted.length === 1 ? (
             <>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-[var(--ink-3)]">
                 {isFreedm
                   ? `${Math.round(Number(sorted[0].value))} dagen`
                   : formatCurrency(Number(sorted[0].value))}
                 {' op '}
                 {new Date(sorted[0].date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}
               </p>
-              <p className="mt-1 text-[10px] text-zinc-400">
+              <p className="mt-1 text-[10px] text-[var(--ink-3)]">
                 Voeg bijdragen of updates toe voor een trendgrafiek.
               </p>
             </>
           ) : (
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-[var(--ink-3)]">
               Nog geen voortgangshistorie beschikbaar.
             </p>
           )}
@@ -147,12 +147,12 @@ export function GoalProgressTimeline({ goal, history }: GoalProgressTimelineProp
 
   return (
     <div data-testid="goal-timeline">
-      <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">
+      <p className="mb-2 text-xs font-semibold text-[var(--ink-3)] uppercase">
         Voortgang over tijd
       </p>
 
       {/* SVG Chart */}
-      <div className="rounded-lg bg-zinc-50 p-3" data-testid="goal-timeline-chart">
+      <div className="rounded-lg bg-[var(--subtle)] p-3" data-testid="goal-timeline-chart">
         <svg viewBox={`0 0 ${W} ${H}`} className="h-44 w-full" preserveAspectRatio="xMidYMid meet">
           {/* Grid lines and Y labels */}
           {yTicks.map((val, i) => (
@@ -283,7 +283,7 @@ export function GoalProgressTimeline({ goal, history }: GoalProgressTimelineProp
         </svg>
 
         {/* Legend */}
-        <div className="mt-1 flex flex-wrap items-center gap-4 text-[10px] text-zinc-400">
+        <div className="mt-1 flex flex-wrap items-center gap-4 text-[10px] text-[var(--ink-3)]">
           <span className="flex items-center gap-1">
             <span className="inline-block h-0.5 w-3 rounded" style={{ backgroundColor: lineColor }} />
             Werkelijke voortgang
@@ -331,12 +331,12 @@ function PaceMessageBanner({
   const bgClass = status === 'ahead' ? 'bg-emerald-50 border-emerald-200'
     : status === 'behind' ? 'bg-red-50 border-red-200'
     : status === 'on_track' ? 'bg-wil-50 border-wil-200'
-    : 'bg-zinc-50 border-zinc-200'
+    : 'bg-[var(--subtle)] border-[var(--border-ed)]'
 
   const textClass = status === 'ahead' ? 'text-emerald-700'
     : status === 'behind' ? 'text-red-700'
     : status === 'on_track' ? 'text-wil-700'
-    : 'text-zinc-600'
+    : 'text-[var(--ink-2)]'
 
   const Icon = status === 'ahead' ? TrendingUp
     : status === 'behind' ? AlertTriangle

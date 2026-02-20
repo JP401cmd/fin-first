@@ -115,12 +115,12 @@ export function NotificationModal() {
       style={{ right: 'var(--chat-sidebar-width, 0px)' }}
       onClick={handleBackdrop}
     >
-      <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:max-h-[80vh]">
+      <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-[var(--r-lg)] bg-[var(--paper)] shadow-2xl sm:max-h-[80vh]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-5 py-4">
           <div className="flex items-center gap-2">
-            <Bell className="h-5 w-5 text-zinc-600" />
-            <h2 className="text-base font-semibold text-zinc-900">
+            <Bell className="h-5 w-5 text-[var(--ink-2)]" />
+            <h2 className="text-base font-semibold text-[var(--ink)]">
               Meldingen
             </h2>
             {unreadCount > 0 && (
@@ -133,7 +133,7 @@ export function NotificationModal() {
             {unreadCount > 0 && (
               <button
                 onClick={markAllRead}
-                className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+                className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[var(--ink-3)] transition-colors hover:bg-zinc-100 hover:text-[var(--ink-2)]"
               >
                 <Check className="h-3.5 w-3.5" />
                 Alles gelezen
@@ -141,7 +141,7 @@ export function NotificationModal() {
             )}
             <button
               onClick={closeModal}
-              className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+              className="rounded-lg p-1.5 text-[var(--ink-3)] transition-colors hover:bg-zinc-100 hover:text-[var(--ink-2)]"
             >
               <X className="h-5 w-5" />
             </button>
@@ -152,18 +152,18 @@ export function NotificationModal() {
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600" />
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--border-md)] border-t-zinc-600" />
             </div>
           ) : history.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-16 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-zinc-100">
-                <Bell className="h-7 w-7 text-zinc-300" />
+                <Bell className="h-7 w-7 text-[var(--ink-4)]" />
               </div>
               <div>
-                <p className="text-sm font-medium text-zinc-700">
+                <p className="text-sm font-medium text-[var(--ink-2)]">
                   Geen meldingen
                 </p>
-                <p className="mt-0.5 text-xs text-zinc-400">
+                <p className="mt-0.5 text-xs text-[var(--ink-3)]">
                   Alles is op orde — er zijn geen aandachtspunten
                 </p>
               </div>
@@ -173,8 +173,8 @@ export function NotificationModal() {
               {groups.map((group) => (
                 <div key={group.key}>
                   {/* Day separator */}
-                  <div className="sticky top-0 z-10 border-b border-zinc-100 bg-zinc-50/90 px-5 py-2 backdrop-blur-sm">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                  <div className="sticky top-0 z-10 border-b border-[var(--border-ed)] bg-[var(--subtle)]/90 px-5 py-2 backdrop-blur-sm">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]">
                       {group.label}
                     </span>
                   </div>
@@ -192,8 +192,8 @@ export function NotificationModal() {
               ))}
 
               {/* Footer */}
-              <div className="border-t border-zinc-100 px-5 py-3 text-center">
-                <p className="text-xs text-zinc-400">
+              <div className="border-t border-[var(--border-ed)] px-5 py-3 text-center">
+                <p className="text-xs text-[var(--ink-3)]">
                   Meldingen van de afgelopen 7 dagen
                 </p>
               </div>

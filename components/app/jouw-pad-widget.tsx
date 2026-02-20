@@ -118,7 +118,7 @@ export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCo
     <Link
       href="/identity"
       data-testid="jouw-pad-widget"
-      className={`group block rounded-xl border ${colors.border} ${colors.bg} p-5 transition-all hover:shadow-md`}
+      className={`group block rounded-[var(--r-lg)] border ${colors.border} ${colors.bg} p-5 transition-all hover:shadow-md`}
     >
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
@@ -126,7 +126,7 @@ export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCo
             <Shield className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+            <p className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
               Jouw Pad
             </p>
             <p className={`text-sm font-bold ${colors.text}`} data-testid="jouw-pad-phase">
@@ -134,7 +134,7 @@ export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCo
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-1 text-xs font-medium text-zinc-400 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="flex items-center gap-1 text-xs font-medium text-[var(--ink-3)] opacity-0 transition-opacity group-hover:opacity-100">
           Bekijken <ArrowRight className="h-3 w-3" />
         </div>
       </div>
@@ -142,8 +142,8 @@ export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCo
       {/* Current level */}
       <div className="mt-4 flex items-center justify-between">
         <div>
-          <p className="text-xs text-zinc-500" data-testid="jouw-pad-level">Level {level}</p>
-          <p className="text-sm font-semibold text-zinc-900" data-testid="jouw-pad-level-name">{levelName}</p>
+          <p className="text-xs text-[var(--ink-3)]" data-testid="jouw-pad-level">Level {level}</p>
+          <p className="text-sm font-semibold text-[var(--ink)]" data-testid="jouw-pad-level-name">{levelName}</p>
         </div>
         <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${colors.badge}`} data-testid="jouw-pad-freedom">
           {freedomPct.toFixed(1)}% vrij
@@ -174,7 +174,7 @@ export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCo
             )
           })}
         </div>
-        <div className="mt-1 flex justify-between text-[9px] text-zinc-400">
+        <div className="mt-1 flex justify-between text-[9px] text-[var(--ink-3)]">
           {PHASES.map(p => (
             <span key={p.id} className={p.id === phase ? phaseColors[p.color].text + ' font-semibold' : ''}>
               {p.label}
@@ -186,7 +186,7 @@ export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCo
       {/* Criteria checklist for next level */}
       {nextCriteria && nextCriteria.length > 0 && (
         <div className="mt-3 space-y-1.5" data-testid="jouw-pad-criteria">
-          <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide">
+          <p className="text-[10px] font-semibold text-[var(--ink-3)] uppercase tracking-wide">
             Voortgang naar niveau {level + 1}
           </p>
           {nextCriteria.map((criterion, idx) => {
@@ -203,9 +203,9 @@ export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCo
                     <Check className="h-2.5 w-2.5 text-emerald-600" />
                   </div>
                 ) : (
-                  <Circle className="h-4 w-4 shrink-0 text-zinc-300" />
+                  <Circle className="h-4 w-4 shrink-0 text-[var(--ink-4)]" />
                 )}
-                <span className={`text-[11px] ${met ? 'text-emerald-700 line-through' : 'text-zinc-600'}`}>
+                <span className={`text-[11px] ${met ? 'text-emerald-700 line-through' : 'text-[var(--ink-2)]'}`}>
                   {criterion.label}
                 </span>
               </div>
@@ -217,7 +217,7 @@ export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCo
       {/* Freedom milestone forecast */}
       {milestones && milestones.length > 0 && (
         <div className="mt-3" data-testid="jouw-pad-milestones">
-          <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-2">
+          <p className="text-[10px] font-semibold text-[var(--ink-3)] uppercase tracking-wide mb-2">
             Vrijheidsmijlpalen
           </p>
 
@@ -247,7 +247,7 @@ export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCo
                     ? 'text-purple-600'
                     : m.icon === 'clock'
                       ? 'text-blue-600'
-                      : 'text-zinc-400'
+                      : 'text-[var(--ink-3)]'
 
                 return (
                   <div
@@ -264,7 +264,7 @@ export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCo
                     {/* Milestone content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1">
-                        <span className={`text-[11px] font-medium ${m.reached ? 'text-emerald-700' : 'text-zinc-700'}`}>
+                        <span className={`text-[11px] font-medium ${m.reached ? 'text-emerald-700' : 'text-[var(--ink-2)]'}`}>
                           {m.label}
                         </span>
                         {m.reached && (
@@ -273,13 +273,13 @@ export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCo
                           </span>
                         )}
                         {m.projectedDate && !m.reached && (
-                          <span className="text-[9px] text-zinc-400 shrink-0">
+                          <span className="text-[9px] text-[var(--ink-3)] shrink-0">
                             {m.projectedDate}
                           </span>
                         )}
                       </div>
                       {!m.reached && (
-                        <p className={`text-[10px] mt-0.5 ${m.monthsAway !== null ? 'text-zinc-500' : 'text-zinc-400 italic'}`}>
+                        <p className={`text-[10px] mt-0.5 ${m.monthsAway !== null ? 'text-[var(--ink-3)]' : 'text-[var(--ink-3)] italic'}`}>
                           {m.message}
                         </p>
                       )}
@@ -306,13 +306,13 @@ export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCo
 
       {/* Next level preview */}
       {nextLevelName && nextUnlock && (
-        <div className="mt-3 rounded-lg bg-white/60 px-3 py-2" data-testid="jouw-pad-next-level">
-          <p className="text-[11px] text-zinc-500">
-            <span className="font-medium text-zinc-700">Volgend niveau</span>
+        <div className="mt-3 rounded-lg bg-[var(--paper)]/60 px-3 py-2" data-testid="jouw-pad-next-level">
+          <p className="text-[11px] text-[var(--ink-3)]">
+            <span className="font-medium text-[var(--ink-2)]">Volgend niveau</span>
             {' '}&rarr;{' '}
             Lvl {level + 1}: {nextLevelName}
           </p>
-          <p className="mt-0.5 text-[10px] text-zinc-400">
+          <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">
             Ontgrendelt: {nextUnlock}
           </p>
         </div>

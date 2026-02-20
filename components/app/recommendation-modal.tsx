@@ -110,7 +110,7 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
         {step === 'detail' && (
           <>
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
+            <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-6 py-4">
               <div className="flex items-center gap-2">
                 <div className={`flex items-center gap-1.5 rounded-full ${colors.bgLight} px-3 py-1`}>
                   <BudgetIcon name={iconName} className={`h-3.5 w-3.5 ${colors.text}`} />
@@ -124,15 +124,15 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
                   </div>
                 )}
               </div>
-              <button type="button" onClick={onClose} className="touch-target rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+              <button type="button" onClick={onClose} className="touch-target rounded-lg text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             {/* Body */}
             <div className="space-y-4 px-6 py-5">
-              <h2 className="text-lg font-semibold text-zinc-900">{recommendation.title}</h2>
-              <p className="text-sm leading-relaxed text-zinc-600">{recommendation.description}</p>
+              <h2 className="text-lg font-semibold text-[var(--ink)]">{recommendation.title}</h2>
+              <p className="text-sm leading-relaxed text-[var(--ink-2)]">{recommendation.description}</p>
 
               {/* Freedom days highlight */}
               {recommendation.freedom_days_per_year != null && recommendation.freedom_days_per_year > 0 && (
@@ -147,7 +147,7 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
               {/* Before/after comparison */}
               {recommendation.current_value != null && recommendation.proposed_value != null && (
                 <div className="flex items-center justify-center gap-3 text-sm">
-                  <span className="rounded-md bg-zinc-100 px-2.5 py-1 font-medium text-zinc-600">
+                  <span className="rounded-md bg-zinc-100 px-2.5 py-1 font-medium text-[var(--ink-2)]">
                     {formatCurrency(recommendation.current_value)}/mnd
                   </span>
                   <ArrowRight className="h-4 w-4 text-wil-500" />
@@ -159,7 +159,7 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
 
               {/* Euro impact */}
               {recommendation.euro_impact_yearly != null && recommendation.euro_impact_yearly > 0 && (
-                <p className="text-center text-xs text-zinc-500">
+                <p className="text-center text-xs text-[var(--ink-3)]">
                   Besparing: {formatCurrency(recommendation.euro_impact_monthly || 0)}/mnd ({formatCurrency(recommendation.euro_impact_yearly)}/jaar)
                 </p>
               )}
@@ -167,10 +167,10 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
               {/* Suggested actions */}
               {recommendation.suggested_actions && recommendation.suggested_actions.length > 0 && (
                 <div>
-                  <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Concrete stappen</h4>
+                  <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]">Concrete stappen</h4>
                   <ul className="space-y-1.5">
                     {recommendation.suggested_actions.map((action, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-zinc-600">
+                      <li key={i} className="flex items-start gap-2 text-sm text-[var(--ink-2)]">
                         <div className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-wil-400" />
                         <span>
                           {action.title}
@@ -194,7 +194,7 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
             </div>
 
             {/* Action buttons */}
-            <div className="border-t border-zinc-200 px-6 py-4">
+            <div className="border-t border-[var(--border-ed)] px-6 py-4">
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -218,7 +218,7 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
                   type="button"
                   onClick={() => setStep('reject')}
                   disabled={isLoading}
-                  className="flex items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 disabled:opacity-50"
+                  className="flex items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium text-[var(--ink-3)] transition-colors hover:bg-zinc-100 hover:text-[var(--ink-2)] disabled:opacity-50"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -229,7 +229,7 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
 
         {step === 'postpone' && (
           <div className="px-6 py-5">
-            <h2 className="mb-4 text-lg font-semibold text-zinc-900">Uitstellen</h2>
+            <h2 className="mb-4 text-lg font-semibold text-[var(--ink)]">Uitstellen</h2>
             <PostponeForm
               mode="recommendation"
               onSubmit={(data) =>
@@ -242,10 +242,10 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
 
         {step === 'reject' && (
           <div className="px-6 py-5">
-            <h2 className="mb-4 text-lg font-semibold text-zinc-900">Afwijzen</h2>
+            <h2 className="mb-4 text-lg font-semibold text-[var(--ink)]">Afwijzen</h2>
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-600">
+                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
                   Waarom niet? (optioneel)
                 </label>
                 <input
@@ -253,7 +253,7 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
                   value={rejectReason}
                   onChange={(e) => setRejectReason(e.target.value)}
                   placeholder="Bijv. niet relevant, te moeilijk, doe ik al..."
-                  className="w-full rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-red-300 focus:outline-none focus:ring-1 focus:ring-red-300"
+                  className="w-full rounded-md border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-red-300 focus:outline-none focus:ring-1 focus:ring-red-300"
                 />
               </div>
               <div className="flex gap-2">
@@ -268,7 +268,7 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
                 <button
                   type="button"
                   onClick={() => setStep('detail')}
-                  className="rounded-md px-3 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-100"
+                  className="rounded-md px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] transition-colors hover:bg-zinc-100"
                 >
                   Annuleren
                 </button>
@@ -281,25 +281,25 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
           <div className="px-6 py-5">
             {/* Header */}
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-zinc-900">Acties plannen</h2>
-              <button type="button" onClick={onClose} className="touch-target rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+              <h2 className="text-lg font-semibold text-[var(--ink)]">Acties plannen</h2>
+              <button type="button" onClick={onClose} className="touch-target rounded-lg text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             {actionDrafts.length === 0 ? (
-              <p className="mb-4 text-sm text-zinc-500">Geen concrete stappen gevonden. Je kunt het voorstel toch accepteren.</p>
+              <p className="mb-4 text-sm text-[var(--ink-3)]">Geen concrete stappen gevonden. Je kunt het voorstel toch accepteren.</p>
             ) : (
               <div className="mb-4 space-y-3">
                 {actionDrafts.map((draft, index) => (
-                  <div key={index} className={`rounded-lg border p-3 transition-colors ${draft.enabled ? 'border-wil-200 bg-wil-50/30' : 'border-zinc-200 bg-zinc-50 opacity-60'}`}>
+                  <div key={index} className={`rounded-lg border p-3 transition-colors ${draft.enabled ? 'border-wil-200 bg-wil-50/30' : 'border-[var(--border-ed)] bg-[var(--subtle)] opacity-60'}`}>
                     {/* Row: checkbox + title + impact */}
                     <div className="flex items-start gap-2">
                       <input
                         type="checkbox"
                         checked={draft.enabled}
                         onChange={(e) => updateDraft(index, { enabled: e.target.checked })}
-                        className="mt-1 h-4 w-4 shrink-0 rounded border-zinc-300 text-wil-500 focus:ring-wil-500"
+                        className="mt-1 h-4 w-4 shrink-0 rounded border-[var(--border-md)] text-wil-500 focus:ring-wil-500"
                       />
                       <div className="min-w-0 flex-1">
                         {draft.editing ? (
@@ -310,7 +310,7 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
                             onBlur={() => updateDraft(index, { editing: false })}
                             onKeyDown={(e) => { if (e.key === 'Enter') updateDraft(index, { editing: false }) }}
                             autoFocus
-                            className="w-full rounded border border-wil-300 bg-white px-2 py-0.5 text-sm text-zinc-900 focus:outline-none focus:ring-1 focus:ring-wil-400"
+                            className="w-full rounded border border-wil-300 bg-[var(--paper)] px-2 py-0.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-wil-400"
                           />
                         ) : (
                           <div className="flex items-center gap-1.5">
@@ -318,14 +318,14 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
                             <button
                               type="button"
                               onClick={() => updateDraft(index, { editing: true })}
-                              className="shrink-0 rounded p-0.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600"
+                              className="shrink-0 rounded p-0.5 text-[var(--ink-3)] hover:bg-zinc-200 hover:text-[var(--ink-2)]"
                             >
                               <Pencil className="h-3 w-3" />
                             </button>
                           </div>
                         )}
                         {draft.description && (
-                          <p className="mt-0.5 text-xs text-zinc-500">{draft.description}</p>
+                          <p className="mt-0.5 text-xs text-[var(--ink-3)]">{draft.description}</p>
                         )}
                       </div>
                       <div className="shrink-0 text-right">
@@ -333,7 +333,7 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
                           <div className="text-xs font-semibold text-wil-600">{Math.round(draft.freedom_days_impact)} dagen</div>
                         )}
                         {draft.euro_impact_monthly != null && draft.euro_impact_monthly > 0 && (
-                          <div className="text-xs text-zinc-500">{formatCurrency(draft.euro_impact_monthly)}/mnd</div>
+                          <div className="text-xs text-[var(--ink-3)]">{formatCurrency(draft.euro_impact_monthly)}/mnd</div>
                         )}
                       </div>
                     </div>
@@ -341,14 +341,14 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
                     {/* Week scheduler */}
                     {draft.enabled && (
                       <div className="ml-6 mt-2 space-y-1.5">
-                        <label className="flex items-center gap-2 text-xs text-zinc-600">
+                        <label className="flex items-center gap-2 text-xs text-[var(--ink-2)]">
                           <input
                             type="checkbox"
                             checked={draft.scheduled_week_offset !== null}
                             onChange={(e) =>
                               updateDraft(index, { scheduled_week_offset: e.target.checked ? 0 : null })
                             }
-                            className="h-3.5 w-3.5 rounded border-zinc-300 text-wil-500 focus:ring-wil-500"
+                            className="h-3.5 w-3.5 rounded border-[var(--border-md)] text-wil-500 focus:ring-wil-500"
                           />
                           Inplannen
                         </label>
@@ -384,11 +384,11 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
                     type="checkbox"
                     checked={applyBudget}
                     onChange={(e) => setApplyBudget(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-wil-500 focus:ring-wil-500"
+                    className="mt-0.5 h-4 w-4 rounded border-[var(--border-md)] text-wil-500 focus:ring-wil-500"
                   />
                   <div>
                     <div className="text-sm font-medium text-zinc-800">Budget automatisch aanpassen</div>
-                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-zinc-500">
+                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-[var(--ink-3)]">
                       <span>{recommendation.related_budget_slug}:</span>
                       <span>{formatCurrency(recommendation.current_value!)}/mnd</span>
                       <ArrowRight className="h-3 w-3 text-wil-500" />
@@ -400,11 +400,11 @@ export function RecommendationModal({ recommendation, onDecide, onClose }: Recom
             )}
 
             {/* Footer */}
-            <div className="flex items-center justify-between border-t border-zinc-200 pt-4">
+            <div className="flex items-center justify-between border-t border-[var(--border-ed)] pt-4">
               <button
                 type="button"
                 onClick={() => setStep('detail')}
-                className="flex items-center gap-1 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-700"
+                className="flex items-center gap-1 text-sm font-medium text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)]"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Terug

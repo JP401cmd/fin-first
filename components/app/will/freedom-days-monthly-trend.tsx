@@ -69,10 +69,10 @@ export function FreedomDaysMonthlyTrend({ completedActions }: FreedomDaysMonthly
         <span className="rounded-full bg-wil-50 px-3 py-1 font-medium text-wil-700" data-testid="trend-summary-current">
           Deze maand: +{formatDays(stats.current)} dagen
         </span>
-        <span className="rounded-full bg-zinc-100 px-3 py-1 font-medium text-zinc-600" data-testid="trend-summary-average">
+        <span className="rounded-full bg-zinc-100 px-3 py-1 font-medium text-[var(--ink-2)]" data-testid="trend-summary-average">
           Gemiddeld: +{formatDays(stats.average)} dagen
         </span>
-        <span className="rounded-full bg-zinc-100 px-3 py-1 font-medium text-zinc-600" data-testid="trend-summary-best">
+        <span className="rounded-full bg-zinc-100 px-3 py-1 font-medium text-[var(--ink-2)]" data-testid="trend-summary-best">
           Beste maand: +{formatDays(stats.best)} dagen
         </span>
       </div>
@@ -173,12 +173,12 @@ export function FreedomDaysMonthlyTrend({ completedActions }: FreedomDaysMonthly
           </text>
         </svg>
       ) : (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-50 py-10" data-testid="freedom-days-no-data">
-          <BarChart3 className="mb-2 h-8 w-8 text-zinc-300" />
-          <p className="text-sm text-zinc-500">
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-[var(--border-md)] bg-[var(--subtle)] py-10" data-testid="freedom-days-no-data">
+          <BarChart3 className="mb-2 h-8 w-8 text-[var(--ink-4)]" />
+          <p className="text-sm text-[var(--ink-3)]">
             Nog geen voltooide acties met vrijheidsdagen.
           </p>
-          <p className="mt-1 text-xs text-zinc-400">
+          <p className="mt-1 text-xs text-[var(--ink-3)]">
             Rond acties af om je trend te zien.
           </p>
         </div>

@@ -120,11 +120,11 @@ export function HouseholdFireSection() {
       <section className="mt-10" data-testid="household-fire-section">
         <div className="mb-3 flex items-center gap-2">
           <Users className="h-4 w-4 text-horizon-500" />
-          <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          <h2 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
             Huishouden FIRE Projecties
           </h2>
         </div>
-        <div className="flex items-center justify-center rounded-xl border border-zinc-200 bg-white p-12">
+        <div className="flex items-center justify-center rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-12">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-horizon-500 border-t-transparent" />
         </div>
       </section>
@@ -142,17 +142,17 @@ export function HouseholdFireSection() {
       <div className="mb-5">
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-horizon-500" />
-          <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          <h2 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
             {householdName} — FIRE Projecties
           </h2>
         </div>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-[var(--ink-3)]">
           Gecombineerd inkomen, gecombineerde uitgaven. Gedeeld en individueel FIRE-doel.
         </p>
       </div>
 
       {/* Combined Household Hero Card */}
-      <div className="rounded-xl border-2 border-horizon-200 bg-gradient-to-br from-horizon-50 to-white p-6" data-testid="household-combined-card">
+      <div className="rounded-[var(--r-lg)] border-2 border-horizon-200 bg-gradient-to-br from-horizon-50 to-white p-6" data-testid="household-combined-card">
         <div className="mb-4 flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-horizon-100">
             <Users className="h-4 w-4 text-horizon-600" />
@@ -255,8 +255,8 @@ export function HouseholdFireSection() {
       {hasMultiplePartners && (
         <div className="mt-6" data-testid="partner-comparison-view">
           <div className="mb-3 flex items-center gap-2">
-            <User className="h-3.5 w-3.5 text-zinc-400" />
-            <h3 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+            <User className="h-3.5 w-3.5 text-[var(--ink-3)]" />
+            <h3 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
               Partner vergelijking
             </h3>
           </div>
@@ -273,8 +273,8 @@ export function HouseholdFireSection() {
           </div>
 
           {/* Side-by-side comparison bars */}
-          <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-5" data-testid="comparison-bars">
-            <h4 className="mb-4 text-xs font-semibold text-zinc-500 uppercase">Vergelijking</h4>
+          <div className="mt-4 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5" data-testid="comparison-bars">
+            <h4 className="mb-4 text-xs font-semibold text-[var(--ink-3)] uppercase">Vergelijking</h4>
 
             <ComparisonBar
               label="Netto vermogen"
@@ -329,7 +329,7 @@ export function HouseholdFireSection() {
           </div>
 
           {/* Combined vs Individual insight */}
-          <div className="mt-4 rounded-xl border border-horizon-100 bg-horizon-50/50 p-4" data-testid="household-insight">
+          <div className="mt-4 rounded-[var(--r-lg)] border border-horizon-100 bg-horizon-50/50 p-4" data-testid="household-insight">
             <div className="flex items-start gap-3">
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-horizon-500" />
               <div className="text-sm text-horizon-800">
@@ -358,12 +358,12 @@ export function HouseholdFireSection() {
 
       {/* Single partner info */}
       {!hasMultiplePartners && partners.length === 1 && (
-        <div className="mt-4 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-5 text-center" data-testid="single-partner-notice">
-          <Users className="mx-auto mb-2 h-6 w-6 text-zinc-400" />
-          <p className="text-sm font-medium text-zinc-600">
+        <div className="mt-4 rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-5 text-center" data-testid="single-partner-notice">
+          <Users className="mx-auto mb-2 h-6 w-6 text-[var(--ink-3)]" />
+          <p className="text-sm font-medium text-[var(--ink-2)]">
             Partner vergelijking wordt beschikbaar zodra je partner het huishouden heeft geaccepteerd.
           </p>
-          <p className="mt-1 text-xs text-zinc-400">
+          <p className="mt-1 text-xs text-[var(--ink-3)]">
             Nodig je partner uit via je profiel om samen je pad naar vrijheid te plannen.
           </p>
         </div>
@@ -384,15 +384,15 @@ function FinancialCard({
   testId: string
 }) {
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-3" data-testid={testId}>
+    <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-3" data-testid={testId}>
       <div className="mb-1 flex items-center gap-1.5">
-        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-zinc-50">
+        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--subtle)]">
           {icon}
         </div>
-        <p className="text-[10px] font-medium text-zinc-500">{label}</p>
+        <p className="text-[10px] font-medium text-[var(--ink-3)]">{label}</p>
       </div>
-      <p className="text-sm font-bold text-zinc-900">
-        {value}{suffix && <span className="text-xs font-normal text-zinc-400">{suffix}</span>}
+      <p className="text-sm font-bold text-[var(--ink)]">
+        {value}{suffix && <span className="text-xs font-normal text-[var(--ink-3)]">{suffix}</span>}
       </p>
     </div>
   )
@@ -415,7 +415,7 @@ function PartnerCard({
 
   return (
     <div
-      className={`rounded-xl border ${colors.border} ${colors.bg} p-5`}
+      className={`rounded-[var(--r-lg)] border ${colors.border} ${colors.bg} p-5`}
       data-testid={`partner-card-${partner.isCurrentUser ? 'self' : 'other'}`}
     >
       <div className="mb-3 flex items-center gap-2">
@@ -425,7 +425,7 @@ function PartnerCard({
         <div>
           <p className={`text-sm font-semibold ${colors.accent}`}>{name}</p>
           {partner.isCurrentUser && (
-            <span className="text-[10px] text-zinc-400">jouw projectie</span>
+            <span className="text-[10px] text-[var(--ink-3)]">jouw projectie</span>
           )}
         </div>
       </div>
@@ -433,26 +433,26 @@ function PartnerCard({
       {/* Individual FIRE KPIs */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <p className="text-[10px] font-medium text-zinc-400 uppercase">FIRE leeftijd</p>
+          <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">FIRE leeftijd</p>
           <p className={`text-xl font-bold ${colors.accent}`} data-testid={`partner-fire-age-${partner.isCurrentUser ? 'self' : 'other'}`}>
             {partner.projection.fireAge !== null ? Math.round(partner.projection.fireAge) : '-'}
           </p>
         </div>
         <div>
-          <p className="text-[10px] font-medium text-zinc-400 uppercase">Vrijheid</p>
+          <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Vrijheid</p>
           <p className={`text-xl font-bold ${colors.accent}`} data-testid={`partner-freedom-pct-${partner.isCurrentUser ? 'self' : 'other'}`}>
             {partner.projection.freedomPercentage.toFixed(1)}%
           </p>
         </div>
         <div>
-          <p className="text-[10px] font-medium text-zinc-400 uppercase">FIRE-doel</p>
-          <p className="text-sm font-semibold text-zinc-700">
+          <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">FIRE-doel</p>
+          <p className="text-sm font-semibold text-[var(--ink-2)]">
             {formatCurrency(partner.projection.fireTarget)}
           </p>
         </div>
         <div>
-          <p className="text-[10px] font-medium text-zinc-400 uppercase">Spaarquote</p>
-          <p className="text-sm font-semibold text-zinc-700">
+          <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Spaarquote</p>
+          <p className="text-sm font-semibold text-[var(--ink-2)]">
             {partner.projection.savingsRate.toFixed(1)}%
           </p>
         </div>
@@ -466,7 +466,7 @@ function PartnerCard({
             style={{ width: `${Math.max(Math.min(partner.projection.freedomPercentage, 100), 0)}%` }}
           />
         </div>
-        <div className="mt-0.5 flex justify-between text-[9px] text-zinc-400">
+        <div className="mt-0.5 flex justify-between text-[9px] text-[var(--ink-3)]">
           <span>{partner.projection.fireDate}</span>
           <span>
             {partner.projection.freedomYears}j {partner.projection.freedomMonths}mnd vrijheid
@@ -475,7 +475,7 @@ function PartnerCard({
       </div>
 
       {/* Financial details */}
-      <div className="mt-3 space-y-1.5 text-xs text-zinc-600">
+      <div className="mt-3 space-y-1.5 text-xs text-[var(--ink-2)]">
         <div className="flex justify-between">
           <span>Netto vermogen</span>
           <span className="font-medium">{formatCurrency(partner.financials.netWorth)}</span>
@@ -514,7 +514,7 @@ function ComparisonBar({
 
   return (
     <div className="mb-4 last:mb-0" data-testid={testId}>
-      <p className="mb-1.5 text-xs font-medium text-zinc-500">{label}</p>
+      <p className="mb-1.5 text-xs font-medium text-[var(--ink-3)]">{label}</p>
       <div className="space-y-1.5">
         {values.map((v, i) => {
           const pct = maxValue > 0 ? (Math.abs(v.value) / maxValue) * 100 : 0
@@ -525,14 +525,14 @@ function ComparisonBar({
 
           return (
             <div key={v.name} className="flex items-center gap-2">
-              <span className="w-16 shrink-0 text-xs text-zinc-500 truncate">{v.name}</span>
+              <span className="w-16 shrink-0 text-xs text-[var(--ink-3)] truncate">{v.name}</span>
               <div className="h-5 flex-1 overflow-hidden rounded-full bg-zinc-100">
                 <div
                   className={`h-full rounded-full ${barColor} transition-all duration-700`}
                   style={{ width: `${Math.max(pct, 2)}%` }}
                 />
               </div>
-              <span className="w-20 shrink-0 text-right text-xs font-medium text-zinc-700">{v.formatted}</span>
+              <span className="w-20 shrink-0 text-right text-xs font-medium text-[var(--ink-2)]">{v.formatted}</span>
             </div>
           )
         })}

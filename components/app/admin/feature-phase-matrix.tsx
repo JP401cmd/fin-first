@@ -81,7 +81,7 @@ export function FeaturePhaseMatrix() {
     return (
       <div className="animate-pulse space-y-3">
         <div className="h-6 w-48 rounded bg-zinc-200" />
-        <div className="h-64 rounded-xl bg-zinc-200" />
+        <div className="h-64 rounded-[var(--r-lg)] bg-zinc-200" />
       </div>
     )
   }
@@ -89,8 +89,8 @@ export function FeaturePhaseMatrix() {
   return (
     <div>
       <div className="mb-4">
-        <h2 className="text-xl font-bold text-zinc-900">Feature-Fase Matrix</h2>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h2 className="text-xl font-bold text-[var(--ink)]">Feature-Fase Matrix</h2>
+        <p className="mt-1 text-sm text-[var(--ink-3)]">
           Configureer welke functionaliteiten beschikbaar zijn per soevereiniteitsfase
         </p>
       </div>
@@ -107,11 +107,11 @@ export function FeaturePhaseMatrix() {
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
+      <div className="overflow-x-auto rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)]">
         <table className="w-full text-sm">
           <thead>
             <tr>
-              <th className="px-4 py-3 text-left font-medium text-zinc-600 bg-zinc-50 min-w-[200px]">
+              <th className="px-4 py-3 text-left font-medium text-[var(--ink-2)] bg-[var(--subtle)] min-w-[200px]">
                 Feature
               </th>
               {PHASES.map((phase) => {
@@ -132,10 +132,10 @@ export function FeaturePhaseMatrix() {
           </thead>
           <tbody className="divide-y divide-zinc-100">
             {FEATURES.map((feature) => (
-              <tr key={feature.id} className="hover:bg-zinc-50 transition-colors">
+              <tr key={feature.id} className="hover:bg-[var(--subtle)] transition-colors">
                 <td className="px-4 py-3">
                   <div className="font-medium text-zinc-800">{feature.label}</div>
-                  <div className="text-xs text-zinc-400">{feature.description}</div>
+                  <div className="text-xs text-[var(--ink-3)]">{feature.description}</div>
                 </td>
                 {PHASES.map((phase) => {
                   const checked = matrix[feature.id]?.[phase.id] ?? false
@@ -160,7 +160,7 @@ export function FeaturePhaseMatrix() {
       <div className="mt-4 flex items-center justify-between">
         <button
           onClick={handleReset}
-          className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+          className="rounded-lg border border-[var(--border-md)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
         >
           Standaardwaarden herstellen
         </button>

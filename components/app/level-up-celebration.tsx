@@ -261,7 +261,7 @@ export function LevelUpCelebration({ oldLevel, newLevel, onClose }: LevelUpCeleb
       {/* Main celebration card */}
       <div
         data-testid="level-up-card"
-        className={`relative mx-4 w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl transition-all duration-500 ${
+        className={`relative mx-4 w-full max-w-md overflow-hidden rounded-3xl bg-[var(--paper)] shadow-2xl transition-all duration-500 ${
           phase === 'enter' ? 'opacity-0 scale-75 translate-y-8' :
           phase === 'exit' ? 'opacity-0 scale-90 -translate-y-4' :
           'opacity-100 scale-100 translate-y-0'
@@ -283,14 +283,14 @@ export function LevelUpCelebration({ oldLevel, newLevel, onClose }: LevelUpCeleb
           <button
             data-testid="level-up-close"
             onClick={handleDismiss}
-            className="absolute top-3 right-3 rounded-full p-1.5 text-white/60 hover:text-white hover:bg-white/20 transition-colors z-10"
+            className="absolute top-3 right-3 rounded-full p-1.5 text-white/60 hover:text-white hover:bg-[var(--paper)]/20 transition-colors z-10"
             aria-label="Sluiten"
           >
             <X className="h-5 w-5" />
           </button>
 
           {/* Level icon with pulse */}
-          <div className={`relative z-[1] mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm ring-4 ${colors.ring} transition-all duration-700 ${
+          <div className={`relative z-[1] mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-[var(--paper)]/20 backdrop-blur-sm ring-4 ${colors.ring} transition-all duration-700 ${
             phase === 'show' ? 'scale-100 animate-level-icon-pulse' : 'scale-0'
           }`}>
             <span className="text-4xl" data-testid="level-up-icon">{levelInfo.icon}</span>
@@ -300,7 +300,7 @@ export function LevelUpCelebration({ oldLevel, newLevel, onClose }: LevelUpCeleb
           <div className={`relative z-[1] flex justify-center mb-2 transition-all duration-500 ${
             showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
           }`}>
-            <div className="flex items-center gap-1 rounded-full bg-white/20 px-3 py-1 text-sm font-medium backdrop-blur-sm">
+            <div className="flex items-center gap-1 rounded-full bg-[var(--paper)]/20 px-3 py-1 text-sm font-medium backdrop-blur-sm">
               <ArrowUp className="h-4 w-4 animate-bounce" />
               <span>Niveau omhoog!</span>
             </div>
@@ -365,8 +365,8 @@ export function LevelUpCelebration({ oldLevel, newLevel, onClose }: LevelUpCeleb
             <div className="flex items-center gap-2 rounded-lg bg-zinc-100 px-3 py-2">
               <span className="text-lg">{oldLevelInfo.icon}</span>
               <div>
-                <p className="text-xs text-zinc-400">Was</p>
-                <p className="text-sm font-semibold text-zinc-600">Lvl {oldLevel}</p>
+                <p className="text-xs text-[var(--ink-3)]">Was</p>
+                <p className="text-sm font-semibold text-[var(--ink-2)]">Lvl {oldLevel}</p>
               </div>
             </div>
             <div className="flex items-center">
@@ -383,14 +383,14 @@ export function LevelUpCelebration({ oldLevel, newLevel, onClose }: LevelUpCeleb
 
           {/* Motivational message */}
           <div className="text-center">
-            <p className="text-sm text-zinc-600 leading-relaxed">
+            <p className="text-sm text-[var(--ink-2)] leading-relaxed">
               Je soevereiniteitsniveau is gestegen! Blijf bouwen aan je financiële vrijheid.
             </p>
           </div>
         </div>
 
         {/* Footer: dismiss button */}
-        <div className="border-t border-zinc-100 px-6 py-4">
+        <div className="border-t border-[var(--border-ed)] px-6 py-4">
           <button
             data-testid="level-up-dismiss"
             onClick={handleDismiss}

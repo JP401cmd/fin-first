@@ -91,7 +91,7 @@ export default function BeheerGoCardlessPage() {
     return (
       <div className="animate-pulse space-y-4">
         <div className="h-8 w-48 rounded bg-zinc-200" />
-        <div className="h-64 rounded-xl bg-zinc-200" />
+        <div className="h-64 rounded-[var(--r-lg)] bg-zinc-200" />
       </div>
     )
   }
@@ -114,9 +114,9 @@ export default function BeheerGoCardlessPage() {
       )}
 
       {/* Feature toggle */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6">
-        <h2 className="mb-4 text-lg font-semibold text-zinc-900">GoCardless Bankverbinding</h2>
-        <p className="mb-4 text-sm text-zinc-500">
+      <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">
+        <h2 className="mb-4 text-lg font-semibold text-[var(--ink)]">GoCardless Bankverbinding</h2>
+        <p className="mb-4 text-sm text-[var(--ink-3)]">
           Schakel automatische bankconnectiviteit in via de GoCardless Bank Account Data API.
           Gebruikers kunnen hun bankrekening koppelen om transacties automatisch te synchroniseren.
         </p>
@@ -134,26 +134,26 @@ export default function BeheerGoCardlessPage() {
             <div className={`block h-6 w-11 rounded-full transition-colors ${
               isEnabled ? 'bg-kern-500' : 'bg-zinc-300'
             }`} />
-            <div className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+            <div className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-[var(--paper)] shadow transition-transform ${
               isEnabled ? 'translate-x-5' : 'translate-x-0'
             }`} />
           </div>
-          <span className="text-sm font-medium text-zinc-700">
+          <span className="text-sm font-medium text-[var(--ink-2)]">
             {isEnabled ? 'Ingeschakeld' : 'Uitgeschakeld'}
           </span>
         </label>
 
         {!isEnabled && (
-          <p className="mt-2 text-xs text-zinc-400">
+          <p className="mt-2 text-xs text-[var(--ink-3)]">
             Wanneer uitgeschakeld is de bankverbinding-functie onzichtbaar voor alle gebruikers.
           </p>
         )}
       </div>
 
       {/* Credentials */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6">
-        <h2 className="mb-4 text-lg font-semibold text-zinc-900">API Credentials</h2>
-        <p className="mb-4 text-sm text-zinc-500">
+      <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">
+        <h2 className="mb-4 text-lg font-semibold text-[var(--ink)]">API Credentials</h2>
+        <p className="mb-4 text-sm text-[var(--ink-3)]">
           Verkrijg je Secret ID en Secret Key via{' '}
           <a href="https://bankaccountdata.gocardless.com" target="_blank" rel="noopener noreferrer" className="text-kern-600 underline hover:text-kern-700">
             GoCardless Bank Account Data
@@ -162,38 +162,38 @@ export default function BeheerGoCardlessPage() {
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">Secret ID</label>
+            <label className="block text-sm font-medium text-[var(--ink-2)] mb-1">Secret ID</label>
             <div className="flex items-center gap-2">
               <input
                 type="password"
                 value={settings.gocardless_secret_id}
                 onChange={(e) => setSettings({ ...settings, gocardless_secret_id: e.target.value })}
-                className="flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500"
+                className="flex-1 rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500"
                 placeholder="Voer Secret ID in..."
               />
               <StatusBadge configured={settings.gocardless_secret_id !== '' && !settings.gocardless_secret_id.includes('***')} />
             </div>
             {settings.gocardless_secret_id.includes('***') && (
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="mt-1 text-xs text-[var(--ink-3)]">
                 Geconfigureerd. Voer een nieuwe waarde in om te wijzigen.
               </p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">Secret Key</label>
+            <label className="block text-sm font-medium text-[var(--ink-2)] mb-1">Secret Key</label>
             <div className="flex items-center gap-2">
               <input
                 type="password"
                 value={settings.gocardless_secret_key}
                 onChange={(e) => setSettings({ ...settings, gocardless_secret_key: e.target.value })}
-                className="flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500"
+                className="flex-1 rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500"
                 placeholder="Voer Secret Key in..."
               />
               <StatusBadge configured={settings.gocardless_secret_key !== '' && !settings.gocardless_secret_key.includes('***')} />
             </div>
             {settings.gocardless_secret_key.includes('***') && (
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="mt-1 text-xs text-[var(--ink-3)]">
                 Geconfigureerd. Voer een nieuwe waarde in om te wijzigen.
               </p>
             )}
@@ -202,8 +202,8 @@ export default function BeheerGoCardlessPage() {
       </div>
 
       {/* Environment */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6">
-        <h2 className="mb-4 text-lg font-semibold text-zinc-900">Omgeving</h2>
+      <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">
+        <h2 className="mb-4 text-lg font-semibold text-[var(--ink)]">Omgeving</h2>
         <div className="flex gap-4">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -214,7 +214,7 @@ export default function BeheerGoCardlessPage() {
               onChange={() => setSettings({ ...settings, gocardless_environment: 'sandbox' })}
               className="accent-kern-600"
             />
-            <span className="text-sm font-medium text-zinc-700">Sandbox</span>
+            <span className="text-sm font-medium text-[var(--ink-2)]">Sandbox</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -225,11 +225,11 @@ export default function BeheerGoCardlessPage() {
               onChange={() => setSettings({ ...settings, gocardless_environment: 'production' })}
               className="accent-kern-600"
             />
-            <span className="text-sm font-medium text-zinc-700">Productie</span>
+            <span className="text-sm font-medium text-[var(--ink-2)]">Productie</span>
           </label>
         </div>
         {settings.gocardless_environment === 'sandbox' && (
-          <p className="mt-2 text-xs text-zinc-400">
+          <p className="mt-2 text-xs text-[var(--ink-3)]">
             Sandbox-modus gebruikt testbanken en testdata. Schakel naar productie voor echte bankverbindingen.
           </p>
         )}
@@ -240,7 +240,7 @@ export default function BeheerGoCardlessPage() {
         <button
           onClick={handleTestConnection}
           disabled={testing || !hasCredentials}
-          className="rounded-lg border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+          className="rounded-lg border border-[var(--border-ed)] px-4 py-2.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
         >
           {testing ? 'Testen...' : 'Test verbinding'}
         </button>
@@ -263,7 +263,7 @@ function StatusBadge({ configured }: { configured: boolean }) {
       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
         configured
           ? 'bg-green-50 text-green-700'
-          : 'bg-zinc-100 text-zinc-500'
+          : 'bg-zinc-100 text-[var(--ink-3)]'
       }`}
     >
       <span className={`h-1.5 w-1.5 rounded-full ${configured ? 'bg-green-500' : 'bg-zinc-400'}`} />

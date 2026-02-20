@@ -24,7 +24,7 @@ export function RecommendationCard({ recommendation, onClick }: RecommendationCa
     <button
       type="button"
       onClick={onClick}
-      className={`relative w-full cursor-pointer overflow-hidden rounded-xl border ${colors.border} bg-gradient-to-br from-wil-50 via-white to-kern-50/30 px-4 py-3 text-left transition-all hover:shadow-md`}
+      className={`relative w-full cursor-pointer overflow-hidden rounded-[var(--r-lg)] border ${colors.border} bg-gradient-to-br from-wil-50 via-white to-kern-50/30 px-4 py-3 text-left transition-all hover:shadow-md`}
     >
       <div className="flex items-center gap-3">
         {/* Type icon */}
@@ -36,9 +36,9 @@ export function RecommendationCard({ recommendation, onClick }: RecommendationCa
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             {isPostponed && <Clock className="h-3.5 w-3.5 shrink-0 text-amber-500" />}
-            <h3 className="truncate text-sm font-semibold text-zinc-900">{recommendation.title}</h3>
+            <h3 className="truncate text-sm font-semibold text-[var(--ink)]">{recommendation.title}</h3>
           </div>
-          <div className="mt-0.5 flex items-center gap-2 text-xs text-zinc-500">
+          <div className="mt-0.5 flex items-center gap-2 text-xs text-[var(--ink-3)]">
             <span className={`font-medium ${colors.text}`}>{typeLabel}</span>
             {recommendation.current_value != null && recommendation.proposed_value != null && (
               <>

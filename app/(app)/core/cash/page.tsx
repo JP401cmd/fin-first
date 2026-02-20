@@ -625,9 +625,9 @@ export default function CashPage() {
   if (error) {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-700">{error}</p>
-          <button onClick={() => { setError(null); setLoading(true); loadAccounts() }} className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
+          <button onClick={() => { setError(null); setLoading(true); loadAccounts() }} className="mt-3 rounded-[var(--r)] bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
             Opnieuw proberen
           </button>
         </div>
@@ -638,10 +638,10 @@ export default function CashPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* Account header */}
-      <section className="rounded-2xl border border-kern-200 bg-gradient-to-br from-kern-50 to-white p-6">
+      <section className="rounded-[var(--r-lg)] border border-kern-200 card-editorial p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-kern-100">
+            <div className="flex h-10 w-10 items-center justify-center rounded-[var(--r-lg)] bg-kern-100">
               <Wallet className="h-5 w-5 text-kern-600" />
             </div>
             <div>
@@ -650,18 +650,18 @@ export default function CashPage() {
                   <select
                     value={selectedAccountId}
                     onChange={(e) => setSelectedAccountId(e.target.value)}
-                    className="border-none bg-transparent text-lg font-bold text-zinc-900 outline-none"
+                    className="border-none bg-transparent text-lg font-bold text-[var(--ink)] outline-none"
                   >
                     {accounts.map((a) => (
                       <option key={a.id} value={a.id}>{a.name}</option>
                     ))}
                   </select>
                 ) : (
-                  <h1 className="text-lg font-bold text-zinc-900">{selectedAccount?.name}</h1>
+                  <h1 className="text-lg font-bold text-[var(--ink)]">{selectedAccount?.name}</h1>
                 )}
                 <button
                   onClick={() => { setEditAccount(selectedAccount ?? null); setShowAccountForm(true) }}
-                  className="rounded-lg p-1.5 text-zinc-400 hover:bg-kern-100 hover:text-kern-600"
+                  className="rounded-[var(--r)] p-1.5 text-[var(--ink-3)] hover:bg-kern-100 hover:text-kern-600"
                   title="Rekening bewerken"
                 >
                   <Settings2 className="h-4 w-4" />
@@ -669,10 +669,10 @@ export default function CashPage() {
               </div>
               <div className="flex items-center gap-2">
                 {selectedAccount?.iban && (
-                  <p className="text-xs text-zinc-500">{selectedAccount.iban}</p>
+                  <p className="text-xs text-[var(--ink-3)]">{selectedAccount.iban}</p>
                 )}
                 {selectedAccount?.bank_name && (
-                  <span className="text-xs text-zinc-400">
+                  <span className="text-xs text-[var(--ink-3)]">
                     {selectedAccount.iban ? '·' : ''} {selectedAccount.bank_name}
                   </span>
                 )}
@@ -682,14 +682,14 @@ export default function CashPage() {
           <div className="flex items-center gap-4">
             <button
               onClick={() => { setEditAccount(null); setShowAccountForm(true) }}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-kern-200 px-3 py-1.5 text-xs font-medium text-kern-700 hover:bg-kern-50"
+              className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-kern-200 px-3 py-1.5 text-xs font-medium text-kern-700 hover:bg-kern-50"
             >
               <Plus className="h-3.5 w-3.5" />
               Rekening toevoegen
             </button>
             <div className="text-right">
-              <p className="text-xs font-medium text-zinc-500 uppercase">Saldo</p>
-              <p className="text-2xl font-bold text-zinc-900">
+              <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Saldo</p>
+              <p className="text-2xl font-bold text-[var(--ink)]">
                 {formatCurrency(Number(selectedAccount?.balance ?? 0))}
               </p>
             </div>
@@ -702,14 +702,14 @@ export default function CashPage() {
         <div className="flex items-center gap-2">
           <Link
             href="/core/cash/import"
-            className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+            className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
           >
             <Upload className="h-4 w-4" />
             Importeer transacties
           </Link>
           <button
             onClick={() => { setEditTransaction(null); setShowForm(true) }}
-            className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
+            className="inline-flex items-center gap-2 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
           >
             <Plus className="h-4 w-4" />
             Nieuwe transactie
@@ -720,16 +720,16 @@ export default function CashPage() {
         <div className="flex items-center gap-1">
           <button
             onClick={prevMonth}
-            className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+            className="rounded-[var(--r)] p-2 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="min-w-[140px] text-center text-sm font-semibold capitalize text-zinc-900">
+          <span className="min-w-[140px] text-center text-sm font-semibold capitalize text-[var(--ink)]">
             {monthLabel}
           </span>
           <button
             onClick={nextMonth}
-            className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+            className="rounded-[var(--r)] p-2 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -741,16 +741,16 @@ export default function CashPage() {
         <section className="mt-6">
           <button
             onClick={() => setShowBankConnections((v) => !v)}
-            className="flex w-full items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-left transition-colors hover:bg-zinc-50"
+            className="flex w-full items-center gap-2 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]"
           >
             {showBankConnections ? (
-              <ChevronUp className="h-4 w-4 text-zinc-400" />
+              <ChevronUp className="h-4 w-4 text-[var(--ink-3)]" />
             ) : (
-              <ChevronDown className="h-4 w-4 text-zinc-400" />
+              <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" />
             )}
             <Link2 className="h-4 w-4 text-kern-500" />
-            <span className="text-sm font-semibold text-zinc-700">Bankverbindingen</span>
-            <span className="ml-auto text-xs text-zinc-500">
+            <span className="text-sm font-semibold text-[var(--ink-2)]">Bankverbindingen</span>
+            <span className="ml-auto text-xs text-[var(--ink-3)]">
               {gcAccounts.length} gekoppeld
             </span>
           </button>
@@ -772,7 +772,7 @@ export default function CashPage() {
 
               <Link
                 href="/core/cash/connect"
-                className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-3 text-sm font-medium text-zinc-600 transition-colors hover:border-kern-300 hover:bg-kern-50 hover:text-kern-700"
+                className="flex items-center justify-center gap-2 rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] px-4 py-3 text-sm font-medium text-[var(--ink-2)] transition-colors hover:border-kern-300 hover:bg-kern-50 hover:text-kern-700"
               >
                 <Plus className="h-4 w-4" />
                 Bank koppelen
@@ -784,7 +784,7 @@ export default function CashPage() {
 
       {/* Monthly overview */}
       <section className="mt-6 grid grid-cols-3 gap-4" data-testid="monthly-summary">
-        <div className="rounded-xl border border-zinc-200 bg-white p-4 text-center">
+        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-center">
           <div className="flex items-center justify-center gap-1.5">
             <ArrowDownLeft className="h-4 w-4 text-emerald-500" />
             <p className="text-xs font-medium text-emerald-600 uppercase">Inkomen</p>
@@ -796,7 +796,7 @@ export default function CashPage() {
             </p>
           )}
         </div>
-        <div className="rounded-xl border border-zinc-200 bg-white p-4 text-center">
+        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-center">
           <div className="flex items-center justify-center gap-1.5">
             <ArrowUpRight className="h-4 w-4 text-red-500" />
             <p className="text-xs font-medium text-red-600 uppercase">Uitgaven</p>
@@ -808,8 +808,8 @@ export default function CashPage() {
             </p>
           )}
         </div>
-        <div className="rounded-xl border border-zinc-200 bg-white p-4 text-center">
-          <p className="text-xs font-medium text-zinc-500 uppercase">Netto</p>
+        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-center">
+          <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Netto</p>
           <p className={`mt-1 text-xl font-bold ${netAmount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
             {formatCurrencyShort(netAmount)}
           </p>
@@ -826,22 +826,22 @@ export default function CashPage() {
         <section className="mt-6">
           <button
             onClick={() => setShowRecurring((v) => !v)}
-            className="flex w-full items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-left transition-colors hover:bg-zinc-50"
+            className="flex w-full items-center gap-2 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]"
           >
             {showRecurring ? (
-              <ChevronUp className="h-4 w-4 text-zinc-400" />
+              <ChevronUp className="h-4 w-4 text-[var(--ink-3)]" />
             ) : (
-              <ChevronDown className="h-4 w-4 text-zinc-400" />
+              <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" />
             )}
             <Repeat className="h-4 w-4 text-kern-500" />
-            <span className="text-sm font-semibold text-zinc-700">Terugkerende boekingen</span>
-            <span className="ml-auto text-xs text-zinc-500">
+            <span className="text-sm font-semibold text-[var(--ink-2)]">Terugkerende boekingen</span>
+            <span className="ml-auto text-xs text-[var(--ink-3)]">
               Verwacht: {formatCurrencyShort(getExpectedMonthlyTotal(recurrings))}/mnd
             </span>
           </button>
 
           {showRecurring && (
-            <div className="mt-2 overflow-hidden rounded-xl border border-zinc-200 bg-white">
+            <div className="mt-2 overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)]">
               {recurrings.map((r, idx) => {
                 const amount = Number(r.amount)
                 const isPositive = amount > 0
@@ -852,25 +852,25 @@ export default function CashPage() {
                   <div
                     key={r.id}
                     className={`flex items-center gap-3 px-4 py-3 ${
-                      idx < recurrings.length - 1 ? 'border-b border-zinc-100' : ''
+                      idx < recurrings.length - 1 ? 'border-b border-[var(--border-ed)]' : ''
                     }`}
                   >
-                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r)] ${
                       isPositive ? 'bg-emerald-50' : 'bg-zinc-100'
                     }`}>
                       {budget ? (
-                        <BudgetIcon name={budget.icon} className={`h-4 w-4 ${isPositive ? 'text-emerald-500' : 'text-zinc-500'}`} />
+                        <BudgetIcon name={budget.icon} className={`h-4 w-4 ${isPositive ? 'text-emerald-500' : 'text-[var(--ink-3)]'}`} />
                       ) : (
-                        <Repeat className={`h-4 w-4 ${isPositive ? 'text-emerald-500' : 'text-zinc-400'}`} />
+                        <Repeat className={`h-4 w-4 ${isPositive ? 'text-emerald-500' : 'text-[var(--ink-3)]'}`} />
                       )}
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-zinc-900">{r.name}</p>
+                      <p className="truncate text-sm font-medium text-[var(--ink)]">{r.name}</p>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-zinc-500">{formatSchedule(r)}</span>
+                        <span className="text-xs text-[var(--ink-3)]">{formatSchedule(r)}</span>
                         {nextDate && (
-                          <span className="text-xs text-zinc-400">
+                          <span className="text-xs text-[var(--ink-3)]">
                             · volgende: {nextDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
                           </span>
                         )}
@@ -878,20 +878,20 @@ export default function CashPage() {
                     </div>
 
                     {budget && (
-                      <span className="hidden shrink-0 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600 sm:inline-block">
+                      <span className="hidden shrink-0 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-[var(--ink-2)] sm:inline-block">
                         {budget.name}
                       </span>
                     )}
 
                     <span className={`shrink-0 text-sm font-semibold ${
-                      isPositive ? 'text-emerald-600' : 'text-zinc-900'
+                      isPositive ? 'text-emerald-600' : 'text-[var(--ink)]'
                     }`}>
                       {isPositive ? '+' : ''}{formatCurrency(amount)}
                     </span>
 
                     <button
                       onClick={() => deleteRecurring(r.id)}
-                      className="shrink-0 rounded p-1 text-zinc-300 hover:bg-red-50 hover:text-red-500"
+                      className="shrink-0 rounded p-1 text-[var(--ink-4)] hover:bg-red-50 hover:text-red-500"
                       title="Deactiveren"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -909,18 +909,18 @@ export default function CashPage() {
         <section className="mt-6">
           <button
             onClick={() => setShowSankey((v) => !v)}
-            className="flex w-full items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-left transition-colors hover:bg-zinc-50"
+            className="flex w-full items-center gap-2 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]"
           >
             {showSankey ? (
-              <ChevronUp className="h-4 w-4 text-zinc-400" />
+              <ChevronUp className="h-4 w-4 text-[var(--ink-3)]" />
             ) : (
-              <ChevronDown className="h-4 w-4 text-zinc-400" />
+              <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" />
             )}
-            <span className="text-sm font-semibold text-zinc-700">Geldstroom</span>
+            <span className="text-sm font-semibold text-[var(--ink-2)]">Geldstroom</span>
           </button>
 
           {showSankey && (
-            <div className="relative mt-2 overflow-hidden rounded-xl border border-zinc-200 bg-white">
+            <div className="relative mt-2 overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)]">
               <SankeyDiagram
                 nodes={sankeyData.nodes}
                 links={sankeyData.links}
@@ -935,11 +935,11 @@ export default function CashPage() {
       <FeatureGate featureId="cashflow_forecast" fallback="locked">
         {cashFlowHasData && cashFlowForecast.length >= 2 && (
           <section className="mt-6" data-testid="cashflow-forecast-section">
-            <div className="rounded-xl border border-zinc-200 bg-white p-4">
+            <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4">
               <div className="mb-3 flex items-center gap-2">
                 <LineChart className="h-4 w-4 text-kern-600" />
-                <h3 className="text-sm font-semibold text-zinc-700">Cashflow Prognose</h3>
-                <span className="ml-auto text-xs text-zinc-400">
+                <h3 className="text-sm font-semibold text-[var(--ink-2)]">Cashflow Prognose</h3>
+                <span className="ml-auto text-xs text-[var(--ink-3)]">
                   {cashFlowForecast.length - 1} maanden vooruit
                 </span>
               </div>
@@ -955,16 +955,16 @@ export default function CashPage() {
 
       {/* Transaction filters */}
       <section className="mt-6" data-testid="transaction-filters">
-        <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:flex-row sm:items-center">
           {/* Search input */}
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ink-3)]" />
             <input
               type="text"
               value={filterSearch}
               onChange={(e) => setFilterSearch(e.target.value)}
               placeholder="Zoek op omschrijving of tegenpartij..."
-              className="w-full rounded-lg border border-zinc-200 py-2 pl-9 pr-3 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+              className="w-full rounded-[var(--r)] border border-[var(--border-ed)] py-2 pl-9 pr-3 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--ink-3)] focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               data-testid="filter-search"
             />
           </div>
@@ -973,7 +973,7 @@ export default function CashPage() {
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value as 'all' | 'income' | 'expense')}
-            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+            className="rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm text-[var(--ink-2)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
             data-testid="filter-type"
           >
             <option value="all">Alle types</option>
@@ -985,7 +985,7 @@ export default function CashPage() {
           <select
             value={filterBudgetId}
             onChange={(e) => setFilterBudgetId(e.target.value)}
-            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+            className="rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm text-[var(--ink-2)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
             data-testid="filter-budget"
           >
             <option value="all">Alle categorieën</option>
@@ -1003,7 +1003,7 @@ export default function CashPage() {
           {hasActiveFilters && (
             <button
               onClick={resetFilters}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-kern-200 bg-kern-50 px-3 py-2 text-sm font-medium text-kern-700 hover:bg-kern-100 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-kern-200 bg-kern-50 px-3 py-2 text-sm font-medium text-kern-700 hover:bg-kern-100 transition-colors"
               data-testid="filter-reset"
             >
               <RotateCcw className="h-3.5 w-3.5" />
@@ -1014,7 +1014,7 @@ export default function CashPage() {
 
         {/* Active filter summary */}
         {hasActiveFilters && (
-          <div className="mt-2 flex items-center gap-2 text-xs text-zinc-500" data-testid="filter-summary">
+          <div className="mt-2 flex items-center gap-2 text-xs text-[var(--ink-3)]" data-testid="filter-summary">
             <Filter className="h-3.5 w-3.5" />
             <span>
               {filteredTransactions.length} van {transactions.length} transacties
@@ -1026,15 +1026,15 @@ export default function CashPage() {
       {/* Transaction list */}
       <section className="mt-6" data-testid="transaction-list">
         {sortedDates.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center" data-testid="no-transactions">
-            <Wallet className="mx-auto h-8 w-8 text-zinc-300" />
-            <p className="mt-2 text-sm font-medium text-zinc-600">Geen transacties gevonden</p>
+          <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-8 text-center" data-testid="no-transactions">
+            <Wallet className="mx-auto h-8 w-8 text-[var(--ink-4)]" />
+            <p className="mt-2 text-sm font-medium text-[var(--ink-2)]">Geen transacties gevonden</p>
             {hasActiveFilters ? (
               <>
-                <p className="mt-1 text-xs text-zinc-400">Geen transacties komen overeen met de huidige filters.</p>
+                <p className="mt-1 text-xs text-[var(--ink-3)]">Geen transacties komen overeen met de huidige filters.</p>
                 <button
                   onClick={resetFilters}
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
                   data-testid="filter-reset-empty"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
@@ -1042,7 +1042,7 @@ export default function CashPage() {
                 </button>
               </>
             ) : (
-              <p className="mt-1 text-xs text-zinc-400">Er zijn geen transacties in {monthLabel}. Voeg een transactie toe of importeer je bankafschriften.</p>
+              <p className="mt-1 text-xs text-[var(--ink-3)]">Er zijn geen transacties in {monthLabel}. Voeg een transactie toe of importeer je bankafschriften.</p>
             )}
           </div>
         ) : (
@@ -1058,10 +1058,10 @@ export default function CashPage() {
 
               return (
                 <div key={dateStr}>
-                  <h3 className="mb-2 text-xs font-semibold uppercase text-zinc-400">
+                  <h3 className="mb-2 text-xs font-semibold uppercase text-[var(--ink-3)]">
                     {dateLabel}
                   </h3>
-                  <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+                  <div className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)]">
                     {dateTxs.map((tx, idx) => {
                       const budget = getBudgetForId(tx.budget_id)
                       const amount = Number(tx.amount)
@@ -1071,31 +1071,31 @@ export default function CashPage() {
                         <div
                           key={tx.id}
                           onClick={() => { setEditTransaction(tx); setShowForm(true) }}
-                          className={`flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-zinc-50 ${
-                            idx < dateTxs.length - 1 ? 'border-b border-zinc-100' : ''
+                          className={`flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-[var(--subtle)] ${
+                            idx < dateTxs.length - 1 ? 'border-b border-[var(--border-ed)]' : ''
                           }`}
                         >
                           {/* Icon */}
-                          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r)] ${
                             isPositive ? 'bg-emerald-50' : 'bg-zinc-100'
                           }`}>
                             {budget ? (
                               <BudgetIcon
                                 name={budget.icon}
-                                className={`h-4 w-4 ${isPositive ? 'text-emerald-500' : 'text-zinc-500'}`}
+                                className={`h-4 w-4 ${isPositive ? 'text-emerald-500' : 'text-[var(--ink-3)]'}`}
                               />
                             ) : (
-                              <Tag className={`h-4 w-4 ${isPositive ? 'text-emerald-500' : 'text-zinc-400'}`} />
+                              <Tag className={`h-4 w-4 ${isPositive ? 'text-emerald-500' : 'text-[var(--ink-3)]'}`} />
                             )}
                           </div>
 
                           {/* Description + counterparty */}
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-zinc-900">
+                            <p className="truncate text-sm font-medium text-[var(--ink)]">
                               {tx.description}
                             </p>
                             {tx.counterparty_name && (
-                              <p className="truncate text-xs text-zinc-500">
+                              <p className="truncate text-xs text-[var(--ink-3)]">
                                 {tx.counterparty_name}
                               </p>
                             )}
@@ -1103,7 +1103,7 @@ export default function CashPage() {
 
                           {/* Budget badge */}
                           {budget ? (
-                            <span className="hidden shrink-0 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600 sm:inline-block">
+                            <span className="hidden shrink-0 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-[var(--ink-2)] sm:inline-block">
                               {budget.name}
                             </span>
                           ) : (
@@ -1115,13 +1115,13 @@ export default function CashPage() {
                           {/* Amount + freedom time */}
                           <div className="shrink-0 text-right">
                             <span className={`text-sm font-semibold ${
-                              isPositive ? 'text-emerald-600' : 'text-zinc-900'
+                              isPositive ? 'text-emerald-600' : 'text-[var(--ink)]'
                             }`}>
                               {isPositive ? '+' : ''}{formatCurrency(amount)}
                             </span>
                             {dailyExpenses > 0 && (
                               <p className={`text-[10px] leading-tight ${
-                                isPositive ? 'text-emerald-500/60' : 'text-zinc-400'
+                                isPositive ? 'text-emerald-500/60' : 'text-[var(--ink-3)]'
                               }`} data-testid="tx-freedom-time">
                                 {(() => {
                                   const fd = calculateFreedomTime(Math.abs(amount), dailyExpenses)
@@ -1221,30 +1221,30 @@ function AccountFormModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+        className="w-full max-w-md rounded-[var(--r-lg)] bg-[var(--paper)] p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Building2 className="h-5 w-5 text-kern-600" />
-            <h2 className="text-lg font-bold text-zinc-900">
+            <h2 className="text-lg font-bold text-[var(--ink)]">
               {account ? 'Rekening bewerken' : 'Nieuwe rekening'}
             </h2>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+          <button onClick={onClose} className="rounded-[var(--r)] p-1.5 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-700">Naam *</label>
+            <label className="mb-1 block text-sm font-medium text-[var(--ink-2)]">Naam *</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Bijv. Hoofdrekening"
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+              className="w-full rounded-[var(--r)] border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               required
               autoFocus
             />
@@ -1252,34 +1252,34 @@ function AccountFormModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-zinc-700">IBAN</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--ink-2)]">IBAN</label>
               <input
                 type="text"
                 value={iban}
                 onChange={(e) => setIban(e.target.value.toUpperCase())}
                 placeholder="NL91ABNA..."
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                className="w-full rounded-[var(--r)] border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-zinc-700">Bank</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--ink-2)]">Bank</label>
               <input
                 type="text"
                 value={bankName}
                 onChange={(e) => setBankName(e.target.value)}
                 placeholder="Bijv. ING"
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                className="w-full rounded-[var(--r)] border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-zinc-700">Type</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--ink-2)]">Type</label>
               <select
                 value={accountType}
                 onChange={(e) => setAccountType(e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                className="w-full rounded-[var(--r)] border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               >
                 {ACCOUNT_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>{t.label}</option>
@@ -1287,14 +1287,14 @@ function AccountFormModal({
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-zinc-700">Huidig saldo</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--ink-2)]">Huidig saldo</label>
               <input
                 type="number"
                 step="0.01"
                 value={balance}
                 onChange={(e) => setBalance(e.target.value)}
                 placeholder="0,00"
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                className="w-full rounded-[var(--r)] border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               />
             </div>
           </div>
@@ -1307,14 +1307,14 @@ function AccountFormModal({
                   <button
                     type="button"
                     onClick={() => onDelete(account.id)}
-                    className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+                    className="rounded-[var(--r)] bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
                   >
                     Verwijderen
                   </button>
                   <button
                     type="button"
                     onClick={() => setConfirmDelete(false)}
-                    className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100"
+                    className="rounded-[var(--r)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-zinc-100"
                   >
                     Annuleer
                   </button>
@@ -1323,7 +1323,7 @@ function AccountFormModal({
                 <button
                   type="button"
                   onClick={() => setConfirmDelete(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                  className="inline-flex items-center gap-1.5 rounded-[var(--r)] px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   Verwijderen
@@ -1337,13 +1337,13 @@ function AccountFormModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100"
+                className="rounded-[var(--r)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-zinc-100"
               >
                 Annuleer
               </button>
               <button
                 type="submit"
-                className="rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
+                className="rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
               >
                 {account ? 'Opslaan' : 'Toevoegen'}
               </button>

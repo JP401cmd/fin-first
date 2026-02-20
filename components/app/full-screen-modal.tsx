@@ -41,21 +41,21 @@ export function FullScreenModal({ open, onClose, title, href, children }: FullSc
       style={{ right: 'var(--chat-sidebar-width, 0px)' }}
       onClick={handleBackdrop}
     >
-      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[var(--r-lg)] bg-[var(--paper)] shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
-          <h3 className="font-semibold text-zinc-900">{title}</h3>
+        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-5 py-4">
+          <h3 className="font-semibold text-[var(--ink)]">{title}</h3>
           <div className="flex items-center gap-2">
             <Link
               href={href}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
             >
               <ExternalLink className="h-3.5 w-3.5" />
               Open volledig
             </Link>
             <button
               onClick={onClose}
-              className="touch-target rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+              className="touch-target rounded-md text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
             >
               <X className="h-5 w-5" />
             </button>

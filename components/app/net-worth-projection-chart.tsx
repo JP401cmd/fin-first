@@ -90,11 +90,11 @@ export function NetWorthProjectionChart({
     <div data-testid="net-worth-projection-section">
       {/* Contextual message */}
       <div
-        className={`mb-4 flex items-start gap-2.5 rounded-xl border p-3.5 ${
+        className={`mb-4 flex items-start gap-2.5 rounded-[var(--r-lg)] border p-3.5 ${
           isGrowing
             ? 'border-kern-200 bg-kern-50/60'
             : current === projection.year5
-              ? 'border-zinc-200 bg-zinc-50/60'
+              ? 'border-[var(--border-ed)] bg-[var(--subtle)]/60'
               : 'border-red-200 bg-red-50/60'
         }`}
         data-testid="projection-context-message"
@@ -104,10 +104,10 @@ export function NetWorthProjectionChart({
         ) : projection.year5 < current ? (
           <TrendingDown className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
         ) : (
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" />
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-3)]" />
         )}
         <p className={`text-sm font-medium ${
-          isGrowing ? 'text-kern-800' : projection.year5 < current ? 'text-red-800' : 'text-zinc-700'
+          isGrowing ? 'text-kern-800' : projection.year5 < current ? 'text-red-800' : 'text-[var(--ink-2)]'
         }`}>
           {message}
         </p>
@@ -370,10 +370,10 @@ function ProjectionBadge({
   const isNegative = delta < 0
 
   return (
-    <div className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-xs">
-      <span className="text-zinc-500">{label}:</span>
+    <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-ed)] bg-[var(--paper)] px-2.5 py-1 text-xs">
+      <span className="text-[var(--ink-3)]">{label}:</span>
       <span className="font-medium text-zinc-800">{value}</span>
-      <span className={`font-medium ${isPositive ? 'text-emerald-600' : isNegative ? 'text-red-600' : 'text-zinc-400'}`}>
+      <span className={`font-medium ${isPositive ? 'text-emerald-600' : isNegative ? 'text-red-600' : 'text-[var(--ink-3)]'}`}>
         ({isPositive ? '+' : ''}{formatProjectedValue(delta)})
       </span>
     </div>

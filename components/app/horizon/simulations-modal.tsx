@@ -65,7 +65,7 @@ export function SimulationsModal({ input, open, onClose }: Props) {
       <BottomSheet open={true} onClose={onClose}>
           <div className="flex flex-col items-center justify-center p-12 py-10">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-horizon-500 border-t-transparent" />
-            <p className="mt-4 text-sm text-zinc-500">
+            <p className="mt-4 text-sm text-[var(--ink-3)]">
               Monte Carlo simulaties berekenen ({simCount.toLocaleString('nl-NL')} paden)...
             </p>
           </div>
@@ -88,27 +88,27 @@ export function SimulationsModal({ input, open, onClose }: Props) {
           </button>
 
           {showSettings && (
-            <div className="rounded-xl border border-zinc-200 bg-white p-6">
+            <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6">
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <div>
-                  <label className="text-xs font-medium text-zinc-500">Simulaties: {simCount.toLocaleString('nl-NL')}</label>
+                  <label className="text-xs font-medium text-[var(--ink-3)]">Simulaties: {simCount.toLocaleString('nl-NL')}</label>
                   <input
                     type="range" min={100} max={5000} step={100} value={simCount}
                     onChange={e => setSimCount(Number(e.target.value))}
                     className="mt-1 w-full accent-horizon-600"
                   />
-                  <div className="flex justify-between text-[10px] text-zinc-400">
+                  <div className="flex justify-between text-[10px] text-[var(--ink-3)]">
                     <span>100</span><span>5.000</span>
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-zinc-500">Projectiehorizon: {projYears} jaar</label>
+                  <label className="text-xs font-medium text-[var(--ink-3)]">Projectiehorizon: {projYears} jaar</label>
                   <input
                     type="range" min={10} max={60} step={5} value={projYears}
                     onChange={e => setProjYears(Number(e.target.value))}
                     className="mt-1 w-full accent-horizon-600"
                   />
-                  <div className="flex justify-between text-[10px] text-zinc-400">
+                  <div className="flex justify-between text-[10px] text-[var(--ink-3)]">
                     <span>10 jaar</span><span>60 jaar</span>
                   </div>
                 </div>
@@ -119,40 +119,40 @@ export function SimulationsModal({ input, open, onClose }: Props) {
           {/* Confidence summary */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div
-              className="cursor-pointer rounded-xl border border-horizon-200 bg-horizon-50 p-5 text-center transition-colors hover:border-horizon-300"
+              className="cursor-pointer rounded-[var(--r-lg)] border border-horizon-200 bg-horizon-50 p-5 text-center transition-colors hover:border-horizon-300"
               onClick={() => setSelectedMetric('fire_prob')}
             >
               <p className="text-xs font-medium text-horizon-600 uppercase">FIRE kans</p>
-              <p className="mt-1 text-4xl font-bold text-zinc-900">
+              <p className="mt-1 text-4xl font-bold text-[var(--ink)]">
                 {Math.round(mc.fireProb * 100)}%
               </p>
-              <p className="mt-1 text-sm text-zinc-500">
+              <p className="mt-1 text-sm text-[var(--ink-3)]">
                 van {mc.simulations.toLocaleString('nl-NL')} simulaties
               </p>
             </div>
             <div
-              className="cursor-pointer rounded-xl border border-horizon-200 bg-horizon-50 p-5 text-center transition-colors hover:border-horizon-300"
+              className="cursor-pointer rounded-[var(--r-lg)] border border-horizon-200 bg-horizon-50 p-5 text-center transition-colors hover:border-horizon-300"
               onClick={() => setSelectedMetric('p50')}
             >
               <p className="text-xs font-medium text-horizon-600 uppercase">Verwachte FIRE leeftijd (P50)</p>
-              <p className="mt-1 text-4xl font-bold text-zinc-900">
+              <p className="mt-1 text-4xl font-bold text-[var(--ink)]">
                 {mc.p50FireAge !== null ? Math.round(mc.p50FireAge) : '-'}
               </p>
-              <p className="mt-1 text-sm text-zinc-500">
+              <p className="mt-1 text-sm text-[var(--ink-3)]">
                 {mc.p10FireAge !== null && mc.p90FireAge !== null
                   ? `range: ${Math.round(mc.p10FireAge)} - ${Math.round(mc.p90FireAge)}`
                   : 'onvoldoende data'}
               </p>
             </div>
             <div
-              className="cursor-pointer rounded-xl border border-horizon-200 bg-horizon-50 p-5 text-center transition-colors hover:border-horizon-300"
+              className="cursor-pointer rounded-[var(--r-lg)] border border-horizon-200 bg-horizon-50 p-5 text-center transition-colors hover:border-horizon-300"
               onClick={() => setSelectedMetric('p10')}
             >
               <p className="text-xs font-medium text-horizon-600 uppercase">Beste scenario (P10)</p>
-              <p className="mt-1 text-4xl font-bold text-zinc-900">
+              <p className="mt-1 text-4xl font-bold text-[var(--ink)]">
                 {mc.p10FireAge !== null ? Math.round(mc.p10FireAge) : '-'}
               </p>
-              <p className="mt-1 text-sm text-zinc-500">10% kans op eerder</p>
+              <p className="mt-1 text-sm text-[var(--ink-3)]">10% kans op eerder</p>
             </div>
           </div>
 
@@ -170,14 +170,14 @@ export function SimulationsModal({ input, open, onClose }: Props) {
           {/* Cone of Freedom chart */}
           <section>
             <div className="mb-4">
-              <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+              <h2 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
                 Cone of Freedom
               </h2>
-              <p className="mt-1 text-sm text-zinc-500">
+              <p className="mt-1 text-sm text-[var(--ink-3)]">
                 Spreiding van vermogensgroei over {mc.years} jaar (P10-P90 band)
               </p>
             </div>
-            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
+            <div className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
               <ConeChart
                 percentiles={mc.percentiles}
                 years={mc.years}
@@ -190,25 +190,25 @@ export function SimulationsModal({ input, open, onClose }: Props) {
 
             {hoveredYear !== null && (
               <div className="mt-3 rounded-lg border border-horizon-200 bg-horizon-50 p-4">
-                <p className="text-sm font-medium text-zinc-700">
+                <p className="text-sm font-medium text-[var(--ink-2)]">
                   {currentAge !== null ? `Leeftijd ${currentAge + hoveredYear}` : `Over ${hoveredYear} jaar`}
                 </p>
                 <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <div>
-                    <p className="text-xs text-zinc-500">P10 (slechtst)</p>
-                    <p className="text-sm font-bold text-zinc-900">{formatCurrency(mc.percentiles.p10[hoveredYear])}</p>
+                    <p className="text-xs text-[var(--ink-3)]">P10 (slechtst)</p>
+                    <p className="text-sm font-bold text-[var(--ink)]">{formatCurrency(mc.percentiles.p10[hoveredYear])}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-zinc-500">P50 (mediaan)</p>
+                    <p className="text-xs text-[var(--ink-3)]">P50 (mediaan)</p>
                     <p className="text-sm font-bold text-horizon-700">{formatCurrency(mc.percentiles.p50[hoveredYear])}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-zinc-500">P90 (best)</p>
-                    <p className="text-sm font-bold text-zinc-900">{formatCurrency(mc.percentiles.p90[hoveredYear])}</p>
+                    <p className="text-xs text-[var(--ink-3)]">P90 (best)</p>
+                    <p className="text-sm font-bold text-[var(--ink)]">{formatCurrency(mc.percentiles.p90[hoveredYear])}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-zinc-500">FIRE kans</p>
-                    <p className="text-sm font-bold text-zinc-900">
+                    <p className="text-xs text-[var(--ink-3)]">FIRE kans</p>
+                    <p className="text-sm font-bold text-[var(--ink)]">
                       {mc.percentiles.p50[hoveredYear] >= fireTarget ? '50%+' :
                        mc.percentiles.p90[hoveredYear] >= fireTarget ? '<50%' : '<10%'}
                     </p>
@@ -222,22 +222,22 @@ export function SimulationsModal({ input, open, onClose }: Props) {
           {histogram.length > 0 && (
             <section>
               <div className="mb-4">
-                <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+                <h2 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
                   Verdeling FIRE-leeftijden
                 </h2>
-                <p className="mt-1 text-sm text-zinc-500">
+                <p className="mt-1 text-sm text-[var(--ink-3)]">
                   Hoe vaak elke FIRE-leeftijd voorkomt in {mc.simulations.toLocaleString('nl-NL')} simulaties
                 </p>
               </div>
-              <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
+              <div className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
                 <HistogramChart buckets={histogram} max={maxBucket} />
               </div>
             </section>
           )}
 
           {histogram.length === 0 && (
-            <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
-              <p className="text-sm text-zinc-500">
+            <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-8 text-center">
+              <p className="text-sm text-[var(--ink-3)]">
                 Geen enkele simulatie bereikte FIRE. Verhoog je spaarquote of verlaag je uitgaven.
               </p>
             </div>
@@ -415,8 +415,8 @@ function SimulationDetailModal({
   return (
     <BottomSheet open={true} onClose={onClose}>
         <div className="flex items-center justify-between border-b border-horizon-200 bg-horizon-50 px-6 py-4">
-          <h2 className="text-lg font-semibold text-zinc-900">{titles[metric]}</h2>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+          <h2 className="text-lg font-semibold text-[var(--ink)]">{titles[metric]}</h2>
+          <button onClick={onClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -425,12 +425,12 @@ function SimulationDetailModal({
           {metric === 'fire_prob' && (
             <>
               <div className="text-center">
-                <p className="text-5xl font-bold text-zinc-900">{Math.round(mc.fireProb * 100)}%</p>
-                <p className="mt-2 text-sm text-zinc-500">
+                <p className="text-5xl font-bold text-[var(--ink)]">{Math.round(mc.fireProb * 100)}%</p>
+                <p className="mt-2 text-sm text-[var(--ink-3)]">
                   In {Math.round(mc.fireProb * mc.simulations)} van {mc.simulations} simulaties wordt FIRE bereikt
                 </p>
               </div>
-              <div className="rounded-lg bg-zinc-50 p-4 text-sm text-zinc-600">
+              <div className="rounded-lg bg-[var(--subtle)] p-4 text-sm text-[var(--ink-2)]">
                 <p>De FIRE-kans is het percentage simulaties waarin je doelvermogen van {formatCurrency(fireTarget)} wordt bereikt binnen 40 jaar.</p>
                 <p className="mt-2">Dit doelvermogen is gebaseerd op de 4%-regel: je jaarlijkse uitgaven gedeeld door 0,04.</p>
               </div>
@@ -440,26 +440,26 @@ function SimulationDetailModal({
           {metric === 'p50' && (
             <>
               <div className="text-center">
-                <p className="text-5xl font-bold text-zinc-900">
+                <p className="text-5xl font-bold text-[var(--ink)]">
                   {mc.p50FireAge !== null ? Math.round(mc.p50FireAge) : '-'}
                 </p>
-                <p className="mt-2 text-sm text-zinc-500">Mediaan FIRE-leeftijd (50% kans op eerder)</p>
+                <p className="mt-2 text-sm text-[var(--ink-3)]">Mediaan FIRE-leeftijd (50% kans op eerder)</p>
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-lg bg-zinc-50 p-3 text-center">
-                  <p className="text-xs text-zinc-500">P10 (optimistisch)</p>
+                <div className="rounded-lg bg-[var(--subtle)] p-3 text-center">
+                  <p className="text-xs text-[var(--ink-3)]">P10 (optimistisch)</p>
                   <p className="mt-0.5 text-lg font-bold text-emerald-600">
                     {mc.p10FireAge !== null ? Math.round(mc.p10FireAge) : '-'}
                   </p>
                 </div>
                 <div className="rounded-lg bg-horizon-50 p-3 text-center">
                   <p className="text-xs text-horizon-600">P50 (mediaan)</p>
-                  <p className="mt-0.5 text-lg font-bold text-zinc-900">
+                  <p className="mt-0.5 text-lg font-bold text-[var(--ink)]">
                     {mc.p50FireAge !== null ? Math.round(mc.p50FireAge) : '-'}
                   </p>
                 </div>
-                <div className="rounded-lg bg-zinc-50 p-3 text-center">
-                  <p className="text-xs text-zinc-500">P90 (conservatief)</p>
+                <div className="rounded-lg bg-[var(--subtle)] p-3 text-center">
+                  <p className="text-xs text-[var(--ink-3)]">P90 (conservatief)</p>
                   <p className="mt-0.5 text-lg font-bold text-red-600">
                     {mc.p90FireAge !== null ? Math.round(mc.p90FireAge) : '-'}
                   </p>
@@ -474,9 +474,9 @@ function SimulationDetailModal({
                 <p className="text-5xl font-bold text-emerald-600">
                   {mc.p10FireAge !== null ? Math.round(mc.p10FireAge) : '-'}
                 </p>
-                <p className="mt-2 text-sm text-zinc-500">Beste 10% van de simulaties bereikt FIRE op deze leeftijd</p>
+                <p className="mt-2 text-sm text-[var(--ink-3)]">Beste 10% van de simulaties bereikt FIRE op deze leeftijd</p>
               </div>
-              <div className="rounded-lg bg-emerald-50 p-4 text-sm text-zinc-600">
+              <div className="rounded-lg bg-emerald-50 p-4 text-sm text-[var(--ink-2)]">
                 <p>Het P10-scenario representeert een optimistisch maar realistisch pad waarbij de markt bovengemiddeld presteert.</p>
                 {mc.p50FireAge !== null && mc.p10FireAge !== null && (
                   <p className="mt-2 font-medium text-emerald-700">
@@ -488,7 +488,7 @@ function SimulationDetailModal({
           )}
 
           <div>
-            <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">Vermogensgroei per 5 jaar</p>
+            <p className="mb-2 text-xs font-semibold text-[var(--ink-3)] uppercase">Vermogensgroei per 5 jaar</p>
             <div className="space-y-2">
               {sampleYears.map((yr) => {
                 const p = metric === 'p10' ? 'p10' : 'p50'
@@ -496,7 +496,7 @@ function SimulationDetailModal({
                 const pctOfFire = fireTarget > 0 ? Math.round((value / fireTarget) * 100) : 0
                 return (
                   <div key={yr} className="flex items-center gap-3">
-                    <span className="w-14 shrink-0 text-xs text-zinc-400">
+                    <span className="w-14 shrink-0 text-xs text-[var(--ink-3)]">
                       {currentAge !== null ? `${currentAge + yr}j` : `+${yr}j`}
                     </span>
                     <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100">
@@ -505,7 +505,7 @@ function SimulationDetailModal({
                         style={{ width: `${Math.min(pctOfFire, 100)}%` }}
                       />
                     </div>
-                    <span className="w-20 shrink-0 text-right text-xs font-medium text-zinc-700">
+                    <span className="w-20 shrink-0 text-right text-xs font-medium text-[var(--ink-2)]">
                       {formatCurrency(value)}
                     </span>
                   </div>

@@ -40,7 +40,7 @@ export function OwnershipToggle({ value, onChange, hasHousehold, compact = false
             className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
               value === 'personal'
                 ? 'bg-zinc-900 text-white'
-                : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'
+                : 'bg-zinc-100 text-[var(--ink-3)] hover:bg-zinc-200'
             }`}
             data-testid="ownership-personal-btn"
           >
@@ -53,7 +53,7 @@ export function OwnershipToggle({ value, onChange, hasHousehold, compact = false
             className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
               value === 'shared'
                 ? 'bg-teal-600 text-white'
-                : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'
+                : 'bg-zinc-100 text-[var(--ink-3)] hover:bg-zinc-200'
             }`}
             data-testid="ownership-shared-btn"
           >
@@ -73,24 +73,24 @@ export function OwnershipToggle({ value, onChange, hasHousehold, compact = false
 
   return (
     <div data-testid="ownership-toggle">
-      <label className="mb-1.5 block text-sm font-medium text-zinc-700">
+      <label className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
         Eigendom
       </label>
       <div className="flex gap-2">
         <button
           type="button"
           onClick={() => handleSelect('personal')}
-          className={`flex flex-1 items-center justify-center gap-2 rounded-xl border-2 px-4 py-3 text-sm font-medium transition-all ${
+          className={`flex flex-1 items-center justify-center gap-2 rounded-[var(--r-lg)] border-2 px-4 py-3 text-sm font-medium transition-all ${
             value === 'personal'
-              ? 'border-zinc-900 bg-zinc-50 text-zinc-900 shadow-sm'
-              : 'border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50'
+              ? 'border-zinc-900 bg-[var(--subtle)] text-[var(--ink)] shadow-[var(--s0)]'
+              : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:bg-[var(--subtle)]'
           }`}
           data-testid="ownership-personal-btn"
         >
-          <User className={`h-4 w-4 ${value === 'personal' ? 'text-zinc-900' : 'text-zinc-400'}`} />
+          <User className={`h-4 w-4 ${value === 'personal' ? 'text-[var(--ink)]' : 'text-[var(--ink-3)]'}`} />
           <div className="text-left">
             <span className="block">Persoonlijk</span>
-            <span className={`block text-[10px] font-normal ${value === 'personal' ? 'text-zinc-500' : 'text-zinc-400'}`}>
+            <span className={`block text-[10px] font-normal ${value === 'personal' ? 'text-[var(--ink-3)]' : 'text-[var(--ink-3)]'}`}>
               Alleen van jou
             </span>
           </div>
@@ -98,17 +98,17 @@ export function OwnershipToggle({ value, onChange, hasHousehold, compact = false
         <button
           type="button"
           onClick={() => handleSelect('shared')}
-          className={`flex flex-1 items-center justify-center gap-2 rounded-xl border-2 px-4 py-3 text-sm font-medium transition-all ${
+          className={`flex flex-1 items-center justify-center gap-2 rounded-[var(--r-lg)] border-2 px-4 py-3 text-sm font-medium transition-all ${
             value === 'shared'
-              ? 'border-teal-600 bg-teal-50 text-teal-900 shadow-sm'
-              : 'border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50'
+              ? 'border-teal-600 bg-teal-50 text-teal-900 shadow-[var(--s0)]'
+              : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:bg-[var(--subtle)]'
           }`}
           data-testid="ownership-shared-btn"
         >
-          <Users className={`h-4 w-4 ${value === 'shared' ? 'text-teal-600' : 'text-zinc-400'}`} />
+          <Users className={`h-4 w-4 ${value === 'shared' ? 'text-teal-600' : 'text-[var(--ink-3)]'}`} />
           <div className="text-left">
             <span className="block">Gedeeld</span>
-            <span className={`block text-[10px] font-normal ${value === 'shared' ? 'text-teal-600' : 'text-zinc-400'}`}>
+            <span className={`block text-[10px] font-normal ${value === 'shared' ? 'text-teal-600' : 'text-[var(--ink-3)]'}`}>
               Samen met partner
             </span>
           </div>

@@ -120,7 +120,7 @@ export default function HoldingTransactionLog({
 
   if (error) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-4" data-testid="transaction-log-error">
+      <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-4" data-testid="transaction-log-error">
         <div className="flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-red-500" />
           <p className="text-sm text-red-700">{error}</p>
@@ -175,10 +175,10 @@ export default function HoldingTransactionLog({
 
       {/* New transaction button */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-zinc-700">
+        <h3 className="text-sm font-semibold text-[var(--ink-2)]">
           Transactiegeschiedenis
           {transactions.length > 0 && (
-            <span className="ml-1.5 text-xs font-normal text-zinc-400">
+            <span className="ml-1.5 text-xs font-normal text-[var(--ink-3)]">
               ({transactions.length} transactie{transactions.length !== 1 ? 's' : ''})
             </span>
           )}
@@ -212,10 +212,10 @@ export default function HoldingTransactionLog({
 
       {/* Transaction list */}
       {transactions.length === 0 ? (
-        <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center" data-testid="no-transactions">
-          <Receipt className="mx-auto h-10 w-10 text-zinc-300" />
-          <p className="mt-3 text-sm font-medium text-zinc-600">Nog geen transacties</p>
-          <p className="mt-1 text-xs text-zinc-400">
+        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-8 text-center" data-testid="no-transactions">
+          <Receipt className="mx-auto h-10 w-10 text-[var(--ink-4)]" />
+          <p className="mt-3 text-sm font-medium text-[var(--ink-2)]">Nog geen transacties</p>
+          <p className="mt-1 text-xs text-[var(--ink-3)]">
             Registreer je eerste koop-, verkoop- of dividendtransactie.
           </p>
         </div>
@@ -229,7 +229,7 @@ export default function HoldingTransactionLog({
             return (
               <div
                 key={tx.id}
-                className={`rounded-xl border bg-white transition-colors ${isExpanded ? 'border-kern-200' : 'border-zinc-100'}`}
+                className={`rounded-[var(--r-lg)] border bg-[var(--paper)] transition-colors ${isExpanded ? 'border-kern-200' : 'border-[var(--border-ed)]'}`}
                 data-testid={`transaction-item-${tx.id}`}
               >
                 {/* Transaction row */}
@@ -243,7 +243,7 @@ export default function HoldingTransactionLog({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className={`text-xs font-semibold ${cfg.color}`}>{cfg.label}</span>
-                      <span className="text-xs text-zinc-400">
+                      <span className="text-xs text-[var(--ink-3)]">
                         {new Date(tx.date).toLocaleDateString('nl-NL', {
                           day: 'numeric',
                           month: 'short',
@@ -251,12 +251,12 @@ export default function HoldingTransactionLog({
                         })}
                       </span>
                       {tx.notes && (
-                        <span className="truncate text-xs text-zinc-400 italic">
+                        <span className="truncate text-xs text-[var(--ink-3)] italic">
                           {tx.notes}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-xs text-[var(--ink-3)]">
                       {tx.units} eenhe{tx.units === 1 ? 'id' : 'den'} @ {formatCurrency(tx.price_per_unit)}
                     </p>
                   </div>
@@ -278,16 +278,16 @@ export default function HoldingTransactionLog({
                   {/* Expand indicator */}
                   <div className="shrink-0">
                     {isExpanded ? (
-                      <ChevronUp className="h-4 w-4 text-zinc-400" />
+                      <ChevronUp className="h-4 w-4 text-[var(--ink-3)]" />
                     ) : (
-                      <ChevronDown className="h-4 w-4 text-zinc-400" />
+                      <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" />
                     )}
                   </div>
                 </button>
 
                 {/* Expanded detail: running P&L */}
                 {isExpanded && (
-                  <div className="border-t border-zinc-100 px-3 py-3" data-testid="tx-detail">
+                  <div className="border-t border-[var(--border-ed)] px-3 py-3" data-testid="tx-detail">
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                       <MiniStat label="Eenheden na tx" value={tx.running_units.toString()} />
                       <MiniStat label="Gem. kosten" value={formatCurrency(tx.running_avg_price)} />
@@ -343,19 +343,19 @@ function SummaryCard({
       ? 'text-emerald-600'
       : value < 0
         ? 'text-red-600'
-        : 'text-zinc-600'
-    : 'text-zinc-900'
+        : 'text-[var(--ink-2)]'
+    : 'text-[var(--ink)]'
 
   return (
     <div
-      className={`rounded-xl border p-3 ${
+      className={`rounded-[var(--r-lg)] border p-3 ${
         highlight
           ? 'border-kern-200 bg-kern-50/50'
-          : 'border-zinc-100 bg-white'
+          : 'border-[var(--border-ed)] bg-[var(--paper)]'
       }`}
       data-testid={testId}
     >
-      <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">{label}</p>
+      <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--ink-3)]">{label}</p>
       <p className={`mt-1 text-sm font-bold ${valueColor}`} data-testid={testId ? `${testId}-value` : undefined}>
         {colored && value > 0 ? '+' : ''}{formatCurrency(value)}
       </p>
@@ -377,12 +377,12 @@ function MiniStat({
       ? 'text-emerald-600'
       : colored < 0
         ? 'text-red-600'
-        : 'text-zinc-600'
-    : 'text-zinc-900'
+        : 'text-[var(--ink-2)]'
+    : 'text-[var(--ink)]'
 
   return (
     <div>
-      <p className="text-[10px] font-medium text-zinc-500">{label}</p>
+      <p className="text-[10px] font-medium text-[var(--ink-3)]">{label}</p>
       <p className={`text-xs font-semibold ${color}`}>{value}</p>
     </div>
   )
@@ -450,7 +450,7 @@ function InlineTransactionForm({
   }
 
   return (
-    <div className="rounded-xl border border-kern-200 bg-kern-50/30 p-4" data-testid="inline-transaction-form">
+    <div className="rounded-[var(--r-lg)] border border-kern-200 bg-kern-50/30 p-4" data-testid="inline-transaction-form">
       {error && (
         <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-2">
           <p className="text-xs text-red-600">{error}</p>
@@ -469,7 +469,7 @@ function InlineTransactionForm({
               className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all ${
                 txType === t
                   ? `${cfg.bg} ${cfg.border} ${cfg.color} ring-1 ring-offset-0`
-                  : 'border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50'
+                  : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
               }`}
               data-testid={`tx-type-${t}`}
             >
@@ -483,7 +483,7 @@ function InlineTransactionForm({
       {/* Fields */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div>
-          <label className="mb-1 block text-[10px] font-medium text-zinc-500">
+          <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">
             {txType === 'dividend' ? 'Bedrag per eenheid' : 'Eenheden'} *
           </label>
           <div className="relative">
@@ -493,7 +493,7 @@ function InlineTransactionForm({
               value={units}
               onChange={(e) => setUnits(e.target.value)}
               className={`w-full rounded-lg border px-2.5 py-1.5 text-sm ${
-                sellExceedsOwned || sellFromZero ? 'border-red-300 bg-red-50/50' : 'border-zinc-200'
+                sellExceedsOwned || sellFromZero ? 'border-red-300 bg-red-50/50' : 'border-[var(--border-ed)]'
               }`}
               placeholder="10"
               autoFocus
@@ -512,30 +512,30 @@ function InlineTransactionForm({
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-[10px] font-medium text-zinc-500">Prijs *</label>
+          <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Prijs *</label>
           <input
             type="number"
             step="0.01"
             value={pricePerUnit}
             onChange={(e) => setPricePerUnit(e.target.value)}
-            className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+            className="w-full rounded-lg border border-[var(--border-ed)] px-2.5 py-1.5 text-sm"
             placeholder="50.00"
             data-testid="tx-price-input"
           />
         </div>
         <div>
-          <label className="mb-1 block text-[10px] font-medium text-zinc-500">Datum *</label>
+          <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Datum *</label>
           <input
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+            className="w-full rounded-lg border border-[var(--border-ed)] px-2.5 py-1.5 text-sm"
             data-testid="tx-date-input"
           />
         </div>
         <div>
-          <label className="mb-1 block text-[10px] font-medium text-zinc-500">Totaal</label>
-          <div className="flex items-center rounded-lg border border-zinc-100 bg-zinc-50 px-2.5 py-1.5 text-sm font-medium text-zinc-700">
+          <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Totaal</label>
+          <div className="flex items-center rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-2.5 py-1.5 text-sm font-medium text-[var(--ink-2)]">
             {formatCurrency(totalAmount)}
           </div>
         </div>
@@ -556,13 +556,13 @@ function InlineTransactionForm({
         <input
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          className="flex-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-sm"
+          className="flex-1 rounded-lg border border-[var(--border-ed)] px-2.5 py-1.5 text-sm"
           placeholder="Notitie (optioneel)"
           data-testid="tx-notes-input"
         />
         <button
           onClick={onCancel}
-          className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+          className="rounded-lg border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
         >
           Annuleren
         </button>

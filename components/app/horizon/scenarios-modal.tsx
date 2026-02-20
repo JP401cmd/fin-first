@@ -44,7 +44,7 @@ export function ScenariosModal({ input, debts = [], open, onClose }: Props) {
     <BottomSheet open={true} onClose={onClose} title="Toekomstpaden">
         <div className="space-y-6 px-6 py-6">
           {/* Diverging paths chart */}
-          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
+          <div className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
             <DivergingPathsChart scenarios={scenarios} fireTarget={fireTarget} />
           </div>
 
@@ -97,10 +97,10 @@ export function ScenariosModal({ input, debts = [], open, onClose }: Props) {
 
           {/* Market weather */}
           <section>
-            <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+            <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
               Marktweeer
             </h2>
-            <p className="mb-4 text-sm text-zinc-500">Hoe presteren de scenario&apos;s bij verschillende marktomstandigheden?</p>
+            <p className="mb-4 text-sm text-[var(--ink-3)]">Hoe presteren de scenario&apos;s bij verschillende marktomstandigheden?</p>
 
             <div className="flex flex-wrap gap-2">
               {(Object.entries(MARKET_WEATHER) as [MarketWeather, typeof MARKET_WEATHER[MarketWeather]][]).map(([key, val]) => (
@@ -110,7 +110,7 @@ export function ScenariosModal({ input, debts = [], open, onClose }: Props) {
                   className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                     weather === key
                       ? 'bg-horizon-600 text-white'
-                      : 'border border-zinc-200 bg-white text-zinc-600 hover:border-horizon-200 hover:bg-horizon-50'
+                      : 'border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] hover:border-horizon-200 hover:bg-horizon-50'
                   }`}
                 >
                   {val.label}
@@ -118,16 +118,16 @@ export function ScenariosModal({ input, debts = [], open, onClose }: Props) {
               ))}
             </div>
 
-            <p className="mt-3 text-xs text-zinc-400">{MARKET_WEATHER[weather].description}</p>
+            <p className="mt-3 text-xs text-[var(--ink-3)]">{MARKET_WEATHER[weather].description}</p>
           </section>
 
           {/* Resilience score */}
           {resilience && (
             <section>
-              <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+              <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
                 Veerkrachtscore
               </h2>
-              <div className="rounded-xl border border-zinc-200 bg-white p-6">
+              <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6">
                 <div className="flex flex-col items-center gap-6 sm:flex-row">
                   <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
                     <svg viewBox="0 0 100 100" className="h-full w-full">
@@ -139,11 +139,11 @@ export function ScenariosModal({ input, debts = [], open, onClose }: Props) {
                         transform="rotate(-90 50 50)"
                       />
                     </svg>
-                    <span className="absolute text-2xl font-bold text-zinc-900">{resilience.total}</span>
+                    <span className="absolute text-2xl font-bold text-[var(--ink)]">{resilience.total}</span>
                   </div>
 
                   <div className="flex-1">
-                    <p className="text-lg font-bold text-zinc-900">{resilience.label}</p>
+                    <p className="text-lg font-bold text-[var(--ink)]">{resilience.label}</p>
                     <div className="mt-3 space-y-2">
                       <ResilienceBar label="Noodfonds" value={resilience.breakdown.emergency} max={25} />
                       <ResilienceBar label="Diversificatie" value={resilience.breakdown.diversification} max={25} />
@@ -176,13 +176,13 @@ function ScenarioCard({
   const hoverClass = color === 'red' ? 'hover:border-red-300' : color === 'green' ? 'hover:border-emerald-300' : 'hover:border-horizon-300'
 
   return (
-    <div className={`cursor-pointer rounded-xl border ${borderClass} ${bgClass} ${hoverClass} p-5 transition-colors`} onClick={onClick}>
+    <div className={`cursor-pointer rounded-[var(--r-lg)] border ${borderClass} ${bgClass} ${hoverClass} p-5 transition-colors`} onClick={onClick}>
       <p className={`text-xs font-semibold uppercase ${textClass}`}>{title}</p>
-      <p className="mt-0.5 text-xs text-zinc-500">{subtitle}</p>
-      <p className="mt-3 text-2xl font-bold text-zinc-900">
+      <p className="mt-0.5 text-xs text-[var(--ink-3)]">{subtitle}</p>
+      <p className="mt-3 text-2xl font-bold text-[var(--ink)]">
         {fireAge !== null ? `${Math.round(fireAge)} jaar` : 'Nooit / 67+'}
       </p>
-      <p className="mt-2 text-sm text-zinc-600">{description}</p>
+      <p className="mt-2 text-sm text-[var(--ink-2)]">{description}</p>
     </div>
   )
 }
@@ -209,37 +209,37 @@ function ScenarioDetailModal({
     <BottomSheet open={true} onClose={onClose}>
         <div className={`flex items-center justify-between border-b ${c.border} ${c.bg} px-6 py-4`}>
           <div>
-            <h2 className="text-lg font-semibold text-zinc-900">{scenario.label}</h2>
+            <h2 className="text-lg font-semibold text-[var(--ink)]">{scenario.label}</h2>
             <p className={`text-xs font-medium ${c.text}`}>{scenario.name}</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+          <button onClick={onClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <div className="px-6 py-4 text-center">
-          <p className="text-4xl font-bold text-zinc-900">
+          <p className="text-4xl font-bold text-[var(--ink)]">
             {scenario.fireAge !== null ? `${Math.round(scenario.fireAge)} jaar` : 'Nooit / 67+'}
           </p>
-          <p className="mt-1 text-sm text-zinc-500">
+          <p className="mt-1 text-sm text-[var(--ink-3)]">
             {scenario.fireAge !== null
               ? `FIRE bereikt na ${scenario.fireMonth ? Math.round(scenario.fireMonth / 12) : '?'} jaar`
               : 'FIRE-doelvermogen wordt niet bereikt in 40 jaar'}
           </p>
-          <p className="mt-2 text-xs text-zinc-400">
+          <p className="mt-2 text-xs text-[var(--ink-3)]">
             Benodigd doelvermogen: {formatCurrency(fireTarget)}
           </p>
         </div>
 
-        <div className="border-t border-zinc-100 px-6 py-4">
-          <p className="mb-3 text-xs font-semibold text-zinc-500 uppercase">Projectie per 5 jaar</p>
+        <div className="border-t border-[var(--border-ed)] px-6 py-4">
+          <p className="mb-3 text-xs font-semibold text-[var(--ink-3)] uppercase">Projectie per 5 jaar</p>
           <div className="space-y-2">
             {yearlyPoints.map((pt) => {
               const year = Math.round(pt.month / 12)
               const pctOfFire = fireTarget > 0 ? Math.round((pt.netWorth / fireTarget) * 100) : 0
               return (
                 <div key={pt.month} className="flex items-center gap-3">
-                  <span className="w-14 shrink-0 text-xs text-zinc-400">
+                  <span className="w-14 shrink-0 text-xs text-[var(--ink-3)]">
                     {pt.age !== null ? `${Math.round(pt.age)}j` : `+${year}j`}
                   </span>
                   <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100">
@@ -248,27 +248,27 @@ function ScenarioDetailModal({
                       style={{ width: `${Math.min(pctOfFire, 100)}%`, backgroundColor: scenario.name === 'drifter' ? '#f87171' : scenario.name === 'optimizer' ? '#34d399' : '#a78bfa' }}
                     />
                   </div>
-                  <span className="w-20 shrink-0 text-right text-xs font-medium text-zinc-700">
+                  <span className="w-20 shrink-0 text-right text-xs font-medium text-[var(--ink-2)]">
                     {formatCurrency(pt.netWorth)}
                   </span>
-                  <span className="w-10 shrink-0 text-right text-xs text-zinc-400">{pctOfFire}%</span>
+                  <span className="w-10 shrink-0 text-right text-xs text-[var(--ink-3)]">{pctOfFire}%</span>
                 </div>
               )
             })}
           </div>
         </div>
 
-        <div className="border-t border-zinc-100 px-6 py-4">
+        <div className="border-t border-[var(--border-ed)] px-6 py-4">
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-lg bg-zinc-50 p-3">
-              <p className="text-xs text-zinc-500">Eindvermogen (40j)</p>
-              <p className="mt-0.5 text-sm font-bold text-zinc-900">
+            <div className="rounded-lg bg-[var(--subtle)] p-3">
+              <p className="text-xs text-[var(--ink-3)]">Eindvermogen (40j)</p>
+              <p className="mt-0.5 text-sm font-bold text-[var(--ink)]">
                 {scenario.months.length > 0 ? formatCurrency(scenario.months[scenario.months.length - 1].netWorth) : '-'}
               </p>
             </div>
-            <div className="rounded-lg bg-zinc-50 p-3">
-              <p className="text-xs text-zinc-500">Passief inkomen (40j)</p>
-              <p className="mt-0.5 text-sm font-bold text-zinc-900">
+            <div className="rounded-lg bg-[var(--subtle)] p-3">
+              <p className="text-xs text-[var(--ink-3)]">Passief inkomen (40j)</p>
+              <p className="mt-0.5 text-sm font-bold text-[var(--ink)]">
                 {scenario.months.length > 0 ? formatCurrency(scenario.months[scenario.months.length - 1].passiveIncome * 12) + '/jr' : '-'}
               </p>
             </div>
@@ -282,14 +282,14 @@ function ResilienceBar({ label, value, max }: { label: string; value: number; ma
   const pct = (value / max) * 100
   return (
     <div className="flex items-center gap-3">
-      <span className="w-24 text-xs text-zinc-500">{label}</span>
+      <span className="w-24 text-xs text-[var(--ink-3)]">{label}</span>
       <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100">
         <div
           className="h-full rounded-full bg-horizon-500 transition-all duration-500"
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="w-8 text-right text-xs font-medium text-zinc-600">{value}/{max}</span>
+      <span className="w-8 text-right text-xs font-medium text-[var(--ink-2)]">{value}/{max}</span>
     </div>
   )
 }
@@ -393,17 +393,17 @@ function DebtStrategyComparison({ debts }: { debts: Debt[] }) {
 
   return (
     <section>
-      <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+      <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
         <TrendingDown className="mr-1.5 inline h-3.5 w-3.5 text-horizon-500" />
         Aflossingsstrategieën vergelijken
       </h2>
-      <p className="mb-4 text-sm text-zinc-500">
+      <p className="mb-4 text-sm text-[var(--ink-3)]">
         Vergelijk snowball (kleinste schuld eerst) vs. avalanche (hoogste rente eerst) om je FIRE-datum te versnellen.
       </p>
 
       {/* Extra monthly payment slider */}
-      <div className="mb-4 rounded-xl border border-zinc-200 bg-white p-4">
-        <label className="text-xs font-medium text-zinc-500">
+      <div className="mb-4 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+        <label className="text-xs font-medium text-[var(--ink-3)]">
           Extra maandelijkse aflossing: {formatCurrency(extraMonthly)}
         </label>
         <input
@@ -415,7 +415,7 @@ function DebtStrategyComparison({ debts }: { debts: Debt[] }) {
           onChange={(e) => setExtraMonthly(Number(e.target.value))}
           className="mt-2 w-full accent-horizon-600"
         />
-        <div className="flex justify-between text-[10px] text-zinc-400">
+        <div className="flex justify-between text-[10px] text-[var(--ink-3)]">
           <span>{formatCurrency(0)}</span>
           <span>{formatCurrency(1000)}</span>
         </div>
@@ -463,7 +463,7 @@ function DebtStrategyComparison({ debts }: { debts: Debt[] }) {
 
       {/* Savings summary */}
       {interestSaved > 0 && (
-        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center">
+        <div className="mt-4 rounded-[var(--r-lg)] border border-emerald-200 bg-emerald-50 p-4 text-center">
           <p className="text-sm font-medium text-emerald-700">
             Met de {bestStrategy === 'avalanche' ? 'avalanche' : 'snowball'}-strategie bespaar je{' '}
             <span className="font-bold">{formatCurrency(interestSaved)}</span> aan rente
@@ -478,7 +478,7 @@ function DebtStrategyComparison({ debts }: { debts: Debt[] }) {
       )}
 
       {/* Payoff balance chart */}
-      <div className="mt-4 overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
+      <div className="mt-4 overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
         <PayoffComparisonChart
           snowball={snowballMonths}
           avalanche={avalancheMonths}
@@ -507,13 +507,13 @@ function StrategyCard({
 }) {
   const borderClass = isSelected
     ? (color === 'blue' ? 'border-blue-400 ring-2 ring-blue-200' : color === 'green' ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-zinc-400 ring-2 ring-zinc-200')
-    : (color === 'blue' ? 'border-blue-200' : color === 'green' ? 'border-emerald-200' : 'border-zinc-200')
-  const bgClass = color === 'blue' ? 'bg-blue-50' : color === 'green' ? 'bg-emerald-50' : 'bg-zinc-50'
-  const textClass = color === 'blue' ? 'text-blue-600' : color === 'green' ? 'text-emerald-600' : 'text-zinc-600'
+    : (color === 'blue' ? 'border-blue-200' : color === 'green' ? 'border-emerald-200' : 'border-[var(--border-ed)]')
+  const bgClass = color === 'blue' ? 'bg-blue-50' : color === 'green' ? 'bg-emerald-50' : 'bg-[var(--subtle)]'
+  const textClass = color === 'blue' ? 'text-blue-600' : color === 'green' ? 'text-emerald-600' : 'text-[var(--ink-2)]'
 
   return (
     <div
-      className={`cursor-pointer rounded-xl border ${borderClass} ${bgClass} p-5 transition-all hover:shadow-sm`}
+      className={`cursor-pointer rounded-[var(--r-lg)] border ${borderClass} ${bgClass} p-5 transition-all hover:shadow-[var(--s0)]`}
       onClick={onClick}
     >
       <div className="flex items-center gap-2">
@@ -525,21 +525,21 @@ function StrategyCard({
           </span>
         )}
       </div>
-      <p className="mt-0.5 text-xs text-zinc-500">{subtitle}</p>
-      <p className="mt-3 text-2xl font-bold text-zinc-900">
+      <p className="mt-0.5 text-xs text-[var(--ink-3)]">{subtitle}</p>
+      <p className="mt-3 text-2xl font-bold text-[var(--ink)]">
         {months > 0 ? `${Math.ceil(months / 12)} jaar` : '-'}
       </p>
-      <p className="mt-1 text-xs text-zinc-500">
+      <p className="mt-1 text-xs text-[var(--ink-3)]">
         {months > 0 ? `${months} maanden` : 'Geen schulden'}
       </p>
       <div className="mt-3 space-y-1">
         <div className="flex justify-between text-xs">
-          <span className="text-zinc-500">Totale rente</span>
+          <span className="text-[var(--ink-3)]">Totale rente</span>
           <span className="font-medium text-red-600">{formatCurrency(totalInterest)}</span>
         </div>
         <div className="flex justify-between text-xs">
-          <span className="text-zinc-500">Totaal betaald</span>
-          <span className="font-medium text-zinc-700">{formatCurrency(totalPaid)}</span>
+          <span className="text-[var(--ink-3)]">Totaal betaald</span>
+          <span className="font-medium text-[var(--ink-2)]">{formatCurrency(totalPaid)}</span>
         </div>
       </div>
     </div>
@@ -573,12 +573,12 @@ function StrategyDetail({
   }).sort((a, b) => (a.payoffMonth ?? 999) - (b.payoffMonth ?? 999))
 
   return (
-    <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-5">
+    <div className="mt-4 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5">
       <h3 className="text-sm font-semibold text-zinc-800">{title}-strategie detail</h3>
-      <p className="mt-1 text-xs text-zinc-500">{description}</p>
+      <p className="mt-1 text-xs text-[var(--ink-3)]">{description}</p>
 
       <div className="mt-4">
-        <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">Aflosvolgorde</p>
+        <p className="mb-2 text-xs font-semibold text-[var(--ink-3)] uppercase">Aflosvolgorde</p>
         <div className="space-y-2">
           {payoffOrder.map((debt, i) => (
             <div key={debt.name} className="flex items-center gap-3">
@@ -587,11 +587,11 @@ function StrategyDetail({
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-zinc-800">{debt.name}</p>
-                <p className="text-xs text-zinc-400">
+                <p className="text-xs text-[var(--ink-3)]">
                   {formatCurrency(debt.balance)} · {debt.rate}% rente
                 </p>
               </div>
-              <span className="shrink-0 text-xs font-medium text-zinc-600">
+              <span className="shrink-0 text-xs font-medium text-[var(--ink-2)]">
                 {debt.payoffMonth !== null ? `${debt.payoffMonth} mnd` : 'Aflossingsvrij'}
               </span>
             </div>

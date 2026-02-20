@@ -131,14 +131,14 @@ export function GoalForm({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl" style={{ maxHeight: '90vh' }}>
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-zinc-900">
+      <div className="w-full max-w-lg overflow-y-auto rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl" style={{ maxHeight: '90vh' }}>
+        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-6 py-4">
+          <h2 className="text-lg font-semibold text-[var(--ink)]">
             {isEdit ? 'Doel bewerken' : 'Nieuw doel'}
           </h2>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+            className="rounded-lg p-1.5 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
           >
             <X className="h-5 w-5" />
           </button>
@@ -154,7 +154,7 @@ export function GoalForm({
           <div className="space-y-4">
             {/* Name */}
             <div>
-              <label htmlFor="goal-name" className="mb-1.5 block text-sm font-medium text-zinc-700">
+              <label htmlFor="goal-name" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                 Naam
               </label>
               <input
@@ -162,7 +162,7 @@ export function GoalForm({
                 type="text"
                 value={form.name}
                 onChange={(e) => update('name', e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                 placeholder="bijv. Noodfonds opbouwen"
                 required
               />
@@ -170,14 +170,14 @@ export function GoalForm({
 
             {/* Type */}
             <div>
-              <label htmlFor="goal-type" className="mb-1.5 block text-sm font-medium text-zinc-700">
+              <label htmlFor="goal-type" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                 Type doel
               </label>
               <select
                 id="goal-type"
                 value={form.goal_type}
                 onChange={(e) => update('goal_type', e.target.value as GoalType)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
               >
                 {(Object.keys(GOAL_TYPE_LABELS) as GoalType[]).map((type) => (
                   <option key={type} value={type}>{GOAL_TYPE_LABELS[type]}</option>
@@ -188,7 +188,7 @@ export function GoalForm({
             {/* Target + Current */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="goal-target" className="mb-1.5 block text-sm font-medium text-zinc-700">
+                <label htmlFor="goal-target" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                   {form.goal_type === 'freedom_days' ? 'Doeldagen' : 'Doelbedrag (€)'}
                 </label>
                 <input
@@ -198,13 +198,13 @@ export function GoalForm({
                   step={form.goal_type === 'freedom_days' ? '1' : '0.01'}
                   value={form.target_value}
                   onChange={(e) => update('target_value', e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                   placeholder="0"
                   required
                 />
               </div>
               <div>
-                <label htmlFor="goal-current" className="mb-1.5 block text-sm font-medium text-zinc-700">
+                <label htmlFor="goal-current" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                   {form.goal_type === 'freedom_days' ? 'Huidige dagen' : 'Huidige waarde (€)'}
                 </label>
                 <input
@@ -214,7 +214,7 @@ export function GoalForm({
                   step={form.goal_type === 'freedom_days' ? '1' : '0.01'}
                   value={form.current_value}
                   onChange={(e) => update('current_value', e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                   placeholder="0"
                 />
               </div>
@@ -222,7 +222,7 @@ export function GoalForm({
 
             {/* Deadline */}
             <div>
-              <label htmlFor="goal-date" className="mb-1.5 block text-sm font-medium text-zinc-700">
+              <label htmlFor="goal-date" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                 Deadline (optioneel)
               </label>
               <input
@@ -230,21 +230,21 @@ export function GoalForm({
                 type="date"
                 value={form.target_date}
                 onChange={(e) => update('target_date', e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
               />
             </div>
 
             {/* Link to asset (for savings/net_worth) */}
             {(form.goal_type === 'savings' || form.goal_type === 'net_worth') && assets.length > 0 && (
               <div>
-                <label htmlFor="goal-asset" className="mb-1.5 block text-sm font-medium text-zinc-700">
+                <label htmlFor="goal-asset" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                   Koppel aan asset (optioneel)
                 </label>
                 <select
                   id="goal-asset"
                   value={form.linked_asset_id}
                   onChange={(e) => handleAssetLink(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                 >
                   <option value="">Niet gekoppeld</option>
                   {assets.map((a) => (
@@ -257,14 +257,14 @@ export function GoalForm({
             {/* Link to debt (for debt_payoff) */}
             {form.goal_type === 'debt_payoff' && debts.length > 0 && (
               <div>
-                <label htmlFor="goal-debt" className="mb-1.5 block text-sm font-medium text-zinc-700">
+                <label htmlFor="goal-debt" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                   Koppel aan schuld
                 </label>
                 <select
                   id="goal-debt"
                   value={form.linked_debt_id}
                   onChange={(e) => handleDebtLink(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                 >
                   <option value="">Selecteer schuld</option>
                   {debts.map((d) => (
@@ -277,7 +277,7 @@ export function GoalForm({
             {/* Color + Icon */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zinc-700">Kleur</label>
+                <label className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">Kleur</label>
                 <div className="flex flex-wrap gap-2">
                   {GOAL_COLORS.map((c) => (
                     <button
@@ -293,12 +293,12 @@ export function GoalForm({
                 </div>
               </div>
               <div>
-                <label htmlFor="goal-icon" className="mb-1.5 block text-sm font-medium text-zinc-700">Icoon</label>
+                <label htmlFor="goal-icon" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">Icoon</label>
                 <select
                   id="goal-icon"
                   value={form.icon}
                   onChange={(e) => update('icon', e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                 >
                   {iconOptions.map((name) => (
                     <option key={name} value={name}>{name}</option>
@@ -309,14 +309,14 @@ export function GoalForm({
 
             {/* Description */}
             <div>
-              <label htmlFor="goal-desc" className="mb-1.5 block text-sm font-medium text-zinc-700">
+              <label htmlFor="goal-desc" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                 Beschrijving (optioneel)
               </label>
               <textarea
                 id="goal-desc"
                 value={form.description}
                 onChange={(e) => update('description', e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                 rows={2}
                 placeholder="Waarom is dit doel belangrijk?"
               />
@@ -324,11 +324,11 @@ export function GoalForm({
           </div>
 
           {/* Actions */}
-          <div className="mt-6 flex items-center justify-end gap-3 border-t border-zinc-200 pt-4">
+          <div className="mt-6 flex items-center justify-end gap-3 border-t border-[var(--border-ed)] pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+              className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
             >
               Annuleren
             </button>

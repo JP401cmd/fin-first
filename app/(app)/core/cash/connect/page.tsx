@@ -73,7 +73,7 @@ export default function ConnectBankPage() {
       {/* Back link */}
       <Link
         href="/core/cash"
-        className="mb-6 inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-700"
+        className="mb-6 inline-flex items-center gap-1 text-sm text-[var(--ink-3)] hover:text-[var(--ink-2)]"
       >
         <ChevronLeft className="h-4 w-4" />
         Terug naar Kas
@@ -81,8 +81,8 @@ export default function ConnectBankPage() {
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-zinc-900">Bank koppelen</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h1 className="text-2xl font-bold text-[var(--ink)]">Bank koppelen</h1>
+        <p className="mt-1 text-sm text-[var(--ink-3)]">
           Koppel je bankrekening om transacties automatisch te synchroniseren
         </p>
       </div>
@@ -105,12 +105,12 @@ export default function ConnectBankPage() {
                 ? 'bg-kern-500 text-white'
                 : i < ['select', 'confirm', 'redirect'].indexOf(step)
                   ? 'bg-kern-100 text-kern-700'
-                  : 'bg-zinc-100 text-zinc-400'
+                  : 'bg-zinc-100 text-[var(--ink-3)]'
             }`}>
               {i + 1}
             </div>
             <span className={`text-xs font-medium ${
-              step === s ? 'text-zinc-900' : 'text-zinc-400'
+              step === s ? 'text-[var(--ink)]' : 'text-[var(--ink-3)]'
             }`}>
               {s === 'select' ? 'Kies bank' : s === 'confirm' ? 'Bevestig' : 'Autoriseer'}
             </span>
@@ -126,7 +126,7 @@ export default function ConnectBankPage() {
       {/* Step: Confirm */}
       {step === 'confirm' && selectedBank && (
         <div className="space-y-6">
-          <div className="flex items-center gap-4 rounded-xl border border-kern-200 bg-kern-50 p-4">
+          <div className="flex items-center gap-4 rounded-[var(--r-lg)] border border-kern-200 bg-kern-50 p-4">
             {selectedBank.logo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={selectedBank.logo} alt={selectedBank.name} className="h-12 w-12 rounded-lg object-contain" />
@@ -136,37 +136,37 @@ export default function ConnectBankPage() {
               </div>
             )}
             <div>
-              <p className="font-semibold text-zinc-900">{selectedBank.name}</p>
-              <p className="text-sm text-zinc-500">Je wordt doorgestuurd om in te loggen</p>
+              <p className="font-semibold text-[var(--ink)]">{selectedBank.name}</p>
+              <p className="text-sm text-[var(--ink-3)]">Je wordt doorgestuurd om in te loggen</p>
             </div>
           </div>
 
           <div className="space-y-3">
-            <div className="flex items-start gap-3 rounded-lg bg-zinc-50 p-3">
+            <div className="flex items-start gap-3 rounded-lg bg-[var(--subtle)] p-3">
               <Shield className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" />
               <div>
-                <p className="text-sm font-medium text-zinc-700">Veilige verbinding</p>
-                <p className="text-xs text-zinc-500">
+                <p className="text-sm font-medium text-[var(--ink-2)]">Veilige verbinding</p>
+                <p className="text-xs text-[var(--ink-3)]">
                   Je inloggegevens worden nooit met ons gedeeld. De verbinding loopt via GoCardless, een door de EU gereguleerde dienst.
                 </p>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 rounded-lg bg-zinc-50 p-3">
+            <div className="flex items-start gap-3 rounded-lg bg-[var(--subtle)] p-3">
               <Clock className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" />
               <div>
-                <p className="text-sm font-medium text-zinc-700">90 dagen geldig</p>
-                <p className="text-xs text-zinc-500">
+                <p className="text-sm font-medium text-[var(--ink-2)]">90 dagen geldig</p>
+                <p className="text-xs text-[var(--ink-3)]">
                   De autorisatie is 90 dagen geldig. Daarna kun je eenvoudig opnieuw verbinden.
                 </p>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 rounded-lg bg-zinc-50 p-3">
+            <div className="flex items-start gap-3 rounded-lg bg-[var(--subtle)] p-3">
               <ExternalLink className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" />
               <div>
-                <p className="text-sm font-medium text-zinc-700">Alleen lezen</p>
-                <p className="text-xs text-zinc-500">
+                <p className="text-sm font-medium text-[var(--ink-2)]">Alleen lezen</p>
+                <p className="text-xs text-[var(--ink-3)]">
                   Wij kunnen alleen transacties en saldo&apos;s bekijken. Geen overboekingen of wijzigingen.
                 </p>
               </div>
@@ -176,7 +176,7 @@ export default function ConnectBankPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => { setStep('select'); setSelectedBank(null) }}
-              className="rounded-lg border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+              className="rounded-lg border border-[var(--border-ed)] px-4 py-2.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
             >
               Andere bank
             </button>
@@ -195,10 +195,10 @@ export default function ConnectBankPage() {
       {step === 'redirect' && (
         <div className="flex flex-col items-center py-12 text-center">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
-          <p className="mt-4 text-sm font-medium text-zinc-700">
+          <p className="mt-4 text-sm font-medium text-[var(--ink-2)]">
             Je wordt doorgestuurd naar je bank...
           </p>
-          <p className="mt-1 text-xs text-zinc-400">
+          <p className="mt-1 text-xs text-[var(--ink-3)]">
             Dit kan een moment duren. Sluit dit venster niet.
           </p>
         </div>

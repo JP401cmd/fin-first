@@ -101,7 +101,7 @@ export function BudgetAlert({
           {message} — {formatCurrency(spent)} van {formatCurrency(limit)}
         </p>
         {freedomOver && (
-          <p className="text-sm italic text-zinc-500" data-testid="alert-freedom-time">
+          <p className="text-sm italic text-[var(--ink-3)]" data-testid="alert-freedom-time">
             {formatCurrency(overAmount)} over — {freedomOver.formattedDagen} ingeleverd
           </p>
         )}

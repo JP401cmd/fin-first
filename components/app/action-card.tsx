@@ -41,7 +41,7 @@ export function ActionCard({ action, onStatusChange, onUpdate }: ActionCardProps
   return (
     <>
       <div
-        className={`rounded-lg border border-zinc-200 border-l-4 ${statusBorder} bg-white px-3 py-2.5 transition-all hover:shadow-sm cursor-pointer`}
+        className={`rounded-lg border border-[var(--border-ed)] border-l-4 ${statusBorder} bg-[var(--paper)] px-3 py-2.5 transition-all hover:shadow-[var(--s0)] cursor-pointer`}
         onClick={() => {
           if (!showPostpone && !showReject && onUpdate) setShowEdit(true)
         }}
@@ -49,7 +49,7 @@ export function ActionCard({ action, onStatusChange, onUpdate }: ActionCardProps
         <div className="flex items-center justify-between gap-2">
           {/* Left: title + badges */}
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <h4 className="truncate text-sm font-medium text-zinc-900">{action.title}</h4>
+            <h4 className="truncate text-sm font-medium text-[var(--ink)]">{action.title}</h4>
             <span className={`shrink-0 rounded-full px-1.5 py-px text-xs font-medium ${sourceBadge}`}>
               {ACTION_SOURCE_LABELS[action.source]}
             </span>
@@ -64,7 +64,7 @@ export function ActionCard({ action, onStatusChange, onUpdate }: ActionCardProps
               </span>
             )}
             {action.due_date && action.status === 'open' && (
-              <span className="hidden sm:inline text-xs text-zinc-400">
+              <span className="hidden sm:inline text-xs text-[var(--ink-3)]">
                 {new Date(action.due_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
               </span>
             )}
@@ -75,7 +75,7 @@ export function ActionCard({ action, onStatusChange, onUpdate }: ActionCardProps
               </span>
             )}
             {action.recommendation?.title && (
-              <span className="hidden md:inline truncate max-w-[120px] text-[11px] text-zinc-400">
+              <span className="hidden md:inline truncate max-w-[120px] text-[11px] text-[var(--ink-3)]">
                 {action.recommendation.title}
               </span>
             )}
@@ -106,7 +106,7 @@ export function ActionCard({ action, onStatusChange, onUpdate }: ActionCardProps
                   onClick={() => setShowReject(true)}
                   disabled={isLoading}
                   title="Afwijzen"
-                  className="touch-target rounded text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-red-500 disabled:opacity-50"
+                  className="touch-target rounded text-[var(--ink-3)] transition-colors hover:bg-zinc-100 hover:text-red-500 disabled:opacity-50"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -153,7 +153,7 @@ export function ActionCard({ action, onStatusChange, onUpdate }: ActionCardProps
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               placeholder="Reden (optioneel)"
-              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-red-300 focus:outline-none focus:ring-1 focus:ring-red-300"
+              className="w-full rounded-md border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-red-300 focus:outline-none focus:ring-1 focus:ring-red-300"
             />
             <div className="flex gap-2">
               <button
@@ -167,7 +167,7 @@ export function ActionCard({ action, onStatusChange, onUpdate }: ActionCardProps
               <button
                 type="button"
                 onClick={() => setShowReject(false)}
-                className="rounded-md px-3 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-100"
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] transition-colors hover:bg-zinc-100"
               >
                 Annuleren
               </button>

@@ -137,8 +137,8 @@ export default function BeheerTestdataPage() {
       {/* Testdata Personas */}
       <div>
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-zinc-900">Testdata laden</h2>
-          <p className="mt-1 text-sm text-zinc-500">
+          <h2 className="text-xl font-bold text-[var(--ink)]">Testdata laden</h2>
+          <p className="mt-1 text-sm text-[var(--ink-3)]">
             Selecteer een persona om de applicatie te vullen met testdata. Dit wist alle huidige data.
           </p>
         </div>
@@ -161,16 +161,16 @@ export default function BeheerTestdataPage() {
         {/* Confirmation dialog */}
         {confirmPersona && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-              <h3 className="text-lg font-semibold text-zinc-900">Bevestiging</h3>
-              <p className="mt-2 text-sm text-zinc-600">
+            <div className="mx-4 w-full max-w-md rounded-xl bg-[var(--paper)] p-6 shadow-xl">
+              <h3 className="text-lg font-semibold text-[var(--ink)]">Bevestiging</h3>
+              <p className="mt-2 text-sm text-[var(--ink-2)]">
                 Dit wist <span className="font-semibold text-red-600">AL</span> je huidige financiele data en vervangt het met de gegevens van{' '}
                 <span className="font-semibold">{PERSONAS[confirmPersona].meta.name}</span>. Doorgaan?
               </p>
               <div className="mt-6 flex justify-end gap-3">
                 <button
                   onClick={() => setConfirmPersona(null)}
-                  className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+                  className="rounded-lg border border-[var(--border-md)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
                 >
                   Annuleren
                 </button>
@@ -187,12 +187,12 @@ export default function BeheerTestdataPage() {
 
         {/* Progress bar */}
         {(seeding || seedSummary || seedError) && (
-          <div className="mt-6 rounded-xl border border-zinc-200 bg-white p-6">
+          <div className="mt-6 rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-medium text-zinc-700">
+              <span className="text-sm font-medium text-[var(--ink-2)]">
                 {seeding ? 'Bezig met laden...' : seedError ? 'Fout opgetreden' : 'Voltooid'}
               </span>
-              <span className="text-sm text-zinc-500">{seedProgress}%</span>
+              <span className="text-sm text-[var(--ink-3)]">{seedProgress}%</span>
             </div>
 
             <div className="h-3 w-full overflow-hidden rounded-full bg-zinc-100">
@@ -204,7 +204,7 @@ export default function BeheerTestdataPage() {
               />
             </div>
 
-            <p className="mt-2 text-sm text-zinc-500">{seedStep}</p>
+            <p className="mt-2 text-sm text-[var(--ink-3)]">{seedStep}</p>
 
             {seedError && (
               <div className="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 border border-red-200">
@@ -214,23 +214,23 @@ export default function BeheerTestdataPage() {
 
             {seedSummary && (
               <div className="mt-4">
-                <h4 className="mb-2 text-sm font-semibold text-zinc-700">Samenvatting</h4>
-                <div className="overflow-hidden rounded-lg border border-zinc-200">
+                <h4 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">Samenvatting</h4>
+                <div className="overflow-hidden rounded-lg border border-[var(--border-ed)]">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-zinc-50">
-                        <th className="px-3 py-2 text-left font-medium text-zinc-600">Tabel</th>
-                        <th className="px-3 py-2 text-left font-medium text-zinc-600">Actie</th>
-                        <th className="px-3 py-2 text-right font-medium text-zinc-600">Records</th>
-                        <th className="px-3 py-2 text-center font-medium text-zinc-600">Status</th>
+                      <tr className="bg-[var(--subtle)]">
+                        <th className="px-3 py-2 text-left font-medium text-[var(--ink-2)]">Tabel</th>
+                        <th className="px-3 py-2 text-left font-medium text-[var(--ink-2)]">Actie</th>
+                        <th className="px-3 py-2 text-right font-medium text-[var(--ink-2)]">Records</th>
+                        <th className="px-3 py-2 text-center font-medium text-[var(--ink-2)]">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
                       {seedSteps
                         .filter((s) => s.action === 'insert' || s.action === 'update')
                         .map((s, i) => (
-                        <tr key={i} className="hover:bg-zinc-50">
-                          <td className="px-3 py-1.5 text-zinc-700 font-mono text-xs">{TABLE_LABELS[s.table] ?? s.table}</td>
+                        <tr key={i} className="hover:bg-[var(--subtle)]">
+                          <td className="px-3 py-1.5 text-[var(--ink-2)] font-mono text-xs">{TABLE_LABELS[s.table] ?? s.table}</td>
                           <td className="px-3 py-1.5">
                             <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
                               s.action === 'insert' ? 'bg-green-50 text-green-700' :
@@ -239,7 +239,7 @@ export default function BeheerTestdataPage() {
                               {s.action === 'insert' ? 'Gevuld' : 'Bijgewerkt'}
                             </span>
                           </td>
-                          <td className="px-3 py-1.5 text-right text-zinc-700 font-mono text-xs">
+                          <td className="px-3 py-1.5 text-right text-[var(--ink-2)] font-mono text-xs">
                             {s.count ?? '-'}
                           </td>
                           <td className="px-3 py-1.5 text-center">
@@ -253,10 +253,10 @@ export default function BeheerTestdataPage() {
                   </table>
                 </div>
 
-                <div className="mt-3 flex flex-wrap gap-3 text-xs text-zinc-500">
+                <div className="mt-3 flex flex-wrap gap-3 text-xs text-[var(--ink-3)]">
                   {Object.entries(seedSummary).map(([key, count]) => (
                     <span key={key}>
-                      <span className="font-medium text-zinc-700">{TABLE_LABELS[key] ?? key}:</span> {count}
+                      <span className="font-medium text-[var(--ink-2)]">{TABLE_LABELS[key] ?? key}:</span> {count}
                     </span>
                   ))}
                 </div>
@@ -267,9 +267,9 @@ export default function BeheerTestdataPage() {
       </div>
 
       {/* Onboarding flow testen */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6">
-        <h3 className="text-lg font-semibold text-zinc-900">Onboarding flow testen</h3>
-        <p className="mt-1 text-sm text-zinc-500">
+      <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">
+        <h3 className="text-lg font-semibold text-[var(--ink)]">Onboarding flow testen</h3>
+        <p className="mt-1 text-sm text-[var(--ink-3)]">
           Wis alle data en doorloop de onboarding opnieuw als nieuwe gebruiker.
         </p>
         <button
@@ -284,16 +284,16 @@ export default function BeheerTestdataPage() {
       {/* Onboarding confirmation dialog */}
       {showOnboardingConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-zinc-900">Onboarding testen</h3>
-            <p className="mt-2 text-sm text-zinc-600">
+          <div className="mx-4 w-full max-w-md rounded-xl bg-[var(--paper)] p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-[var(--ink)]">Onboarding testen</h3>
+            <p className="mt-2 text-sm text-[var(--ink-2)]">
               Dit wist <span className="font-semibold text-red-600">al je financiele data</span> en
               stuurt je naar de onboarding flow als nieuwe gebruiker. Doorgaan?
             </p>
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => setShowOnboardingConfirm(false)}
-                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+                className="rounded-lg border border-[var(--border-md)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
               >
                 Annuleren
               </button>
@@ -320,22 +320,22 @@ export default function BeheerTestdataPage() {
       )}
 
       {/* Fase-overgang testen */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6">
-        <h3 className="text-lg font-semibold text-zinc-900">Fase-overgang testen</h3>
-        <p className="mt-1 text-sm text-zinc-500">
+      <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">
+        <h3 className="text-lg font-semibold text-[var(--ink)]">Fase-overgang testen</h3>
+        <p className="mt-1 text-sm text-[var(--ink-3)]">
           Simuleer een fase-overgang om de celebratie-modal te testen.
         </p>
 
         <div className="mt-4">
-          <p className="text-sm text-zinc-600">
+          <p className="text-sm text-[var(--ink-2)]">
             Huidige fase:{' '}
             <span className="font-semibold capitalize">{featureAccess.phase}</span>
-            <span className="text-zinc-400 ml-1">(berekend)</span>
+            <span className="text-[var(--ink-3)] ml-1">(berekend)</span>
           </p>
         </div>
 
         <div className="mt-4">
-          <p className="text-sm font-medium text-zinc-700 mb-2">Simuleer overgang vanaf:</p>
+          <p className="text-sm font-medium text-[var(--ink-2)] mb-2">Simuleer overgang vanaf:</p>
           <div className="flex flex-wrap gap-2">
             {PHASES.map(phase => {
               const currentIndex = PHASES.findIndex(p => p.id === featureAccess.phase)
@@ -368,7 +368,7 @@ export default function BeheerTestdataPage() {
                     }
                   }}
                   className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                    isLower ? colorMap[phase.color] ?? '' : 'bg-zinc-100 text-zinc-400 border-zinc-200'
+                    isLower ? colorMap[phase.color] ?? '' : 'bg-zinc-100 text-[var(--ink-3)] border-[var(--border-ed)]'
                   }`}
                 >
                   {phase.label}
@@ -376,7 +376,7 @@ export default function BeheerTestdataPage() {
               )
             })}
           </div>
-          <p className="mt-2 text-xs text-zinc-400">
+          <p className="mt-2 text-xs text-[var(--ink-3)]">
             Alleen fasen lager dan je huidige fase zijn klikbaar.
           </p>
         </div>
@@ -385,8 +385,8 @@ export default function BeheerTestdataPage() {
           <p className="mt-3 text-sm text-teal-600 animate-pulse">Bezig met simuleren...</p>
         )}
 
-        <div className="mt-6 border-t border-zinc-200 pt-4">
-          <p className="text-sm font-medium text-zinc-700 mb-2">Activatie testen</p>
+        <div className="mt-6 border-t border-[var(--border-ed)] pt-4">
+          <p className="text-sm font-medium text-[var(--ink-2)] mb-2">Activatie testen</p>
           <button
             disabled={simulatingPhase || seeding}
             onClick={async () => {
@@ -408,16 +408,16 @@ export default function BeheerTestdataPage() {
           >
             Reset activatie
           </button>
-          <p className="mt-2 text-xs text-zinc-400">
+          <p className="mt-2 text-xs text-[var(--ink-3)]">
             Zet last_known_phase op NULL zodat de activatieknop weer verschijnt.
           </p>
         </div>
       </div>
 
       {/* Mobile Preview */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6">
-        <h3 className="text-lg font-semibold text-zinc-900">Mobile Preview</h3>
-        <p className="mt-1 text-sm text-zinc-500">
+      <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">
+        <h3 className="text-lg font-semibold text-[var(--ink)]">Mobile Preview</h3>
+        <p className="mt-1 text-sm text-[var(--ink-3)]">
           Bekijk de app in een telefoon-frame om de mobile layout te testen op desktop.
         </p>
 
@@ -429,18 +429,18 @@ export default function BeheerTestdataPage() {
             }`}
           >
             <span
-              className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+              className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-[var(--paper)] shadow-sm transition-transform ${
                 mobilePreview.enabled ? 'translate-x-5' : 'translate-x-0'
               }`}
             />
           </button>
-          <span className="text-sm font-medium text-zinc-700">
+          <span className="text-sm font-medium text-[var(--ink-2)]">
             {mobilePreview.enabled ? 'Actief' : 'Uit'}
           </span>
         </div>
 
         <div className="mt-4">
-          <p className="text-sm font-medium text-zinc-700 mb-2">Device</p>
+          <p className="text-sm font-medium text-[var(--ink-2)] mb-2">Device</p>
           <div className="flex flex-wrap gap-2">
             {DEVICE_PRESETS.map(d => (
               <button
@@ -449,11 +449,11 @@ export default function BeheerTestdataPage() {
                 className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
                   mobilePreview.device.name === d.name
                     ? 'border-kern-400 bg-kern-50 text-kern-700'
-                    : 'border-zinc-200 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50'
+                    : 'border-[var(--border-ed)] text-[var(--ink-2)] hover:border-[var(--border-md)] hover:bg-[var(--subtle)]'
                 }`}
               >
                 {d.name}
-                <span className="ml-1 text-xs text-zinc-400">{d.width}&times;{d.height}</span>
+                <span className="ml-1 text-xs text-[var(--ink-3)]">{d.width}&times;{d.height}</span>
               </button>
             ))}
           </div>
@@ -492,7 +492,7 @@ function PersonaCard({
     new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
 
   return (
-    <div className={`rounded-xl border ${colors.border} ${colors.bg} p-5 transition-all hover:shadow-md`}>
+    <div className={`rounded-[var(--r-lg)] border ${colors.border} ${colors.bg} p-5 transition-all hover:shadow-md`}>
       <div className="flex items-start gap-3">
         <div
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white text-sm font-bold"
@@ -502,16 +502,16 @@ function PersonaCard({
         </div>
         <div className="min-w-0 flex-1">
           <h3 className={`font-semibold ${colors.text}`}>{meta.name}</h3>
-          <p className="text-xs font-medium text-zinc-500">{meta.subtitle}</p>
+          <p className="text-xs font-medium text-[var(--ink-3)]">{meta.subtitle}</p>
         </div>
       </div>
 
-      <p className="mt-3 text-xs text-zinc-600 line-clamp-2">{meta.description}</p>
+      <p className="mt-3 text-xs text-[var(--ink-2)] line-clamp-2">{meta.description}</p>
 
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--ink-3)]">
         <span>Vermogen: <span className={`font-semibold ${meta.netWorth < 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(meta.netWorth)}</span></span>
-        <span>Inkomen: <span className="font-medium text-zinc-700">{formatCurrency(meta.income)}/mnd</span></span>
-        <span>Uitgaven: <span className="font-medium text-zinc-700">{formatCurrency(meta.expenses)}/mnd</span></span>
+        <span>Inkomen: <span className="font-medium text-[var(--ink-2)]">{formatCurrency(meta.income)}/mnd</span></span>
+        <span>Uitgaven: <span className="font-medium text-[var(--ink-2)]">{formatCurrency(meta.expenses)}/mnd</span></span>
       </div>
 
       <button

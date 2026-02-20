@@ -402,7 +402,7 @@ export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) 
         {/* Legend + details */}
         <div className="space-y-2">
           {/* Ring legend */}
-          <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500">
+          <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--ink-3)]">
             <span className="flex items-center gap-1.5">
               <span className="inline-block h-3 w-6 rounded-sm bg-zinc-300" />
               Budget
@@ -423,7 +423,7 @@ export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) 
             return (
               <div key={seg.id}>
                 <button
-                  className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all ${
+                  className={`flex w-full items-center gap-3 rounded-[var(--r-lg)] border px-3 py-2.5 text-left transition-all ${
                     isActive ? 'ring-2 ring-kern-400' : ''
                   }`}
                   style={{
@@ -448,8 +448,8 @@ export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) 
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-zinc-900">{seg.name}</p>
-                    <p className="text-xs text-zinc-500">
+                    <p className="truncate text-sm font-medium text-[var(--ink)]">{seg.name}</p>
+                    <p className="text-xs text-[var(--ink-3)]">
                       <span className={isOver ? 'font-semibold text-red-600' : ''}>
                         {formatCurrency(seg.spent)}
                       </span>
@@ -458,7 +458,7 @@ export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) 
                     </p>
                   </div>
 
-                  <span className={`shrink-0 text-xs font-bold ${isOver ? 'text-red-600' : 'text-zinc-600'}`}>
+                  <span className={`shrink-0 text-xs font-bold ${isOver ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
                     {pct}%
                   </span>
                 </button>
@@ -476,7 +476,7 @@ export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) 
                         <button
                           key={child.id}
                           className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left transition-colors ${
-                            isChildHovered ? 'bg-zinc-100' : 'hover:bg-zinc-50'
+                            isChildHovered ? 'bg-zinc-100' : 'hover:bg-[var(--subtle)]'
                           }`}
                           onMouseEnter={() => setHoveredChildIdx(ci)}
                           onMouseLeave={() => setHoveredChildIdx(null)}
@@ -489,15 +489,15 @@ export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) 
                           <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded" style={{ backgroundColor: c.bg }}>
                             <BudgetIcon name={child.icon} className="h-3 w-3" />
                           </div>
-                          <span className="min-w-0 flex-1 truncate text-xs text-zinc-700">{child.name}</span>
-                          <span className="text-xs text-zinc-500">
+                          <span className="min-w-0 flex-1 truncate text-xs text-[var(--ink-2)]">{child.name}</span>
+                          <span className="text-xs text-[var(--ink-3)]">
                             <span className={childOver ? 'font-semibold text-red-600' : ''}>
                               {formatCurrency(child.spent)}
                             </span>
                             {' / '}
                             {formatCurrency(child.limit)}
                           </span>
-                          <span className={`w-8 text-right text-xs font-medium ${childOver ? 'text-red-600' : 'text-zinc-400'}`}>
+                          <span className={`w-8 text-right text-xs font-medium ${childOver ? 'text-red-600' : 'text-[var(--ink-3)]'}`}>
                             {childPct}%
                           </span>
                         </button>

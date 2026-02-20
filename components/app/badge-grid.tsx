@@ -19,7 +19,7 @@ const colorMap: Record<string, {
   amber: {
     bg: 'bg-kern-50',
     bgEarned: 'bg-kern-100',
-    border: 'border-zinc-200',
+    border: 'border-[var(--border-ed)]',
     borderEarned: 'border-kern-300',
     text: 'text-kern-700',
     ring: 'ring-kern-200',
@@ -27,7 +27,7 @@ const colorMap: Record<string, {
   teal: {
     bg: 'bg-wil-50',
     bgEarned: 'bg-wil-100',
-    border: 'border-zinc-200',
+    border: 'border-[var(--border-ed)]',
     borderEarned: 'border-wil-300',
     text: 'text-wil-700',
     ring: 'ring-wil-200',
@@ -35,7 +35,7 @@ const colorMap: Record<string, {
   purple: {
     bg: 'bg-horizon-50',
     bgEarned: 'bg-horizon-100',
-    border: 'border-zinc-200',
+    border: 'border-[var(--border-ed)]',
     borderEarned: 'border-horizon-300',
     text: 'text-horizon-700',
     ring: 'ring-horizon-200',
@@ -43,7 +43,7 @@ const colorMap: Record<string, {
   emerald: {
     bg: 'bg-emerald-50',
     bgEarned: 'bg-emerald-100',
-    border: 'border-zinc-200',
+    border: 'border-[var(--border-ed)]',
     borderEarned: 'border-emerald-300',
     text: 'text-emerald-700',
     ring: 'ring-emerald-200',
@@ -51,7 +51,7 @@ const colorMap: Record<string, {
   rose: {
     bg: 'bg-rose-50',
     bgEarned: 'bg-rose-100',
-    border: 'border-zinc-200',
+    border: 'border-[var(--border-ed)]',
     borderEarned: 'border-rose-300',
     text: 'text-rose-700',
     ring: 'ring-rose-200',
@@ -59,17 +59,17 @@ const colorMap: Record<string, {
   blue: {
     bg: 'bg-blue-50',
     bgEarned: 'bg-blue-100',
-    border: 'border-zinc-200',
+    border: 'border-[var(--border-ed)]',
     borderEarned: 'border-blue-300',
     text: 'text-blue-700',
     ring: 'ring-blue-200',
   },
   zinc: {
-    bg: 'bg-zinc-50',
+    bg: 'bg-[var(--subtle)]',
     bgEarned: 'bg-zinc-100',
-    border: 'border-zinc-200',
+    border: 'border-[var(--border-ed)]',
     borderEarned: 'border-zinc-400',
-    text: 'text-zinc-700',
+    text: 'text-[var(--ink-2)]',
     ring: 'ring-zinc-200',
   },
 }
@@ -292,44 +292,44 @@ function BadgeDetail({
       data-testid="badge-detail-overlay"
     >
       <div
-        className="mx-4 w-full max-w-sm rounded-xl bg-white p-6 shadow-xl"
+        className="mx-4 w-full max-w-sm rounded-[var(--r-lg)] bg-[var(--paper)] p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
         data-testid="badge-detail-modal"
         data-badge-slug={badge.slug}
       >
         <div className="flex items-start gap-4">
           <div
-            className={`flex h-16 w-16 items-center justify-center rounded-2xl text-3xl ${
+            className={`flex h-16 w-16 items-center justify-center rounded-[var(--r-lg)] text-3xl ${
               badge.earned ? colors.bgEarned : 'bg-zinc-100'
-            } ${badge.earned ? colors.borderEarned : 'border-zinc-200'} border-2`}
+            } ${badge.earned ? colors.borderEarned : 'border-[var(--border-ed)]'} border-2`}
           >
             {badge.earned ? badge.icon : '?'}
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-bold text-zinc-900" data-testid="badge-detail-name">
+            <h3 className="text-lg font-bold text-[var(--ink)]" data-testid="badge-detail-name">
               {badge.earned ? badge.name : '???'}
             </h3>
-            <p className="mt-0.5 text-xs font-medium uppercase tracking-wider text-zinc-400">
+            <p className="mt-0.5 text-xs font-medium uppercase tracking-wider text-[var(--ink-3)]">
               {categoryLabels[badge.category]}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
             data-testid="badge-detail-close"
           >
             ✕
           </button>
         </div>
 
-        <p className="mt-4 text-sm leading-relaxed text-zinc-600" data-testid="badge-detail-description">
+        <p className="mt-4 text-sm leading-relaxed text-[var(--ink-2)]" data-testid="badge-detail-description">
           {badge.earned
             ? badge.description
             : 'Deze badge is nog vergrendeld. Blijf groeien om hem te verdienen!'}
         </p>
 
         {badge.earned && badge.earned_at && (
-          <p className="mt-3 text-xs text-zinc-400" data-testid="badge-detail-date">
+          <p className="mt-3 text-xs text-[var(--ink-3)]" data-testid="badge-detail-date">
             Verdiend op{' '}
             {new Date(badge.earned_at).toLocaleDateString('nl-NL', {
               year: 'numeric',
@@ -341,7 +341,7 @@ function BadgeDetail({
 
         {!badge.earned && badge.progress !== null && badge.progress !== undefined && (
           <div className="mt-4" data-testid="badge-detail-progress">
-            <div className="flex items-center justify-between text-xs text-zinc-500">
+            <div className="flex items-center justify-between text-xs text-[var(--ink-3)]">
               <span>Voortgang</span>
               <span className="font-semibold">{Math.round((badge.progress ?? 0) * 100)}%</span>
             </div>
@@ -357,14 +357,14 @@ function BadgeDetail({
               />
             </div>
             {badge.progress_label && (
-              <p className="mt-1 text-[11px] text-zinc-400">{badge.progress_label}</p>
+              <p className="mt-1 text-[11px] text-[var(--ink-3)]">{badge.progress_label}</p>
             )}
           </div>
         )}
 
         {!badge.earned && (
-          <div className="mt-4 rounded-lg bg-zinc-50 p-3">
-            <p className="text-xs font-medium text-zinc-500">
+          <div className="mt-4 rounded-lg bg-[var(--subtle)] p-3">
+            <p className="text-xs font-medium text-[var(--ink-3)]">
               Tip: {badge.description}
             </p>
           </div>
@@ -374,7 +374,7 @@ function BadgeDetail({
         {badge.earned && onShare && (
           <button
             onClick={() => onShare(badge)}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-wil-200 bg-wil-50 px-4 py-2.5 text-sm font-medium text-wil-700 transition-all hover:bg-wil-100 hover:border-wil-300 active:scale-[0.98]"
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-[var(--r-lg)] border border-wil-200 bg-wil-50 px-4 py-2.5 text-sm font-medium text-wil-700 transition-all hover:bg-wil-100 hover:border-wil-300 active:scale-[0.98]"
             data-testid="badge-share-button"
           >
             <Share2 className="h-4 w-4" />
@@ -408,23 +408,23 @@ function BadgeCard({
       data-slug={badge.slug}
       data-progress={badge.progress ?? undefined}
       data-newly-earned={isNewlyEarned ? 'true' : undefined}
-      className={`group relative flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all hover:shadow-md ${
+      className={`group relative flex flex-col items-center gap-2 rounded-[var(--r-lg)] border-2 p-4 transition-all hover:shadow-md ${
         badge.earned
           ? `${colors.bgEarned} ${colors.borderEarned}`
-          : 'border-dashed border-zinc-200 bg-zinc-50'
+          : 'border-dashed border-[var(--border-ed)] bg-[var(--subtle)]'
       } ${isNewlyEarned ? 'animate-badge-unlock animate-badge-scale-in' : ''}`}
     >
       {/* Shimmer overlay for newly earned badges */}
       {isNewlyEarned && badge.earned && (
         <div
-          className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none animate-badge-shimmer"
+          className="absolute inset-0 rounded-[var(--r-lg)] overflow-hidden pointer-events-none animate-badge-shimmer"
           data-testid={`badge-shimmer-${badge.slug}`}
         />
       )}
 
       {/* Icon */}
       <div
-        className={`flex h-12 w-12 items-center justify-center rounded-xl text-2xl transition-transform group-hover:scale-110 ${
+        className={`flex h-12 w-12 items-center justify-center rounded-[var(--r-lg)] text-2xl transition-transform group-hover:scale-110 ${
           badge.earned ? '' : 'grayscale opacity-30'
         }`}
       >
@@ -434,7 +434,7 @@ function BadgeCard({
       {/* Name */}
       <span
         className={`text-center text-xs font-semibold leading-tight ${
-          badge.earned ? 'text-zinc-800' : 'text-zinc-400'
+          badge.earned ? 'text-zinc-800' : 'text-[var(--ink-3)]'
         }`}
       >
         {badge.earned ? badge.name : '???'}
@@ -453,7 +453,7 @@ function BadgeCard({
               style={{ width: `${Math.round((badge.progress ?? 0) * 100)}%` }}
             />
           </div>
-          <span className="mt-0.5 block text-center text-[9px] text-zinc-400">
+          <span className="mt-0.5 block text-center text-[9px] text-[var(--ink-3)]">
             {Math.round((badge.progress ?? 0) * 100)}%
           </span>
         </div>
@@ -461,8 +461,8 @@ function BadgeCard({
 
       {/* Locked overlay */}
       {!badge.earned && !hasProgress && (
-        <div className="absolute inset-0 flex items-center justify-center rounded-xl">
-          <div className="absolute inset-0 rounded-xl bg-zinc-100/40" />
+        <div className="absolute inset-0 flex items-center justify-center rounded-[var(--r-lg)]">
+          <div className="absolute inset-0 rounded-[var(--r-lg)] bg-zinc-100/40" />
         </div>
       )}
     </button>
@@ -573,7 +573,7 @@ export function BadgeGrid() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900" />
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--border-md)] border-t-zinc-900" />
       </div>
     )
   }
@@ -586,8 +586,8 @@ export function BadgeGrid() {
       {/* Progress summary */}
       <div className="mb-6 flex items-center gap-4" data-testid="badge-progress-summary">
         <div className="flex items-center gap-2">
-          <span className="text-2xl font-bold text-zinc-900" data-testid="badge-earned-count">{earnedCount}</span>
-          <span className="text-sm text-zinc-500" data-testid="badge-total-label">van {totalCount} verdiend</span>
+          <span className="text-2xl font-bold text-[var(--ink)]" data-testid="badge-earned-count">{earnedCount}</span>
+          <span className="text-sm text-[var(--ink-3)]" data-testid="badge-total-label">van {totalCount} verdiend</span>
         </div>
         <div className="flex-1">
           <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
@@ -611,10 +611,10 @@ export function BadgeGrid() {
           return (
             <div key={category}>
               <div className="mb-3 flex items-center gap-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)]">
                   {categoryLabels[category as BadgeCategory] ?? category}
                 </h3>
-                <span className="text-[10px] text-zinc-300">
+                <span className="text-[10px] text-[var(--ink-4)]">
                   {categoryEarned}/{categoryBadges.length}
                 </span>
               </div>

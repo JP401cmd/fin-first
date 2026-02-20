@@ -174,8 +174,8 @@ export function DiscoverCarousel({ module }: DiscoverCarouselProps) {
     <section className="mt-10">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-zinc-400" />
-          <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          <Sparkles className="h-4 w-4 text-[var(--ink-3)]" />
+          <h2 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
             Ontdek
           </h2>
         </div>
@@ -183,7 +183,7 @@ export function DiscoverCarousel({ module }: DiscoverCarouselProps) {
           <button
             onClick={() => scroll('left')}
             disabled={!canScrollLeft}
-            className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 disabled:opacity-30 disabled:hover:bg-transparent"
+            className="rounded-lg p-1.5 text-[var(--ink-3)] transition-colors hover:bg-zinc-100 hover:text-[var(--ink-2)] disabled:opacity-30 disabled:hover:bg-transparent"
             aria-label="Scroll links"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -191,7 +191,7 @@ export function DiscoverCarousel({ module }: DiscoverCarouselProps) {
           <button
             onClick={() => scroll('right')}
             disabled={!canScrollRight}
-            className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 disabled:opacity-30 disabled:hover:bg-transparent"
+            className="rounded-lg p-1.5 text-[var(--ink-3)] transition-colors hover:bg-zinc-100 hover:text-[var(--ink-2)] disabled:opacity-30 disabled:hover:bg-transparent"
             aria-label="Scroll rechts"
           >
             <ChevronRight className="h-4 w-4" />
@@ -213,22 +213,22 @@ export function DiscoverCarousel({ module }: DiscoverCarouselProps) {
               key={item.id}
               href={item.href}
               onClick={() => handleClick(item.id)}
-              className={`group flex w-[260px] shrink-0 flex-col rounded-xl border p-4 transition-all hover:shadow-md ${
+              className={`group flex w-[260px] shrink-0 flex-col rounded-[var(--r-lg)] border p-4 transition-all hover:shadow-md ${
                 isVisited
-                  ? 'border-zinc-100 bg-zinc-50/50 opacity-60 hover:opacity-80'
+                  ? 'border-[var(--border-ed)] bg-[var(--subtle)]/50 opacity-60 hover:opacity-80'
                   : `${colors.border} ${colors.bg} hover:shadow-${item.module === 'kern' ? 'kern' : item.module === 'wil' ? 'wil' : 'horizon'}-100`
               }`}
             >
               <div className="mb-2 flex items-center gap-2">
                 <div className={`h-2 w-2 rounded-full ${isVisited ? 'bg-zinc-300' : colors.dot}`} />
-                <span className={`text-[10px] font-semibold uppercase tracking-wider ${isVisited ? 'text-zinc-400' : colors.text}`}>
+                <span className={`text-[10px] font-semibold uppercase tracking-wider ${isVisited ? 'text-[var(--ink-3)]' : colors.text}`}>
                   {item.module === 'kern' ? 'De Kern' : item.module === 'wil' ? 'De Wil' : 'De Horizon'}
                 </span>
               </div>
-              <p className={`text-sm font-semibold ${isVisited ? 'text-zinc-500' : 'text-zinc-900'}`}>
+              <p className={`text-sm font-semibold ${isVisited ? 'text-[var(--ink-3)]' : 'text-[var(--ink)]'}`}>
                 {item.label}
               </p>
-              <p className={`mt-1 text-xs leading-relaxed ${isVisited ? 'text-zinc-400' : 'text-zinc-500'}`}>
+              <p className={`mt-1 text-xs leading-relaxed ${isVisited ? 'text-[var(--ink-3)]' : 'text-[var(--ink-3)]'}`}>
                 {isVisited ? item.description : item.teaser}
               </p>
               {!isVisited && (

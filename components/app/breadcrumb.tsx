@@ -84,7 +84,7 @@ export function Breadcrumb({
         return (
           <span key={segment.href} className="flex items-center gap-1.5">
             {index > 0 && (
-              <ChevronRight className="h-3.5 w-3.5 text-zinc-300" aria-hidden />
+              <ChevronRight className="h-3.5 w-3.5 text-[var(--ink-4)]" aria-hidden />
             )}
             {isLast ? (
               <span className={`font-medium ${accent.text}`} aria-current="page">
@@ -93,7 +93,7 @@ export function Breadcrumb({
             ) : (
               <Link
                 href={segment.href}
-                className={`text-zinc-500 transition-colors ${accent.hover}`}
+                className={`text-[var(--ink-3)] transition-colors ${accent.hover}`}
               >
                 {segment.label}
               </Link>

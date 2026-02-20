@@ -136,7 +136,7 @@ const metrics: MetricConfig[] = [
 function DeltaIndicator({ delta, invert }: { delta: number; invert?: boolean }) {
   if (delta === 0) {
     return (
-      <div className="flex items-center gap-1 text-zinc-400">
+      <div className="flex items-center gap-1 text-[var(--ink-3)]">
         <Minus className="h-3.5 w-3.5" />
         <span className="text-xs font-medium">Geen verschil</span>
       </div>
@@ -175,25 +175,25 @@ function MetricRow({
   const delta = valA !== null && valB !== null ? valB - valA : null
   const deltaColor =
     delta === null
-      ? 'text-zinc-400'
+      ? 'text-[var(--ink-3)]'
       : delta === 0
-        ? 'text-zinc-500'
+        ? 'text-[var(--ink-3)]'
         : (metric.invertColor ? delta < 0 : delta > 0)
           ? 'text-emerald-600'
           : 'text-red-500'
 
   const deltaBg =
     delta === null
-      ? 'bg-zinc-50'
+      ? 'bg-[var(--subtle)]'
       : delta === 0
-        ? 'bg-zinc-50'
+        ? 'bg-[var(--subtle)]'
         : (metric.invertColor ? delta < 0 : delta > 0)
           ? 'bg-emerald-50'
           : 'bg-red-50'
 
   return (
     <div
-      className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-3 rounded-lg border border-zinc-100 bg-white p-4"
+      className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-3 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-4"
       data-testid={`metric-row-${metric.key}`}
     >
       {/* Snapshot A value */}
@@ -207,7 +207,7 @@ function MetricRow({
 
       {/* Arrow */}
       <div className="flex items-center justify-center">
-        <ArrowRight className="h-4 w-4 text-zinc-300" />
+        <ArrowRight className="h-4 w-4 text-[var(--ink-4)]" />
       </div>
 
       {/* Snapshot B value */}
@@ -229,7 +229,7 @@ function MetricRow({
             <DeltaIndicator delta={delta} invert={metric.invertColor} />
           </>
         ) : (
-          <span className="text-xs text-zinc-400">—</span>
+          <span className="text-xs text-[var(--ink-3)]">—</span>
         )}
       </div>
     </div>
@@ -253,12 +253,12 @@ function MonthSelector({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-medium text-zinc-500 uppercase tracking-wide">{label}</label>
+      <label className="text-xs font-medium text-[var(--ink-3)] uppercase tracking-wide">{label}</label>
       <div className="relative">
         <select
           value={selectedKey}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full appearance-none rounded-lg border border-zinc-200 bg-white px-3 py-2 pr-8 text-sm font-medium text-zinc-800 focus:border-kern-400 focus:outline-none focus:ring-2 focus:ring-kern-100"
+          className="w-full appearance-none rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 pr-8 text-sm font-medium text-zinc-800 focus:border-kern-400 focus:outline-none focus:ring-2 focus:ring-kern-100"
           data-testid={testId}
         >
           {monthKeys.map(key => (
@@ -267,7 +267,7 @@ function MonthSelector({
             </option>
           ))}
         </select>
-        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ink-3)]" />
       </div>
     </div>
   )
@@ -296,8 +296,8 @@ export function SnapshotComparisonView({ snapshots }: SnapshotComparisonViewProp
 
   if (monthKeys.length < 2) {
     return (
-      <div className="rounded-lg border border-zinc-100 bg-zinc-50 p-6 text-center">
-        <p className="text-sm text-zinc-500">
+      <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-6 text-center">
+        <p className="text-sm text-[var(--ink-3)]">
           Vergelijking is beschikbaar zodra er minstens 2 maandelijkse snapshots zijn.
         </p>
       </div>
@@ -309,8 +309,8 @@ export function SnapshotComparisonView({ snapshots }: SnapshotComparisonViewProp
 
   if (!snapshotA || !snapshotB) {
     return (
-      <div className="rounded-lg border border-zinc-100 bg-zinc-50 p-6 text-center">
-        <p className="text-sm text-zinc-500">Selecteer twee maanden om te vergelijken.</p>
+      <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-6 text-center">
+        <p className="text-sm text-[var(--ink-3)]">Selecteer twee maanden om te vergelijken.</p>
       </div>
     )
   }
@@ -362,7 +362,7 @@ export function SnapshotComparisonView({ snapshots }: SnapshotComparisonViewProp
 
       {/* Summary banner */}
       {monthA !== monthB && (
-        <div className="mb-5 flex items-center justify-between rounded-lg border border-zinc-100 bg-zinc-50 px-4 py-3" data-testid="comparison-summary">
+        <div className="mb-5 flex items-center justify-between rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-4 py-3" data-testid="comparison-summary">
           <div className="flex items-center gap-4">
             {improvements > 0 && (
               <span className="flex items-center gap-1 text-sm font-semibold text-emerald-600">
@@ -377,13 +377,13 @@ export function SnapshotComparisonView({ snapshots }: SnapshotComparisonViewProp
               </span>
             )}
             {improvements === 0 && regressions === 0 && (
-              <span className="flex items-center gap-1 text-sm font-medium text-zinc-500">
+              <span className="flex items-center gap-1 text-sm font-medium text-[var(--ink-3)]">
                 <Minus className="h-4 w-4" />
                 Geen veranderingen
               </span>
             )}
           </div>
-          <span className="text-xs text-zinc-400">
+          <span className="text-xs text-[var(--ink-3)]">
             {formatMonthLabel(monthA)} → {formatMonthLabel(monthB)}
           </span>
         </div>
@@ -391,14 +391,14 @@ export function SnapshotComparisonView({ snapshots }: SnapshotComparisonViewProp
 
       {/* Metric headers */}
       <div className="mb-2 grid grid-cols-[1fr_auto_1fr_auto] items-center gap-3 px-4">
-        <p className="text-center text-xs font-semibold text-zinc-400 uppercase tracking-wide">
+        <p className="text-center text-xs font-semibold text-[var(--ink-3)] uppercase tracking-wide">
           {formatMonthLabel(monthA)}
         </p>
         <div className="w-4" />
-        <p className="text-center text-xs font-semibold text-zinc-400 uppercase tracking-wide">
+        <p className="text-center text-xs font-semibold text-[var(--ink-3)] uppercase tracking-wide">
           {formatMonthLabel(monthB)}
         </p>
-        <p className="text-center text-xs font-semibold text-zinc-400 uppercase tracking-wide min-w-[80px]">
+        <p className="text-center text-xs font-semibold text-[var(--ink-3)] uppercase tracking-wide min-w-[80px]">
           Delta
         </p>
       </div>
@@ -413,7 +413,7 @@ export function SnapshotComparisonView({ snapshots }: SnapshotComparisonViewProp
 
           return (
             <div key={metric.key}>
-              <p className="mb-1 pl-1 text-xs font-medium text-zinc-500">
+              <p className="mb-1 pl-1 text-xs font-medium text-[var(--ink-3)]">
                 {metric.label}
               </p>
               <MetricRow

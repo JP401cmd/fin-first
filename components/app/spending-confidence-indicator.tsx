@@ -147,17 +147,17 @@ const CONFIDENCE_COLORS = {
   low: {
     bar: 'bg-zinc-400',
     barInactive: 'bg-zinc-200',
-    text: 'text-zinc-600',
-    bg: 'bg-zinc-50',
-    border: 'border-zinc-200',
+    text: 'text-[var(--ink-2)]',
+    bg: 'bg-[var(--subtle)]',
+    border: 'border-[var(--border-ed)]',
     dot: 'bg-zinc-400',
   },
   insufficient: {
     bar: 'bg-zinc-300',
     barInactive: 'bg-zinc-200',
-    text: 'text-zinc-400',
-    bg: 'bg-zinc-50',
-    border: 'border-zinc-200',
+    text: 'text-[var(--ink-3)]',
+    bg: 'bg-[var(--subtle)]',
+    border: 'border-[var(--border-ed)]',
     dot: 'bg-zinc-300',
   },
 }
@@ -266,13 +266,13 @@ export function SpendingConfidenceIndicator({
       {/* Tooltip */}
       {showTooltip && tooltipVisible && (
         <div
-          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-64 rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-lg"
+          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-64 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 shadow-[var(--s2)]"
           data-testid="confidence-tooltip"
         >
           <p className={`text-xs font-semibold ${colors.text}`}>{label}</p>
-          <p className="mt-0.5 text-[10px] text-zinc-500 leading-relaxed">{tooltip}</p>
+          <p className="mt-0.5 text-[10px] text-[var(--ink-3)] leading-relaxed">{tooltip}</p>
           {data.hasSufficientData && (
-            <div className="mt-1.5 flex items-center gap-2 text-[10px] text-zinc-400">
+            <div className="mt-1.5 flex items-center gap-2 text-[10px] text-[var(--ink-3)]">
               <span>σ = €{Math.round(data.stdDev)}</span>
               <span>•</span>
               <span>CV = {(data.cv * 100).toFixed(1)}%</span>
@@ -329,13 +329,13 @@ export function SpendingConfidenceBadge({ data, className = '' }: ConfidenceBadg
       {/* Tooltip */}
       {tooltipVisible && (
         <div
-          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-64 rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-lg"
+          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-64 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 shadow-[var(--s2)]"
           data-testid="badge-tooltip"
         >
           <p className={`text-xs font-semibold ${colors.text}`}>{label}</p>
-          <p className="mt-0.5 text-[10px] text-zinc-500 leading-relaxed">{tooltip}</p>
+          <p className="mt-0.5 text-[10px] text-[var(--ink-3)] leading-relaxed">{tooltip}</p>
           {data.hasSufficientData && (
-            <div className="mt-1.5 flex items-center gap-2 text-[10px] text-zinc-400">
+            <div className="mt-1.5 flex items-center gap-2 text-[10px] text-[var(--ink-3)]">
               <span>σ = €{Math.round(data.stdDev)}</span>
               <span>•</span>
               <span>CV = {(data.cv * 100).toFixed(1)}%</span>
@@ -373,7 +373,7 @@ export function SpendingVarianceDetailPanel({ data, className = '' }: VarianceDe
 
   if (!data.hasSufficientData) {
     return (
-      <div className={`rounded-lg border border-zinc-200 bg-zinc-50 p-3 ${className}`} data-testid="variance-detail-panel">
+      <div className={`rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-3 ${className}`} data-testid="variance-detail-panel">
         <div className="flex items-center gap-2">
           <div className="flex items-end gap-[1px]">
             {[6, 10, 14].map((height, index) => (
@@ -384,7 +384,7 @@ export function SpendingVarianceDetailPanel({ data, className = '' }: VarianceDe
               />
             ))}
           </div>
-          <p className="text-xs text-zinc-400" data-testid="variance-insufficient-message">
+          <p className="text-xs text-[var(--ink-3)]" data-testid="variance-insufficient-message">
             Onvoldoende data — minimaal 3 maanden met uitgaven nodig ({data.monthsOfData}/3)
           </p>
         </div>
@@ -417,16 +417,16 @@ export function SpendingVarianceDetailPanel({ data, className = '' }: VarianceDe
       {/* Stats row */}
       <div className="mt-2 grid grid-cols-3 gap-2 text-center">
         <div>
-          <p className="text-[10px] text-zinc-400">Gemiddeld</p>
-          <p className="text-xs font-medium text-zinc-700" data-testid="detail-mean">{formattedMean}</p>
+          <p className="text-[10px] text-[var(--ink-3)]">Gemiddeld</p>
+          <p className="text-xs font-medium text-[var(--ink-2)]" data-testid="detail-mean">{formattedMean}</p>
         </div>
         <div>
-          <p className="text-[10px] text-zinc-400">Variatie</p>
-          <p className="text-xs font-medium text-zinc-700" data-testid="detail-stddev">{formattedStdDev}</p>
+          <p className="text-[10px] text-[var(--ink-3)]">Variatie</p>
+          <p className="text-xs font-medium text-[var(--ink-2)]" data-testid="detail-stddev">{formattedStdDev}</p>
         </div>
         <div>
-          <p className="text-[10px] text-zinc-400">Maanden</p>
-          <p className="text-xs font-medium text-zinc-700" data-testid="detail-months">{data.monthsOfData}</p>
+          <p className="text-[10px] text-[var(--ink-3)]">Maanden</p>
+          <p className="text-xs font-medium text-[var(--ink-2)]" data-testid="detail-months">{data.monthsOfData}</p>
         </div>
       </div>
 

@@ -302,9 +302,9 @@ export default function HorizonPage() {
   if (error || !fire || !range || !resilience) {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-700">{error ?? 'Er ging iets mis.'}</p>
-          <button onClick={() => { setError(null); setLoading(true); loadData() }} className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
+          <button onClick={() => { setError(null); setLoading(true); loadData() }} className="mt-3 rounded-[var(--r)] bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
             Opnieuw proberen
           </button>
         </div>
@@ -319,13 +319,13 @@ export default function HorizonPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* === 1. Hero (Gradient) === */}
-      <section data-testid="horizon-hero" className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-horizon-950 via-horizon-900 to-horizon-950 p-5 text-white sm:p-8 md:p-10">
-        <div className="pointer-events-none absolute -top-24 right-1/4 h-64 w-64 rounded-full bg-horizon-500/10 blur-3xl" />
+      <section data-testid="horizon-hero" className="card-editorial overflow-hidden">
+        <div className="h-1.5 bg-horizon-500" />
 
-        <div className="relative">
+        <div className="p-5 sm:p-8 md:p-10">
           <div className="mb-6 flex items-center gap-3">
             <FfinAvatar size={40} />
-            <p className="text-xs font-semibold tracking-[0.2em] text-horizon-300/80 uppercase">
+            <p className="label-editorial text-horizon-600">
               Jouw horizon naar vrijheid
             </p>
           </div>
@@ -333,55 +333,55 @@ export default function HorizonPage() {
           <div className="mb-6" data-testid="hero-primary-metric">
             {fire.fireAge !== null ? (
               <>
-                <span data-testid="hero-fire-age" className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
+                <span data-testid="hero-fire-age" className="font-display text-[52px] font-bold tracking-tight text-[var(--ink)]">
                   {Math.round(fire.fireAge)}
                 </span>
-                <span className="ml-3 text-lg text-horizon-200/70">jaar — FIRE leeftijd</span>
+                <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">jaar — FIRE leeftijd</span>
               </>
             ) : (
               <>
-                <span data-testid="hero-freedom-pct-fallback" className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl lg:text-6xl">
+                <span data-testid="hero-freedom-pct-fallback" className="font-display text-[52px] font-bold tracking-tight text-[var(--ink)]">
                   {fire.freedomPercentage.toFixed(1)}%
                 </span>
-                <span className="ml-3 text-lg text-horizon-200/70">vrijheid bereikt</span>
+                <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">vrijheid bereikt</span>
               </>
             )}
           </div>
 
           <div className="mb-8">
-            <div className="h-3 w-full overflow-hidden rounded-full bg-horizon-950/60">
+            <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-horizon-600 via-horizon-400 to-horizon-300 transition-all duration-1000"
                 style={{ width: `${Math.max(Math.min(fire.freedomPercentage, 100), 0)}%` }}
               />
             </div>
-            <div className="mt-2 flex justify-between text-xs text-horizon-300/50">
+            <div className="mt-2 flex justify-between text-xs text-[var(--ink-4)]">
               <span>0%</span>
-              <span>{formatCurrency(fire.fireTarget)} — volledige vrijheid</span>
+              <span className="font-mono">{formatCurrency(fire.fireTarget)} — volledige vrijheid</span>
               <span>100%</span>
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-3">
             <div data-testid="hero-countdown">
-              <p className="text-xs font-medium text-horizon-300/60 uppercase">Aftellen</p>
-              <p className="mt-1 text-2xl font-bold">
+              <p className="label-editorial text-[var(--ink-3)]">Aftellen</p>
+              <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]">
                 {fire.countdownDays > 0 ? `${fire.countdownDays.toLocaleString('nl-NL')} dagen` : fire.fireDate}
               </p>
-              <p className="text-sm text-horizon-200/50">tot volledige vrijheid</p>
+              <p className="font-serif italic text-sm text-[var(--ink-3)]">tot volledige vrijheid</p>
             </div>
             <div data-testid="hero-passive-income">
-              <p className="text-xs font-medium text-horizon-300/60 uppercase">Passief inkomen</p>
-              <p className="mt-1 text-2xl font-bold">
+              <p className="label-editorial text-[var(--ink-3)]">Passief inkomen</p>
+              <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]">
                 {formatCurrency(fire.monthlyPassiveIncome + monthlyDividendIncome)}/mnd
               </p>
-              <p className="text-sm text-horizon-200/50">uit vermogen + dividenden</p>
+              <p className="font-serif italic text-sm text-[var(--ink-3)]">uit vermogen + dividenden</p>
             </div>
             <div data-testid="hero-fire-date">
-              <p className="text-xs font-medium text-horizon-300/60 uppercase">Volledige vrijheid</p>
-              <p className="mt-1 text-2xl font-bold capitalize">{fire.fireDate}</p>
+              <p className="label-editorial text-[var(--ink-3)]">Volledige vrijheid</p>
+              <p className="mt-1 font-mono text-2xl font-bold capitalize text-[var(--ink)]">{fire.fireDate}</p>
               {fire.fireAge !== null && (
-                <p className="text-sm text-horizon-200/50">
+                <p className="font-serif italic text-sm text-[var(--ink-3)]">
                   op leeftijd {formatFireAge(fire.fireAge)}
                 </p>
               )}
@@ -404,63 +404,63 @@ export default function HorizonPage() {
 
       {/* === 2. KPI Cards (White cards, subtle borders) === */}
       <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" data-testid="horizon-kpis">
-        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-fire-age">
+        <div className="card-editorial p-5" data-testid="kpi-fire-age">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-horizon-50">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
               <Hourglass className="h-5 w-5 text-horizon-600" />
             </div>
             <KpiTooltip text="Je verwachte vrijheidsleeftijd met optimistisch en pessimistisch scenario." />
           </div>
-          <p className="text-sm font-medium text-zinc-500">Vrijheidsleeftijd</p>
-          <p className="mt-1 text-3xl font-bold text-zinc-900">
+          <p className="label-editorial text-[var(--ink-3)]">Vrijheidsleeftijd</p>
+          <p className="mt-1 font-mono text-3xl font-bold text-[var(--ink)]">
             {fire.fireAge !== null ? Math.round(fire.fireAge) : '-'}
           </p>
           {range.optimistic.fireAge !== null && range.pessimistic.fireAge !== null && (
-            <p className="mt-1 text-xs text-zinc-400">
+            <p className="mt-1 text-xs text-[var(--ink-4)]">
               range: {Math.round(range.optimistic.fireAge)}-{Math.round(range.pessimistic.fireAge)}
             </p>
           )}
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-countdown">
+        <div className="card-editorial p-5" data-testid="kpi-countdown">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-horizon-50">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
               <Calendar className="h-5 w-5 text-horizon-600" />
             </div>
             <KpiTooltip text="Aantal dagen tot je verwacht moment van volledige vrijheid." />
           </div>
-          <p className="text-sm font-medium text-zinc-500">Aftellen</p>
-          <p className="mt-1 text-3xl font-bold text-zinc-900">
+          <p className="label-editorial text-[var(--ink-3)]">Aftellen</p>
+          <p className="mt-1 font-mono text-3xl font-bold text-[var(--ink)]">
             {fire.countdownDays > 0 ? fire.countdownDays.toLocaleString('nl-NL') : '0'}
           </p>
-          <p className="mt-1 text-xs text-zinc-400">dagen tot volledige vrijheid</p>
+          <p className="mt-1 text-xs text-[var(--ink-4)]">dagen tot volledige vrijheid</p>
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-fire-target">
+        <div className="card-editorial p-5" data-testid="kpi-fire-target">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-horizon-50">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
               <Target className="h-5 w-5 text-horizon-600" />
             </div>
             <KpiTooltip text="Het doelbedrag voor volledige financiële vrijheid, berekend als je jaarlijkse uitgaven × 25 (4%-regel)." />
           </div>
-          <p className="text-sm font-medium text-zinc-500">FIRE Doelbedrag</p>
+          <p className="label-editorial text-[var(--ink-3)]">FIRE Doelbedrag</p>
           <p className="mt-1 text-3xl font-bold text-horizon-600">{formatCurrency(fire.fireTarget)}</p>
-          <p className="mt-1 text-xs text-zinc-400">nodig voor volledige vrijheid</p>
+          <p className="mt-1 text-xs text-[var(--ink-4)]">nodig voor volledige vrijheid</p>
         </div>
 
         <FeatureGate featureId="veerkracht_score" fallback="locked">
-        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="resilience-kpi">
+        <div className="card-editorial p-5" data-testid="resilience-kpi">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-horizon-50">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
               <Shield className="h-5 w-5 text-horizon-600" />
             </div>
             <KpiTooltip text="Veerkrachtscore 0-100: hoe goed je bestand bent tegen tegenvallers. Gebaseerd op je meest recente snapshot." />
           </div>
-          <p className="text-sm font-medium text-zinc-500">Veerkracht</p>
-          <p className="mt-1 text-3xl font-bold text-zinc-900" data-testid="resilience-value">
+          <p className="label-editorial text-[var(--ink-3)]">Veerkracht</p>
+          <p className="mt-1 font-mono text-3xl font-bold text-[var(--ink)]" data-testid="resilience-value">
             {snapshotResilience !== null ? snapshotResilience : resilience.total}
           </p>
-          <p className="mt-1 text-xs text-zinc-400" data-testid="resilience-label">
+          <p className="mt-1 text-xs text-[var(--ink-4)]" data-testid="resilience-label">
             {snapshotResilience !== null ? getResilienceLabel(snapshotResilience) : resilience.label}
           </p>
           {snapshotResilience !== null && (
@@ -476,12 +476,12 @@ export default function HorizonPage() {
       {/* === 3. Alerts === */}
       {(hasNoDob || fireNotReachable || hasDebt) && (
         <section className="mt-8" data-testid="horizon-alerts">
-          <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          <h2 className="mb-3 label-editorial text-[var(--ink-2)]">
             Aandachtspunten
           </h2>
           <div className="space-y-2">
             {hasNoDob && (
-              <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+              <div className="flex items-center gap-3 rounded-[var(--r)] border border-amber-200 bg-amber-50/50 p-3">
                 <AlertTriangle className="h-4 w-4 text-amber-500" />
                 <span className="flex-1 text-sm font-medium text-amber-700">
                   Stel je geboortedatum in bij instellingen voor nauwkeurige leeftijdsberekeningen.
@@ -489,7 +489,7 @@ export default function HorizonPage() {
               </div>
             )}
             {fireNotReachable && (
-              <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50/50 p-3">
+              <div className="flex items-center gap-3 rounded-[var(--r)] border border-red-200 bg-red-50/50 p-3">
                 <AlertTriangle className="h-4 w-4 text-red-500" />
                 <span className="flex-1 text-sm font-medium text-red-700">
                   Volledige vrijheid is niet haalbaar bij huidige koers. Verhoog je spaarquote of verlaag je uitgaven.
@@ -497,7 +497,7 @@ export default function HorizonPage() {
               </div>
             )}
             {hasDebt && (
-              <div className="flex items-center gap-3 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3">
+              <div className="flex items-center gap-3 rounded-[var(--r)] border border-horizon-200 bg-horizon-50/50 p-3">
                 <Info className="h-4 w-4 text-horizon-500" />
                 <span className="flex-1 text-sm font-medium text-horizon-700">
                   Je hebt {formatCurrency(effectiveInput?.totalDebts ?? 0)} aan schulden — dit vertraagt je pad naar volledige vrijheid.
@@ -512,17 +512,17 @@ export default function HorizonPage() {
       <section className="mt-10" data-testid="fire-inputs">
         <div className="mb-3 flex items-center justify-between">
           <div>
-            <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+            <h2 className="label-editorial text-[var(--ink-2)]">
               Projectie-invoer
             </h2>
-            <p className="mt-1 text-sm text-zinc-500">
+            <p className="mt-1 text-sm text-[var(--ink-3)]">
               Jouw financiële gegevens die je pad naar volledige vrijheid bepalen
             </p>
           </div>
           {incomeOverride !== null && (
             <button
               onClick={() => { setIncomeOverride(null); setEditingIncome(false) }}
-              className="rounded-lg border border-horizon-200 bg-horizon-50 px-3 py-1.5 text-xs font-medium text-horizon-600 hover:bg-horizon-100"
+              className="rounded-[var(--r)] border border-horizon-200 bg-horizon-50 px-3 py-1.5 text-xs font-medium text-horizon-600 hover:bg-horizon-100"
             >
               Reset naar werkelijk
             </button>
@@ -530,18 +530,18 @@ export default function HorizonPage() {
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {/* Monthly Income - editable */}
-          <div className="rounded-xl border border-zinc-200 bg-white p-4" data-testid="input-income">
+          <div className="rounded-xl border border-zinc-200 bg-[var(--paper)] p-4" data-testid="input-income">
             <div className="mb-2 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50">
+                <div className="flex h-7 w-7 items-center justify-center rounded-[var(--r)] bg-emerald-50">
                   <DollarSign className="h-4 w-4 text-emerald-600" />
                 </div>
-                <p className="text-xs font-medium text-zinc-500">Maandinkomen</p>
+                <p className="text-xs font-medium text-[var(--ink-3)]">Maandinkomen</p>
               </div>
               {!editingIncome && (
                 <button
                   onClick={() => setEditingIncome(true)}
-                  className="rounded p-1 text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600"
+                  className="rounded p-1 text-zinc-400 hover:bg-zinc-50 hover:text-[var(--ink-2)]"
                   title="Inkomen aanpassen"
                   data-testid="edit-income-btn"
                 >
@@ -551,12 +551,12 @@ export default function HorizonPage() {
             </div>
             {editingIncome ? (
               <div className="flex items-center gap-2">
-                <span className="text-sm text-zinc-400">&euro;</span>
+                <span className="text-sm text-[var(--ink-3)]">&euro;</span>
                 <input
                   type="number"
                   data-testid="income-input"
                   defaultValue={Math.round(effectiveInput?.monthlyIncome ?? input?.monthlyIncome ?? 0)}
-                  className="w-full rounded-lg border border-horizon-300 bg-horizon-50/30 px-2 py-1.5 text-lg font-bold text-zinc-900 focus:border-horizon-500 focus:outline-none"
+                  className="w-full rounded-lg border border-horizon-300 bg-horizon-50/30 px-2 py-1.5 text-lg font-bold text-[var(--ink)] focus:border-horizon-500 focus:outline-none"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       const val = Number((e.target as HTMLInputElement).value)
@@ -580,20 +580,20 @@ export default function HorizonPage() {
                 />
                 <button
                   onClick={() => setEditingIncome(false)}
-                  className="rounded p-1 text-zinc-400 hover:text-zinc-600"
+                  className="rounded p-1 text-zinc-400 hover:text-[var(--ink-2)]"
                 >
                   <Check className="h-4 w-4" />
                 </button>
               </div>
             ) : (
-              <p className="text-lg font-bold text-zinc-900" data-testid="income-display">
+              <p className="text-lg font-bold text-[var(--ink)]" data-testid="income-display">
                 {formatCurrency(effectiveInput?.monthlyIncome ?? 0)}
                 {incomeOverride !== null && (
                   <span className="ml-1.5 text-xs font-normal text-horizon-500">(aangepast)</span>
                 )}
               </p>
             )}
-            <p className="mt-0.5 text-[10px] text-zinc-400">
+            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">
               {incomeOverride !== null
                 ? `Werkelijk: ${formatCurrency(input?.monthlyIncome ?? 0)}`
                 : 'uit transacties deze maand'}
@@ -601,67 +601,67 @@ export default function HorizonPage() {
           </div>
 
           {/* Monthly Expenses */}
-          <div className="rounded-xl border border-zinc-200 bg-white p-4" data-testid="input-expenses">
+          <div className="rounded-xl border border-zinc-200 bg-[var(--paper)] p-4" data-testid="input-expenses">
             <div className="mb-2 flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-50">
+              <div className="flex h-7 w-7 items-center justify-center rounded-[var(--r)] bg-red-50">
                 <Wallet className="h-4 w-4 text-red-500" />
               </div>
-              <p className="text-xs font-medium text-zinc-500">Maanduitgaven</p>
+              <p className="text-xs font-medium text-[var(--ink-3)]">Maanduitgaven</p>
             </div>
-            <p className="text-lg font-bold text-zinc-900">{formatCurrency(effectiveInput?.monthlyExpenses ?? 0)}</p>
-            <p className="mt-0.5 text-[10px] text-zinc-400">uit transacties deze maand</p>
+            <p className="text-lg font-bold text-[var(--ink)]">{formatCurrency(effectiveInput?.monthlyExpenses ?? 0)}</p>
+            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">uit transacties deze maand</p>
           </div>
 
           {/* Total Assets */}
-          <div className="rounded-xl border border-zinc-200 bg-white p-4" data-testid="input-assets">
+          <div className="rounded-xl border border-zinc-200 bg-[var(--paper)] p-4" data-testid="input-assets">
             <div className="mb-2 flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-horizon-50">
+              <div className="flex h-7 w-7 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
                 <PiggyBank className="h-4 w-4 text-horizon-600" />
               </div>
-              <p className="text-xs font-medium text-zinc-500">Totaal vermogen</p>
+              <p className="text-xs font-medium text-[var(--ink-3)]">Totaal vermogen</p>
             </div>
-            <p className="text-lg font-bold text-zinc-900">{formatCurrency(effectiveInput?.totalAssets ?? 0)}</p>
-            <p className="mt-0.5 text-[10px] text-zinc-400">actieve bezittingen</p>
+            <p className="text-lg font-bold text-[var(--ink)]">{formatCurrency(effectiveInput?.totalAssets ?? 0)}</p>
+            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">actieve bezittingen</p>
           </div>
 
           {/* Total Debts */}
-          <div className="rounded-xl border border-zinc-200 bg-white p-4" data-testid="input-debts">
+          <div className="rounded-xl border border-zinc-200 bg-[var(--paper)] p-4" data-testid="input-debts">
             <div className="mb-2 flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-kern-50">
+              <div className="flex h-7 w-7 items-center justify-center rounded-[var(--r)] bg-kern-50">
                 <TrendingUp className="h-4 w-4 text-kern-600" />
               </div>
-              <p className="text-xs font-medium text-zinc-500">Totaal schulden</p>
+              <p className="text-xs font-medium text-[var(--ink-3)]">Totaal schulden</p>
             </div>
-            <p className="text-lg font-bold text-zinc-900">{formatCurrency(effectiveInput?.totalDebts ?? 0)}</p>
-            <p className="mt-0.5 text-[10px] text-zinc-400">actieve schulden</p>
+            <p className="text-lg font-bold text-[var(--ink)]">{formatCurrency(effectiveInput?.totalDebts ?? 0)}</p>
+            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">actieve schulden</p>
           </div>
 
           {/* Savings Rate - computed from income & expenses */}
-          <div className="rounded-xl border border-zinc-200 bg-white p-4" data-testid="input-savings-rate">
+          <div className="rounded-xl border border-zinc-200 bg-[var(--paper)] p-4" data-testid="input-savings-rate">
             <div className="mb-2 flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-wil-50">
+              <div className="flex h-7 w-7 items-center justify-center rounded-[var(--r)] bg-wil-50">
                 <Percent className="h-4 w-4 text-wil-600" />
               </div>
-              <p className="text-xs font-medium text-zinc-500">Spaarquote</p>
+              <p className="text-xs font-medium text-[var(--ink-3)]">Spaarquote</p>
             </div>
-            <p className="text-lg font-bold text-zinc-900" data-testid="savings-rate-display">
+            <p className="text-lg font-bold text-[var(--ink)]" data-testid="savings-rate-display">
               {fire ? `${fire.savingsRate.toFixed(1)}%` : '0.0%'}
             </p>
-            <p className="mt-0.5 text-[10px] text-zinc-400">berekend uit inkomen &amp; uitgaven</p>
+            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">berekend uit inkomen &amp; uitgaven</p>
           </div>
 
           {/* Annual Expenses - from budget data */}
-          <div className="rounded-xl border border-zinc-200 bg-white p-4" data-testid="input-annual-expenses">
+          <div className="rounded-xl border border-zinc-200 bg-[var(--paper)] p-4" data-testid="input-annual-expenses">
             <div className="mb-2 flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-50">
+              <div className="flex h-7 w-7 items-center justify-center rounded-[var(--r)] bg-rose-50">
                 <Target className="h-4 w-4 text-rose-500" />
               </div>
-              <p className="text-xs font-medium text-zinc-500">Jaarlijkse vaste lasten</p>
+              <p className="text-xs font-medium text-[var(--ink-3)]">Jaarlijkse vaste lasten</p>
             </div>
-            <p className="text-lg font-bold text-zinc-900" data-testid="annual-expenses-display">
+            <p className="text-lg font-bold text-[var(--ink)]" data-testid="annual-expenses-display">
               {formatCurrency(effectiveInput?.yearlyMustExpenses ?? 0)}
             </p>
-            <p className="mt-0.5 text-[10px] text-zinc-400">uit budget categorieën</p>
+            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">uit budget categorieën</p>
           </div>
         </div>
       </section>
@@ -671,15 +671,15 @@ export default function HorizonPage() {
         <FeatureGate featureId="veerkracht_score" fallback="hidden">
         <section className="mt-10" data-testid="resilience-trend-section">
           <div className="mb-3">
-            <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+            <h2 className="label-editorial text-[var(--ink-2)]">
               <Shield className="mr-1.5 inline h-3.5 w-3.5 text-horizon-500" />
               Veerkracht verloop
             </h2>
-            <p className="mt-1 text-sm text-zinc-500">
+            <p className="mt-1 text-sm text-[var(--ink-3)]">
               Je veerkrachtscore over tijd, gebaseerd op echte snapshot data
             </p>
           </div>
-          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
+          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 sm:p-6">
             <ResilienceContextMessage snapshots={resilienceSnapshots} />
             <ResilienceTrendChart snapshots={resilienceSnapshots} />
           </div>
@@ -703,17 +703,17 @@ export default function HorizonPage() {
         return (
           <section className="mt-10" data-testid="fire-age-trend-section">
             <div className="mb-3">
-              <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+              <h2 className="label-editorial text-[var(--ink-2)]">
                 <Hourglass className="mr-1.5 inline h-3.5 w-3.5 text-horizon-500" />
                 Je FIRE-leeftijd over tijd
               </h2>
-              <p className="mt-1 text-sm text-zinc-500">
+              <p className="mt-1 text-sm text-[var(--ink-3)]">
                 Hoe je vrijheidsleeftijd zich ontwikkelt — lager is beter
               </p>
             </div>
-            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
+            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 sm:p-6">
               {/* Contextual progress message */}
-              <div className="mb-4 rounded-lg border border-horizon-100 bg-horizon-50 px-4 py-3" data-testid="fire-age-context-message">
+              <div className="mb-4 rounded-[var(--r)] border border-horizon-100 bg-horizon-50 px-4 py-3" data-testid="fire-age-context-message">
                 <p className="text-sm text-horizon-800">
                   {improved ? (
                     <>
@@ -791,26 +791,26 @@ export default function HorizonPage() {
       <FeatureGate featureId="levensgebeurtenissen" fallback="locked">
       <section className="mt-10">
         <div className="mb-5">
-          <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          <h2 className="label-editorial text-[var(--ink-2)]">
             Jouw tijdlijn
           </h2>
-          <p className="mt-1 text-sm text-zinc-500">
+          <p className="mt-1 text-sm text-[var(--ink-3)]">
             Plan levensgebeurtenissen en acties, en zie hun impact op je pad naar vrijheid
           </p>
         </div>
 
         {/* FIRE comparison summary */}
-        <div className="rounded-xl border border-horizon-200 bg-horizon-50 p-5">
+        <div className="rounded-[var(--r-lg)] border border-horizon-200 bg-horizon-50 p-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="text-center">
               <p className="text-xs font-medium text-horizon-600 uppercase">Basis vrijheid</p>
-              <p className="mt-1 text-3xl font-bold text-zinc-900">
+              <p className="mt-1 font-mono text-3xl font-bold text-[var(--ink)]">
                 {baseFire?.fireAge != null ? `${Math.round(baseFire.fireAge)}j` : '-'}
               </p>
             </div>
             <div className="text-center">
               <p className="text-xs font-medium text-horizon-600 uppercase">Aangepast (met events)</p>
-              <p className="mt-1 text-3xl font-bold text-zinc-900">
+              <p className="mt-1 font-mono text-3xl font-bold text-[var(--ink)]">
                 {adjustedFireAge != null ? `${Math.round(adjustedFireAge)}j` : '-'}
               </p>
             </div>
@@ -819,14 +819,14 @@ export default function HorizonPage() {
               <p className={`mt-1 text-3xl font-bold ${totalDelayMonths > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
                 {totalDelayMonths > 0 ? `+${totalDelayMonths} mnd` : '0 mnd'}
               </p>
-              <p className="text-xs text-zinc-500">door {events.length} event{events.length !== 1 ? 's' : ''}</p>
+              <p className="text-xs text-[var(--ink-3)]">door {events.length} event{events.length !== 1 ? 's' : ''}</p>
             </div>
           </div>
         </div>
 
         {/* Logarithmic Visual Timeline */}
         {currentAge != null && (
-          <div className="mt-6 overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
+          <div className="mt-6 overflow-hidden rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 sm:p-6">
             <LogTimeline
               currentAge={currentAge}
               baseFireAge={baseFire?.fireAge != null ? Math.round(baseFire.fireAge) : null}
@@ -844,7 +844,7 @@ export default function HorizonPage() {
       <section className="mt-8">
         {events.length > 0 && (
           <>
-            <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+            <h2 className="mb-3 label-editorial text-[var(--ink-2)]">
               <Target className="mr-1.5 inline h-3.5 w-3.5 text-horizon-500" />
               Levensgebeurtenissen
             </h2>
@@ -853,25 +853,25 @@ export default function HorizonPage() {
                 const impact = impacts[i]
                 const catalog = LIFE_EVENT_CATALOG[ev.event_type]
                 return (
-                  <div key={ev.id} className="rounded-xl border border-zinc-200 bg-white p-5">
+                  <div key={ev.id} className="card-editorial p-5">
                     <div className="flex items-start gap-4">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-horizon-50 text-horizon-600">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] text-horizon-600">
                         {EVENT_ICONS[ev.icon] ?? EVENT_ICONS[catalog?.icon ?? 'Calendar'] ?? <Calendar className="h-4 w-4" />}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="font-medium text-zinc-900">{ev.name}</p>
-                            <p className="text-xs text-zinc-400">
+                            <p className="font-medium text-[var(--ink)]">{ev.name}</p>
+                            <p className="text-xs text-[var(--ink-4)]">
                               {ev.target_age ? `op leeftijd ${ev.target_age}` : 'geen leeftijd ingesteld'}
                               {Number(ev.duration_months) > 0 ? ` \u00B7 ${ev.duration_months} maanden` : ''}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
-                            <button onClick={() => openEditForm(ev)} className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600">
+                            <button onClick={() => openEditForm(ev)} className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-50 hover:text-[var(--ink-2)]">
                               <Edit3 className="h-4 w-4" />
                             </button>
-                            <button onClick={() => deleteEvent(ev.id)} className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-500">
+                            <button onClick={() => deleteEvent(ev.id)} className="rounded-lg p-1.5 text-[var(--ink-3)] hover:bg-red-50 hover:text-red-500">
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
@@ -879,25 +879,25 @@ export default function HorizonPage() {
 
                         <div className="mt-3 flex flex-wrap gap-3">
                           {Number(ev.one_time_cost) > 0 && (
-                            <span className="rounded-lg bg-red-50 px-2 py-1 text-xs font-medium text-red-600">
+                            <span className="rounded-[var(--r)] bg-red-50 px-2 py-1 text-xs font-medium text-red-600">
                               {formatCurrency(Number(ev.one_time_cost))} eenmalig
                             </span>
                           )}
                           {Number(ev.monthly_cost_change) > 0 && (
-                            <span className="rounded-lg bg-red-50 px-2 py-1 text-xs font-medium text-red-600">
+                            <span className="rounded-[var(--r)] bg-red-50 px-2 py-1 text-xs font-medium text-red-600">
                               +{formatCurrency(Number(ev.monthly_cost_change))}/mnd
                             </span>
                           )}
                           {Number(ev.monthly_income_change) !== 0 && (
-                            <span className={`rounded-lg px-2 py-1 text-xs font-medium ${Number(ev.monthly_income_change) < 0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                            <span className={`rounded-[var(--r)] px-2 py-1 text-xs font-medium ${Number(ev.monthly_income_change) < 0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
                               {Number(ev.monthly_income_change) > 0 ? '+' : ''}{formatCurrency(Number(ev.monthly_income_change))}/mnd inkomen
                             </span>
                           )}
                         </div>
 
                         {impact && (
-                          <div className="mt-3 rounded-lg bg-zinc-50 p-3">
-                            <p className="text-xs text-zinc-600">
+                          <div className="mt-3 rounded-lg bg-[var(--subtle)] p-3">
+                            <p className="text-xs text-[var(--ink-2)]">
                               <span className="font-medium">Impact:</span>{' '}
                               Vrijheid {impact.fireDelayMonths > 0 ? `+${impact.fireDelayMonths} maanden later` : 'geen vertraging'}{' '}
                               {'\u00B7'} totale kosten {formatCurrency(impact.totalCost)}{' '}
@@ -915,8 +915,8 @@ export default function HorizonPage() {
         )}
 
         {events.length === 0 && actions.length === 0 && (
-          <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
-            <p className="text-sm text-zinc-500">
+          <div className="rounded-xl border border-dashed border-zinc-300 bg-[var(--subtle)] p-8 text-center">
+            <p className="text-sm text-[var(--ink-3)]">
               Nog geen levensgebeurtenissen gepland. Klik op een evenement hieronder om te beginnen.
             </p>
           </div>
@@ -924,7 +924,7 @@ export default function HorizonPage() {
 
         {/* Event Catalog */}
         <div className="mt-6">
-          <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          <h2 className="mb-3 label-editorial text-[var(--ink-2)]">
             Evenement toevoegen
           </h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -932,14 +932,14 @@ export default function HorizonPage() {
               <button
                 key={key}
                 onClick={() => openCatalogForm(key)}
-                className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 text-left transition-colors hover:border-horizon-200 hover:bg-horizon-50/30"
+                className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 text-left transition-colors hover:border-horizon-200 hover:bg-horizon-50/30"
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-horizon-50 text-horizon-600">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] text-horizon-600">
                   {EVENT_ICONS[val.icon] ?? <Calendar className="h-4 w-4" />}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-zinc-900">{val.label}</p>
-                  <p className="truncate text-xs text-zinc-400">{val.description}</p>
+                  <p className="text-sm font-medium text-[var(--ink)]">{val.label}</p>
+                  <p className="truncate text-xs text-[var(--ink-4)]">{val.description}</p>
                 </div>
               </button>
             ))}
@@ -951,7 +951,7 @@ export default function HorizonPage() {
       {/* === 9. Acties (Primary Content) === */}
       {actions.length > 0 && (
         <section className="mt-8">
-          <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          <h2 className="mb-3 label-editorial text-[var(--ink-2)]">
             <Zap className="mr-1.5 inline h-3.5 w-3.5 text-wil-500" />
             Geplande acties (komend jaar)
           </h2>
@@ -971,14 +971,14 @@ export default function HorizonPage() {
       <FeatureGate featureId="vermogensprojectie_chart" fallback="locked">
       <section className="mt-10">
         <div className="mb-5">
-          <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          <h2 className="label-editorial text-[var(--ink-2)]">
             Vermogensprojectie
           </h2>
-          <p className="mt-1 text-sm text-zinc-500">
+          <p className="mt-1 text-sm text-[var(--ink-3)]">
             Verwacht netto vermogen richting volledige vrijheid (30 jaar, 7% rendement)
           </p>
         </div>
-        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
+        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 sm:p-6">
           <ProjectionChart data={projection} fireTarget={fire.fireTarget} />
         </div>
       </section>
@@ -987,33 +987,33 @@ export default function HorizonPage() {
       {/* === 11. Samenvatting (Deep Dive) === */}
       <section className="mt-10">
         <div className="mb-5">
-          <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          <h2 className="label-editorial text-[var(--ink-2)]">
             Samenvatting
           </h2>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="rounded-xl border border-zinc-200 bg-white p-6">
-            <p className="text-sm font-medium text-zinc-500">Opgebouwde vrijheidstijd</p>
-            <p className="mt-2 text-2xl font-bold text-zinc-900">
+          <div className="rounded-xl border border-zinc-200 bg-[var(--paper)] p-6">
+            <p className="label-editorial text-[var(--ink-3)]">Opgebouwde vrijheidstijd</p>
+            <p className="mt-2 text-2xl font-bold text-[var(--ink)]">
               {fire.freedomYears} jaar en {fire.freedomMonths} maanden
             </p>
-            <p className="mt-1 text-sm text-zinc-400">
+            <p className="mt-1 text-sm text-[var(--ink-3)]">
               Je kunt {fire.freedomYears > 0 ? `${fire.freedomYears} jaar en ${fire.freedomMonths} maanden` : `${fire.freedomMonths} maanden`} leven van je vermogen zonder inkomen.
             </p>
           </div>
-          <div className="rounded-xl border border-zinc-200 bg-white p-6">
-            <p className="text-sm font-medium text-zinc-500">Passief inkomen vs. uitgaven</p>
-            <p className="mt-2 text-2xl font-bold text-zinc-900">
+          <div className="rounded-xl border border-zinc-200 bg-[var(--paper)] p-6">
+            <p className="label-editorial text-[var(--ink-3)]">Passief inkomen vs. uitgaven</p>
+            <p className="mt-2 text-2xl font-bold text-[var(--ink)]">
               {formatCurrency(fire.monthlyPassiveIncome + monthlyDividendIncome)} / mnd
             </p>
-            <p className="mt-1 text-sm text-zinc-400">
+            <p className="mt-1 text-sm text-[var(--ink-3)]">
               passief inkomen dekt {(fire.monthlyPassiveIncome + monthlyDividendIncome) > 0 && effectiveInput?.monthlyExpenses
                 ? `${Math.round(((fire.monthlyPassiveIncome + monthlyDividendIncome) / effectiveInput.monthlyExpenses) * 100)}%`
                 : '0%'
               } van je maandelijkse uitgaven ({formatCurrency(effectiveInput?.monthlyExpenses ?? 0)})
             </p>
             {monthlyDividendIncome > 0 && (
-              <div className="mt-2 flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-1.5" data-testid="dividend-passive-income">
+              <div className="mt-2 flex items-center gap-2 rounded-[var(--r)] bg-emerald-50 border border-emerald-100 px-3 py-1.5" data-testid="dividend-passive-income">
                 <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
                 <p className="text-xs text-emerald-700">
                   Waarvan {formatCurrency(monthlyDividendIncome)} / mnd uit dividenden
@@ -1036,58 +1036,58 @@ export default function HorizonPage() {
             <div className="space-y-4 p-6">
               {/* Template tip */}
               {LIFE_EVENT_CATALOG[formType]?.tip && !editingEvent && (
-                <div className="rounded-lg bg-horizon-50 p-3 text-xs text-horizon-700">
+                <div className="rounded-[var(--r)] bg-horizon-50 p-3 text-xs text-horizon-700">
                   <span className="font-medium">Tip:</span> {LIFE_EVENT_CATALOG[formType].tip}
                 </div>
               )}
 
               <div>
-                <label className="text-xs font-medium text-zinc-500">Naam</label>
+                <label className="text-xs font-medium text-[var(--ink-3)]">Naam</label>
                 <input
                   type="text" value={formName} onChange={e => setFormName(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-medium text-zinc-500">Leeftijd</label>
+                <label className="text-xs font-medium text-[var(--ink-3)]">Leeftijd</label>
                 <input
                   type="number" value={formAge} onChange={e => setFormAge(e.target.value ? Number(e.target.value) : '')}
-                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
                   placeholder="bijv. 45"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-zinc-500">Eenmalige kosten</label>
+                  <label className="text-xs font-medium text-[var(--ink-3)]">Eenmalige kosten</label>
                   <input
                     type="number" value={formCost} onChange={e => setFormCost(e.target.value ? Number(e.target.value) : '')}
-                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-zinc-500">Duur (maanden)</label>
+                  <label className="text-xs font-medium text-[var(--ink-3)]">Duur (maanden)</label>
                   <input
                     type="number" value={formDuration} onChange={e => setFormDuration(e.target.value ? Number(e.target.value) : '')}
-                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-zinc-500">Maandelijkse kosten</label>
+                  <label className="text-xs font-medium text-[var(--ink-3)]">Maandelijkse kosten</label>
                   <input
                     type="number" value={formMonthlyCost} onChange={e => setFormMonthlyCost(e.target.value ? Number(e.target.value) : '')}
-                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-zinc-500">Inkomenswijziging/mnd</label>
+                  <label className="text-xs font-medium text-[var(--ink-3)]">Inkomenswijziging/mnd</label>
                   <input
                     type="number" value={formMonthlyIncome} onChange={e => setFormMonthlyIncome(e.target.value ? Number(e.target.value) : '')}
-                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
                     placeholder="bijv. -1000"
                   />
                 </div>
@@ -1096,7 +1096,7 @@ export default function HorizonPage() {
               <button
                 onClick={saveEvent}
                 disabled={!formName}
-                className="w-full rounded-lg bg-horizon-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-horizon-700 disabled:opacity-50"
+                className="w-full rounded-[var(--r)] bg-horizon-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-horizon-700 disabled:opacity-50"
               >
                 {editingEvent ? 'Opslaan' : 'Toevoegen'}
               </button>
@@ -1129,9 +1129,9 @@ function KpiTooltip({ text }: { text: string }) {
         onBlur={() => setOpen(false)}
         className="touch-target"
       >
-        <Info className={`h-4 w-4 cursor-help transition-colors ${open ? 'text-horizon-500' : 'text-zinc-300'} group-hover:text-horizon-500`} />
+        <Info className={`h-4 w-4 cursor-help transition-colors ${open ? 'text-horizon-500' : 'text-[var(--ink-4)]'} group-hover:text-horizon-500`} />
       </button>
-      <div className={`absolute right-0 z-10 mt-1 w-56 rounded-lg border border-zinc-200 bg-white p-3 text-xs leading-relaxed text-zinc-600 shadow-lg transition-opacity ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}>
+      <div className={`absolute right-0 z-10 mt-1 w-56 rounded-lg border border-zinc-200 bg-white p-3 text-xs leading-relaxed text-[var(--ink-2)] shadow-lg transition-opacity ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}>
         {text}
       </div>
     </div>
@@ -1146,15 +1146,15 @@ function ExploreCard({
   return (
     <button
       onClick={onClick}
-      className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 text-left transition-colors hover:border-horizon-200 hover:bg-horizon-50/30"
+      className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 text-left transition-colors hover:border-horizon-200 hover:bg-horizon-50/30"
     >
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-horizon-50">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] group-hover:bg-horizon-50">
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium text-zinc-500">{title}</p>
-        <p className="text-lg font-bold text-zinc-900">{value}</p>
-        <p className="text-xs text-zinc-400">{subtitle}</p>
+        <p className="text-xs font-medium text-[var(--ink-3)]">{title}</p>
+        <p className="text-lg font-bold text-[var(--ink)]">{value}</p>
+        <p className="text-xs text-[var(--ink-4)]">{subtitle}</p>
       </div>
     </button>
   )
@@ -1256,7 +1256,7 @@ function ResilienceContextMessage({ snapshots }: { snapshots: SnapshotForTrend[]
   const monthLabel = monthSpan === 1 ? '1 maand' : `${monthSpan} maanden`
 
   return (
-    <div className="mb-4 rounded-lg border border-horizon-100 bg-horizon-50 px-4 py-3" data-testid="resilience-context-message">
+    <div className="mb-4 rounded-[var(--r)] border border-horizon-100 bg-horizon-50 px-4 py-3" data-testid="resilience-context-message">
       <p className="text-sm text-horizon-800">
         {diff > 0 ? (
           <>
@@ -1416,7 +1416,7 @@ function FireAgeTrendChart({ snapshots }: { snapshots: SnapshotForTrend[] }) {
   const withAge = snapshots.filter(s => s.fire_age !== null && s.fire_age !== undefined)
   if (withAge.length < 2) {
     return (
-      <div className="py-8 text-center text-sm text-zinc-400" data-testid="fire-age-no-data">
+      <div className="py-8 text-center text-sm text-[var(--ink-3)]" data-testid="fire-age-no-data">
         Nog niet genoeg snapshots om een trend te tonen. Na je volgende maandelijkse snapshot verschijnt hier je FIRE-leeftijd verloop.
       </div>
     )

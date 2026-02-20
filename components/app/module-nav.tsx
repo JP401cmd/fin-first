@@ -40,7 +40,7 @@ export function ModuleNav({ config }: { config: ModuleNavConfig }) {
   )
 
   return (
-    <div className={`sticky top-[var(--header-height)] z-40 border-b bg-white ${styles.border}`}>
+    <div className={`sticky top-[var(--header-height)] z-40 border-b border-[var(--border-ed)] bg-[var(--paper)] ${styles.border}`}>
       <div className="mx-auto max-w-6xl px-6">
         <div className="relative">
           <nav
@@ -53,10 +53,10 @@ export function ModuleNav({ config }: { config: ModuleNavConfig }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`whitespace-nowrap border-b-2 px-3 py-3.5 text-sm font-medium transition-colors ${
+                  className={`whitespace-nowrap border-b-2 px-3 py-3.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors ${
                     active
                       ? styles.active
-                      : `border-transparent text-zinc-500 ${styles.hover}`
+                      : `border-transparent text-[var(--ink-3)] ${styles.hover}`
                   }`}
                 >
                   {item.label}
@@ -64,7 +64,7 @@ export function ModuleNav({ config }: { config: ModuleNavConfig }) {
               )
             })}
           </nav>
-          <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-white md:hidden" />
+          <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-[var(--paper)] md:hidden" />
         </div>
       </div>
     </div>

@@ -323,7 +323,7 @@ export function TrendChart({
   if (series.length === 0 || allLabels.length === 0) {
     return (
       <div
-        className={`py-6 text-center text-sm text-zinc-400 ${className}`}
+        className={`py-6 text-center text-sm text-[var(--ink-3)] ${className}`}
         data-testid={testId}
         data-mode={mode}
       >
@@ -337,7 +337,7 @@ export function TrendChart({
     <div className={className} data-testid={testId} data-mode={mode} data-module-color={moduleColor}>
       {/* Title */}
       {title && (
-        <h3 className="mb-2 text-sm font-semibold text-zinc-700" data-testid={`${testId}-title`}>
+        <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]" data-testid={`${testId}-title`}>
           {title}
         </h3>
       )}
@@ -706,7 +706,7 @@ export function TrendChart({
                   style={{ backgroundColor: sp.color }}
                 />
               )}
-              <span className="text-[11px] font-medium text-zinc-600">
+              <span className="text-[11px] font-medium text-[var(--ink-2)]">
                 {sp.name}
               </span>
             </div>
@@ -719,7 +719,7 @@ export function TrendChart({
                   background: `repeating-linear-gradient(90deg, ${theme.primary} 0px, ${theme.primary} 3px, transparent 3px, transparent 6px)`,
                 }}
               />
-              <span className="text-[11px] text-zinc-400">Prognose</span>
+              <span className="text-[11px] text-[var(--ink-3)]">Prognose</span>
             </div>
           )}
         </div>

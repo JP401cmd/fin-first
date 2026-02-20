@@ -82,14 +82,14 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
 
   if (pending.length === 0 && !isGenerating) {
     return (
-      <div className="rounded-2xl border border-wil-200 bg-wil-50 p-8 text-center">
+      <div className="rounded-[var(--r-lg)] border border-wil-200 bg-wil-50 p-8 text-center">
         <div className="mx-auto mb-4 flex justify-center">
           <FinnAvatar size={64} />
         </div>
-        <h2 className="mb-2 text-xl font-bold text-zinc-900">
+        <h2 className="mb-2 text-xl font-bold text-[var(--ink)]">
           Klaar voor optimalisatie?
         </h2>
-        <p className="mb-6 text-zinc-500">
+        <p className="mb-6 text-[var(--ink-3)]">
           Will analyseert je financieel profiel en ontdekt verborgen vrijheidsdagen.
           Laat de AI kansen vinden die je misschien over het hoofd ziet.
         </p>
@@ -113,7 +113,7 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
     <div className="space-y-6">
       {/* Summary bar */}
       {totalFreedomDays > 0 && (
-        <div className="rounded-xl bg-gradient-to-r from-wil-500 to-wil-600 p-4 text-white">
+        <div className="rounded-[var(--r-lg)] bg-gradient-to-r from-wil-500 to-wil-600 p-4 text-white">
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-wil-100">Potentieel te winnen</div>
@@ -128,7 +128,7 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
 
       {/* Generate button */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-zinc-900">Voorstellen</h2>
+        <h2 className="text-lg font-semibold text-[var(--ink)]">Voorstellen</h2>
         <button
           type="button"
           onClick={generateRecommendations}
@@ -152,7 +152,7 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
       {isGenerating && (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse rounded-xl border border-wil-100 bg-wil-50/30 px-4 py-3">
+            <div key={i} className="animate-pulse rounded-[var(--r-lg)] border border-wil-100 bg-wil-50/30 px-4 py-3">
               <div className="flex items-center gap-3">
                 <div className="h-8 w-8 rounded-lg bg-wil-100" />
                 <div className="flex-1">

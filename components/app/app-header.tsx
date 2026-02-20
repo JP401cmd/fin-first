@@ -16,14 +16,14 @@ const allNavItems = [
 ] as const
 
 const activeClasses: Record<string, string> = {
-  zinc: 'text-zinc-900 border-zinc-500',
+  zinc: 'text-[var(--ink)] border-[var(--ink)]',
   amber: 'text-kern-600 border-kern-500',
   teal: 'text-wil-600 border-wil-500',
   purple: 'text-horizon-600 border-horizon-500',
 }
 
 const hoverClasses: Record<string, string> = {
-  zinc: 'hover:text-zinc-900',
+  zinc: 'hover:text-[var(--ink)]',
   amber: 'hover:text-kern-600',
   teal: 'hover:text-wil-600',
   purple: 'hover:text-horizon-600',
@@ -40,11 +40,11 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
   const navItems = allNavItems
 
   return (
-    <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white">
+    <header className="sticky top-0 z-50 border-b-2 border-[var(--ink)] bg-[var(--paper)] shadow-[var(--s0)]">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
         <div className="flex items-center gap-8">
-          <Link href="/dashboard" className="text-xl font-bold text-zinc-900">
-            TriFinity
+          <Link href="/dashboard" className="font-display text-[28px] font-bold tracking-tight text-[var(--ink)]">
+            <span className="lowercase">t</span>ri<span className="lowercase">f</span>inity<span className="text-kern-500">.</span>
           </Link>
 
           <nav className="hidden items-center gap-1 md:flex">
@@ -55,12 +55,12 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors border-b-3 ${
                     isActive
-                      ? `${activeClasses[item.color]} bg-zinc-50`
+                      ? `${activeClasses[item.color]}`
                       : isLocked
-                        ? 'text-zinc-400 hover:text-zinc-500'
-                        : `text-zinc-600 ${hoverClasses[item.color]}`
+                        ? 'text-[var(--ink-4)] border-transparent hover:text-[var(--ink-3)]'
+                        : `text-[var(--ink-3)] border-transparent ${hoverClasses[item.color]}`
                   }`}
                 >
                   {item.label}
@@ -79,7 +79,7 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
               setMenuOpen(false)
               openModal()
             }}
-            className="relative rounded-lg p-2 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+            className="relative rounded-[var(--r)] p-2 text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
             aria-label="Meldingen"
           >
             <Bell className="h-5 w-5" />
@@ -94,9 +94,9 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
           <div className="relative">
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="flex items-center gap-2 rounded-full bg-zinc-100 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-200"
+              className="flex items-center gap-2 rounded-full bg-[var(--subtle)] px-3 py-1.5 text-sm text-[var(--ink-2)] hover:bg-[var(--border-ed)]"
             >
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-900 text-xs font-medium text-white">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--ink)] text-xs font-medium text-[var(--paper)]">
                 {email[0]?.toUpperCase() ?? '?'}
               </span>
               <span className="hidden max-w-[140px] truncate sm:inline">
@@ -104,7 +104,7 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
               </span>
             </button>
             {menuOpen && (
-              <div className="absolute right-0 mt-2 w-40 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+              <div className="absolute right-0 mt-2 w-40 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] py-1 shadow-[var(--s2)]">
                 {role === 'superadmin' && (
                   <Link
                     href="/beheer"
@@ -116,14 +116,14 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
                 )}
                 <Link
                   href="/identity"
-                  className="block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+                  className="block px-4 py-2 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)]"
                   onClick={() => setMenuOpen(false)}
                 >
                   Identiteit
                 </Link>
                 <Link
                   href="/logout"
-                  className="block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+                  className="block px-4 py-2 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)]"
                   onClick={() => setMenuOpen(false)}
                 >
                   Uitloggen

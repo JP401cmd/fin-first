@@ -186,7 +186,7 @@ export function TransactionForm({
           <div className="space-y-4">
             {/* Type toggle */}
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-zinc-700">Type</label>
+              <label className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">Type</label>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -194,7 +194,7 @@ export function TransactionForm({
                   className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                     !form.is_income
                       ? 'border-red-300 bg-red-50 text-red-700'
-                      : 'border-zinc-200 text-zinc-500 hover:bg-zinc-50'
+                      : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
                   }`}
                 >
                   Uitgave
@@ -205,7 +205,7 @@ export function TransactionForm({
                   className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                     form.is_income
                       ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                      : 'border-zinc-200 text-zinc-500 hover:bg-zinc-50'
+                      : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
                   }`}
                 >
                   Inkomen
@@ -216,7 +216,7 @@ export function TransactionForm({
             {/* Date + Amount */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="tx-date" className="mb-1.5 block text-sm font-medium text-zinc-700">
+                <label htmlFor="tx-date" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                   Datum
                 </label>
                 <input
@@ -224,12 +224,12 @@ export function TransactionForm({
                   type="date"
                   value={form.date}
                   onChange={(e) => update('date', e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                   required
                 />
               </div>
               <div>
-                <label htmlFor="tx-amount" className="mb-1.5 block text-sm font-medium text-zinc-700">
+                <label htmlFor="tx-amount" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                   Bedrag (&euro;)
                 </label>
                 <input
@@ -239,7 +239,7 @@ export function TransactionForm({
                   step="0.01"
                   value={form.amount}
                   onChange={(e) => update('amount', e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                   placeholder="0,00"
                   required
                 />
@@ -248,7 +248,7 @@ export function TransactionForm({
 
             {/* Description */}
             <div>
-              <label htmlFor="tx-description" className="mb-1.5 block text-sm font-medium text-zinc-700">
+              <label htmlFor="tx-description" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                 Beschrijving
               </label>
               <input
@@ -256,7 +256,7 @@ export function TransactionForm({
                 type="text"
                 value={form.description}
                 onChange={(e) => update('description', e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 placeholder="bijv. Albert Heijn boodschappen"
                 required
               />
@@ -264,7 +264,7 @@ export function TransactionForm({
 
             {/* Counterparty */}
             <div>
-              <label htmlFor="tx-counterparty" className="mb-1.5 block text-sm font-medium text-zinc-700">
+              <label htmlFor="tx-counterparty" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                 Tegenpartij (optioneel)
               </label>
               <input
@@ -272,21 +272,21 @@ export function TransactionForm({
                 type="text"
                 value={form.counterparty_name}
                 onChange={(e) => update('counterparty_name', e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 placeholder="bijv. Albert Heijn"
               />
             </div>
 
             {/* Budget */}
             <div>
-              <label htmlFor="tx-budget" className="mb-1.5 block text-sm font-medium text-zinc-700">
+              <label htmlFor="tx-budget" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                 Budget
               </label>
               <select
                 id="tx-budget"
                 value={form.budget_id}
                 onChange={(e) => update('budget_id', e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               >
                 <option value="">Niet gecategoriseerd</option>
                 {budgetGroups
@@ -305,30 +305,30 @@ export function TransactionForm({
 
             {/* Recurring toggle — only for new transactions */}
             {!isEdit && (
-              <div className="rounded-lg border border-zinc-200 p-3">
+              <div className="rounded-lg border border-[var(--border-ed)] p-3">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={form.is_recurring}
                     onChange={(e) => update('is_recurring', e.target.checked)}
-                    className="h-4 w-4 rounded border-zinc-300 text-kern-600 focus:ring-kern-500"
+                    className="h-4 w-4 rounded border-[var(--border-md)] text-kern-600 focus:ring-kern-500"
                   />
-                  <Repeat className="h-4 w-4 text-zinc-500" />
-                  <span className="text-sm font-medium text-zinc-700">Terugkerende transactie</span>
+                  <Repeat className="h-4 w-4 text-[var(--ink-3)]" />
+                  <span className="text-sm font-medium text-[var(--ink-2)]">Terugkerende transactie</span>
                 </label>
 
                 {form.is_recurring && (
-                  <div className="mt-3 space-y-3 border-t border-zinc-100 pt-3">
+                  <div className="mt-3 space-y-3 border-t border-[var(--border-ed)] pt-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label htmlFor="tx-frequency" className="mb-1 block text-xs font-medium text-zinc-600">
+                        <label htmlFor="tx-frequency" className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
                           Frequentie
                         </label>
                         <select
                           id="tx-frequency"
                           value={form.frequency}
                           onChange={(e) => update('frequency', e.target.value)}
-                          className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                          className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                         >
                           {Object.entries(FREQUENCY_LABELS).map(([value, label]) => (
                             <option key={value} value={value}>{label}</option>
@@ -337,14 +337,14 @@ export function TransactionForm({
                       </div>
                       {form.frequency === 'weekly' ? (
                         <div>
-                          <label htmlFor="tx-dow" className="mb-1 block text-xs font-medium text-zinc-600">
+                          <label htmlFor="tx-dow" className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
                             Dag van de week
                           </label>
                           <select
                             id="tx-dow"
                             value={form.day_of_week}
                             onChange={(e) => update('day_of_week', e.target.value)}
-                            className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                            className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                           >
                             {['Zondag','Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag'].map((d, i) => (
                               <option key={i} value={i}>{d}</option>
@@ -353,7 +353,7 @@ export function TransactionForm({
                         </div>
                       ) : (
                         <div>
-                          <label htmlFor="tx-dom" className="mb-1 block text-xs font-medium text-zinc-600">
+                          <label htmlFor="tx-dom" className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
                             Dag van de maand
                           </label>
                           <input
@@ -363,13 +363,13 @@ export function TransactionForm({
                             max="31"
                             value={form.day_of_month}
                             onChange={(e) => update('day_of_month', e.target.value)}
-                            className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                            className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                           />
                         </div>
                       )}
                     </div>
                     <div>
-                      <label htmlFor="tx-enddate" className="mb-1 block text-xs font-medium text-zinc-600">
+                      <label htmlFor="tx-enddate" className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
                         Einddatum (optioneel)
                       </label>
                       <input
@@ -377,7 +377,7 @@ export function TransactionForm({
                         type="date"
                         value={form.end_date}
                         onChange={(e) => update('end_date', e.target.value)}
-                        className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                        className="w-full rounded-lg border border-[var(--border-md)] px-2 py-1.5 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                       />
                     </div>
                   </div>
@@ -387,14 +387,14 @@ export function TransactionForm({
 
             {/* Notes */}
             <div>
-              <label htmlFor="tx-notes" className="mb-1.5 block text-sm font-medium text-zinc-700">
+              <label htmlFor="tx-notes" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                 Notities (optioneel)
               </label>
               <textarea
                 id="tx-notes"
                 value={form.notes}
                 onChange={(e) => update('notes', e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 rows={2}
                 placeholder="Optionele notities..."
               />
@@ -402,7 +402,7 @@ export function TransactionForm({
           </div>
 
           {/* Actions */}
-          <div className="mt-6 flex items-center justify-between border-t border-zinc-200 pt-4">
+          <div className="mt-6 flex items-center justify-between border-t border-[var(--border-ed)] pt-4">
             <div>
               {isEdit && (
                 <button
@@ -424,7 +424,7 @@ export function TransactionForm({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+                className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
               >
                 Annuleren
               </button>

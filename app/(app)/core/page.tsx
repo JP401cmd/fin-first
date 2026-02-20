@@ -552,9 +552,9 @@ export default function CorePage() {
   if (error || !data) {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-700">{error ?? 'Er ging iets mis.'}</p>
-          <button onClick={() => { setError(null); setLoading(true); loadData() }} className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
+          <button onClick={() => { setError(null); setLoading(true); loadData() }} className="mt-3 rounded-[var(--r)] bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
             Opnieuw proberen
           </button>
         </div>
@@ -590,34 +590,34 @@ export default function CorePage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* === 1. Hero (Gradient) === */}
-      <section data-testid="kern-hero" className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-kern-950 via-kern-900 to-kern-950 p-5 text-white sm:p-8 md:p-10">
-        <div className="pointer-events-none absolute -top-24 right-1/4 h-64 w-64 rounded-full bg-kern-500/10 blur-3xl" />
+      <section data-testid="kern-hero" className="card-editorial overflow-hidden">
+        <div className="h-1.5 bg-kern-500" />
 
-        <div className="relative">
+        <div className="p-5 sm:p-8 md:p-10">
           <div className="mb-6 flex items-center gap-3">
             <FhinAvatar size={40} />
-            <p className="text-xs font-semibold tracking-[0.2em] text-kern-300/80 uppercase">
+            <p className="label-editorial text-kern-600">
               Jouw tijdlijn naar vrijheid
             </p>
           </div>
 
           <div className="mb-6">
-            <span className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
+            <span className="font-display text-[52px] font-bold tracking-tight text-[var(--ink)]">
               {data.freedomPercentage.toFixed(1)}%
             </span>
-            <span className="ml-3 text-lg text-kern-200/70">vrijheid bereikt</span>
+            <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">vrijheid bereikt</span>
           </div>
 
           <button type="button" onClick={() => setShowFireReceipt(true)} className="mb-8 w-full text-left transition-opacity hover:opacity-80">
-            <div className="h-3 w-full overflow-hidden rounded-full bg-kern-950/60">
+            <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-kern-600 via-kern-400 to-kern-300 transition-all duration-1000"
                 style={{ width: `${Math.max(Math.min(data.freedomPercentage, 100), 0)}%` }}
               />
             </div>
-            <div className="mt-2 flex justify-between text-xs text-kern-300/50">
+            <div className="mt-2 flex justify-between text-xs text-[var(--ink-4)]">
               <span>0%</span>
-              <span>{formatCurrency(data.fireTarget)} — volledige vrijheid</span>
+              <span className="font-mono">{formatCurrency(data.fireTarget)} — volledige vrijheid</span>
               <span>100%</span>
             </div>
           </button>
@@ -628,9 +628,9 @@ export default function CorePage() {
               onClick={() => setShowProjectionModal(true)}
               className="cursor-pointer text-left transition-opacity hover:opacity-80"
             >
-              <p className="text-xs font-medium text-kern-300/60 uppercase">Netto vermogen</p>
-              <p className="mt-1 text-2xl font-bold">{formatCurrency(data.netWorth)}</p>
-              <p className="mt-1 text-sm text-kern-200/70" data-testid="net-worth-freedom-subtitle">
+              <p className="label-editorial text-[var(--ink-3)]">Netto vermogen</p>
+              <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]">{formatCurrency(data.netWorth)}</p>
+              <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]" data-testid="net-worth-freedom-subtitle">
                 dat is {data.freedomYears > 0 ? `${data.freedomYears} jaar en ` : ''}{data.freedomMonths} maanden vrijheid
               </p>
               <NetWorthSparkline snapshots={snapshots} projection={nwProjection} />
@@ -641,24 +641,24 @@ export default function CorePage() {
               className="cursor-pointer text-left transition-opacity hover:opacity-80"
               data-testid="hero-deze-maand"
             >
-              <p className="text-xs font-medium text-kern-300/60 uppercase">Deze maand</p>
+              <p className="label-editorial text-[var(--ink-3)]">Deze maand</p>
 
               {/* Budget voortgang */}
               {totalBudgetLimit > 0 && (
                 <div className="mt-2">
                   <div className="flex items-baseline justify-between">
-                    <span className="text-sm text-kern-200/70">Budget</span>
-                    <span className={`text-sm font-semibold ${totalBudgetSpent <= totalBudgetLimit ? 'text-kern-300' : 'text-red-400'}`}>
+                    <span className="text-sm text-[var(--ink-3)]">Budget</span>
+                    <span className={`text-sm font-mono font-semibold ${totalBudgetSpent <= totalBudgetLimit ? 'text-kern-600' : 'text-red-400'}`}>
                       {Math.round((totalBudgetSpent / totalBudgetLimit) * 100)}%
                     </span>
                   </div>
-                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-kern-950/60">
+                  <div className="mt-1 h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
                     <div
                       className={`h-full rounded-full transition-all duration-500 ${totalBudgetSpent <= totalBudgetLimit ? 'bg-gradient-to-r from-kern-600 via-kern-400 to-kern-300' : 'bg-red-400'}`}
                       style={{ width: `${Math.min((totalBudgetSpent / totalBudgetLimit) * 100, 100)}%` }}
                     />
                   </div>
-                  <p className="mt-0.5 text-[10px] text-kern-300/40">
+                  <p className="mt-0.5 text-[10px] font-mono text-[var(--ink-4)]">
                     {formatCurrency(totalBudgetSpent)} / {formatCurrency(totalBudgetLimit)}
                   </p>
                 </div>
@@ -668,17 +668,17 @@ export default function CorePage() {
               <BudgetSpendingSparkline data={budgetSpendingHistory} budgetLimit={totalBudgetLimit} />
             </button>
             <div data-testid="hero-kerngetallen">
-              <p className="text-xs font-medium text-kern-300/60 uppercase">Kerngetallen</p>
+              <p className="label-editorial text-[var(--ink-3)]">Kerngetallen</p>
 
               {/* Spaarquote */}
               <div className="mt-2 flex items-center gap-1.5">
-                <p className={`text-2xl font-bold ${savingsRate12 >= 0 ? 'text-white' : 'text-red-400'}`}>
+                <p className={`font-mono text-2xl font-bold ${savingsRate12 >= 0 ? 'text-[var(--ink)]' : 'text-red-400'}`}>
                   {savingsRate12.toFixed(1)}%
                 </p>
-                <span className="text-sm text-kern-200/60">spaarquote</span>
+                <span className="text-sm text-[var(--ink-3)]">spaarquote</span>
                 <HeroTooltip text="Percentage van je inkomen dat je spaart over de afgelopen 12 maanden. Bij minder data wordt geëxtrapoleerd." />
               </div>
-              <p className="text-[10px] text-kern-300/40">
+              <p className="text-[10px] text-[var(--ink-4)]">
                 {savingsRateMonths < 12
                   ? `${savingsRateMonths} maand${savingsRateMonths > 1 ? 'en' : ''} data`
                   : 'laatste 12 maanden'}
@@ -686,11 +686,11 @@ export default function CorePage() {
 
               {/* Vrije dagen per jaar */}
               <div className="mt-3 flex items-center gap-1.5">
-                <p className="text-2xl font-bold text-white">{data.freeDaysPerYear}</p>
-                <span className="text-sm text-kern-200/60">vrije dagen/jaar</span>
+                <p className="font-mono text-2xl font-bold text-[var(--ink)]">{data.freeDaysPerYear}</p>
+                <span className="text-sm text-[var(--ink-3)]">vrije dagen/jaar</span>
                 <HeroTooltip text="Hoeveel dagen per jaar je passief inkomen (4% SWR op vermogen) je dagelijkse uitgaven dekt." />
               </div>
-              <p className="text-[10px] text-kern-300/40">gedekt door passief inkomen</p>
+              <p className="text-[10px] text-[var(--ink-4)]">gedekt door passief inkomen</p>
             </div>
           </div>
         </div>
@@ -698,9 +698,10 @@ export default function CorePage() {
 
       {/* === Missie Controle (direct onder hero) === */}
       <section className="mt-8" data-testid="mission-control-section">
-        <h2 className="mb-4 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
-          Missie Controle
-        </h2>
+        <div className="mb-4 flex items-center gap-2">
+          <div className="h-5 w-1 rounded-full bg-kern-500" />
+          <h2 className="label-editorial text-[var(--ink-2)]">Missie Controle</h2>
+        </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {/* Cash Card */}
           <MissionControlCard
@@ -714,7 +715,7 @@ export default function CorePage() {
             statusLabel={data.monthlyIncome >= data.monthlyExpenses ? 'Gezond' : 'Aandacht nodig'}
             details={[
               { label: 'Inkomen', value: formatCurrency(data.monthlyIncome), color: 'text-emerald-600' },
-              { label: 'Uitgaven', value: formatCurrency(data.monthlyExpenses), color: 'text-zinc-600' },
+              { label: 'Uitgaven', value: formatCurrency(data.monthlyExpenses), color: 'text-[var(--ink-2)]' },
             ]}
             cta="Bekijk transacties"
             testId="mission-cash"
@@ -731,8 +732,8 @@ export default function CorePage() {
             status={overBudgetCount === 0 ? 'healthy' : 'attention'}
             statusLabel={overBudgetCount === 0 ? 'Alles op schema' : `${overBudgetCount} overschreden`}
             details={[
-              { label: 'Uitgaven', value: formatCurrency(data.monthlyExpenses), color: 'text-zinc-600' },
-              { label: 'Budgetten', value: `${budgetCount} actief`, color: 'text-zinc-500' },
+              { label: 'Uitgaven', value: formatCurrency(data.monthlyExpenses), color: 'text-[var(--ink-2)]' },
+              { label: 'Budgetten', value: `${budgetCount} actief`, color: 'text-[var(--ink-3)]' },
             ]}
             cta="Beheer budgetten"
             testId="mission-budgetten"
@@ -754,7 +755,7 @@ export default function CorePage() {
             growthDirection={assetGrowthDirection}
             details={[
               { label: 'Totaal', value: formatCurrency(data.totalAssets), color: 'text-emerald-600' },
-              { label: 'Richting', value: assetGrowthDirection === 'up' ? '↑ Omhoog' : assetGrowthDirection === 'down' ? '↓ Omlaag' : '→ Stabiel', color: assetGrowthDirection === 'up' ? 'text-emerald-600' : assetGrowthDirection === 'down' ? 'text-red-500' : 'text-zinc-500' },
+              { label: 'Richting', value: assetGrowthDirection === 'up' ? '↑ Omhoog' : assetGrowthDirection === 'down' ? '↓ Omlaag' : '→ Stabiel', color: assetGrowthDirection === 'up' ? 'text-emerald-600' : assetGrowthDirection === 'down' ? 'text-red-500' : 'text-[var(--ink-3)]' },
             ]}
             cta="Bekijk portfolio"
             testId="mission-assets"
@@ -773,7 +774,7 @@ export default function CorePage() {
             debtProgress={debtProgress ?? undefined}
             details={[
               { label: 'Openstaand', value: formatCurrency(data.totalDebts), color: 'text-red-600' },
-              { label: 'Afgelost', value: debtProgress ? `${debtProgress.progressPct.toFixed(0)}%` : '—', color: debtProgress && debtProgress.progressPct > 0 ? 'text-emerald-600' : 'text-zinc-400' },
+              { label: 'Afgelost', value: debtProgress ? `${debtProgress.progressPct.toFixed(0)}%` : '—', color: debtProgress && debtProgress.progressPct > 0 ? 'text-emerald-600' : 'text-[var(--ink-3)]' },
             ]}
             cta="Beheer schulden"
             testId="mission-schulden"
@@ -785,17 +786,17 @@ export default function CorePage() {
           <div className="mt-4">
             <Link
               href="/core/belasting"
-              className="group flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition-colors hover:border-kern-200 hover:bg-kern-50/30"
+              className="group card-editorial flex items-center gap-3 p-4"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-kern-50">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
                 <Receipt className="h-5 w-5 text-kern-600" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-zinc-500">Box 3 Belasting</p>
-                <p className="text-lg font-bold text-zinc-900">Berekenen</p>
-                <p className="text-xs text-zinc-400">vermogensrendementsheffing</p>
+                <p className="label-editorial text-[var(--ink-3)]">Box 3 Belasting</p>
+                <p className="text-lg font-bold text-[var(--ink)]">Berekenen</p>
+                <p className="text-xs text-[var(--ink-3)]">vermogensrendementsheffing</p>
               </div>
-              <ArrowRight className="h-4 w-4 shrink-0 text-zinc-300 group-hover:text-kern-500" />
+              <ArrowRight className="h-4 w-4 shrink-0 text-[var(--ink-4)] group-hover:text-kern-500" />
             </Link>
           </div>
         </FeatureGate>
@@ -804,9 +805,9 @@ export default function CorePage() {
       {/* === Budget overzicht === */}
       {overviewBudgetGroups.length > 0 && (
         <section className="mt-6">
-          <div className="rounded-xl border border-zinc-200 bg-white p-4">
+          <div className="card-editorial p-4">
             <div className="mb-1 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-zinc-700">Budget overzicht</h3>
+              <h3 className="text-sm font-semibold text-[var(--ink-2)]">Budget overzicht</h3>
               <Link
                 href="/core/budgets"
                 className="text-xs font-medium text-kern-600 hover:text-kern-700"
@@ -850,10 +851,10 @@ export default function CorePage() {
       <section className="mt-10">
         <div className="mb-5 flex items-end justify-between">
           <div>
-            <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+            <h2 className="label-editorial text-[var(--ink-2)]">
               Financiële Kerngetallen
             </h2>
-            <p className="mt-1 text-sm text-zinc-500">
+            <p className="mt-1 text-sm text-[var(--ink-3)]">
               Gebaseerd op je werkelijke transacties en budgetinstellingen.
             </p>
           </div>
@@ -863,34 +864,34 @@ export default function CorePage() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <button type="button" onClick={() => setShowIncomeReceipt(true)} className="rounded-xl border border-zinc-200 bg-white p-6 text-left transition-all hover:border-emerald-300 hover:shadow-sm">
+          <button type="button" onClick={() => setShowIncomeReceipt(true)} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 text-left transition-all hover:border-emerald-300 hover:shadow-sm">
             <div className="mb-3 flex items-center justify-between">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-emerald-50">
                 <TrendingUp className="h-6 w-6 text-emerald-600" />
               </div>
               <KpiTooltip text="Geschat jaarinkomen gebaseerd op werkelijke transacties. Bij minder dan 12 maanden data wordt het gemiddelde geextrapoleerd naar een jaar." />
             </div>
-            <p className="text-sm font-medium text-zinc-500">Geschat Jaarinkomen</p>
-            <p className="mt-1 text-2xl font-bold text-zinc-900">{formatCurrency(data.estimatedYearlyIncome)}</p>
+            <p className="text-sm font-medium text-[var(--ink-3)]">Geschat Jaarinkomen</p>
+            <p className="mt-1 text-2xl font-bold text-[var(--ink)]">{formatCurrency(data.estimatedYearlyIncome)}</p>
             <FreedomTimeBadge amount={data.estimatedYearlyIncome} className="mt-1" />
-            <p className="mt-1 text-xs text-zinc-400">
+            <p className="mt-1 text-xs text-[var(--ink-3)]">
               {incomeMonths < 12
                 ? `geextrapoleerd vanuit ${incomeMonths} maand${incomeMonths > 1 ? 'en' : ''}`
                 : 'laatste 12 maanden'}
             </p>
           </button>
 
-          <button type="button" onClick={() => setShowExpenseReceipt(true)} className="rounded-xl border border-zinc-200 bg-white p-6 text-left transition-all hover:border-zinc-300 hover:shadow-sm">
+          <button type="button" onClick={() => setShowExpenseReceipt(true)} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 text-left transition-all hover:border-[var(--border-md)] hover:shadow-sm">
             <div className="mb-3 flex items-center justify-between">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-100">
-                <ShoppingCart className="h-6 w-6 text-zinc-500" />
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-[var(--subtle)]">
+                <ShoppingCart className="h-6 w-6 text-[var(--ink-3)]" />
               </div>
               <KpiTooltip text="Jaarlijkse som van je essentiële budgetten: vaste lasten, dagelijkse uitgaven en vervoer. Dit zijn de kosten die je sowieso maakt." />
             </div>
-            <p className="text-sm font-medium text-zinc-500">Jaarlijkse Must Uitgaven</p>
-            <p className="mt-1 text-2xl font-bold text-zinc-900">{formatCurrency(data.yearlyMustExpenses)}</p>
+            <p className="text-sm font-medium text-[var(--ink-3)]">Jaarlijkse Must Uitgaven</p>
+            <p className="mt-1 text-2xl font-bold text-[var(--ink)]">{formatCurrency(data.yearlyMustExpenses)}</p>
             <FreedomTimeBadge amount={data.yearlyMustExpenses} className="mt-1" />
-            <p className="mt-1 text-xs text-zinc-400">essentiële kosten per jaar</p>
+            <p className="mt-1 text-xs text-[var(--ink-3)]">essentiële kosten per jaar</p>
           </button>
         </div>
       </section>
@@ -947,11 +948,11 @@ export default function CorePage() {
           {snapshots.length > 0 && (
             <section>
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-zinc-700">Vermogensverloop</h3>
+                <h3 className="text-sm font-semibold text-[var(--ink-2)]">Vermogensverloop</h3>
                 <button
                   onClick={createSnapshot}
                   disabled={snapshotLoading}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] disabled:opacity-50"
                 >
                   <Camera className="h-3.5 w-3.5" />
                   {snapshotLoading ? 'Bezig...' : 'Snapshot nu'}
@@ -963,11 +964,11 @@ export default function CorePage() {
 
           {/* Vermogensprognose */}
           <section>
-            <h3 className="mb-3 text-sm font-semibold text-zinc-700">Vermogensprognose</h3>
+            <h3 className="mb-3 text-sm font-semibold text-[var(--ink-2)]">Vermogensprognose</h3>
             {nwProjection && nwProjection.points.length >= 2 ? (
               <NetWorthProjectionChart projection={nwProjection} />
             ) : (
-              <p className="py-8 text-center text-sm text-zinc-500">
+              <p className="py-8 text-center text-sm text-[var(--ink-3)]">
                 Nog niet genoeg data voor een vermogensprognose.
               </p>
             )}
@@ -976,7 +977,7 @@ export default function CorePage() {
           {/* Vergelijking snapshots */}
           {snapshots.length >= 2 && (
             <section>
-              <h3 className="mb-3 text-sm font-semibold text-zinc-700">Vergelijking snapshots</h3>
+              <h3 className="mb-3 text-sm font-semibold text-[var(--ink-2)]">Vergelijking snapshots</h3>
               <SnapshotComparisonView snapshots={snapshots} />
             </section>
           )}
@@ -994,21 +995,21 @@ export default function CorePage() {
           {/* Uitgaventrend per categorie */}
           {budgetSparklines.length > 0 && (
             <section>
-              <h3 className="mb-3 text-sm font-semibold text-zinc-700">Uitgaventrend per categorie</h3>
+              <h3 className="mb-3 text-sm font-semibold text-[var(--ink-2)]">Uitgaventrend per categorie</h3>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {budgetSparklines.map((cat) => (
                   <Link
                     key={cat.id}
                     href={`/core/budgets?budget=${cat.id}`}
                     onClick={() => setShowBudgetModal(false)}
-                    className="group flex items-center gap-3 rounded-xl border border-zinc-100 bg-white p-3 transition-all hover:border-kern-200 hover:bg-kern-50/20 hover:shadow-sm"
+                    className="group flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 transition-all hover:border-kern-200 hover:bg-kern-50/20 hover:shadow-sm"
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-kern-50">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r)] bg-kern-50">
                       <BudgetIcon name={cat.icon} className="h-4 w-4 text-kern-600" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-medium text-zinc-700">{cat.name}</p>
-                      <p className="text-[10px] text-zinc-400">
+                      <p className="truncate text-xs font-medium text-[var(--ink-2)]">{cat.name}</p>
+                      <p className="text-[10px] text-[var(--ink-3)]">
                         {formatCurrency(cat.data[cat.data.length - 1]?.spent ?? 0)} deze maand
                       </p>
                     </div>
@@ -1027,7 +1028,7 @@ export default function CorePage() {
           {/* Uitgavenpatronen */}
           {(spendingInsightsLoading || spendingInsights.length > 0 || spendingInsightsHasData) && (
             <section>
-              <h3 className="mb-3 text-sm font-semibold text-zinc-700">Uitgavenpatronen</h3>
+              <h3 className="mb-3 text-sm font-semibold text-[var(--ink-2)]">Uitgavenpatronen</h3>
               <SpendingInsightsSection
                 insights={spendingInsights}
                 dataMonths={spendingInsightsDataMonths}
@@ -1038,7 +1039,7 @@ export default function CorePage() {
           )}
 
           {budgetSparklines.length === 0 && !spendingInsightsLoading && spendingInsights.length === 0 && (
-            <p className="py-8 text-center text-sm text-zinc-500">
+            <p className="py-8 text-center text-sm text-[var(--ink-3)]">
               Nog niet genoeg data voor uitgaventrends.
             </p>
           )}
@@ -1047,49 +1048,49 @@ export default function CorePage() {
 
       {/* === Kassabon Modal: Inkomen === */}
       <BottomSheet open={showIncomeReceipt} onClose={() => setShowIncomeReceipt(false)} title="Kassabon: Geschat Jaarinkomen">
-        <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50/50 p-4 font-mono text-sm">
+        <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 font-mono text-sm">
           <div className="mb-3 text-center">
-            <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Inkomen overzicht</p>
-            <p className="mt-0.5 text-[10px] text-zinc-400">
+            <p className="text-xs font-bold uppercase tracking-widest text-[var(--ink-3)]">Inkomen overzicht</p>
+            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">
               {incomeMonths < 12
                 ? `${incomeMonths} maand${incomeMonths > 1 ? 'en' : ''} data beschikbaar`
                 : 'Laatste 12 maanden'}
             </p>
           </div>
 
-          <div className="mb-1 border-b border-dashed border-zinc-300 pb-2 text-[11px] text-zinc-400 leading-relaxed">
+          <div className="mb-1 border-b border-dashed border-[var(--border-md)] pb-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
             Je geschat jaarinkomen is de basis voor veel berekeningen, zoals je spaarquote en vrijheidspercentage. We tellen alle positieve transacties op over de afgelopen 12 maanden.
           </div>
 
-          <div className="border-b border-dashed border-zinc-300 mb-2 pb-2 mt-2">
+          <div className="border-b border-dashed border-[var(--border-md)] mb-2 pb-2 mt-2">
             {incomeByMonth.map(({ month, amount }) => {
               const [y, m] = month.split('-')
               const label = new Date(Number(y), Number(m) - 1).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
               return (
                 <div key={month} className="flex justify-between py-0.5">
-                  <span className="text-zinc-600 capitalize">{label}</span>
-                  <span className="tabular-nums text-zinc-900">{formatCurrency(amount)}</span>
+                  <span className="text-[var(--ink-2)] capitalize">{label}</span>
+                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(amount)}</span>
                 </div>
               )
             })}
           </div>
           <div className="flex justify-between py-1">
-            <span className="text-zinc-500">Subtotaal werkelijk</span>
-            <span className="tabular-nums font-medium text-zinc-900">
+            <span className="text-[var(--ink-3)]">Subtotaal werkelijk</span>
+            <span className="tabular-nums font-medium text-[var(--ink)]">
               {formatCurrency(incomeByMonth.reduce((s, i) => s + i.amount, 0))}
             </span>
           </div>
           {incomeMonths < 12 && data && (
-            <div className="mt-2 border-t border-dashed border-zinc-300 pt-2">
-              <p className="text-[11px] leading-relaxed text-zinc-400">
+            <div className="mt-2 border-t border-dashed border-[var(--border-md)] pt-2">
+              <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
                 Gemiddeld per maand: {formatCurrency(incomeByMonth.reduce((s, i) => s + i.amount, 0) / incomeMonths)}
                 {' '}({incomeMonths} mnd) &rarr; geëxtrapoleerd naar 12 maanden
               </p>
             </div>
           )}
-          <div className="mt-2 border-t-2 border-zinc-900 pt-2 flex justify-between">
-            <span className="font-bold text-zinc-900">Geschat Jaarinkomen</span>
-            <span className="tabular-nums font-bold text-zinc-900">{data ? formatCurrency(data.estimatedYearlyIncome) : '—'}</span>
+          <div className="mt-2 border-t-2 border-[var(--ink)] pt-2 flex justify-between">
+            <span className="font-bold text-[var(--ink)]">Geschat Jaarinkomen</span>
+            <span className="tabular-nums font-bold text-[var(--ink)]">{data ? formatCurrency(data.estimatedYearlyIncome) : '—'}</span>
           </div>
           {data && (
             <div className="mt-2 flex justify-center">
@@ -1097,54 +1098,54 @@ export default function CorePage() {
             </div>
           )}
 
-          <div className="mt-3 border-t border-dashed border-zinc-300 pt-2 text-[11px] text-zinc-400 leading-relaxed">
-            <p><strong className="text-zinc-500">Formule:</strong> som van alle positieve transacties over {incomeMonths < 12 ? `${incomeMonths} maanden, gedeeld door ${incomeMonths} en vermenigvuldigd met 12` : 'de laatste 12 maanden'}</p>
+          <div className="mt-3 border-t border-dashed border-[var(--border-md)] pt-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
+            <p><strong className="text-[var(--ink-3)]">Formule:</strong> som van alle positieve transacties over {incomeMonths < 12 ? `${incomeMonths} maanden, gedeeld door ${incomeMonths} en vermenigvuldigd met 12` : 'de laatste 12 maanden'}</p>
           </div>
 
-          <p className="mt-3 text-center text-[10px] text-zinc-400">Berekend op basis van werkelijke transacties</p>
+          <p className="mt-3 text-center text-[10px] text-[var(--ink-3)]">Berekend op basis van werkelijke transacties</p>
         </div>
       </BottomSheet>
 
       {/* === Kassabon Modal: Spaarquote === */}
       <BottomSheet open={showSavingsReceipt} onClose={() => setShowSavingsReceipt(false)} title="Kassabon: Spaarquote">
-        <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50/50 p-4 font-mono text-sm">
+        <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 font-mono text-sm">
           <div className="mb-3 text-center">
-            <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Spaarquote berekening</p>
-            <p className="mt-0.5 text-[10px] text-zinc-400">
+            <p className="text-xs font-bold uppercase tracking-widest text-[var(--ink-3)]">Spaarquote berekening</p>
+            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">
               {savingsRateMonths < 12
                 ? `${savingsRateMonths} maand${savingsRateMonths > 1 ? 'en' : ''} data, geëxtrapoleerd naar 12`
                 : 'Laatste 12 maanden'}
             </p>
           </div>
 
-          <div className="mb-1 border-b border-dashed border-zinc-300 pb-2 text-[11px] text-zinc-400 leading-relaxed">
+          <div className="mb-1 border-b border-dashed border-[var(--border-md)] pb-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
             Je spaarquote laat zien welk deel van je inkomen je overhoudt. Hoe hoger dit percentage, hoe sneller je financiële vrijheid groeit.
           </div>
 
-          <div className="border-b border-dashed border-zinc-300 mb-2 pb-2 mt-2">
+          <div className="border-b border-dashed border-[var(--border-md)] mb-2 pb-2 mt-2">
             <div className="flex justify-between py-0.5">
-              <span className="text-zinc-600">Jaarinkomen{savingsRateMonths < 12 ? ' (geëxtrapoleerd)' : ''}</span>
-              <span className="tabular-nums text-zinc-900">{formatCurrency(savingsReceiptData.extYearlyIncome)}</span>
+              <span className="text-[var(--ink-2)]">Jaarinkomen{savingsRateMonths < 12 ? ' (geëxtrapoleerd)' : ''}</span>
+              <span className="tabular-nums text-[var(--ink)]">{formatCurrency(savingsReceiptData.extYearlyIncome)}</span>
             </div>
             <div className="flex justify-between py-0.5">
-              <span className="text-zinc-600">Jaaruitgaven{savingsRateMonths < 12 ? ' (geëxtrapoleerd)' : ''}</span>
+              <span className="text-[var(--ink-2)]">Jaaruitgaven{savingsRateMonths < 12 ? ' (geëxtrapoleerd)' : ''}</span>
               <span className="tabular-nums text-red-600">- {formatCurrency(savingsReceiptData.extYearlyExpenses)}</span>
             </div>
           </div>
           <div className="flex justify-between py-1">
-            <span className="font-medium text-zinc-700">Jaarlijkse besparing</span>
+            <span className="font-medium text-[var(--ink-2)]">Jaarlijkse besparing</span>
             <span className={`tabular-nums font-medium ${savingsReceiptData.yearlySavings >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
               {savingsReceiptData.yearlySavings >= 0 ? '+' : ''}{formatCurrency(savingsReceiptData.yearlySavings)}
             </span>
           </div>
-          <div className="mt-2 border-t-2 border-zinc-900 pt-2 flex justify-between">
-            <span className="font-bold text-zinc-900">Spaarquote</span>
-            <span className={`tabular-nums font-bold ${savingsRate12 >= 0 ? 'text-zinc-900' : 'text-red-600'}`}>{savingsRate12.toFixed(1)}%</span>
+          <div className="mt-2 border-t-2 border-[var(--ink)] pt-2 flex justify-between">
+            <span className="font-bold text-[var(--ink)]">Spaarquote</span>
+            <span className={`tabular-nums font-bold ${savingsRate12 >= 0 ? 'text-[var(--ink)]' : 'text-red-600'}`}>{savingsRate12.toFixed(1)}%</span>
           </div>
 
           {savingsRateMonths < 12 && (
-            <div className="mt-2 border-t border-dashed border-zinc-300 pt-2">
-              <p className="text-[11px] leading-relaxed text-zinc-400">
+            <div className="mt-2 border-t border-dashed border-[var(--border-md)] pt-2">
+              <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
                 Werkelijk inkomen: {formatCurrency(savingsReceiptData.last12Income)} over {savingsRateMonths} mnd.
                 Werkelijke uitgaven: {formatCurrency(savingsReceiptData.last12Expenses)} over {savingsRateMonths} mnd.
                 Beide geëxtrapoleerd naar 12 maanden.
@@ -1152,59 +1153,59 @@ export default function CorePage() {
             </div>
           )}
 
-          <div className="mt-3 border-t border-dashed border-zinc-300 pt-2 text-[11px] text-zinc-400 leading-relaxed">
-            <p><strong className="text-zinc-500">Formule:</strong> (inkomen − uitgaven) / inkomen × 100%</p>
+          <div className="mt-3 border-t border-dashed border-[var(--border-md)] pt-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
+            <p><strong className="text-[var(--ink-3)]">Formule:</strong> (inkomen − uitgaven) / inkomen × 100%</p>
             <p className="mt-1">Een spaarquote van 50% betekent dat je voor elke gewerkte dag ook één dag vrijheid opbouwt.</p>
           </div>
 
-          <p className="mt-3 text-center text-[10px] text-zinc-400">Berekend op basis van werkelijke transacties</p>
+          <p className="mt-3 text-center text-[10px] text-[var(--ink-3)]">Berekend op basis van werkelijke transacties</p>
         </div>
       </BottomSheet>
 
       {/* === Kassabon Modal: FIRE Target === */}
       <BottomSheet open={showFireReceipt} onClose={() => setShowFireReceipt(false)} title="Kassabon: Volledige Vrijheid">
-        <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50/50 p-4 font-mono text-sm">
+        <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 font-mono text-sm">
           <div className="mb-3 text-center">
-            <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Benodigd voor volledige vrijheid</p>
-            <p className="mt-0.5 text-[10px] text-zinc-400">FIRE-berekening op basis van de 4%-regel</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-[var(--ink-3)]">Benodigd voor volledige vrijheid</p>
+            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">FIRE-berekening op basis van de 4%-regel</p>
           </div>
 
-          <div className="mb-1 border-b border-dashed border-zinc-300 pb-2 text-[11px] text-zinc-400 leading-relaxed">
+          <div className="mb-1 border-b border-dashed border-[var(--border-md)] pb-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
             Het FIRE-bedrag is het vermogen waarmee je voor altijd van de opbrengsten kunt leven, zonder je kapitaal aan te spreken. Dit is gebaseerd op de &ldquo;4%-regel&rdquo;: je onttrekt jaarlijks 4% van je vermogen.
           </div>
 
           {data && (
             <>
-              <div className="border-b border-dashed border-zinc-300 mb-2 pb-2 mt-2">
+              <div className="border-b border-dashed border-[var(--border-md)] mb-2 pb-2 mt-2">
                 <div className="flex justify-between py-0.5">
-                  <span className="text-zinc-600">Maandelijkse uitgaven</span>
-                  <span className="tabular-nums text-zinc-900">{formatCurrency(data.monthlyExpenses)}</span>
+                  <span className="text-[var(--ink-2)]">Maandelijkse uitgaven</span>
+                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(data.monthlyExpenses)}</span>
                 </div>
                 <div className="flex justify-between py-0.5">
-                  <span className="text-zinc-600">× 12 maanden</span>
-                  <span className="tabular-nums text-zinc-900">{formatCurrency(data.monthlyExpenses * 12)}</span>
+                  <span className="text-[var(--ink-2)]">× 12 maanden</span>
+                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(data.monthlyExpenses * 12)}</span>
                 </div>
                 <div className="flex justify-between py-0.5">
-                  <span className="text-zinc-600">÷ opnamepercentage (4%)</span>
-                  <span className="tabular-nums text-zinc-400">÷ 0,04</span>
+                  <span className="text-[var(--ink-2)]">÷ opnamepercentage (4%)</span>
+                  <span className="tabular-nums text-[var(--ink-3)]">÷ 0,04</span>
                 </div>
               </div>
-              <div className="border-b-2 border-zinc-900 pb-2 flex justify-between">
-                <span className="font-bold text-zinc-900">FIRE-bedrag</span>
-                <span className="tabular-nums font-bold text-zinc-900">{formatCurrency(data.fireTarget)}</span>
+              <div className="border-b-2 border-[var(--ink)] pb-2 flex justify-between">
+                <span className="font-bold text-[var(--ink)]">FIRE-bedrag</span>
+                <span className="tabular-nums font-bold text-[var(--ink)]">{formatCurrency(data.fireTarget)}</span>
               </div>
 
-              <div className="mt-3 border-b border-dashed border-zinc-300 pb-2">
+              <div className="mt-3 border-b border-dashed border-[var(--border-md)] pb-2">
                 <div className="flex justify-between py-0.5">
-                  <span className="text-zinc-600">Huidig netto vermogen</span>
-                  <span className="tabular-nums text-zinc-900">{formatCurrency(data.netWorth)}</span>
+                  <span className="text-[var(--ink-2)]">Huidig netto vermogen</span>
+                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(data.netWorth)}</span>
                 </div>
                 <div className="flex justify-between py-0.5">
-                  <span className="text-zinc-600">Nog nodig</span>
-                  <span className="tabular-nums text-zinc-900">{formatCurrency(Math.max(0, data.fireTarget - data.netWorth))}</span>
+                  <span className="text-[var(--ink-2)]">Nog nodig</span>
+                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(Math.max(0, data.fireTarget - data.netWorth))}</span>
                 </div>
                 <div className="flex justify-between py-0.5">
-                  <span className="text-zinc-600">Voortgang</span>
+                  <span className="text-[var(--ink-2)]">Voortgang</span>
                   <span className="tabular-nums font-medium text-kern-600">{data.freedomPercentage.toFixed(1)}%</span>
                 </div>
               </div>
@@ -1213,12 +1214,12 @@ export default function CorePage() {
                 <FreedomTimeBadge amount={data.fireTarget} />
               </div>
 
-              <div className="mt-3 border-t border-dashed border-zinc-300 pt-2 text-[11px] text-zinc-400 leading-relaxed">
-                <p><strong className="text-zinc-500">De 4%-regel:</strong> Onderzoek (de &ldquo;Trinity Study&rdquo;) toont aan dat je 4% per jaar kunt onttrekken aan een gediversifieerde portefeuille zonder dat het kapitaal opraakt over 30+ jaar.</p>
-                <p className="mt-1"><strong className="text-zinc-500">Formule:</strong> jaarlijkse uitgaven ÷ 0,04 = benodigd vermogen</p>
+              <div className="mt-3 border-t border-dashed border-[var(--border-md)] pt-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
+                <p><strong className="text-[var(--ink-3)]">De 4%-regel:</strong> Onderzoek (de &ldquo;Trinity Study&rdquo;) toont aan dat je 4% per jaar kunt onttrekken aan een gediversifieerde portefeuille zonder dat het kapitaal opraakt over 30+ jaar.</p>
+                <p className="mt-1"><strong className="text-[var(--ink-3)]">Formule:</strong> jaarlijkse uitgaven ÷ 0,04 = benodigd vermogen</p>
               </div>
 
-              <p className="mt-3 text-center text-[10px] text-zinc-400">Berekend op basis van je huidige maandelijkse uitgaven</p>
+              <p className="mt-3 text-center text-[10px] text-[var(--ink-3)]">Berekend op basis van je huidige maandelijkse uitgaven</p>
             </>
           )}
         </div>
@@ -1226,34 +1227,34 @@ export default function CorePage() {
 
       {/* === Kassabon Modal: Must Uitgaven === */}
       <BottomSheet open={showExpenseReceipt} onClose={() => setShowExpenseReceipt(false)} title="Kassabon: Essentiële Uitgaven">
-        <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50/50 p-4 font-mono text-sm">
+        <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 font-mono text-sm">
           <div className="mb-3 text-center">
-            <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Essentiële uitgaven</p>
-            <p className="mt-0.5 text-[10px] text-zinc-400">Vaste lasten op jaarbasis</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-[var(--ink-3)]">Essentiële uitgaven</p>
+            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">Vaste lasten op jaarbasis</p>
           </div>
 
-          <div className="mb-1 border-b border-dashed border-zinc-300 pb-2 text-[11px] text-zinc-400 leading-relaxed">
+          <div className="mb-1 border-b border-dashed border-[var(--border-md)] pb-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
             Dit zijn de kosten die je sowieso maakt — vaste lasten, dagelijkse boodschappen en vervoer. Dit bedrag bepaalt hoeveel vermogen je nodig hebt voor volledige vrijheid.
           </div>
 
-          <div className="border-b border-dashed border-zinc-300 mb-2 pb-2 mt-2">
+          <div className="border-b border-dashed border-[var(--border-md)] mb-2 pb-2 mt-2">
             {mustExpenseItems.map((item) => {
               const intervalLabel = item.interval === 'monthly' ? '/mnd' : item.interval === 'quarterly' ? '/kwt' : '/jr'
               return (
                 <div key={item.name} className="flex justify-between py-0.5">
-                  <span className="text-zinc-600">
-                    {item.name} <span className="text-[10px] text-zinc-400">{intervalLabel}</span>
+                  <span className="text-[var(--ink-2)]">
+                    {item.name} <span className="text-[10px] text-[var(--ink-3)]">{intervalLabel}</span>
                   </span>
-                  <span className="tabular-nums text-zinc-900">{formatCurrency(item.annualAmount)}</span>
+                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(item.annualAmount)}</span>
                 </div>
               )
             })}
           </div>
-          <div className="mt-1 border-t-2 border-zinc-900 pt-2 flex justify-between">
-            <span className="font-bold text-zinc-900">Totaal per jaar</span>
-            <span className="tabular-nums font-bold text-zinc-900">{data ? formatCurrency(data.yearlyMustExpenses) : '—'}</span>
+          <div className="mt-1 border-t-2 border-[var(--ink)] pt-2 flex justify-between">
+            <span className="font-bold text-[var(--ink)]">Totaal per jaar</span>
+            <span className="tabular-nums font-bold text-[var(--ink)]">{data ? formatCurrency(data.yearlyMustExpenses) : '—'}</span>
           </div>
-          <div className="mt-1 flex justify-between text-zinc-500">
+          <div className="mt-1 flex justify-between text-[var(--ink-3)]">
             <span>Gemiddeld per maand</span>
             <span className="tabular-nums">{data ? formatCurrency(data.yearlyMustExpenses / 12) : '—'}</span>
           </div>
@@ -1263,11 +1264,11 @@ export default function CorePage() {
             </div>
           )}
 
-          <div className="mt-3 border-t border-dashed border-zinc-300 pt-2 text-[11px] text-zinc-400 leading-relaxed">
-            <p><strong className="text-zinc-500">Formule:</strong> per budget het limietbedrag omgerekend naar jaarbasis (maandelijks × 12, per kwartaal × 4, of jaarlijks × 1), alles opgeteld</p>
+          <div className="mt-3 border-t border-dashed border-[var(--border-md)] pt-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
+            <p><strong className="text-[var(--ink-3)]">Formule:</strong> per budget het limietbedrag omgerekend naar jaarbasis (maandelijks × 12, per kwartaal × 4, of jaarlijks × 1), alles opgeteld</p>
           </div>
 
-          <p className="mt-3 text-center text-[10px] text-zinc-400">Berekend op basis van essentiële budgetinstellingen</p>
+          <p className="mt-3 text-center text-[10px] text-[var(--ink-3)]">Berekend op basis van essentiële budgetinstellingen</p>
         </div>
       </BottomSheet>
     </div>
@@ -1287,7 +1288,7 @@ function HeroTooltip({ text }: { text: string }) {
         <Info className={`h-3.5 w-3.5 cursor-help transition-colors ${open ? 'text-kern-300' : 'text-kern-300/40'} hover:text-kern-300`} />
       </button>
       {open && (
-        <div className="absolute bottom-full left-1/2 z-10 mb-2 w-52 -translate-x-1/2 rounded-lg border border-kern-700/50 bg-kern-950 p-2.5 text-xs leading-relaxed text-kern-200/80 shadow-lg">
+        <div className="absolute bottom-full left-1/2 z-10 mb-2 w-52 -translate-x-1/2 rounded-[var(--r)] border border-kern-700/50 bg-kern-950 p-2.5 text-xs leading-relaxed text-kern-200/80 shadow-[var(--s2)]">
           {text}
         </div>
       )}
@@ -1484,9 +1485,9 @@ function KpiTooltip({ text }: { text: string }) {
         onBlur={() => setOpen(false)}
         className="touch-target"
       >
-        <Info className={`h-4 w-4 cursor-help transition-colors ${open ? 'text-kern-500' : 'text-zinc-300'} group-hover:text-kern-500`} />
+        <Info className={`h-4 w-4 cursor-help transition-colors ${open ? 'text-kern-500' : 'text-[var(--ink-4)]'} group-hover:text-kern-500`} />
       </span>
-      <div role="tooltip" className={`absolute right-0 z-10 mt-1 w-56 rounded-lg border border-zinc-200 bg-white p-3 text-xs leading-relaxed text-zinc-600 shadow-lg transition-opacity ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}>
+      <div role="tooltip" className={`absolute right-0 z-10 mt-1 w-56 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 text-xs leading-relaxed text-[var(--ink-2)] shadow-[var(--s2)] transition-opacity ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}>
         {text}
       </div>
     </div>
@@ -1527,15 +1528,20 @@ function MissionControlCard({
       type="button"
       onClick={onClick ?? (() => { window.location.href = href })}
       data-testid={testId}
-      className="group flex flex-col rounded-xl border border-zinc-200 bg-white p-5 text-left transition-all hover:border-kern-200 hover:bg-kern-50/20 hover:shadow-sm"
+      className="group card-editorial flex flex-col overflow-hidden p-0 text-left"
     >
+      <div className="flex h-1 items-stretch">
+        <div className="w-1 bg-kern-500" />
+        <div className="flex-1" />
+      </div>
+      <div className="p-5">
       {/* Header: icon + title + status */}
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-50 group-hover:bg-kern-50">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
             {icon}
           </div>
-          <p className="text-sm font-semibold text-zinc-700">{title}</p>
+          <p className="text-sm font-semibold text-[var(--ink-2)]">{title}</p>
         </div>
         <div data-testid={`${testId}-status`} className="flex items-center gap-1">
           {status === 'healthy' ? (
@@ -1549,12 +1555,12 @@ function MissionControlCard({
       {/* Key Metric */}
       <div className="mb-2">
         <div className="flex items-baseline gap-2">
-          <p className={`text-2xl font-bold ${metricColor}`}>{metric}</p>
+          <p className={`font-mono text-2xl font-bold ${metricColor}`}>{metric}</p>
           {growthDirection && (
             <span className="flex items-center">
               {growthDirection === 'up' && <ArrowUpRight className="h-4 w-4 text-emerald-500" />}
               {growthDirection === 'down' && <ArrowDownRight className="h-4 w-4 text-red-500" />}
-              {growthDirection === 'flat' && <Minus className="h-4 w-4 text-zinc-400" />}
+              {growthDirection === 'flat' && <Minus className="h-4 w-4 text-[var(--ink-4)]" />}
             </span>
           )}
         </div>
@@ -1577,32 +1583,33 @@ function MissionControlCard({
       {/* Debt payoff progress bar */}
       {debtProg && debtProg.totalOriginal > 0 && (
         <div className="mb-3" data-testid={`${testId}-progress-bar`}>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100">
+          <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
             <div
               className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-500"
               style={{ width: `${debtProg.progressPct}%` }}
             />
           </div>
-          <p className="mt-1 text-[10px] text-zinc-400">
+          <p className="mt-1 text-[10px] font-mono text-[var(--ink-4)]">
             {formatCurrency(debtProg.totalOriginal - debtProg.totalCurrent)} afgelost van {formatCurrency(debtProg.totalOriginal)}
           </p>
         </div>
       )}
 
       {/* Detail lines */}
-      <div className="mt-auto space-y-1 border-t border-zinc-100 pt-3">
+      <div className="mt-auto space-y-1 border-t border-[var(--border-ed)] pt-3">
         {details.map((d, i) => (
           <div key={i} className="flex items-center justify-between text-xs">
-            <span className="text-zinc-400">{d.label}</span>
-            <span className={`font-medium ${d.color}`}>{d.value}</span>
+            <span className="text-[var(--ink-3)]">{d.label}</span>
+            <span className={`font-mono font-medium ${d.color}`}>{d.value}</span>
           </div>
         ))}
       </div>
 
       {/* CTA */}
       <div className="mt-3 flex items-center justify-between">
-        <span className="text-xs font-medium text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">{cta}</span>
-        <ArrowRight className="h-4 w-4 text-zinc-300 transition-colors group-hover:text-kern-500" />
+        <span className="label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">{cta}</span>
+        <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
+      </div>
       </div>
     </button>
   )
@@ -1624,7 +1631,7 @@ function ExportDropdown() {
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700"
+        className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
       >
         <Download className="h-3.5 w-3.5" />
         Export
@@ -1633,16 +1640,16 @@ function ExportDropdown() {
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+          <div className="absolute right-0 z-20 mt-1 w-44 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] py-1 shadow-lg">
             {EXPORT_OPTIONS.map(({ type, label }) => (
               <a
                 key={type}
                 href={`/api/export?type=${type}`}
                 download
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)] hover:text-[var(--ink)]"
               >
-                <Download className="h-3.5 w-3.5 text-zinc-400" />
+                <Download className="h-3.5 w-3.5 text-[var(--ink-3)]" />
                 {label}
               </a>
             ))}
@@ -1665,7 +1672,7 @@ function SnapshotComparisonContent({ snapshots }: { snapshots: NetWorthSnapshot[
 
   function DeltaValue({ value, invert }: { value: number; invert?: boolean }) {
     const isPositive = invert ? value < 0 : value > 0
-    const color = value === 0 ? 'text-zinc-500' : isPositive ? 'text-emerald-600' : 'text-red-500'
+    const color = value === 0 ? 'text-[var(--ink-3)]' : isPositive ? 'text-emerald-600' : 'text-red-500'
     const prefix = value > 0 ? '+' : ''
     return (
       <span className={`text-lg font-bold ${color}`}>
@@ -1676,31 +1683,31 @@ function SnapshotComparisonContent({ snapshots }: { snapshots: NetWorthSnapshot[
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-5">
-        <p className="text-sm font-medium text-zinc-500">Netto vermogen</p>
+      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-5">
+        <p className="text-sm font-medium text-[var(--ink-3)]">Netto vermogen</p>
         <DeltaValue value={netDelta} />
-        <div className="mt-1 flex gap-3 text-xs text-zinc-400">
+        <div className="mt-1 flex gap-3 text-xs text-[var(--ink-3)]">
           <span>{formatCurrency(Number(previous.net_worth))}</span>
           <ArrowRight className="h-3.5 w-3.5" />
-          <span className="font-medium text-zinc-600">{formatCurrency(Number(latest.net_worth))}</span>
+          <span className="font-medium text-[var(--ink-2)]">{formatCurrency(Number(latest.net_worth))}</span>
         </div>
       </div>
-      <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-5">
-        <p className="text-sm font-medium text-zinc-500">Assets</p>
+      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-5">
+        <p className="text-sm font-medium text-[var(--ink-3)]">Assets</p>
         <DeltaValue value={assetDelta} />
-        <div className="mt-1 flex gap-3 text-xs text-zinc-400">
+        <div className="mt-1 flex gap-3 text-xs text-[var(--ink-3)]">
           <span>{formatCurrency(Number(previous.total_assets))}</span>
           <ArrowRight className="h-3.5 w-3.5" />
-          <span className="font-medium text-zinc-600">{formatCurrency(Number(latest.total_assets))}</span>
+          <span className="font-medium text-[var(--ink-2)]">{formatCurrency(Number(latest.total_assets))}</span>
         </div>
       </div>
-      <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-5">
-        <p className="text-sm font-medium text-zinc-500">Schulden</p>
+      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-5">
+        <p className="text-sm font-medium text-[var(--ink-3)]">Schulden</p>
         <DeltaValue value={debtDelta} invert />
-        <div className="mt-1 flex gap-3 text-xs text-zinc-400">
+        <div className="mt-1 flex gap-3 text-xs text-[var(--ink-3)]">
           <span>{formatCurrency(Number(previous.total_debts))}</span>
           <ArrowRight className="h-3.5 w-3.5" />
-          <span className="font-medium text-zinc-600">{formatCurrency(Number(latest.total_debts))}</span>
+          <span className="font-medium text-[var(--ink-2)]">{formatCurrency(Number(latest.total_debts))}</span>
         </div>
       </div>
     </div>
@@ -1987,7 +1994,7 @@ function NetWorthChart({ snapshots, fireTarget = 0, earnedBadges = [] }: {
       {/* Milestone summary below chart */}
       {detectedMilestones.length > 0 && (
         <div className="mt-3 space-y-1">
-          <p className="text-xs font-medium text-zinc-500 mb-1.5">📍 Bereikte mijlpalen</p>
+          <p className="text-xs font-medium text-[var(--ink-3)] mb-1.5">📍 Bereikte mijlpalen</p>
           <div className="flex flex-wrap gap-2">
             {detectedMilestones.map((m, i) => (
               <div
@@ -1998,7 +2005,7 @@ function NetWorthChart({ snapshots, fireTarget = 0, earnedBadges = [] }: {
               >
                 <span>{m.icon}</span>
                 <span className="font-medium" style={{ color: m.color }}>{m.label}</span>
-                <span className="text-zinc-400">
+                <span className="text-[var(--ink-3)]">
                   {new Date(m.achievedDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </span>
                 {m.badgeEarnedAt && <span title="Badge verdiend">🏅</span>}
@@ -2032,7 +2039,7 @@ function BudgetLegendOverview({
   return (
     <div className="mt-4 space-y-2">
       {/* Header swatches */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs text-zinc-500">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs text-[var(--ink-3)]">
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-3 w-6 rounded-sm bg-zinc-600" />
           Besteed
@@ -2052,7 +2059,7 @@ function BudgetLegendOverview({
         return (
           <div key={seg.id}>
             <button
-              className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all ${
+              className={`flex w-full items-center gap-3 rounded-[var(--r-lg)] border px-3 py-2.5 text-left transition-all ${
                 isExpanded ? 'ring-2 ring-kern-400' : ''
               }`}
               style={{
@@ -2072,8 +2079,8 @@ function BudgetLegendOverview({
               </div>
 
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-zinc-900">{seg.name}</p>
-                <p className="text-xs text-zinc-500">
+                <p className="truncate text-sm font-medium text-[var(--ink)]">{seg.name}</p>
+                <p className="text-xs text-[var(--ink-3)]">
                   <span className={isOver ? 'font-semibold text-red-600' : ''}>
                     {formatCurrency(seg.spent)}
                   </span>
@@ -2082,7 +2089,7 @@ function BudgetLegendOverview({
                 </p>
               </div>
 
-              <span className={`shrink-0 text-xs font-bold ${isOver ? 'text-red-600' : 'text-zinc-600'}`}>
+              <span className={`shrink-0 text-xs font-bold ${isOver ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
                 {pct}%
               </span>
             </button>
@@ -2098,7 +2105,7 @@ function BudgetLegendOverview({
                   return (
                     <button
                       key={child.id}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left transition-colors hover:bg-zinc-50"
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left transition-colors hover:bg-[var(--subtle)]"
                       onClick={() => onNavigate(child.id)}
                     >
                       <div className="flex items-center gap-0.5">
@@ -2108,15 +2115,15 @@ function BudgetLegendOverview({
                       <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded" style={{ backgroundColor: c.bg }}>
                         <BudgetIcon name={child.icon} className="h-3 w-3" />
                       </div>
-                      <span className="min-w-0 flex-1 truncate text-xs text-zinc-700">{child.name}</span>
-                      <span className="text-xs text-zinc-500">
+                      <span className="min-w-0 flex-1 truncate text-xs text-[var(--ink-2)]">{child.name}</span>
+                      <span className="text-xs text-[var(--ink-3)]">
                         <span className={childOver ? 'font-semibold text-red-600' : ''}>
                           {formatCurrency(child.spent)}
                         </span>
                         {' / '}
                         {formatCurrency(child.limit)}
                       </span>
-                      <span className={`w-8 text-right text-xs font-medium ${childOver ? 'text-red-600' : 'text-zinc-400'}`}>
+                      <span className={`w-8 text-right text-xs font-medium ${childOver ? 'text-red-600' : 'text-[var(--ink-3)]'}`}>
                         {childPct}%
                       </span>
                     </button>

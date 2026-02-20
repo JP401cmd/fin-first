@@ -198,19 +198,19 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-lg font-semibold text-zinc-900 flex items-center gap-2">
+        <h2 className="text-lg font-semibold text-[var(--ink)] flex items-center gap-2">
           <Database className="h-5 w-5 text-kern-600" />
           Database Migratie
         </h2>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-[var(--ink-3)]">
           Status van de database schema en migratietools
         </p>
       </div>
 
       {/* Schema Status */}
-      <div className="rounded-lg border border-zinc-200 bg-white p-6">
+      <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-medium text-zinc-900">Schema Status</h3>
+          <h3 className="font-medium text-[var(--ink)]">Schema Status</h3>
           <button
             onClick={checkSchema}
             disabled={loading}
@@ -221,7 +221,7 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
         </div>
 
         {loading ? (
-          <div className="flex items-center gap-2 text-zinc-500">
+          <div className="flex items-center gap-2 text-[var(--ink-3)]">
             <Loader2 className="h-4 w-4 animate-spin" />
             Schema controleren...
           </div>
@@ -238,7 +238,7 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
             </div>
 
             <div>
-              <h4 className="text-sm font-medium text-zinc-700 mb-2">Tabellen</h4>
+              <h4 className="text-sm font-medium text-[var(--ink-2)] mb-2">Tabellen</h4>
               <div className="grid grid-cols-2 gap-2">
                 {Object.entries(schemaStatus.tables).map(([name, exists]) => (
                   <div key={name} className="flex items-center gap-2 text-sm">
@@ -247,14 +247,14 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
                     ) : (
                       <XCircle className="h-3.5 w-3.5 text-red-500" />
                     )}
-                    <code className="text-zinc-600">{name}</code>
+                    <code className="text-[var(--ink-2)]">{name}</code>
                   </div>
                 ))}
               </div>
             </div>
 
             <div>
-              <h4 className="text-sm font-medium text-zinc-700 mb-2">Kolommen op net_worth_snapshots</h4>
+              <h4 className="text-sm font-medium text-[var(--ink-2)] mb-2">Kolommen op net_worth_snapshots</h4>
               <div className="grid grid-cols-2 gap-2">
                 {Object.entries(schemaStatus.columns).map(([name, exists]) => (
                   <div key={name} className="flex items-center gap-2 text-sm">
@@ -263,7 +263,7 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
                     ) : (
                       <XCircle className="h-3.5 w-3.5 text-red-500" />
                     )}
-                    <code className="text-zinc-600">{name}</code>
+                    <code className="text-[var(--ink-2)]">{name}</code>
                   </div>
                 ))}
               </div>
@@ -276,9 +276,9 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
 
       {/* Auto-apply Migration */}
       {schemaStatus && schemaStatus.status !== 'complete' && (
-        <div className="rounded-lg border border-zinc-200 bg-white p-6">
-          <h3 className="font-medium text-zinc-900 mb-2">Migratie Uitvoeren</h3>
-          <p className="text-sm text-zinc-500 mb-4">
+        <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-6">
+          <h3 className="font-medium text-[var(--ink)] mb-2">Migratie Uitvoeren</h3>
+          <p className="text-sm text-[var(--ink-3)] mb-4">
             Voer je database wachtwoord in om de migratie automatisch uit te voeren.
             Vind je wachtwoord in Supabase Dashboard &gt; Settings &gt; Database.
           </p>
@@ -289,7 +289,7 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
               value={dbPassword}
               onChange={(e) => setDbPassword(e.target.value)}
               placeholder="Database wachtwoord"
-              className="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-kern-500 focus:ring-1 focus:ring-kern-500 focus:outline-none"
+              className="flex-1 rounded-md border border-[var(--border-md)] px-3 py-2 text-sm focus:border-kern-500 focus:ring-1 focus:ring-kern-500 focus:outline-none"
             />
             <button
               onClick={applyMigration}
@@ -326,9 +326,9 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
 
       {/* Manual SQL */}
       {schemaStatus && schemaStatus.status !== 'complete' && (
-        <div className="rounded-lg border border-zinc-200 bg-white p-6">
+        <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="font-medium text-zinc-900">Handmatig via SQL Editor</h3>
+            <h3 className="font-medium text-[var(--ink)]">Handmatig via SQL Editor</h3>
             <button
               onClick={copySQL}
               className="flex items-center gap-1 text-sm text-kern-600 hover:text-kern-700"
@@ -337,7 +337,7 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
               {copied ? 'Gekopieerd!' : 'Kopieer SQL'}
             </button>
           </div>
-          <p className="text-sm text-zinc-500 mb-4">
+          <p className="text-sm text-[var(--ink-3)] mb-4">
             Als alternatief kun je de SQL handmatig uitvoeren in de{' '}
             <a
               href="https://supabase.com/dashboard/project/pnnuqwdcgoympgddrvze/sql/new"
@@ -350,7 +350,7 @@ ALTER TABLE net_worth_snapshots ADD COLUMN IF NOT EXISTS resilience_score INT;`
             .
           </p>
           <div className="max-h-64 overflow-auto rounded-md bg-zinc-900 p-4">
-            <pre className="text-xs text-zinc-300 whitespace-pre-wrap">{migrationSQL.substring(0, 2000)}...</pre>
+            <pre className="text-xs text-[var(--ink-4)] whitespace-pre-wrap">{migrationSQL.substring(0, 2000)}...</pre>
           </div>
         </div>
       )}

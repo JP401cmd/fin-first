@@ -25,8 +25,8 @@ export default function ConnectCallbackPage() {
   return (
     <div className="flex flex-col items-center justify-center py-20">
       <div className="h-10 w-10 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
-      <p className="mt-4 text-sm font-medium text-zinc-700">Verbinding verwerken...</p>
-      <p className="mt-1 text-xs text-zinc-400">Even geduld, je wordt automatisch doorgestuurd.</p>
+      <p className="mt-4 text-sm font-medium text-[var(--ink-2)]">Verbinding verwerken...</p>
+      <p className="mt-1 text-xs text-[var(--ink-3)]">Even geduld, je wordt automatisch doorgestuurd.</p>
     </div>
   )
 }

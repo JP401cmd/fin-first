@@ -41,19 +41,19 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
       style={{ right: 'var(--chat-sidebar-width, 0px)' }}
       onClick={handleBackdrop}
     >
-      <div className="w-full max-h-[92vh] overflow-y-auto bg-white rounded-t-2xl md:mx-4 md:max-w-lg md:rounded-2xl safe-bottom">
+      <div className="w-full max-h-[92vh] overflow-y-auto bg-[var(--paper)] rounded-t-[var(--r-lg)] shadow-[var(--s2)] md:mx-4 md:max-w-lg md:rounded-[var(--r-lg)] safe-bottom">
         {/* Drag handle — mobile only */}
         <div className="flex justify-center pt-3 md:hidden">
-          <div className="h-1 w-10 rounded-full bg-zinc-300" />
+          <div className="h-1 w-10 rounded-full bg-[var(--border-md)]" />
         </div>
 
         {/* Header */}
         {title && (
-          <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
-            <h3 className="font-semibold text-zinc-900">{title}</h3>
+          <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-5 py-4">
+            <h3 className="font-semibold text-[var(--ink)]">{title}</h3>
             <button
               onClick={onClose}
-              className="touch-target rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+              className="touch-target rounded-md text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
             >
               <X className="h-5 w-5" />
             </button>

@@ -124,38 +124,38 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
                   className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                     strategy === key
                       ? 'bg-horizon-600 text-white'
-                      : 'border border-zinc-200 bg-white text-zinc-600 hover:border-horizon-200 hover:bg-horizon-50'
+                      : 'border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] hover:border-horizon-200 hover:bg-horizon-50'
                   }`}
                 >
                   {val.label}
                 </button>
               ))}
             </div>
-            <p className="mt-3 text-sm text-zinc-500">{STRATEGY_INFO[strategy].description}</p>
+            <p className="mt-3 text-sm text-[var(--ink-3)]">{STRATEGY_INFO[strategy].description}</p>
           </section>
 
           {/* Parameters */}
-          <section className="rounded-xl border border-zinc-200 bg-white p-6">
+          <section className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6">
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
-                <label className="text-xs font-medium text-zinc-500">Pensioenleeftijd: {retirementAge}</label>
+                <label className="text-xs font-medium text-[var(--ink-3)]">Pensioenleeftijd: {retirementAge}</label>
                 <input
                   type="range" min={40} max={70} step={1} value={retirementAge}
                   onChange={e => setRetirementAge(Number(e.target.value))}
                   className="mt-1 w-full accent-horizon-600"
                 />
-                <div className="flex justify-between text-[10px] text-zinc-400">
+                <div className="flex justify-between text-[10px] text-[var(--ink-3)]">
                   <span>40 jaar</span><span>70 jaar</span>
                 </div>
               </div>
               <div>
-                <label className="text-xs font-medium text-zinc-500">Doelleeftijd: {targetAge}</label>
+                <label className="text-xs font-medium text-[var(--ink-3)]">Doelleeftijd: {targetAge}</label>
                 <input
                   type="range" min={75} max={100} step={1} value={targetAge}
                   onChange={e => setTargetAge(Number(e.target.value))}
                   className="mt-1 w-full accent-horizon-600"
                 />
-                <div className="flex justify-between text-[10px] text-zinc-400">
+                <div className="flex justify-between text-[10px] text-[var(--ink-3)]">
                   <span>75 jaar</span><span>100 jaar</span>
                 </div>
               </div>
@@ -174,49 +174,49 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
               </button>
 
               {showStrategySettings && strategy === 'guardrails' && (
-                <div className="mt-3 rounded-xl border border-zinc-200 bg-white p-6">
+                <div className="mt-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6">
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                     <div>
-                      <label className="text-xs font-medium text-zinc-500">Vloer: {grFloor}%</label>
+                      <label className="text-xs font-medium text-[var(--ink-3)]">Vloer: {grFloor}%</label>
                       <input
                         type="range" min={50} max={100} step={5} value={grFloor}
                         onChange={e => setGrFloor(Number(e.target.value))}
                         className="mt-1 w-full accent-horizon-600"
                       />
-                      <div className="flex justify-between text-[10px] text-zinc-400">
+                      <div className="flex justify-between text-[10px] text-[var(--ink-3)]">
                         <span>50%</span><span>100%</span>
                       </div>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-zinc-500">Plafond: {grCeiling}%</label>
+                      <label className="text-xs font-medium text-[var(--ink-3)]">Plafond: {grCeiling}%</label>
                       <input
                         type="range" min={100} max={150} step={5} value={grCeiling}
                         onChange={e => setGrCeiling(Number(e.target.value))}
                         className="mt-1 w-full accent-horizon-600"
                       />
-                      <div className="flex justify-between text-[10px] text-zinc-400">
+                      <div className="flex justify-between text-[10px] text-[var(--ink-3)]">
                         <span>100%</span><span>150%</span>
                       </div>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-zinc-500">Verhoging: +{grRaise}%</label>
+                      <label className="text-xs font-medium text-[var(--ink-3)]">Verhoging: +{grRaise}%</label>
                       <input
                         type="range" min={5} max={20} step={1} value={grRaise}
                         onChange={e => setGrRaise(Number(e.target.value))}
                         className="mt-1 w-full accent-horizon-600"
                       />
-                      <div className="flex justify-between text-[10px] text-zinc-400">
+                      <div className="flex justify-between text-[10px] text-[var(--ink-3)]">
                         <span>5%</span><span>20%</span>
                       </div>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-zinc-500">Verlaging: -{grCut}%</label>
+                      <label className="text-xs font-medium text-[var(--ink-3)]">Verlaging: -{grCut}%</label>
                       <input
                         type="range" min={5} max={20} step={1} value={grCut}
                         onChange={e => setGrCut(Number(e.target.value))}
                         className="mt-1 w-full accent-horizon-600"
                       />
-                      <div className="flex justify-between text-[10px] text-zinc-400">
+                      <div className="flex justify-between text-[10px] text-[var(--ink-3)]">
                         <span>5%</span><span>20%</span>
                       </div>
                     </div>
@@ -225,27 +225,27 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
               )}
 
               {showStrategySettings && strategy === 'bucket' && (
-                <div className="mt-3 rounded-xl border border-zinc-200 bg-white p-6">
+                <div className="mt-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6">
                   <div className="mb-4">
-                    <p className="text-xs font-medium text-zinc-500">Allocatie</p>
+                    <p className="text-xs font-medium text-[var(--ink-3)]">Allocatie</p>
                     <div className="mt-2 grid grid-cols-3 gap-3">
-                      <div className="rounded-lg bg-zinc-50 p-3 text-center">
-                        <p className="text-xs text-zinc-500">Cash</p>
-                        <p className="text-lg font-bold text-zinc-900">{bkCash}%</p>
+                      <div className="rounded-lg bg-[var(--subtle)] p-3 text-center">
+                        <p className="text-xs text-[var(--ink-3)]">Cash</p>
+                        <p className="text-lg font-bold text-[var(--ink)]">{bkCash}%</p>
                       </div>
-                      <div className="rounded-lg bg-zinc-50 p-3 text-center">
-                        <p className="text-xs text-zinc-500">Obligaties</p>
-                        <p className="text-lg font-bold text-zinc-900">{bkBond}%</p>
+                      <div className="rounded-lg bg-[var(--subtle)] p-3 text-center">
+                        <p className="text-xs text-[var(--ink-3)]">Obligaties</p>
+                        <p className="text-lg font-bold text-[var(--ink)]">{bkBond}%</p>
                       </div>
                       <div className="rounded-lg bg-horizon-50 p-3 text-center">
                         <p className="text-xs text-horizon-600">Aandelen</p>
-                        <p className="text-lg font-bold text-zinc-900">{bkStock}%</p>
+                        <p className="text-lg font-bold text-[var(--ink)]">{bkStock}%</p>
                       </div>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                     <div>
-                      <label className="text-xs font-medium text-zinc-500">Cash: {bkCash}%</label>
+                      <label className="text-xs font-medium text-[var(--ink-3)]">Cash: {bkCash}%</label>
                       <input
                         type="range" min={5} max={30} step={5} value={bkCash}
                         onChange={e => {
@@ -256,7 +256,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-zinc-500">Obligaties: {bkBond}%</label>
+                      <label className="text-xs font-medium text-[var(--ink-3)]">Obligaties: {bkBond}%</label>
                       <input
                         type="range" min={10} max={50} step={5} value={bkBond}
                         onChange={e => {
@@ -267,24 +267,24 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-zinc-500">Obligatierendement: {bkBondReturn}%</label>
+                      <label className="text-xs font-medium text-[var(--ink-3)]">Obligatierendement: {bkBondReturn}%</label>
                       <input
                         type="range" min={1} max={6} step={0.5} value={bkBondReturn}
                         onChange={e => setBkBondReturn(Number(e.target.value))}
                         className="mt-1 w-full accent-horizon-600"
                       />
-                      <div className="flex justify-between text-[10px] text-zinc-400">
+                      <div className="flex justify-between text-[10px] text-[var(--ink-3)]">
                         <span>1%</span><span>6%</span>
                       </div>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-zinc-500">Cash buffer: {bkCashYears} jaar</label>
+                      <label className="text-xs font-medium text-[var(--ink-3)]">Cash buffer: {bkCashYears} jaar</label>
                       <input
                         type="range" min={1} max={5} step={1} value={bkCashYears}
                         onChange={e => setBkCashYears(Number(e.target.value))}
                         className="mt-1 w-full accent-horizon-600"
                       />
-                      <div className="flex justify-between text-[10px] text-zinc-400">
+                      <div className="flex justify-between text-[10px] text-[var(--ink-3)]">
                         <span>1 jaar</span><span>5 jaar</span>
                       </div>
                     </div>
@@ -296,36 +296,36 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
 
           {/* Results */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-zinc-200 bg-white p-5 text-center">
-              <p className="text-xs font-medium text-zinc-500">Maandelijkse opname</p>
+            <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 text-center">
+              <p className="text-xs font-medium text-[var(--ink-3)]">Maandelijkse opname</p>
               <p className="mt-1 text-3xl font-bold text-horizon-700">{formatCurrency(result.monthlyWithdrawal)}</p>
-              <p className="mt-1 text-xs text-zinc-400">per maand</p>
+              <p className="mt-1 text-xs text-[var(--ink-3)]">per maand</p>
             </div>
-            <div className="rounded-xl border border-zinc-200 bg-white p-5 text-center">
-              <p className="text-xs font-medium text-zinc-500">Houdbaar tot</p>
+            <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 text-center">
+              <p className="text-xs font-medium text-[var(--ink-3)]">Houdbaar tot</p>
               <p className={`mt-1 text-3xl font-bold ${result.depleted ? 'text-red-600' : 'text-emerald-600'}`}>
                 {result.depleted ? `${result.successYears} jaar` : `${result.totalYears} jaar`}
               </p>
-              <p className="mt-1 text-xs text-zinc-400">
+              <p className="mt-1 text-xs text-[var(--ink-3)]">
                 {result.depleted ? 'vermogen op voor doelleeftijd' : 'voldoende tot doelleeftijd'}
               </p>
             </div>
-            <div className="rounded-xl border border-zinc-200 bg-white p-5 text-center">
-              <p className="text-xs font-medium text-zinc-500">Startportfolio</p>
-              <p className="mt-1 text-3xl font-bold text-zinc-900">
+            <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 text-center">
+              <p className="text-xs font-medium text-[var(--ink-3)]">Startportfolio</p>
+              <p className="mt-1 text-3xl font-bold text-[var(--ink)]">
                 {formatCurrency(result.schedule[0]?.startBalance ?? 0)}
               </p>
-              <p className="mt-1 text-xs text-zinc-400">verwacht op pensioenleeftijd</p>
+              <p className="mt-1 text-xs text-[var(--ink-3)]">verwacht op pensioenleeftijd</p>
             </div>
           </div>
 
           {/* NL-specific AOW info */}
-          <div className="rounded-xl border border-horizon-200 bg-horizon-50 p-5">
+          <div className="rounded-[var(--r-lg)] border border-horizon-200 bg-horizon-50 p-5">
             <div className="flex items-start gap-3">
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-horizon-600" />
               <div>
                 <p className="text-sm font-medium text-horizon-700">AOW en je opnamestrategie</p>
-                <p className="mt-1 text-sm text-zinc-600">
+                <p className="mt-1 text-sm text-[var(--ink-2)]">
                   Tot {NL_AOW_AGE}: volledig uit vermogen. Vanaf {NL_AOW_AGE}: AOW ({formatCurrency(NL_AOW_MONTHLY)}/mnd alleenstaand)
                   + aanvulling uit je portfolio. Dit verlaagt je opname aanzienlijk.
                 </p>
@@ -336,11 +336,11 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
           {/* Drawdown chart */}
           <section>
             <div className="mb-4">
-              <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+              <h2 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
                 Vermogensverloop na pensioen
               </h2>
             </div>
-            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
+            <div className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
               <DrawdownChart schedule={result.schedule} />
             </div>
           </section>
@@ -356,29 +356,29 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
             </button>
 
             {showTable && (
-              <div className="mt-3 overflow-x-auto rounded-xl border border-zinc-200">
+              <div className="mt-3 overflow-x-auto rounded-[var(--r-lg)] border border-[var(--border-ed)]">
                 <table className="w-full text-sm">
-                  <thead className="bg-zinc-50">
+                  <thead className="bg-[var(--subtle)]">
                     <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-zinc-500">Leeftijd</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-zinc-500">Startsaldo</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-zinc-500">Opname</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-zinc-500">AOW</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-zinc-500">Groei</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-zinc-500">Eindsaldo</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-[var(--ink-3)]">Leeftijd</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-[var(--ink-3)]">Startsaldo</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-[var(--ink-3)]">Opname</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-[var(--ink-3)]">AOW</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-[var(--ink-3)]">Groei</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-[var(--ink-3)]">Eindsaldo</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100">
                     {result.schedule.map((row) => (
                       <tr key={row.age} className={row.endBalance <= 0 ? 'bg-red-50/50' : ''}>
-                        <td className="px-3 py-2 font-medium text-zinc-700">{row.age}</td>
-                        <td className="px-3 py-2 text-right text-zinc-600">{formatCurrency(row.startBalance)}</td>
+                        <td className="px-3 py-2 font-medium text-[var(--ink-2)]">{row.age}</td>
+                        <td className="px-3 py-2 text-right text-[var(--ink-2)]">{formatCurrency(row.startBalance)}</td>
                         <td className="px-3 py-2 text-right text-red-600">-{formatCurrency(row.withdrawal)}</td>
                         <td className="px-3 py-2 text-right text-emerald-600">
                           {row.aowIncome > 0 ? formatCurrency(row.aowIncome) : '-'}
                         </td>
-                        <td className="px-3 py-2 text-right text-zinc-600">{formatCurrency(row.growth)}</td>
-                        <td className={`px-3 py-2 text-right font-medium ${row.endBalance <= 0 ? 'text-red-600' : 'text-zinc-900'}`}>
+                        <td className="px-3 py-2 text-right text-[var(--ink-2)]">{formatCurrency(row.growth)}</td>
+                        <td className={`px-3 py-2 text-right font-medium ${row.endBalance <= 0 ? 'text-red-600' : 'text-[var(--ink)]'}`}>
                           {formatCurrency(row.endBalance)}
                         </td>
                       </tr>

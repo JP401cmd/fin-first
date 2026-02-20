@@ -235,9 +235,9 @@ export default function AssetsPage() {
   if (error) {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-700">{error}</p>
-          <button onClick={() => { setError(null); setLoading(true); loadAssets() }} className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
+          <button onClick={() => { setError(null); setLoading(true); loadAssets() }} className="mt-3 rounded-[var(--r)] bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
             Opnieuw proberen
           </button>
         </div>
@@ -248,25 +248,25 @@ export default function AssetsPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* Header */}
-      <section className="rounded-2xl border border-kern-200 bg-gradient-to-br from-kern-50 to-white p-6">
+      <section className="rounded-[var(--r-lg)] border border-kern-200 card-editorial p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-zinc-900">Bezittingen</h1>
-            <p className="mt-1 text-sm text-zinc-500">
+            <h1 className="text-xl font-bold text-[var(--ink)]">Bezittingen</h1>
+            <p className="mt-1 text-sm text-[var(--ink-3)]">
               {activeAssets.length} actieve bezitting{activeAssets.length !== 1 ? 'en' : ''} — opgeslagen vrijheid
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Link
               href="/core/assets/holdings"
-              className="inline-flex items-center gap-2 rounded-lg border border-kern-200 px-4 py-2 text-sm font-medium text-kern-700 hover:bg-kern-50"
+              className="inline-flex items-center gap-2 rounded-[var(--r)] border border-kern-200 px-4 py-2 text-sm font-medium text-kern-700 hover:bg-kern-50"
             >
               <BarChart3 className="h-4 w-4" />
               Holdings
             </Link>
             <button
               onClick={() => { setEditAsset(null); setShowForm(true) }}
-              className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
+              className="inline-flex items-center gap-2 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
             >
               <Plus className="h-4 w-4" />
               Asset toevoegen
@@ -276,8 +276,8 @@ export default function AssetsPage() {
 
         <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div>
-            <p className="text-xs font-medium text-zinc-500 uppercase">Totale waarde</p>
-            <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalValue)}</p>
+            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Totale waarde</p>
+            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalValue)}</p>
             {dailyExpenses > 0 && totalValue > 0 && (
               <p className="mt-0.5 text-xs text-kern-600/70" data-testid="total-value-freedom">
                 {formatFreedomTimeString(calculateFreedomTime(totalValue, dailyExpenses), 'long')} vrijheid
@@ -285,11 +285,11 @@ export default function AssetsPage() {
             )}
           </div>
           <div>
-            <p className="text-xs font-medium text-zinc-500 uppercase">Maandelijkse inleg</p>
-            <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(totalMonthlyContrib)}</p>
+            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Maandelijkse inleg</p>
+            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalMonthlyContrib)}</p>
           </div>
           <div>
-            <p className="text-xs font-medium text-zinc-500 uppercase">Rendement (totaal)</p>
+            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Rendement (totaal)</p>
             {totalPurchase > 0 ? (
               <>
                 <p className={`mt-1 text-xl font-bold ${totalValue >= totalPurchase ? 'text-emerald-600' : 'text-red-600'}`}>
@@ -306,11 +306,11 @@ export default function AssetsPage() {
                 )}
               </>
             ) : (
-              <p className="mt-1 text-xl font-bold text-zinc-400">-</p>
+              <p className="mt-1 text-xl font-bold text-[var(--ink-3)]">-</p>
             )}
           </div>
           <div>
-            <p className="text-xs font-medium text-zinc-500 uppercase">Waarde over {projectionYears} jaar</p>
+            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Waarde over {projectionYears} jaar</p>
             <p className="mt-1 text-xl font-bold text-emerald-600">{formatCurrency(futureValue)}</p>
             {dailyExpenses > 0 && futureValue > 0 && (
               <p className="mt-0.5 text-xs text-emerald-500/70" data-testid="future-value-freedom">
@@ -324,8 +324,8 @@ export default function AssetsPage() {
       {/* Allocation + projection */}
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         {/* Allocation */}
-        <section className="rounded-2xl border border-zinc-200 bg-white p-6">
-          <h2 className="text-sm font-semibold text-zinc-700">Verdeling</h2>
+        <section className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6">
+          <h2 className="text-sm font-semibold text-[var(--ink-2)]">Verdeling</h2>
           <div className="mt-4 flex items-center gap-6">
             <AllocationPie byType={byType} total={totalValue} dailyExpenses={dailyExpenses} />
             <div className="flex-1 space-y-2">
@@ -339,9 +339,9 @@ export default function AssetsPage() {
                       className="inline-block h-3 w-3 rounded-sm"
                       style={{ backgroundColor: ASSET_TYPE_COLORS[type] }}
                     />
-                    <span className="flex-1 text-xs text-zinc-600">{ASSET_TYPE_LABELS[type]}</span>
-                    <span className="text-xs font-medium text-zinc-900">{pct.toFixed(0)}%</span>
-                    <span className="text-xs text-zinc-400">{formatCurrency(data.total)}</span>
+                    <span className="flex-1 text-xs text-[var(--ink-2)]">{ASSET_TYPE_LABELS[type]}</span>
+                    <span className="text-xs font-medium text-[var(--ink)]">{pct.toFixed(0)}%</span>
+                    <span className="text-xs text-[var(--ink-3)]">{formatCurrency(data.total)}</span>
                   </div>
                 )
               })}
@@ -350,9 +350,9 @@ export default function AssetsPage() {
         </section>
 
         {/* Projection chart */}
-        <section className="rounded-2xl border border-zinc-200 bg-white p-6" data-testid="portfolio-projection-section">
+        <section className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6" data-testid="portfolio-projection-section">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-zinc-700">Projectie</h2>
+            <h2 className="text-sm font-semibold text-[var(--ink-2)]">Projectie</h2>
             <div className="flex items-center gap-1" data-testid="projection-year-buttons">
               {[5, 10, 20, 30].map((y) => (
                 <button
@@ -362,7 +362,7 @@ export default function AssetsPage() {
                   className={`rounded-md px-2 py-1 text-xs font-medium ${
                     projectionYears === y
                       ? 'bg-kern-100 text-kern-700'
-                      : 'text-zinc-400 hover:text-zinc-600'
+                      : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
                   }`}
                 >
                   {y}j
@@ -374,13 +374,13 @@ export default function AssetsPage() {
           <div className="mt-3 flex items-center gap-4 text-xs">
             <div className="flex items-center gap-1">
               <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-              <span className="text-zinc-500">Verwachte groei:</span>
+              <span className="text-[var(--ink-3)]">Verwachte groei:</span>
               <span className="font-medium text-emerald-600" data-testid="projected-growth">+{formatCurrency(projectedGrowth)}</span>
             </div>
           </div>
           {/* Contextual projection message */}
           {projection.length > 0 && (
-            <p className="mt-3 text-xs text-zinc-500 leading-relaxed" data-testid="projection-context-message">
+            <p className="mt-3 text-xs text-[var(--ink-3)] leading-relaxed" data-testid="projection-context-message">
               {totalMonthlyContrib > 0
                 ? `Met je huidige inleg van ${formatCurrency(totalMonthlyContrib)}/maand groeit je portfolio naar ${formatCurrency(futureValue)} in ${projectionYears} jaar`
                 : `Zonder extra inleg groeit je portfolio naar ${formatCurrency(futureValue)} in ${projectionYears} jaar`}
@@ -397,10 +397,10 @@ export default function AssetsPage() {
       {/* Asset list */}
       <section className="mt-6 space-y-2">
         {assets.length === 0 && (
-          <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
+          <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-8 text-center">
             <TrendingUp className="mx-auto h-8 w-8 text-kern-400" />
-            <p className="mt-2 text-sm font-medium text-zinc-600">Geen assets geregistreerd</p>
-            <p className="mt-1 text-xs text-zinc-400">Voeg een asset toe om je vermogen te volgen.</p>
+            <p className="mt-2 text-sm font-medium text-[var(--ink-2)]">Geen assets geregistreerd</p>
+            <p className="mt-1 text-xs text-[var(--ink-3)]">Voeg een asset toe om je vermogen te volgen.</p>
           </div>
         )}
         {assets.map((asset) => {
@@ -413,21 +413,21 @@ export default function AssetsPage() {
           return (
             <div
               key={asset.id}
-              className="flex cursor-pointer items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 transition-colors hover:border-kern-200 hover:bg-kern-50/30"
+              className="flex cursor-pointer items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 transition-colors hover:border-kern-200 hover:bg-kern-50/30"
               onClick={() => openAssetModal(asset)}
             >
               <div
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)]"
                 style={{ backgroundColor: color + '15' }}
               >
                 <BudgetIcon name={icon} className="h-4 w-4" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-zinc-900 flex items-center gap-1.5">
+                <p className="truncate text-sm font-medium text-[var(--ink)] flex items-center gap-1.5">
                   {asset.name}
                   <OwnershipBadge ownership={asset.ownership ?? 'personal'} />
                 </p>
-                <p className="truncate text-xs text-zinc-500">
+                <p className="truncate text-xs text-[var(--ink-3)]">
                   {ASSET_TYPE_LABELS[asset.asset_type]}
                   {asset.subtype && ASSET_SUBTYPE_LABELS[asset.asset_type]?.[asset.subtype]
                     ? ` \u2022 ${ASSET_SUBTYPE_LABELS[asset.asset_type]![asset.subtype]}`
@@ -445,7 +445,7 @@ export default function AssetsPage() {
                 return null
               })()}
               <div className="shrink-0 text-right">
-                <p className="text-sm font-semibold text-zinc-900">{formatCurrency(value)}</p>
+                <p className="text-sm font-semibold text-[var(--ink)]">{formatCurrency(value)}</p>
                 {dailyExpenses > 0 && value > 0 && (
                   <p className="text-[10px] text-kern-500/70" data-testid="asset-card-freedom">
                     {formatFreedomTimeString(calculateFreedomTime(value, dailyExpenses), 'short', true)} vrijheid
@@ -578,21 +578,21 @@ function AssetDetailModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl"
+        className="w-full max-w-lg overflow-y-auto rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl"
         style={{ maxHeight: '90vh' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center gap-3 border-b border-zinc-200 px-6 py-4">
+        <div className="flex items-center gap-3 border-b border-[var(--border-ed)] px-6 py-4">
           <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)]"
             style={{ backgroundColor: color + '15' }}
           >
             <BudgetIcon name={icon} className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="font-semibold text-zinc-900">{asset.name}</h2>
-            <p className="text-xs text-zinc-500">
+            <h2 className="font-semibold text-[var(--ink)]">{asset.name}</h2>
+            <p className="text-xs text-[var(--ink-3)]">
               {ASSET_TYPE_LABELS[asset.asset_type]}
               {asset.subtype && ASSET_SUBTYPE_LABELS[asset.asset_type]?.[asset.subtype]
                 ? ` \u2022 ${ASSET_SUBTYPE_LABELS[asset.asset_type]![asset.subtype]}`
@@ -600,15 +600,15 @@ function AssetDetailModal({
               {asset.institution ? ` \u2022 ${asset.institution}` : ''}
             </p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+          <button onClick={onClose} className="rounded-[var(--r)] p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Value highlight */}
-        <div className="border-b border-zinc-100 px-6 py-4 text-center">
-          {isEigenHuis && <p className="mb-1 text-xs font-medium text-zinc-500 uppercase">Marktwaarde</p>}
-          <p className="text-3xl font-bold text-zinc-900">{formatCurrency(value)}</p>
+        <div className="border-b border-[var(--border-ed)] px-6 py-4 text-center">
+          {isEigenHuis && <p className="mb-1 text-xs font-medium text-[var(--ink-3)] uppercase">Marktwaarde</p>}
+          <p className="text-3xl font-bold text-[var(--ink)]">{formatCurrency(value)}</p>
           {dailyExpenses > 0 && value > 0 && (
             <p className="mt-0.5 text-xs text-kern-600/70" data-testid="detail-value-freedom">
               {formatFreedomTimeString(calculateFreedomTime(value, dailyExpenses), 'long')} vrijheid
@@ -642,7 +642,7 @@ function AssetDetailModal({
               <span className="inline-block rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">Liquide</span>
             )}
             {asset.is_liquid === false && (
-              <span className="inline-block rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600">Vastgezet</span>
+              <span className="inline-block rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-[var(--ink-2)]">Vastgezet</span>
             )}
             {asset.tax_benefit && (
               <span className="inline-block rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700">Fiscaal voordeel</span>
@@ -653,25 +653,25 @@ function AssetDetailModal({
         {/* Details grid */}
         <div className="space-y-4 px-6 py-4">
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-lg bg-zinc-50 p-3">
-              <p className="text-xs text-zinc-500">{isEigenHuis ? 'Aankoopprijs' : 'Aankoopwaarde'}</p>
-              <p className="mt-0.5 text-sm font-medium text-zinc-900">{purchase > 0 ? formatCurrency(purchase) : '-'}</p>
+            <div className="rounded-[var(--r)] bg-[var(--subtle)] p-3">
+              <p className="text-xs text-[var(--ink-3)]">{isEigenHuis ? 'Aankoopprijs' : 'Aankoopwaarde'}</p>
+              <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">{purchase > 0 ? formatCurrency(purchase) : '-'}</p>
             </div>
-            <div className="rounded-lg bg-zinc-50 p-3">
-              <p className="text-xs text-zinc-500">Verwacht rendement</p>
-              <p className="mt-0.5 text-sm font-medium text-zinc-900">{Number(asset.expected_return)}% p.j.</p>
+            <div className="rounded-[var(--r)] bg-[var(--subtle)] p-3">
+              <p className="text-xs text-[var(--ink-3)]">Verwacht rendement</p>
+              <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">{Number(asset.expected_return)}% p.j.</p>
             </div>
             {!isEigenHuis && (
-              <div className="rounded-lg bg-zinc-50 p-3">
-                <p className="text-xs text-zinc-500">Maandelijkse inleg</p>
-                <p className="mt-0.5 text-sm font-medium text-zinc-900">
+              <div className="rounded-[var(--r)] bg-[var(--subtle)] p-3">
+                <p className="text-xs text-[var(--ink-3)]">Maandelijkse inleg</p>
+                <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">
                   {Number(asset.monthly_contribution) > 0 ? formatCurrency(Number(asset.monthly_contribution)) : '-'}
                 </p>
               </div>
             )}
-            <div className="rounded-lg bg-zinc-50 p-3">
-              <p className="text-xs text-zinc-500">Aankoopdatum</p>
-              <p className="mt-0.5 text-sm font-medium text-zinc-900">
+            <div className="rounded-[var(--r)] bg-[var(--subtle)] p-3">
+              <p className="text-xs text-[var(--ink-3)]">Aankoopdatum</p>
+              <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">
                 {asset.purchase_date
                   ? new Date(asset.purchase_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
                   : '-'}
@@ -681,16 +681,16 @@ function AssetDetailModal({
 
           {/* Hypotheek + overwaarde (eigen woning) */}
           {isEigenHuis && (
-            <div className="rounded-lg border border-kern-200 bg-kern-50/50 p-3 space-y-2">
+            <div className="rounded-[var(--r)] border border-kern-200 bg-kern-50/50 p-3 space-y-2">
               <p className="text-xs font-semibold text-kern-700/60 uppercase">Hypotheek</p>
               {mortgage ? (
                 <>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-zinc-600">{mortgage.name}</span>
-                    <span className="text-sm font-medium text-zinc-900">{formatCurrency(mortgage.balance)}</span>
+                    <span className="text-xs text-[var(--ink-2)]">{mortgage.name}</span>
+                    <span className="text-sm font-medium text-[var(--ink)]">{formatCurrency(mortgage.balance)}</span>
                   </div>
                   <div className="flex items-center justify-between border-t border-kern-200/60 pt-2">
-                    <span className="text-xs font-medium text-zinc-700">Overwaarde</span>
+                    <span className="text-xs font-medium text-[var(--ink-2)]">Overwaarde</span>
                     {(() => {
                       const overwaarde = value - mortgage.balance
                       return (
@@ -702,7 +702,7 @@ function AssetDetailModal({
                   </div>
                 </>
               ) : (
-                <p className="text-xs text-zinc-500">Geen hypotheek gekoppeld. Koppel een hypotheek via De Kern &gt; Schulden.</p>
+                <p className="text-xs text-[var(--ink-3)]">Geen hypotheek gekoppeld. Koppel een hypotheek via De Kern &gt; Schulden.</p>
               )}
             </div>
           )}
@@ -721,9 +721,9 @@ function AssetDetailModal({
             return (
               <div className="grid grid-cols-2 gap-3">
                 {details.map((d) => (
-                  <div key={d.label} className="rounded-lg bg-kern-50/50 p-3">
+                  <div key={d.label} className="rounded-[var(--r)] bg-kern-50/50 p-3">
                     <p className="text-xs text-kern-700/60">{d.label}</p>
-                    <p className="mt-0.5 text-sm font-medium text-zinc-900">{d.value}</p>
+                    <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">{d.value}</p>
                   </div>
                 ))}
               </div>
@@ -731,7 +731,7 @@ function AssetDetailModal({
           })()}
 
           {asset.notes && (
-            <p className="text-xs text-zinc-500">{asset.notes}</p>
+            <p className="text-xs text-[var(--ink-3)]">{asset.notes}</p>
           )}
 
           {/* Valuation history */}
@@ -740,8 +740,8 @@ function AssetDetailModal({
           )}
           {/* No valuation history message */}
           {(!valuations || valuations.length === 0) && (
-            <div className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50/50 p-4 text-center" data-testid="no-valuation-history">
-              <p className="text-xs text-zinc-400">Nog geen waardehistorie. Gebruik &ldquo;Herwaarderen&rdquo; om de waarde bij te werken.</p>
+            <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/50 p-4 text-center" data-testid="no-valuation-history">
+              <p className="text-xs text-[var(--ink-3)]">Nog geen waardehistorie. Gebruik &ldquo;Herwaarderen&rdquo; om de waarde bij te werken.</p>
             </div>
           )}
 
@@ -753,7 +753,7 @@ function AssetDetailModal({
 
         {/* Holdings source-of-truth banner */}
         {hasActiveHoldings && (
-          <div className="mx-6 mb-0 mt-2 flex items-start gap-2 rounded-lg bg-kern-50 border border-kern-200 px-3 py-2" data-testid="holdings-source-of-truth-banner">
+          <div className="mx-6 mb-0 mt-2 flex items-start gap-2 rounded-[var(--r)] bg-kern-50 border border-kern-200 px-3 py-2" data-testid="holdings-source-of-truth-banner">
             <Briefcase className="mt-0.5 h-3.5 w-3.5 shrink-0 text-kern-600" />
             <p className="text-xs text-kern-700">
               <strong>Portfolio tracker actief</strong> ({holdingsCount} holding{holdingsCount !== 1 ? 's' : ''}): de waarde van deze asset wordt automatisch berekend uit de holdings. Handmatig herwaarderen is uitgeschakeld.
@@ -762,14 +762,14 @@ function AssetDetailModal({
         )}
 
         {/* Actions */}
-        <div className="flex gap-2 border-t border-zinc-200 px-6 py-4">
+        <div className="flex gap-2 border-t border-[var(--border-ed)] px-6 py-4">
           <button
             onClick={hasActiveHoldings ? undefined : onRevalue}
             disabled={hasActiveHoldings}
             title={hasActiveHoldings ? 'Waarde wordt automatisch berekend uit holdings' : undefined}
-            className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium ${
+            className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-[var(--r)] border px-3 py-2 text-xs font-medium ${
               hasActiveHoldings
-                ? 'border-zinc-200 text-zinc-400 cursor-not-allowed bg-zinc-50'
+                ? 'border-[var(--border-ed)] text-[var(--ink-3)] cursor-not-allowed bg-[var(--subtle)]'
                 : 'border-kern-200 text-kern-700 hover:bg-kern-50'
             }`}
             data-testid="revalue-btn"
@@ -779,7 +779,7 @@ function AssetDetailModal({
           </button>
           <button
             onClick={onEdit}
-            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-kern-600 px-3 py-2 text-xs font-medium text-white hover:bg-kern-700"
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-3 py-2 text-xs font-medium text-white hover:bg-kern-700"
           >
             <Edit3 className="h-3.5 w-3.5" />
             Bewerken
@@ -787,14 +787,14 @@ function AssetDetailModal({
           {confirmDelete ? (
             <button
               onClick={onDelete}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-xs font-medium text-white hover:bg-red-700"
+              className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] bg-red-600 px-3 py-2 text-xs font-medium text-white hover:bg-red-700"
             >
               Bevestigen
             </button>
           ) : (
             <button
               onClick={() => setConfirmDelete(true)}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+              className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -934,11 +934,11 @@ function ValuationTrendSection({ valuations }: { valuations: Valuation[] }) {
 
   return (
     <div data-testid="valuation-trend-section">
-      <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">Waardehistorie ({valuations.length} metingen)</p>
+      <p className="mb-2 text-xs font-semibold text-[var(--ink-3)] uppercase">Waardehistorie ({valuations.length} metingen)</p>
 
       {/* Line chart */}
       {sorted.length >= 2 ? (
-        <div className="mb-3 rounded-lg bg-zinc-50 p-3" data-testid="valuation-line-chart">
+        <div className="mb-3 rounded-[var(--r)] bg-[var(--subtle)] p-3" data-testid="valuation-line-chart">
           <svg viewBox={`0 0 ${W} ${H}`} className="h-36 w-full" preserveAspectRatio="xMidYMid meet">
             {/* Grid lines and Y labels */}
             {yTicks.map((val, i) => (
@@ -996,7 +996,7 @@ function ValuationTrendSection({ valuations }: { valuations: Valuation[] }) {
 
           {/* Trend summary */}
           <div className="mt-1 flex items-center justify-between text-[10px]">
-            <span className="text-zinc-400">
+            <span className="text-[var(--ink-3)]">
               {new Date(sorted[0].valuation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
               {' — '}
               {new Date(sorted[sorted.length - 1].valuation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -1015,12 +1015,12 @@ function ValuationTrendSection({ valuations }: { valuations: Valuation[] }) {
           </div>
         </div>
       ) : sorted.length === 1 ? (
-        <div className="mb-3 rounded-lg bg-zinc-50 p-3 text-center" data-testid="valuation-single-point">
-          <p className="text-xs text-zinc-500">
+        <div className="mb-3 rounded-[var(--r)] bg-[var(--subtle)] p-3 text-center" data-testid="valuation-single-point">
+          <p className="text-xs text-[var(--ink-3)]">
             {formatCurrency(Number(sorted[0].value))} op{' '}
             {new Date(sorted[0].valuation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
-          <p className="mt-1 text-[10px] text-zinc-400">Voeg meer waarderingen toe voor een trendgrafiek.</p>
+          <p className="mt-1 text-[10px] text-[var(--ink-3)]">Voeg meer waarderingen toe voor een trendgrafiek.</p>
         </div>
       ) : null}
 
@@ -1033,17 +1033,17 @@ function ValuationTrendSection({ valuations }: { valuations: Valuation[] }) {
           const diff = prev ? Number(v.value) - Number(prev.value) : null
           return (
             <div key={v.id} className="flex items-center gap-3 text-xs">
-              <span className="w-24 shrink-0 text-zinc-400">
+              <span className="w-24 shrink-0 text-[var(--ink-3)]">
                 {new Date(v.valuation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: '2-digit' })}
               </span>
-              <span className="font-medium text-zinc-700">{formatCurrency(Number(v.value))}</span>
+              <span className="font-medium text-[var(--ink-2)]">{formatCurrency(Number(v.value))}</span>
               {diff !== null && (
                 <span className={`text-[10px] font-medium ${diff >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                   {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
                 </span>
               )}
               {v.notes && (
-                <span className="truncate text-[10px] text-zinc-400">{v.notes}</span>
+                <span className="truncate text-[10px] text-[var(--ink-3)]">{v.notes}</span>
               )}
             </div>
           )
@@ -1054,7 +1054,7 @@ function ValuationTrendSection({ valuations }: { valuations: Valuation[] }) {
       {hasMore && (
         <button
           onClick={() => setShowAll(!showAll)}
-          className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-medium text-kern-600 hover:bg-kern-50/50"
+          className="mt-2 flex w-full items-center justify-center gap-1 rounded-[var(--r)] py-1.5 text-xs font-medium text-kern-600 hover:bg-kern-50/50"
           data-testid="valuation-show-more"
         >
           {showAll ? (
@@ -1250,24 +1250,24 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
       {/* Toggle header */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center justify-between rounded-lg bg-kern-50/50 px-3 py-2 text-left hover:bg-kern-50"
+        className="flex w-full items-center justify-between rounded-[var(--r)] bg-kern-50/50 px-3 py-2 text-left hover:bg-kern-50"
         data-testid="holdings-toggle"
       >
         <div className="flex items-center gap-2">
           <Briefcase className="h-4 w-4 text-kern-600" />
-          <span className="text-xs font-semibold text-zinc-700">
+          <span className="text-xs font-semibold text-[var(--ink-2)]">
             Holdings ({loading ? '…' : holdings.length})
           </span>
           {!loading && holdings.length > 0 && (
-            <span className="text-xs text-zinc-500">
+            <span className="text-xs text-[var(--ink-3)]">
               — {formatCurrency(totalValue)}
             </span>
           )}
         </div>
         {expanded ? (
-          <ChevronUp className="h-4 w-4 text-zinc-400" />
+          <ChevronUp className="h-4 w-4 text-[var(--ink-3)]" />
         ) : (
-          <ChevronDown className="h-4 w-4 text-zinc-400" />
+          <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" />
         )}
       </button>
 
@@ -1280,15 +1280,15 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
           )}
 
           {error && (
-            <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">
+            <div className="flex items-center gap-2 rounded-[var(--r)] bg-red-50 px-3 py-2 text-xs text-red-600">
               <AlertCircle className="h-3.5 w-3.5" />
               {error}
             </div>
           )}
 
           {!loading && holdings.length === 0 && !showForm && (
-            <div className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50/50 p-4 text-center" data-testid="no-holdings">
-              <p className="text-xs text-zinc-400">Nog geen holdings voor dit vermogensobject.</p>
+            <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/50 p-4 text-center" data-testid="no-holdings">
+              <p className="text-xs text-[var(--ink-3)]">Nog geen holdings voor dit vermogensobject.</p>
               <button
                 onClick={openCreateForm}
                 className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-kern-600 hover:text-kern-700"
@@ -1312,24 +1312,24 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                 return (
                   <div
                     key={h.id}
-                    className="flex items-center justify-between rounded-lg border border-zinc-100 bg-white px-3 py-2"
+                    className="flex items-center justify-between rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2"
                     data-testid={`holding-item-${h.id}`}
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-medium text-zinc-900 truncate">{h.name}</span>
+                        <span className="text-xs font-medium text-[var(--ink)] truncate">{h.name}</span>
                         {h.ticker && (
-                          <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-mono text-zinc-500">
+                          <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-mono text-[var(--ink-3)]">
                             {h.ticker}
                           </span>
                         )}
                         {h.isin && !h.ticker && (
-                          <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-mono text-zinc-500">
+                          <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-mono text-[var(--ink-3)]">
                             {h.isin}
                           </span>
                         )}
                       </div>
-                      <div className="mt-0.5 flex items-center gap-2 text-[10px] text-zinc-400">
+                      <div className="mt-0.5 flex items-center gap-2 text-[10px] text-[var(--ink-3)]">
                         <span>{h.units} eenheden</span>
                         <span>·</span>
                         <span>Gem. {formatCurrency(h.avg_purchase_price)}</span>
@@ -1343,7 +1343,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <div className="text-right">
-                        <p className="text-xs font-medium text-zinc-900">{formatCurrency(value)}</p>
+                        <p className="text-xs font-medium text-[var(--ink)]">{formatCurrency(value)}</p>
                         <p className={`text-[10px] ${returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                           {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}%
                         </p>
@@ -1351,7 +1351,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                       <div className="flex gap-0.5">
                         <button
                           onClick={(e) => { e.stopPropagation(); openEditForm(h) }}
-                          className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                          className="rounded p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
                           title="Bewerken"
                           data-testid={`edit-holding-${h.id}`}
                         >
@@ -1373,7 +1373,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                         ) : (
                           <button
                             onClick={(e) => { e.stopPropagation(); setDeleteConfirm(h.id) }}
-                            className="rounded p-1 text-zinc-400 hover:bg-red-50 hover:text-red-600"
+                            className="rounded p-1 text-[var(--ink-3)] hover:bg-red-50 hover:text-red-600"
                             title="Verwijderen"
                             data-testid={`delete-holding-${h.id}`}
                           >
@@ -1387,10 +1387,10 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
               })}
 
               {/* Summary row */}
-              <div className="flex items-center justify-between border-t border-zinc-100 pt-1.5 px-3">
-                <span className="text-[10px] font-medium text-zinc-500">Totaal</span>
+              <div className="flex items-center justify-between border-t border-[var(--border-ed)] pt-1.5 px-3">
+                <span className="text-[10px] font-medium text-[var(--ink-3)]">Totaal</span>
                 <div className="text-right">
-                  <span className="text-xs font-semibold text-zinc-900">{formatCurrency(totalValue)}</span>
+                  <span className="text-xs font-semibold text-[var(--ink)]">{formatCurrency(totalValue)}</span>
                   {totalCost > 0 && (
                     <span className={`ml-1.5 text-[10px] ${totalValue >= totalCost ? 'text-emerald-600' : 'text-red-600'}`}>
                       ({totalValue >= totalCost ? '+' : ''}{((totalValue - totalCost) / totalCost * 100).toFixed(1)}%)
@@ -1402,7 +1402,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
               {/* Add holding button */}
               <button
                 onClick={openCreateForm}
-                className="flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-kern-200 py-1.5 text-xs font-medium text-kern-600 hover:bg-kern-50"
+                className="flex w-full items-center justify-center gap-1 rounded-[var(--r)] border border-dashed border-kern-200 py-1.5 text-xs font-medium text-kern-600 hover:bg-kern-50"
                 data-testid="add-holding-btn"
               >
                 <Plus className="h-3 w-3" />
@@ -1413,14 +1413,14 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
 
           {/* Create / Edit form */}
           {showForm && (
-            <div className="rounded-lg border border-kern-200 bg-kern-50/30 p-3 space-y-2" data-testid="holding-form">
+            <div className="rounded-[var(--r)] border border-kern-200 bg-kern-50/30 p-3 space-y-2" data-testid="holding-form">
               <div className="flex items-center justify-between">
-                <h4 className="text-xs font-semibold text-zinc-700">
+                <h4 className="text-xs font-semibold text-[var(--ink-2)]">
                   {editHolding ? 'Holding bewerken' : 'Nieuwe holding'}
                 </h4>
                 <button
                   onClick={() => { setShowForm(false); setEditHolding(null); resetForm() }}
-                  className="rounded p-0.5 text-zinc-400 hover:text-zinc-600"
+                  className="rounded p-0.5 text-[var(--ink-3)] hover:text-[var(--ink-2)]"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -1428,41 +1428,41 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="col-span-2">
-                  <label className="text-[10px] font-medium text-zinc-500">Naam *</label>
+                  <label className="text-[10px] font-medium text-[var(--ink-3)]">Naam *</label>
                   <input
                     type="text"
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
                     placeholder="bijv. Vanguard FTSE All-World"
-                    className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
+                    className="mt-0.5 w-full rounded border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
                     data-testid="holding-name-input"
                     autoFocus
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-medium text-zinc-500">Ticker</label>
+                  <label className="text-[10px] font-medium text-[var(--ink-3)]">Ticker</label>
                   <input
                     type="text"
                     value={formTicker}
                     onChange={(e) => setFormTicker(e.target.value.toUpperCase())}
                     placeholder="bijv. VWRL"
-                    className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
+                    className="mt-0.5 w-full rounded border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
                     data-testid="holding-ticker-input"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-medium text-zinc-500">ISIN</label>
+                  <label className="text-[10px] font-medium text-[var(--ink-3)]">ISIN</label>
                   <input
                     type="text"
                     value={formIsin}
                     onChange={(e) => setFormIsin(e.target.value.toUpperCase())}
                     placeholder="bijv. IE00B3RBWM25"
-                    className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
+                    className="mt-0.5 w-full rounded border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
                     data-testid="holding-isin-input"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-medium text-zinc-500">Eenheden</label>
+                  <label className="text-[10px] font-medium text-[var(--ink-3)]">Eenheden</label>
                   <input
                     type="number"
                     value={formUnits}
@@ -1470,12 +1470,12 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                     placeholder="bijv. 50"
                     step="any"
                     min="0"
-                    className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
+                    className="mt-0.5 w-full rounded border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
                     data-testid="holding-units-input"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-medium text-zinc-500">Gem. aankoopprijs (€)</label>
+                  <label className="text-[10px] font-medium text-[var(--ink-3)]">Gem. aankoopprijs (€)</label>
                   <input
                     type="number"
                     value={formAvgPrice}
@@ -1483,18 +1483,18 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                     placeholder="bijv. 80.00"
                     step="0.01"
                     min="0"
-                    className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
+                    className="mt-0.5 w-full rounded border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
                     data-testid="holding-avg-price-input"
                   />
                 </div>
                 {!editHolding && (
                   <div className="col-span-2">
-                    <label className="text-[10px] font-medium text-zinc-500">Aankoopdatum</label>
+                    <label className="text-[10px] font-medium text-[var(--ink-3)]">Aankoopdatum</label>
                     <input
                       type="date"
                       value={formPurchaseDate}
                       onChange={(e) => setFormPurchaseDate(e.target.value)}
-                      className="mt-0.5 w-full rounded border border-zinc-200 px-2 py-1.5 text-xs text-zinc-900 focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
+                      className="mt-0.5 w-full rounded border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
                       data-testid="holding-purchase-date-input"
                     />
                   </div>
@@ -1511,7 +1511,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
               <div className="flex justify-end gap-2 pt-1">
                 <button
                   onClick={() => { setShowForm(false); setEditHolding(null); resetForm() }}
-                  className="rounded px-3 py-1 text-xs text-zinc-500 hover:bg-zinc-100"
+                  className="rounded px-3 py-1 text-xs text-[var(--ink-3)] hover:bg-zinc-100"
                 >
                   Annuleren
                 </button>
@@ -1612,7 +1612,7 @@ function ProjectionChart({
   data: ReturnType<typeof projectPortfolio>
   currentValue: number
 }) {
-  if (data.length === 0) return <div className="flex h-40 items-center justify-center text-xs text-zinc-400">Geen data</div>
+  if (data.length === 0) return <div className="flex h-40 items-center justify-center text-xs text-[var(--ink-3)]">Geen data</div>
 
   const w = 400
   const h = 160
@@ -1872,14 +1872,14 @@ function AssetForm({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
+        className="w-full max-w-lg rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-zinc-900">
+          <h3 className="text-lg font-bold text-[var(--ink)]">
             {isEdit ? 'Asset bewerken' : 'Nieuwe asset'}
           </h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+          <button onClick={onClose} className="rounded-[var(--r)] p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -1887,20 +1887,20 @@ function AssetForm({
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Naam</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Naam</label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
                 placeholder="Spaarrekening"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Type</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Type</label>
               <select
                 value={assetType}
                 onChange={(e) => handleTypeChange(e.target.value as AssetType)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
               >
                 {Object.entries(ASSET_TYPE_LABELS).map(([key, label]) => (
                   <option key={key} value={key}>{label}</option>
@@ -1919,11 +1919,11 @@ function AssetForm({
           {/* Subtype dropdown (conditional) */}
           {subtypeOptions && (
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Subtype</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Subtype</label>
               <select
                 value={subtype}
                 onChange={(e) => handleSubtypeChange(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
               >
                 <option value="">Selecteer subtype...</option>
                 {Object.entries(subtypeOptions).map(([key, label]) => (
@@ -1935,7 +1935,7 @@ function AssetForm({
 
           {/* Warning when holdings are active */}
           {hasActiveHoldings && (
-            <div className="flex items-start gap-2 rounded-lg bg-kern-50 border border-kern-200 px-3 py-2" data-testid="asset-form-holdings-warning">
+            <div className="flex items-start gap-2 rounded-[var(--r)] bg-kern-50 border border-kern-200 px-3 py-2" data-testid="asset-form-holdings-warning">
               <Briefcase className="mt-0.5 h-3.5 w-3.5 shrink-0 text-kern-600" />
               <p className="text-xs text-kern-700">
                 Deze asset heeft {holdingsCount} actieve holding{holdingsCount !== 1 ? 's' : ''}. De waarde wordt automatisch berekend uit de portfolio tracker. Het veld &ldquo;Huidige waarde&rdquo; kan niet handmatig worden gewijzigd.
@@ -1945,7 +1945,7 @@ function AssetForm({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
                 {assetType === 'eigen_huis' ? 'Marktwaarde' : 'Huidige waarde'}
               </label>
               <input
@@ -1953,10 +1953,10 @@ function AssetForm({
                 value={currentValue}
                 onChange={(e) => !hasActiveHoldings && setCurrentValue(e.target.value)}
                 readOnly={hasActiveHoldings}
-                className={`w-full rounded-lg border px-3 py-2 text-sm ${
+                className={`w-full rounded-[var(--r)] border px-3 py-2 text-sm ${
                   hasActiveHoldings
-                    ? 'border-zinc-200 bg-zinc-50 text-zinc-400 cursor-not-allowed'
-                    : 'border-zinc-200'
+                    ? 'border-[var(--border-ed)] bg-[var(--subtle)] text-[var(--ink-3)] cursor-not-allowed'
+                    : 'border-[var(--border-ed)]'
                 }`}
                 title={hasActiveHoldings ? 'Waarde wordt automatisch berekend uit holdings' : undefined}
               />
@@ -1965,58 +1965,58 @@ function AssetForm({
               )}
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
                 {assetType === 'eigen_huis' ? 'Aankoopprijs' : 'Aankoopwaarde'}
               </label>
               <input
                 type="number"
                 value={purchaseValue}
                 onChange={(e) => setPurchaseValue(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
               />
             </div>
           </div>
 
           <div className={`grid ${assetType === 'eigen_huis' ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Rendement (% p.j.)</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Rendement (% p.j.)</label>
               <input
                 type="number"
                 step="0.1"
                 value={expectedReturn}
                 onChange={(e) => setExpectedReturn(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
               />
             </div>
             {assetType !== 'eigen_huis' && (
               <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-600">Inleg p/m</label>
+                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Inleg p/m</label>
                 <input
                   type="number"
                   value={monthlyContribution}
                   onChange={(e) => setMonthlyContribution(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                  className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
                 />
               </div>
             )}
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Aankoopdatum</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Aankoopdatum</label>
               <input
                 type="date"
                 value={purchaseDate}
                 onChange={(e) => setPurchaseDate(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
               />
             </div>
           </div>
 
           {assetType !== 'eigen_huis' && (
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Instelling</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Instelling</label>
               <input
                 value={institution}
                 onChange={(e) => setInstitution(e.target.value)}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
                 placeholder="ABN AMRO, DEGIRO, ABP..."
               />
             </div>
@@ -2024,16 +2024,16 @@ function AssetForm({
 
           {/* Type-specific fields */}
           {visibleFields.length > 0 && visibleFields.some((f) => f !== 'subtype') && (
-            <div className="space-y-3 rounded-lg border border-kern-100 bg-kern-50/30 p-3">
+            <div className="space-y-3 rounded-[var(--r)] border border-kern-100 bg-kern-50/30 p-3">
               <p className="text-xs font-semibold text-kern-700/60 uppercase">Details</p>
               <div className="grid grid-cols-2 gap-3">
                 {visibleFields.includes('risk_profile') && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Risicoprofiel</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Risicoprofiel</label>
                     <select
                       value={riskProfile}
                       onChange={(e) => setRiskProfile(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
                     >
                       <option value="">-</option>
                       {Object.entries(RISK_PROFILE_LABELS).map(([k, l]) => (
@@ -2044,55 +2044,55 @@ function AssetForm({
                 )}
                 {visibleFields.includes('ticker_symbol') && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Ticker / ISIN</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Ticker / ISIN</label>
                     <input
                       value={tickerSymbol}
                       onChange={(e) => setTickerSymbol(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
                       placeholder="VWRL, IWDA..."
                     />
                   </div>
                 )}
                 {visibleFields.includes('is_liquid') && (
-                  <label className="flex items-center gap-2 text-sm text-zinc-700">
+                  <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
                     <input
                       type="checkbox"
                       checked={isLiquid}
                       onChange={(e) => setIsLiquid(e.target.checked)}
-                      className="rounded border-zinc-300"
+                      className="rounded border-[var(--border-md)]"
                     />
                     Direct opneembaar
                   </label>
                 )}
                 {visibleFields.includes('lock_end_date') && !isLiquid && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Vastgezet tot</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Vastgezet tot</label>
                     <input
                       type="date"
                       value={lockEndDate}
                       onChange={(e) => setLockEndDate(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
                     />
                   </div>
                 )}
                 {visibleFields.includes('tax_benefit') && (
-                  <label className="flex items-center gap-2 text-sm text-zinc-700">
+                  <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
                     <input
                       type="checkbox"
                       checked={taxBenefit}
                       onChange={(e) => setTaxBenefit(e.target.checked)}
-                      className="rounded border-zinc-300"
+                      className="rounded border-[var(--border-md)]"
                     />
                     Fiscaal voordeel
                   </label>
                 )}
                 {visibleFields.includes('retirement_provider_type') && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Pensioenuitvoerder</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Pensioenuitvoerder</label>
                     <select
                       value={retirementProviderType}
                       onChange={(e) => setRetirementProviderType(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
                     >
                       <option value="">-</option>
                       {Object.entries(RETIREMENT_PROVIDER_LABELS).map(([k, l]) => (
@@ -2103,30 +2103,30 @@ function AssetForm({
                 )}
                 {visibleFields.includes('address_postcode') && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Postcode</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Postcode</label>
                     <input
                       value={addressPostcode}
                       onChange={(e) => setAddressPostcode(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
                       placeholder="1234 AB"
                     />
                   </div>
                 )}
                 {visibleFields.includes('address_house_number') && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Huisnummer</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Huisnummer</label>
                     <div className="flex gap-2">
                       <input
                         value={addressHouseNumber}
                         onChange={(e) => setAddressHouseNumber(e.target.value)}
-                        className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                        className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
                         placeholder="42"
                       />
                       <button
                         type="button"
                         onClick={handleWozLookup}
                         disabled={wozLoading || !addressPostcode || !addressHouseNumber}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-kern-600 px-3 py-2 text-xs font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-3 py-2 text-xs font-medium text-white hover:bg-kern-700 disabled:opacity-50"
                       >
                         {wozLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
                         WOZ
@@ -2135,54 +2135,54 @@ function AssetForm({
                   </div>
                 )}
                 {wozResult && (
-                  <div className="col-span-2 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
+                  <div className="col-span-2 rounded-[var(--r)] border border-emerald-200 bg-emerald-50/50 p-3">
                     <p className="mb-2 text-xs font-semibold text-emerald-700">WOZ-waarden gevonden</p>
                     <div className="space-y-1">
                       {wozResult.map((w) => (
                         <div key={w.peildatum} className="flex items-center justify-between text-xs">
-                          <span className="text-zinc-600">{new Date(w.peildatum).toLocaleDateString('nl-NL', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
-                          <span className="font-medium text-zinc-900">{formatCurrency(w.waarde)}</span>
+                          <span className="text-[var(--ink-2)]">{new Date(w.peildatum).toLocaleDateString('nl-NL', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                          <span className="font-medium text-[var(--ink)]">{formatCurrency(w.waarde)}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
                 {wozError && (
-                  <div className="col-span-2 rounded-lg border border-red-200 bg-red-50/50 p-2">
+                  <div className="col-span-2 rounded-[var(--r)] border border-red-200 bg-red-50/50 p-2">
                     <p className="text-xs text-red-600">{wozError}</p>
                   </div>
                 )}
                 {visibleFields.includes('rental_income') && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Huurinkomsten p/m</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Huurinkomsten p/m</label>
                     <input
                       type="number"
                       value={rentalIncome}
                       onChange={(e) => setRentalIncome(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
                     />
                   </div>
                 )}
                 {visibleFields.includes('woz_value') && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">WOZ-waarde</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">WOZ-waarde</label>
                     <input
                       type="number"
                       value={wozValue}
                       onChange={(e) => setWozValue(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
                     />
                   </div>
                 )}
                 {visibleFields.includes('depreciation_rate') && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Afschrijving (% p.j.)</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Afschrijving (% p.j.)</label>
                     <input
                       type="number"
                       step="0.5"
                       value={depreciationRate}
                       onChange={(e) => setDepreciationRate(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
                     />
                   </div>
                 )}
@@ -2191,18 +2191,18 @@ function AssetForm({
           )}
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-600">Notities (optioneel)</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notities (optioneel)</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
             />
           </div>
         </div>
 
         {validationError && (
-          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700" data-testid="asset-validation-error">
+          <div className="mt-3 rounded-[var(--r)] border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700" data-testid="asset-validation-error">
             {validationError}
           </div>
         )}
@@ -2210,14 +2210,14 @@ function AssetForm({
         <div className="mt-5 flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+            className="rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
           >
             Annuleren
           </button>
           <button
             onClick={handleSave}
             disabled={saving || !name || !currentValue}
-            className="rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+            className="rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
           >
             {saving ? 'Opslaan...' : isEdit ? 'Bijwerken' : 'Toevoegen'}
           </button>
@@ -2313,21 +2313,21 @@ function ValuationModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl"
+        className="w-full max-w-md rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-zinc-900">{label}</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+          <h3 className="text-lg font-bold text-[var(--ink)]">{label}</h3>
+          <button onClick={onClose} className="rounded-[var(--r)] p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <p className="mb-4 text-sm text-zinc-500">{entityName}</p>
+        <p className="mb-4 text-sm text-[var(--ink-3)]">{entityName}</p>
 
         {/* Warning when holdings are active */}
         {hasActiveHoldings && (
-          <div className="mb-4 flex items-start gap-2 rounded-lg bg-kern-50 border border-kern-200 px-3 py-2" data-testid="valuation-holdings-warning">
+          <div className="mb-4 flex items-start gap-2 rounded-[var(--r)] bg-kern-50 border border-kern-200 px-3 py-2" data-testid="valuation-holdings-warning">
             <Briefcase className="mt-0.5 h-3.5 w-3.5 shrink-0 text-kern-600" />
             <p className="text-xs text-kern-700">
               Deze asset heeft {holdingsCount} actieve holding{holdingsCount !== 1 ? 's' : ''}. De waarde wordt automatisch berekend uit de portfolio tracker. Handmatig herwaarderen is niet mogelijk.
@@ -2337,16 +2337,16 @@ function ValuationModal({
 
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-600">Datum</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Datum</label>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-600">
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
               {entityType === 'asset' ? 'Nieuwe waarde' : 'Nieuw saldo'}
             </label>
             <input
@@ -2354,18 +2354,18 @@ function ValuationModal({
               step="0.01"
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
             />
-            <p className="mt-1 text-xs text-zinc-400">
+            <p className="mt-1 text-xs text-[var(--ink-3)]">
               Huidige waarde: {formatCurrency(currentValue)}
             </p>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-600">Notitie (optioneel)</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notitie (optioneel)</label>
             <input
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
               placeholder="Reden van waardewijziging..."
             />
           </div>
@@ -2374,14 +2374,14 @@ function ValuationModal({
         <div className="mt-5 flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+            className="rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
           >
             Annuleren
           </button>
           <button
             onClick={handleSave}
             disabled={saving || !value}
-            className="rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+            className="rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
           >
             {saving ? 'Opslaan...' : 'Opslaan'}
           </button>
@@ -2412,25 +2412,25 @@ function ValuationHistory({
   if (!valuations || valuations.length === 0) return null
 
   return (
-    <div className="mt-4 border-t border-zinc-100 pt-3">
-      <p className="mb-2 text-xs font-semibold text-zinc-500 uppercase">Waardehistorie</p>
+    <div className="mt-4 border-t border-[var(--border-ed)] pt-3">
+      <p className="mb-2 text-xs font-semibold text-[var(--ink-3)] uppercase">Waardehistorie</p>
       <div className="space-y-1">
         {valuations.map((v) => {
           const prev = valuations.find((vv) => vv.valuation_date < v.valuation_date)
           const diff = prev ? Number(v.value) - Number(prev.value) : null
           return (
             <div key={v.id} className="flex items-center gap-3 text-xs">
-              <span className="w-20 shrink-0 text-zinc-400">
+              <span className="w-20 shrink-0 text-[var(--ink-3)]">
                 {new Date(v.valuation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
               </span>
-              <span className="font-medium text-zinc-700">{formatCurrency(Number(v.value))}</span>
+              <span className="font-medium text-[var(--ink-2)]">{formatCurrency(Number(v.value))}</span>
               {diff !== null && (
                 <span className={`text-[10px] font-medium ${diff >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                   {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
                 </span>
               )}
               {v.notes && (
-                <span className="truncate text-zinc-400">{v.notes}</span>
+                <span className="truncate text-[var(--ink-3)]">{v.notes}</span>
               )}
             </div>
           )

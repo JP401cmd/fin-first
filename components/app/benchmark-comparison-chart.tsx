@@ -201,10 +201,10 @@ export function BenchmarkComparisonChart({
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-zinc-200 bg-white p-6" data-testid="benchmark-comparison-section">
+      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6" data-testid="benchmark-comparison-section">
         <div className="flex items-center gap-2 mb-4">
           <BarChart3 className="h-4 w-4 text-kern-600" />
-          <h2 className="text-sm font-semibold text-zinc-700">Benchmark vergelijking</h2>
+          <h2 className="text-sm font-semibold text-[var(--ink-2)]">Benchmark vergelijking</h2>
         </div>
         <div className="animate-pulse space-y-4">
           <div className="h-8 w-48 rounded bg-zinc-100" />
@@ -217,17 +217,17 @@ export function BenchmarkComparisonChart({
 
   if (!comparison || !chartData) {
     return (
-      <div className="rounded-2xl border border-zinc-200 bg-white p-6" data-testid="benchmark-comparison-section">
+      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6" data-testid="benchmark-comparison-section">
         <div className="flex items-center gap-2 mb-4">
           <BarChart3 className="h-4 w-4 text-kern-600" />
-          <h2 className="text-sm font-semibold text-zinc-700">Benchmark vergelijking</h2>
+          <h2 className="text-sm font-semibold text-[var(--ink-2)]">Benchmark vergelijking</h2>
         </div>
         <div className="flex flex-col items-center justify-center py-8 text-center">
-          <BarChart3 className="h-10 w-10 text-zinc-300" />
-          <p className="mt-3 text-sm font-medium text-zinc-600">
+          <BarChart3 className="h-10 w-10 text-[var(--ink-4)]" />
+          <p className="mt-3 text-sm font-medium text-[var(--ink-2)]">
             Onvoldoende data voor vergelijking
           </p>
-          <p className="mt-1 text-xs text-zinc-400">
+          <p className="mt-1 text-xs text-[var(--ink-3)]">
             Voeg holdings toe en registreer transacties om je portfolio te vergelijken met benchmarks.
           </p>
         </div>
@@ -239,12 +239,12 @@ export function BenchmarkComparisonChart({
   const alphaVsBest = bestBenchmark ? getAlphaDescription(bestBenchmark.alpha) : null
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-6" data-testid="benchmark-comparison-section">
+    <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6" data-testid="benchmark-comparison-section">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <BarChart3 className="h-4 w-4 text-kern-600" />
-          <h2 className="text-sm font-semibold text-zinc-700">Benchmark vergelijking</h2>
+          <h2 className="text-sm font-semibold text-[var(--ink-2)]">Benchmark vergelijking</h2>
         </div>
         {/* Period buttons */}
         <div className="flex items-center gap-1" data-testid="benchmark-period-buttons">
@@ -256,7 +256,7 @@ export function BenchmarkComparisonChart({
               className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${
                 activePeriod.id === p.id
                   ? 'bg-kern-100 text-kern-700'
-                  : 'text-zinc-400 hover:text-zinc-600'
+                  : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
               }`}
             >
               {p.label}
@@ -388,14 +388,14 @@ export function BenchmarkComparisonChart({
         {/* Tooltip */}
         {tooltipData && (
           <div
-            className="absolute z-10 rounded-lg border border-zinc-200 bg-white p-2 shadow-lg"
+            className="absolute z-10 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-2 shadow-[var(--s2)]"
             style={{
               left: `${(tooltipData.x / width) * 100}%`,
               top: '10px',
               transform: tooltipData.x > width * 0.7 ? 'translateX(-100%)' : 'translateX(0)',
             }}
           >
-            <p className="text-[10px] font-medium text-zinc-500 mb-1">
+            <p className="text-[10px] font-medium text-[var(--ink-3)] mb-1">
               {new Date(tooltipData.date).toLocaleDateString('nl-NL', {
                 day: 'numeric',
                 month: 'short',
@@ -408,8 +408,8 @@ export function BenchmarkComparisonChart({
                   className="inline-block h-2 w-2 rounded-full"
                   style={{ backgroundColor: v.color }}
                 />
-                <span className="text-zinc-600">{v.name}</span>
-                <span className="font-medium text-zinc-900 ml-auto">
+                <span className="text-[var(--ink-2)]">{v.name}</span>
+                <span className="font-medium text-[var(--ink)] ml-auto">
                   {v.value.toFixed(1)}
                 </span>
               </div>
@@ -422,7 +422,7 @@ export function BenchmarkComparisonChart({
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-1.5">
           <span className="inline-block h-0.5 w-4 rounded-full" style={{ backgroundColor: PORTFOLIO_COLOR }} />
-          <span className="text-[11px] font-medium text-zinc-700">Jouw portfolio</span>
+          <span className="text-[11px] font-medium text-[var(--ink-2)]">Jouw portfolio</span>
           <span className={`text-[11px] font-semibold ${comparison.portfolio.returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
             {comparison.portfolio.returnPct >= 0 ? '+' : ''}{comparison.portfolio.returnPct.toFixed(1)}%
           </span>
@@ -441,7 +441,7 @@ export function BenchmarkComparisonChart({
                 opacity: hoveredBenchmark && hoveredBenchmark !== b.id ? 0.3 : 1,
               }}
             />
-            <span className="text-[11px] text-zinc-500">{b.name}</span>
+            <span className="text-[11px] text-[var(--ink-3)]">{b.name}</span>
             <span className={`text-[11px] font-medium ${b.returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
               {b.returnPct >= 0 ? '+' : ''}{b.returnPct.toFixed(1)}%
             </span>
@@ -457,11 +457,11 @@ export function BenchmarkComparisonChart({
           return (
             <div
               key={b.id}
-              className="flex items-center gap-2 rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2"
+              className="flex items-center gap-2 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2"
               data-testid={`alpha-${b.id}`}
             >
               <AlphaIcon className={`h-3.5 w-3.5 ${desc.color}`} />
-              <span className="text-xs text-zinc-600 flex-1">
+              <span className="text-xs text-[var(--ink-2)] flex-1">
                 vs {b.name}
               </span>
               <span className={`text-xs font-semibold ${desc.color}`} data-testid={`alpha-value-${b.id}`}>
@@ -476,7 +476,7 @@ export function BenchmarkComparisonChart({
       {alphaVsBest && (
         <div className="mt-3 flex items-start gap-2 rounded-lg border border-kern-100 bg-kern-50/50 p-3" data-testid="benchmark-context-message">
           <Info className="h-3.5 w-3.5 shrink-0 text-kern-500 mt-0.5" />
-          <p className="text-xs text-zinc-600 leading-relaxed">
+          <p className="text-xs text-[var(--ink-2)] leading-relaxed">
             <span className="font-medium">Benchmarkvergelijking:</span>{' '}
             Je portfolio rendement van{' '}
             <span className={`font-semibold ${comparison.portfolio.returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>

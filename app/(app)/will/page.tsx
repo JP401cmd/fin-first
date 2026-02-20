@@ -268,22 +268,22 @@ export default function WillPage() {
     <FreedomDaysAnimationProvider>
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* === 1. Hero (Gradient) === */}
-      <section data-testid="wil-hero" className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-wil-950 via-wil-900 to-wil-950 p-5 text-white sm:p-8 md:p-10">
-        <div className="pointer-events-none absolute -top-24 right-1/4 h-64 w-64 rounded-full bg-wil-500/10 blur-3xl" />
+      <section data-testid="wil-hero" className="card-editorial overflow-hidden">
+        <div className="h-1.5 bg-wil-500" />
 
-        <div className="relative">
+        <div className="p-5 sm:p-8 md:p-10">
           <div className="mb-6 flex items-center gap-3">
             <FinnAvatar size={40} />
-            <p className="text-xs font-semibold tracking-[0.2em] text-wil-300/80 uppercase">
+            <p className="label-editorial text-wil-600">
               Jouw wilskracht in actie
             </p>
           </div>
 
           <div className="mb-2 flex items-baseline gap-2" data-testid="wil-hero-primary-metric">
-            <span className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl" data-testid="wil-hero-freedom-days-value">
+            <span className="font-display text-[52px] font-bold tracking-tight text-[var(--ink)]" data-testid="wil-hero-freedom-days-value">
               {totalFreedomDaysWon > 0 ? `+${totalFreedomDaysWon}` : '0'}
             </span>
-            <span className="ml-3 text-lg text-wil-200/70" data-testid="wil-hero-freedom-days-label">
+            <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]" data-testid="wil-hero-freedom-days-label">
               {totalFreedomDaysWon === 1 ? 'vrijheidsdag gewonnen' : 'vrijheidsdagen gewonnen'}
             </span>
             <HeroTooltip text="Gewonnen vrijheidsdagen komen uitsluitend van voltooide acties in De Wil. Elke afgeronde actie levert concrete vrijheidsdagen op." />
@@ -291,9 +291,9 @@ export default function WillPage() {
 
           {/* Weekly freedom days summary */}
           <div className="mb-6 flex items-center gap-3" data-testid="wil-hero-weekly-summary">
-            <div className="inline-flex items-center gap-2 rounded-full bg-wil-800/50 px-3 py-1.5 backdrop-blur-sm">
-              <Sparkles className="h-3.5 w-3.5 text-wil-300" />
-              <span className="text-sm font-medium text-wil-200" data-testid="weekly-freedom-days-value">
+            <div className="inline-flex items-center gap-2 rounded-full bg-wil-50 px-3 py-1.5">
+              <Sparkles className="h-3.5 w-3.5 text-wil-500" />
+              <span className="text-sm font-medium text-wil-700" data-testid="weekly-freedom-days-value">
                 Deze week: +{weeklyFreedomDaysWon % 1 === 0 ? weeklyFreedomDaysWon : weeklyFreedomDaysWon.toFixed(1)} {weeklyFreedomDaysWon === 1 ? 'vrijheidsdag' : 'vrijheidsdagen'} gewonnen
               </span>
             </div>
@@ -301,15 +301,15 @@ export default function WillPage() {
 
           {/* Progress bar: completion ratio */}
           <div className="mb-8">
-            <div className="h-3 w-full overflow-hidden rounded-full bg-wil-950/60">
+            <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-wil-600 via-wil-400 to-wil-300 transition-all duration-1000"
                 style={{ width: `${Math.min(completionRatio, 100)}%` }}
               />
             </div>
-            <div className="mt-2 flex justify-between text-xs text-wil-300/50">
+            <div className="mt-2 flex justify-between text-xs text-[var(--ink-4)]">
               <span>0% acties voltooid</span>
-              <span>{completionRatio}% afgerond</span>
+              <span className="font-mono">{completionRatio}% afgerond</span>
               <span>100%</span>
             </div>
           </div>
@@ -317,28 +317,28 @@ export default function WillPage() {
           {/* Sub KPIs */}
           <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-3" data-testid="wil-hero-sub-kpis">
             <div data-testid="wil-hero-acties-voltooid">
-              <p className="text-xs font-medium text-wil-300/60 uppercase">Acties voltooid</p>
-              <p className="mt-1 text-2xl font-bold">
+              <p className="label-editorial text-[var(--ink-3)]">Acties voltooid</p>
+              <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]">
                 {completedActions.length} van {totalActions}
               </p>
-              <p className="text-sm text-wil-200/50">bewuste keuzes gemaakt</p>
+              <p className="font-serif italic text-sm text-[var(--ink-3)]">bewuste keuzes gemaakt</p>
             </div>
             <div data-testid="wil-hero-open-potentieel">
               <div className="flex items-center gap-1.5">
-                <p className="text-xs font-medium text-wil-300/60 uppercase">Open potentieel</p>
+                <p className="label-editorial text-[var(--ink-3)]">Open potentieel</p>
                 <HeroTooltip text="Open potentieel toont vrijheidsdagen die je kunt winnen door openstaande acties en aanbevelingen in De Wil af te ronden." />
               </div>
-              <p className="mt-1 text-2xl font-bold">
+              <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]">
                 +{openPotential} dagen
               </p>
-              <p className="text-sm text-wil-200/50">nog te winnen</p>
+              <p className="font-serif italic text-sm text-[var(--ink-3)]">nog te winnen</p>
             </div>
             <div data-testid="wil-hero-beslissnelheid">
-              <p className="text-xs font-medium text-wil-300/60 uppercase">Beslissnelheid</p>
-              <p className="mt-1 text-2xl font-bold">
+              <p className="label-editorial text-[var(--ink-3)]">Beslissnelheid</p>
+              <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]">
                 {decisionDays.length > 0 ? `${avgDecisionDays} dagen` : '-'}
               </p>
-              <p className="text-sm text-wil-200/50">gem. tijd tot beslissing</p>
+              <p className="font-serif italic text-sm text-[var(--ink-3)]">gem. tijd tot beslissing</p>
             </div>
           </div>
         </div>
@@ -359,15 +359,15 @@ export default function WillPage() {
 
       {/* === 2. KPI Stat Cards (White cards, subtle borders) === */}
       <section data-testid="wil-kpi-grid" className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-voltooide-acties">
+        <div className="card-editorial p-5" data-testid="kpi-voltooide-acties">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-wil-50">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
               <CheckCircle className="h-5 w-5 text-wil-600" />
             </div>
             <KpiTooltip text="Hoeveel acties je hebt afgerond. Elke actie brengt je dichter bij vrijheid." />
           </div>
-          <p className="text-sm font-medium text-zinc-500">Voltooide Acties</p>
-          <p className="mt-1 text-3xl font-bold text-zinc-900">
+          <p className="text-sm font-medium text-[var(--ink-3)]">Voltooide Acties</p>
+          <p className="mt-1 text-3xl font-bold text-[var(--ink)]">
             {completedActions.length}/{totalActions}
           </p>
           <p className="mt-1 text-xs text-wil-600">
@@ -375,53 +375,53 @@ export default function WillPage() {
           </p>
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-open-potentieel">
+        <div className="card-editorial p-5" data-testid="kpi-open-potentieel">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-wil-50">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
               <Sparkles className="h-5 w-5 text-wil-600" />
             </div>
             <KpiTooltip text="Open potentieel — exclusief De Wil. Vrijheidsdagen die je kunt winnen door openstaande acties en aanbevelingen af te ronden. Dit verschilt van 'Vrije Dagen per Jaar' in De Kern, dat gebaseerd is op passief inkomen." />
           </div>
-          <p className="text-sm font-medium text-zinc-500">Open Potentieel</p>
-          <p className="mt-1 text-3xl font-bold text-zinc-900">
+          <p className="text-sm font-medium text-[var(--ink-3)]">Open Potentieel</p>
+          <p className="mt-1 text-3xl font-bold text-[var(--ink)]">
             +{openPotential} dagen
           </p>
-          <p className="mt-1 text-xs text-zinc-400">wachtend op actie</p>
+          <p className="mt-1 text-xs text-[var(--ink-3)]">wachtend op actie</p>
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-doelvoortgang">
+        <div className="card-editorial p-5" data-testid="kpi-doelvoortgang">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-wil-50">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
               <Target className="h-5 w-5 text-wil-600" />
             </div>
             <KpiTooltip text="Gemiddelde voortgang over al je actieve financiele doelen." />
           </div>
-          <p className="text-sm font-medium text-zinc-500">Doelvoortgang</p>
-          <p className="mt-1 text-3xl font-bold text-zinc-900">
+          <p className="text-sm font-medium text-[var(--ink-3)]">Doelvoortgang</p>
+          <p className="mt-1 text-3xl font-bold text-[var(--ink)]">
             {goals.length > 0 ? `${avgGoalProgress}%` : '-'}
           </p>
-          <p className="mt-1 text-xs text-zinc-400">
+          <p className="mt-1 text-xs text-[var(--ink-3)]">
             {goals.length > 0 ? `over ${goals.length} actieve doelen` : 'geen actieve doelen'}
           </p>
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-5" data-testid="kpi-wilskrachtscore">
+        <div className="card-editorial p-5" data-testid="kpi-wilskrachtscore">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-wil-50">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
               <Flame className="h-5 w-5 text-wil-600" />
             </div>
             <KpiTooltip text="Hoe actief je bent in het nemen en afronden van beslissingen." />
           </div>
-          <p className="text-sm font-medium text-zinc-500">Wilskrachtscore</p>
+          <p className="text-sm font-medium text-[var(--ink-3)]">Wilskrachtscore</p>
           <p className="mt-1 text-3xl font-bold text-wil-600">{willpowerScore}</p>
-          <p className="mt-1 text-xs text-zinc-400">{willpowerLabel[willpowerScore]}</p>
+          <p className="mt-1 text-xs text-[var(--ink-3)]">{willpowerLabel[willpowerScore]}</p>
         </div>
       </section>
 
       {/* === 3. Alerts === */}
       {(overdueActions.length > 0 || reactivatedRecs.length > 0 || offTrackGoals.length > 0) && (
         <section className="mt-8" data-testid="wil-alerts">
-          <h2 className="mb-3 text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          <h2 className="mb-3 label-editorial text-[var(--ink-2)]">
             Aandachtspunten
           </h2>
           <div className="space-y-2">
@@ -456,10 +456,10 @@ export default function WillPage() {
       {/* === 4. Suggesties (Primary Content) === */}
       <section id="section-suggesties" className="mt-10 scroll-mt-8">
         <div className="mb-5">
-          <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          <h2 className="label-editorial text-[var(--ink-2)]">
             Suggesties
           </h2>
-          <p className="mt-1 text-sm text-zinc-500">
+          <p className="mt-1 text-sm text-[var(--ink-3)]">
             Ontdek verborgen vrijheidsdagen
           </p>
         </div>
@@ -476,10 +476,10 @@ export default function WillPage() {
       {/* === 6. Acties (Primary Content) === */}
       <section id="section-acties" className="mt-10 scroll-mt-8">
         <div className="mb-5">
-          <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+          <h2 className="label-editorial text-[var(--ink-2)]">
             Acties
           </h2>
-          <p className="mt-1 text-sm text-zinc-500">
+          <p className="mt-1 text-sm text-[var(--ink-3)]">
             Concrete stappen die je vrijheid laten groeien
           </p>
         </div>
@@ -491,17 +491,17 @@ export default function WillPage() {
       <section id="section-doelen" className="mt-10 scroll-mt-8">
         <div className="mb-5 flex items-center justify-between">
           <div>
-            <h2 className="text-xs font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+            <h2 className="label-editorial text-[var(--ink-2)]">
               Doelvoortgang
             </h2>
-            <p className="mt-1 text-sm text-zinc-500">
+            <p className="mt-1 text-sm text-[var(--ink-3)]">
               Je actieve financiele doelen
             </p>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowGoalForm(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-wil-200 px-3 py-1.5 text-sm font-medium text-wil-600 hover:bg-wil-50"
+              className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-wil-200 px-3 py-1.5 text-sm font-medium text-wil-600 hover:bg-wil-50"
             >
               <Plus className="h-3.5 w-3.5" />
               Nieuw doel
@@ -509,7 +509,7 @@ export default function WillPage() {
             {goals.length > 0 && (
               <button
                 onClick={() => setShowGoalModal(true)}
-                className="rounded-lg border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+                className="rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-1.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
               >
                 Alle doelen bekijken
               </button>
@@ -518,7 +518,7 @@ export default function WillPage() {
         </div>
 
         {goals.length > 0 ? (
-          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+          <div className="card-editorial overflow-hidden">
             <div className="divide-y divide-zinc-100">
               {goals.map((goal, i) => (
                 <GoalSummaryRow
@@ -531,8 +531,8 @@ export default function WillPage() {
             </div>
           </div>
         ) : (
-          <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
-            <p className="text-sm text-zinc-500">
+          <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-8 text-center">
+            <p className="text-sm text-[var(--ink-3)]">
               Nog geen doelen ingesteld. Klik op &quot;Nieuw doel&quot; om te starten.
             </p>
           </div>
@@ -553,7 +553,7 @@ export default function WillPage() {
             <ImpactChart entries={impactEntries} maxImpact={maxImpact} getBarColor={getBarColor} getTypeLabel={getTypeLabel} />
           ) : (
             <div className="py-4 text-center">
-              <p className="text-sm text-zinc-500">
+              <p className="text-sm text-[var(--ink-3)]">
                 Nog geen acties afgerond. Scroll naar de{' '}
                 <button onClick={() => scrollToSection('section-suggesties')} className="font-medium text-wil-600 hover:underline">
                   suggesties
@@ -630,7 +630,7 @@ function HeroTooltip({ text }: { text: string }) {
       </button>
       <div
         role="tooltip"
-        className={`absolute left-0 z-10 mt-1 w-64 rounded-lg border border-wil-700/50 bg-wil-900/95 p-3 text-xs leading-relaxed text-wil-100 shadow-lg backdrop-blur-sm transition-opacity ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}
+        className={`absolute left-0 z-10 mt-1 w-64 rounded-lg border border-wil-700/50 bg-wil-900/95 p-3 text-xs leading-relaxed text-wil-100 shadow-[var(--s2)] backdrop-blur-sm transition-opacity ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}
       >
         {text}
       </div>
@@ -649,9 +649,9 @@ function KpiTooltip({ text }: { text: string }) {
         onBlur={() => setOpen(false)}
         className="touch-target"
       >
-        <Info className={`h-4 w-4 cursor-help transition-colors ${open ? 'text-wil-500' : 'text-zinc-300'} group-hover:text-wil-500`} />
+        <Info className={`h-4 w-4 cursor-help transition-colors ${open ? 'text-wil-500' : 'text-[var(--ink-4)]'} group-hover:text-wil-500`} />
       </button>
-      <div role="tooltip" className={`absolute right-0 z-10 mt-1 w-56 rounded-lg border border-zinc-200 bg-white p-3 text-xs leading-relaxed text-zinc-600 shadow-lg transition-opacity ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}>
+      <div role="tooltip" className={`absolute right-0 z-10 mt-1 w-56 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 text-xs leading-relaxed text-[var(--ink-2)] shadow-[var(--s2)] transition-opacity ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}>
         {text}
       </div>
     </div>
@@ -675,7 +675,7 @@ function AlertBanner({
   return (
     <button
       onClick={onClick}
-      className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:opacity-80 ${borderClass}`}
+      className={`flex w-full items-center gap-3 rounded-[var(--r)] border p-3 text-left transition-colors hover:opacity-80 ${borderClass}`}
     >
       {icon}
       <span className={`flex-1 text-sm font-medium ${textClass}`}>{message}</span>
@@ -759,25 +759,25 @@ function GoalSummaryRow({
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-zinc-50"
+      className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-[var(--subtle)]"
     >
-      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${colors.bgLight}`}>
+      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r)] ${colors.bgLight}`}>
         <span className="text-sm">{goal.icon}</span>
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between">
-          <p className="truncate text-sm font-medium text-zinc-900">{goal.name}</p>
+          <p className="truncate text-sm font-medium text-[var(--ink)]">{goal.name}</p>
           <div className="ml-3 flex items-center gap-2">
-            <span className="text-sm font-bold text-zinc-700">{progress.pct}%</span>
+            <span className="text-sm font-bold text-[var(--ink-2)]">{progress.pct}%</span>
             {progress.eta && (
-              <span className="text-xs text-zinc-400">{progress.eta}</span>
+              <span className="text-xs text-[var(--ink-3)]">{progress.eta}</span>
             )}
             {!progress.onTrack && goal.target_date && (
               <span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-600">achter</span>
             )}
           </div>
         </div>
-        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
           <div
             className={`h-full rounded-full ${colors.bar} transition-all duration-500`}
             style={{ width: `${progress.pct}%` }}

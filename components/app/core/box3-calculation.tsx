@@ -9,8 +9,8 @@ import { BOX3_TOOLTIPS } from '@/lib/box3-data'
 function Tooltip({ text }: { text: string }) {
   return (
     <div className="group relative inline-block">
-      <Info className="h-3.5 w-3.5 cursor-help text-zinc-300 transition-colors group-hover:text-kern-500" />
-      <div className="pointer-events-none absolute right-0 z-10 mt-1 w-52 rounded-lg border border-zinc-200 bg-white p-2.5 text-xs leading-relaxed text-zinc-600 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+      <Info className="h-3.5 w-3.5 cursor-help text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
+      <div className="pointer-events-none absolute right-0 z-10 mt-1 w-52 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-2.5 text-xs leading-relaxed text-[var(--ink-2)] opacity-0 shadow-[var(--s2)] transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
         {text}
       </div>
     </div>
@@ -30,7 +30,7 @@ function Step({ label, value, tooltip, highlight, indent, negative }: StepProps)
   return (
     <div className={`flex items-center justify-between py-1.5 ${indent ? 'pl-4' : ''} ${highlight ? 'font-semibold' : ''}`}>
       <div className="flex items-center gap-1.5">
-        <span className={`text-sm ${highlight ? 'text-zinc-900' : 'text-zinc-600'}`}>
+        <span className={`text-sm ${highlight ? 'text-[var(--ink)]' : 'text-[var(--ink-2)]'}`}>
           {label}
         </span>
         {tooltip && <Tooltip text={tooltip} />}
@@ -38,7 +38,7 @@ function Step({ label, value, tooltip, highlight, indent, negative }: StepProps)
       <span className={`text-sm font-medium tabular-nums ${
         negative ? 'text-red-600' :
         highlight ? 'text-kern-700' :
-        'text-zinc-900'
+        'text-[var(--ink)]'
       }`}>
         {value}
       </span>
@@ -52,32 +52,32 @@ export function Box3Calculation({ result }: { result: Box3Result }) {
   const pct = (v: number) => `${(v * 100).toFixed(2)}%`
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white">
+    <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)]">
       <button
         onClick={() => setExpanded(v => !v)}
-        className="flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-zinc-50"
+        className="flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-[var(--subtle)]"
       >
         <div>
-          <h3 className="text-sm font-semibold text-zinc-900">Berekening stap-voor-stap</h3>
-          <p className="mt-0.5 text-xs text-zinc-400">"Kassabon" — hoe je Box 3 belasting tot stand komt</p>
+          <h3 className="text-sm font-semibold text-[var(--ink)]">Berekening stap-voor-stap</h3>
+          <p className="mt-0.5 text-xs text-[var(--ink-3)]">"Kassabon" — hoe je Box 3 belasting tot stand komt</p>
         </div>
         {expanded
-          ? <ChevronUp className="h-4 w-4 text-zinc-400" />
-          : <ChevronDown className="h-4 w-4 text-zinc-400" />
+          ? <ChevronUp className="h-4 w-4 text-[var(--ink-3)]" />
+          : <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" />
         }
       </button>
 
       {expanded && (
-        <div className="border-t border-zinc-100 px-5 py-4">
+        <div className="border-t border-[var(--border-ed)] px-5 py-4">
           {/* Section: Bezittingen */}
           <div className="mb-4">
-            <p className="mb-1 text-[10px] font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+            <p className="mb-1 text-[10px] font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
               Bezittingen op peildatum
             </p>
             <Step label="Spaargeld" value={formatCurrency(result.totaalSpaargeld)} />
             <Step label="Beleggingen" value={formatCurrency(result.totaalBeleggingen)} />
             <Step label="Uitgesloten (Box 1 e.d.)" value={formatCurrency(result.totaalUitgesloten)} tooltip={BOX3_TOOLTIPS.eigenWoning} />
-            <div className="my-2 border-t border-dashed border-zinc-200" />
+            <div className="my-2 border-t border-dashed border-[var(--border-ed)]" />
             <Step
               label="Totaal Box 3 bezittingen"
               value={formatCurrency(result.totaalSpaargeld + result.totaalBeleggingen)}
@@ -87,18 +87,18 @@ export function Box3Calculation({ result }: { result: Box3Result }) {
 
           {/* Section: Schulden */}
           <div className="mb-4">
-            <p className="mb-1 text-[10px] font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+            <p className="mb-1 text-[10px] font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
               Schulden
             </p>
             <Step label="Box 3 schulden" value={formatCurrency(result.totaalBox3Schulden)} />
             <Step label="Schuldendrempel" value={`-/- ${formatCurrency(result.schuldendrempel)}`} tooltip={BOX3_TOOLTIPS.schuldendrempel} />
-            <div className="my-2 border-t border-dashed border-zinc-200" />
+            <div className="my-2 border-t border-dashed border-[var(--border-ed)]" />
             <Step label="Aftrekbare schulden" value={formatCurrency(result.aftrekbareSchulden)} highlight />
           </div>
 
           {/* Section: Forfaitair rendement */}
           <div className="mb-4">
-            <p className="mb-1 text-[10px] font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+            <p className="mb-1 text-[10px] font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
               Forfaitair rendement
             </p>
             <Step
@@ -115,13 +115,13 @@ export function Box3Calculation({ result }: { result: Box3Result }) {
               value={`-/- ${formatCurrency(result.forfaitairSchulden)}`}
               negative
             />
-            <div className="my-2 border-t border-dashed border-zinc-200" />
+            <div className="my-2 border-t border-dashed border-[var(--border-ed)]" />
             <Step label="Voordeel uit sparen en beleggen" value={formatCurrency(result.voordeelUitSparen)} highlight />
           </div>
 
           {/* Section: Grondslag */}
           <div className="mb-4">
-            <p className="mb-1 text-[10px] font-semibold tracking-[0.15em] text-zinc-400 uppercase">
+            <p className="mb-1 text-[10px] font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
               Grondslag
             </p>
             <Step
@@ -134,7 +134,7 @@ export function Box3Calculation({ result }: { result: Box3Result }) {
               value={`-/- ${formatCurrency(result.heffingsvrijVermogen)}`}
               tooltip={BOX3_TOOLTIPS.heffingsvrijVermogen}
             />
-            <div className="my-2 border-t border-dashed border-zinc-200" />
+            <div className="my-2 border-t border-dashed border-[var(--border-ed)]" />
             <Step label="Grondslag sparen en beleggen" value={formatCurrency(result.grondslagSparen)} highlight />
           </div>
 

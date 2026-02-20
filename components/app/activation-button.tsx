@@ -49,7 +49,7 @@ export function ActivationButton({ data }: { data: FeatureAccessData }) {
       {/* FAB — positioned left of chat FAB */}
       <button
         onClick={() => setShowModal(true)}
-        className="group fixed bottom-[calc(var(--bottom-nav-height)+1.5rem)] right-[88px] z-50 flex h-14 w-14 items-center justify-center rounded-full bg-horizon-600 text-white shadow-lg transition-transform hover:scale-105 active:scale-95 animate-pulse md:bottom-6"
+        className="group fixed bottom-[calc(var(--bottom-nav-height)+1.5rem)] right-[88px] z-50 flex h-14 w-14 items-center justify-center rounded-full bg-horizon-600 text-white shadow-[var(--s2)] transition-transform hover:scale-105 active:scale-95 animate-pulse md:bottom-6"
         title="Bekijk je startpositie en activeer je routekaart"
       >
         <Sparkles className="h-6 w-6" />
@@ -62,7 +62,7 @@ export function ActivationButton({ data }: { data: FeatureAccessData }) {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-lg rounded-2xl bg-white shadow-xl overflow-hidden">
+          <div className="mx-4 w-full max-w-lg rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl overflow-hidden">
             {/* Header */}
             <div className={`bg-gradient-to-r ${colors.gradient} px-6 py-8 text-center text-white`}>
               <div className="mx-auto mb-4 flex justify-center">
@@ -80,30 +80,30 @@ export function ActivationButton({ data }: { data: FeatureAccessData }) {
             {/* Body — 2x2 metrics grid */}
             <div className="px-6 py-5">
               <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-                  <p className="text-xs font-medium text-zinc-500">Netto vermogen</p>
+                <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+                  <p className="text-xs font-medium text-[var(--ink-3)]">Netto vermogen</p>
                   <p className={`mt-1 text-lg font-bold ${data.netWorth >= 0 ? 'text-green-700' : 'text-red-600'}`}>
                     {formatCurrency(data.netWorth)}
                   </p>
                 </div>
 
-                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-                  <p className="text-xs font-medium text-zinc-500">Vrijheid</p>
+                <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+                  <p className="text-xs font-medium text-[var(--ink-3)]">Vrijheid</p>
                   <p className="mt-1 text-lg font-bold text-horizon-700">
                     {data.freedomPct.toFixed(1)}%
                   </p>
                 </div>
 
-                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-                  <p className="text-xs font-medium text-zinc-500">Maandlasten</p>
-                  <p className="mt-1 text-lg font-bold text-zinc-700">
+                <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+                  <p className="text-xs font-medium text-[var(--ink-3)]">Maandlasten</p>
+                  <p className="mt-1 text-lg font-bold text-[var(--ink-2)]">
                     {formatCurrency(data.monthlyExpenses)}
                   </p>
                 </div>
 
-                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-                  <p className="text-xs font-medium text-zinc-500">Vrijgekochte tijd</p>
-                  <p className="mt-1 text-lg font-bold text-zinc-700">
+                <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+                  <p className="text-xs font-medium text-[var(--ink-3)]">Vrijgekochte tijd</p>
+                  <p className="mt-1 text-lg font-bold text-[var(--ink-2)]">
                     {freedomYears > 0 ? `${freedomYears}j ` : ''}{freedomMonths}m
                   </p>
                 </div>
@@ -111,10 +111,10 @@ export function ActivationButton({ data }: { data: FeatureAccessData }) {
             </div>
 
             {/* Footer */}
-            <div className="border-t border-zinc-100 px-6 py-4 flex justify-end gap-3">
+            <div className="border-t border-[var(--border-ed)] px-6 py-4 flex justify-end gap-3">
               <button
                 onClick={() => setShowModal(false)}
-                className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+                className="rounded-lg border border-[var(--border-md)] px-4 py-2.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
               >
                 Later
               </button>

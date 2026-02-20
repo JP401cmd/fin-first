@@ -86,7 +86,7 @@ export function NotificationItem({ notification, onRead, onClose }: Props) {
   return (
     <div
       onClick={handleClick}
-      className={`flex cursor-pointer gap-3 px-4 py-3 transition-colors hover:bg-zinc-50 ${
+      className={`flex cursor-pointer gap-3 px-4 py-3 transition-colors hover:bg-[var(--subtle)] ${
         !notification.read ? 'bg-blue-50/30' : ''
       }`}
     >
@@ -110,7 +110,7 @@ export function NotificationItem({ notification, onRead, onClose }: Props) {
               <span className="h-2 w-2 rounded-full bg-blue-500" />
             )}
           </div>
-          <span className="shrink-0 text-xs text-zinc-400">
+          <span className="shrink-0 text-xs text-[var(--ink-3)]">
             {timeAgo(notification.createdAt)}
           </span>
         </div>
@@ -118,14 +118,14 @@ export function NotificationItem({ notification, onRead, onClose }: Props) {
         <p
           className={`mt-1 text-sm leading-snug ${
             !notification.read
-              ? 'font-semibold text-zinc-900'
-              : 'font-medium text-zinc-700'
+              ? 'font-semibold text-[var(--ink)]'
+              : 'font-medium text-[var(--ink-2)]'
           }`}
         >
           {notification.title}
         </p>
 
-        <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-zinc-500">
+        <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-[var(--ink-3)]">
           {notification.description}
         </p>
 

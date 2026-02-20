@@ -63,8 +63,8 @@ export default function ConnectSuccessPage() {
         <CheckCircle2 className="h-8 w-8 text-green-600" />
       </div>
 
-      <h1 className="mt-4 text-2xl font-bold text-zinc-900">Bank gekoppeld!</h1>
-      <p className="mt-2 text-sm text-zinc-500">
+      <h1 className="mt-4 text-2xl font-bold text-[var(--ink)]">Bank gekoppeld!</h1>
+      <p className="mt-2 text-sm text-[var(--ink-3)]">
         Je bankrekening is succesvol verbonden. Je kunt nu transacties synchroniseren.
       </p>
 
@@ -72,14 +72,14 @@ export default function ConnectSuccessPage() {
       {!loading && accounts.length > 0 && (
         <div className="mt-8 space-y-3 text-left">
           {accounts.map((acc) => (
-            <div key={acc.id} className="rounded-xl border border-zinc-200 bg-white p-4">
+            <div key={acc.id} className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-zinc-900">
+                  <p className="text-sm font-semibold text-[var(--ink)]">
                     {acc.gocardless_requisitions?.institution_name}
                   </p>
                   {acc.iban && (
-                    <p className="text-xs text-zinc-500">{acc.iban}</p>
+                    <p className="text-xs text-[var(--ink-3)]">{acc.iban}</p>
                   )}
                 </div>
 

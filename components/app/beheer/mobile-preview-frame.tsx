@@ -35,7 +35,7 @@ export function MobilePreviewFrame({ children }: { children: ReactNode }) {
       {/* Toolbar */}
       <div className="flex w-full items-center justify-between px-4 py-3 bg-zinc-900">
         <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-zinc-300">Device:</span>
+          <span className="text-sm font-medium text-[var(--ink-4)]">Device:</span>
           <select
             value={device.name}
             onChange={(e) => {
@@ -60,7 +60,7 @@ export function MobilePreviewFrame({ children }: { children: ReactNode }) {
               className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                 activePath === r.path
                   ? 'bg-zinc-600 text-zinc-100'
-                  : 'text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                  : 'text-[var(--ink-3)] hover:bg-zinc-700 hover:text-zinc-200'
               }`}
             >
               {r.label}
@@ -134,7 +134,7 @@ function PhoneFrame({
 
       {/* Content area */}
       <div
-        className="relative flex-1 overflow-hidden rounded-b-[36px] bg-zinc-50"
+        className="relative flex-1 overflow-hidden rounded-b-[36px] bg-[var(--subtle)]"
         style={{ width, margin: '0 auto' }}
       >
         {children}

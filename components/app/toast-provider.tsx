@@ -81,7 +81,7 @@ function FlyingBadgeIcon({ icon, onDone }: { icon: string; onDone: () => void })
         transition: 'all 800ms cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     >
-      <span className="text-4xl drop-shadow-lg" aria-hidden="true">
+      <span className="text-4xl drop-shadow-[var(--s2)]" aria-hidden="true">
         {icon}
       </span>
     </div>
@@ -113,7 +113,7 @@ function BadgeToastItem({
   return (
     <>
       <div
-        className="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl border-2 p-4 shadow-lg backdrop-blur-sm transition-all duration-300 bg-gradient-to-r from-amber-50 to-teal-50 border-amber-300 text-zinc-900"
+        className="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-[var(--r-lg)] border-2 p-4 shadow-[var(--s2)] backdrop-blur-sm transition-all duration-300 bg-gradient-to-r from-amber-50 to-teal-50 border-amber-300 text-[var(--ink)]"
         role="alert"
         data-testid="badge-toast"
         data-toast-type="badge"
@@ -143,7 +143,7 @@ function BadgeToastItem({
         </div>
         <button
           onClick={onRemove}
-          className="flex-shrink-0 ml-2 text-zinc-400 hover:text-zinc-600 transition-colors"
+          className="flex-shrink-0 ml-2 text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors"
           aria-label="Sluiten"
         >
           ✕
@@ -186,7 +186,7 @@ function ToastItem({
 
   return (
     <div
-      className={`pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl border-2 p-4 shadow-lg backdrop-blur-sm transition-all duration-300 ${bgMap[toast.type]}`}
+      className={`pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-[var(--r-lg)] border-2 p-4 shadow-[var(--s2)] backdrop-blur-sm transition-all duration-300 ${bgMap[toast.type]}`}
       role="alert"
       data-testid="toast-item"
       style={{
@@ -207,7 +207,7 @@ function ToastItem({
       </div>
       <button
         onClick={onRemove}
-        className="flex-shrink-0 ml-2 text-zinc-400 hover:text-zinc-600 transition-colors"
+        className="flex-shrink-0 ml-2 text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors"
         aria-label="Sluiten"
       >
         ✕

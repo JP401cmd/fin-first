@@ -171,7 +171,7 @@ export function BudgetSankey({
 
   return (
     <div className="mt-4">
-      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+      <div className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)]">
         <SankeyDiagram
           nodes={nodes}
           links={links}

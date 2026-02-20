@@ -54,7 +54,7 @@ export function CollapsibleSection({
 
   return (
     <div
-      className="rounded-xl border border-zinc-200 bg-white overflow-hidden"
+      className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden"
       data-testid={`collapsible-section-${storageKey}`}
       data-collapsed={!isOpen ? 'true' : 'false'}
     >
@@ -62,24 +62,24 @@ export function CollapsibleSection({
       <button
         type="button"
         onClick={toggle}
-        className="flex w-full items-center gap-3 p-5 text-left transition-colors hover:bg-zinc-50"
+        className="flex w-full items-center gap-3 p-5 text-left transition-colors hover:bg-[var(--subtle)]"
         aria-expanded={isOpen}
         data-testid={`collapsible-toggle-${storageKey}`}
       >
         {icon && (
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-50">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)]">
             {icon}
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-zinc-900" data-testid={`collapsible-title-${storageKey}`}>{title}</h3>
+          <h3 className="text-sm font-semibold text-[var(--ink)]" data-testid={`collapsible-title-${storageKey}`}>{title}</h3>
           {/* Show summary preview when collapsed */}
           {!isOpen && summary && (
-            <p className="mt-0.5 truncate text-xs text-zinc-400" data-testid={`collapsible-summary-${storageKey}`}>{summary}</p>
+            <p className="mt-0.5 truncate text-xs text-[var(--ink-3)]" data-testid={`collapsible-summary-${storageKey}`}>{summary}</p>
           )}
         </div>
         <ChevronDown
-          className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform duration-200 ${
+          className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${
             isOpen ? 'rotate-180' : ''
           }`}
         />
@@ -92,7 +92,7 @@ export function CollapsibleSection({
           isOpen && mounted ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
         }`}
       >
-        <div className="border-t border-zinc-100 p-5">
+        <div className="border-t border-[var(--border-ed)] p-5">
           {children}
         </div>
       </div>

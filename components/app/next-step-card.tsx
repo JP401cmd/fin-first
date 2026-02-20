@@ -73,8 +73,8 @@ export function NextStepCard({ step, onDismiss, dismissDisabled }: NextStepCardP
   const IconComponent = ICON_MAP[step.icon ?? 'lightbulb']
 
   return (
-    <div data-testid="next-step-card" data-step-key={step.key || step.title} className={`group relative flex items-center gap-4 rounded-xl border ${styles.border} ${styles.bg} p-4 transition-all ${styles.hoverBorder} hover:shadow-md ${styles.hoverShadow}`}>
-      <Link href={step.href} className="absolute inset-0 z-0 rounded-xl" aria-label={step.title} />
+    <div data-testid="next-step-card" data-step-key={step.key || step.title} className={`group relative flex items-center gap-4 rounded-[var(--r-lg)] border ${styles.border} ${styles.bg} p-4 transition-all ${styles.hoverBorder} hover:shadow-md ${styles.hoverShadow}`}>
+      <Link href={step.href} className="absolute inset-0 z-0 rounded-[var(--r-lg)]" aria-label={step.title} />
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${styles.iconBg}`}>
         <IconComponent className={`h-5 w-5 ${styles.iconText}`} />
       </div>
@@ -84,8 +84,8 @@ export function NextStepCard({ step, onDismiss, dismissDisabled }: NextStepCardP
             Volgende Stap
           </span>
         </div>
-        <p className="mt-1 text-sm font-semibold text-zinc-900">{step.title}</p>
-        <p className="mt-0.5 text-xs text-zinc-500">{step.description}</p>
+        <p className="mt-1 text-sm font-semibold text-[var(--ink)]">{step.title}</p>
+        <p className="mt-0.5 text-xs text-[var(--ink-3)]">{step.description}</p>
       </div>
       <div className="flex items-center gap-2">
         {onDismiss && (
@@ -100,7 +100,7 @@ export function NextStepCard({ step, onDismiss, dismissDisabled }: NextStepCardP
                 onDismiss(step)
               }
             }}
-            className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors ${styles.dismissHover} ${dismissDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-lg text-[var(--ink-3)] transition-colors ${styles.dismissHover} ${dismissDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             title="Negeren"
             aria-label="Suggestie negeren"
           >
@@ -123,13 +123,13 @@ export function NextStepEmptyCard({ moduleColor }: { moduleColor?: 'amber' | 'te
   const styles = MODULE_STYLES[color]
 
   return (
-    <div className={`flex items-center gap-4 rounded-xl border ${styles.border} ${styles.bg} p-4`}>
+    <div className={`flex items-center gap-4 rounded-[var(--r-lg)] border ${styles.border} ${styles.bg} p-4`}>
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${styles.iconBg}`}>
         <CheckCircle2 className={`h-5 w-5 ${styles.iconText}`} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-zinc-900">Alles bij!</p>
-        <p className="mt-0.5 text-xs text-zinc-500">Geen openstaande suggesties meer. Goed bezig!</p>
+        <p className="text-sm font-semibold text-[var(--ink)]">Alles bij!</p>
+        <p className="mt-0.5 text-xs text-[var(--ink-3)]">Geen openstaande suggesties meer. Goed bezig!</p>
       </div>
     </div>
   )

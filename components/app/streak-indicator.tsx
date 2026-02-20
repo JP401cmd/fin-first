@@ -117,7 +117,7 @@ export function StreakIndicator() {
     return (
       <div className="flex items-center gap-2 rounded-lg bg-orange-50 px-3 py-1.5 text-sm" data-testid="streak-indicator-loading">
         <span className="animate-pulse">🔥</span>
-        <span className="text-zinc-400">...</span>
+        <span className="text-[var(--ink-3)]">...</span>
       </div>
     )
   }
@@ -163,7 +163,7 @@ export function StreakIndicator() {
         {/* Expand button for streak details */}
         <button
           onClick={() => setShowDetails(!showDetails)}
-          className="rounded-lg border border-zinc-200 px-2 py-1.5 text-xs text-zinc-500 hover:bg-zinc-50 transition-colors"
+          className="rounded-lg border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink-3)] hover:bg-[var(--subtle)] transition-colors"
           data-testid="streak-details-toggle"
           title="Toon alle streaks"
         >
@@ -184,7 +184,7 @@ export function StreakIndicator() {
       {/* Checkin feedback message */}
       {checkinMessage && (
         <div
-          className="mt-1 whitespace-nowrap rounded-md bg-zinc-900 px-3 py-1.5 text-xs text-white shadow-lg z-50"
+          className="mt-1 whitespace-nowrap rounded-md bg-zinc-900 px-3 py-1.5 text-xs text-white shadow-[var(--s2)] z-50"
           data-testid="streak-checkin-message"
         >
           {checkinMessage}
@@ -194,10 +194,10 @@ export function StreakIndicator() {
       {/* Expanded streak details */}
       {showDetails && (
         <div
-          className="mt-2 w-72 rounded-xl border border-zinc-200 bg-white p-4 shadow-lg z-50"
+          className="mt-2 w-72 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 shadow-[var(--s2)] z-50"
           data-testid="streak-details-panel"
         >
-          <h3 className="text-xs font-semibold tracking-[0.1em] text-zinc-400 uppercase mb-3">
+          <h3 className="text-xs font-semibold tracking-[0.1em] text-[var(--ink-3)] uppercase mb-3">
             Alle Streaks
           </h3>
 
@@ -210,11 +210,11 @@ export function StreakIndicator() {
               </div>
               <div className="flex items-center gap-1">
                 <span className="text-sm font-bold text-orange-600" data-testid="streak-login-count">{loginCount}</span>
-                <span className="text-xs text-zinc-400">{loginCount === 1 ? 'week' : 'weken'}</span>
+                <span className="text-xs text-[var(--ink-3)]">{loginCount === 1 ? 'week' : 'weken'}</span>
               </div>
             </div>
-            <div className="mt-1 flex items-center justify-between text-xs text-zinc-400">
-              <span>Langste: <span className="font-medium text-zinc-600" data-testid="streak-login-longest">{loginLongest}</span></span>
+            <div className="mt-1 flex items-center justify-between text-xs text-[var(--ink-3)]">
+              <span>Langste: <span className="font-medium text-[var(--ink-2)]" data-testid="streak-login-longest">{loginLongest}</span></span>
               {loginStreak?.at_risk && (
                 <span className="text-orange-600 font-medium" data-testid="streak-login-warning">⚠️ In gevaar</span>
               )}
@@ -230,11 +230,11 @@ export function StreakIndicator() {
               </div>
               <div className="flex items-center gap-1">
                 <span className="text-sm font-bold text-emerald-600" data-testid="streak-budget-count">{budgetCount}</span>
-                <span className="text-xs text-zinc-400">{budgetCount === 1 ? 'week' : 'weken'}</span>
+                <span className="text-xs text-[var(--ink-3)]">{budgetCount === 1 ? 'week' : 'weken'}</span>
               </div>
             </div>
-            <div className="mt-1 flex items-center justify-between text-xs text-zinc-400">
-              <span>Langste: <span className="font-medium text-zinc-600" data-testid="streak-budget-longest">{budgetLongest}</span></span>
+            <div className="mt-1 flex items-center justify-between text-xs text-[var(--ink-3)]">
+              <span>Langste: <span className="font-medium text-[var(--ink-2)]" data-testid="streak-budget-longest">{budgetLongest}</span></span>
               {budgetStreak?.at_risk && (
                 <span className="text-orange-600 font-medium" data-testid="streak-budget-warning">⚠️ In gevaar</span>
               )}
@@ -250,11 +250,11 @@ export function StreakIndicator() {
               </div>
               <div className="flex items-center gap-1">
                 <span className="text-sm font-bold text-wil-600" data-testid="streak-action-count">{actionCount}</span>
-                <span className="text-xs text-zinc-400">{actionCount === 1 ? 'week' : 'weken'}</span>
+                <span className="text-xs text-[var(--ink-3)]">{actionCount === 1 ? 'week' : 'weken'}</span>
               </div>
             </div>
-            <div className="mt-1 flex items-center justify-between text-xs text-zinc-400">
-              <span>Langste: <span className="font-medium text-zinc-600" data-testid="streak-action-longest">{actionLongest}</span></span>
+            <div className="mt-1 flex items-center justify-between text-xs text-[var(--ink-3)]">
+              <span>Langste: <span className="font-medium text-[var(--ink-2)]" data-testid="streak-action-longest">{actionLongest}</span></span>
               {actionStreak?.at_risk && (
                 <span className="text-orange-600 font-medium" data-testid="streak-action-warning">⚠️ In gevaar</span>
               )}
@@ -263,7 +263,7 @@ export function StreakIndicator() {
 
           {/* Warnings section */}
           {hasWarnings && (
-            <div className="mt-3 border-t border-zinc-100 pt-3" data-testid="streak-warnings-section">
+            <div className="mt-3 border-t border-[var(--border-ed)] pt-3" data-testid="streak-warnings-section">
               {warnings.map((w, i) => (
                 <div
                   key={i}

@@ -212,7 +212,7 @@ export function SparklineWithLabel({
   let labelColor: string
   if (trend === 'flat') {
     trendLabel = 'stabiel'
-    labelColor = 'text-zinc-400'
+    labelColor = 'text-[var(--ink-3)]'
   } else if (isIncome) {
     trendLabel = trend === 'up' ? '↑ groei' : '↓ daling'
     labelColor = trend === 'up' ? 'text-emerald-600' : 'text-red-600'

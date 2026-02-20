@@ -26,24 +26,24 @@ export function Box3ScenarioModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 transition-[right] duration-300" style={{ right: 'var(--chat-sidebar-width, 0px)' }} onClick={onClose}>
       <div
-        className="w-full max-w-xl rounded-2xl bg-white shadow-xl overflow-y-auto"
+        className="w-full max-w-xl rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl overflow-y-auto"
         style={{ maxHeight: '90vh' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
-          <h3 className="text-lg font-bold text-zinc-900">Wat-als scenario&apos;s</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100">
+        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-6 py-4">
+          <h3 className="text-lg font-bold text-[var(--ink)]">Wat-als scenario&apos;s</h3>
+          <button onClick={onClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-zinc-100 px-6">
+        <div className="flex border-b border-[var(--border-ed)] px-6">
           <button
             onClick={() => setTab('shift')}
             className={`flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-              tab === 'shift' ? 'border-kern-500 text-kern-700' : 'border-transparent text-zinc-400 hover:text-zinc-600'
+              tab === 'shift' ? 'border-kern-500 text-kern-700' : 'border-transparent text-[var(--ink-3)] hover:text-[var(--ink-2)]'
             }`}
           >
             <ArrowRightLeft className="h-3.5 w-3.5" />
@@ -52,7 +52,7 @@ export function Box3ScenarioModal({
           <button
             onClick={() => setTab('compare')}
             className={`flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-              tab === 'compare' ? 'border-kern-500 text-kern-700' : 'border-transparent text-zinc-400 hover:text-zinc-600'
+              tab === 'compare' ? 'border-kern-500 text-kern-700' : 'border-transparent text-[var(--ink-3)] hover:text-[var(--ink-2)]'
             }`}
           >
             <GitCompare className="h-3.5 w-3.5" />
@@ -87,14 +87,14 @@ function ShiftTab({ input, result }: { input: Box3Input; result: Box3Result }) {
 
   return (
     <div>
-      <p className="mb-4 text-sm text-zinc-600">
+      <p className="mb-4 text-sm text-[var(--ink-2)]">
         Verschuif vermogen van beleggingen naar spaargeld. Spaargeld heeft een lager forfaitair rendement.
       </p>
 
       {/* Slider */}
       <div className="mb-6">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-xs text-zinc-500">Beleggingen &rarr; Spaargeld</span>
+          <span className="text-xs text-[var(--ink-3)]">Beleggingen &rarr; Spaargeld</span>
           <span className="text-sm font-semibold text-kern-700">{formatCurrency(shiftAmount)}</span>
         </div>
         <input
@@ -106,7 +106,7 @@ function ShiftTab({ input, result }: { input: Box3Input; result: Box3Result }) {
           onChange={e => setShiftAmount(Number(e.target.value))}
           className="w-full accent-kern-500"
         />
-        <div className="mt-1 flex justify-between text-[10px] text-zinc-400">
+        <div className="mt-1 flex justify-between text-[10px] text-[var(--ink-3)]">
           <span>{formatCurrency(0)}</span>
           <span>{formatCurrency(maxShift)}</span>
         </div>
@@ -114,20 +114,20 @@ function ShiftTab({ input, result }: { input: Box3Input; result: Box3Result }) {
 
       {/* Result comparison */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-          <p className="text-[10px] font-semibold tracking-[0.15em] text-zinc-400 uppercase">Huidige situatie</p>
-          <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(result.belasting)}</p>
-          <p className="text-xs text-zinc-500">Box 3 belasting</p>
-          <div className="mt-2 text-xs text-zinc-400">
+        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+          <p className="text-[10px] font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">Huidige situatie</p>
+          <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(result.belasting)}</p>
+          <p className="text-xs text-[var(--ink-3)]">Box 3 belasting</p>
+          <div className="mt-2 text-xs text-[var(--ink-3)]">
             <p>Spaargeld: {formatCurrency(result.totaalSpaargeld)}</p>
             <p>Beleggingen: {formatCurrency(result.totaalBeleggingen)}</p>
           </div>
         </div>
-        <div className={`rounded-xl border p-4 ${delta > 0 ? 'border-emerald-200 bg-emerald-50' : 'border-zinc-200 bg-zinc-50'}`}>
-          <p className="text-[10px] font-semibold tracking-[0.15em] text-zinc-400 uppercase">Na verschuiving</p>
-          <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(shifted.belasting)}</p>
-          <p className="text-xs text-zinc-500">Box 3 belasting</p>
-          <div className="mt-2 text-xs text-zinc-400">
+        <div className={`rounded-[var(--r-lg)] border p-4 ${delta > 0 ? 'border-emerald-200 bg-emerald-50' : 'border-[var(--border-ed)] bg-[var(--subtle)]'}`}>
+          <p className="text-[10px] font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">Na verschuiving</p>
+          <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(shifted.belasting)}</p>
+          <p className="text-xs text-[var(--ink-3)]">Box 3 belasting</p>
+          <div className="mt-2 text-xs text-[var(--ink-3)]">
             <p>Spaargeld: {formatCurrency(shifted.totaalSpaargeld)}</p>
             <p>Beleggingen: {formatCurrency(shifted.totaalBeleggingen)}</p>
           </div>
@@ -161,24 +161,24 @@ function CompareTab({ input, result }: { input: Box3Input; result: Box3Result })
 
   return (
     <div>
-      <p className="mb-4 text-sm text-zinc-600">
+      <p className="mb-4 text-sm text-[var(--ink-2)]">
         Vergelijk de belastingdruk tussen {result.year} en {otherYear} met dezelfde vermogenssamenstelling.
       </p>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-xl border border-kern-200 bg-kern-50 p-4">
+        <div className="rounded-[var(--r-lg)] border border-kern-200 bg-kern-50 p-4">
           <p className="text-xs font-semibold text-kern-700">{result.year}</p>
-          <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(result.belasting)}</p>
-          <div className="mt-3 space-y-1 text-xs text-zinc-500">
+          <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(result.belasting)}</p>
+          <div className="mt-3 space-y-1 text-xs text-[var(--ink-3)]">
             <p>Forfait spaargeld: {(params1.forfaitSpaargeld * 100).toFixed(2)}%</p>
             <p>Forfait beleggingen: {(params1.forfaitBeleggingen * 100).toFixed(2)}%</p>
             <p>Heffingsvrij: {formatCurrency(result.hasPartner ? params1.heffingsvrijPartner : params1.heffingsvrijSingle)}</p>
           </div>
         </div>
-        <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-          <p className="text-xs font-semibold text-zinc-600">{otherYear}</p>
-          <p className="mt-1 text-xl font-bold text-zinc-900">{formatCurrency(otherResult.belasting)}</p>
-          <div className="mt-3 space-y-1 text-xs text-zinc-500">
+        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+          <p className="text-xs font-semibold text-[var(--ink-2)]">{otherYear}</p>
+          <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(otherResult.belasting)}</p>
+          <div className="mt-3 space-y-1 text-xs text-[var(--ink-3)]">
             <p>Forfait spaargeld: {(params2.forfaitSpaargeld * 100).toFixed(2)}%</p>
             <p>Forfait beleggingen: {(params2.forfaitBeleggingen * 100).toFixed(2)}%</p>
             <p>Heffingsvrij: {formatCurrency(result.hasPartner ? params2.heffingsvrijPartner : params2.heffingsvrijSingle)}</p>

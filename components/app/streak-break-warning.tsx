@@ -80,7 +80,7 @@ export function StreakBreakWarning() {
 
   return (
     <div
-      className="rounded-xl border border-orange-300 bg-gradient-to-r from-orange-50 to-amber-50 p-4 shadow-sm"
+      className="rounded-[var(--r-lg)] border border-orange-300 bg-gradient-to-r from-orange-50 to-amber-50 p-4 shadow-[var(--s0)]"
       data-testid="streak-break-warning-notification"
     >
       <div className="flex items-start gap-3">
@@ -109,7 +109,7 @@ export function StreakBreakWarning() {
               {atRiskStreaks.map(s => (
                 <div
                   key={s.type}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-white/70 border border-orange-200 px-2.5 py-1 text-xs"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--paper)]/70 border border-orange-200 px-2.5 py-1 text-xs"
                   data-testid={`streak-at-risk-${s.type}`}
                 >
                   <span>{s.icon}</span>

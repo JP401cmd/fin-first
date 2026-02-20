@@ -108,20 +108,30 @@ export default async function DashboardPage() {
   const monthlySavings = monthlyIncome - monthlyExpenses
   const milestoneResult = computeFreedomMilestones(netWorth, monthlyExpenses, monthlySavings)
 
+  // Dateline
+  const dateStr = now.toLocaleDateString('nl-NL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-10">
       {/* Badge evaluation on dashboard load */}
       <BadgeEvaluator />
 
+      {/* Dateline row */}
+      <div className="flex items-baseline gap-3 border-b border-[var(--border-ed)] pb-3 mb-6">
+        <span className="label-editorial text-[var(--ink-3)]">{dateStr}</span>
+        <span className="text-[var(--ink-4)]">|</span>
+        <span className="font-serif italic text-sm text-[var(--ink-3)]">Persoonlijk Financieel Dashboard</span>
+      </div>
+
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-zinc-900">
-            Welkom terug, {displayName}
+          <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--ink)]">
+            Welkom terug, <span className="font-serif italic">{displayName}</span>
           </h1>
           <StreakIndicator />
         </div>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-[var(--ink-3)]">
           TriFinity helpt je bewust omgaan met je opgeslagen levensenergie.
         </p>
       </div>
@@ -136,149 +146,161 @@ export default async function DashboardPage() {
         {/* De Kern */}
         <Link
           href="/core"
-          className="group rounded-2xl border border-kern-200 bg-white p-6 transition-all hover:border-kern-300 hover:shadow-lg hover:shadow-kern-50 active:scale-[0.98] transition-transform"
+          className="group card-editorial overflow-hidden p-0 active:scale-[0.98] transition-transform animate-fade-up"
+          style={{ animationDelay: '0s' }}
         >
-          <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-kern-50">
-              <FhinAvatar size={36} />
-            </div>
-            <div>
-              <h2 className="font-bold text-zinc-900">De Kern</h2>
-              <p className="text-xs text-kern-600">Waar sta je echt?</p>
-            </div>
-          </div>
-          <p className="mb-5 text-sm leading-relaxed text-zinc-500">
-            Je financiele fundament. Inzicht in je vermogen, schulden en budgetten.
-          </p>
-
-          {/* Preview metric — Vermogensgroei deze maand */}
-          <div className="space-y-3 border-t border-zinc-100 pt-4">
-            <div data-testid="kern-preview-metric">
-              <div className="flex items-center gap-1.5 text-xs text-zinc-400 mb-1">
-                <TrendingUp className="h-3.5 w-3.5" /> Vermogensgroei deze maand
+          <div className="h-1 bg-kern-500" />
+          <div className="p-6">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
+                <FhinAvatar size={36} />
               </div>
-              <p className="text-sm font-semibold text-zinc-900" data-testid="kern-preview-value">
-                {monthlyGrowth >= 0 ? '+' : ''}{formatCurrency(monthlyGrowth)}
-                {growthDaysStr && (
-                  <span className="ml-1 font-normal text-kern-600">
-                    ({monthlyGrowth >= 0 ? '+' : '-'}{growthDaysStr})
-                  </span>
-                )}
-              </p>
+              <div>
+                <h2 className="font-display font-bold text-[var(--ink)]">De Kern</h2>
+                <p className="label-editorial text-kern-600">Waar sta je echt?</p>
+              </div>
             </div>
-          </div>
+            <p className="mb-5 text-sm leading-relaxed text-[var(--ink-3)]">
+              Je financiele fundament. Inzicht in je vermogen, schulden en budgetten.
+            </p>
 
-          <div className="mt-5 flex items-center gap-1 text-xs font-medium text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">
-            Bekijken <ArrowRight className="h-3 w-3" />
+            {/* Preview metric — Vermogensgroei deze maand */}
+            <div className="space-y-3 border-t border-[var(--border-ed)] pt-4">
+              <div data-testid="kern-preview-metric">
+                <div className="flex items-center gap-1.5 label-editorial text-[var(--ink-3)] mb-1">
+                  <TrendingUp className="h-3.5 w-3.5" /> Vermogensgroei deze maand
+                </div>
+                <p className="text-sm font-semibold text-[var(--ink)]" data-testid="kern-preview-value">
+                  <span className="font-mono">{monthlyGrowth >= 0 ? '+' : ''}{formatCurrency(monthlyGrowth)}</span>
+                  {growthDaysStr && (
+                    <span className="ml-1 font-normal text-kern-600">
+                      ({monthlyGrowth >= 0 ? '+' : '-'}{growthDaysStr})
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 flex items-center gap-1 label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">
+              Bekijken <ArrowRight className="h-3 w-3" />
+            </div>
           </div>
         </Link>
 
         {/* De Wil */}
         <Link
           href="/will"
-          className={`group rounded-2xl border border-wil-200 bg-white p-6 transition-all hover:border-wil-300 hover:shadow-lg hover:shadow-wil-50 active:scale-[0.98] transition-transform ${!activated ? 'opacity-75' : ''}`}
+          className={`group card-editorial overflow-hidden p-0 active:scale-[0.98] transition-transform animate-fade-up ${!activated ? 'opacity-75' : ''}`}
+          style={{ animationDelay: '0.05s' }}
         >
+          <div className="h-1 bg-wil-500" />
+          <div className="p-6">
             <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-wil-50">
+              <div className="flex h-12 w-12 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
                 <FinnAvatar size={36} />
               </div>
               <div>
-                <h2 className="font-bold text-zinc-900">De Wil</h2>
-                <p className="text-xs text-wil-600">Wat ga je doen?</p>
+                <h2 className="font-display font-bold text-[var(--ink)]">De Wil</h2>
+                <p className="label-editorial text-wil-600">Wat ga je doen?</p>
               </div>
             </div>
-            <p className="mb-5 text-sm leading-relaxed text-zinc-500">
+            <p className="mb-5 text-sm leading-relaxed text-[var(--ink-3)]">
               Bewuste keuzes en acties. Van inzicht naar impact.
             </p>
 
             {/* Preview metric — X acties open — Y dagen te winnen */}
-            <div className="space-y-3 border-t border-zinc-100 pt-4">
+            <div className="space-y-3 border-t border-[var(--border-ed)] pt-4">
               <div data-testid="wil-preview-metric">
-                <div className="flex items-center gap-1.5 text-xs text-zinc-400 mb-1">
+                <div className="flex items-center gap-1.5 label-editorial text-[var(--ink-3)] mb-1">
                   <Zap className="h-3.5 w-3.5" /> Openstaande acties
                 </div>
-                <p className="text-sm font-semibold text-zinc-900" data-testid="wil-preview-value">
-                  {openActions.length} {openActions.length === 1 ? 'actie' : 'acties'} open
-                  <span className="mx-1 text-zinc-400">—</span>
-                  <span className="text-wil-600">
+                <p className="text-sm font-semibold text-[var(--ink)]" data-testid="wil-preview-value">
+                  <span className="font-mono">{openActions.length}</span> {openActions.length === 1 ? 'actie' : 'acties'} open
+                  <span className="mx-1 text-[var(--ink-4)]">—</span>
+                  <span className="text-wil-600 font-mono">
                     {Math.round(totalFreedomDaysOpen)} {Math.round(totalFreedomDaysOpen) === 1 ? 'dag' : 'dagen'} te winnen
                   </span>
                 </p>
               </div>
             </div>
 
-            <div className="mt-5 flex items-center gap-1 text-xs font-medium text-wil-600 opacity-0 transition-opacity group-hover:opacity-100">
+            <div className="mt-5 flex items-center gap-1 label-editorial text-wil-600 opacity-0 transition-opacity group-hover:opacity-100">
               Bekijken <ArrowRight className="h-3 w-3" />
             </div>
+          </div>
         </Link>
 
         {/* De Horizon */}
         <Link
           href="/horizon"
-          className={`group rounded-2xl border border-horizon-200 bg-white p-6 transition-all hover:border-horizon-300 hover:shadow-lg hover:shadow-horizon-50 active:scale-[0.98] transition-transform ${!activated ? 'opacity-75' : ''}`}
+          className={`group card-editorial overflow-hidden p-0 active:scale-[0.98] transition-transform animate-fade-up ${!activated ? 'opacity-75' : ''}`}
+          style={{ animationDelay: '0.1s' }}
         >
+          <div className="h-1 bg-horizon-500" />
+          <div className="p-6">
             <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-horizon-50">
+              <div className="flex h-12 w-12 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
                 <FfinAvatar size={36} />
               </div>
               <div>
-                <h2 className="font-bold text-zinc-900">De Horizon</h2>
-                <p className="text-xs text-horizon-600">Waar ga je naartoe?</p>
+                <h2 className="font-display font-bold text-[var(--ink)]">De Horizon</h2>
+                <p className="label-editorial text-horizon-600">Waar ga je naartoe?</p>
               </div>
             </div>
-            <p className="mb-5 text-sm leading-relaxed text-zinc-500">
+            <p className="mb-5 text-sm leading-relaxed text-[var(--ink-3)]">
               Je pad naar financiele vrijheid. Projecties, scenario&apos;s en je tijdlijn.
             </p>
 
             {/* Preview metric — Countdown: X jaar, Y maanden */}
-            <div className="space-y-3 border-t border-zinc-100 pt-4">
+            <div className="space-y-3 border-t border-[var(--border-ed)] pt-4">
               <div data-testid="horizon-preview-metric">
-                <div className="flex items-center gap-1.5 text-xs text-zinc-400 mb-1">
+                <div className="flex items-center gap-1.5 label-editorial text-[var(--ink-3)] mb-1">
                   <Compass className="h-3.5 w-3.5" /> Countdown naar vrijheid
                 </div>
-                <p className="text-sm font-semibold text-zinc-900" data-testid="horizon-preview-value">
+                <p className="text-sm font-semibold text-[var(--ink)]" data-testid="horizon-preview-value">
                   {fireProjResult.fireDate === 'Bereikt!'
-                    ? <span className="text-horizon-600">Bereikt! 🎉</span>
+                    ? <span className="text-horizon-600">Bereikt!</span>
                     : fireProjResult.countdownDays > 0
-                      ? <>Countdown: <span className="text-horizon-600">{fireProjResult.countdownYears} jaar, {fireProjResult.countdownMonths} maanden</span></>
-                      : <span className="text-zinc-400">-</span>
+                      ? <>Countdown: <span className="text-horizon-600 font-mono">{fireProjResult.countdownYears} jaar, {fireProjResult.countdownMonths} maanden</span></>
+                      : <span className="text-[var(--ink-4)]">-</span>
                   }
                 </p>
               </div>
             </div>
 
-            <div className="mt-5 flex items-center gap-1 text-xs font-medium text-horizon-600 opacity-0 transition-opacity group-hover:opacity-100">
+            <div className="mt-5 flex items-center gap-1 label-editorial text-horizon-600 opacity-0 transition-opacity group-hover:opacity-100">
               Bekijken <ArrowRight className="h-3 w-3" />
             </div>
+          </div>
         </Link>
       </div>
 
       {/* Freedom indicator — preview teaser linking to De Kern (primary owner) */}
       <section className="mt-8" data-testid="dashboard-freedom-teaser">
-        <div className="rounded-xl border border-zinc-200 bg-white px-5 py-4">
+        <div className="card-editorial px-5 py-4">
           <div className="flex items-center gap-4">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <p className="text-xs font-medium text-zinc-400 uppercase">
+                <p className="label-editorial text-[var(--ink-3)]">
                   Financiele vrijheid
                 </p>
-                <span className="text-xs text-zinc-300">·</span>
-                <span className="text-xs text-zinc-400">
+                <span className="text-[var(--ink-4)]">·</span>
+                <span className="text-xs font-mono text-[var(--ink-3)]">
                   {formatCurrency(netWorth)} / {formatCurrency(fireTarget)}
                 </span>
               </div>
               <div className="mt-2 flex items-center gap-3">
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100">
+                <div className="h-[5px] flex-1 overflow-hidden rounded-full bg-[var(--subtle)]">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-kern-400 via-wil-400 to-horizon-500 transition-all duration-1000"
+                    className="h-full rounded-full bg-gradient-to-r from-kern-400 via-wil-400 to-horizon-500 transition-all duration-1000 animate-prog-in"
                     style={{ width: `${Math.min(freedomPct, 100)}%` }}
                   />
                 </div>
-                <span className="text-sm font-semibold text-zinc-700 tabular-nums">
+                <span className="text-sm font-mono font-medium text-[var(--ink-2)] tabular-nums">
                   {freedomPct.toFixed(1)}%
                 </span>
               </div>
-              <p className="mt-1.5 text-xs text-zinc-400">
+              <p className="mt-1.5 text-xs text-[var(--ink-3)]">
                 {fireProjResult.fireDate === 'Bereikt!'
                   ? 'Je passief inkomen dekt je uitgaven!'
                   : fireProjResult.fireDate === 'Niet haalbaar'

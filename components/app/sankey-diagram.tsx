@@ -678,12 +678,12 @@ export function SankeyDiagram({ nodes, links, height: fixedHeight, aspectRatio =
 
       {/* Tooltip */}
       {hoveredLink && (
-        <div className="pointer-events-none absolute right-4 top-4 rounded-lg border border-zinc-200 bg-white/95 px-3 py-2 shadow-xl backdrop-blur-sm">
-          <p className="text-xs font-medium text-zinc-700">
+        <div className="pointer-events-none absolute right-4 top-4 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)]/95 px-3 py-2 shadow-xl backdrop-blur-sm">
+          <p className="text-xs font-medium text-[var(--ink-2)]">
             {layoutNodes.find((n) => n.id === hoveredLink.source)?.label} →{' '}
             {layoutNodes.find((n) => n.id === hoveredLink.target)?.label}
           </p>
-          <p className="mt-0.5 text-sm font-bold text-zinc-900">
+          <p className="mt-0.5 text-sm font-bold text-[var(--ink)]">
             {formatCurrency(hoveredLink.value)}
           </p>
         </div>

@@ -18,7 +18,7 @@ export function BeheerNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="flex gap-1 overflow-x-auto border-b border-zinc-200">
+    <nav className="flex gap-1 overflow-x-auto border-b border-[var(--border-ed)]">
       {tabs.map((tab) => {
         const basePath = tab.href.split('#')[0]
         const isActive = tab.href.includes('#') ? false : pathname === basePath
@@ -29,7 +29,7 @@ export function BeheerNav() {
             className={`whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
               isActive
                 ? 'border-amber-500 text-amber-700'
-                : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'
+                : 'border-transparent text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
             }`}
           >
             {tab.label}
