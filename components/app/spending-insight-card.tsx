@@ -50,7 +50,7 @@ function SpendingInsightCard({ insight }: { insight: SpendingInsight }) {
 
   return (
     <div
-      className={`rounded-[var(--r-lg)] border ${style.border} ${style.bg} p-4 transition-all hover:shadow-[var(--s0)]`}
+      className={`rounded-[var(--r-lg)] border ${style.border} ${style.bg} p-3 sm:p-4 transition-all hover:shadow-[var(--s0)]`}
       data-testid={`spending-insight-${insight.id}`}
     >
       <div className="flex items-start gap-3">

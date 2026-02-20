@@ -58,7 +58,7 @@ export default function ConnectSuccessPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg px-6 py-12 text-center">
+    <div className="mx-auto max-w-lg px-4 py-5 sm:px-6 sm:py-12 text-center">
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
         <CheckCircle2 className="h-8 w-8 text-green-600" />
       </div>

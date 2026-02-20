@@ -108,7 +108,7 @@ export default function BelastingPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
         </div>
@@ -118,7 +118,7 @@ export default function BelastingPage() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-700">{error}</p>
           <button
@@ -134,7 +134,7 @@ export default function BelastingPage() {
 
   if (!result) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-8 text-center">
           <p className="text-sm text-[var(--ink-3)]">
             Geen assets of schulden gevonden. Voeg eerst je vermogen toe bij Assets en Schulden.
@@ -153,7 +153,7 @@ export default function BelastingPage() {
 
   return (
     <FeatureGate featureId="box3_belasting" fallback="locked">
-    <div className="mx-auto max-w-6xl px-6 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       {/* === A. Hero Banner === */}
       <section className="relative overflow-hidden rounded-[var(--r-lg)] bg-gradient-to-br from-kern-950 via-kern-900 to-kern-950 p-5 text-white sm:p-8 md:p-10">
         <div className="pointer-events-none absolute -top-24 right-1/4 h-64 w-64 rounded-full bg-kern-500/10 blur-3xl" />
@@ -226,7 +226,7 @@ export default function BelastingPage() {
       </section>
 
       {/* === B. KPI Cards === */}
-      <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="mt-4 sm:mt-8 grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5" data-testid="kpi-totale-belasting">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-kern-50">
@@ -287,7 +287,7 @@ export default function BelastingPage() {
       </section>
 
       {/* === C. Vermogensindeling === */}
-      <section className="mt-10">
+      <section className="mt-5 sm:mt-8">
         <div className="mb-5">
           <h2 className="label-editorial text-[var(--ink-2)]">
             Vermogensindeling Box 3
@@ -303,12 +303,12 @@ export default function BelastingPage() {
       </section>
 
       {/* === D. Berekening Stap-voor-Stap === */}
-      <section className="mt-8">
+      <section className="mt-4 sm:mt-8">
         <Box3Calculation result={result} />
       </section>
 
       {/* === E. Wat-Als Scenario's === */}
-      <section className="mt-10">
+      <section className="mt-5 sm:mt-8">
         <div className="mb-5">
           <h2 className="label-editorial text-[var(--ink-2)]">
             Wat-als scenario&apos;s
@@ -317,7 +317,7 @@ export default function BelastingPage() {
             Ontdek hoe je Box 3 belasting verandert bij andere keuzes.
           </p>
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <button
             onClick={() => setShowScenarioModal(true)}
             className="group flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-left transition-colors hover:border-kern-200 hover:bg-kern-50/30"
@@ -361,7 +361,7 @@ export default function BelastingPage() {
 
       {/* === F. Optimalisatietips === */}
       {optimizations.length > 0 && (
-        <section className="mt-10">
+        <section className="mt-5 sm:mt-8">
           <div className="mb-5">
             <h2 className="label-editorial text-[var(--ink-2)]">
               Optimalisatietips

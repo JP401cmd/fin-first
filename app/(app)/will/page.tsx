@@ -156,7 +156,7 @@ export default function WillPage() {
 
   if (loading || !kpi) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-wil-500 border-t-transparent" />
         </div>
@@ -266,13 +266,13 @@ export default function WillPage() {
 
   return (
     <FreedomDaysAnimationProvider>
-    <div className="mx-auto max-w-6xl px-6 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       {/* === 1. Hero (Gradient) === */}
       <section data-testid="wil-hero" className="card-editorial overflow-hidden">
         <div className="h-1.5 bg-wil-500" />
 
-        <div className="p-5 sm:p-8 md:p-10">
-          <div className="mb-6 flex items-center gap-3">
+        <div className="p-4 sm:p-6 md:p-8">
+          <div className="mb-3 sm:mb-6 flex items-center gap-3">
             <FinnAvatar size={40} />
             <p className="label-editorial text-wil-600">
               Jouw wilskracht in actie
@@ -280,7 +280,7 @@ export default function WillPage() {
           </div>
 
           <div className="mb-2 flex items-baseline gap-2" data-testid="wil-hero-primary-metric">
-            <span className="font-display text-[52px] font-bold tracking-tight text-[var(--ink)]" data-testid="wil-hero-freedom-days-value">
+            <span className="font-display text-[36px] sm:text-[44px] md:text-[52px] font-bold tracking-tight text-[var(--ink)]" data-testid="wil-hero-freedom-days-value">
               {totalFreedomDaysWon > 0 ? `+${totalFreedomDaysWon}` : '0'}
             </span>
             <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]" data-testid="wil-hero-freedom-days-label">
@@ -290,7 +290,7 @@ export default function WillPage() {
           </div>
 
           {/* Weekly freedom days summary */}
-          <div className="mb-6 flex items-center gap-3" data-testid="wil-hero-weekly-summary">
+          <div className="mb-3 sm:mb-5 flex items-center gap-3" data-testid="wil-hero-weekly-summary">
             <div className="inline-flex items-center gap-2 rounded-full bg-wil-50 px-3 py-1.5">
               <Sparkles className="h-3.5 w-3.5 text-wil-500" />
               <span className="text-sm font-medium text-wil-700" data-testid="weekly-freedom-days-value">
@@ -300,7 +300,7 @@ export default function WillPage() {
           </div>
 
           {/* Progress bar: completion ratio */}
-          <div className="mb-8">
+          <div className="mb-4 sm:mb-6">
             <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-wil-600 via-wil-400 to-wil-300 transition-all duration-1000"
@@ -315,7 +315,7 @@ export default function WillPage() {
           </div>
 
           {/* Sub KPIs */}
-          <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-3" data-testid="wil-hero-sub-kpis">
+          <div className="grid grid-cols-1 gap-3 sm:gap-5 sm:grid-cols-3" data-testid="wil-hero-sub-kpis">
             <div data-testid="wil-hero-acties-voltooid">
               <p className="label-editorial text-[var(--ink-3)]">Acties voltooid</p>
               <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]">
@@ -358,11 +358,11 @@ export default function WillPage() {
       </section>
 
       {/* === 2. KPI Stat Cards (White cards, subtle borders) === */}
-      <section data-testid="wil-kpi-grid" className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="card-editorial p-5" data-testid="kpi-voltooide-acties">
+      <section data-testid="wil-kpi-grid" className="mt-4 sm:mt-8 grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="card-editorial p-3 sm:p-5" data-testid="kpi-voltooide-acties">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
-              <CheckCircle className="h-5 w-5 text-wil-600" />
+            <div className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
+              <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-wil-600" />
             </div>
             <KpiTooltip text="Hoeveel acties je hebt afgerond. Elke actie brengt je dichter bij vrijheid." />
           </div>
@@ -375,10 +375,10 @@ export default function WillPage() {
           </p>
         </div>
 
-        <div className="card-editorial p-5" data-testid="kpi-open-potentieel">
+        <div className="card-editorial p-3 sm:p-5" data-testid="kpi-open-potentieel">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
-              <Sparkles className="h-5 w-5 text-wil-600" />
+            <div className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
+              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-wil-600" />
             </div>
             <KpiTooltip text="Open potentieel — exclusief De Wil. Vrijheidsdagen die je kunt winnen door openstaande acties en aanbevelingen af te ronden. Dit verschilt van 'Vrije Dagen per Jaar' in De Kern, dat gebaseerd is op passief inkomen." />
           </div>
@@ -389,10 +389,10 @@ export default function WillPage() {
           <p className="mt-1 text-xs text-[var(--ink-3)]">wachtend op actie</p>
         </div>
 
-        <div className="card-editorial p-5" data-testid="kpi-doelvoortgang">
+        <div className="card-editorial p-3 sm:p-5" data-testid="kpi-doelvoortgang">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
-              <Target className="h-5 w-5 text-wil-600" />
+            <div className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
+              <Target className="h-4 w-4 sm:h-5 sm:w-5 text-wil-600" />
             </div>
             <KpiTooltip text="Gemiddelde voortgang over al je actieve financiele doelen." />
           </div>
@@ -405,10 +405,10 @@ export default function WillPage() {
           </p>
         </div>
 
-        <div className="card-editorial p-5" data-testid="kpi-wilskrachtscore">
+        <div className="card-editorial p-3 sm:p-5" data-testid="kpi-wilskrachtscore">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
-              <Flame className="h-5 w-5 text-wil-600" />
+            <div className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
+              <Flame className="h-4 w-4 sm:h-5 sm:w-5 text-wil-600" />
             </div>
             <KpiTooltip text="Hoe actief je bent in het nemen en afronden van beslissingen." />
           </div>
@@ -420,7 +420,7 @@ export default function WillPage() {
 
       {/* === 3. Alerts === */}
       {(overdueActions.length > 0 || reactivatedRecs.length > 0 || offTrackGoals.length > 0) && (
-        <section className="mt-8" data-testid="wil-alerts">
+        <section className="mt-4 sm:mt-8" data-testid="wil-alerts">
           <h2 className="mb-3 label-editorial text-[var(--ink-2)]">
             Aandachtspunten
           </h2>
@@ -454,7 +454,7 @@ export default function WillPage() {
       )}
 
       {/* === 4. Suggesties (Primary Content) === */}
-      <section id="section-suggesties" className="mt-10 scroll-mt-8">
+      <section id="section-suggesties" className="mt-5 sm:mt-8 scroll-mt-8">
         <div className="mb-5">
           <h2 className="label-editorial text-[var(--ink-2)]">
             Suggesties
@@ -468,13 +468,13 @@ export default function WillPage() {
 
       {/* === 5. Budget Gezondheidscheck (NIBUD) (Primary Content) === */}
       <FeatureGate featureId="nibud_benchmark" fallback="locked">
-        <section id="section-gezondheidscheck" className="mt-8 scroll-mt-8">
+        <section id="section-gezondheidscheck" className="mt-4 sm:mt-8 scroll-mt-8">
           <NibudBenchmarkSection />
         </section>
       </FeatureGate>
 
       {/* === 6. Acties (Primary Content) === */}
-      <section id="section-acties" className="mt-10 scroll-mt-8">
+      <section id="section-acties" className="mt-5 sm:mt-8 scroll-mt-8">
         <div className="mb-5">
           <h2 className="label-editorial text-[var(--ink-2)]">
             Acties
@@ -488,7 +488,7 @@ export default function WillPage() {
 
       {/* === 7. Doelen (Primary Content) === */}
       <FeatureGate featureId="doelen_systeem" fallback="locked">
-      <section id="section-doelen" className="mt-10 scroll-mt-8">
+      <section id="section-doelen" className="mt-5 sm:mt-8 scroll-mt-8">
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h2 className="label-editorial text-[var(--ink-2)]">
@@ -542,7 +542,7 @@ export default function WillPage() {
 
       {/* === 8. Beslissingspatronen (Deep Dive) === */}
       <FeatureGate featureId="beslissingspatronen" fallback="locked">
-      <section className="mt-10">
+      <section className="mt-5 sm:mt-8">
         <CollapsibleSection
           storageKey="wil_beslissingspatronen"
           title="Beslissingspatronen"

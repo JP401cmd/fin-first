@@ -541,7 +541,7 @@ export default function CorePage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
         </div>
@@ -551,7 +551,7 @@ export default function CorePage() {
 
   if (error || !data) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-700">{error ?? 'Er ging iets mis.'}</p>
           <button onClick={() => { setError(null); setLoading(true); loadData() }} className="mt-3 rounded-[var(--r)] bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
@@ -588,27 +588,27 @@ export default function CorePage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       {/* === 1. Hero (Gradient) === */}
       <section data-testid="kern-hero" className="card-editorial overflow-hidden">
         <div className="h-1.5 bg-kern-500" />
 
-        <div className="p-5 sm:p-8 md:p-10">
-          <div className="mb-6 flex items-center gap-3">
+        <div className="p-4 sm:p-6 md:p-8">
+          <div className="mb-3 sm:mb-6 flex items-center gap-3">
             <FhinAvatar size={40} />
             <p className="label-editorial text-kern-600">
               Jouw tijdlijn naar vrijheid
             </p>
           </div>
 
-          <div className="mb-6">
-            <span className="font-display text-[52px] font-bold tracking-tight text-[var(--ink)]">
+          <div className="mb-3 sm:mb-5">
+            <span className="font-display text-[36px] sm:text-[44px] md:text-[52px] font-bold tracking-tight text-[var(--ink)]">
               {data.freedomPercentage.toFixed(1)}%
             </span>
             <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">vrijheid bereikt</span>
           </div>
 
-          <button type="button" onClick={() => setShowFireReceipt(true)} className="mb-8 w-full text-left transition-opacity hover:opacity-80">
+          <button type="button" onClick={() => setShowFireReceipt(true)} className="mb-4 sm:mb-6 w-full text-left transition-opacity hover:opacity-80">
             <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-kern-600 via-kern-400 to-kern-300 transition-all duration-1000"
@@ -622,7 +622,7 @@ export default function CorePage() {
             </div>
           </button>
 
-          <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:gap-5 sm:grid-cols-3">
             <button
               type="button"
               onClick={() => setShowProjectionModal(true)}
@@ -697,12 +697,12 @@ export default function CorePage() {
       </section>
 
       {/* === Missie Controle (direct onder hero) === */}
-      <section className="mt-8" data-testid="mission-control-section">
+      <section className="mt-4 sm:mt-8" data-testid="mission-control-section">
         <div className="mb-4 flex items-center gap-2">
           <div className="h-5 w-1 rounded-full bg-kern-500" />
           <h2 className="label-editorial text-[var(--ink-2)]">Missie Controle</h2>
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {/* Cash Card */}
           <MissionControlCard
             href="/core/cash"
@@ -848,7 +848,7 @@ export default function CorePage() {
       )}
 
       {/* === 7. Financiële Kerngetallen (Deep Dive) === */}
-      <section className="mt-10">
+      <section className="mt-5 sm:mt-8">
         <div className="mb-5 flex items-end justify-between">
           <div>
             <h2 className="label-editorial text-[var(--ink-2)]">
@@ -863,11 +863,11 @@ export default function CorePage() {
           </FeatureGate>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <button type="button" onClick={() => setShowIncomeReceipt(true)} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 text-left transition-all hover:border-emerald-300 hover:shadow-sm">
+        <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2">
+          <button type="button" onClick={() => setShowIncomeReceipt(true)} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6 text-left transition-all hover:border-emerald-300 hover:shadow-sm">
             <div className="mb-3 flex items-center justify-between">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-emerald-50">
-                <TrendingUp className="h-6 w-6 text-emerald-600" />
+              <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-emerald-50">
+                <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
               </div>
               <KpiTooltip text="Geschat jaarinkomen gebaseerd op werkelijke transacties. Bij minder dan 12 maanden data wordt het gemiddelde geextrapoleerd naar een jaar." />
             </div>
@@ -881,10 +881,10 @@ export default function CorePage() {
             </p>
           </button>
 
-          <button type="button" onClick={() => setShowExpenseReceipt(true)} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 text-left transition-all hover:border-[var(--border-md)] hover:shadow-sm">
+          <button type="button" onClick={() => setShowExpenseReceipt(true)} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6 text-left transition-all hover:border-[var(--border-md)] hover:shadow-sm">
             <div className="mb-3 flex items-center justify-between">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-[var(--subtle)]">
-                <ShoppingCart className="h-6 w-6 text-[var(--ink-3)]" />
+              <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-[var(--subtle)]">
+                <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6 text-[var(--ink-3)]" />
               </div>
               <KpiTooltip text="Jaarlijkse som van je essentiële budgetten: vaste lasten, dagelijkse uitgaven en vervoer. Dit zijn de kosten die je sowieso maakt." />
             </div>
@@ -1534,11 +1534,11 @@ function MissionControlCard({
         <div className="w-1 bg-kern-500" />
         <div className="flex-1" />
       </div>
-      <div className="p-5">
+      <div className="p-3 sm:p-5">
       {/* Header: icon + title + status */}
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-2 sm:mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
+          <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
             {icon}
           </div>
           <p className="text-sm font-semibold text-[var(--ink-2)]">{title}</p>
@@ -1567,7 +1567,7 @@ function MissionControlCard({
       </div>
 
       {/* Status label */}
-      <div className={`mb-3 inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${
+      <div className={`mb-2 sm:mb-3 inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${
         status === 'healthy'
           ? 'bg-emerald-50 text-emerald-700'
           : 'bg-kern-50 text-kern-700'
@@ -1596,7 +1596,7 @@ function MissionControlCard({
       )}
 
       {/* Detail lines */}
-      <div className="mt-auto space-y-1 border-t border-[var(--border-ed)] pt-3">
+      <div className="mt-auto space-y-0.5 sm:space-y-1 border-t border-[var(--border-ed)] pt-2 sm:pt-3">
         {details.map((d, i) => (
           <div key={i} className="flex items-center justify-between text-xs">
             <span className="text-[var(--ink-3)]">{d.label}</span>
@@ -1606,7 +1606,7 @@ function MissionControlCard({
       </div>
 
       {/* CTA */}
-      <div className="mt-3 flex items-center justify-between">
+      <div className="mt-2 sm:mt-3 flex items-center justify-between">
         <span className="label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">{cta}</span>
         <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
       </div>

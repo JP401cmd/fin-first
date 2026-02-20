@@ -112,7 +112,7 @@ export default async function DashboardPage() {
   const dateStr = now.toLocaleDateString('nl-NL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10">
+    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       {/* Badge evaluation on dashboard load */}
       <BadgeEvaluator />
 
@@ -124,7 +124,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-5 sm:mb-8">
         <div className="flex items-center justify-between">
           <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--ink)]">
             Welkom terug, <span className="font-serif italic">{displayName}</span>
@@ -137,12 +137,12 @@ export default async function DashboardPage() {
       </div>
 
       {/* Streak break warning notification */}
-      <div className="mb-6" data-testid="streak-warning-section">
+      <div className="mb-3 sm:mb-6" data-testid="streak-warning-section">
         <StreakBreakWarning />
       </div>
 
       {/* Three module cards */}
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 md:grid-cols-3">
         {/* De Kern */}
         <Link
           href="/core"
@@ -150,9 +150,9 @@ export default async function DashboardPage() {
           style={{ animationDelay: '0s' }}
         >
           <div className="h-1 bg-kern-500" />
-          <div className="p-6">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
+          <div className="p-4 sm:p-6">
+            <div className="mb-2 sm:mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
                 <FhinAvatar size={36} />
               </div>
               <div>
@@ -160,12 +160,12 @@ export default async function DashboardPage() {
                 <p className="label-editorial text-kern-600">Waar sta je echt?</p>
               </div>
             </div>
-            <p className="mb-5 text-sm leading-relaxed text-[var(--ink-3)]">
+            <p className="mb-3 sm:mb-5 text-sm leading-relaxed text-[var(--ink-3)]">
               Je financiele fundament. Inzicht in je vermogen, schulden en budgetten.
             </p>
 
             {/* Preview metric — Vermogensgroei deze maand */}
-            <div className="space-y-3 border-t border-[var(--border-ed)] pt-4">
+            <div className="space-y-2 sm:space-y-3 border-t border-[var(--border-ed)] pt-3 sm:pt-4">
               <div data-testid="kern-preview-metric">
                 <div className="flex items-center gap-1.5 label-editorial text-[var(--ink-3)] mb-1">
                   <TrendingUp className="h-3.5 w-3.5" /> Vermogensgroei deze maand
@@ -194,9 +194,9 @@ export default async function DashboardPage() {
           style={{ animationDelay: '0.05s' }}
         >
           <div className="h-1 bg-wil-500" />
-          <div className="p-6">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
+          <div className="p-4 sm:p-6">
+            <div className="mb-2 sm:mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
                 <FinnAvatar size={36} />
               </div>
               <div>
@@ -204,12 +204,12 @@ export default async function DashboardPage() {
                 <p className="label-editorial text-wil-600">Wat ga je doen?</p>
               </div>
             </div>
-            <p className="mb-5 text-sm leading-relaxed text-[var(--ink-3)]">
+            <p className="mb-3 sm:mb-5 text-sm leading-relaxed text-[var(--ink-3)]">
               Bewuste keuzes en acties. Van inzicht naar impact.
             </p>
 
             {/* Preview metric — X acties open — Y dagen te winnen */}
-            <div className="space-y-3 border-t border-[var(--border-ed)] pt-4">
+            <div className="space-y-2 sm:space-y-3 border-t border-[var(--border-ed)] pt-3 sm:pt-4">
               <div data-testid="wil-preview-metric">
                 <div className="flex items-center gap-1.5 label-editorial text-[var(--ink-3)] mb-1">
                   <Zap className="h-3.5 w-3.5" /> Openstaande acties
@@ -237,9 +237,9 @@ export default async function DashboardPage() {
           style={{ animationDelay: '0.1s' }}
         >
           <div className="h-1 bg-horizon-500" />
-          <div className="p-6">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
+          <div className="p-4 sm:p-6">
+            <div className="mb-2 sm:mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
                 <FfinAvatar size={36} />
               </div>
               <div>
@@ -247,12 +247,12 @@ export default async function DashboardPage() {
                 <p className="label-editorial text-horizon-600">Waar ga je naartoe?</p>
               </div>
             </div>
-            <p className="mb-5 text-sm leading-relaxed text-[var(--ink-3)]">
+            <p className="mb-3 sm:mb-5 text-sm leading-relaxed text-[var(--ink-3)]">
               Je pad naar financiele vrijheid. Projecties, scenario&apos;s en je tijdlijn.
             </p>
 
             {/* Preview metric — Countdown: X jaar, Y maanden */}
-            <div className="space-y-3 border-t border-[var(--border-ed)] pt-4">
+            <div className="space-y-2 sm:space-y-3 border-t border-[var(--border-ed)] pt-3 sm:pt-4">
               <div data-testid="horizon-preview-metric">
                 <div className="flex items-center gap-1.5 label-editorial text-[var(--ink-3)] mb-1">
                   <Compass className="h-3.5 w-3.5" /> Countdown naar vrijheid

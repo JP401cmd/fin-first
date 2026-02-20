@@ -218,6 +218,215 @@ When the user asks you to **commit and push**:
 
 **NEVER use `--no-verify` on push commands.** The pre-push hook exists to prevent deploy failures on Vercel. If the build fails, that means the push *should* be blocked until the errors are resolved.
 
+## Design Language — "Editorial Finance"
+
+TriFinity's visuele identiteit is geïnspireerd op kwaliteitskranten zoals de Financial Times en NRC. Het combineert de autoriteit van redactioneel drukwerk met de warmte van persoonlijk financieel advies. Dit is geen fintech-dashboard — het is een persoonlijk financieel dagblad.
+
+### Ontwerpprincipes
+
+1. **Krant, geen dashboard** — Informatiehiërarchie via typografie, niet via kleur-overload. Witruimte is een feature, geen leegte.
+2. **Inkt op papier** — Warm off-white (`#faf9f6`) als achtergrond, donkere inkt (`#1a1916`) als primaire tekst. Nooit pure zwart-op-wit.
+3. **Drie modules, drie tinten** — Elke module heeft één distincte kleur. Alle andere UI-elementen zijn neutraal (inkt + papier).
+4. **Typografie doet het werk** — Hiërarchie wordt gecreëerd door font-keuze en gewicht, niet door achtergrondkleuren of decoratie.
+5. **Elk getal vertelt een verhaal** — Bedragen tonen altijd hun vrijheidstijd-equivalent. Klikbare getallen openen een kassabon (receipt breakdown).
+6. **Geen concessies op leesbaarheid** — WCAG AAA contrast. Touch targets minimaal 44×44px. Monospace voor alle bedragen.
+7. **Subtiele beweging** — Animaties zijn functioneel (feedUp entrance, progress fills), nooit decoratief. Max 0.5s duur.
+
+### Kleurensysteem
+
+#### Achtergrond & Inkt (Neutraal palet)
+```
+--bg:        #faf9f6    Pagina-achtergrond (warm off-white)
+--paper:     #ffffff    Kaart-achtergrond (zuiver wit)
+--subtle:    #f3f2ee    Hover-states, secondary backgrounds
+--border-ed: #e2e0d8    Dunne scheidingslijnen
+--border-md: #c8c5ba    Zwaardere borders (knoppen, accenten)
+
+--ink:       #1a1916    Primaire tekst (koppen, body)
+--ink-2:     #4a4840    Secundaire tekst (knoppen, labels)
+--ink-3:     #888070    Tertiaire tekst (meta, timestamps)
+--ink-4:     #bbb8b0    Disabled, placeholders
+```
+
+#### Module-kleuren (OKLCH dynamisch palet)
+Elke module genereert een 11-staps palet (50–950) via `lib/color-palette.ts` met OKLCH voor perceptuele consistentie.
+
+```
+KERN (De Kern — Bruin/Aarde)
+  Basis: #6b4339
+  Licht: --kern-l (#6b43391a)  → achtergronden, badges
+  Medium: --kern-m (#6b433945) → borders, outlines
+  Tekst:  --kern-t (#58362d)   → labels, iconen
+  Tailwind: bg-kern-50 … bg-kern-950, text-kern-500, border-kern-300
+
+WIL (De Wil — Paars/Actie)
+  Basis: #3d3048
+  Licht: --will-l (#3d30481a)
+  Medium: --will-m (#3d304845)
+  Tekst:  --will-t (#2e2437)
+  Tailwind: bg-wil-50 … bg-wil-950, text-wil-500, border-wil-300
+
+HORIZON (De Horizon — Zandgoud/Toekomst)
+  Basis: #c4a06b
+  Licht: --hor-l (#c4a06b1a)
+  Medium: --hor-m (#c4a06b45)
+  Tekst:  --hor-t (#8a6e42)
+  Tailwind: bg-horizon-50 … bg-horizon-950, text-horizon-500, border-horizon-300
+```
+
+#### Schaduw-systeem
+```
+--s0: 0 1px 3px rgba(26,25,22,.05)      Rust-state (kaarten)
+--s1: 0 2px 10px rgba(26,25,22,.07)      Hover / focus
+--s2: 0 4px 24px rgba(26,25,22,.09)      Modals / overlays
+```
+
+#### Border-radii
+```
+--r:    8px     Standaard (knoppen, inputs)
+--r-lg: 14px    Kaarten, modals, hero-blokken
+--r-sm: 5px     Kleine elementen (tags, pills)
+```
+
+### Typografie
+
+Vier fonts vormen een strikte hiërarchie. Gebruik NOOIT een font buiten deze vier.
+
+| Font | Rol | Gewichten | CSS Variable |
+|------|-----|-----------|--------------|
+| **Playfair Display** | Display/koppen — logo, hero-waarden, sectietitels | 400, 600, 700 + italic | `--font-playfair` |
+| **Source Serif 4** | Redactionele body — AI-quotes, beschrijvingen, links | 300, 400, 600 + italic | `--font-source-serif` |
+| **DM Mono** | Data — geldbedragen, percentages, tabular numbers | 400, 500 | `--font-dm-mono` |
+| **Inter** | UI — labels, knoppen, formulieren, navigatie | 300, 400, 500, 600 | `--font-inter` |
+
+#### Typografische regels
+- **Koppen**: Playfair Display, 32–52px, letter-spacing: -0.03em
+- **Kicker/rubriek**: Inter, 10–11px, UPPERCASE, letter-spacing: 0.08–0.12em, font-weight: 600–700
+- **Geldbedragen**: DM Mono, tabular-nums, geen decimalen tenzij < €1
+- **AI-citaten**: Source Serif 4 italic, 15px, line-height: 1.65, `border-left: 3px solid module-color`
+- **Meta-tekst**: Inter of Source Serif italic, 11px, color: `--ink-3`
+- **Links in editorial context**: Source Serif 4 italic, module-kleur
+
+### Component-patronen
+
+#### Masthead (Koptegel)
+- Sticky top, `border-bottom: 2px solid var(--ink)` — zoals een krantenkop
+- Wordmark: `tf.` in Playfair Display 36px bold, `t` = ink, `f.` = kern-bruin
+- Secundaire navigatie: tab-strip met 3px gekleurde bottom-border per actieve module
+- Tab-labels: Inter 12px, UPPERCASE, letter-spacing: 0.04em
+
+#### Hero-blok (Vermogensoverzicht)
+- 4px kleur-accent bovenaan (`::before` pseudo-element)
+- Kicker: module-kleur, 10px uppercase met icoon
+- Hoofdwaarde: Playfair Display 52px (desktop), 38px (mobiel)
+- Delta-indicator: pijl + bedrag + percentage, kleur `--hor-t` (positief) of urgent-rood
+- Sparkline-grafiek eronder met grid-lijnen en actieve data-dot
+
+#### Kaarten (card-editorial)
+```css
+background: var(--paper);
+border: 1px solid var(--border-ed);
+border-radius: var(--r-lg);    /* 14px */
+box-shadow: var(--s0);
+transition: all 0.2s ease;
+```
+Hover: `box-shadow: var(--s1); transform: translateY(-1px);`
+
+#### Rekening-kaarten (4-kolom grid)
+- 3px kleur-accent bovenaan per module
+- Icoon in 36×36px rounded container met lichte module-achtergrond
+- Label: 10px uppercase, ink-3
+- Waarde: DM Mono 18px
+- Sub-label: 11px met kleur-status (groen/bruin)
+
+#### Sidebar-kaarten (rechterkolom, 340px)
+- Header-balk met 3px verticale kleur-rule + UPPERCASE titel
+- Italic link rechts ("Alle bekijken →") in Source Serif + module-kleur
+- Actie-items: genummerd met gekleurde cirkel-badges, DM Mono waarde rechts
+- Tags: 9px UPPERCASE met gekleurde achtergrond + border
+
+#### AI-kaart (Fhin/Finn/Ffin)
+- Header: subtle achtergrond, 9px gekleurde pill, naam bold + italic rol
+- Quote: Source Serif 4 italic met `border-left: 3px solid module-color`
+- Actie-knoppen: primaire knop in module-kleur, secundaire knoppen met border
+
+#### Freedom Badge
+```css
+background: var(--hor-l);
+border: 1px solid var(--hor-m);
+border-radius: var(--r);     /* 8px */
+padding: 8px 12px;
+text-align: center;
+```
+- Waarde: Playfair Display 24px bold in `--hor-t`
+- Label: 9px UPPERCASE
+
+#### Voortgangsbalk
+- Track: 5px hoog, `--hor-l` achtergrond, 1px `--hor-m` border
+- Fill: lineair gradient van `--hor-t` naar `--hor`
+- Animate-in: 1.4s cubic-bezier(.22,1,.36,1) met delay
+
+#### Dateline
+- Flex row met `border-bottom: 1px solid var(--border)`
+- Links: Inter 11px UPPERCASE, letter-spacing: 0.11em, ink-3
+- Rechts: Source Serif 4 italic, 13px, ink-3
+
+#### Begroeting
+- Sub-label: 11px UPPERCASE, ink-3
+- Hoofdtekst: Playfair Display 32px, met `<em>` in kern-bruin italic
+
+### Layout-structuur
+
+```
+Desktop (>900px):
+  max-width: 1280px, padding: 32px
+  Main grid: 1fr 340px (content + sidebar)
+  Rekeningen: 4-kolom grid
+
+Tablet (560–900px):
+  padding: 20px 16px
+  Main grid: 1-kolom (sidebar onder content)
+  Rekeningen: 2-kolom grid
+
+Mobiel (<560px):
+  Rekeningen: 2-kolom
+  Hero stats: horizontale rij i.p.v. kolom
+  AI-acties: horizontale rij
+  Bottom navigation (BottomNav component)
+  Safe-area padding voor notch
+```
+
+### Animatie & Beweging
+
+- **Page entrance**: `fadeUp` — 0.5s, translateY(16px→0), staggered per kaart (0.05s interval)
+- **Progress fill**: `progIn` — 1.4s cubic-bezier, breedte 0→target, 0.4s delay
+- **Hover**: `transition: all 0.15–0.2s`, translateY(-1px), schaduw-verhoging
+- **AI-personages**: `blink` (2.5s interval), `breathe` (subtiel Y-axis), `talk` (mond-animatie)
+- **Badge unlock**: `badge-shimmer` + `badge-scale-in` + `badge-unlock-glow`
+- **GEEN**: Bounce, shake, infinite spin, decoratieve animaties
+
+### Interactie-principes
+
+1. **Elk KPI-getal is klikbaar** → opent BottomSheet met kassabon-breakdown
+2. **Hover = schaduw + lift** — nooit achtergrondkleur-verandering als enige indicator
+3. **Touch targets: minimaal 44×44px** — `.touch-target` utility class
+4. **Cards als `<button type="button">`** wanneer klikbaar, met `text-left`
+5. **Italic links** in editorial context (Source Serif 4 italic + module-kleur + pijl)
+6. **Geen tooltips op mobiel** — gebruik inline uitleg of kassabon modal
+
+### Footer
+- `border-top: 2px solid var(--ink)` — sluit de "krant" af
+- Wordmark: Playfair Display 22px
+- Italic tagline: Source Serif 4
+- Module-indicators: 3 gekleurde module-namen met iconen (verborgen op mobiel)
+
+### Referentie-implementatie
+- **Design mockup**: `tf-web.html` (Desktop/OneDrive) — volledige editorial layout
+- **Live code**: `app/globals.css` — CSS tokens en utilities
+- **Kleur-generatie**: `lib/color-palette.ts` — OKLCH dynamische paletten
+- **Layout**: `app/(app)/layout.tsx` — provider-hiërarchie en structuur
+- **Hero**: `app/(app)/core/page.tsx` — kern-hero + kassabon modals
+
 ## Guidelines
 
 1. Be concise and helpful

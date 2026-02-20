@@ -346,7 +346,7 @@ export default function BudgetsPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
         </div>
@@ -356,7 +356,7 @@ export default function BudgetsPage() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-700">{error}</p>
           <button onClick={() => { setError(null); setLoading(true); loadBudgets() }} className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
@@ -368,9 +368,9 @@ export default function BudgetsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       {/* Month selector */}
-      <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 sm:p-8">
+      <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
         <div className="mb-6 flex items-center justify-between">
           <button
             onClick={prevMonth}
@@ -390,7 +390,7 @@ export default function BudgetsPage() {
         </div>
 
         {/* Totals split: Income / Expenses / Savings / Debt — budget limits as primary */}
-        <div className="grid grid-cols-2 gap-4 text-center sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 text-center sm:grid-cols-4">
           <div>
             <p className="text-xs font-medium text-emerald-600 uppercase">Inkomen</p>
             <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalIncome)}</p>
@@ -417,7 +417,7 @@ export default function BudgetsPage() {
       </section>
 
       {/* View toggle + New budget button */}
-      <div className="mt-6 flex items-center justify-between">
+      <div className="mt-3 sm:mt-6 flex items-center justify-between">
         <div className="flex items-center gap-0.5 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-0.5">
           <button
             onClick={() => toggleViewMode('tree')}
@@ -478,7 +478,7 @@ export default function BudgetsPage() {
       {viewMode === 'tree' ? (
         <>
           {incomeBudgets.length > 0 && (
-            <div className="mt-8">
+            <div className="mt-4 sm:mt-8">
               <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Inkomen</h3>
               <BudgetTree
                 groups={incomeBudgets}
@@ -489,7 +489,7 @@ export default function BudgetsPage() {
             </div>
           )}
           {expenseBudgets.length > 0 && (
-            <div className="mt-8">
+            <div className="mt-4 sm:mt-8">
               <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Uitgaven</h3>
               <BudgetTree
                 groups={expenseBudgets}
@@ -500,7 +500,7 @@ export default function BudgetsPage() {
             </div>
           )}
           {savingsBudgets.length > 0 && (
-            <div className="mt-8">
+            <div className="mt-4 sm:mt-8">
               <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Sparen <span className="ml-1 font-normal normal-case tracking-normal text-blue-400/70">— vrijheid opbouwen</span></h3>
               <BudgetTree
                 groups={savingsBudgets}
@@ -511,7 +511,7 @@ export default function BudgetsPage() {
             </div>
           )}
           {debtBudgets.length > 0 && (
-            <div className="mt-8">
+            <div className="mt-4 sm:mt-8">
               <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Schulden <span className="ml-1 font-normal normal-case tracking-normal text-red-400/70">— vrijheid terugkopen</span></h3>
               <BudgetTree
                 groups={debtBudgets}

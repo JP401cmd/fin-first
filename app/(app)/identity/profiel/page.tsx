@@ -111,7 +111,7 @@ export default function ProfielPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-4xl px-6 py-12">
+      <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="flex items-center justify-center py-24">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--border-md)] border-t-zinc-900" />
         </div>
@@ -120,8 +120,8 @@ export default function ProfielPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-8">
-      <div className="mb-10">
+    <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
+      <div className="mb-5 sm:mb-8">
         <h1 className="text-3xl font-bold text-[var(--ink)]">Profiel</h1>
         <p className="mt-2 text-[var(--ink-3)]">
           Je persoonlijke gegevens en huishoudprofiel.
@@ -129,11 +129,11 @@ export default function ProfielPage() {
       </div>
 
       {/* ── Persoonlijke Gegevens ─────────────────────────────────── */}
-      <section className="mb-10 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 sm:p-8">
+      <section className="mb-5 sm:mb-8 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-8">
         <h2 className="label-editorial text-[var(--ink-2)]">
           Persoonlijke Gegevens
         </h2>
-        <p className="mt-1 mb-6 text-sm text-[var(--ink-3)]">
+        <p className="mt-1 mb-3 sm:mb-6 text-sm text-[var(--ink-3)]">
           Basisinformatie over jou en je huishouden.
         </p>
 
@@ -201,7 +201,7 @@ export default function ProfielPage() {
           </div>
         </div>
 
-        <div className="mt-6 flex items-center gap-3">
+        <div className="mt-3 sm:mt-6 flex items-center gap-3">
           <button
             onClick={saveProfile}
             disabled={saving}
@@ -218,11 +218,11 @@ export default function ProfielPage() {
       </section>
 
       {/* ── Huishoudprofiel (NIBUD matching) ─────────────────────── */}
-      <section className="mb-10 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 sm:p-8">
+      <section className="mb-5 sm:mb-8 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-8">
         <h2 className="label-editorial text-[var(--ink-2)]">
           Huishoudprofiel
         </h2>
-        <p className="mt-1 mb-6 text-sm text-[var(--ink-3)]">
+        <p className="mt-1 mb-3 sm:mb-6 text-sm text-[var(--ink-3)]">
           Deze gegevens worden gebruikt voor je NIBUD Budget Gezondheidscheck.
         </p>
 
@@ -379,7 +379,7 @@ export default function ProfielPage() {
           </div>
         </div>
 
-        <div className="mt-6 flex items-center gap-3">
+        <div className="mt-3 sm:mt-6 flex items-center gap-3">
           <button
             onClick={saveProfile}
             disabled={saving}
@@ -473,14 +473,14 @@ function ModuleColorSection() {
     && localColors.horizon === DEFAULT_MODULE_COLORS.horizon
 
   return (
-    <section className="mb-10 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 sm:p-8">
+    <section className="mb-5 sm:mb-8 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-8">
       <div className="flex items-center gap-2">
         <Palette className="h-4 w-4 text-[var(--ink-3)]" />
         <h2 className="label-editorial text-[var(--ink-2)]">
           Module Kleuren
         </h2>
       </div>
-      <p className="mt-1 mb-6 text-sm text-[var(--ink-3)]">
+      <p className="mt-1 mb-3 sm:mb-6 text-sm text-[var(--ink-3)]">
         Kies een accentkleur per module. Alle tinten worden automatisch gegenereerd.
       </p>
 
@@ -535,7 +535,7 @@ function ModuleColorSection() {
         })}
       </div>
 
-      <div className="mt-6 flex items-center gap-3">
+      <div className="mt-3 sm:mt-6 flex items-center gap-3">
         <button
           onClick={saveColors}
           disabled={colorSaving}

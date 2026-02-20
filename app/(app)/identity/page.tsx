@@ -141,7 +141,7 @@ export default function IdentityPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-4xl px-6 py-12">
+      <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="flex items-center justify-center py-24">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--border-md)] border-t-zinc-900" />
         </div>
@@ -152,9 +152,9 @@ export default function IdentityPage() {
   const householdLabel = householdType === 'solo' ? 'Solo' : householdType === 'samen' ? 'Samen' : 'Gezin'
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-8">
+    <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
       {/* Page header */}
-      <div className="mb-10">
+      <div className="mb-5 sm:mb-8">
         <h1 className="text-3xl font-bold text-[var(--ink)]">Identiteit</h1>
         <p className="mt-2 text-[var(--ink-3)]">
           Wie ben je en hoe sta je in het leven? Jouw positie op de reis naar vrijheid.
@@ -163,7 +163,7 @@ export default function IdentityPage() {
 
       {/* ── Demo user banner ──────────────────────────────────────── */}
       {isDemoUser && (
-        <section className="mb-6 rounded-[var(--r-lg)] border-2 border-wil-200 bg-wil-50/50 p-6">
+        <section className="mb-3 sm:mb-6 rounded-[var(--r-lg)] border-2 border-wil-200 bg-wil-50/50 p-4 sm:p-6">
           <div className="flex items-start gap-4">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wil-100">
               <svg className="h-5 w-5 text-wil-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -231,10 +231,10 @@ export default function IdentityPage() {
       )}
 
       {/* ── Preview-kaarten ──────────────────────────────────────── */}
-      <div className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="mb-5 sm:mb-8 grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2">
         <Link
           href="/identity/profiel"
-          className="group rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 transition-all hover:border-wil-300 hover:shadow-sm"
+          className="group rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6 transition-all hover:border-wil-300 hover:shadow-sm"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -254,7 +254,7 @@ export default function IdentityPage() {
 
         <Link
           href="/identity/voortgang"
-          className="group rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 transition-all hover:border-wil-300 hover:shadow-sm"
+          className="group rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6 transition-all hover:border-wil-300 hover:shadow-sm"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -274,7 +274,7 @@ export default function IdentityPage() {
 
         <Link
           href="/identity/delen"
-          className="group rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 transition-all hover:border-wil-300 hover:shadow-sm"
+          className="group rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6 transition-all hover:border-wil-300 hover:shadow-sm"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -294,7 +294,7 @@ export default function IdentityPage() {
 
         <Link
           href="/identity/instellingen"
-          className="group rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 transition-all hover:border-wil-300 hover:shadow-sm"
+          className="group rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6 transition-all hover:border-wil-300 hover:shadow-sm"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -314,16 +314,16 @@ export default function IdentityPage() {
       </div>
 
       {/* ── The Temporal Balance ──────────────────────────────────── */}
-      <section className="mb-10 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 sm:p-8">
+      <section className="mb-5 sm:mb-8 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-8">
         <h2 className="label-editorial text-[var(--ink-2)]">
           The Temporal Balance
         </h2>
-        <p className="mt-1 mb-8 text-sm text-[var(--ink-3)]">
+        <p className="mt-1 mb-5 sm:mb-8 text-sm text-[var(--ink-3)]">
           How much &lsquo;Now&rsquo; are you willing to trade for &lsquo;Later&rsquo;?
         </p>
 
         {/* Slider */}
-        <div className="mb-8">
+        <div className="mb-5 sm:mb-8">
           <input
             type="range"
             min={1}
@@ -364,16 +364,16 @@ export default function IdentityPage() {
       </section>
 
       {/* ── The Chronology Scale ──────────────────────────────────── */}
-      <section className="mb-10 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 sm:p-8">
+      <section className="mb-5 sm:mb-8 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-8">
         <h2 className="label-editorial text-[var(--ink-2)]">
           The Chronology Scale
         </h2>
-        <p className="mt-1 mb-6 text-sm text-[var(--ink-3)]">
+        <p className="mt-1 mb-3 sm:mb-6 text-sm text-[var(--ink-3)]">
           Jouw positie op de reis naar financiele soevereiniteit.
         </p>
 
         {/* Progress overview bar */}
-        <div className="mb-6 rounded-xl bg-[var(--subtle)] p-4">
+        <div className="mb-3 sm:mb-6 rounded-xl bg-[var(--subtle)] p-4">
           <div className="mb-2 flex items-center justify-between text-xs text-[var(--ink-3)]">
             <span>Lvl {chronologyLevels[0].level}: {chronologyLevels[0].name}</span>
             <span>Lvl {chronologyLevels[chronologyLevels.length - 1].level}: {chronologyLevels[chronologyLevels.length - 1].name}</span>
@@ -427,7 +427,7 @@ export default function IdentityPage() {
           const nextPhase = chronologyPhases.find(p => p.phase === nextLevel.phase)
           const colors = nextPhase ? phaseColors[nextPhase.color] : phaseColors.teal
           return (
-            <div className={`mb-6 rounded-[var(--r-lg)] border p-4 ${colors.badge}`}>
+            <div className={`mb-3 sm:mb-6 rounded-[var(--r-lg)] border p-4 ${colors.badge}`}>
               <p className="text-xs font-bold uppercase">Volgende mijlpaal</p>
               <p className="mt-1 text-sm font-semibold">
                 Lvl {nextLevel.level}: {nextLevel.name}

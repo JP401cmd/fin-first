@@ -41,7 +41,7 @@ export function DomainCard({
   return (
     <Link
       href={href}
-      className={`group block rounded-[var(--r-lg)] border ${colors.border} ${colors.bg} p-8 transition-all hover:shadow-[var(--s2)]`}
+      className={`group block rounded-[var(--r-lg)] border ${colors.border} ${colors.bg} p-5 sm:p-8 transition-all hover:shadow-[var(--s2)]`}
     >
       <div className="mb-4 flex justify-center">
         {icon}

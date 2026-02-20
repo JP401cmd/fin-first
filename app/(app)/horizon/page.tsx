@@ -291,7 +291,7 @@ export default function HorizonPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-horizon-500 border-t-transparent" />
         </div>
@@ -301,7 +301,7 @@ export default function HorizonPage() {
 
   if (error || !fire || !range || !resilience) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-700">{error ?? 'Er ging iets mis.'}</p>
           <button onClick={() => { setError(null); setLoading(true); loadData() }} className="mt-3 rounded-[var(--r)] bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
@@ -317,30 +317,30 @@ export default function HorizonPage() {
   const hasDebt = (effectiveInput?.totalDebts ?? 0) > 0
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       {/* === 1. Hero (Gradient) === */}
       <section data-testid="horizon-hero" className="card-editorial overflow-hidden">
         <div className="h-1.5 bg-horizon-500" />
 
-        <div className="p-5 sm:p-8 md:p-10">
-          <div className="mb-6 flex items-center gap-3">
+        <div className="p-4 sm:p-6 md:p-8">
+          <div className="mb-3 sm:mb-6 flex items-center gap-3">
             <FfinAvatar size={40} />
             <p className="label-editorial text-horizon-600">
               Jouw horizon naar vrijheid
             </p>
           </div>
 
-          <div className="mb-6" data-testid="hero-primary-metric">
+          <div className="mb-3 sm:mb-5" data-testid="hero-primary-metric">
             {fire.fireAge !== null ? (
               <>
-                <span data-testid="hero-fire-age" className="font-display text-[52px] font-bold tracking-tight text-[var(--ink)]">
+                <span data-testid="hero-fire-age" className="font-display text-[36px] sm:text-[44px] md:text-[52px] font-bold tracking-tight text-[var(--ink)]">
                   {Math.round(fire.fireAge)}
                 </span>
                 <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">jaar — FIRE leeftijd</span>
               </>
             ) : (
               <>
-                <span data-testid="hero-freedom-pct-fallback" className="font-display text-[52px] font-bold tracking-tight text-[var(--ink)]">
+                <span data-testid="hero-freedom-pct-fallback" className="font-display text-[36px] sm:text-[44px] md:text-[52px] font-bold tracking-tight text-[var(--ink)]">
                   {fire.freedomPercentage.toFixed(1)}%
                 </span>
                 <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">vrijheid bereikt</span>
@@ -348,7 +348,7 @@ export default function HorizonPage() {
             )}
           </div>
 
-          <div className="mb-8">
+          <div className="mb-4 sm:mb-6">
             <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-horizon-600 via-horizon-400 to-horizon-300 transition-all duration-1000"
@@ -362,7 +362,7 @@ export default function HorizonPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:gap-5 sm:grid-cols-3">
             <div data-testid="hero-countdown">
               <p className="label-editorial text-[var(--ink-3)]">Aftellen</p>
               <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]">
@@ -403,16 +403,16 @@ export default function HorizonPage() {
       </section>
 
       {/* === 2. KPI Cards (White cards, subtle borders) === */}
-      <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" data-testid="horizon-kpis">
-        <div className="card-editorial p-5" data-testid="kpi-fire-age">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
-              <Hourglass className="h-5 w-5 text-horizon-600" />
+      <section className="mt-4 sm:mt-8 grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4" data-testid="horizon-kpis">
+        <div className="card-editorial p-3 sm:p-5" data-testid="kpi-fire-age">
+          <div className="mb-2 sm:mb-3 flex items-center justify-between">
+            <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
+              <Hourglass className="h-4 w-4 sm:h-5 sm:w-5 text-horizon-600" />
             </div>
             <KpiTooltip text="Je verwachte vrijheidsleeftijd met optimistisch en pessimistisch scenario." />
           </div>
           <p className="label-editorial text-[var(--ink-3)]">Vrijheidsleeftijd</p>
-          <p className="mt-1 font-mono text-3xl font-bold text-[var(--ink)]">
+          <p className="mt-1 font-mono text-2xl sm:text-3xl font-bold text-[var(--ink)]">
             {fire.fireAge !== null ? Math.round(fire.fireAge) : '-'}
           </p>
           {range.optimistic.fireAge !== null && range.pessimistic.fireAge !== null && (
@@ -422,42 +422,42 @@ export default function HorizonPage() {
           )}
         </div>
 
-        <div className="card-editorial p-5" data-testid="kpi-countdown">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
-              <Calendar className="h-5 w-5 text-horizon-600" />
+        <div className="card-editorial p-3 sm:p-5" data-testid="kpi-countdown">
+          <div className="mb-2 sm:mb-3 flex items-center justify-between">
+            <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
+              <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-horizon-600" />
             </div>
             <KpiTooltip text="Aantal dagen tot je verwacht moment van volledige vrijheid." />
           </div>
           <p className="label-editorial text-[var(--ink-3)]">Aftellen</p>
-          <p className="mt-1 font-mono text-3xl font-bold text-[var(--ink)]">
+          <p className="mt-1 font-mono text-2xl sm:text-3xl font-bold text-[var(--ink)]">
             {fire.countdownDays > 0 ? fire.countdownDays.toLocaleString('nl-NL') : '0'}
           </p>
           <p className="mt-1 text-xs text-[var(--ink-4)]">dagen tot volledige vrijheid</p>
         </div>
 
-        <div className="card-editorial p-5" data-testid="kpi-fire-target">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
-              <Target className="h-5 w-5 text-horizon-600" />
+        <div className="card-editorial p-3 sm:p-5" data-testid="kpi-fire-target">
+          <div className="mb-2 sm:mb-3 flex items-center justify-between">
+            <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
+              <Target className="h-4 w-4 sm:h-5 sm:w-5 text-horizon-600" />
             </div>
             <KpiTooltip text="Het doelbedrag voor volledige financiële vrijheid, berekend als je jaarlijkse uitgaven × 25 (4%-regel)." />
           </div>
           <p className="label-editorial text-[var(--ink-3)]">FIRE Doelbedrag</p>
-          <p className="mt-1 text-3xl font-bold text-horizon-600">{formatCurrency(fire.fireTarget)}</p>
+          <p className="mt-1 text-2xl sm:text-3xl font-bold text-horizon-600">{formatCurrency(fire.fireTarget)}</p>
           <p className="mt-1 text-xs text-[var(--ink-4)]">nodig voor volledige vrijheid</p>
         </div>
 
         <FeatureGate featureId="veerkracht_score" fallback="locked">
-        <div className="card-editorial p-5" data-testid="resilience-kpi">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
-              <Shield className="h-5 w-5 text-horizon-600" />
+        <div className="card-editorial p-3 sm:p-5" data-testid="resilience-kpi">
+          <div className="mb-2 sm:mb-3 flex items-center justify-between">
+            <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
+              <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-horizon-600" />
             </div>
             <KpiTooltip text="Veerkrachtscore 0-100: hoe goed je bestand bent tegen tegenvallers. Gebaseerd op je meest recente snapshot." />
           </div>
           <p className="label-editorial text-[var(--ink-3)]">Veerkracht</p>
-          <p className="mt-1 font-mono text-3xl font-bold text-[var(--ink)]" data-testid="resilience-value">
+          <p className="mt-1 font-mono text-2xl sm:text-3xl font-bold text-[var(--ink)]" data-testid="resilience-value">
             {snapshotResilience !== null ? snapshotResilience : resilience.total}
           </p>
           <p className="mt-1 text-xs text-[var(--ink-4)]" data-testid="resilience-label">
@@ -475,7 +475,7 @@ export default function HorizonPage() {
 
       {/* === 3. Alerts === */}
       {(hasNoDob || fireNotReachable || hasDebt) && (
-        <section className="mt-8" data-testid="horizon-alerts">
+        <section className="mt-4 sm:mt-8" data-testid="horizon-alerts">
           <h2 className="mb-3 label-editorial text-[var(--ink-2)]">
             Aandachtspunten
           </h2>
@@ -509,7 +509,7 @@ export default function HorizonPage() {
       )}
 
       {/* === 4. Projectie-invoer (Financial Inputs Summary / Primary Content) === */}
-      <section className="mt-10" data-testid="fire-inputs">
+      <section className="mt-5 sm:mt-8" data-testid="fire-inputs">
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h2 className="label-editorial text-[var(--ink-2)]">
@@ -669,7 +669,7 @@ export default function HorizonPage() {
       {/* === 5. Resilience Trend Chart (Deep Dive) === */}
       {resilienceSnapshots.filter(s => s.resilience_score !== null).length >= 2 && (
         <FeatureGate featureId="veerkracht_score" fallback="hidden">
-        <section className="mt-10" data-testid="resilience-trend-section">
+        <section className="mt-5 sm:mt-8" data-testid="resilience-trend-section">
           <div className="mb-3">
             <h2 className="label-editorial text-[var(--ink-2)]">
               <Shield className="mr-1.5 inline h-3.5 w-3.5 text-horizon-500" />
@@ -701,7 +701,7 @@ export default function HorizonPage() {
         const improved = diff > 0
 
         return (
-          <section className="mt-10" data-testid="fire-age-trend-section">
+          <section className="mt-5 sm:mt-8" data-testid="fire-age-trend-section">
             <div className="mb-3">
               <h2 className="label-editorial text-[var(--ink-2)]">
                 <Hourglass className="mr-1.5 inline h-3.5 w-3.5 text-horizon-500" />
@@ -748,7 +748,7 @@ export default function HorizonPage() {
       })()}
 
       {/* === 6. Verken-kaarten (Explore Cards / Primary Content) === */}
-      <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="mt-4 sm:mt-8 grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <FeatureGate featureId="fire_projecties" fallback="locked">
           <ExploreCard
             onClick={() => setActiveModal('projections')}
@@ -789,7 +789,7 @@ export default function HorizonPage() {
 
       {/* === 7. Tijdlijn + Levensgebeurtenissen (Primary Content) === */}
       <FeatureGate featureId="levensgebeurtenissen" fallback="locked">
-      <section className="mt-10">
+      <section className="mt-5 sm:mt-8">
         <div className="mb-5">
           <h2 className="label-editorial text-[var(--ink-2)]">
             Jouw tijdlijn
@@ -841,7 +841,7 @@ export default function HorizonPage() {
       </section>
 
       {/* === 8. Levensgebeurtenissen (Primary Content) === */}
-      <section className="mt-8">
+      <section className="mt-4 sm:mt-8">
         {events.length > 0 && (
           <>
             <h2 className="mb-3 label-editorial text-[var(--ink-2)]">
@@ -950,7 +950,7 @@ export default function HorizonPage() {
 
       {/* === 9. Acties (Primary Content) === */}
       {actions.length > 0 && (
-        <section className="mt-8">
+        <section className="mt-4 sm:mt-8">
           <h2 className="mb-3 label-editorial text-[var(--ink-2)]">
             <Zap className="mr-1.5 inline h-3.5 w-3.5 text-wil-500" />
             Geplande acties (komend jaar)
@@ -969,7 +969,7 @@ export default function HorizonPage() {
 
       {/* === 10. Projectie-chart (Deep Dive) === */}
       <FeatureGate featureId="vermogensprojectie_chart" fallback="locked">
-      <section className="mt-10">
+      <section className="mt-5 sm:mt-8">
         <div className="mb-5">
           <h2 className="label-editorial text-[var(--ink-2)]">
             Vermogensprojectie
@@ -985,7 +985,7 @@ export default function HorizonPage() {
       </FeatureGate>
 
       {/* === 11. Samenvatting (Deep Dive) === */}
-      <section className="mt-10">
+      <section className="mt-5 sm:mt-8">
         <div className="mb-5">
           <h2 className="label-editorial text-[var(--ink-2)]">
             Samenvatting

@@ -68,8 +68,8 @@ export default function InstellingenPage() {
   }, [notifPrefs])
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-8">
-      <div className="mb-10">
+    <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
+      <div className="mb-5 sm:mb-8">
         <h1 className="text-3xl font-bold text-[var(--ink)]">Instellingen</h1>
         <p className="mt-2 text-[var(--ink-3)]">
           Notificatie-instellingen en gegevensbeheer.
@@ -77,11 +77,11 @@ export default function InstellingenPage() {
       </div>
 
       {/* ── Notificatie-instellingen ────────────────────────────── */}
-      <section className="mb-10 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 sm:p-8">
+      <section className="mb-5 sm:mb-8 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-8">
         <h2 className="label-editorial text-[var(--ink-2)]">
           Notificatie-instellingen
         </h2>
-        <p className="mt-1 mb-6 text-sm text-[var(--ink-3)]">
+        <p className="mt-1 mb-3 sm:mb-6 text-sm text-[var(--ink-3)]">
           Kies welke meldingen je wilt ontvangen.
         </p>
 
@@ -119,7 +119,7 @@ export default function InstellingenPage() {
               })}
             </div>
 
-            <div className="mt-6 flex items-center gap-3">
+            <div className="mt-3 sm:mt-6 flex items-center gap-3">
               <button
                 onClick={saveNotifPrefs}
                 disabled={notifSaving}
@@ -138,11 +138,11 @@ export default function InstellingenPage() {
       </section>
 
       {/* ── Gegevens Resetten ──────────────────────────────────── */}
-      <section className="mb-10 rounded-2xl border border-red-200 bg-[var(--paper)] p-6 sm:p-8">
+      <section className="mb-5 sm:mb-8 rounded-2xl border border-red-200 bg-[var(--paper)] p-4 sm:p-8">
         <h2 className="text-xs font-semibold tracking-[0.15em] text-red-400 uppercase">
           Gegevens Resetten
         </h2>
-        <p className="mt-1 mb-6 text-sm text-[var(--ink-3)]">
+        <p className="mt-1 mb-3 sm:mb-6 text-sm text-[var(--ink-3)]">
           Wis al je financiele gegevens en doorloop de onboarding opnieuw.
           Dit verwijdert al je bankrekeningen, transacties, budgetten, doelen en overige data.
         </p>

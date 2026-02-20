@@ -224,7 +224,7 @@ export default function AssetsPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
         </div>
@@ -234,7 +234,7 @@ export default function AssetsPage() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-700">{error}</p>
           <button onClick={() => { setError(null); setLoading(true); loadAssets() }} className="mt-3 rounded-[var(--r)] bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
@@ -246,9 +246,9 @@ export default function AssetsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       {/* Header */}
-      <section className="rounded-[var(--r-lg)] border border-kern-200 card-editorial p-6">
+      <section className="rounded-[var(--r-lg)] border border-kern-200 card-editorial p-4 sm:p-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-[var(--ink)]">Bezittingen</h1>
@@ -274,7 +274,7 @@ export default function AssetsPage() {
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="mt-3 sm:mt-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
           <div>
             <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Totale waarde</p>
             <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalValue)}</p>
@@ -322,9 +322,9 @@ export default function AssetsPage() {
       </section>
 
       {/* Allocation + projection */}
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <div className="mt-3 sm:mt-6 grid gap-3 sm:gap-6 lg:grid-cols-2">
         {/* Allocation */}
-        <section className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6">
+        <section className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
           <h2 className="text-sm font-semibold text-[var(--ink-2)]">Verdeling</h2>
           <div className="mt-4 flex items-center gap-6">
             <AllocationPie byType={byType} total={totalValue} dailyExpenses={dailyExpenses} />
@@ -350,7 +350,7 @@ export default function AssetsPage() {
         </section>
 
         {/* Projection chart */}
-        <section className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6" data-testid="portfolio-projection-section">
+        <section className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6" data-testid="portfolio-projection-section">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-[var(--ink-2)]">Projectie</h2>
             <div className="flex items-center gap-1" data-testid="projection-year-buttons">
@@ -395,7 +395,7 @@ export default function AssetsPage() {
       </div>
 
       {/* Asset list */}
-      <section className="mt-6 space-y-2">
+      <section className="mt-3 sm:mt-6 space-y-2">
         {assets.length === 0 && (
           <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-8 text-center">
             <TrendingUp className="mx-auto h-8 w-8 text-kern-400" />

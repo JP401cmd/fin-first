@@ -331,7 +331,7 @@ export default function HoldingsPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
         </div>
@@ -340,7 +340,7 @@ export default function HoldingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       {/* Header */}
       <section className="rounded-[var(--r-lg)] border border-kern-200 bg-gradient-to-br from-kern-50 to-white p-6">
         <div className="flex items-center gap-3 mb-4">
@@ -422,7 +422,7 @@ export default function HoldingsPage() {
         )}
 
         {/* KPI Stats */}
-        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <div className="mt-3 sm:mt-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
           <div>
             <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Totale waarde</p>
             <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalValue)}</p>
@@ -449,7 +449,7 @@ export default function HoldingsPage() {
 
       {/* Portfolio allocation visualization — donut chart with sector/geography/asset class views */}
       {holdingsForAllocation.length > 0 && (
-        <section className="mt-6 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6" data-testid="portfolio-allocation">
+        <section className="mt-3 sm:mt-6 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6" data-testid="portfolio-allocation">
           <div className="flex items-center gap-2 mb-4">
             <PieChart className="h-4 w-4 text-kern-600" />
             <h2 className="text-sm font-semibold text-[var(--ink-2)]">Portfolio verdeling</h2>
@@ -463,7 +463,7 @@ export default function HoldingsPage() {
 
       {/* Benchmark comparison */}
       {holdings.length > 0 && (
-        <section className="mt-6">
+        <section className="mt-3 sm:mt-6">
           <BenchmarkComparisonChart
             comparison={benchmarkComparison}
             onPeriodChange={handleBenchmarkPeriodChange}
@@ -475,7 +475,7 @@ export default function HoldingsPage() {
 
       {/* Dividend Tracker */}
       {holdings.length > 0 && (
-        <section className="mt-6" data-testid="dividend-tracker-section">
+        <section className="mt-3 sm:mt-6" data-testid="dividend-tracker-section">
           <DividendTracker />
         </section>
       )}
@@ -494,7 +494,7 @@ export default function HoldingsPage() {
       )}
 
       {/* Holdings list */}
-      <section className="mt-6 space-y-2">
+      <section className="mt-3 sm:mt-6 space-y-2">
         {holdings.length === 0 && !loading && (
           <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-8 text-center">
             <Briefcase className="mx-auto h-10 w-10 text-[var(--ink-4)]" />

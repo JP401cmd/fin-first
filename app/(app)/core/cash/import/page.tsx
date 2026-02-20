@@ -578,7 +578,7 @@ export default function ImportPage() {
 
   if (loading && !error) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
         </div>
@@ -588,7 +588,7 @@ export default function ImportPage() {
 
   if (loading && error) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="flex flex-col items-center justify-center py-20">
           <div className={`rounded-lg border p-6 text-center ${
             isNetworkError
@@ -615,9 +615,9 @@ export default function ImportPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       {/* Back */}
-      <div className="mb-6">
+      <div className="mb-3 sm:mb-6">
         <Link
           href="/core/cash"
           className="inline-flex items-center gap-1.5 text-sm text-[var(--ink-3)] hover:text-[var(--ink-2)]"
@@ -628,10 +628,10 @@ export default function ImportPage() {
       </div>
 
       <h1 className="mb-2 text-2xl font-bold text-[var(--ink)]">Transacties importeren</h1>
-      <p className="mb-8 text-sm text-[var(--ink-3)]">Upload een bankbestand (MT940, CSV of OFX) van je bank.</p>
+      <p className="mb-5 sm:mb-8 text-sm text-[var(--ink-3)]">Upload een bankbestand (MT940, CSV of OFX) van je bank.</p>
 
       {/* Steps indicator */}
-      <div className="mb-8 flex items-center gap-2 text-sm">
+      <div className="mb-5 sm:mb-8 flex items-center gap-2 text-sm">
         {['Upload', 'Categoriseer', 'Dubbelingen', 'Klaar'].map((label, i) => {
           const stepNum = i + 1
           const isActive = step === stepNum
@@ -654,7 +654,7 @@ export default function ImportPage() {
       </div>
 
       {error && (
-        <div className={`mb-6 rounded-lg border p-4 text-sm ${
+        <div className={`mb-3 sm:mb-6 rounded-lg border p-4 text-sm ${
           isNetworkError
             ? 'border-orange-200 bg-orange-50 text-orange-800'
             : 'border-red-200 bg-red-50 text-red-700'
@@ -704,7 +704,7 @@ export default function ImportPage() {
 
       {/* Step 1: Upload */}
       {step === 1 && (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* Account selector */}
           <div>
             <label htmlFor="import-account" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
@@ -1136,7 +1136,7 @@ export default function ImportPage() {
             <span>Totaal bij: <strong className="text-emerald-600">{formatCurrency(totalBij)}</strong></span>
             <span>Totaal af: <strong className="text-red-600">{formatCurrency(Math.abs(totalAf))}</strong></span>
           </div>
-          <div className="mt-6">
+          <div className="mt-3 sm:mt-6">
             <Link
               href="/core/cash"
               className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-6 py-2 text-sm font-medium text-white hover:bg-kern-700"

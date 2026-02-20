@@ -232,7 +232,7 @@ export default function DebtsPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
         </div>
@@ -242,7 +242,7 @@ export default function DebtsPage() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-700">{error}</p>
           <button onClick={() => { setError(null); setLoading(true); loadDebts() }} className="mt-3 rounded-[var(--r)] bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
@@ -254,9 +254,9 @@ export default function DebtsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       {/* Header with totals */}
-      <section className="rounded-[var(--r-lg)] border border-kern-200 card-editorial p-6">
+      <section className="rounded-[var(--r-lg)] border border-kern-200 card-editorial p-4 sm:p-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-[var(--ink)]">Schulden</h1>
@@ -273,7 +273,7 @@ export default function DebtsPage() {
           </button>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="mt-3 sm:mt-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
           <div data-testid="kpi-total-debt">
             <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Totale schuld</p>
             <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalBalance)}</p>
@@ -316,7 +316,7 @@ export default function DebtsPage() {
 
       {/* Payoff strategy */}
       <FeatureGate featureId="schulden_aflosplan" fallback="locked">
-      <section className="mt-6 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6">
+      <section className="mt-3 sm:mt-6 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
         <h2 className="text-sm font-semibold text-[var(--ink-2)]">Aflosstrategie</h2>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           {(['avalanche', 'snowball', 'current'] as PayoffStrategy[]).map((s) => (
@@ -349,7 +349,7 @@ export default function DebtsPage() {
         </div>
 
         {/* Strategy results */}
-        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
           <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-3" data-testid="strategy-payoff-date">
             <p className="text-xs text-[var(--ink-3)]">Schuldenvrij op</p>
             <p className="mt-1 text-sm font-bold text-[var(--ink)]">
@@ -400,7 +400,7 @@ export default function DebtsPage() {
 
         {/* Strategy comparison: Snowball vs Avalanche trajectory overlay */}
         {activeDebts.length > 0 && snowballSim.length > 0 && avalancheSim.length > 0 && (
-          <div className="mt-6" data-testid="strategy-comparison-section">
+          <div className="mt-3 sm:mt-6" data-testid="strategy-comparison-section">
             <DebtPayoffTrajectoryChart
               snowballMonths={snowballSim}
               avalancheMonths={avalancheSim}
@@ -418,7 +418,7 @@ export default function DebtsPage() {
       </FeatureGate>
 
       {/* Debt list */}
-      <section className="mt-6 space-y-2">
+      <section className="mt-3 sm:mt-6 space-y-2">
         {debts.map((debt) => {
           const balance = Number(debt.current_balance)
           const original = Number(debt.original_amount)

@@ -12,7 +12,7 @@ export default function BudgetEditRedirect() {
   }, [id, router])
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-12">
+    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
       <div className="flex items-center justify-center py-20">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
       </div>

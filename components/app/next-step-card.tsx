@@ -73,7 +73,7 @@ export function NextStepCard({ step, onDismiss, dismissDisabled }: NextStepCardP
   const IconComponent = ICON_MAP[step.icon ?? 'lightbulb']
 
   return (
-    <div data-testid="next-step-card" data-step-key={step.key || step.title} className={`group relative flex items-center gap-4 rounded-[var(--r-lg)] border ${styles.border} ${styles.bg} p-4 transition-all ${styles.hoverBorder} hover:shadow-md ${styles.hoverShadow}`}>
+    <div data-testid="next-step-card" data-step-key={step.key || step.title} className={`group relative flex items-center gap-4 rounded-[var(--r-lg)] border ${styles.border} ${styles.bg} p-3 sm:p-4 transition-all ${styles.hoverBorder} hover:shadow-md ${styles.hoverShadow}`}>
       <Link href={step.href} className="absolute inset-0 z-0 rounded-[var(--r-lg)]" aria-label={step.title} />
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${styles.iconBg}`}>
         <IconComponent className={`h-5 w-5 ${styles.iconText}`} />
@@ -123,7 +123,7 @@ export function NextStepEmptyCard({ moduleColor }: { moduleColor?: 'amber' | 'te
   const styles = MODULE_STYLES[color]
 
   return (
-    <div className={`flex items-center gap-4 rounded-[var(--r-lg)] border ${styles.border} ${styles.bg} p-4`}>
+    <div className={`flex items-center gap-4 rounded-[var(--r-lg)] border ${styles.border} ${styles.bg} p-3 sm:p-4`}>
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${styles.iconBg}`}>
         <CheckCircle2 className={`h-5 w-5 ${styles.iconText}`} />
       </div>

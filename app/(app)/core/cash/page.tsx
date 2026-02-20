@@ -614,7 +614,7 @@ export default function CashPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
         </div>
@@ -624,7 +624,7 @@ export default function CashPage() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-700">{error}</p>
           <button onClick={() => { setError(null); setLoading(true); loadAccounts() }} className="mt-3 rounded-[var(--r)] bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
@@ -636,9 +636,9 @@ export default function CashPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       {/* Account header */}
-      <section className="rounded-[var(--r-lg)] border border-kern-200 card-editorial p-6">
+      <section className="rounded-[var(--r-lg)] border border-kern-200 card-editorial p-4 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-[var(--r-lg)] bg-kern-100">
@@ -698,7 +698,7 @@ export default function CashPage() {
       </section>
 
       {/* Action bar */}
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="mt-3 sm:mt-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Link
             href="/core/cash/import"
@@ -738,7 +738,7 @@ export default function CashPage() {
 
       {/* GoCardless bank connections */}
       {gcEnabled && (
-        <section className="mt-6">
+        <section className="mt-3 sm:mt-6">
           <button
             onClick={() => setShowBankConnections((v) => !v)}
             className="flex w-full items-center gap-2 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]"
@@ -783,7 +783,7 @@ export default function CashPage() {
       )}
 
       {/* Monthly overview */}
-      <section className="mt-6 grid grid-cols-3 gap-4" data-testid="monthly-summary">
+      <section className="mt-3 sm:mt-6 grid grid-cols-3 gap-3 sm:gap-4" data-testid="monthly-summary">
         <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-center">
           <div className="flex items-center justify-center gap-1.5">
             <ArrowDownLeft className="h-4 w-4 text-emerald-500" />
@@ -823,7 +823,7 @@ export default function CashPage() {
 
       {/* Recurring transactions */}
       {recurrings.length > 0 && (
-        <section className="mt-6">
+        <section className="mt-3 sm:mt-6">
           <button
             onClick={() => setShowRecurring((v) => !v)}
             className="flex w-full items-center gap-2 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]"
@@ -906,7 +906,7 @@ export default function CashPage() {
 
       {/* Sankey flow diagram */}
       {sankeyData && sankeyData.nodes.length > 0 && (
-        <section className="mt-6">
+        <section className="mt-3 sm:mt-6">
           <button
             onClick={() => setShowSankey((v) => !v)}
             className="flex w-full items-center gap-2 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]"
@@ -934,7 +934,7 @@ export default function CashPage() {
       {/* Cashflow Prognose */}
       <FeatureGate featureId="cashflow_forecast" fallback="locked">
         {cashFlowHasData && cashFlowForecast.length >= 2 && (
-          <section className="mt-6" data-testid="cashflow-forecast-section">
+          <section className="mt-3 sm:mt-6" data-testid="cashflow-forecast-section">
             <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4">
               <div className="mb-3 flex items-center gap-2">
                 <LineChart className="h-4 w-4 text-kern-600" />
@@ -954,7 +954,7 @@ export default function CashPage() {
       </FeatureGate>
 
       {/* Transaction filters */}
-      <section className="mt-6" data-testid="transaction-filters">
+      <section className="mt-3 sm:mt-6" data-testid="transaction-filters">
         <div className="flex flex-col gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:flex-row sm:items-center">
           {/* Search input */}
           <div className="relative flex-1">
@@ -1024,7 +1024,7 @@ export default function CashPage() {
       </section>
 
       {/* Transaction list */}
-      <section className="mt-6" data-testid="transaction-list">
+      <section className="mt-3 sm:mt-6" data-testid="transaction-list">
         {sortedDates.length === 0 ? (
           <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-8 text-center" data-testid="no-transactions">
             <Wallet className="mx-auto h-8 w-8 text-[var(--ink-4)]" />
