@@ -15,6 +15,20 @@ export interface ReportConfig {
   last_generated_at: string | null
   created_at: string
   updated_at: string
+  use_ai: boolean
+  cached_data: unknown | null
+}
+
+export interface HistoricalPeriodSummary {
+  periodLabel: string
+  dateFrom: string
+  dateTo: string
+  netWorthEnd: number | null
+  totalIncome: number
+  totalExpenses: number
+  totalSaved: number
+  savingsRate: number | null
+  firePercentage: number | null
 }
 
 export interface ReportData {
@@ -42,6 +56,10 @@ export interface ReportData {
 
   // ── AI Pullquotes ──
   aiInsights: ReportAiInsight[]
+
+  // ── Meta ──
+  useAi: boolean
+  historicalPeriods: HistoricalPeriodSummary[]
 }
 
 export interface ReportKernSection {

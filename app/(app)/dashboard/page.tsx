@@ -117,21 +117,21 @@ export default async function DashboardPage() {
       <BadgeEvaluator />
 
       {/* Dateline row */}
-      <div className="flex items-baseline gap-3 border-b border-[var(--border-ed)] pb-3 mb-6">
-        <span className="label-editorial text-[var(--ink-3)]">{dateStr}</span>
-        <span className="text-[var(--ink-4)]">|</span>
-        <span className="font-serif italic text-sm text-[var(--ink-3)]">Persoonlijk Financieel Dashboard</span>
+      <div className="flex items-center justify-between border-b border-[var(--border-ed)] pb-3 mb-6">
+        <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.11em' }} className="text-[var(--ink-3)]">{dateStr}</span>
+        <div className="flex items-center gap-3">
+          <StreakIndicator />
+          <span className="font-serif italic text-[13px] text-[var(--ink-3)] hidden sm:inline">Persoonlijk Financieel Dagblad</span>
+        </div>
       </div>
 
       {/* Header */}
       <div className="mb-5 sm:mb-8">
-        <div className="flex items-center justify-between">
-          <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--ink)]">
-            Welkom terug, <span className="font-serif italic">{displayName}</span>
-          </h1>
-          <StreakIndicator />
-        </div>
-        <p className="mt-1 text-sm text-[var(--ink-3)]">
+        <p className="label-editorial text-[var(--ink-3)] mb-1">Jouw financieel dagblad</p>
+        <h1 className="font-display text-[32px] font-bold text-[var(--ink)]" style={{ letterSpacing: '-0.03em' }}>
+          Welkom terug, <em className="not-italic font-display italic text-kern-600">{displayName}</em>
+        </h1>
+        <p className="mt-1 font-serif italic text-[13px] text-[var(--ink-3)]">
           TriFinity helpt je bewust omgaan met je opgeslagen levensenergie.
         </p>
       </div>
@@ -152,12 +152,12 @@ export default async function DashboardPage() {
           <div className="h-1 bg-kern-500" />
           <div className="p-4 sm:p-6">
             <div className="mb-2 sm:mb-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
+              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-[var(--r)] bg-kern-50">
                 <FhinAvatar size={36} />
               </div>
               <div>
-                <h2 className="font-display font-bold text-[var(--ink)]">De Kern</h2>
-                <p className="label-editorial text-kern-600">Waar sta je echt?</p>
+                <h2 className="font-display font-bold text-xl text-[var(--ink)]">De Kern</h2>
+                <p className="label-editorial text-kern-600">Financieel Fundament</p>
               </div>
             </div>
             <p className="mb-3 sm:mb-5 text-sm leading-relaxed text-[var(--ink-3)]">
@@ -181,7 +181,7 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            <div className="mt-5 flex items-center gap-1 label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">
+            <div className="mt-5 flex items-center gap-1 label-editorial text-kern-600 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
               Bekijken <ArrowRight className="h-3 w-3" />
             </div>
           </div>
@@ -196,12 +196,12 @@ export default async function DashboardPage() {
           <div className="h-1 bg-wil-500" />
           <div className="p-4 sm:p-6">
             <div className="mb-2 sm:mb-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
+              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-[var(--r)] bg-wil-50">
                 <FinnAvatar size={36} />
               </div>
               <div>
-                <h2 className="font-display font-bold text-[var(--ink)]">De Wil</h2>
-                <p className="label-editorial text-wil-600">Wat ga je doen?</p>
+                <h2 className="font-display font-bold text-xl text-[var(--ink)]">De Wil</h2>
+                <p className="label-editorial text-wil-600">Bewuste Actie</p>
               </div>
             </div>
             <p className="mb-3 sm:mb-5 text-sm leading-relaxed text-[var(--ink-3)]">
@@ -224,7 +224,7 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            <div className="mt-5 flex items-center gap-1 label-editorial text-wil-600 opacity-0 transition-opacity group-hover:opacity-100">
+            <div className="mt-5 flex items-center gap-1 label-editorial text-wil-600 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
               Bekijken <ArrowRight className="h-3 w-3" />
             </div>
           </div>
@@ -239,12 +239,12 @@ export default async function DashboardPage() {
           <div className="h-1 bg-horizon-500" />
           <div className="p-4 sm:p-6">
             <div className="mb-2 sm:mb-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
+              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-[var(--r)] bg-horizon-50">
                 <FfinAvatar size={36} />
               </div>
               <div>
-                <h2 className="font-display font-bold text-[var(--ink)]">De Horizon</h2>
-                <p className="label-editorial text-horizon-600">Waar ga je naartoe?</p>
+                <h2 className="font-display font-bold text-xl text-[var(--ink)]">De Horizon</h2>
+                <p className="label-editorial text-horizon-600">Toekomstperspectief</p>
               </div>
             </div>
             <p className="mb-3 sm:mb-5 text-sm leading-relaxed text-[var(--ink-3)]">
@@ -268,7 +268,7 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            <div className="mt-5 flex items-center gap-1 label-editorial text-horizon-600 opacity-0 transition-opacity group-hover:opacity-100">
+            <div className="mt-5 flex items-center gap-1 label-editorial text-horizon-600 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
               Bekijken <ArrowRight className="h-3 w-3" />
             </div>
           </div>
@@ -276,39 +276,38 @@ export default async function DashboardPage() {
       </div>
 
       {/* Freedom indicator — preview teaser linking to De Kern (primary owner) */}
-      <section className="mt-8" data-testid="dashboard-freedom-teaser">
+      <section className="mt-8" aria-label="Vrijheidsvoortgang" data-testid="dashboard-freedom-teaser">
         <div className="card-editorial px-5 py-4">
-          <div className="flex items-center gap-4">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="label-editorial text-[var(--ink-3)]">
-                  Financiele vrijheid
-                </p>
-                <span className="text-[var(--ink-4)]">·</span>
-                <span className="text-xs font-mono text-[var(--ink-3)]">
-                  {formatCurrency(netWorth)} / {formatCurrency(fireTarget)}
-                </span>
-              </div>
-              <div className="mt-2 flex items-center gap-3">
-                <div className="h-[5px] flex-1 overflow-hidden rounded-full bg-[var(--subtle)]">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-kern-400 via-wil-400 to-horizon-500 transition-all duration-1000 animate-prog-in"
-                    style={{ width: `${Math.min(freedomPct, 100)}%` }}
-                  />
-                </div>
-                <span className="text-sm font-mono font-medium text-[var(--ink-2)] tabular-nums">
-                  {freedomPct.toFixed(1)}%
-                </span>
-              </div>
-              <p className="mt-1.5 text-xs text-[var(--ink-3)]">
-                {fireProjResult.fireDate === 'Bereikt!'
-                  ? 'Je passief inkomen dekt je uitgaven!'
-                  : fireProjResult.fireDate === 'Niet haalbaar'
-                    ? 'Verhoog je spaarcapaciteit om volledige vrijheid te bereiken'
-                    : `Verwacht moment van volledige vrijheid: ${fireProjResult.fireDate}`
-                }
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <Compass className="h-3.5 w-3.5 text-horizon-600" />
+              <p className="label-editorial text-horizon-600">
+                Vrijheidsvoortgang
               </p>
+              <span className="text-[var(--ink-4)]">·</span>
+              <span className="text-xs font-mono text-[var(--ink-3)]">
+                {formatCurrency(netWorth)} / {formatCurrency(fireTarget)}
+              </span>
             </div>
+            <div className="mt-2 flex items-center gap-3">
+              <div className="h-[5px] flex-1 overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-horizon-400 to-horizon-600 animate-prog-in"
+                  style={{ width: `${Math.min(freedomPct, 100)}%` }}
+                />
+              </div>
+              <span className="text-sm font-mono font-medium text-[var(--ink-2)] tabular-nums">
+                {freedomPct.toFixed(1)}%
+              </span>
+            </div>
+            <p className="mt-1.5 font-serif italic text-[12px] text-[var(--ink-3)]">
+              {fireProjResult.fireDate === 'Bereikt!'
+                ? 'Je passief inkomen dekt je uitgaven — volledige vrijheid bereikt!'
+                : fireProjResult.fireDate === 'Niet haalbaar'
+                  ? 'Verhoog je spaarcapaciteit om volledige vrijheid te bereiken'
+                  : `Verwacht moment van volledige vrijheid: ${fireProjResult.fireDate}`
+              }
+            </p>
           </div>
         </div>
       </section>

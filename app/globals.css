@@ -70,6 +70,125 @@
   --color-horizon-900: oklch(0.414 0.0537 76.6);
   --color-horizon-950: oklch(0.292 0.0364 76.6);
 
+  /* ── Budget type palettes (overridden by user preferences) ── */
+  /* Income: Donkergroen #2d6a4f */
+  --color-income-50: oklch(0.9 0.0073 162);
+  --color-income-100: oklch(0.853 0.018 162);
+  --color-income-200: oklch(0.767 0.036 162);
+  --color-income-300: oklch(0.661 0.064 162);
+  --color-income-400: oklch(0.533 0.096 162);
+  --color-income-500: oklch(0.42 0.12 162);
+  --color-income-600: oklch(0.381 0.1333 162);
+  --color-income-700: oklch(0.340 0.1173 162);
+  --color-income-800: oklch(0.311 0.0973 162);
+  --color-income-900: oklch(0.299 0.0787 162);
+  --color-income-950: oklch(0.2 0.0533 162);
+
+  /* Expense: Terracotta #6b3a2d */
+  --color-expense-50: oklch(0.888 0.0043 36);
+  --color-expense-100: oklch(0.837 0.0105 36);
+  --color-expense-200: oklch(0.746 0.021 36);
+  --color-expense-300: oklch(0.634 0.0373 36);
+  --color-expense-400: oklch(0.499 0.056 36);
+  --color-expense-500: oklch(0.38 0.07 36);
+  --color-expense-600: oklch(0.347 0.0778 36);
+  --color-expense-700: oklch(0.313 0.0685 36);
+  --color-expense-800: oklch(0.290 0.0568 36);
+  --color-expense-900: oklch(0.283 0.0459 36);
+  --color-expense-950: oklch(0.188 0.0311 36);
+
+  /* Savings: Staalsblauw #1d4e6b */
+  --color-savings-50: oklch(0.870 0.0049 233);
+  --color-savings-100: oklch(0.815 0.012 233);
+  --color-savings-200: oklch(0.714 0.024 233);
+  --color-savings-300: oklch(0.592 0.0427 233);
+  --color-savings-400: oklch(0.448 0.064 233);
+  --color-savings-500: oklch(0.32 0.08 233);
+  --color-savings-600: oklch(0.296 0.0889 233);
+  --color-savings-700: oklch(0.271 0.0783 233);
+  --color-savings-800: oklch(0.258 0.0649 233);
+  --color-savings-900: oklch(0.261 0.0525 233);
+  --color-savings-950: oklch(0.17 0.0356 233);
+
+  /* Debt: Bordeaux #7a2d3a */
+  --color-debt-50: oklch(0.870 0.0049 12);
+  --color-debt-100: oklch(0.815 0.012 12);
+  --color-debt-200: oklch(0.714 0.024 12);
+  --color-debt-300: oklch(0.592 0.0427 12);
+  --color-debt-400: oklch(0.448 0.064 12);
+  --color-debt-500: oklch(0.32 0.08 12);
+  --color-debt-600: oklch(0.296 0.0889 12);
+  --color-debt-700: oklch(0.271 0.0783 12);
+  --color-debt-800: oklch(0.258 0.0649 12);
+  --color-debt-900: oklch(0.261 0.0525 12);
+  --color-debt-950: oklch(0.17 0.0356 12);
+
+  /* Other: Neutraal #4a4840 */
+  --color-other-50: oklch(0.876 0.0006 88);
+  --color-other-100: oklch(0.822 0.0015 88);
+  --color-other-200: oklch(0.724 0.003 88);
+  --color-other-300: oklch(0.606 0.0053 88);
+  --color-other-400: oklch(0.465 0.008 88);
+  --color-other-500: oklch(0.34 0.01 88);
+  --color-other-600: oklch(0.313 0.0111 88);
+  --color-other-700: oklch(0.285 0.0098 88);
+  --color-other-800: oklch(0.268 0.0081 88);
+  --color-other-900: oklch(0.268 0.0065 88);
+  --color-other-950: oklch(0.176 0.0044 88);
+
+  /* ── Phase palettes (overridden by user preferences) ── */
+  /* Phase Recovery: Donkerrood #8b3a3a */
+  --color-phase-recovery-50: oklch(0.891 0.0043 22);
+  --color-phase-recovery-100: oklch(0.841 0.0105 22);
+  --color-phase-recovery-200: oklch(0.751 0.021 22);
+  --color-phase-recovery-300: oklch(0.641 0.0373 22);
+  --color-phase-recovery-400: oklch(0.507 0.056 22);
+  --color-phase-recovery-500: oklch(0.39 0.07 22);
+  --color-phase-recovery-600: oklch(0.355 0.0778 22);
+  --color-phase-recovery-700: oklch(0.320 0.0685 22);
+  --color-phase-recovery-800: oklch(0.295 0.0568 22);
+  --color-phase-recovery-900: oklch(0.287 0.0459 22);
+  --color-phase-recovery-950: oklch(0.192 0.0311 22);
+
+  /* Phase Stability: Staalsblauw #355a78 */
+  --color-phase-stability-50: oklch(0.885 0.0043 222);
+  --color-phase-stability-100: oklch(0.834 0.0105 222);
+  --color-phase-stability-200: oklch(0.740 0.021 222);
+  --color-phase-stability-300: oklch(0.627 0.0373 222);
+  --color-phase-stability-400: oklch(0.491 0.056 222);
+  --color-phase-stability-500: oklch(0.37 0.07 222);
+  --color-phase-stability-600: oklch(0.339 0.0778 222);
+  --color-phase-stability-700: oklch(0.306 0.0685 222);
+  --color-phase-stability-800: oklch(0.284 0.0568 222);
+  --color-phase-stability-900: oklch(0.280 0.0459 222);
+  --color-phase-stability-950: oklch(0.185 0.0311 222);
+
+  /* Phase Momentum: Paars #3d3048 — same base as wil */
+  --color-phase-momentum-50: oklch(0.875 0.0027 308.8);
+  --color-phase-momentum-100: oklch(0.82 0.0067 308.8);
+  --color-phase-momentum-200: oklch(0.721 0.0134 308.8);
+  --color-phase-momentum-300: oklch(0.602 0.0238 308.8);
+  --color-phase-momentum-400: oklch(0.46 0.0357 308.8);
+  --color-phase-momentum-500: oklch(0.334 0.0446 308.8);
+  --color-phase-momentum-600: oklch(0.308 0.0496 308.8);
+  --color-phase-momentum-700: oklch(0.281 0.0436 308.8);
+  --color-phase-momentum-800: oklch(0.265 0.0362 308.8);
+  --color-phase-momentum-900: oklch(0.266 0.0293 308.8);
+  --color-phase-momentum-950: oklch(0.175 0.0198 308.8);
+
+  /* Phase Mastery: Zandgoud #c4a06b — same base as horizon */
+  --color-phase-mastery-50: oklch(0.992 0.005 76.6);
+  --color-phase-mastery-100: oklch(0.968 0.0123 76.6);
+  --color-phase-mastery-200: oklch(0.93 0.0246 76.6);
+  --color-phase-mastery-300: oklch(0.872 0.0437 76.6);
+  --color-phase-mastery-400: oklch(0.791 0.0655 76.6);
+  --color-phase-mastery-500: oklch(0.726 0.0819 76.6);
+  --color-phase-mastery-600: oklch(0.639 0.091 76.6);
+  --color-phase-mastery-700: oklch(0.551 0.08 76.6);
+  --color-phase-mastery-800: oklch(0.474 0.0664 76.6);
+  --color-phase-mastery-900: oklch(0.414 0.0537 76.6);
+  --color-phase-mastery-950: oklch(0.292 0.0364 76.6);
+
   --safe-area-top: env(safe-area-inset-top, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-left: env(safe-area-inset-left, 0px);
@@ -127,6 +246,116 @@
   --color-horizon-800: var(--color-horizon-800);
   --color-horizon-900: var(--color-horizon-900);
   --color-horizon-950: var(--color-horizon-950);
+
+  /* ── Budget color tokens ── */
+  --color-income-50: var(--color-income-50);
+  --color-income-100: var(--color-income-100);
+  --color-income-200: var(--color-income-200);
+  --color-income-300: var(--color-income-300);
+  --color-income-400: var(--color-income-400);
+  --color-income-500: var(--color-income-500);
+  --color-income-600: var(--color-income-600);
+  --color-income-700: var(--color-income-700);
+  --color-income-800: var(--color-income-800);
+  --color-income-900: var(--color-income-900);
+  --color-income-950: var(--color-income-950);
+
+  --color-expense-50: var(--color-expense-50);
+  --color-expense-100: var(--color-expense-100);
+  --color-expense-200: var(--color-expense-200);
+  --color-expense-300: var(--color-expense-300);
+  --color-expense-400: var(--color-expense-400);
+  --color-expense-500: var(--color-expense-500);
+  --color-expense-600: var(--color-expense-600);
+  --color-expense-700: var(--color-expense-700);
+  --color-expense-800: var(--color-expense-800);
+  --color-expense-900: var(--color-expense-900);
+  --color-expense-950: var(--color-expense-950);
+
+  --color-savings-50: var(--color-savings-50);
+  --color-savings-100: var(--color-savings-100);
+  --color-savings-200: var(--color-savings-200);
+  --color-savings-300: var(--color-savings-300);
+  --color-savings-400: var(--color-savings-400);
+  --color-savings-500: var(--color-savings-500);
+  --color-savings-600: var(--color-savings-600);
+  --color-savings-700: var(--color-savings-700);
+  --color-savings-800: var(--color-savings-800);
+  --color-savings-900: var(--color-savings-900);
+  --color-savings-950: var(--color-savings-950);
+
+  --color-debt-50: var(--color-debt-50);
+  --color-debt-100: var(--color-debt-100);
+  --color-debt-200: var(--color-debt-200);
+  --color-debt-300: var(--color-debt-300);
+  --color-debt-400: var(--color-debt-400);
+  --color-debt-500: var(--color-debt-500);
+  --color-debt-600: var(--color-debt-600);
+  --color-debt-700: var(--color-debt-700);
+  --color-debt-800: var(--color-debt-800);
+  --color-debt-900: var(--color-debt-900);
+  --color-debt-950: var(--color-debt-950);
+
+  --color-other-50: var(--color-other-50);
+  --color-other-100: var(--color-other-100);
+  --color-other-200: var(--color-other-200);
+  --color-other-300: var(--color-other-300);
+  --color-other-400: var(--color-other-400);
+  --color-other-500: var(--color-other-500);
+  --color-other-600: var(--color-other-600);
+  --color-other-700: var(--color-other-700);
+  --color-other-800: var(--color-other-800);
+  --color-other-900: var(--color-other-900);
+  --color-other-950: var(--color-other-950);
+
+  /* ── Phase color tokens ── */
+  --color-phase-recovery-50: var(--color-phase-recovery-50);
+  --color-phase-recovery-100: var(--color-phase-recovery-100);
+  --color-phase-recovery-200: var(--color-phase-recovery-200);
+  --color-phase-recovery-300: var(--color-phase-recovery-300);
+  --color-phase-recovery-400: var(--color-phase-recovery-400);
+  --color-phase-recovery-500: var(--color-phase-recovery-500);
+  --color-phase-recovery-600: var(--color-phase-recovery-600);
+  --color-phase-recovery-700: var(--color-phase-recovery-700);
+  --color-phase-recovery-800: var(--color-phase-recovery-800);
+  --color-phase-recovery-900: var(--color-phase-recovery-900);
+  --color-phase-recovery-950: var(--color-phase-recovery-950);
+
+  --color-phase-stability-50: var(--color-phase-stability-50);
+  --color-phase-stability-100: var(--color-phase-stability-100);
+  --color-phase-stability-200: var(--color-phase-stability-200);
+  --color-phase-stability-300: var(--color-phase-stability-300);
+  --color-phase-stability-400: var(--color-phase-stability-400);
+  --color-phase-stability-500: var(--color-phase-stability-500);
+  --color-phase-stability-600: var(--color-phase-stability-600);
+  --color-phase-stability-700: var(--color-phase-stability-700);
+  --color-phase-stability-800: var(--color-phase-stability-800);
+  --color-phase-stability-900: var(--color-phase-stability-900);
+  --color-phase-stability-950: var(--color-phase-stability-950);
+
+  --color-phase-momentum-50: var(--color-phase-momentum-50);
+  --color-phase-momentum-100: var(--color-phase-momentum-100);
+  --color-phase-momentum-200: var(--color-phase-momentum-200);
+  --color-phase-momentum-300: var(--color-phase-momentum-300);
+  --color-phase-momentum-400: var(--color-phase-momentum-400);
+  --color-phase-momentum-500: var(--color-phase-momentum-500);
+  --color-phase-momentum-600: var(--color-phase-momentum-600);
+  --color-phase-momentum-700: var(--color-phase-momentum-700);
+  --color-phase-momentum-800: var(--color-phase-momentum-800);
+  --color-phase-momentum-900: var(--color-phase-momentum-900);
+  --color-phase-momentum-950: var(--color-phase-momentum-950);
+
+  --color-phase-mastery-50: var(--color-phase-mastery-50);
+  --color-phase-mastery-100: var(--color-phase-mastery-100);
+  --color-phase-mastery-200: var(--color-phase-mastery-200);
+  --color-phase-mastery-300: var(--color-phase-mastery-300);
+  --color-phase-mastery-400: var(--color-phase-mastery-400);
+  --color-phase-mastery-500: var(--color-phase-mastery-500);
+  --color-phase-mastery-600: var(--color-phase-mastery-600);
+  --color-phase-mastery-700: var(--color-phase-mastery-700);
+  --color-phase-mastery-800: var(--color-phase-mastery-800);
+  --color-phase-mastery-900: var(--color-phase-mastery-900);
+  --color-phase-mastery-950: var(--color-phase-mastery-950);
 }
 
 /* Landing page animations */

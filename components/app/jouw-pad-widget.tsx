@@ -6,22 +6,22 @@ import type { FreedomMilestone } from '@/lib/freedom-milestones'
 
 // Phase definitions matching identity page
 const PHASES = [
-  { id: 'recovery', label: 'Recovery', subtitle: 'Restoring Balance', color: 'rose', levels: [-2, -1, 0] },
-  { id: 'stability', label: 'Stability', subtitle: 'Fortifying Time', color: 'blue', levels: [1, 2] },
-  { id: 'momentum', label: 'Momentum', subtitle: 'Multiplying Time', color: 'teal', levels: [3, 4] },
-  { id: 'mastery', label: 'Mastery', subtitle: 'Owning Time', color: 'amber', levels: [5, 6] },
+  { id: 'recovery', label: 'Herstel', subtitle: 'Balans herstellen', color: 'phase_recovery', levels: [-2, -1, 0] },
+  { id: 'stability', label: 'Stabiliteit', subtitle: 'Tijd opbouwen', color: 'phase_stability', levels: [1, 2] },
+  { id: 'momentum', label: 'Momentum', subtitle: 'Tijd vermenigvuldigen', color: 'phase_momentum', levels: [3, 4] },
+  { id: 'mastery', label: 'Meesterschap', subtitle: 'Tijd bezitten', color: 'phase_mastery', levels: [5, 6] },
 ] as const
 
 const LEVEL_NAMES: Record<number, string> = {
-  [-2]: 'Time Deficit',
-  [-1]: 'Time Drag',
-  0: 'The Reset',
-  1: 'Time Buffer',
-  2: 'Time Shield',
-  3: 'Time Investor',
-  4: 'Time Multiplier',
-  5: 'Time Sovereign',
-  6: 'Timeless',
+  [-2]: 'Tijdtekort',
+  [-1]: 'Tijdverlies',
+  0: 'Het Reset-punt',
+  1: 'Tijdbuffer',
+  2: 'Tijdschild',
+  3: 'Tijdinvesteerder',
+  4: 'Tijdvermenigvuldiger',
+  5: 'Tijdssoeverein',
+  6: 'Tijdloos',
 }
 
 const NEXT_LEVEL_UNLOCKS: Record<number, string> = {
@@ -37,10 +37,10 @@ const NEXT_LEVEL_UNLOCKS: Record<number, string> = {
 }
 
 const phaseColors: Record<string, { bg: string; border: string; text: string; bar: string; badge: string }> = {
-  rose: { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700', bar: 'bg-rose-400', badge: 'bg-rose-100 text-rose-700' },
-  blue: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', bar: 'bg-blue-400', badge: 'bg-blue-100 text-blue-700' },
-  teal: { bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-700', bar: 'bg-teal-400', badge: 'bg-teal-100 text-teal-700' },
-  amber: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', bar: 'bg-amber-400', badge: 'bg-amber-100 text-amber-700' },
+  phase_recovery:  { bg: 'bg-[var(--color-phase-recovery-50)]',  border: 'border-[var(--color-phase-recovery-200)]',  text: 'text-[var(--color-phase-recovery-700)]',  bar: 'bg-[var(--color-phase-recovery-400)]',  badge: 'bg-[var(--color-phase-recovery-100)] text-[var(--color-phase-recovery-700)]' },
+  phase_stability: { bg: 'bg-[var(--color-phase-stability-50)]', border: 'border-[var(--color-phase-stability-200)]', text: 'text-[var(--color-phase-stability-700)]', bar: 'bg-[var(--color-phase-stability-400)]', badge: 'bg-[var(--color-phase-stability-100)] text-[var(--color-phase-stability-700)]' },
+  phase_momentum:  { bg: 'bg-[var(--color-phase-momentum-50)]',  border: 'border-[var(--color-phase-momentum-200)]',  text: 'text-[var(--color-phase-momentum-700)]',  bar: 'bg-[var(--color-phase-momentum-400)]',  badge: 'bg-[var(--color-phase-momentum-100)] text-[var(--color-phase-momentum-700)]' },
+  phase_mastery:   { bg: 'bg-[var(--color-phase-mastery-50)]',   border: 'border-[var(--color-phase-mastery-200)]',   text: 'text-[var(--color-phase-mastery-700)]',   bar: 'bg-[var(--color-phase-mastery-400)]',   badge: 'bg-[var(--color-phase-mastery-100)] text-[var(--color-phase-mastery-700)]' },
 }
 
 // Criteria checklist for progressing to the NEXT level
@@ -134,7 +134,7 @@ export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCo
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-1 text-xs font-medium text-[var(--ink-3)] opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="flex items-center gap-1 label-editorial text-[var(--ink-3)] opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           Bekijken <ArrowRight className="h-3 w-3" />
         </div>
       </div>
@@ -236,17 +236,17 @@ export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCo
                 const iconBg = m.reached
                   ? 'bg-emerald-100'
                   : m.icon === 'target'
-                    ? 'bg-purple-100'
+                    ? 'bg-wil-100'
                     : m.icon === 'clock'
-                      ? 'bg-blue-100'
-                      : 'bg-zinc-100'
+                      ? 'bg-horizon-100'
+                      : 'bg-[var(--subtle)]'
 
                 const iconColor = m.reached
                   ? 'text-emerald-600'
                   : m.icon === 'target'
-                    ? 'text-purple-600'
+                    ? 'text-wil-600'
                     : m.icon === 'clock'
-                      ? 'text-blue-600'
+                      ? 'text-horizon-600'
                       : 'text-[var(--ink-3)]'
 
                 return (
@@ -292,10 +292,10 @@ export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCo
 
           {/* Contextual next milestone message */}
           {nextMilestoneMessage && (
-            <div className="mt-2.5 rounded-lg bg-gradient-to-r from-purple-50 to-blue-50 px-3 py-2 border border-purple-100" data-testid="milestone-next-message">
+            <div className="mt-2.5 rounded-[var(--r)] bg-horizon-50 px-3 py-2 border border-horizon-200" data-testid="milestone-next-message">
               <div className="flex items-center gap-1.5">
-                <Flag className="h-3 w-3 text-purple-500 shrink-0" />
-                <p className="text-[11px] text-purple-700 font-medium">
+                <Flag className="h-3 w-3 text-horizon-600 shrink-0" />
+                <p className="text-[11px] text-horizon-700 font-medium">
                   {nextMilestoneMessage}
                 </p>
               </div>

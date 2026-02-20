@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useParams } from 'next/navigation'
 import type { ReportData } from '@/lib/report-data'
 import { PrintToolbar } from './components/print-toolbar'
 import { ReportMasthead } from './components/report-masthead'
@@ -11,9 +11,13 @@ import { WilColumn } from './components/wil-column'
 import { HorizonColumn } from './components/horizon-column'
 import { PullQuoteSection } from './components/pull-quote'
 import { MonthlyTable } from './components/monthly-table'
+import { HistoricalComparison } from './components/historical-comparison'
 
 export default function ReportViewerPage() {
   const searchParams = useSearchParams()
+  const { id } = useParams<{ id: string }>()
+  const configId = id !== 'new' ? id : null
+
   const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -23,6 +27,7 @@ export default function ReportViewerPage() {
       const periodType = searchParams.get('type') || 'month'
       const dateFrom = searchParams.get('from')
       const dateTo = searchParams.get('to')
+      const useAi = searchParams.get('ai') !== 'false'
 
       if (!dateFrom || !dateTo) {
         setError('Geen datumbereik opgegeven')
@@ -31,9 +36,12 @@ export default function ReportViewerPage() {
       }
 
       try {
-        const res = await fetch(
-          `/api/report?period_type=${periodType}&date_from=${dateFrom}&date_to=${dateTo}`
-        )
+        let url = `/api/report?period_type=${periodType}&date_from=${dateFrom}&date_to=${dateTo}&use_ai=${useAi}`
+        if (configId) {
+          url += `&config_id=${configId}`
+        }
+
+        const res = await fetch(url)
         if (!res.ok) {
           const err = await res.json()
           throw new Error(err.error || 'Rapport laden mislukt')
@@ -48,7 +56,7 @@ export default function ReportViewerPage() {
     }
 
     fetchReport()
-  }, [searchParams])
+  }, [searchParams, configId])
 
   if (loading) {
     return (
@@ -84,13 +92,25 @@ export default function ReportViewerPage() {
       {data.aiIntroduction && (
         <div className="report-section mb-8">
           <p className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-wil-600 mb-2">
-            Redactionele Inleiding — Finn
+            Redactionele Inleiding — Will
           </p>
           <blockquote className="border-l-[3px] border-wil-400 pl-4 font-source-serif text-[15px] italic leading-[1.65] text-[var(--ink-2)]">
             {data.aiIntroduction}
           </blockquote>
         </div>
       )}
+
+      {/* Historical Comparison */}
+      <HistoricalComparison
+        historicalPeriods={data.historicalPeriods ?? []}
+        currentPeriodLabel={data.reportName}
+        currentNetWorthEnd={data.kern.netWorthEnd}
+        currentTotalIncome={data.kern.totalIncome}
+        currentTotalExpenses={data.kern.totalExpenses}
+        currentTotalSaved={data.kern.totalSaved}
+        currentSavingsRate={data.kern.savingsRate}
+        currentFirePercentage={data.kern.firePercentage}
+      />
 
       {/* Three-column grid: Kern | Wil | Horizon */}
       <div className="grid gap-8 md:grid-cols-[2fr_1.5fr_1.5fr]">

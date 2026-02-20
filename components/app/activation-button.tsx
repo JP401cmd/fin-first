@@ -1,17 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sparkles } from 'lucide-react'
 import { FfinAvatar } from '@/components/app/avatars'
 import { formatCurrency } from '@/lib/format'
 import type { FeatureAccessData } from '@/lib/compute-feature-access'
 
-const PHASE_COLORS: Record<string, { gradient: string; badge: string }> = {
-  recovery:  { gradient: 'from-rose-500 to-rose-600',  badge: 'bg-rose-100 text-rose-700' },
-  stability: { gradient: 'from-blue-500 to-blue-600',  badge: 'bg-blue-100 text-blue-700' },
-  momentum:  { gradient: 'from-teal-500 to-teal-600',  badge: 'bg-teal-100 text-teal-700' },
-  mastery:   { gradient: 'from-amber-500 to-amber-600', badge: 'bg-amber-100 text-amber-700' },
+const PHASE_GRADIENT_STYLE: Record<string, React.CSSProperties> = {
+  recovery:  { background: 'linear-gradient(to right, var(--color-phase-recovery-500), var(--color-phase-recovery-600))' },
+  stability: { background: 'linear-gradient(to right, var(--color-phase-stability-500), var(--color-phase-stability-600))' },
+  momentum:  { background: 'linear-gradient(to right, var(--color-phase-momentum-500), var(--color-phase-momentum-600))' },
+  mastery:   { background: 'linear-gradient(to right, var(--color-phase-mastery-500), var(--color-phase-mastery-600))' },
+}
+
+const PHASE_BADGE_STYLE: Record<string, React.CSSProperties> = {
+  recovery:  { backgroundColor: 'var(--color-phase-recovery-100)',  color: 'var(--color-phase-recovery-700)' },
+  stability: { backgroundColor: 'var(--color-phase-stability-100)', color: 'var(--color-phase-stability-700)' },
+  momentum:  { backgroundColor: 'var(--color-phase-momentum-100)',  color: 'var(--color-phase-momentum-700)' },
+  mastery:   { backgroundColor: 'var(--color-phase-mastery-100)',   color: 'var(--color-phase-mastery-700)' },
 }
 
 const PHASE_LABELS: Record<string, string> = {
@@ -26,7 +33,8 @@ export function ActivationButton({ data }: { data: FeatureAccessData }) {
   const [showModal, setShowModal] = useState(false)
   const [activating, setActivating] = useState(false)
 
-  const colors = PHASE_COLORS[data.phase] ?? PHASE_COLORS.recovery
+  const gradientStyle = PHASE_GRADIENT_STYLE[data.phase] ?? PHASE_GRADIENT_STYLE.recovery
+  const badgeStyle = PHASE_BADGE_STYLE[data.phase] ?? PHASE_BADGE_STYLE.recovery
   const phaseLabel = PHASE_LABELS[data.phase] ?? data.phase
 
   const yearlyExpenses = data.monthlyExpenses * 12
@@ -64,14 +72,14 @@ export function ActivationButton({ data }: { data: FeatureAccessData }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="mx-4 w-full max-w-lg rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl overflow-hidden">
             {/* Header */}
-            <div className={`bg-gradient-to-r ${colors.gradient} px-6 py-8 text-center text-white`}>
+            <div className="px-6 py-8 text-center text-white" style={gradientStyle}>
               <div className="mx-auto mb-4 flex justify-center">
                 <FfinAvatar size={72} />
               </div>
               <h2 className="text-xl font-bold">Klaar voor actie</h2>
               <p className="mt-1 text-sm text-white/90">Dit is je financiele startpositie</p>
               <div className="mt-3 flex justify-center">
-                <span className={`rounded-full px-3 py-1 text-sm font-medium ${colors.badge}`}>
+                <span className="rounded-full px-3 py-1 text-sm font-medium" style={badgeStyle}>
                   {phaseLabel}
                 </span>
               </div>
@@ -121,7 +129,8 @@ export function ActivationButton({ data }: { data: FeatureAccessData }) {
               <button
                 onClick={handleActivate}
                 disabled={activating}
-                className={`rounded-lg bg-gradient-to-r ${colors.gradient} px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50`}
+                className="rounded-lg px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                style={gradientStyle}
               >
                 {activating ? 'Activeren...' : 'Activeer mijn routekaart'}
               </button>

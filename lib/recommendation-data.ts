@@ -68,6 +68,7 @@ export type Action = {
   status_changed_at: string | null
   created_at: string
   updated_at: string
+  metadata?: Record<string, unknown> | null
   // Joined fields
   recommendation?: Pick<Recommendation, 'title' | 'recommendation_type'> | null
 }

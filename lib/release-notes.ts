@@ -44,6 +44,105 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'fin_prod_0.71',
+    date: '2026-02-20',
+    title: 'Abonnementen, eigen overboekingen & kleurpersonalisatie',
+    sections: [
+      {
+        module: 'De Wil',
+        color: 'teal',
+        items: [
+          {
+            title: 'Abonnementendetectie & overzicht',
+            description: 'Automatische herkenning van terugkerende abonnementen uit je transacties. Nieuwe KPI-kaart toont aantal actieve abonnementen en maandelijkse kosten met kassabon-breakdown.',
+          },
+          {
+            title: 'AI-abonnementsadvies van Will',
+            description: 'Vraag Will om elk abonnement te beoordelen: nuttig, overlappend of niet relevant. Toont besparingspotentieel in euro\'s en vrijheidsdagen met concrete opzegacties.',
+          },
+          {
+            title: 'Opzegbrief-generator',
+            description: 'Genereer en verstuur opzegbrieven direct vanuit de app. Actiekaarten met type "abonnement opzeggen" tonen een snelkoppeling naar de opzegmodal.',
+          },
+          {
+            title: '12-maanden abonnementsanalyse in AI-context',
+            description: 'AI-aanbevelingen houden nu rekening met een volledig jaar abonnementsdata: categorieën (streaming, muziek, sport, software, gaming), overlap-detectie en vrijheidsdagen-per-jaar berekening.',
+          },
+        ],
+      },
+      {
+        module: 'De Kern',
+        color: 'amber',
+        items: [
+          {
+            title: 'Eigen-rekeningoverboekingen herkennen',
+            description: 'Transacties tussen je eigen rekeningen worden automatisch herkend en uitgesloten van inkomsten/uitgaven-totalen en Sankey-diagrammen. Visueel onderscheiden met overboeking-icoon en badge.',
+          },
+          {
+            title: 'Eigen IBAN-registratie',
+            description: 'Registreer IBAN\'s van je andere bankrekeningen zodat overboekingen correct worden gedetecteerd, ook tussen verschillende banken.',
+          },
+          {
+            title: 'Overboekingsdetectie bij import',
+            description: 'CSV-import herkent nu automatisch eigen overboekingen, slaat budgetcategorisatie over en toont een informatieve banner. Handmatig overschrijven met "Toch als uitgave?" mogelijk.',
+          },
+          {
+            title: 'Bevestigingsstroom voor onzekere overboekingen',
+            description: 'Onbevestigde eigen overboekingen tonen een gouden "Controleer"-badge. Review en bevestig ze via een bottom sheet met één klik.',
+          },
+        ],
+      },
+      {
+        module: 'Identiteit',
+        color: 'blue',
+        items: [
+          {
+            title: 'Budgetcategorie-kleuren aanpasbaar',
+            description: 'Kies op je profielpagina een eigen kleur per budgettype (inkomen, uitgaven, sparen, schuld, overig). Het systeem genereert automatisch een volledig kleurenpalet per categorie.',
+          },
+          {
+            title: 'Sovereignty-fasekleuren aanpasbaar',
+            description: 'Personaliseer de kleuren van de vier sovereignty-fasen (Herstel, Stabiliteit, Momentum, Meesterschap) met live preview en persistentie.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Uitgebreid kleursysteem (132 CSS-variabelen)',
+            description: 'Drie onafhankelijke kleurlagen: module-kleuren, budgettype-kleuren en fasekleuren. Elk genereert 11 tinten via OKLCH, volledig geïntegreerd met Tailwind utilities.',
+          },
+          {
+            title: 'Rapportages: historische vergelijking',
+            description: 'Rapporten tonen nu een vergelijkingstabel met de twee voorgaande perioden: vermogen, inkomen, uitgaven, spaarquote en vrijheidspercentage met delta-pijlen.',
+          },
+          {
+            title: 'Rapportages: optionele AI-inleiding',
+            description: 'Kies bij het genereren van een rapport voor "Standaard" (direct) of "Met AI-inleiding" (+5-10 sec). Will schrijft een persoonlijke editorial over je financiële maand.',
+          },
+          {
+            title: 'Rapportcaching',
+            description: 'Gegenereerde rapporten worden opgeslagen in de database. Herladen van hetzelfde rapport is direct, zonder herberekening.',
+          },
+          {
+            title: 'Duplicaat-rapportpreventie',
+            description: 'Bij het aanmaken van een rapport wordt gecontroleerd of er al een bestaat voor dezelfde periode. Zo ja, navigeer direct naar het bestaande rapport.',
+          },
+          {
+            title: 'Notificatiesysteem redesign',
+            description: 'Volledig herontworpen notificatiepaneel in redactionele stijl: urgente meldingen bovenaan, "Vandaag"-sectie, en inklapbare "Eerder"-secties per dag. Nieuwe notificatietypes voor sync-waarschuwingen en level-up meldingen.',
+          },
+          {
+            title: 'Dashboard editorial styling',
+            description: 'Dashboard met verbeterde typografie: Playfair Display kop met persoonlijke naam, Source Serif ondertitel, streak-indicator in de dateline en module-gekleurde avatars.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: 'fin_prod_0.7',
     date: '2026-02-19',
     title: 'Identiteit, bankkoppeling & dynamische kleuren',

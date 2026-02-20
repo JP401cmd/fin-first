@@ -915,8 +915,11 @@ function BudgetDetailModal({
           <div className="mt-3">
             <div className="h-2.5 w-full overflow-hidden rounded-full bg-zinc-100">
               <div
-                className={`h-full rounded-full transition-all ${spent > limit ? 'bg-red-500' : pct > 80 ? colors.barWarning : colors.barDefault}`}
-                style={{ width: `${pct}%` }}
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${pct}%`,
+                  backgroundColor: spent > limit ? '#ef4444' : pct > 80 ? colors.barHexWarn : colors.barHex,
+                }}
               />
             </div>
             <div className="mt-1 flex items-center justify-between">
@@ -1097,8 +1100,11 @@ function BudgetDetailModal({
                       </div>
                       <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-zinc-100">
                         <div
-                          className={`h-full rounded-full ${childSpent > childLimit ? 'bg-red-500' : colors.barDefault}`}
-                          style={{ width: `${childPct}%` }}
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${childPct}%`,
+                            backgroundColor: childSpent > childLimit ? '#ef4444' : colors.barHex,
+                          }}
                         />
                       </div>
                     </div>
@@ -1182,8 +1188,11 @@ function BudgetDetailModal({
                     {/* Spent bar */}
                     <div className="mt-auto w-full">
                       <div
-                        className={`w-full rounded-t ${over ? 'bg-red-400' : colors.barDefault}`}
-                        style={{ height: `${Math.max(spentH * 0.8, 2)}px` }}
+                        className="w-full rounded-t"
+                        style={{
+                          height: `${Math.max(spentH * 0.8, 2)}px`,
+                          backgroundColor: over ? '#f87171' : colors.barHex,
+                        }}
                       />
                     </div>
                     {/* Month label */}

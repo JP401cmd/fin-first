@@ -6,9 +6,12 @@ import Link from 'next/link'
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Plus, Upload, ArrowUpRight, ArrowDownLeft,
   Wallet, Tag, Settings2, Trash2, X, Building2, Repeat, Calendar, Search, Filter, RotateCcw,
-  Link2,
+  Link2, ArrowLeftRight, HelpCircle,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { isOwnAccountTransfer } from '@/lib/parsers/categorize'
+import { TransferConfirmSheet } from '@/components/app/transfer-confirm-sheet'
+import { PendingTransferBanner } from '@/components/app/pending-transfer-banner'
 import { CashFlowForecastChart, type ForecastPoint, type ForecastAlert } from '@/components/app/cashflow-forecast-chart'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { LineChart } from 'lucide-react'
@@ -32,6 +35,7 @@ type Transaction = {
   is_income: boolean
   notes: string | null
   category_source: string
+  transaction_type: string | null
 }
 
 type Account = {
@@ -94,8 +98,12 @@ export default function CashPage() {
 
   // Filter state
   const [filterSearch, setFilterSearch] = useState('')
-  const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all')
+  const [filterType, setFilterType] = useState<'all' | 'income' | 'expense' | 'transfer'>('all')
   const [filterBudgetId, setFilterBudgetId] = useState<string>('all')
+
+  // Transfer detection state
+  const [ownIbans, setOwnIbans] = useState<Set<string>>(new Set())
+  const [confirmTransferTx, setConfirmTransferTx] = useState<Transaction | null>(null)
 
   const hasActiveFilters = filterSearch !== '' || filterType !== 'all' || filterBudgetId !== 'all'
 
@@ -159,11 +167,14 @@ export default function CashPage() {
   const loadAccounts = useCallback(async () => {
     try {
       const supabase = createClient()
-      const { data, error: fetchError } = await supabase
-        .from('bank_accounts')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true })
+      const { data: { user } } = await supabase.auth.getUser()
+
+      const [{ data, error: fetchError }, { data: ownIbanRows }] = await Promise.all([
+        supabase.from('bank_accounts').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
+        user
+          ? supabase.from('user_own_ibans').select('iban').eq('user_id', user.id)
+          : Promise.resolve({ data: [] }),
+      ])
 
       if (fetchError) throw fetchError
 
@@ -178,6 +189,15 @@ export default function CashPage() {
       }
 
       setAccounts(data as Account[])
+
+      // Build own IBAN set
+      const ibansFromAccounts = (data as Account[])
+        .map((a) => a.iban)
+        .filter(Boolean)
+        .map((i) => i!.replace(/\s/g, '').toUpperCase())
+      const ibansFromOwn = (ownIbanRows ?? []).map((r: { iban: string }) => r.iban.replace(/\s/g, '').toUpperCase())
+      setOwnIbans(new Set([...ibansFromAccounts, ...ibansFromOwn]))
+
       const firstId = data[0].id
       setSelectedAccountId(firstId)
       await loadTransactions(firstId)
@@ -263,16 +283,20 @@ export default function CashPage() {
     return budgets.find((b) => b.id === budgetId)
   }
 
-  // Calculate monthly totals — use amount sign as source of truth
-  const totalIncome = transactions
+  // Calculate monthly totals — exclude transfers, use amount sign as source of truth
+  const nonTransferTx = transactions.filter((t) => t.transaction_type !== 'transfer')
+  const transferTx = transactions.filter((t) => t.transaction_type === 'transfer')
+
+  const totalIncome = nonTransferTx
     .filter((t) => Number(t.amount) > 0)
     .reduce((sum, t) => sum + Number(t.amount), 0)
 
-  const totalExpenses = transactions
+  const totalExpenses = nonTransferTx
     .filter((t) => Number(t.amount) < 0)
     .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
 
   const netAmount = totalIncome - totalExpenses
+  const transferTotal = transferTx.reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
 
   // Daily expenses for freedom-time calculations
   // Use current month's total expenses / 30 as the daily cost of living
@@ -303,11 +327,13 @@ export default function CashPage() {
       )
     }
 
-    // Type filter: income or expense
+    // Type filter: income, expense, or transfer
     if (filterType === 'income') {
-      result = result.filter((tx) => Number(tx.amount) > 0)
+      result = result.filter((tx) => Number(tx.amount) > 0 && tx.transaction_type !== 'transfer')
     } else if (filterType === 'expense') {
-      result = result.filter((tx) => Number(tx.amount) < 0)
+      result = result.filter((tx) => Number(tx.amount) < 0 && tx.transaction_type !== 'transfer')
+    } else if (filterType === 'transfer') {
+      result = result.filter((tx) => tx.transaction_type === 'transfer')
     }
 
     // Budget category filter
@@ -334,7 +360,7 @@ export default function CashPage() {
 
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId)
 
-  // Build Sankey data from transactions + budget structure
+  // Build Sankey data from transactions + budget structure (transfers excluded)
   const sankeyData = useMemo(() => {
     if (transactions.length === 0 || budgetGroups.length === 0) return null
 
@@ -347,12 +373,13 @@ export default function CashPage() {
     // Red for debt
     const debtColors = ['#ef4444', '#f87171', '#fca5a5', '#fecaca']
 
-    // Sum transactions per budget_id
+    // Sum transactions per budget_id — exclude transfers
+    const sankeyTx = transactions.filter((t) => t.transaction_type !== 'transfer')
     const spendingByBudget: Record<string, number> = {}
     let uncategorizedIncome = 0
     let uncategorizedExpense = 0
 
-    for (const tx of transactions) {
+    for (const tx of sankeyTx) {
       const amount = Math.abs(Number(tx.amount))
       if (tx.budget_id) {
         spendingByBudget[tx.budget_id] = (spendingByBudget[tx.budget_id] ?? 0) + amount
@@ -782,6 +809,28 @@ export default function CashPage() {
         </section>
       )}
 
+      {/* Pending transfer banner */}
+      {(() => {
+        const pendingTransfers = transactions.filter(
+          (t) =>
+            t.transaction_type !== 'transfer' &&
+            t.counterparty_iban &&
+            isOwnAccountTransfer(t.counterparty_iban, ownIbans)
+        )
+        if (pendingTransfers.length === 0) return null
+        return (
+          <div className="mt-3 sm:mt-6">
+            <PendingTransferBanner
+              count={pendingTransfers.length}
+              onReview={() => {
+                const first = pendingTransfers[0]
+                if (first) setConfirmTransferTx(first)
+              }}
+            />
+          </div>
+        )
+      })()}
+
       {/* Monthly overview */}
       <section className="mt-3 sm:mt-6 grid grid-cols-3 gap-3 sm:gap-4" data-testid="monthly-summary">
         <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-center">
@@ -820,6 +869,11 @@ export default function CashPage() {
           )}
         </div>
       </section>
+      {transferTx.length > 0 && (
+        <p className="mt-1 text-[10px] italic text-[var(--ink-4)] text-center" data-testid="transfer-footnote">
+          {transferTx.length} eigen {transferTx.length === 1 ? 'overboeking' : 'overboekingen'} ({new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(transferTotal)}) zijn uitgesloten van bovenstaande totalen.
+        </p>
+      )}
 
       {/* Recurring transactions */}
       {recurrings.length > 0 && (
@@ -926,6 +980,11 @@ export default function CashPage() {
                 links={sankeyData.links}
                 onNodeClick={handleSankeyNodeClick}
               />
+              {transferTx.length > 0 && (
+                <p className="pb-2 text-[10px] italic text-[var(--ink-4)] text-center">
+                  Eigen overboekingen zijn niet weergegeven in de geldstroom.
+                </p>
+              )}
             </div>
           )}
         </section>
@@ -972,13 +1031,14 @@ export default function CashPage() {
           {/* Type filter */}
           <select
             value={filterType}
-            onChange={(e) => setFilterType(e.target.value as 'all' | 'income' | 'expense')}
+            onChange={(e) => setFilterType(e.target.value as 'all' | 'income' | 'expense' | 'transfer')}
             className="rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm text-[var(--ink-2)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
             data-testid="filter-type"
           >
             <option value="all">Alle types</option>
             <option value="income">Inkomen</option>
             <option value="expense">Uitgaven</option>
+            <option value="transfer">Overboekingen</option>
           </select>
 
           {/* Budget category filter */}
@@ -1066,20 +1126,40 @@ export default function CashPage() {
                       const budget = getBudgetForId(tx.budget_id)
                       const amount = Number(tx.amount)
                       const isPositive = amount > 0
+                      const isTransfer = tx.transaction_type === 'transfer'
+                      const isPendingTransfer =
+                        !isTransfer &&
+                        !!tx.counterparty_iban &&
+                        isOwnAccountTransfer(tx.counterparty_iban, ownIbans)
 
                       return (
                         <div
                           key={tx.id}
-                          onClick={() => { setEditTransaction(tx); setShowForm(true) }}
+                          onClick={() => {
+                            if (isPendingTransfer) {
+                              setConfirmTransferTx(tx)
+                            } else {
+                              setEditTransaction(tx)
+                              setShowForm(true)
+                            }
+                          }}
                           className={`flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-[var(--subtle)] ${
                             idx < dateTxs.length - 1 ? 'border-b border-[var(--border-ed)]' : ''
-                          }`}
+                          } ${isPendingTransfer ? 'border-l-2 border-[var(--hor)]' : ''}`}
                         >
                           {/* Icon */}
                           <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r)] ${
-                            isPositive ? 'bg-emerald-50' : 'bg-zinc-100'
+                            isTransfer
+                              ? 'bg-[var(--subtle)] border border-[var(--border-ed)]'
+                              : isPendingTransfer
+                                ? 'bg-[var(--hor-l)] border border-[var(--hor-m)]'
+                                : isPositive ? 'bg-emerald-50' : 'bg-zinc-100'
                           }`}>
-                            {budget ? (
+                            {isTransfer ? (
+                              <ArrowLeftRight className="h-4 w-4 text-[var(--ink-3)]" />
+                            ) : isPendingTransfer ? (
+                              <HelpCircle className="h-4 w-4 text-[var(--hor-t)]" />
+                            ) : budget ? (
                               <BudgetIcon
                                 name={budget.icon}
                                 className={`h-4 w-4 ${isPositive ? 'text-emerald-500' : 'text-[var(--ink-3)]'}`}
@@ -1091,18 +1171,28 @@ export default function CashPage() {
 
                           {/* Description + counterparty */}
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-[var(--ink)]">
-                              {tx.description}
+                            <p className={`truncate text-sm font-medium ${
+                              isTransfer ? 'text-[var(--ink-2)]' : 'text-[var(--ink)]'
+                            }`}>
+                              {isTransfer ? 'Eigen overboeking' : tx.description}
                             </p>
-                            {tx.counterparty_name && (
-                              <p className="truncate text-xs text-[var(--ink-3)]">
-                                {tx.counterparty_name}
-                              </p>
-                            )}
+                            <p className="truncate text-xs text-[var(--ink-3)]">
+                              {isTransfer && tx.counterparty_name
+                                ? `${tx.counterparty_name}${tx.counterparty_iban ? ' · ' + tx.counterparty_iban.slice(-4) : ''}`
+                                : tx.counterparty_name ?? ''}
+                            </p>
                           </div>
 
-                          {/* Budget badge */}
-                          {budget ? (
+                          {/* Badge */}
+                          {isTransfer ? (
+                            <span className="hidden shrink-0 rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[.06em] text-[var(--ink-3)] sm:inline-block">
+                              Overboeking
+                            </span>
+                          ) : isPendingTransfer ? (
+                            <span className="hidden shrink-0 rounded-full bg-[var(--hor-l)] border border-[var(--hor-m)] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[.06em] text-[var(--hor-t)] sm:inline-block">
+                              Controleer
+                            </span>
+                          ) : budget ? (
                             <span className="hidden shrink-0 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-[var(--ink-2)] sm:inline-block">
                               {budget.name}
                             </span>
@@ -1114,12 +1204,15 @@ export default function CashPage() {
 
                           {/* Amount + freedom time */}
                           <div className="shrink-0 text-right">
-                            <span className={`text-sm font-semibold ${
-                              isPositive ? 'text-emerald-600' : 'text-[var(--ink)]'
+                            <span className={`font-mono text-sm font-semibold tabular-nums ${
+                              isTransfer || isPendingTransfer
+                                ? 'text-[var(--ink-2)]'
+                                : isPositive ? 'text-emerald-600' : 'text-[var(--ink)]'
                             }`}>
-                              {isPositive ? '+' : ''}{formatCurrency(amount)}
+                              {!isTransfer && !isPendingTransfer && (isPositive ? '+' : '')}{formatCurrency(amount)}
                             </span>
-                            {dailyExpenses > 0 && (
+                            {/* No freedom-time for transfers — philosophically correct */}
+                            {!isTransfer && !isPendingTransfer && dailyExpenses > 0 && (
                               <p className={`text-[10px] leading-tight ${
                                 isPositive ? 'text-emerald-500/60' : 'text-[var(--ink-3)]'
                               }`} data-testid="tx-freedom-time">
@@ -1172,6 +1265,23 @@ export default function CashPage() {
           onClose={() => { setShowAccountForm(false); setEditAccount(null) }}
         />
       )}
+
+      {/* Transfer confirm sheet */}
+      {confirmTransferTx && (
+        <TransferConfirmSheet
+          transaction={confirmTransferTx}
+          matchedAccount={(() => {
+            const iban = confirmTransferTx.counterparty_iban?.replace(/\s/g, '').toUpperCase() ?? ''
+            const acc = accounts.find((a) => a.iban?.replace(/\s/g, '').toUpperCase() === iban)
+            return acc ? { name: acc.name, iban: acc.iban } : null
+          })()}
+          onClose={() => setConfirmTransferTx(null)}
+          onConfirmed={() => {
+            loadTransactions(selectedAccountId)
+            setConfirmTransferTx(null)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -1205,6 +1315,48 @@ function AccountFormModal({
   const [accountType, setAccountType] = useState(account?.account_type ?? 'checking')
   const [balance, setBalance] = useState(account ? String(account.balance) : '')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [showOwnIbans, setShowOwnIbans] = useState(false)
+  const [ownIbanRows, setOwnIbanRows] = useState<{ id: string; iban: string; label: string | null }[]>([])
+  const [newOwnIban, setNewOwnIban] = useState('')
+  const [newOwnIbanLabel, setNewOwnIbanLabel] = useState('')
+
+  const loadOwnIbans = useCallback(async () => {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('user_own_ibans')
+      .select('id, iban, label')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true })
+    if (data) setOwnIbanRows(data)
+  }, [])
+
+  useEffect(() => {
+    if (showOwnIbans) loadOwnIbans()
+  }, [showOwnIbans, loadOwnIbans])
+
+  async function addOwnIban() {
+    const normalized = newOwnIban.replace(/\s/g, '').toUpperCase()
+    if (!normalized) return
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    await supabase.from('user_own_ibans').insert({
+      user_id: user.id,
+      iban: normalized,
+      label: newOwnIbanLabel.trim() || null,
+    })
+    setNewOwnIban('')
+    setNewOwnIbanLabel('')
+    loadOwnIbans()
+  }
+
+  async function removeOwnIban(id: string) {
+    const supabase = createClient()
+    await supabase.from('user_own_ibans').delete().eq('id', id)
+    loadOwnIbans()
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -1297,6 +1449,60 @@ function AccountFormModal({
                 className="w-full rounded-[var(--r)] border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
               />
             </div>
+          </div>
+
+          {/* Own IBAN registry */}
+          <div className="border-t border-[var(--border-ed)] pt-3">
+            <button
+              type="button"
+              onClick={() => setShowOwnIbans((v) => !v)}
+              className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-[var(--ink-3)] hover:text-[var(--ink-2)]"
+            >
+              <span>{showOwnIbans ? '▾' : '▸'}</span>
+              Mijn andere eigen IBANs
+            </button>
+            {showOwnIbans && (
+              <div className="mt-2 space-y-2">
+                {ownIbanRows.map((row) => (
+                  <div key={row.id} className="flex items-center gap-2">
+                    <span className="flex-1 font-mono text-xs text-[var(--ink-2)]">{row.iban}</span>
+                    {row.label && (
+                      <span className="text-xs italic text-[var(--ink-3)]">{row.label}</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeOwnIban(row.id)}
+                      className="rounded p-0.5 text-[var(--ink-4)] hover:bg-red-50 hover:text-red-500"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newOwnIban}
+                    onChange={(e) => setNewOwnIban(e.target.value.toUpperCase())}
+                    placeholder="NL91ABNA..."
+                    className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] px-2 py-1 font-mono text-xs text-[var(--ink)] outline-none focus:border-kern-500"
+                  />
+                  <input
+                    type="text"
+                    value={newOwnIbanLabel}
+                    onChange={(e) => setNewOwnIbanLabel(e.target.value)}
+                    placeholder="Label (optioneel)"
+                    className="w-32 rounded-[var(--r)] border border-[var(--border-ed)] px-2 py-1 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={addOwnIban}
+                    className="rounded-[var(--r)] bg-kern-100 px-2 py-1 text-xs font-medium text-kern-700 hover:bg-kern-200"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between pt-2">

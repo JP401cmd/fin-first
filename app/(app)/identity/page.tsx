@@ -155,8 +155,11 @@ export default function IdentityPage() {
     <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
       {/* Page header */}
       <div className="mb-5 sm:mb-8">
-        <h1 className="text-3xl font-bold text-[var(--ink)]">Identiteit</h1>
-        <p className="mt-2 text-[var(--ink-3)]">
+        <p className="label-editorial text-[var(--ink-3)] mb-1">Persoonlijk profiel</p>
+        <h1 className="font-display text-[32px] font-bold text-[var(--ink)]" style={{ letterSpacing: '-0.03em' }}>
+          Identiteit &amp; Vrijheidspad
+        </h1>
+        <p className="mt-1 font-serif italic text-[13px] text-[var(--ink-3)]">
           Wie ben je en hoe sta je in het leven? Jouw positie op de reis naar vrijheid.
         </p>
       </div>
@@ -232,100 +235,75 @@ export default function IdentityPage() {
 
       {/* ── Preview-kaarten ──────────────────────────────────────── */}
       <div className="mb-5 sm:mb-8 grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2">
-        <Link
-          href="/identity/profiel"
-          className="group rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6 transition-all hover:border-wil-300 hover:shadow-sm"
-        >
+        <Link href="/identity/profiel" className="group card-editorial p-4 sm:p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-wil-50">
+              <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
                 <User className="h-4 w-4 text-wil-600" />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-[var(--ink)]">Profiel</h3>
-                <p className="text-xs text-[var(--ink-3)]">
-                  {fullName || 'Geen naam'} &middot; {householdLabel}
-                </p>
+                <p className="text-xs text-[var(--ink-3)]">{fullName || 'Geen naam'} &middot; {householdLabel}</p>
               </div>
             </div>
             <ChevronRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />
           </div>
         </Link>
 
-        <Link
-          href="/identity/voortgang"
-          className="group rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6 transition-all hover:border-wil-300 hover:shadow-sm"
-        >
+        <Link href="/identity/voortgang" className="group card-editorial p-4 sm:p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-wil-50">
+              <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
                 <Trophy className="h-4 w-4 text-wil-600" />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-[var(--ink)]">Voortgang</h3>
-                <p className="text-xs text-[var(--ink-3)]">
-                  {badgeCount} badge{badgeCount !== 1 ? 's' : ''} behaald
-                </p>
+                <p className="text-xs text-[var(--ink-3)]">{badgeCount} badge{badgeCount !== 1 ? 's' : ''} behaald</p>
               </div>
             </div>
             <ChevronRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />
           </div>
         </Link>
 
-        <Link
-          href="/identity/delen"
-          className="group rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6 transition-all hover:border-wil-300 hover:shadow-sm"
-        >
+        <Link href="/identity/delen" className="group card-editorial p-4 sm:p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-wil-50">
+              <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
                 <Share2 className="h-4 w-4 text-wil-600" />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-[var(--ink)]">Delen</h3>
-                <p className="text-xs text-[var(--ink-3)]">
-                  Vrijheidskaart & Jaaroverzicht
-                </p>
+                <p className="text-xs text-[var(--ink-3)]">Vrijheidskaart & Jaaroverzicht</p>
               </div>
             </div>
             <ChevronRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />
           </div>
         </Link>
 
-        <Link
-          href="/identity/instellingen"
-          className="group rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6 transition-all hover:border-wil-300 hover:shadow-sm"
-        >
+        <Link href="/identity/instellingen" className="group card-editorial p-4 sm:p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-wil-50">
+              <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
                 <Settings className="h-4 w-4 text-wil-600" />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-[var(--ink)]">Instellingen</h3>
-                <p className="text-xs text-[var(--ink-3)]">
-                  {activeNotifCount} van 7 notificaties actief
-                </p>
+                <p className="text-xs text-[var(--ink-3)]">{activeNotifCount} van 7 notificaties actief</p>
               </div>
             </div>
             <ChevronRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />
           </div>
         </Link>
 
-        <Link
-          href="/rapportages"
-          className="group rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6 transition-all hover:border-kern-300 hover:shadow-sm"
-        >
+        <Link href="/rapportages" className="group card-editorial p-4 sm:p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-kern-50">
+              <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-kern-50">
                 <FileText className="h-4 w-4 text-kern-600" />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-[var(--ink)]">Rapportages</h3>
-                <p className="text-xs text-[var(--ink-3)]">
-                  Financieel Archief
-                </p>
+                <p className="text-xs text-[var(--ink-3)]">Financieel Archief</p>
               </div>
             </div>
             <ChevronRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
@@ -334,12 +312,13 @@ export default function IdentityPage() {
       </div>
 
       {/* ── The Temporal Balance ──────────────────────────────────── */}
-      <section className="mb-5 sm:mb-8 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-8">
-        <h2 className="label-editorial text-[var(--ink-2)]">
-          The Temporal Balance
+      <section className="mb-5 sm:mb-8 card-editorial p-4 sm:p-8">
+        <p className="label-editorial text-[var(--ink-3)] mb-1">Temporeel evenwicht</p>
+        <h2 className="font-display text-xl font-bold text-[var(--ink)] mb-1" style={{ letterSpacing: '-0.02em' }}>
+          Hoeveel &lsquo;Nu&rsquo; ruil je in voor &lsquo;Later&rsquo;?
         </h2>
-        <p className="mt-1 mb-5 sm:mb-8 text-sm text-[var(--ink-3)]">
-          How much &lsquo;Now&rsquo; are you willing to trade for &lsquo;Later&rsquo;?
+        <p className="mb-5 sm:mb-8 font-serif italic text-[13px] text-[var(--ink-3)]">
+          Jouw persoonlijke balans tussen genieten van het heden en bouwen aan de toekomst.
         </p>
 
         {/* Slider */}
@@ -351,7 +330,7 @@ export default function IdentityPage() {
             step={1}
             value={temporalBalance}
             onChange={(e) => updateTemporalBalance(Number(e.target.value))}
-            className="w-full cursor-pointer accent-zinc-900"
+            className="w-full cursor-pointer accent-[var(--ink)]"
           />
           <div className="mt-2 flex justify-between text-xs text-[var(--ink-3)]">
             {temporalLevels.map((l) => (
@@ -366,13 +345,15 @@ export default function IdentityPage() {
         </div>
 
         {/* Active level card */}
-        <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] p-5">
+        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-5">
           <div className="flex items-start gap-4">
             <span className="text-4xl">{activeLevel.icon}</span>
             <div>
-              <h3 className="text-lg font-bold text-[var(--ink)]">{activeLevel.name}</h3>
-              <p className="text-sm font-medium text-[var(--ink-3)]">{activeLevel.nameNl}</p>
-              <p className="mt-1 text-sm font-semibold italic text-[var(--ink-2)]">
+              <h3 className="font-display text-lg font-bold text-[var(--ink)]" style={{ letterSpacing: '-0.02em' }}>
+                {activeLevel.nameNl}
+              </h3>
+              <p className="text-xs label-editorial text-[var(--ink-3)] mt-0.5">{activeLevel.name}</p>
+              <p className="mt-2 font-serif italic text-sm text-[var(--ink-2)] leading-relaxed border-l-2 border-[var(--border-md)] pl-3">
                 &ldquo;{activeLevel.tagline}&rdquo;
               </p>
               <p className="mt-2 text-sm leading-relaxed text-[var(--ink-2)]">
@@ -383,22 +364,23 @@ export default function IdentityPage() {
         </div>
       </section>
 
-      {/* ── The Chronology Scale ──────────────────────────────────── */}
-      <section className="mb-5 sm:mb-8 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-8">
-        <h2 className="label-editorial text-[var(--ink-2)]">
-          The Chronology Scale
+      {/* ── Chronologische Schaal ─────────────────────────────────── */}
+      <section className="mb-5 sm:mb-8 card-editorial p-4 sm:p-8">
+        <p className="label-editorial text-[var(--ink-3)] mb-1">Vrijheidsreis</p>
+        <h2 className="font-display text-xl font-bold text-[var(--ink)] mb-1" style={{ letterSpacing: '-0.02em' }}>
+          Chronologische Schaal
         </h2>
-        <p className="mt-1 mb-3 sm:mb-6 text-sm text-[var(--ink-3)]">
-          Jouw positie op de reis naar financiele soevereiniteit.
+        <p className="mb-5 sm:mb-6 font-serif italic text-[13px] text-[var(--ink-3)]">
+          Elk niveau vertegenwoordigt een stap dichter bij volledige tijdsoevereiniteit.
         </p>
 
         {/* Progress overview bar */}
-        <div className="mb-3 sm:mb-6 rounded-xl bg-[var(--subtle)] p-4">
-          <div className="mb-2 flex items-center justify-between text-xs text-[var(--ink-3)]">
-            <span>Lvl {chronologyLevels[0].level}: {chronologyLevels[0].name}</span>
-            <span>Lvl {chronologyLevels[chronologyLevels.length - 1].level}: {chronologyLevels[chronologyLevels.length - 1].name}</span>
+        <div className="mb-4 sm:mb-6 rounded-[var(--r-lg)] bg-[var(--subtle)] border border-[var(--border-ed)] p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-[11px] font-mono text-[var(--ink-3)]">Lvl {chronologyLevels[0].level}: {chronologyLevels[0].name}</span>
+            <span className="text-[11px] font-mono text-[var(--ink-3)]">Lvl {chronologyLevels[chronologyLevels.length - 1].level}: {chronologyLevels[chronologyLevels.length - 1].name}</span>
           </div>
-          <div className="relative h-3 w-full overflow-hidden rounded-full bg-zinc-200">
+          <div className="relative h-[5px] w-full overflow-visible rounded-full bg-[var(--border-ed)]">
             {chronologyPhases.map((phase, pi) => {
               const levels = chronologyLevels.filter(l => l.phase === phase.phase)
               const startIdx = chronologyLevels.indexOf(levels[0])
@@ -412,8 +394,8 @@ export default function IdentityPage() {
               return (
                 <div
                   key={pi}
-                  className={`absolute top-0 h-full transition-opacity ${isReached ? colors.activeDot : 'bg-zinc-300'}`}
-                  style={{ left: `${left}%`, width: `${right - left}%`, opacity: isReached ? 1 : 0.3 }}
+                  className={`absolute top-0 h-full ${isReached ? colors.activeDot : 'bg-[var(--border-ed)]'}`}
+                  style={{ left: `${left}%`, width: `${right - left}%`, opacity: isReached ? 1 : 0.4 }}
                 />
               )
             })}
@@ -422,17 +404,17 @@ export default function IdentityPage() {
               const pct = idx >= 0 ? (idx / (chronologyLevels.length - 1)) * 100 : 0
               return (
                 <div
-                  className="absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-zinc-900 shadow-md"
+                  className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[var(--paper)] bg-[var(--ink)] shadow-md"
                   style={{ left: `${pct}%` }}
                 />
               )
             })()}
           </div>
-          <div className="mt-2 flex justify-between">
+          <div className="mt-2.5 flex justify-between">
             {chronologyPhases.map((phase) => {
               const colors = phaseColors[phase.color]
               return (
-                <span key={phase.phase} className={`text-[10px] font-medium ${colors.text}`}>
+                <span key={phase.phase} style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }} className={colors.text}>
                   {phase.name}
                 </span>
               )
@@ -445,15 +427,15 @@ export default function IdentityPage() {
           const nextLevel = chronologyLevels.find(l => l.level === sovereigntyLevel + 1)
           if (!nextLevel) return null
           const nextPhase = chronologyPhases.find(p => p.phase === nextLevel.phase)
-          const colors = nextPhase ? phaseColors[nextPhase.color] : phaseColors.teal
+          const colors = nextPhase ? phaseColors[nextPhase.color] : phaseColors.wil
           return (
-            <div className={`mb-3 sm:mb-6 rounded-[var(--r-lg)] border p-4 ${colors.badge}`}>
-              <p className="text-xs font-bold uppercase">Volgende mijlpaal</p>
-              <p className="mt-1 text-sm font-semibold">
-                Lvl {nextLevel.level}: {nextLevel.name}
+            <div className={`mb-4 sm:mb-6 rounded-[var(--r-lg)] border p-4 ${colors.badge}`}>
+              <p className="label-editorial mb-1">Volgende mijlpaal</p>
+              <p className="font-display font-bold text-[var(--ink)]" style={{ fontSize: '15px', letterSpacing: '-0.01em' }}>
+                Niveau {nextLevel.level}: {nextLevel.name}
               </p>
-              <p className="mt-0.5 text-xs opacity-80">
-                Focus: {nextLevel.focus} &mdash; {nextLevel.metaphor}
+              <p className="mt-1 font-serif italic text-[12px] text-[var(--ink-3)]">
+                Focus: {nextLevel.focus} — {nextLevel.metaphor}
               </p>
             </div>
           )
@@ -463,7 +445,7 @@ export default function IdentityPage() {
           {chronologyPhases.map((phase) => {
             const levels = chronologyLevels.filter((l) => l.phase === phase.phase)
             const colors = phaseColors[phase.color]
-            const phaseId = PHASES.find(p => p.color === phase.color)?.id ?? ''
+            const phaseId = PHASES[phase.phase - 1]?.id ?? ''
             const phaseFeatures = featuresPerPhase[phaseId] ?? []
             const currentPhaseId = levelToPhaseId(sovereigntyLevel)
             const currentPhaseIdx = PHASES.findIndex(p => p.id === currentPhaseId)
@@ -475,8 +457,8 @@ export default function IdentityPage() {
               <div key={phase.phase} data-testid={`phase-${phaseId}`}>
                 {/* Phase header */}
                 <div className="mb-3 flex items-center gap-2">
-                  <span className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ${colors.badge}`}>
-                    Phase {phase.phase}
+                  <span className={`inline-flex rounded-[var(--r-sm)] border px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ${colors.badge}`}>
+                    Fase {phase.phase}
                   </span>
                   <span className="text-sm font-semibold text-[var(--ink-2)]">{phase.name}</span>
                   <span className="text-xs text-[var(--ink-3)]">&mdash; {phase.subtitle}</span>
@@ -490,16 +472,15 @@ export default function IdentityPage() {
                       className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors"
                       data-testid={`feature-roadmap-toggle-${phaseId}`}
                     >
-                      <span className="text-xs">{isPhaseExpanded ? '\u25BC' : '\u25B6'}</span>
+                      <span className="text-xs">{isPhaseExpanded ? '▼' : '▶'}</span>
                       <span>{phaseFeatures.length} feature{phaseFeatures.length !== 1 ? 's' : ''} worden ontgrendeld</span>
-                      {isPhaseUnlocked && (
+                      {isPhaseUnlocked ? (
                         <span className="ml-1 inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 border border-emerald-200">
-                          \u2713 Beschikbaar
+                          ✓ Beschikbaar
                         </span>
-                      )}
-                      {!isPhaseUnlocked && (
-                        <span className="ml-1 inline-flex items-center rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--ink-3)] border border-[var(--border-ed)]">
-                          \uD83D\uDD12 Vergrendeld
+                      ) : (
+                        <span className="ml-1 inline-flex items-center rounded-[var(--r-sm)] bg-[var(--subtle)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--ink-3)] border border-[var(--border-ed)]">
+                          Vergrendeld
                         </span>
                       )}
                     </button>
@@ -507,11 +488,11 @@ export default function IdentityPage() {
                     {/* Feature icon pills */}
                     <div className="flex flex-wrap gap-1.5 mb-2">
                       {phaseFeatures.map((feature) => {
-                        const icon = featureIcons[feature.id] ?? '\u26A1'
+                        const icon = featureIcons[feature.id] ?? '⚡'
                         return (
                           <div
                             key={feature.id}
-                            className={`group relative inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium border transition-all ${
+                            className={`group relative inline-flex items-center gap-1 rounded-[var(--r-sm)] px-2 py-0.5 text-[11px] font-medium border transition-all ${
                               isPhaseUnlocked
                                 ? `${colors.badge} opacity-100`
                                 : 'bg-[var(--subtle)] text-[var(--ink-3)] border-[var(--border-ed)] opacity-60'
@@ -521,14 +502,13 @@ export default function IdentityPage() {
                           >
                             <span className="text-xs">{icon}</span>
                             <span className="hidden sm:inline">{feature.label}</span>
-                            {!isPhaseUnlocked && <span className="text-[9px] ml-0.5">\uD83D\uDD12</span>}
-                            <div className="pointer-events-none absolute left-1/2 bottom-full z-20 mb-2 -translate-x-1/2 w-48 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-2 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+                            <div className="pointer-events-none absolute left-1/2 bottom-full z-20 mb-2 -translate-x-1/2 w-48 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-2 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
                               <p className="text-[11px] font-semibold text-[var(--ink-2)]">{feature.label}</p>
                               <p className="text-[10px] text-[var(--ink-3)]">{feature.description}</p>
                               {isPhaseUnlocked ? (
-                                <p className="mt-1 text-[10px] font-semibold text-emerald-600">\u2713 Ontgrendeld</p>
+                                <p className="mt-1 text-[10px] font-semibold text-emerald-600">✓ Ontgrendeld</p>
                               ) : (
-                                <p className="mt-1 text-[10px] font-semibold text-[var(--ink-3)]">\uD83D\uDD12 Beschikbaar vanaf {phase.name}</p>
+                                <p className="mt-1 text-[10px] font-semibold text-[var(--ink-3)]">Beschikbaar vanaf {phase.name}</p>
                               )}
                             </div>
                           </div>
@@ -538,19 +518,17 @@ export default function IdentityPage() {
 
                     {/* Expanded feature list */}
                     {isPhaseExpanded && (
-                      <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/50 p-3 mb-2" data-testid={`feature-list-${phaseId}`}>
-                        <p className="mb-2 text-[11px] font-semibold text-[var(--ink-3)] uppercase tracking-wide">
+                      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-3 mb-2" data-testid={`feature-list-${phaseId}`}>
+                        <p className="label-editorial text-[var(--ink-3)] mb-2">
                           Features in {phase.name}
                         </p>
                         <div className="space-y-1.5">
                           {phaseFeatures.map((feature) => {
-                            const icon = featureIcons[feature.id] ?? '\u26A1'
+                            const icon = featureIcons[feature.id] ?? '⚡'
                             return (
                               <div
                                 key={feature.id}
-                                className={`flex items-start gap-2 rounded-md p-1.5 ${
-                                  isPhaseUnlocked ? '' : 'opacity-50'
-                                }`}
+                                className={`flex items-start gap-2 rounded-[var(--r)] p-1.5 ${isPhaseUnlocked ? '' : 'opacity-50'}`}
                                 data-testid={`feature-detail-${feature.id}`}
                               >
                                 <span className="text-sm shrink-0 mt-0.5">{icon}</span>
@@ -558,9 +536,9 @@ export default function IdentityPage() {
                                   <div className="flex items-center gap-1.5">
                                     <span className="text-xs font-semibold text-[var(--ink-2)]">{feature.label}</span>
                                     {isPhaseUnlocked ? (
-                                      <span className="text-[10px] text-emerald-600 font-medium">\u2713</span>
+                                      <span className="text-[10px] text-emerald-600 font-medium">✓</span>
                                     ) : (
-                                      <span className="text-[10px] text-[var(--ink-3)]">\uD83D\uDD12</span>
+                                      <span className="text-[10px] text-[var(--ink-3)]">—</span>
                                     )}
                                   </div>
                                   <p className="text-[11px] text-[var(--ink-3)] leading-snug">{feature.description}</p>
@@ -590,30 +568,30 @@ export default function IdentityPage() {
                       >
                         <div
                           className={`absolute -left-[calc(1.5rem+5px)] top-1.5 h-2.5 w-2.5 rounded-full ${
-                            isActive ? colors.activeDot : isPast ? colors.dot : 'bg-zinc-200'
-                          } ${isActive ? 'ring-4 ring-offset-1 ring-offset-white ring-' + phase.color + '-200' : ''}`}
-                          style={isActive ? { boxShadow: `0 0 0 4px color-mix(in srgb, currentColor 20%, transparent)` } : {}}
+                            isActive ? colors.activeDot : isPast ? colors.dot : 'bg-[var(--border-md)]'
+                          }`}
+                          style={isActive ? { boxShadow: `0 0 0 3px var(--paper), 0 0 0 5px currentColor` } : {}}
                         />
 
-                        <div className={`rounded-lg p-3 ${isActive ? 'bg-[var(--subtle)] border border-[var(--border-ed)]' : ''}`}>
+                        <div className={`rounded-[var(--r-lg)] p-3 ${isActive ? 'bg-[var(--subtle)] border border-[var(--border-ed)]' : ''}`}>
                           <div className="flex items-center gap-2">
-                            <span className={`text-xs font-bold ${isActive ? colors.text : 'text-[var(--ink-3)]'}`}>
-                              Lvl {lvl.level}
+                            <span className={`text-[11px] font-mono font-bold ${isActive ? colors.text : 'text-[var(--ink-3)]'}`}>
+                              Niv. {lvl.level}
                             </span>
                             <span className={`text-sm font-semibold ${isActive ? 'text-[var(--ink)]' : isPast ? 'text-[var(--ink-2)]' : 'text-[var(--ink-3)]'}`}>
                               {lvl.name}
                             </span>
                             {isActive && (
-                              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${colors.badge}`}>
+                              <span className={`rounded-[var(--r-sm)] px-2 py-0.5 text-[10px] font-bold uppercase border ${colors.badge}`}>
                                 Huidige positie
                               </span>
                             )}
                             {criteria && (
                               <div className="group relative ml-auto shrink-0">
-                                <div className="flex h-5 w-5 cursor-help items-center justify-center rounded-full border border-[var(--border-md)] text-[10px] font-bold text-[var(--ink-3)] transition-colors group-hover:border-zinc-500 group-hover:text-[var(--ink-2)]">
+                                <div className="flex h-5 w-5 cursor-help items-center justify-center rounded-full border border-[var(--border-md)] text-[10px] font-bold text-[var(--ink-3)] transition-colors group-hover:border-[var(--ink-2)] group-hover:text-[var(--ink-2)]">
                                   i
                                 </div>
-                                <div className="pointer-events-none absolute right-0 bottom-full z-20 mb-2 w-64 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-3 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+                                <div className="pointer-events-none absolute right-0 bottom-full z-20 mb-2 w-64 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
                                   <p className="mb-1.5 text-[11px] font-semibold text-[var(--ink-2)]">
                                     {criteria.label}
                                   </p>
@@ -621,22 +599,22 @@ export default function IdentityPage() {
                                     {criteria.criteria.map((c, i) => (
                                       <li key={i} className="flex items-start gap-1.5 text-[11px] text-[var(--ink-3)]">
                                         <span className="mt-0.5 shrink-0">
-                                          {progressPct >= 100 ? '\u2705' : '\u25CB'}
+                                          {progressPct >= 100 ? '✓' : '○'}
                                         </span>
                                         {c}
                                       </li>
                                     ))}
                                   </ul>
                                   <div className="flex items-center gap-2">
-                                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100">
+                                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
                                       <div
                                         className={`h-full rounded-full transition-all ${
-                                          progressPct >= 100 ? 'bg-emerald-500' : progressPct >= 50 ? 'bg-amber-400' : 'bg-zinc-300'
+                                          progressPct >= 100 ? 'bg-emerald-500' : progressPct >= 50 ? 'bg-horizon-400' : 'bg-[var(--border-md)]'
                                         }`}
                                         style={{ width: `${Math.min(100, progressPct)}%` }}
                                       />
                                     </div>
-                                    <span className={`text-[11px] font-bold ${
+                                    <span className={`text-[11px] font-mono font-bold tabular-nums ${
                                       progressPct >= 100 ? 'text-emerald-600' : 'text-[var(--ink-3)]'
                                     }`}>
                                       {Math.min(100, progressPct)}%
@@ -646,11 +624,11 @@ export default function IdentityPage() {
                               </div>
                             )}
                           </div>
-                          <p className={`mt-0.5 text-xs ${isActive ? 'text-[var(--ink-3)]' : 'text-[var(--ink-3)]'}`}>
+                          <p className="mt-0.5 text-xs text-[var(--ink-3)]">
                             <span className="font-medium">Focus:</span> {lvl.focus}
                           </p>
                           {(isActive || isPast) && (
-                            <p className="mt-1 text-xs italic text-[var(--ink-3)]">
+                            <p className="mt-1 font-serif italic text-[12px] text-[var(--ink-3)]">
                               {lvl.metaphor}
                             </p>
                           )}

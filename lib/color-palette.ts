@@ -213,3 +213,96 @@ export function getModuleHex(
   const palette = generatePalette(hex)
   return palette[shade].hex
 }
+
+// ── Budget color config ─────────────────────────────────────────────────
+
+export type BudgetColorConfig = {
+  income: string
+  expense: string
+  savings: string
+  debt: string
+  other: string
+}
+
+export const DEFAULT_BUDGET_COLORS: BudgetColorConfig = {
+  income:  '#2d6a4f',   // donkergroen — groei
+  expense: '#6b3a2d',   // terracotta — uitstroom
+  savings: '#1d4e6b',   // staalsblauw — opbouw
+  debt:    '#7a2d3a',   // bordeaux — verplichting
+  other:   '#4a4840',   // neutraal ink-2
+}
+
+export type BudgetTypeName = keyof BudgetColorConfig
+const BUDGET_TYPE_NAMES: BudgetTypeName[] = ['income', 'expense', 'savings', 'debt', 'other']
+
+/**
+ * Generates CSS variables for all 5 budget types (55 variables total).
+ * Example: { '--color-income-50': 'oklch(...)' }
+ */
+export function generateBudgetColorVars(
+  config: BudgetColorConfig = DEFAULT_BUDGET_COLORS
+): Record<string, string> {
+  const vars: Record<string, string> = {}
+  for (const type of BUDGET_TYPE_NAMES) {
+    const hex = config[type] || DEFAULT_BUDGET_COLORS[type]
+    const palette = generatePalette(hex)
+    for (const shade of SHADES) {
+      vars[`--color-${type}-${shade}`] = palette[shade].oklch
+    }
+  }
+  return vars
+}
+
+// ── Phase color config ──────────────────────────────────────────────────
+
+export type PhaseColorConfig = {
+  phase_recovery:  string
+  phase_stability: string
+  phase_momentum:  string
+  phase_mastery:   string
+}
+
+export const DEFAULT_PHASE_COLORS: PhaseColorConfig = {
+  phase_recovery:  '#8b3a3a',   // donkerrood — urgentie/herstel
+  phase_stability: '#355a78',   // staalsblauw — fundament
+  phase_momentum:  '#3d3048',   // zelfde als wil-paars (ontkoppeld na instellen)
+  phase_mastery:   '#c4a06b',   // zelfde als horizon-goud (ontkoppeld na instellen)
+}
+
+export type PhaseColorName = keyof PhaseColorConfig
+const PHASE_COLOR_NAMES: PhaseColorName[] = ['phase_recovery', 'phase_stability', 'phase_momentum', 'phase_mastery']
+
+/**
+ * Generates CSS variables for all 4 phase types (44 variables total).
+ * Example: { '--color-phase-recovery-50': 'oklch(...)' }
+ */
+export function generatePhaseColorVars(
+  config: PhaseColorConfig = DEFAULT_PHASE_COLORS
+): Record<string, string> {
+  const vars: Record<string, string> = {}
+  for (const phase of PHASE_COLOR_NAMES) {
+    const hex = config[phase] || DEFAULT_PHASE_COLORS[phase]
+    const palette = generatePalette(hex)
+    // CSS var key: --color-phase-recovery-50 → replace underscore with hyphen
+    const cssKey = phase.replace('_', '-')
+    for (const shade of SHADES) {
+      vars[`--color-${cssKey}-${shade}`] = palette[shade].oklch
+    }
+  }
+  return vars
+}
+
+/**
+ * Generates all CSS color variables: module (33) + budget (55) + phase (44) = 132 total.
+ */
+export function generateAllColorVars(config: {
+  modules: ModuleColorConfig
+  budget: BudgetColorConfig
+  phase: PhaseColorConfig
+}): Record<string, string> {
+  return {
+    ...generateModuleColorVars(config.modules),
+    ...generateBudgetColorVars(config.budget),
+    ...generatePhaseColorVars(config.phase),
+  }
+}

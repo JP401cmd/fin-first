@@ -38,11 +38,11 @@ function ChildBar({
   const isAboveAlert = pct >= alertThreshold
   const colors = getTypeColors(budgetType)
 
-  const fillColor = overBudget
-    ? 'bg-red-500'
+  const fillColorHex = overBudget
+    ? '#ef4444'
     : isAboveAlert
-      ? colors.barWarning
-      : colors.barDefault
+      ? colors.barHexWarn
+      : colors.barHex
 
   return (
     <div
@@ -71,8 +71,8 @@ function ChildBar({
 
         {/* Fill */}
         <div
-          className={`absolute inset-y-1 left-0 rounded-full transition-all duration-500 ${fillColor}`}
-          style={{ width: `${Math.min(pct, 100)}%` }}
+          className="absolute inset-y-1 left-0 rounded-full transition-all duration-500"
+          style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: fillColorHex }}
         />
 
         {/* Over-budget extension */}
@@ -185,10 +185,11 @@ function ParentNode({
       {/* Mini progress bar */}
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
         <div
-          className={`h-full rounded-full transition-all duration-500 ${
-            totalSpent > totalLimit ? 'bg-red-500' : pct > 80 ? colors.barWarning : colors.barDefault
-          }`}
-          style={{ width: `${pct}%` }}
+          className="h-full rounded-full transition-all duration-500"
+          style={{
+            width: `${pct}%`,
+            backgroundColor: totalSpent > totalLimit ? '#ef4444' : pct > 80 ? colors.barHexWarn : colors.barHex,
+          }}
         />
       </div>
     </div>

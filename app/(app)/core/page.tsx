@@ -139,7 +139,7 @@ export default function CorePage() {
           .limit(1),
         supabase
           .from('budgets')
-          .select('id, name, parent_id, default_limit')
+          .select('id, name, parent_id, default_limit, is_essential, interval')
           .not('parent_id', 'is', null),
         supabase
           .from('transactions')
@@ -231,10 +231,15 @@ export default function CorePage() {
       const allChildren = childBudgetsResult.data ?? []
       let yearlyMustExpenses = 0
       const expenseItems: {name: string; monthlyAmount: number; annualAmount: number; interval: string}[] = []
+      const essentialParentIds = new Set((essentialBudgetsResult.data ?? []).map(b => b.id))
+
+      // A: Essential parent budgets — if they have essential children, only count those; otherwise count all children (backwards compat)
       for (const b of essentialBudgetsResult.data) {
         const children = allChildren.filter(c => c.parent_id === b.id)
-        const limit = children.length > 0
-          ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
+        const essentialChildren = children.filter(c => c.is_essential)
+        const relevantChildren = essentialChildren.length > 0 ? essentialChildren : children
+        const limit = relevantChildren.length > 0
+          ? relevantChildren.reduce((sum, c) => sum + Number(c.default_limit), 0)
           : Number(b.default_limit)
         let annual = 0
         if (b.interval === 'monthly') annual = limit * 12
@@ -248,6 +253,27 @@ export default function CorePage() {
           interval: b.interval ?? 'monthly',
         })
       }
+
+      // B: Essential children of non-essential parents — include them individually
+      const orphanEssentialChildren = allChildren.filter(
+        c => c.is_essential && !essentialParentIds.has(c.parent_id)
+      )
+      for (const child of orphanEssentialChildren) {
+        const childInterval = child.interval ?? 'monthly'
+        const childLimit = Number(child.default_limit)
+        let annual = 0
+        if (childInterval === 'monthly') annual = childLimit * 12
+        else if (childInterval === 'quarterly') annual = childLimit * 4
+        else annual = childLimit
+        yearlyMustExpenses += annual
+        expenseItems.push({
+          name: child.name ?? 'Onbekend budget',
+          monthlyAmount: annual / 12,
+          annualAmount: annual,
+          interval: childInterval,
+        })
+      }
+
       setMustExpenseItems(expenseItems)
 
       // Total assets

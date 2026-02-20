@@ -3,9 +3,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { HouseholdSection } from '@/components/app/household-section'
-import { useModuleColors } from '@/components/app/module-color-provider'
-import { generatePalette, DEFAULT_MODULE_COLORS, SHADES } from '@/lib/color-palette'
-import type { ModuleColorConfig, ModuleName } from '@/lib/color-palette'
+import { useModuleColors, useBudgetColors, usePhaseColors } from '@/components/app/module-color-provider'
+import { generatePalette, DEFAULT_MODULE_COLORS, DEFAULT_BUDGET_COLORS, DEFAULT_PHASE_COLORS, SHADES } from '@/lib/color-palette'
+import type { ModuleColorConfig, ModuleName, BudgetColorConfig, PhaseColorConfig } from '@/lib/color-palette'
+import { ColorPickerCard } from '@/components/app/color-picker-card'
+import type { ColorPreset } from '@/components/app/color-picker-card'
 import { Palette, RotateCcw } from 'lucide-react'
 
 type HouseholdType = 'solo' | 'samen' | 'gezin'
@@ -13,6 +15,8 @@ type HouseholdType = 'solo' | 'samen' | 'gezin'
 export default function ProfielPage() {
   const supabase = createClient()
   const { setConfig } = useModuleColors()
+  const { setBudgetConfig } = useBudgetColors()
+  const { setPhaseConfig } = usePhaseColors()
 
   // Profile state
   const [fullName, setFullName] = useState('')
@@ -63,6 +67,27 @@ export default function ProfielPage() {
             kern: mc.kern || DEFAULT_MODULE_COLORS.kern,
             wil: mc.wil || DEFAULT_MODULE_COLORS.wil,
             horizon: mc.horizon || DEFAULT_MODULE_COLORS.horizon,
+          })
+        }
+        // Load budget colors into the provider
+        if (data.budget_colors) {
+          const bc = data.budget_colors as Record<string, string>
+          setBudgetConfig({
+            income:  bc.income  || DEFAULT_BUDGET_COLORS.income,
+            expense: bc.expense || DEFAULT_BUDGET_COLORS.expense,
+            savings: bc.savings || DEFAULT_BUDGET_COLORS.savings,
+            debt:    bc.debt    || DEFAULT_BUDGET_COLORS.debt,
+            other:   bc.other   || DEFAULT_BUDGET_COLORS.other,
+          })
+        }
+        // Load phase colors into the provider
+        if (data.phase_colors) {
+          const pc = data.phase_colors as Record<string, string>
+          setPhaseConfig({
+            phase_recovery:  pc.phase_recovery  || DEFAULT_PHASE_COLORS.phase_recovery,
+            phase_stability: pc.phase_stability || DEFAULT_PHASE_COLORS.phase_stability,
+            phase_momentum:  pc.phase_momentum  || DEFAULT_PHASE_COLORS.phase_momentum,
+            phase_mastery:   pc.phase_mastery   || DEFAULT_PHASE_COLORS.phase_mastery,
           })
         }
       }
@@ -398,9 +423,308 @@ export default function ProfielPage() {
       {/* ── Module Kleuren ────────────────────────────────────────── */}
       <ModuleColorSection />
 
+      {/* ── Budget Categorie Kleuren ──────────────────────────────── */}
+      <BudgetColorSection />
+
+      {/* ── Soevereiniteits-Fase Kleuren ──────────────────────────── */}
+      <PhaseColorSection />
+
       {/* ── Huishouden Management ────────────────────────────────── */}
       <HouseholdSection />
     </div>
+  )
+}
+
+// ── Budget presets ───────────────────────────────────────────────────────
+
+const BUDGET_INCOME_PRESETS: ColorPreset[] = [
+  { hex: '#2d6a4f', name: 'Bos groen' },
+  { hex: '#1a7a3b', name: 'Smaragd' },
+  { hex: '#3d6b2d', name: 'Olijf' },
+  { hex: '#4a7c59', name: 'Salie' },
+]
+const BUDGET_EXPENSE_PRESETS: ColorPreset[] = [
+  { hex: '#6b3a2d', name: 'Terracotta' },
+  { hex: '#8b4513', name: 'Chocolade' },
+  { hex: '#7a3b2d', name: 'Cognac' },
+  { hex: '#6b4c3a', name: 'Kastanje' },
+]
+const BUDGET_SAVINGS_PRESETS: ColorPreset[] = [
+  { hex: '#1d4e6b', name: 'Staalsblauw' },
+  { hex: '#1a3a5c', name: 'Marine' },
+  { hex: '#2c5282', name: 'Kobalt' },
+  { hex: '#234e6b', name: 'Blauwgrijs' },
+]
+const BUDGET_DEBT_PRESETS: ColorPreset[] = [
+  { hex: '#7a2d3a', name: 'Bordeaux' },
+  { hex: '#8b2635', name: 'Karmijn' },
+  { hex: '#6b2d3a', name: 'Wijnrood' },
+  { hex: '#7a2d4a', name: 'Burgunder' },
+]
+const BUDGET_OTHER_PRESETS: ColorPreset[] = [
+  { hex: '#4a4840', name: 'Inkt grijs' },
+  { hex: '#5a5650', name: 'Leisteen' },
+  { hex: '#6b6660', name: 'Grafiet' },
+  { hex: '#3a3830', name: 'Kolen' },
+]
+
+const PHASE_RECOVERY_PRESETS: ColorPreset[] = [
+  { hex: '#8b3a3a', name: 'Donkerrood' },
+  { hex: '#9b2335', name: 'Karmijn' },
+  { hex: '#7a2d2d', name: 'Mahoniebruin' },
+  { hex: '#c0392b', name: 'Helder rood' },
+]
+const PHASE_STABILITY_PRESETS: ColorPreset[] = [
+  { hex: '#355a78', name: 'Staalsblauw' },
+  { hex: '#2c4a6e', name: 'Marine' },
+  { hex: '#1a5276', name: 'Oceaan' },
+  { hex: '#2e6da4', name: 'Blauw' },
+]
+const PHASE_MOMENTUM_PRESETS: ColorPreset[] = [
+  { hex: '#3d3048', name: 'Wil paars' },
+  { hex: '#4a2d6b', name: 'Indigo' },
+  { hex: '#553c7b', name: 'Amethist' },
+  { hex: '#2d2040', name: 'Midnacht' },
+]
+const PHASE_MASTERY_PRESETS: ColorPreset[] = [
+  { hex: '#c4a06b', name: 'Horizon goud' },
+  { hex: '#b8860b', name: 'Donkergoud' },
+  { hex: '#d4a843', name: 'Amberkleurig' },
+  { hex: '#a07850', name: 'Brons' },
+]
+
+// ── Budget Color Picker Section ──────────────────────────────────────────
+
+const BUDGET_ROWS: { key: keyof BudgetColorConfig; label: string; sublabel: string; presets: ColorPreset[] }[] = [
+  { key: 'income',  label: 'Inkomen',   sublabel: 'Inkomsten, salaris',         presets: BUDGET_INCOME_PRESETS },
+  { key: 'expense', label: 'Uitgaven',  sublabel: 'Dagelijkse kosten',           presets: BUDGET_EXPENSE_PRESETS },
+  { key: 'savings', label: 'Sparen',    sublabel: 'Spaargeld, opbouw',           presets: BUDGET_SAVINGS_PRESETS },
+  { key: 'debt',    label: 'Schulden',  sublabel: 'Aflossingen, rente',          presets: BUDGET_DEBT_PRESETS },
+  { key: 'other',   label: 'Overig',    sublabel: 'Overige categorieën',         presets: BUDGET_OTHER_PRESETS },
+]
+
+function BudgetColorSection() {
+  const supabase = createClient()
+  const { budgetConfig, setBudgetConfig } = useBudgetColors()
+  const [localColors, setLocalColors] = useState<BudgetColorConfig>(budgetConfig)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const isLocalChange = useRef(false)
+
+  useEffect(() => {
+    if (isLocalChange.current) {
+      isLocalChange.current = false
+      return
+    }
+    setLocalColors(budgetConfig)
+  }, [budgetConfig])
+
+  const handleChange = (key: keyof BudgetColorConfig, hex: string) => {
+    const updated = { ...localColors, [key]: hex }
+    setLocalColors(updated)
+    isLocalChange.current = true
+    setBudgetConfig(updated)
+  }
+
+  const handleReset = () => {
+    setLocalColors(DEFAULT_BUDGET_COLORS)
+    isLocalChange.current = true
+    setBudgetConfig(DEFAULT_BUDGET_COLORS)
+  }
+
+  const saveColors = async () => {
+    setSaving(true)
+    setMessage(null)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setMessage({ type: 'error', text: 'Niet ingelogd.' }); setSaving(false); return }
+
+    const { error } = await supabase.from('profiles').update({ budget_colors: localColors }).eq('id', user.id)
+    if (error) {
+      setMessage({ type: 'error', text: 'Opslaan mislukt. Probeer opnieuw.' })
+    } else {
+      setMessage({ type: 'success', text: 'Kleuren opgeslagen!' })
+      setTimeout(() => setMessage(null), 3000)
+    }
+    setSaving(false)
+  }
+
+  const isDefault = JSON.stringify(localColors) === JSON.stringify(DEFAULT_BUDGET_COLORS)
+
+  return (
+    <section className="mb-5 sm:mb-8 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-8">
+      <div className="flex items-center gap-2">
+        <Palette className="h-4 w-4 text-[var(--ink-3)]" />
+        <h2 className="label-editorial text-[var(--ink-2)]">Budget Categorieën</h2>
+      </div>
+      <p className="mt-1 mb-3 sm:mb-6 text-sm text-[var(--ink-3)]">
+        Kies accentkleuren voor elke budgetcategorie. Alle tinten worden automatisch gegenereerd.
+      </p>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {BUDGET_ROWS.map(({ key, label, sublabel, presets }) => (
+          <ColorPickerCard
+            key={key}
+            label={label}
+            sublabel={sublabel}
+            value={localColors[key]}
+            defaultValue={DEFAULT_BUDGET_COLORS[key]}
+            presets={presets}
+            onChange={(hex) => handleChange(key, hex)}
+          />
+        ))}
+      </div>
+
+      <div className="mt-3 sm:mt-6 flex items-center gap-3">
+        <button
+          onClick={saveColors}
+          disabled={saving}
+          className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
+        >
+          {saving ? 'Opslaan...' : 'Kleuren opslaan'}
+        </button>
+        {!isDefault && (
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--border-md)] px-4 py-2 text-sm text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Reset
+          </button>
+        )}
+        {message && (
+          <span className={`text-sm ${message.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+            {message.text}
+          </span>
+        )}
+      </div>
+    </section>
+  )
+}
+
+// ── Phase Color Picker Section ───────────────────────────────────────────
+
+const PHASE_ROWS: { key: keyof PhaseColorConfig; label: string; sublabel: string; presets: ColorPreset[] }[] = [
+  { key: 'phase_recovery',  label: 'Herstel',      sublabel: 'Niv. -2 t/m 0 — Balans herstellen',    presets: PHASE_RECOVERY_PRESETS },
+  { key: 'phase_stability', label: 'Stabiliteit',  sublabel: 'Niv. 1–2 — Fundament leggen',            presets: PHASE_STABILITY_PRESETS },
+  { key: 'phase_momentum',  label: 'Momentum',     sublabel: 'Niv. 3–4 — Tijd vermenigvuldigen',       presets: PHASE_MOMENTUM_PRESETS },
+  { key: 'phase_mastery',   label: 'Meesterschap', sublabel: 'Niv. 5–6 — Volledige tijdsoevereiniteit', presets: PHASE_MASTERY_PRESETS },
+]
+
+function PhaseColorSection() {
+  const supabase = createClient()
+  const { phaseConfig, setPhaseConfig } = usePhaseColors()
+  const [localColors, setLocalColors] = useState<PhaseColorConfig>(phaseConfig)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [currentPhase, setCurrentPhase] = useState<string | null>(null)
+  const isLocalChange = useRef(false)
+
+  useEffect(() => {
+    if (isLocalChange.current) {
+      isLocalChange.current = false
+      return
+    }
+    setLocalColors(phaseConfig)
+  }, [phaseConfig])
+
+  // Detect active phase from profile
+  useEffect(() => {
+    async function loadPhase() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase.from('profiles').select('last_known_phase').eq('id', user.id).single()
+      if (data?.last_known_phase) {
+        // Map phase id to config key
+        const phaseMap: Record<string, keyof PhaseColorConfig> = {
+          recovery: 'phase_recovery', stability: 'phase_stability',
+          momentum: 'phase_momentum', mastery: 'phase_mastery',
+        }
+        setCurrentPhase(phaseMap[data.last_known_phase] ?? null)
+      }
+    }
+    loadPhase()
+  }, [supabase])
+
+  const handleChange = (key: keyof PhaseColorConfig, hex: string) => {
+    const updated = { ...localColors, [key]: hex }
+    setLocalColors(updated)
+    isLocalChange.current = true
+    setPhaseConfig(updated)
+  }
+
+  const handleReset = () => {
+    setLocalColors(DEFAULT_PHASE_COLORS)
+    isLocalChange.current = true
+    setPhaseConfig(DEFAULT_PHASE_COLORS)
+  }
+
+  const saveColors = async () => {
+    setSaving(true)
+    setMessage(null)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setMessage({ type: 'error', text: 'Niet ingelogd.' }); setSaving(false); return }
+
+    const { error } = await supabase.from('profiles').update({ phase_colors: localColors }).eq('id', user.id)
+    if (error) {
+      setMessage({ type: 'error', text: 'Opslaan mislukt. Probeer opnieuw.' })
+    } else {
+      setMessage({ type: 'success', text: 'Kleuren opgeslagen!' })
+      setTimeout(() => setMessage(null), 3000)
+    }
+    setSaving(false)
+  }
+
+  const isDefault = JSON.stringify(localColors) === JSON.stringify(DEFAULT_PHASE_COLORS)
+
+  return (
+    <section className="mb-5 sm:mb-8 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-8">
+      <div className="flex items-center gap-2">
+        <Palette className="h-4 w-4 text-[var(--ink-3)]" />
+        <h2 className="label-editorial text-[var(--ink-2)]">Soevereiniteits-Fases</h2>
+      </div>
+      <p className="mt-1 mb-3 sm:mb-6 text-sm text-[var(--ink-3)]">
+        Kies accentkleuren per vrijheidsfase. Onafhankelijk van de module-kleuren.
+      </p>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {PHASE_ROWS.map(({ key, label, sublabel, presets }) => (
+          <ColorPickerCard
+            key={key}
+            label={label}
+            sublabel={sublabel}
+            value={localColors[key]}
+            defaultValue={DEFAULT_PHASE_COLORS[key]}
+            presets={presets}
+            onChange={(hex) => handleChange(key, hex)}
+            activeBadge={currentPhase === key ? 'Jij zit hier →' : undefined}
+          />
+        ))}
+      </div>
+
+      <div className="mt-3 sm:mt-6 flex items-center gap-3">
+        <button
+          onClick={saveColors}
+          disabled={saving}
+          className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
+        >
+          {saving ? 'Opslaan...' : 'Kleuren opslaan'}
+        </button>
+        {!isDefault && (
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--border-md)] px-4 py-2 text-sm text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Reset
+          </button>
+        )}
+        {message && (
+          <span className={`text-sm ${message.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+            {message.text}
+          </span>
+        )}
+      </div>
+    </section>
   )
 }
 

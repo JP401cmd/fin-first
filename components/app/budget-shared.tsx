@@ -53,87 +53,107 @@ export function formatRollover(amount: number, type: string): string {
   }
 }
 
+// Static lookup — full class strings so Tailwind JIT can scan them at build time.
+// CSS variable tokens (bg-income-50, text-savings-600, etc.) are registered via
+// @theme inline in globals.css and resolve dynamically from the user's color settings.
+const TYPE_COLORS: Record<BudgetType, {
+  bg: string; bgDark: string; text: string; textLight: string
+  border: string; barDefault: string; barWarning: string; barLight: string
+  headerGradient: string; hoverBorder: string; hoverBg: string
+  buttonBg: string; gradient: string; barWarn: string; spinner: string
+  hex: string; hexLight: string
+  barHex: string; barHexWarn: string; barHexLight: string
+}> = {
+  income: {
+    bg: 'bg-income-50',
+    bgDark: 'bg-income-100',
+    text: 'text-income-600',
+    textLight: 'text-income-500',
+    border: 'border-income-200',
+    barDefault: 'bg-income-400',
+    barWarning: 'bg-income-500',
+    barLight: 'bg-income-200',
+    headerGradient: 'from-income-50 to-white',
+    hoverBorder: 'hover:border-income-200',
+    hoverBg: 'hover:bg-income-50',
+    buttonBg: 'bg-income-600 hover:bg-income-700',
+    gradient: 'from-income-50 to-white',
+    barWarn: 'bg-income-500',
+    spinner: 'border-income-500',
+    hex: 'var(--color-income-500)',
+    hexLight: 'var(--color-income-200)',
+    barHex: 'var(--color-income-400)',
+    barHexWarn: 'var(--color-income-500)',
+    barHexLight: 'var(--color-income-200)',
+  },
+  expense: {
+    bg: 'bg-expense-50',
+    bgDark: 'bg-expense-100',
+    text: 'text-expense-600',
+    textLight: 'text-expense-500',
+    border: 'border-expense-200',
+    barDefault: 'bg-expense-400',
+    barWarning: 'bg-expense-500',
+    barLight: 'bg-expense-200',
+    headerGradient: 'from-expense-50 to-white',
+    hoverBorder: 'hover:border-expense-200',
+    hoverBg: 'hover:bg-expense-50',
+    buttonBg: 'bg-expense-600 hover:bg-expense-700',
+    gradient: 'from-expense-50 to-white',
+    barWarn: 'bg-expense-500',
+    spinner: 'border-expense-500',
+    hex: 'var(--color-expense-500)',
+    hexLight: 'var(--color-expense-200)',
+    barHex: 'var(--color-expense-400)',
+    barHexWarn: 'var(--color-expense-500)',
+    barHexLight: 'var(--color-expense-200)',
+  },
+  savings: {
+    bg: 'bg-savings-50',
+    bgDark: 'bg-savings-100',
+    text: 'text-savings-600',
+    textLight: 'text-savings-500',
+    border: 'border-savings-200',
+    barDefault: 'bg-savings-400',
+    barWarning: 'bg-savings-500',
+    barLight: 'bg-savings-200',
+    headerGradient: 'from-savings-50 to-white',
+    hoverBorder: 'hover:border-savings-200',
+    hoverBg: 'hover:bg-savings-50',
+    buttonBg: 'bg-savings-600 hover:bg-savings-700',
+    gradient: 'from-savings-50 to-white',
+    barWarn: 'bg-savings-500',
+    spinner: 'border-savings-500',
+    hex: 'var(--color-savings-500)',
+    hexLight: 'var(--color-savings-200)',
+    barHex: 'var(--color-savings-400)',
+    barHexWarn: 'var(--color-savings-500)',
+    barHexLight: 'var(--color-savings-200)',
+  },
+  debt: {
+    bg: 'bg-debt-50',
+    bgDark: 'bg-debt-100',
+    text: 'text-debt-600',
+    textLight: 'text-debt-500',
+    border: 'border-debt-200',
+    barDefault: 'bg-debt-400',
+    barWarning: 'bg-debt-500',
+    barLight: 'bg-debt-200',
+    headerGradient: 'from-debt-50 to-white',
+    hoverBorder: 'hover:border-debt-200',
+    hoverBg: 'hover:bg-debt-50',
+    buttonBg: 'bg-debt-600 hover:bg-debt-700',
+    gradient: 'from-debt-50 to-white',
+    barWarn: 'bg-debt-500',
+    spinner: 'border-debt-500',
+    hex: 'var(--color-debt-500)',
+    hexLight: 'var(--color-debt-200)',
+    barHex: 'var(--color-debt-400)',
+    barHexWarn: 'var(--color-debt-500)',
+    barHexLight: 'var(--color-debt-200)',
+  },
+}
+
 export function getTypeColors(budgetType: BudgetType) {
-  switch (budgetType) {
-    case 'income':
-      return {
-        bg: 'bg-emerald-50',
-        bgDark: 'bg-emerald-100',
-        text: 'text-emerald-600',
-        textLight: 'text-emerald-500',
-        border: 'border-emerald-200',
-        barDefault: 'bg-emerald-400',
-        barWarning: 'bg-emerald-500',
-        barLight: 'bg-emerald-200',
-        headerGradient: 'from-emerald-50 to-white',
-        hoverBorder: 'hover:border-emerald-200',
-        hoverBg: 'hover:bg-emerald-50/30',
-        buttonBg: 'bg-emerald-600 hover:bg-emerald-700',
-        gradient: 'from-emerald-50 to-white',
-        barWarn: 'bg-emerald-500',
-        spinner: 'border-emerald-500',
-        hex: '#10b981',
-        hexLight: '#6ee7b7',
-      }
-    case 'savings':
-      return {
-        bg: 'bg-blue-50',
-        bgDark: 'bg-blue-100',
-        text: 'text-blue-600',
-        textLight: 'text-blue-500',
-        border: 'border-blue-200',
-        barDefault: 'bg-blue-400',
-        barWarning: 'bg-blue-500',
-        barLight: 'bg-blue-200',
-        headerGradient: 'from-blue-50 to-white',
-        hoverBorder: 'hover:border-blue-200',
-        hoverBg: 'hover:bg-blue-50/30',
-        buttonBg: 'bg-blue-600 hover:bg-blue-700',
-        gradient: 'from-blue-50 to-white',
-        barWarn: 'bg-blue-500',
-        spinner: 'border-blue-500',
-        hex: '#3b82f6',
-        hexLight: '#93c5fd',
-      }
-    case 'debt':
-      return {
-        bg: 'bg-red-50',
-        bgDark: 'bg-red-100',
-        text: 'text-red-600',
-        textLight: 'text-red-500',
-        border: 'border-red-200',
-        barDefault: 'bg-red-400',
-        barWarning: 'bg-red-500',
-        barLight: 'bg-red-200',
-        headerGradient: 'from-red-50 to-white',
-        hoverBorder: 'hover:border-red-200',
-        hoverBg: 'hover:bg-red-50/30',
-        buttonBg: 'bg-red-600 hover:bg-red-700',
-        gradient: 'from-red-50 to-white',
-        barWarn: 'bg-red-500',
-        spinner: 'border-red-500',
-        hex: '#ef4444',
-        hexLight: '#fca5a5',
-      }
-    default:
-      return {
-        bg: 'bg-kern-50',
-        bgDark: 'bg-kern-100',
-        text: 'text-kern-600',
-        textLight: 'text-kern-500',
-        border: 'border-kern-200',
-        barDefault: 'bg-kern-400',
-        barWarning: 'bg-kern-500',
-        barLight: 'bg-kern-200',
-        headerGradient: 'from-kern-50 to-white',
-        hoverBorder: 'hover:border-kern-200',
-        hoverBg: 'hover:bg-kern-50/30',
-        buttonBg: 'bg-kern-600 hover:bg-kern-700',
-        gradient: 'from-kern-50 to-white',
-        barWarn: 'bg-kern-500',
-        spinner: 'border-kern-500',
-        hex: '#f59e0b',
-        hexLight: '#fcd34d',
-      }
-  }
+  return TYPE_COLORS[budgetType] ?? TYPE_COLORS.expense
 }

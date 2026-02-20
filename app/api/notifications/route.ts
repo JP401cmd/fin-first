@@ -25,6 +25,7 @@ export type Notification = {
   read: boolean
   actionUrl?: string
   aiContext?: string
+  metadata?: Record<string, unknown>
 }
 
 // ── GET — Aggregate all active notifications ─────────────────────────
@@ -77,6 +78,8 @@ export async function GET(request: NextRequest) {
 
     const notifications: Notification[] = []
     const now = new Date().toISOString()
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
     // ── 1. Budget alerts ─────────────────────────────────────────────
 
@@ -292,24 +295,24 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // ── 3. Unnotified badges ─────────────────────────────────────────
+    // ── 3. Recent badges (last 7 days) ────────────────────────────────
 
-    const { data: unnotifiedBadges } = await supabase
+    const { data: recentBadges } = await supabase
       .from('user_badges')
-      .select('badge_slug, earned_at')
+      .select('badge_slug, earned_at, notified')
       .eq('user_id', user.id)
-      .eq('notified', false)
+      .gte('earned_at', sevenDaysAgo.toISOString())
 
-    if (unnotifiedBadges && unnotifiedBadges.length > 0) {
+    if (recentBadges && recentBadges.length > 0) {
       const { data: badgeDefs } = await supabase
         .from('badge_definitions')
         .select('slug, name, description, icon, color, category')
         .in(
           'slug',
-          unnotifiedBadges.map((b) => b.badge_slug)
+          recentBadges.map((b) => b.badge_slug)
         )
 
-      for (const ub of unnotifiedBadges) {
+      for (const ub of recentBadges) {
         const def = badgeDefs?.find((d) => d.slug === ub.badge_slug)
         if (!def) continue
 
@@ -323,7 +326,7 @@ export async function GET(request: NextRequest) {
           icon: 'Trophy',
           color: 'amber',
           createdAt: ub.earned_at || now,
-          read: readIds.includes(id),
+          read: readIds.includes(id) || ub.notified === true,
           actionUrl: '/identity',
           aiContext: `Ik heb de badge '${def.name}' verdiend! Wat betekent dit voor mijn financiële pad?`,
         })
@@ -343,8 +346,9 @@ export async function GET(request: NextRequest) {
             earned_at: string
             notified: boolean
           }>
-          const unnotified = badges.filter((b) => !b.notified)
-          for (const badge of unnotified) {
+          const recentCutoff = sevenDaysAgo.toISOString()
+          const recent = badges.filter((b) => b.earned_at >= recentCutoff)
+          for (const badge of recent) {
             const id = `badge_${badge.slug}`
             notifications.push({
               id,
@@ -355,7 +359,7 @@ export async function GET(request: NextRequest) {
               icon: 'Trophy',
               color: 'amber',
               createdAt: badge.earned_at || now,
-              read: readIds.includes(id),
+              read: readIds.includes(id) || badge.notified,
               actionUrl: '/identity',
               aiContext: `Ik heb de badge '${badge.slug}' verdiend! Wat betekent dit voor mijn financiële pad?`,
             })
@@ -363,6 +367,80 @@ export async function GET(request: NextRequest) {
         } catch {
           // Invalid JSON — skip
         }
+      }
+    }
+
+    // ── 4. Sync warnings (stale bank accounts) ───────────────────────
+
+    const { data: bankAccounts } = await supabase
+      .from('gocardless_accounts')
+      .select('id, iban, last_synced_at')
+      .eq('is_active', true)
+
+    if (bankAccounts) {
+      const threeDaysAgo = new Date()
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
+
+      for (const account of bankAccounts) {
+        if (!account.last_synced_at) continue
+        const lastSynced = new Date(account.last_synced_at)
+        if (lastSynced >= threeDaysAgo) continue
+
+        const daysSince = Math.floor((Date.now() - lastSynced.getTime()) / 86_400_000)
+        const label = account.iban ? account.iban.replace(/(.{4})/g, '$1 ').trim().slice(-9) : 'Bankrekening'
+        const id = `sync_${account.id}`
+
+        notifications.push({
+          id,
+          type: 'sync',
+          priority: 2,
+          title: `${label}: ${daysSince} dagen niet gesynchroniseerd`,
+          description: `Laatste sync: ${lastSynced.toLocaleDateString('nl-NL')}. Vernieuw je bankgegevens voor actueel inzicht.`,
+          icon: 'RefreshCw',
+          color: 'red',
+          createdAt: now,
+          read: readIds.includes(id),
+          actionUrl: '/core/cash',
+          aiContext: `Mijn bankrekening ${label} is al ${daysSince} dagen niet gesynchroniseerd. Wat moet ik doen?`,
+        })
+      }
+    }
+
+    // ── 5. Level-up notifications ───────────────────────────────────
+
+    const { data: levelChangeData } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', `sovereignty_level_change_${user.id}`)
+      .maybeSingle()
+
+    if (levelChangeData?.value) {
+      try {
+        const change = JSON.parse(levelChangeData.value) as {
+          oldLevel: number
+          newLevel: number
+          timestamp: string
+        }
+        // Only show if within the last 7 days
+        if (change.timestamp >= sevenDaysAgo.toISOString()) {
+          const id = `levelup_${change.newLevel}_${change.timestamp.split('T')[0]}`
+          notifications.push({
+            id,
+            type: 'levelup',
+            priority: 1,
+            title: `Niveau omhoog: Level ${change.newLevel}`,
+            description: `Je soevereiniteitsniveau is gestegen van level ${change.oldLevel} naar ${change.newLevel}. Bekijk welke features er zijn ontgrendeld!`,
+            icon: 'ArrowUp',
+            color: 'purple',
+            createdAt: change.timestamp,
+            read: readIds.includes(id),
+            actionUrl: '/identity',
+            aiContext: `Ik ben van soevereiniteitsniveau ${change.oldLevel} naar ${change.newLevel} gegaan. Wat is er nu anders?`,
+            metadata: { oldLevel: change.oldLevel, newLevel: change.newLevel },
+          })
+        }
+      } catch {
+        // Invalid JSON — skip
       }
     }
 
@@ -376,8 +454,6 @@ export async function GET(request: NextRequest) {
     // Store current notifications in history for the modal to display
     // Keep only entries from the last 7 days
 
-    const sevenDaysAgo = new Date()
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
     const cutoff = sevenDaysAgo.toISOString()
 
     // Start from stored history, prune old entries
@@ -387,9 +463,9 @@ export async function GET(request: NextRequest) {
     const historyIds = new Set(history.map((h) => h.id))
     for (const n of filtered) {
       if (historyIds.has(n.id)) {
-        // Update existing entry with fresh data
+        // Update existing entry with fresh data, but preserve read-status
         history = history.map((h) =>
-          h.id === n.id ? { ...n, createdAt: h.createdAt } : h
+          h.id === n.id ? { ...n, createdAt: h.createdAt, read: h.read || readIds.includes(n.id) } : h
         )
       } else {
         history.push(n)
@@ -408,8 +484,8 @@ export async function GET(request: NextRequest) {
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
 
-    // Persist updated history (fire and forget)
-    supabase
+    // Persist updated history
+    await supabase
       .from('app_settings')
       .upsert(
         {
@@ -418,7 +494,6 @@ export async function GET(request: NextRequest) {
         },
         { onConflict: 'key' }
       )
-      .then(() => {})
 
     return NextResponse.json({
       notifications: filtered,

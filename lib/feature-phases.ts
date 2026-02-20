@@ -4,7 +4,8 @@
 export interface Phase {
   id: string
   label: string
-  color: string       // Tailwind color name
+  color: string       // Tailwind color name (legacy, kept for backward compat)
+  cssName: string     // CSS variable key, e.g. 'phase_recovery'
   levels: number[]
 }
 
@@ -17,10 +18,10 @@ export interface FeatureDef {
 export type FeaturePhaseMatrix = Record<string, Record<string, boolean>>
 
 export const PHASES: Phase[] = [
-  { id: 'recovery',  label: 'Recovery',  color: 'rose',  levels: [-2, -1, 0] },
-  { id: 'stability', label: 'Stability', color: 'blue',  levels: [1, 2] },
-  { id: 'momentum',  label: 'Momentum',  color: 'teal',  levels: [3, 4] },
-  { id: 'mastery',   label: 'Mastery',   color: 'amber', levels: [5, 6] },
+  { id: 'recovery',  label: 'Recovery',  color: 'rose',  cssName: 'phase_recovery',  levels: [-2, -1, 0] },
+  { id: 'stability', label: 'Stability', color: 'blue',  cssName: 'phase_stability', levels: [1, 2] },
+  { id: 'momentum',  label: 'Momentum',  color: 'teal',  cssName: 'phase_momentum',  levels: [3, 4] },
+  { id: 'mastery',   label: 'Mastery',   color: 'amber', cssName: 'phase_mastery',   levels: [5, 6] },
 ]
 
 export const FEATURES: FeatureDef[] = [

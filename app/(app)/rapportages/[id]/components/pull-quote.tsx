@@ -8,8 +8,9 @@ const MODULE_CONFIG = {
 
 const AVATAR_NAMES: Record<string, string> = {
   fhin: 'Fhin',
-  finn: 'Finn',
+  finn: 'Will',
   ffin: 'Ffin',
+  will: 'Will',
 }
 
 export function PullQuote({ insight }: { insight: ReportAiInsight }) {

@@ -31,6 +31,8 @@ function monthsAgo(months: number, day = 1): string {
 
 export type PersonaKey = 'roos' | 'daan' | 'lisa' | 'willem'
 
+export type SovereigntyPhase = 'recovery' | 'stability' | 'momentum' | 'mastery'
+
 export interface PersonaMeta {
   name: string
   subtitle: string
@@ -40,6 +42,11 @@ export interface PersonaMeta {
   netWorth: number
   income: number
   expenses: number
+  backgroundStory: string
+  challenges: string[]
+  currentSituation: string
+  firstGoal: string
+  sovereignty: SovereigntyPhase
 }
 
 export interface PersonaProfile {
@@ -510,6 +517,11 @@ const roosData: PersonaData = {
     netWorth: -22300,
     income: 2800,
     expenses: 3200,
+    backgroundStory: 'Na haar scheiding in 2024 raakte Roos het financieel overzicht kwijt. Jarenlang emotioneel kopen en nu twee schulden — een creditcard op 14% rente en een persoonlijke lening — vreten aan haar maandelijks inkomen als logistiek medewerker. Elke maand loopt ze €400 tekort.',
+    challenges: ['Uitgaven overstijgen inkomen met €400/mnd', 'Creditcard schuld van €4.800 op 14% rente', 'Geen noodfonds aanwezig'],
+    currentSituation: 'Diep in de rode cijfers — netto vermogen -€22.300 met twee actieve schulden.',
+    firstGoal: 'Noodfonds aanleggen en uit de schulden komen',
+    sovereignty: 'recovery',
   },
   profile: {
     full_name: 'Roos van Dijk',
@@ -684,6 +696,11 @@ const daanData: PersonaData = {
     netWorth: -2300,
     income: 3400,
     expenses: 2100,
+    backgroundStory: 'Daan werkt twee jaar als developer bij een startup en ontdekte via Reddit de FIRE-beweging. Hij woont bewust goedkoop in een gedeeld huis en spaart €500/mnd voor zijn noodfonds. Zijn enige schuld is een DUO-lening op 0,46%.',
+    challenges: ['Noodfonds nog niet vol (62%)', 'Studielening van €13.900 bij DUO', 'Eerste beleggingsportefeuille opbouwen'],
+    currentSituation: 'Positieve cashflow van €1.300/mnd, spaart en belegt bewust.',
+    firstGoal: 'Noodfonds van €10.000 volledig vullen',
+    sovereignty: 'stability',
   },
   profile: {
     full_name: 'Daan Bakker',
@@ -876,6 +893,11 @@ const lisaData: PersonaData = {
     netWorth: 100000,
     income: 5200,
     expenses: 4000,
+    backgroundStory: 'Lisa werkt als projectmanager bij de gemeente en is getrouwd met een leraar. Na tien jaar spaardiscipline hebben zij en haar man net de €100K grens overschreden. Met twee kinderen balanceert ze gezinskosten met gerichte investeringen.',
+    challenges: ['Balanceren van gezinskosten met beleggingsgroei', 'Studiefonds voor kinderen opbouwen (€8K van €40K)', 'Hypotheek optioneel versneld aflossen'],
+    currentSituation: 'Solide momentum — netto vermogen €100.000, investeert €400/mnd.',
+    firstGoal: 'Netto vermogen naar €250.000 en studiefonds starten',
+    sovereignty: 'momentum',
   },
   profile: {
     full_name: 'Lisa de Groot',
@@ -1064,6 +1086,11 @@ const willemData: PersonaData = {
     netWorth: 1135000,
     income: 6500,
     expenses: 3000,
+    backgroundStory: 'Willem werkt al 30 jaar als senior consultant en heeft in 2024 zijn hypotheek volledig afgelost. Zijn kinderen staan op eigen benen. Met een portefeuille van €420.000 en ABP-pensioen van €285.000 ziet hij 2028 als vroegpensioen.',
+    challenges: ['Asset allocatie optimaliseren voor pensioenovergang', 'Opnamestrategie bepalen na FIRE', 'Portefeuille naar €500K brengen'],
+    currentSituation: 'Aan de rand van volledige vrijheid — ~85% vrijheidspercentage, vroegpensioen in 2028.',
+    firstGoal: 'Volledige financiële onafhankelijkheid (365 vrijheidsdagen)',
+    sovereignty: 'mastery',
   },
   profile: {
     full_name: 'Willem Jansen',

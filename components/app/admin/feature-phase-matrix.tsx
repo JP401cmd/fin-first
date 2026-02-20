@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   PHASES,
   FEATURES,
@@ -8,11 +8,12 @@ import {
   type FeaturePhaseMatrix,
 } from '@/lib/feature-phases'
 
-const PHASE_COLORS: Record<string, { header: string; checked: string; unchecked: string }> = {
-  rose:  { header: 'bg-rose-50 text-rose-700',  checked: 'accent-rose-600',  unchecked: 'accent-zinc-300' },
-  blue:  { header: 'bg-blue-50 text-blue-700',  checked: 'accent-blue-600',  unchecked: 'accent-zinc-300' },
-  teal:  { header: 'bg-teal-50 text-teal-700',  checked: 'accent-teal-600',  unchecked: 'accent-zinc-300' },
-  amber: { header: 'bg-amber-50 text-amber-700', checked: 'accent-amber-600', unchecked: 'accent-zinc-300' },
+// Phase color styles using CSS variables — keyed by phase cssName
+const PHASE_HEADER_STYLE: Record<string, React.CSSProperties> = {
+  phase_recovery:  { backgroundColor: 'var(--color-phase-recovery-50)',  color: 'var(--color-phase-recovery-700)' },
+  phase_stability: { backgroundColor: 'var(--color-phase-stability-50)', color: 'var(--color-phase-stability-700)' },
+  phase_momentum:  { backgroundColor: 'var(--color-phase-momentum-50)',  color: 'var(--color-phase-momentum-700)' },
+  phase_mastery:   { backgroundColor: 'var(--color-phase-mastery-50)',   color: 'var(--color-phase-mastery-700)' },
 }
 
 export function FeaturePhaseMatrix() {
@@ -115,11 +116,12 @@ export function FeaturePhaseMatrix() {
                 Feature
               </th>
               {PHASES.map((phase) => {
-                const colors = PHASE_COLORS[phase.color]
+                const headerStyle = PHASE_HEADER_STYLE[phase.cssName] ?? {}
                 return (
                   <th
                     key={phase.id}
-                    className={`px-4 py-3 text-center font-semibold text-xs uppercase tracking-wider ${colors.header}`}
+                    className="px-4 py-3 text-center font-semibold text-xs uppercase tracking-wider"
+                    style={headerStyle}
                   >
                     <div>{phase.label}</div>
                     <div className="mt-0.5 font-normal normal-case tracking-normal text-[10px] opacity-70">
@@ -139,14 +141,17 @@ export function FeaturePhaseMatrix() {
                 </td>
                 {PHASES.map((phase) => {
                   const checked = matrix[feature.id]?.[phase.id] ?? false
-                  const colors = PHASE_COLORS[phase.color]
+                  const accentColor = checked
+                    ? `var(--color-${phase.cssName.replace('_', '-')}-600)`
+                    : 'var(--border-md)'
                   return (
                     <td key={phase.id} className="px-4 py-3 text-center">
                       <input
                         type="checkbox"
                         checked={checked}
                         onChange={() => toggle(feature.id, phase.id)}
-                        className={`h-4 w-4 cursor-pointer rounded ${checked ? colors.checked : colors.unchecked}`}
+                        className="h-4 w-4 cursor-pointer rounded"
+                        style={{ accentColor }}
                       />
                     </td>
                   )

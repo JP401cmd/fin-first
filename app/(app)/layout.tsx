@@ -9,7 +9,6 @@ import { BottomNav } from '@/components/app/bottom-nav'
 import { MobilePreviewProvider } from '@/components/app/beheer/mobile-preview-provider'
 import { MobilePreviewFrame } from '@/components/app/beheer/mobile-preview-frame'
 import { ToastProvider } from '@/components/app/toast-provider'
-import { BadgeNotifier } from '@/components/app/badge-notifier'
 import { SessionMonitor } from '@/components/app/session-monitor'
 import { AutoSnapshotTrigger } from '@/components/app/auto-snapshot-trigger'
 import { DailyExpenseProvider } from '@/components/app/freedom-time-label'
@@ -19,8 +18,13 @@ import { NotificationModal } from '@/components/app/notifications/notification-p
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
 import { PHASES } from '@/lib/feature-phases'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
-import { generateModuleColorVars, DEFAULT_MODULE_COLORS } from '@/lib/color-palette'
-import type { ModuleColorConfig } from '@/lib/color-palette'
+import {
+  generateAllColorVars,
+  DEFAULT_MODULE_COLORS,
+  DEFAULT_BUDGET_COLORS,
+  DEFAULT_PHASE_COLORS,
+} from '@/lib/color-palette'
+import type { ModuleColorConfig, BudgetColorConfig, PhaseColorConfig } from '@/lib/color-palette'
 
 export default async function AppLayout({
   children,
@@ -41,7 +45,7 @@ export default async function AppLayout({
   const dateStr = threeMonthsAgo.toISOString().split('T')[0]
 
   const [profileRes, assetsRes, debtsRes, txRes, matrixRes] = await Promise.all([
-    supabase.from('profiles').select('role, onboarding_completed, last_known_phase, module_colors').eq('id', user.id).single(),
+    supabase.from('profiles').select('role, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors').eq('id', user.id).single(),
     supabase.from('assets').select('current_value').eq('is_active', true),
     supabase.from('debts').select('current_balance, debt_type').eq('is_active', true),
     supabase.from('transactions').select('amount, is_income').gte('date', dateStr),
@@ -79,13 +83,59 @@ export default async function AppLayout({
     supabase.from('profiles').update({ last_known_phase: featureAccess.phase }).eq('id', user.id).then(() => {})
   }
 
-  // ── Module colors (SSR) ────────────────────────────────
-  const moduleColors: ModuleColorConfig = {
-    kern: (profile?.module_colors as Record<string, string> | null)?.kern || DEFAULT_MODULE_COLORS.kern,
-    wil: (profile?.module_colors as Record<string, string> | null)?.wil || DEFAULT_MODULE_COLORS.wil,
-    horizon: (profile?.module_colors as Record<string, string> | null)?.horizon || DEFAULT_MODULE_COLORS.horizon,
+  // ── Sovereignty level change detection ────────────────
+  const lastLevelRes = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('key', `last_sovereignty_level_${user.id}`)
+    .maybeSingle()
+
+  const lastLevel = lastLevelRes.data?.value ? Number(JSON.parse(lastLevelRes.data.value)) : null
+
+  if (lastLevel !== null && featureAccess.level > lastLevel) {
+    // Level went up — store the change for notification display
+    supabase.from('app_settings').upsert({
+      key: `sovereignty_level_change_${user.id}`,
+      value: JSON.stringify({
+        oldLevel: lastLevel,
+        newLevel: featureAccess.level,
+        timestamp: new Date().toISOString(),
+      }),
+    }, { onConflict: 'key' }).then(() => {})
   }
-  const colorVars = generateModuleColorVars(moduleColors)
+
+  // Always store current level
+  supabase.from('app_settings').upsert({
+    key: `last_sovereignty_level_${user.id}`,
+    value: JSON.stringify(featureAccess.level),
+  }, { onConflict: 'key' }).then(() => {})
+
+  // ── Module colors (SSR) ────────────────────────────────
+  const mc = profile?.module_colors as Record<string, string> | null
+  const moduleColors: ModuleColorConfig = {
+    kern:    mc?.kern    || DEFAULT_MODULE_COLORS.kern,
+    wil:     mc?.wil     || DEFAULT_MODULE_COLORS.wil,
+    horizon: mc?.horizon || DEFAULT_MODULE_COLORS.horizon,
+  }
+
+  const bc = profile?.budget_colors as Record<string, string> | null
+  const budgetColors: BudgetColorConfig = {
+    income:  bc?.income  || DEFAULT_BUDGET_COLORS.income,
+    expense: bc?.expense || DEFAULT_BUDGET_COLORS.expense,
+    savings: bc?.savings || DEFAULT_BUDGET_COLORS.savings,
+    debt:    bc?.debt    || DEFAULT_BUDGET_COLORS.debt,
+    other:   bc?.other   || DEFAULT_BUDGET_COLORS.other,
+  }
+
+  const pc = profile?.phase_colors as Record<string, string> | null
+  const phaseColors: PhaseColorConfig = {
+    phase_recovery:  pc?.phase_recovery  || DEFAULT_PHASE_COLORS.phase_recovery,
+    phase_stability: pc?.phase_stability || DEFAULT_PHASE_COLORS.phase_stability,
+    phase_momentum:  pc?.phase_momentum  || DEFAULT_PHASE_COLORS.phase_momentum,
+    phase_mastery:   pc?.phase_mastery   || DEFAULT_PHASE_COLORS.phase_mastery,
+  }
+
+  const colorVars = generateAllColorVars({ modules: moduleColors, budget: budgetColors, phase: phaseColors })
 
   return (
     <MobilePreviewProvider>
@@ -93,11 +143,10 @@ export default async function AppLayout({
         <ToastProvider>
           <SessionMonitor />
           <AutoSnapshotTrigger />
-          <BadgeNotifier />
           <PerspectiveProvider>
             <ChatProvider>
               <NotificationProvider>
-                <ModuleColorProvider initialConfig={moduleColors}>
+                <ModuleColorProvider initialConfig={moduleColors} initialBudgetConfig={budgetColors} initialPhaseConfig={phaseColors}>
                   <div className="min-h-screen bg-[var(--bg)]" style={colorVars as React.CSSProperties}>
                     <ChatLayoutWrapper>
                       <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />

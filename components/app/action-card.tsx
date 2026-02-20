@@ -10,14 +10,16 @@ import {
   getSourceBadgeClasses,
   ACTION_SOURCE_LABELS,
 } from '@/lib/recommendation-data'
+import type { CancellationMetadata } from '@/lib/cancellation-types'
 
 type ActionCardProps = {
   action: Action
   onStatusChange: (id: string, status: ActionStatus, data?: Record<string, unknown>) => Promise<void>
   onUpdate?: (id: string, data: Record<string, unknown>) => Promise<void>
+  onCancellationOpen?: (metadata: CancellationMetadata) => void
 }
 
-export function ActionCard({ action, onStatusChange, onUpdate }: ActionCardProps) {
+export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpen }: ActionCardProps) {
   const [showPostpone, setShowPostpone] = useState(false)
   const [showReject, setShowReject] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
@@ -143,6 +145,19 @@ export function ActionCard({ action, onStatusChange, onUpdate }: ActionCardProps
               onSubmit={(data) => handleStatus('postponed', { postpone_weeks: data.postpone_weeks })}
               onCancel={() => setShowPostpone(false)}
             />
+          </div>
+        )}
+
+        {/* Cancellation shortcut */}
+        {action.metadata?.type === 'subscription_cancellation' && onCancellationOpen && (
+          <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => onCancellationOpen(action.metadata as CancellationMetadata)}
+              className="touch-target font-serif text-[11px] italic text-wil-600 transition-colors hover:text-wil-800"
+            >
+              Open opzegbrief →
+            </button>
           </div>
         )}
 

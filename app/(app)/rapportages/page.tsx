@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { ReportConfig } from '@/lib/report-data'
-import { FileText, Trash2, Eye, ChevronRight } from 'lucide-react'
+import { FileText, Trash2, Eye, Sparkles, CheckCircle2 } from 'lucide-react'
 
 type PeriodType = 'month' | 'quarter' | 'year'
 
@@ -87,6 +87,7 @@ export default function RapportagesPage() {
   const [savedConfigs, setSavedConfigs] = useState<ReportConfig[]>([])
   const [generating, setGenerating] = useState(false)
   const [configsLoading, setConfigsLoading] = useState(true)
+  const [useAi, setUseAi] = useState(false)
 
   // Set default selection when period type changes
   useEffect(() => {
@@ -127,6 +128,13 @@ export default function RapportagesPage() {
     try {
       const { from, to, name } = computeDateRange(periodType, selection)
 
+      // Duplicate check — navigate to existing report if same period exists
+      const existing = savedConfigs.find(c => c.date_from === from && c.date_to === to)
+      if (existing) {
+        router.push(`/rapportages/${existing.id}?type=${existing.period_type}&from=${existing.date_from}&to=${existing.date_to}&ai=${existing.use_ai}`)
+        return
+      }
+
       // Save config
       const res = await fetch('/api/report', {
         method: 'POST',
@@ -136,19 +144,20 @@ export default function RapportagesPage() {
           period_type: periodType,
           date_from: from,
           date_to: to,
+          use_ai: useAi,
         }),
       })
 
       if (res.ok) {
         const config = await res.json()
-        router.push(`/rapportages/${config.id}?type=${periodType}&from=${from}&to=${to}`)
+        router.push(`/rapportages/${config.id}?type=${periodType}&from=${from}&to=${to}&ai=${useAi}`)
       } else {
         // Navigate anyway, the report viewer will fetch data directly
-        router.push(`/rapportages/new?type=${periodType}&from=${from}&to=${to}`)
+        router.push(`/rapportages/new?type=${periodType}&from=${from}&to=${to}&ai=${useAi}`)
       }
     } catch {
       const { from, to } = computeDateRange(periodType, selection)
-      router.push(`/rapportages/new?type=${periodType}&from=${from}&to=${to}`)
+      router.push(`/rapportages/new?type=${periodType}&from=${from}&to=${to}&ai=${useAi}`)
     } finally {
       setGenerating(false)
     }
@@ -164,7 +173,7 @@ export default function RapportagesPage() {
   }
 
   const handleView = (config: ReportConfig) => {
-    router.push(`/rapportages/${config.id}?type=${config.period_type}&from=${config.date_from}&to=${config.date_to}`)
+    router.push(`/rapportages/${config.id}?type=${config.period_type}&from=${config.date_from}&to=${config.date_to}&ai=${config.use_ai}`)
   }
 
   const options = periodType === 'month' ? getMonthOptions()
@@ -229,12 +238,70 @@ export default function RapportagesPage() {
           </select>
         </div>
 
+        {/* AI toggle */}
+        <div className="mb-5">
+          <label className="mb-2 block font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">Rapport type</label>
+          <div className="grid grid-cols-2 gap-3">
+            {/* Standaard rapport */}
+            <button
+              type="button"
+              aria-pressed={!useAi}
+              onClick={() => setUseAi(false)}
+              className={`relative rounded-[var(--r)] border-2 p-3 text-left transition-all ${
+                !useAi
+                  ? 'border-wil-400 bg-wil-50'
+                  : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
+              }`}
+            >
+              {!useAi && (
+                <CheckCircle2 className="absolute right-2 top-2 h-3.5 w-3.5 text-wil-500" />
+              )}
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <FileText className={`h-3.5 w-3.5 ${!useAi ? 'text-wil-600' : 'text-[var(--ink-3)]'}`} />
+                <span className={`font-inter text-[10px] font-bold uppercase tracking-[0.08em] ${!useAi ? 'text-wil-700' : 'text-[var(--ink-3)]'}`}>
+                  Standaard
+                </span>
+              </div>
+              <p className="font-source-serif text-[12px] italic leading-snug text-[var(--ink-2)]">
+                Volledige analyse — inkomen, uitgaven, FIRE-voortgang, historisch vergelijk
+              </p>
+              <p className="mt-1.5 font-inter text-[10px] text-[var(--ink-3)]">Direct beschikbaar</p>
+            </button>
+
+            {/* Met AI-inleiding */}
+            <button
+              type="button"
+              aria-pressed={useAi}
+              onClick={() => setUseAi(true)}
+              className={`relative rounded-[var(--r)] border-2 p-3 text-left transition-all ${
+                useAi
+                  ? 'border-wil-400 bg-wil-50'
+                  : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
+              }`}
+            >
+              {useAi && (
+                <CheckCircle2 className="absolute right-2 top-2 h-3.5 w-3.5 text-wil-500" />
+              )}
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <Sparkles className={`h-3.5 w-3.5 ${useAi ? 'text-wil-600' : 'text-[var(--ink-3)]'}`} />
+                <span className={`font-inter text-[10px] font-bold uppercase tracking-[0.08em] ${useAi ? 'text-wil-700' : 'text-[var(--ink-3)]'}`}>
+                  Met AI-inleiding
+                </span>
+              </div>
+              <p className="font-source-serif text-[12px] italic leading-snug text-[var(--ink-2)]">
+                Inclusief persoonlijke redactionele inleiding door Will, gebaseerd op jouw data
+              </p>
+              <p className="mt-1.5 font-inter text-[10px] text-[var(--ink-3)]">+5–10 seconden</p>
+            </button>
+          </div>
+        </div>
+
         {/* Generate button */}
         <button
           type="button"
           onClick={handleGenerate}
           disabled={generating}
-          className="flex w-full items-center justify-center gap-2 rounded-[var(--r)] bg-[var(--ink)] px-4 py-2.5 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)] disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-2 rounded-[var(--r)] bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)] disabled:opacity-50"
         >
           {generating ? (
             <>
@@ -269,15 +336,26 @@ export default function RapportagesPage() {
             {savedConfigs.map(config => (
               <div
                 key={config.id}
-                className="group flex items-center justify-between rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 transition-all hover:shadow-[var(--s1)] hover:-translate-y-px"
+                className="group flex items-center justify-between rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] transition-all hover:shadow-[var(--s1)] hover:-translate-y-px"
               >
-                <div className="min-w-0 flex-1">
-                  <p className="font-inter text-sm font-medium text-[var(--ink)] truncate">{config.name}</p>
+                <button
+                  type="button"
+                  onClick={() => handleView(config)}
+                  className="min-w-0 flex-1 px-4 py-3 text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <p className="font-inter text-sm font-medium text-[var(--ink)] truncate">{config.name}</p>
+                    {config.use_ai && (
+                      <span className="shrink-0 rounded-[var(--r-sm)] bg-wil-50 border border-wil-200 px-1.5 py-0.5 font-inter text-[9px] font-bold uppercase tracking-[0.06em] text-wil-600">
+                        AI
+                      </span>
+                    )}
+                  </div>
                   <p className="font-inter text-[11px] text-[var(--ink-3)]">
                     {new Date(config.date_from).toLocaleDateString('nl-NL')} – {new Date(config.date_to).toLocaleDateString('nl-NL')}
                   </p>
-                </div>
-                <div className="flex items-center gap-1 ml-3">
+                </button>
+                <div className="flex items-center gap-1 px-2">
                   <button
                     type="button"
                     onClick={() => handleView(config)}

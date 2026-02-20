@@ -16,7 +16,7 @@ import {
 import { computeGoalProgress, getGoalColorClasses, type Goal } from '@/lib/goal-data'
 import {
   CheckCircle, Sparkles, Target, Flame, Info, Plus,
-  AlertTriangle, Clock, TrendingDown, ArrowRight, BarChart3,
+  AlertTriangle, Clock, TrendingDown, ArrowRight, RotateCcw, BarChart3, CreditCard,
 } from 'lucide-react'
 import { NibudBenchmarkSection } from '@/components/app/will/nibud-benchmark'
 import { FeatureGate } from '@/components/app/feature-gate'
@@ -26,6 +26,24 @@ import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
 import { NextStepSection, computeAllWilSteps } from '@/components/app/next-step-card'
 import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-animation'
 import { FreedomDaysMonthlyTrend } from '@/components/app/will/freedom-days-monthly-trend'
+import { BottomSheet } from '@/components/app/bottom-sheet'
+import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
+import { formatCurrency } from '@/lib/format'
+import { OpzegModal } from '@/components/app/opzeg-modal'
+import type { CancellationMetadata } from '@/lib/cancellation-types'
+
+type SubscriptionItem = {
+  id: string
+  name: string
+  averageAmount: number
+  monthlyAmount: number
+  frequency: 'monthly' | 'weekly' | 'quarterly' | 'yearly'
+  nextDate: string | null
+  confidence: 'high' | 'medium' | 'low'
+  isVariableAmount: boolean
+  occurrences: number
+  alreadyConfirmed: boolean
+}
 
 type KpiData = {
   completedActions: { id: string; status: string; freedom_days_impact: number; source: string; completed_at: string | null; due_date: string | null; created_at: string; recommendation: { recommendation_type: string }[] | null }[]
@@ -47,6 +65,75 @@ export default function WillPage() {
   const [showGoalForm, setShowGoalForm] = useState(false)
   const [goalAssets, setGoalAssets] = useState<{ id: string; name: string; current_value: number }[]>([])
   const [goalDebts, setGoalDebts] = useState<{ id: string; name: string; current_balance: number }[]>([])
+  const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([])
+  const [subscriptionMonthly, setSubscriptionMonthly] = useState(0)
+  const [subscriptionsOpen, setSubscriptionsOpen] = useState(false)
+  const [willAdvice, setWillAdvice] = useState<{
+    intro: string
+    items: { name: string; verdict: 'nuttig' | 'overlap' | 'niet_relevant'; toelichting: string; savingsMonthly: number }[]
+    conclusion: string
+    totalSavingsPotential: number
+    suggestedActions: {
+      title: string
+      description: string
+      euroSavingMonthly: number
+      freedomDaysPerYear: number
+      suggestedWeekOffset: number
+    }[]
+  } | null>(null)
+  const [willAdviceLoading, setWillAdviceLoading] = useState(false)
+  const [willAdviceError, setWillAdviceError] = useState<string | null>(null)
+  const [schedulerOpen, setSchedulerOpen] = useState<number | null>(null) // index of open action scheduler
+  const [scheduledActions, setScheduledActions] = useState<Record<number, { week: string; label: string }>>({})
+  const [schedulingIdx, setSchedulingIdx] = useState<number | null>(null)
+  const [opzegModalSub, setOpzegModalSub] = useState<SubscriptionItem | null>(null)
+  const [opzegInitialMetadata, setOpzegInitialMetadata] = useState<CancellationMetadata | undefined>(undefined)
+  const [userProfile, setUserProfile] = useState<{ full_name: string | null }>({ full_name: null })
+  const handleFetchWillAdvice = async () => {
+    if (subscriptions.length === 0) return
+    setWillAdviceLoading(true)
+    setWillAdviceError(null)
+    try {
+      const res = await fetch('/api/subscriptions/advice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subscriptions: subscriptions.map(s => ({
+            name: s.name,
+            monthlyAmount: s.monthlyAmount,
+            frequency: s.frequency,
+            confidence: s.confidence,
+          })),
+          totalMonthly: subscriptionMonthly,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error ?? 'Onbekende fout')
+      }
+      const data = await res.json()
+      setWillAdvice(data)
+    } catch (err) {
+      setWillAdviceError(err instanceof Error ? err.message : 'Will kon de analyse niet voltooien.')
+    } finally {
+      setWillAdviceLoading(false)
+    }
+  }
+
+  const handleCancellationSaved = useCallback(async () => {
+    setOpzegModalSub(null)
+    setOpzegInitialMetadata(undefined)
+    // Reload actions so the new one appears on the board
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('actions')
+      .select('*, recommendation:recommendations(title, recommendation_type)')
+      .order('status', { ascending: true })
+      .order('priority_score', { ascending: false })
+      .order('sort_order', { ascending: true })
+    setActions((data as Action[]) ?? [])
+  }, [])
+
   const loadData = useCallback(async () => {
     const supabase = createClient()
     const today = new Date().toISOString().split('T')[0]
@@ -62,6 +149,7 @@ export default function WillPage() {
       actionsForBoardRes,
       assetsRes,
       debtsRes,
+      userRes,
     ] = await Promise.all([
       supabase
         .from('actions')
@@ -101,9 +189,11 @@ export default function WillPage() {
         .order('status', { ascending: true })
         .order('priority_score', { ascending: false })
         .order('sort_order', { ascending: true }),
-      // For GoalForm
+        // For GoalForm
       supabase.from('assets').select('id, name, current_value').eq('is_active', true),
       supabase.from('debts').select('id, name, current_balance').eq('is_active', true),
+      // For OpzegModal
+      supabase.auth.getUser(),
     ])
 
     const allActions = (actionsRes.data ?? []) as KpiData['allActions']
@@ -111,6 +201,13 @@ export default function WillPage() {
     const goals = (activeGoalsRes.data ?? []) as Goal[]
     const loadedAssets = (assetsRes.data ?? []) as { id: string; name: string; current_value: number }[]
     const loadedDebts = (debtsRes.data ?? []) as { id: string; name: string; current_balance: number }[]
+
+    // Profile for OpzegModal
+    const userId = userRes.data.user?.id
+    if (userId) {
+      const { data: profileData } = await supabase.from('profiles').select('full_name').eq('id', userId).single()
+      setUserProfile({ full_name: profileData?.full_name ?? null })
+    }
 
     // Auto-link: override current_value from linked asset/debt
     for (const goal of goals) {
@@ -144,6 +241,17 @@ export default function WillPage() {
     setGoalAssets(loadedAssets)
     setGoalDebts(loadedDebts)
     setLoading(false)
+
+    // Load subscriptions in parallel (non-blocking)
+    fetch('/api/subscriptions')
+      .then(r => r.json())
+      .then(data => {
+        if (data.subscriptions) {
+          setSubscriptions(data.subscriptions as SubscriptionItem[])
+          setSubscriptionMonthly(data.totalMonthly ?? 0)
+        }
+      })
+      .catch(() => {/* ignore */})
   }, [])
 
   useEffect(() => {
@@ -405,17 +513,25 @@ export default function WillPage() {
           </p>
         </div>
 
-        <div className="card-editorial p-3 sm:p-5" data-testid="kpi-wilskrachtscore">
+        <button
+          type="button"
+          className="card-editorial p-3 sm:p-5 text-left transition-all hover:border-wil-300 hover:shadow-sm"
+          data-testid="kpi-abonnementen"
+          onClick={() => setSubscriptionsOpen(true)}
+        >
           <div className="mb-3 flex items-center justify-between">
             <div className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
-              <Flame className="h-4 w-4 sm:h-5 sm:w-5 text-wil-600" />
+              <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-wil-600" />
             </div>
-            <KpiTooltip text="Hoe actief je bent in het nemen en afronden van beslissingen." />
           </div>
-          <p className="text-sm font-medium text-[var(--ink-3)]">Wilskrachtscore</p>
-          <p className="mt-1 text-3xl font-bold text-wil-600">{willpowerScore}</p>
-          <p className="mt-1 text-xs text-[var(--ink-3)]">{willpowerLabel[willpowerScore]}</p>
-        </div>
+          <p className="text-sm font-medium text-[var(--ink-3)]">Actieve Abonnementen</p>
+          <p className="mt-1 text-3xl font-bold text-[var(--ink)]">
+            {subscriptions.length}
+          </p>
+          <p className="mt-1 text-xs text-wil-600">
+            {subscriptionMonthly > 0 ? `${formatCurrency(subscriptionMonthly)}/maand` : 'klik om te detecteren'}
+          </p>
+        </button>
       </section>
 
       {/* === 3. Alerts === */}
@@ -483,7 +599,24 @@ export default function WillPage() {
             Concrete stappen die je vrijheid laten groeien
           </p>
         </div>
-        <ActionBoard initialActions={actions} />
+        <ActionBoard
+          initialActions={actions}
+          onCancellationOpen={(metadata) => {
+            setOpzegInitialMetadata(metadata)
+            setOpzegModalSub({
+              id: '',
+              name: metadata.subscription_name,
+              monthlyAmount: metadata.monthly_amount,
+              averageAmount: metadata.monthly_amount,
+              frequency: (metadata.frequency ?? 'monthly') as SubscriptionItem['frequency'],
+              nextDate: null,
+              confidence: 'high',
+              isVariableAmount: false,
+              occurrences: 0,
+              alreadyConfirmed: false,
+            })
+          }}
+        />
       </section>
 
       {/* === 7. Doelen (Primary Content) === */}
@@ -603,6 +736,306 @@ export default function WillPage() {
       )}
       </FeatureGate>
 
+      {/* === Abonnementen Modal === */}
+      <BottomSheet
+        open={subscriptionsOpen}
+        onClose={() => { setSubscriptionsOpen(false); setWillAdvice(null); setWillAdviceError(null); setScheduledActions({}); setSchedulerOpen(null) }}
+        title="Abonnementen"
+      >
+        <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50/50 p-4 font-mono text-sm">
+          {/* Header */}
+          <div className="mb-3 text-center">
+            <p className="text-xs font-bold uppercase tracking-widest text-[var(--ink)]">ABONNEMENTEN</p>
+            <p className="mt-1 text-[11px] text-[var(--ink-3)]">Automatisch gedetecteerd uit transactiegeschiedenis</p>
+          </div>
+
+          {/* Uitleg */}
+          <p className="mb-3 text-[11px] text-[var(--ink-3)]">
+            Terugkerende betalingen herkend als abonnement. Hoge zekerheid = vaste bedragen gedurende 3+ maanden.
+          </p>
+
+          {/* Regelitems */}
+          {subscriptions.length === 0 ? (
+            <p className="py-4 text-center text-[11px] text-[var(--ink-3)]">
+              Geen abonnementen gedetecteerd. Importeer minimaal 3 maanden aan transacties.
+            </p>
+          ) : (
+            [...subscriptions]
+              .sort((a, b) => b.monthlyAmount - a.monthlyAmount)
+              .map(sub => (
+                <div key={sub.id} className="flex items-center justify-between border-b border-dashed border-[var(--border-ed)] py-1.5 gap-2">
+                  <span className="flex-1 text-[var(--ink-2)]">
+                    {sub.name}
+                    {sub.confidence !== 'high' && (
+                      <span className="ml-1 text-[10px] text-[var(--ink-3)]">(geschat)</span>
+                    )}
+                  </span>
+                  <span className="tabular-nums text-[var(--ink)]">
+                    {formatCurrency(sub.averageAmount)}/{formatFrequency(sub.frequency)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpzegInitialMetadata(undefined)
+                      setOpzegModalSub(sub)
+                    }}
+                    className="touch-target shrink-0 rounded border border-wil-200 px-2 text-[10px] uppercase tracking-wide text-wil-600 transition-colors hover:bg-wil-50"
+                  >
+                    Zeg op
+                  </button>
+                </div>
+              ))
+          )}
+
+          {/* Totaalregel */}
+          {subscriptions.length > 0 && (
+            <>
+              <div className="mt-1 flex justify-between border-t-2 border-zinc-900 pt-2 font-bold">
+                <span>Totaal / maand</span>
+                <span className="tabular-nums">{formatCurrency(subscriptionMonthly)}</span>
+              </div>
+
+              {/* FreedomTimeBadge */}
+              <div className="mt-3 flex justify-center">
+                <FreedomTimeBadge amount={subscriptionMonthly} />
+              </div>
+            </>
+          )}
+
+          {/* Footer */}
+          <p className="mt-3 text-center text-[10px] text-[var(--ink-3)]">
+            Gebaseerd op transacties van de afgelopen 12 maanden
+          </p>
+        </div>
+
+        {/* === Will's Abonnementen-advies === */}
+        {subscriptions.length > 0 && (
+          <div className="mt-4">
+            {!willAdvice && !willAdviceLoading && (
+              <div>
+                <button
+                  type="button"
+                  onClick={handleFetchWillAdvice}
+                  className="flex w-full items-center justify-center gap-2 rounded-[var(--r)] border border-wil-200 bg-white px-4 py-3 text-sm font-medium text-wil-700 transition-colors hover:bg-wil-50"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Vraag Will om advies
+                </button>
+                <p className="mt-1.5 text-center text-[10px] text-[var(--ink-4)]">
+                  Will beoordeelt overlap, nut en besparingspotentieel
+                </p>
+              </div>
+            )}
+
+            {willAdviceLoading && (
+              <div className="flex items-center gap-3 rounded-[var(--r)] border border-wil-100 bg-wil-50/40 px-4 py-3">
+                <FinnAvatar size={32} />
+                <p className="animate-pulse text-sm text-[var(--ink-3)]">
+                  Will analyseert jouw abonnementen…
+                </p>
+              </div>
+            )}
+
+            {willAdviceError && (
+              <div className="rounded-[var(--r)] border border-red-200 bg-red-50 px-4 py-3">
+                <p className="text-sm text-red-700">{willAdviceError}</p>
+                <button
+                  type="button"
+                  onClick={handleFetchWillAdvice}
+                  className="mt-2 text-xs font-medium text-red-600 underline underline-offset-2"
+                >
+                  Probeer opnieuw
+                </button>
+              </div>
+            )}
+
+            {willAdvice && (
+              <div className="rounded-[var(--r-lg)] border border-wil-100 bg-white p-4 shadow-[var(--s0)]">
+                {/* Will header */}
+                <div className="-mx-4 -mt-4 mb-4 flex items-center gap-3 rounded-t-[var(--r-lg)] border-b border-[var(--border-ed)] bg-[var(--subtle)] px-4 py-3">
+                  <FinnAvatar size={36} />
+                  <div>
+                    <p className="text-[13px] font-bold text-[var(--ink)]">Will</p>
+                    <p className="font-serif text-[11px] italic text-[var(--ink-3)]">Abonnementen-advies</p>
+                  </div>
+                </div>
+
+                {/* Intro quote */}
+                <p className="mb-4 border-l-[3px] border-wil-300 pl-3 font-serif text-sm italic leading-relaxed text-[var(--ink-2)]">
+                  {willAdvice.intro}
+                </p>
+
+                {/* Verdict per abonnement */}
+                <div className="mb-4 space-y-3">
+                  {willAdvice.items.map(item => (
+                    <div key={item.name} className="flex items-start gap-2.5">
+                      <span className={`mt-0.5 shrink-0 rounded-[var(--r-sm)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                        item.verdict === 'nuttig'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : item.verdict === 'overlap'
+                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                          : 'bg-wil-50 text-wil-700 border border-wil-200'
+                      }`}>
+                        {item.verdict === 'nuttig' ? '✓ nuttig' : item.verdict === 'overlap' ? '⚠ overlap' : '✗ niet nodig'}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-[var(--ink)]">{item.name}</p>
+                        <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">{item.toelichting}</p>
+                        {item.savingsMonthly > 0 && (
+                          <p className="mt-0.5 font-mono text-[10px] text-wil-600 tabular-nums">
+                            -{formatCurrency(item.savingsMonthly)}/mnd vrijmaken
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Conclusion */}
+                <p className="border-t border-[var(--border-ed)] pt-3 font-serif text-[11px] italic leading-relaxed text-[var(--ink-3)]">
+                  {willAdvice.conclusion}
+                </p>
+
+                {/* Savings badge */}
+                {willAdvice.totalSavingsPotential > 0 && (
+                  <div className="mt-3 flex justify-center">
+                    <FreedomTimeBadge amount={willAdvice.totalSavingsPotential} />
+                  </div>
+                )}
+
+                {/* Suggested actions */}
+                {willAdvice.suggestedActions && willAdvice.suggestedActions.length > 0 && (
+                  <div className="mt-4 border-t border-[var(--border-ed)] pt-4">
+                    <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-wil-600">
+                      Voorgestelde acties
+                    </p>
+                    <div className="space-y-3">
+                      {willAdvice.suggestedActions.map((action, idx) => {
+                        const scheduled = scheduledActions[idx]
+                        const isScheduling = schedulingIdx === idx
+                        const isOpen = schedulerOpen === idx
+
+                        return (
+                          <div
+                            key={idx}
+                            className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--bg)] p-3"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-[var(--ink)]">{action.title}</p>
+                                <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--ink-3)]">{action.description}</p>
+                                <div className="mt-1.5 flex items-center gap-2">
+                                  <span className="font-mono text-[10px] text-wil-600 tabular-nums">
+                                    +{action.freedomDaysPerYear} dagen/jaar
+                                  </span>
+                                  <span className="text-[10px] text-[var(--ink-4)]">·</span>
+                                  <span className="font-mono text-[10px] text-[var(--ink-3)] tabular-nums">
+                                    -{formatCurrency(action.euroSavingMonthly)}/mnd
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Schedule button or confirmation */}
+                              {scheduled ? (
+                                <div className="shrink-0 text-right">
+                                  <p className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
+                                    <CheckCircle className="h-3 w-3" />
+                                    Ingepland
+                                  </p>
+                                  <p className="text-[10px] text-[var(--ink-4)]">{scheduled.label}</p>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={isScheduling}
+                                  onClick={() => setSchedulerOpen(isOpen ? null : idx)}
+                                  className="shrink-0 rounded-[var(--r-sm)] border border-wil-200 px-2.5 py-1.5 text-[11px] font-medium text-wil-700 transition-colors hover:bg-wil-50 disabled:opacity-50"
+                                >
+                                  {isScheduling ? '…' : 'Inplannen'}
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Inline week picker */}
+                            {isOpen && !scheduled && (
+                              <div className="mt-3 flex flex-wrap gap-1.5 border-t border-dashed border-[var(--border-ed)] pt-3">
+                                {[
+                                  { offset: 0, label: 'Deze week' },
+                                  { offset: 1, label: 'Volgende week' },
+                                  { offset: 2, label: 'Over 2 weken' },
+                                  { offset: 4, label: 'Over een maand' },
+                                ].map(({ offset, label }) => (
+                                  <button
+                                    key={offset}
+                                    type="button"
+                                    onClick={async () => {
+                                      setSchedulerOpen(null)
+                                      setSchedulingIdx(idx)
+                                      try {
+                                        const res = await fetch('/api/subscriptions/schedule-action', {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({
+                                            title: action.title,
+                                            description: action.description,
+                                            euroSavingMonthly: action.euroSavingMonthly,
+                                            freedomDaysPerYear: action.freedomDaysPerYear,
+                                            weekOffset: offset,
+                                          }),
+                                        })
+                                        if (res.ok) {
+                                          setScheduledActions(prev => ({ ...prev, [idx]: { week: '', label } }))
+                                        }
+                                      } finally {
+                                        setSchedulingIdx(null)
+                                      }
+                                    }}
+                                    className={`rounded-[var(--r-sm)] border px-3 py-1.5 text-[11px] font-medium transition-colors ${
+                                      offset === action.suggestedWeekOffset
+                                        ? 'border-wil-300 bg-wil-50 text-wil-700'
+                                        : 'border-[var(--border-ed)] text-[var(--ink-2)] hover:border-wil-200 hover:bg-wil-50/50'
+                                    }`}
+                                  >
+                                    {label}
+                                    {offset === action.suggestedWeekOffset && (
+                                      <span className="ml-1 text-[9px] text-wil-500">← aanbevolen</span>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Re-analyse button */}
+                <button
+                  type="button"
+                  onClick={() => { setWillAdvice(null); setWillAdviceError(null); setScheduledActions({}); setSchedulerOpen(null) }}
+                  className="mt-3 flex w-full items-center justify-center gap-1.5 min-h-[44px] py-2.5 text-[11px] text-[var(--ink-4)] transition-colors hover:text-[var(--ink-3)]"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  Opnieuw analyseren
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </BottomSheet>
+
+      {/* === Opzeg Modal === */}
+      <OpzegModal
+        open={!!opzegModalSub}
+        onClose={() => { setOpzegModalSub(null); setOpzegInitialMetadata(undefined) }}
+        subscription={opzegModalSub}
+        initialMetadata={opzegInitialMetadata}
+        userProfile={userProfile}
+        onSavedToActionList={handleCancellationSaved}
+      />
+
       {/* === 9. Locked Features Footer === */}
       <LockedFeaturesFooter module="wil" />
 
@@ -611,6 +1044,17 @@ export default function WillPage() {
     </div>
     </FreedomDaysAnimationProvider>
   )
+}
+
+// --- Inline helper functions ---
+
+function formatFrequency(frequency: string): string {
+  switch (frequency) {
+    case 'weekly': return 'week'
+    case 'quarterly': return 'kwartaal'
+    case 'yearly': return 'jaar'
+    default: return 'maand'
+  }
 }
 
 // --- Inline helper components ---

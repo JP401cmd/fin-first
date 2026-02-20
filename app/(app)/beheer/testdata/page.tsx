@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { PERSONAS, PERSONA_KEYS, type PersonaKey, type PersonaMeta } from '@/lib/test-personas'
+import { PERSONAS, PERSONA_KEYS, type PersonaKey } from '@/lib/test-personas'
+import { PersonaCard } from '@/components/app/persona-card'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { PHASES } from '@/lib/feature-phases'
 import { useMobilePreview, DEVICE_PRESETS } from '@/components/app/beheer/mobile-preview-provider'
@@ -149,10 +150,10 @@ export default function BeheerTestdataPage() {
             return (
               <PersonaCard
                 key={key}
-                personaKey={key}
                 meta={meta}
-                disabled={seeding}
+                showCta
                 onSelect={() => setConfirmPersona(key)}
+                disabled={seeding}
               />
             )
           })}
@@ -469,59 +470,3 @@ export default function BeheerTestdataPage() {
   )
 }
 
-function PersonaCard({
-  personaKey,
-  meta,
-  disabled,
-  onSelect,
-}: {
-  personaKey: PersonaKey
-  meta: PersonaMeta
-  disabled: boolean
-  onSelect: () => void
-}) {
-  const colorClasses: Record<string, { bg: string; border: string; text: string }> = {
-    red: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700' },
-    teal: { bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-700' },
-    amber: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
-    purple: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' },
-  }
-  const colors = colorClasses[meta.color] ?? colorClasses.amber
-
-  const formatCurrency = (n: number) =>
-    new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
-
-  return (
-    <div className={`rounded-[var(--r-lg)] border ${colors.border} ${colors.bg} p-5 transition-all hover:shadow-md`}>
-      <div className="flex items-start gap-3">
-        <div
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white text-sm font-bold"
-          style={{ backgroundColor: meta.avatarColor }}
-        >
-          {meta.name.split(' ').map((w) => w[0]).join('').slice(0, 2)}
-        </div>
-        <div className="min-w-0 flex-1">
-          <h3 className={`font-semibold ${colors.text}`}>{meta.name}</h3>
-          <p className="text-xs font-medium text-[var(--ink-3)]">{meta.subtitle}</p>
-        </div>
-      </div>
-
-      <p className="mt-3 text-xs text-[var(--ink-2)] line-clamp-2">{meta.description}</p>
-
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--ink-3)]">
-        <span>Vermogen: <span className={`font-semibold ${meta.netWorth < 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(meta.netWorth)}</span></span>
-        <span>Inkomen: <span className="font-medium text-[var(--ink-2)]">{formatCurrency(meta.income)}/mnd</span></span>
-        <span>Uitgaven: <span className="font-medium text-[var(--ink-2)]">{formatCurrency(meta.expenses)}/mnd</span></span>
-      </div>
-
-      <button
-        onClick={onSelect}
-        disabled={disabled}
-        className="mt-4 w-full rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        style={{ backgroundColor: disabled ? '#a1a1aa' : meta.avatarColor }}
-      >
-        {disabled ? 'Bezig...' : 'Laden'}
-      </button>
-    </div>
-  )
-}

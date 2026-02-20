@@ -73,10 +73,25 @@ export type CategoryCorrection = {
 }
 
 /**
+ * Detect whether a transaction is a transfer between own accounts
+ * by matching counterparty_iban against the user's own IBAN set.
+ * @param counterpartyIban - IBAN of the counterparty
+ * @param ownIbans - Set of all own IBANs (bank_accounts + user_own_ibans), uppercased
+ */
+export function isOwnAccountTransfer(
+  counterpartyIban: string | null,
+  ownIbans: Set<string>,
+): boolean {
+  if (!counterpartyIban) return false
+  return ownIbans.has(counterpartyIban.replace(/\s/g, '').toUpperCase())
+}
+
+/**
  * Categorize a transaction based on its description and counterparty.
  * Checks user corrections first (highest priority), then falls back to rules.
+ * Priority 0: own-account transfer detection (when ownIbans + counterpartyIban provided).
  *
- * @returns budget_id and confidence, or null if no match found.
+ * @returns budget_id, confidence, budgetName, and optional isTransfer flag.
  */
 export function categorizeTransaction(
   description: string,
@@ -84,7 +99,14 @@ export function categorizeTransaction(
   amount: number,
   budgets: Budget[],
   corrections?: CategoryCorrection[],
-): { budget_id: string | null; confidence: number; budgetName: string | null } {
+  ownIbans?: Set<string>,
+  counterpartyIban?: string | null,
+): { budget_id: string | null; confidence: number; budgetName: string | null; isTransfer?: boolean } {
+  // Priority 0: own-account transfer detection
+  if (ownIbans && counterpartyIban && isOwnAccountTransfer(counterpartyIban, ownIbans)) {
+    return { budget_id: null, confidence: 1.0, budgetName: null, isTransfer: true }
+  }
+
   const searchText = `${description} ${counterparty ?? ''}`.toLowerCase()
   const isIncome = amount > 0
 

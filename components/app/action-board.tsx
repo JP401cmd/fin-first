@@ -7,12 +7,14 @@ import { ActionForm } from '@/components/app/action-form'
 import { useBadgeEvaluation } from '@/lib/hooks/use-badge-evaluation'
 import { useFreedomDaysAnimation } from '@/components/app/freedom-days-animation'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
+import type { CancellationMetadata } from '@/lib/cancellation-types'
 
 type ActionBoardProps = {
   initialActions: Action[]
+  onCancellationOpen?: (metadata: CancellationMetadata) => void
 }
 
-export function ActionBoard({ initialActions }: ActionBoardProps) {
+export function ActionBoard({ initialActions, onCancellationOpen }: ActionBoardProps) {
   const [actions, setActions] = useState<Action[]>(initialActions)
   const [showForm, setShowForm] = useState(false)
   const [showPostponed, setShowPostponed] = useState(false)
@@ -162,7 +164,7 @@ export function ActionBoard({ initialActions }: ActionBoardProps) {
           </div>
           <div className="space-y-2">
             {openActions.map((action) => (
-              <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} />
+              <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} onCancellationOpen={onCancellationOpen} />
             ))}
           </div>
         </div>
@@ -182,7 +184,7 @@ export function ActionBoard({ initialActions }: ActionBoardProps) {
           {showPostponed && (
             <div className="space-y-2">
               {postponedActions.map((action) => (
-                <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} />
+                <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} onCancellationOpen={onCancellationOpen} />
               ))}
             </div>
           )}
@@ -208,7 +210,7 @@ export function ActionBoard({ initialActions }: ActionBoardProps) {
           {showCompleted && (
             <div className="space-y-2">
               {completedActions.map((action) => (
-                <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} />
+                <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} onCancellationOpen={onCancellationOpen} />
               ))}
             </div>
           )}

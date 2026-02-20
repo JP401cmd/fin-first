@@ -62,31 +62,31 @@ export type ChronologyLevel = {
 }
 
 export const chronologyPhases = [
-  { phase: 1, name: 'Recovery', subtitle: 'Restoring Balance', color: 'rose' },
-  { phase: 2, name: 'Stability', subtitle: 'Fortifying Time', color: 'blue' },
-  { phase: 3, name: 'Momentum', subtitle: 'Multiplying Time', color: 'teal' },
-  { phase: 4, name: 'Mastery', subtitle: 'Owning Time', color: 'amber' },
+  { phase: 1, name: 'Herstel', subtitle: 'Balans herstellen', color: 'phase_recovery' },
+  { phase: 2, name: 'Stabiliteit', subtitle: 'Tijd opbouwen', color: 'phase_stability' },
+  { phase: 3, name: 'Momentum', subtitle: 'Tijd vermenigvuldigen', color: 'phase_momentum' },
+  { phase: 4, name: 'Meesterschap', subtitle: 'Tijd bezitten', color: 'phase_mastery' },
 ] as const
 
 export const chronologyLevels: ChronologyLevel[] = [
-  { level: -2, name: 'Time Deficit', focus: 'Stop the Leak', metaphor: 'Je verliest actief tijd. Elke euro is al eigendom van iemand anders.', phase: 1 },
-  { level: -1, name: 'Time Drag', focus: 'Eliminate Drag', metaphor: 'Je sleept het verleden achter je aan. Rente vertraagt je snelheid.', phase: 1 },
-  { level: 0, name: 'The Reset', focus: 'Calibration', metaphor: 'Het nulpunt. De teller staat stil. Niet achteruit, nog niet vooruit.', phase: 1 },
-  { level: 1, name: 'The Anchor', focus: 'Secure Foundation', metaphor: 'Het anker is uitgeworpen. Je drijft niet meer af bij storm.', phase: 2 },
-  { level: 2, name: 'Time Shield', focus: 'Maximum Security', metaphor: 'Een schild van 3\u20136 maanden tijd. Externe schokken raken je niet meer.', phase: 2 },
-  { level: 3, name: 'Velocity', focus: 'Acceleration', metaphor: 'Je geld genereert zijn eigen tijd. Sneller dan je alleen kunt lopen.', phase: 3 },
-  { level: 4, name: 'Autonomous', focus: 'Gliding', metaphor: 'De motoren kunnen uit. Je huidige vaart bereikt de bestemming vanzelf.', phase: 3 },
-  { level: 5, name: 'Sovereign', focus: 'Independence', metaphor: 'Je bezit 100% van je eigen klok. Geen tijd meer ruilen voor geld.', phase: 4 },
-  { level: 6, name: 'Timeless', focus: 'Infinity', metaphor: 'Meer tijd dan je op kunt maken. Je bouwt aan de tijdlijnen van anderen.', phase: 4 },
+  { level: -2, name: 'Tijdtekort', focus: 'Lek dichten', metaphor: 'Je verliest actief tijd. Elke euro is al eigendom van iemand anders.', phase: 1 },
+  { level: -1, name: 'Tijdverlies', focus: 'Weerstand wegnemen', metaphor: 'Je sleept het verleden achter je aan. Rente vertraagt je snelheid.', phase: 1 },
+  { level: 0, name: 'Het Reset-punt', focus: 'Kalibratie', metaphor: 'Het nulpunt. De teller staat stil. Niet achteruit, nog niet vooruit.', phase: 1 },
+  { level: 1, name: 'Het Anker', focus: 'Stabiel fundament', metaphor: 'Het anker is uitgeworpen. Je drijft niet meer af bij storm.', phase: 2 },
+  { level: 2, name: 'Tijdschild', focus: 'Maximale zekerheid', metaphor: 'Een schild van 3\u20136 maanden tijd. Externe schokken raken je niet meer.', phase: 2 },
+  { level: 3, name: 'Snelheid', focus: 'Versnelling', metaphor: 'Je geld genereert zijn eigen tijd. Sneller dan je alleen kunt lopen.', phase: 3 },
+  { level: 4, name: 'Autonoom', focus: 'Glijden', metaphor: 'De motoren kunnen uit. Je huidige vaart bereikt de bestemming vanzelf.', phase: 3 },
+  { level: 5, name: 'Soeverein', focus: 'Onafhankelijkheid', metaphor: 'Je bezit 100% van je eigen klok. Geen tijd meer ruilen voor geld.', phase: 4 },
+  { level: 6, name: 'Tijdloos', focus: 'Oneindigheid', metaphor: 'Meer tijd dan je op kunt maken. Je bouwt aan de tijdlijnen van anderen.', phase: 4 },
 ]
 
 // ── Phase color helpers ──────────────────────────────────────────────
 
 export const phaseColors: Record<string, { dot: string; activeDot: string; line: string; badge: string; text: string }> = {
-  rose: { dot: 'bg-rose-200', activeDot: 'bg-rose-500', line: 'bg-rose-200', badge: 'bg-rose-50 text-rose-700 border-rose-200', text: 'text-rose-600' },
-  blue: { dot: 'bg-blue-200', activeDot: 'bg-blue-500', line: 'bg-blue-200', badge: 'bg-blue-50 text-blue-700 border-blue-200', text: 'text-blue-600' },
-  teal: { dot: 'bg-teal-200', activeDot: 'bg-teal-500', line: 'bg-teal-200', badge: 'bg-teal-50 text-teal-700 border-teal-200', text: 'text-teal-600' },
-  amber: { dot: 'bg-amber-200', activeDot: 'bg-amber-500', line: 'bg-amber-200', badge: 'bg-amber-50 text-amber-700 border-amber-200', text: 'text-amber-600' },
+  phase_recovery:  { dot: 'bg-[var(--color-phase-recovery-200)]',  activeDot: 'bg-[var(--color-phase-recovery-500)]',  line: 'bg-[var(--color-phase-recovery-200)]',  badge: 'bg-[var(--color-phase-recovery-50)] text-[var(--color-phase-recovery-700)] border-[var(--color-phase-recovery-200)]',   text: 'text-[var(--color-phase-recovery-600)]' },
+  phase_stability: { dot: 'bg-[var(--color-phase-stability-200)]', activeDot: 'bg-[var(--color-phase-stability-500)]', line: 'bg-[var(--color-phase-stability-200)]', badge: 'bg-[var(--color-phase-stability-50)] text-[var(--color-phase-stability-700)] border-[var(--color-phase-stability-200)]',  text: 'text-[var(--color-phase-stability-600)]' },
+  phase_momentum:  { dot: 'bg-[var(--color-phase-momentum-200)]',  activeDot: 'bg-[var(--color-phase-momentum-500)]',  line: 'bg-[var(--color-phase-momentum-200)]',  badge: 'bg-[var(--color-phase-momentum-50)] text-[var(--color-phase-momentum-700)] border-[var(--color-phase-momentum-200)]',   text: 'text-[var(--color-phase-momentum-600)]' },
+  phase_mastery:   { dot: 'bg-[var(--color-phase-mastery-200)]',   activeDot: 'bg-[var(--color-phase-mastery-500)]',   line: 'bg-[var(--color-phase-mastery-200)]',   badge: 'bg-[var(--color-phase-mastery-50)] text-[var(--color-phase-mastery-700)] border-[var(--color-phase-mastery-200)]',    text: 'text-[var(--color-phase-mastery-600)]' },
 }
 
 // ── Level criteria & progress ────────────────────────────────────────

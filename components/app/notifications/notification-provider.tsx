@@ -31,8 +31,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const skipNextPollRef = useRef(false)
 
   const fetchNotifications = useCallback(async () => {
+    if (skipNextPollRef.current) {
+      skipNextPollRef.current = false
+      return
+    }
     try {
       const res = await fetch('/api/notifications')
       if (!res.ok) return
@@ -69,6 +74,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     )
     setUnreadCount((prev) => Math.max(0, prev - 1))
 
+    // Skip the next poll cycle to prevent race condition overwriting read-state
+    skipNextPollRef.current = true
+
     await fetch('/api/notifications', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -88,6 +96,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
     setHistory((prev) => prev.map((n) => ({ ...n, read: true })))
     setUnreadCount(0)
+
+    // Skip the next poll cycle to prevent race condition overwriting read-state
+    skipNextPollRef.current = true
 
     await fetch('/api/notifications', {
       method: 'PATCH',

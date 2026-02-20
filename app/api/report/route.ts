@@ -4,7 +4,7 @@ import { computeNetWorthProjection } from '@/lib/net-worth-projection'
 import { buildCategorySpending, patternsToInsights, detectSeasonalPatterns, detectTrends, detectAnomalies } from '@/lib/spending-patterns'
 import { generateText } from 'ai'
 import { getModel } from '@/lib/ai/config'
-import type { ReportData, ReportConfig } from '@/lib/report-data'
+import type { ReportData, ReportConfig, HistoricalPeriodSummary } from '@/lib/report-data'
 
 const MONTH_LABELS_NL: Record<number, string> = {
   0: 'jan', 1: 'feb', 2: 'mrt', 3: 'apr', 4: 'mei', 5: 'jun',
@@ -35,6 +35,45 @@ function formatPeriodName(periodType: string, dateFrom: string, dateTo: string):
   return `${from.toLocaleDateString('nl-NL')} – ${to.toLocaleDateString('nl-NL')}`
 }
 
+function computePreviousPeriods(
+  periodType: string,
+  dateFrom: string,
+  dateTo: string
+): Array<{ from: string; to: string; label: string }> {
+  const from = new Date(dateFrom)
+  const to = new Date(dateTo)
+  const results: Array<{ from: string; to: string; label: string }> = []
+
+  for (let i = 2; i >= 1; i--) {
+    let pFrom: Date
+    let pTo: Date
+
+    if (periodType === 'month') {
+      pFrom = new Date(from.getFullYear(), from.getMonth() - i, 1)
+      pTo = new Date(from.getFullYear(), from.getMonth() - i + 1, 1)
+    } else if (periodType === 'quarter') {
+      pFrom = new Date(from.getFullYear(), from.getMonth() - i * 3, 1)
+      pTo = new Date(from.getFullYear(), from.getMonth() - i * 3 + 3, 1)
+    } else {
+      // year
+      pFrom = new Date(from.getFullYear() - i, 0, 1)
+      pTo = new Date(from.getFullYear() - i + 1, 0, 1)
+    }
+
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const fromStr = `${pFrom.getFullYear()}-${pad(pFrom.getMonth() + 1)}-${pad(pFrom.getDate())}`
+    const toStr = `${pTo.getFullYear()}-${pad(pTo.getMonth() + 1)}-${pad(pTo.getDate())}`
+    const label = formatPeriodName(periodType, fromStr, toStr)
+
+    // Ignore future periods
+    if (pFrom < to) {
+      results.push({ from: fromStr, to: toStr, label })
+    }
+  }
+
+  return results
+}
+
 export async function GET(request: Request) {
   try {
     const supabase = await createClient()
@@ -48,6 +87,8 @@ export async function GET(request: Request) {
     const periodType = url.searchParams.get('period_type') || 'month'
     const dateFrom = url.searchParams.get('date_from')
     const dateTo = url.searchParams.get('date_to')
+    const configId = url.searchParams.get('config_id')
+    const useAi = url.searchParams.get('use_ai') !== 'false'
 
     if (!dateFrom || !dateTo) {
       return Response.json({ error: 'date_from en date_to zijn verplicht' }, { status: 400 })
@@ -64,6 +105,19 @@ export async function GET(request: Request) {
     const maxMs = 2 * 365.25 * 24 * 60 * 60 * 1000
     if (to.getTime() - from.getTime() > maxMs) {
       return Response.json({ error: 'Maximaal 2 jaar per rapport' }, { status: 400 })
+    }
+
+    // ── CACHE CHECK ──
+    if (configId) {
+      const { data: config } = await supabase
+        .from('report_configs')
+        .select('cached_data')
+        .eq('id', configId)
+        .eq('user_id', user.id)
+        .single()
+      if (config?.cached_data) {
+        return Response.json(config.cached_data)
+      }
     }
 
     // Fetch all data in parallel
@@ -453,12 +507,76 @@ export async function GET(request: Request) {
       // FIRE computation may fail with edge case data
     }
 
+    // ── HISTORICAL PERIODS ──
+    const previousPeriods = computePreviousPeriods(periodType, dateFrom, dateTo)
+    const historicalPeriods: HistoricalPeriodSummary[] = []
+
+    if (previousPeriods.length > 0) {
+      type HistSnapshotRow = { net_worth: number; snapshot_date: string }
+      type HistTxRow = { amount: number }
+
+      const histFetches = previousPeriods.flatMap(p => [
+        supabase
+          .from('net_worth_snapshots')
+          .select('net_worth, snapshot_date')
+          .gte('snapshot_date', p.from)
+          .lt('snapshot_date', p.to)
+          .order('snapshot_date', { ascending: false })
+          .limit(1),
+        supabase
+          .from('transactions')
+          .select('amount')
+          .gte('date', p.from)
+          .lt('date', p.to),
+      ])
+
+      const histResults = await Promise.allSettled(histFetches)
+
+      for (let i = 0; i < previousPeriods.length; i++) {
+        const p = previousPeriods[i]
+        const snapshotResult = histResults[i * 2]
+        const txResult = histResults[i * 2 + 1]
+
+        const snapshots = (snapshotResult.status === 'fulfilled' ? snapshotResult.value.data ?? [] : []) as HistSnapshotRow[]
+        const txs = (txResult.status === 'fulfilled' ? txResult.value.data ?? [] : []) as HistTxRow[]
+
+        const histNetWorthEnd = snapshots.length > 0 ? Math.round(Number(snapshots[0].net_worth)) : null
+        let histIncome = 0
+        let histExpenses = 0
+        for (const tx of txs) {
+          const amt = Number(tx.amount)
+          if (amt > 0) histIncome += amt
+          else histExpenses += Math.abs(amt)
+        }
+        histIncome = Math.round(histIncome)
+        histExpenses = Math.round(histExpenses)
+        const histSaved = histIncome - histExpenses
+        const histSavingsRate = histIncome > 0 ? Math.round((histSaved / histIncome) * 1000) / 10 : null
+        const histFirePct = fireTarget > 0 && histNetWorthEnd != null
+          ? Math.round(Math.min((histNetWorthEnd / fireTarget) * 100, 100) * 10) / 10
+          : null
+
+        historicalPeriods.push({
+          periodLabel: p.label,
+          dateFrom: p.from,
+          dateTo: p.to,
+          netWorthEnd: histNetWorthEnd,
+          totalIncome: histIncome,
+          totalExpenses: histExpenses,
+          totalSaved: histSaved,
+          savingsRate: histSavingsRate,
+          firePercentage: histFirePct,
+        })
+      }
+    }
+
     // ── AI INTRODUCTION ──
     let aiIntroduction: string | null = null
-    try {
-      const model = await getModel(supabase)
-      const periodLabel = formatPeriodName(periodType, dateFrom, dateTo)
-      const prompt = `Je bent Finn, de financieel adviseur van TriFinity. Schrijf een bondige redactionele inleiding (3-4 zinnen, max 200 tokens) voor het financieel rapport "${periodLabel}".
+    if (useAi) {
+      try {
+        const model = await getModel(supabase)
+        const periodLabel = formatPeriodName(periodType, dateFrom, dateTo)
+        const prompt = `Je bent Will, de financieel adviseur van TriFinity. Schrijf een bondige redactionele inleiding (3-4 zinnen, max 200 tokens) voor het financieel rapport "${periodLabel}".
 
 Kerndata:
 - Netto vermogen: €${netWorthEnd != null ? Math.round(netWorthEnd) : '?'} (${netWorthGrowthPct != null ? (netWorthGrowthPct >= 0 ? '+' : '') + netWorthGrowthPct + '%' : 'onbekend'})
@@ -469,14 +587,15 @@ Kerndata:
 
 Schrijf in het Nederlands, persoonlijk en bemoedigend. Gebruik de filosofie "geld is opgeslagen tijd". Geen opsommingen, geen bullets — vloeiende tekst.`
 
-      const result = await generateText({
-        model,
-        prompt,
-        maxOutputTokens: 200,
-      })
-      aiIntroduction = result.text?.trim() || null
-    } catch {
-      // AI introduction is optional — report should never fail because of it
+        const result = await generateText({
+          model,
+          prompt,
+          maxOutputTokens: 200,
+        })
+        aiIntroduction = result.text?.trim() || null
+      } catch {
+        // AI introduction is optional — report should never fail because of it
+      }
     }
 
     // ── BUILD RESPONSE ──
@@ -540,6 +659,18 @@ Schrijf in het Nederlands, persoonlijk en bemoedigend. Gebruik de filosofie "gel
       aiIntroduction,
 
       aiInsights: [],
+
+      useAi,
+      historicalPeriods,
+    }
+
+    // ── CACHE SAVE ──
+    if (configId) {
+      await supabase
+        .from('report_configs')
+        .update({ cached_data: reportData, last_generated_at: new Date().toISOString() })
+        .eq('id', configId)
+        .eq('user_id', user.id)
     }
 
     return Response.json(reportData)
@@ -562,7 +693,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { name, period_type, date_from, date_to } = body
+    const { name, period_type, date_from, date_to, use_ai } = body
 
     if (!name || !period_type || !date_from || !date_to) {
       return Response.json({ error: 'Alle velden zijn verplicht' }, { status: 400 })
@@ -576,6 +707,7 @@ export async function POST(request: Request) {
         period_type,
         date_from,
         date_to,
+        use_ai: use_ai !== false,
         last_generated_at: new Date().toISOString(),
       })
       .select()

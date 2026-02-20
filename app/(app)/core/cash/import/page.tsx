@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowLeft, Upload, FileText, Check, AlertTriangle, X,
-  ChevronRight, Loader2, WifiOff, RefreshCw,
+  ChevronRight, Loader2, WifiOff, RefreshCw, ArrowLeftRight,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { parseMT940 } from '@/lib/parsers/mt940'
@@ -13,7 +13,7 @@ import { parseCSV, getCSVHeaders, getCSVPreview } from '@/lib/parsers/csv'
 import { parseOFX } from '@/lib/parsers/ofx'
 import { detectFormat, CSV_PRESETS, type CSVPreset } from '@/lib/parsers/index'
 import type { ParsedTransaction } from '@/lib/parsers/shared'
-import { categorizeTransaction, type CategoryCorrection } from '@/lib/parsers/categorize'
+import { categorizeTransaction, isOwnAccountTransfer, type CategoryCorrection } from '@/lib/parsers/categorize'
 import type { Budget } from '@/lib/budget-data'
 
 type Account = {
@@ -28,6 +28,7 @@ type ImportRow = ParsedTransaction & {
   confidence: number
   isDuplicate: boolean
   skipImport: boolean
+  isTransfer: boolean
 }
 
 function isNetworkFailure(err: unknown): boolean {
@@ -85,6 +86,7 @@ export default function ImportPage() {
   const [csvPreview, setCsvPreview] = useState<string[][]>([])
   const [showColumnMapping, setShowColumnMapping] = useState(false)
   const [corrections, setCorrections] = useState<CategoryCorrection[]>([])
+  const [ownIbans, setOwnIbans] = useState<Set<string>>(new Set())
 
   const loadInitialData = useCallback(async () => {
     setLoading(true)
@@ -94,10 +96,13 @@ export default function ImportPage() {
     try {
       const supabase = createClient()
 
-      const [accountsRes, budgetsRes, correctionsRes] = await Promise.all([
+      const { data: { user } } = await supabase.auth.getUser()
+
+      const [accountsRes, budgetsRes, correctionsRes, ownIbansRes] = await Promise.all([
         supabase.from('bank_accounts').select('id, name, iban').eq('is_active', true).order('sort_order'),
         supabase.from('budgets').select('*').order('sort_order'),
         supabase.from('category_corrections').select('match_field, match_value, budget_id'),
+        user ? supabase.from('user_own_ibans').select('iban').eq('user_id', user.id) : Promise.resolve({ data: [], error: null }),
       ])
 
       // Check for network errors in any of the responses
@@ -114,6 +119,13 @@ export default function ImportPage() {
         if (accountsRes.data.length > 0) {
           setSelectedAccountId(accountsRes.data[0].id)
         }
+        // Build own IBAN set from bank_accounts + user_own_ibans
+        const ibansFromAccounts = (accountsRes.data as Account[])
+          .map((a) => a.iban)
+          .filter(Boolean)
+          .map((i) => i!.replace(/\s/g, '').toUpperCase())
+        const ibansFromOwn = (ownIbansRes.data ?? []).map((r: { iban: string }) => r.iban.replace(/\s/g, '').toUpperCase())
+        setOwnIbans(new Set([...ibansFromAccounts, ...ibansFromOwn]))
       }
 
       if (budgetsRes.data) {
@@ -250,9 +262,12 @@ export default function ImportPage() {
         return
       }
 
-      // Auto-categorize
+      // Auto-categorize with transfer detection
       const importRows: ImportRow[] = parsed.map((tx) => {
-        const cat = categorizeTransaction(tx.description, tx.counterparty_name, tx.amount, budgets, corrections)
+        const isTransfer = isOwnAccountTransfer(tx.counterparty_iban, ownIbans)
+        const cat = isTransfer
+          ? { budget_id: null, confidence: 1.0, budgetName: null }
+          : categorizeTransaction(tx.description, tx.counterparty_name, tx.amount, budgets, corrections)
         return {
           ...tx,
           budget_id: cat.budget_id,
@@ -260,6 +275,8 @@ export default function ImportPage() {
           confidence: cat.confidence,
           isDuplicate: false,
           skipImport: false,
+          isTransfer,
+          transaction_type: isTransfer ? 'transfer' : tx.transaction_type,
         }
       })
 
@@ -296,7 +313,10 @@ export default function ImportPage() {
       }
 
       const importRows: ImportRow[] = parsed.map((tx) => {
-        const cat = categorizeTransaction(tx.description, tx.counterparty_name, tx.amount, budgets, corrections)
+        const isTransfer = isOwnAccountTransfer(tx.counterparty_iban, ownIbans)
+        const cat = isTransfer
+          ? { budget_id: null, confidence: 1.0, budgetName: null }
+          : categorizeTransaction(tx.description, tx.counterparty_name, tx.amount, budgets, corrections)
         return {
           ...tx,
           budget_id: cat.budget_id,
@@ -304,6 +324,8 @@ export default function ImportPage() {
           confidence: cat.confidence,
           isDuplicate: false,
           skipImport: false,
+          isTransfer,
+          transaction_type: isTransfer ? 'transfer' : tx.transaction_type,
         }
       })
 
@@ -486,12 +508,12 @@ export default function ImportPage() {
       description: r.description,
       counterparty_name: r.counterparty_name,
       counterparty_iban: r.counterparty_iban,
-      budget_id: r.budget_id,
+      budget_id: r.isTransfer ? null : r.budget_id,
       is_income: r.amount > 0,
-      category_source: r.budget_id ? 'rule' : 'import',
+      category_source: r.isTransfer ? 'transfer' : (r.budget_id ? 'rule' : 'import'),
       import_hash: r.import_hash,
       reference: r.reference,
-      transaction_type: r.transaction_type,
+      transaction_type: r.isTransfer ? 'transfer' : r.transaction_type,
     }))
 
     // Calculate batches
@@ -955,6 +977,21 @@ export default function ImportPage() {
             </button>
           </div>
 
+          {/* Transfer banner */}
+          {rows.some((r) => r.isTransfer) && (
+            <div className="rounded-[var(--r-lg)] border border-[var(--hor-m)] bg-[var(--hor-l)] px-4 py-3 flex items-start gap-3">
+              <ArrowLeftRight className="h-4 w-4 text-[var(--hor-t)] mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-[var(--ink-2)]">
+                  {rows.filter((r) => r.isTransfer).length} eigen {rows.filter((r) => r.isTransfer).length === 1 ? 'overboeking' : 'overboekingen'} herkend
+                </p>
+                <p className="text-xs italic text-[var(--ink-3)] font-[var(--font-source-serif)]">
+                  Deze transacties worden geïmporteerd maar tellen niet mee in budgetten of geldstroom.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="overflow-x-auto rounded-xl border border-[var(--border-ed)]">
             <table className="w-full text-sm">
               <thead className="bg-[var(--subtle)] text-left">
@@ -968,7 +1005,7 @@ export default function ImportPage() {
               </thead>
               <tbody className="divide-y divide-zinc-100">
                 {rows.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-[var(--subtle)]">
+                  <tr key={idx} className={row.isTransfer ? 'bg-[var(--subtle)]/50' : 'hover:bg-[var(--subtle)]'}>
                     <td className="whitespace-nowrap px-4 py-2 text-[var(--ink-2)]">
                       {new Date(row.date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
                     </td>
@@ -978,31 +1015,50 @@ export default function ImportPage() {
                         <span className="ml-1 text-xs text-[var(--ink-3)]">({row.counterparty_name})</span>
                       )}
                     </td>
-                    <td className={`whitespace-nowrap px-4 py-2 font-medium ${
-                      row.amount > 0 ? 'text-emerald-600' : 'text-[var(--ink)]'
+                    <td className={`whitespace-nowrap px-4 py-2 font-mono font-medium ${
+                      row.isTransfer ? 'text-[var(--ink-2)]' : row.amount > 0 ? 'text-emerald-600' : 'text-[var(--ink)]'
                     }`}>
-                      {row.amount > 0 ? '+' : ''}{formatCurrency(row.amount)}
+                      {!row.isTransfer && (row.amount > 0 ? '+' : '')}{formatCurrency(row.amount)}
                     </td>
                     <td className="px-4 py-2">
-                      <select
-                        value={row.budget_id ?? ''}
-                        onChange={(e) => updateRowBudget(idx, e.target.value)}
-                        className="w-full max-w-[200px] rounded border border-[var(--border-ed)] px-2 py-1 text-xs outline-none focus:border-kern-500"
-                      >
-                        <option value="">Niet gecategoriseerd</option>
-                        {budgetGroups
-                          .filter((group) => group.children.length > 0)
-                          .map((group) => (
-                          <optgroup key={group.parent.id} label={group.parent.name}>
-                            {group.children.map((child) => (
-                              <option key={child.id} value={child.id}>{child.name}</option>
+                      {row.isTransfer ? (
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[.06em] text-[var(--ink-3)]">
+                            Eigen rekening
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setRows((prev) => prev.map((r, i) =>
+                              i === idx ? { ...r, isTransfer: false, transaction_type: null } : r
                             ))}
-                          </optgroup>
-                        ))}
-                      </select>
+                            className="text-[11px] italic text-[var(--ink-4)] hover:text-kern-600 font-[var(--font-source-serif)]"
+                          >
+                            Toch als uitgave?
+                          </button>
+                        </div>
+                      ) : (
+                        <select
+                          value={row.budget_id ?? ''}
+                          onChange={(e) => updateRowBudget(idx, e.target.value)}
+                          className="w-full max-w-[200px] rounded border border-[var(--border-ed)] px-2 py-1 text-xs outline-none focus:border-kern-500"
+                        >
+                          <option value="">Niet gecategoriseerd</option>
+                          {budgetGroups
+                            .filter((group) => group.children.length > 0)
+                            .map((group) => (
+                            <optgroup key={group.parent.id} label={group.parent.name}>
+                              {group.children.map((child) => (
+                                <option key={child.id} value={child.id}>{child.name}</option>
+                              ))}
+                            </optgroup>
+                          ))}
+                        </select>
+                      )}
                     </td>
                     <td className="px-4 py-2 text-center">
-                      {row.confidence >= 0.9 ? (
+                      {row.isTransfer ? (
+                        <ArrowLeftRight className="mx-auto h-4 w-4 text-[var(--ink-3)]" />
+                      ) : row.confidence >= 0.9 ? (
                         <Check className="mx-auto h-4 w-4 text-emerald-500" />
                       ) : row.confidence >= 0.5 ? (
                         <AlertTriangle className="mx-auto h-4 w-4 text-orange-500" />
@@ -1101,7 +1157,11 @@ export default function ImportPage() {
                       {row.amount > 0 ? '+' : ''}{formatCurrency(row.amount)}
                     </td>
                     <td className="px-4 py-2 text-xs text-[var(--ink-2)]">
-                      {row.budgetName ?? 'Niet gecategoriseerd'}
+                      {row.isTransfer ? (
+                        <span className="rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[.06em] text-[var(--ink-3)]">
+                          Eigen rekening
+                        </span>
+                      ) : (row.budgetName ?? 'Niet gecategoriseerd')}
                     </td>
                     <td className="px-4 py-2">
                       {row.isDuplicate ? (
