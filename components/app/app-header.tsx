@@ -13,6 +13,7 @@ const allNavItems = [
   { label: 'De Kern', href: '/core', color: 'amber', requiresActivation: false },
   { label: 'De Wil', href: '/will', color: 'teal', requiresActivation: true },
   { label: 'De Horizon', href: '/horizon', color: 'purple', requiresActivation: true },
+  { label: 'Rapportages', href: '/rapportages', color: 'zinc', requiresActivation: false },
 ] as const
 
 const activeClasses: Record<string, string> = {

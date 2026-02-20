@@ -344,3 +344,73 @@ body {
 .animate-prog-in {
   animation: progIn 1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
+
+/* ── Print styles (PDF export) ──────────────────────────── */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 16mm 14mm;
+  }
+
+  /* Hide app chrome */
+  header,
+  nav,
+  .bottom-nav,
+  [data-print-hide],
+  [data-chat-sidebar],
+  .safe-bottom {
+    display: none !important;
+  }
+
+  /* Reset page background */
+  html, body {
+    background: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Remove shadows and transitions */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    transition: none !important;
+  }
+
+  /* Prevent page breaks inside report sections */
+  .report-section,
+  .kassabon-block,
+  .pull-quote {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Section kickers should stay with their content */
+  .report-kicker {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  /* OKLCH fallback colors for print engines */
+  .report-kern-accent {
+    color: #6b4339 !important;
+    border-color: #6b4339 !important;
+  }
+  .report-wil-accent {
+    color: #3d3048 !important;
+    border-color: #3d3048 !important;
+  }
+  .report-horizon-accent {
+    color: #c4a06b !important;
+    border-color: #c4a06b !important;
+  }
+
+  /* Keep masthead border */
+  .report-masthead {
+    border-bottom: 2px solid #1a1916 !important;
+  }
+
+  /* Links print as plain text */
+  a[href]::after {
+    content: none !important;
+  }
+}
