@@ -3,11 +3,12 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Save, AlertTriangle, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Save, AlertTriangle, RefreshCw, Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Budget } from '@/lib/budget-data'
 import { iconMap, iconOptions } from '@/components/app/budget-shared'
 import { OwnershipToggle, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
+import { GoalForm } from '@/components/app/goal-form'
 
 type FormData = {
   name: string
@@ -25,6 +26,10 @@ type FormData = {
   is_inflation_indexed: boolean
   parent_id: string
   ownership: OwnershipType
+  goal_type: string
+  goal_amount: string
+  goal_date: string
+  goal_frequency: string
 }
 
 export function BudgetForm({
@@ -38,6 +43,11 @@ export function BudgetForm({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [categoryName, setCategoryName] = useState('')
+  const [linkedGoalId, setLinkedGoalId] = useState<string>('')
+  const [availableSavingsGoals, setAvailableSavingsGoals] = useState<
+    { id: string; name: string; target_value: number; target_date: string | null }[]
+  >([])
+  const [showCreateGoal, setShowCreateGoal] = useState(false)
   const { hasHousehold, householdId } = useHouseholdStatus()
 
   const [form, setForm] = useState<FormData>({
@@ -56,6 +66,10 @@ export function BudgetForm({
     is_inflation_indexed: budget?.is_inflation_indexed ?? false,
     parent_id: budget?.parent_id ?? '',
     ownership: budget?.ownership ?? 'personal',
+    goal_type: budget?.goal_type ?? '',
+    goal_amount: budget?.goal_amount ? String(budget.goal_amount) : '',
+    goal_date: budget?.goal_date ?? '',
+    goal_frequency: budget?.goal_frequency ?? '',
   })
 
   const needsAutoParent = !budget && !form.parent_id
@@ -116,6 +130,10 @@ export function BudgetForm({
     is_inflation_indexed: budget?.is_inflation_indexed ?? false,
     parent_id: budget?.parent_id ?? '',
     ownership: budget?.ownership ?? 'personal',
+    goal_type: budget?.goal_type ?? '',
+    goal_amount: budget?.goal_amount ? String(budget.goal_amount) : '',
+    goal_date: budget?.goal_date ?? '',
+    goal_frequency: budget?.goal_frequency ?? '',
   }), [budget])
 
   const isDirty = useMemo(() => {
@@ -135,6 +153,10 @@ export function BudgetForm({
       form.is_inflation_indexed !== initialForm.is_inflation_indexed ||
       form.parent_id !== initialForm.parent_id ||
       form.ownership !== initialForm.ownership ||
+      form.goal_type !== initialForm.goal_type ||
+      form.goal_amount !== initialForm.goal_amount ||
+      form.goal_date !== initialForm.goal_date ||
+      form.goal_frequency !== initialForm.goal_frequency ||
       (needsAutoParent && categoryName.trim() !== '')
     )
   }, [form, initialForm, needsAutoParent, categoryName])
@@ -167,6 +189,26 @@ export function BudgetForm({
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [isDirty])
+
+  // Load available savings goals + existing linked goal on mount
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('goals')
+      .select('id, name, target_value, target_date')
+      .eq('goal_type', 'savings')
+      .eq('is_completed', false)
+      .order('sort_order', { ascending: true })
+      .then(({ data }) => { if (data) setAvailableSavingsGoals(data) })
+    if (budget?.id) {
+      supabase
+        .from('goals')
+        .select('id')
+        .eq('budget_id', budget.id)
+        .maybeSingle()
+        .then(({ data }) => { if (data) setLinkedGoalId(data.id) })
+    }
+  }, [budget?.id])
 
   // Navigation interception for internal links
   function handleNavClick(e: React.MouseEvent, href: string) {
@@ -228,6 +270,8 @@ export function BudgetForm({
       household_id: form.ownership === 'shared' ? householdId : null,
     }
 
+    let savedBudgetId: string | null = budget?.id ?? null
+
     if (budget) {
       // Edit existing budget
       const row = {
@@ -238,7 +282,7 @@ export function BudgetForm({
         default_limit: parseFloat(form.default_limit) || 0,
         budget_type: form.budget_type,
         interval: form.interval,
-        rollover_type: form.rollover_type,
+        rollover_type: form.goal_type === 'maandelijkse_reservering' ? 'carry-over' : form.rollover_type,
         limit_type: form.limit_type,
         alert_threshold: form.alert_threshold,
         max_single_transaction_amount: parseFloat(form.max_single_transaction_amount) || 0,
@@ -246,6 +290,10 @@ export function BudgetForm({
         priority_score: form.priority_score,
         is_inflation_indexed: form.is_inflation_indexed,
         parent_id: form.parent_id || null,
+        goal_type: form.goal_type || null,
+        goal_amount: parseFloat(form.goal_amount) || null,
+        goal_date: form.goal_date || null,
+        goal_frequency: form.goal_frequency || null,
         ...ownershipFields,
       }
 
@@ -327,7 +375,7 @@ export function BudgetForm({
         default_limit: parseFloat(form.default_limit) || 0,
         budget_type: form.budget_type,
         interval: form.interval,
-        rollover_type: form.rollover_type,
+        rollover_type: form.goal_type === 'maandelijkse_reservering' ? 'carry-over' : form.rollover_type,
         limit_type: form.limit_type,
         alert_threshold: form.alert_threshold,
         max_single_transaction_amount: parseFloat(form.max_single_transaction_amount) || 0,
@@ -335,18 +383,45 @@ export function BudgetForm({
         priority_score: form.priority_score,
         is_inflation_indexed: form.is_inflation_indexed,
         parent_id: form.parent_id || null,
+        goal_type: form.goal_type || null,
+        goal_amount: parseFloat(form.goal_amount) || null,
+        goal_date: form.goal_date || null,
+        goal_frequency: form.goal_frequency || null,
         ...ownershipFields,
       }
 
-      const { error: insertError } = await supabase
+      const { data: insertedBudget, error: insertError } = await supabase
         .from('budgets')
         .insert(row)
+        .select('id')
+        .single()
 
       if (insertError) {
         setError(insertError.message)
         setSaving(false)
         return
       }
+      savedBudgetId = insertedBudget?.id ?? null
+    }
+
+    // Goal koppeling (alleen voor spaardoel budgets met parent)
+    if (form.goal_type === 'spaardoel' && savedBudgetId) {
+      // Ontkoppel eventuele vorige goals die naar dit budget wijzen
+      const { data: oldLinked } = await supabase
+        .from('goals')
+        .select('id')
+        .eq('budget_id', savedBudgetId)
+      for (const old of oldLinked ?? []) {
+        if (old.id !== linkedGoalId) {
+          await supabase.from('goals').update({ budget_id: null }).eq('id', old.id)
+        }
+      }
+      if (linkedGoalId) {
+        await supabase.from('goals').update({ budget_id: savedBudgetId }).eq('id', linkedGoalId)
+      }
+    } else if (budget?.id && form.goal_type !== 'spaardoel') {
+      // goal_type gewijzigd weg van spaardoel → ontkoppel
+      await supabase.from('goals').update({ budget_id: null }).eq('budget_id', budget.id)
     }
 
     // Clear draft on successful save
@@ -357,6 +432,7 @@ export function BudgetForm({
   const SelectedIcon = iconMap[form.icon] ?? iconMap['Circle']
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="mx-auto max-w-3xl px-6 py-8" data-testid="budget-form">
       {/* Back */}
       <div className="mb-6">
@@ -582,6 +658,7 @@ export function BudgetForm({
               <option value="income">Inkomen</option>
               <option value="savings">Sparen</option>
               <option value="debt">Schuld</option>
+              <option value="archive">Verborgen</option>
             </select>
           </div>
 
@@ -640,6 +717,138 @@ export function BudgetForm({
           </div>
         </div>
       </fieldset>
+
+      {/* === Doeltype === (alleen voor subbudgetten) */}
+      {form.parent_id && (
+        <fieldset className="mb-8">
+          <legend className="mb-1 text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
+            Doeltype <span className="font-normal normal-case tracking-normal">(optioneel)</span>
+          </legend>
+          <p className="mb-3 text-[11px] text-[var(--ink-3)]">
+            Kies hoe dit budget werkt. Het doeltype bepaalt hoe overschotten en voortgang worden berekend.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {([
+              { value: '', label: 'Geen' },
+              { value: 'vaste_maandlast', label: 'Vaste maandlast' },
+              { value: 'bestedingslimiet', label: 'Bestedingslimiet' },
+              { value: 'spaardoel', label: 'Spaardoel' },
+              { value: 'maandelijkse_reservering', label: 'Reservering' },
+              { value: 'periodieke_last', label: 'Periodieke last' },
+            ] as const).map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => {
+                  update('goal_type', value)
+                  if (value !== 'spaardoel') { update('goal_date', ''); if (value !== 'periodieke_last') update('goal_amount', '') }
+                  if (value !== 'periodieke_last') update('goal_frequency', '')
+                }}
+                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  form.goal_type === value
+                    ? 'bg-kern-50 border-kern-200 text-kern-700'
+                    : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {form.goal_type !== '' && (
+            <div className="mt-2 rounded-lg border border-kern-200 bg-kern-50 px-3 py-2.5">
+              <p className="text-[11px] leading-relaxed text-kern-700">
+                {form.goal_type === 'vaste_maandlast' && 'Een vaste terugkerende uitgave. Je ziet direct of je inkomsten dit dekken of tekortschiet.'}
+                {form.goal_type === 'bestedingslimiet' && 'Maximaal te besteden bedrag. Je ontvangt een melding zodra je de ingestelde drempel nadert.'}
+                {form.goal_type === 'spaardoel' && 'Spaart toe naar een doel. Vul een doelbedrag en einddatum in om de voortgang te volgen.'}
+                {form.goal_type === 'maandelijkse_reservering' && 'Bouwt maandelijks saldo op voor een toekomstige uitgave. Overschot wordt automatisch doorgeschoven naar de volgende maand.'}
+                {form.goal_type === 'periodieke_last' && 'Voor grote uitgaven die je periodiek verwacht, zoals een verzekering of vakantie. Je reserveert maandelijks een deel van het totaalbedrag.'}
+              </p>
+            </div>
+          )}
+
+          {/* Conditionele extra velden — Spaardoel */}
+          {form.goal_type === 'spaardoel' && (
+            <div className="mt-3">
+              {availableSavingsGoals.length > 0 && (
+                <select
+                  value={linkedGoalId}
+                  onChange={(e) => {
+                    const gid = e.target.value
+                    setLinkedGoalId(gid)
+                    if (gid) {
+                      const g = availableSavingsGoals.find(x => x.id === gid)
+                      if (g) {
+                        update('goal_amount', String(g.target_value))
+                        update('goal_date', g.target_date ?? '')
+                      }
+                    } else {
+                      update('goal_amount', '')
+                      update('goal_date', '')
+                    }
+                  }}
+                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                >
+                  <option value="">— Geen koppeling —</option>
+                  {availableSavingsGoals.map(g => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </select>
+              )}
+              {linkedGoalId && (
+                <p className="mt-1 text-[11px] text-wil-600">
+                  Doelbedrag en einddatum worden overgenomen uit het gekoppelde doel.
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowCreateGoal(true)}
+                className="mt-2 inline-flex items-center gap-1.5 text-xs text-wil-600 hover:text-wil-700"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Maak nieuw doel aan in De Wil
+              </button>
+            </div>
+          )}
+
+          {/* Conditionele extra velden — Periodieke Last */}
+          {form.goal_type === 'periodieke_last' && (
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">Totaalbedrag (€)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.goal_amount}
+                  onChange={(e) => update('goal_amount', e.target.value)}
+                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                  placeholder="bijv. 600"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">Frequentie</label>
+                <select
+                  value={form.goal_frequency}
+                  onChange={(e) => update('goal_frequency', e.target.value)}
+                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                >
+                  <option value="">Kies frequentie</option>
+                  <option value="jaarlijks">Jaarlijks</option>
+                  <option value="halfjaarlijks">Halfjaarlijks</option>
+                  <option value="kwartaal">Kwartaal</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {form.goal_type === 'maandelijkse_reservering' && (
+            <p className="mt-2 text-xs text-[var(--ink-3)]">
+              Rollover wordt automatisch ingesteld op &apos;Doorschuiven&apos;.
+            </p>
+          )}
+        </fieldset>
+      )}
 
       {/* === Controle === */}
       <fieldset className="mb-8">
@@ -837,5 +1046,38 @@ export function BudgetForm({
         </button>
       </div>
     </form>
+
+    {showCreateGoal && (
+      <GoalForm
+        assets={[]}
+        debts={[]}
+        lockedToSavings
+        onClose={() => setShowCreateGoal(false)}
+        onSaved={async (newGoalId) => {
+          setShowCreateGoal(false)
+          if (newGoalId) {
+            const supabase = createClient()
+            const { data } = await supabase
+              .from('goals')
+              .select('id, name, target_value, target_date')
+              .eq('goal_type', 'savings')
+              .eq('is_completed', false)
+              .order('sort_order', { ascending: true })
+            setAvailableSavingsGoals(data ?? [])
+            setLinkedGoalId(newGoalId)
+            const newGoal = data?.find(g => g.id === newGoalId)
+            if (newGoal) {
+              update('goal_amount', String(newGoal.target_value))
+              update('goal_date', newGoal.target_date ?? '')
+            }
+          }
+        }}
+        initialValues={{
+          target_value: form.goal_amount || undefined,
+          target_date: form.goal_date || undefined,
+        }}
+      />
+    )}
+    </>
   )
 }

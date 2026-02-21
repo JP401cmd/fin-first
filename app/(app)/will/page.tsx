@@ -14,6 +14,10 @@ import {
   type Action,
 } from '@/lib/recommendation-data'
 import { computeGoalProgress, getGoalColorClasses, type Goal } from '@/lib/goal-data'
+
+type GoalWithBudget = Goal & {
+  budgets?: { id: string; name: string } | null
+}
 import {
   CheckCircle, Sparkles, Target, Flame, Info, Plus,
   AlertTriangle, Clock, TrendingDown, ArrowRight, RotateCcw, BarChart3, CreditCard,
@@ -50,7 +54,7 @@ type KpiData = {
   allActions: { id: string; status: string; freedom_days_impact: number; source: string; completed_at: string | null; due_date: string | null; created_at: string; recommendation: { recommendation_type: string }[] | null }[]
   openActions: { id: string; status: string; freedom_days_impact: number; due_date: string | null }[]
   allPendingRecs: { id: string; status: string; recommendation_type: string; freedom_days_per_year: number; decided_at: string | null; created_at: string }[]
-  goals: Goal[]
+  goals: GoalWithBudget[]
   completedGoalCount: number
   totalGoalCount: number
   goalProgresses: { current: number; target: number; pct: number; onTrack: boolean; eta: string | null }[]
@@ -164,7 +168,7 @@ export default function WillPage() {
         .select('id, feedback_type, recommendation_type, freedom_days_impact, created_at'),
       supabase
         .from('goals')
-        .select('*')
+        .select('*, budgets:budget_id(id, name)')
         .eq('is_completed', false)
         .order('sort_order', { ascending: true })
         .limit(5),
@@ -198,7 +202,7 @@ export default function WillPage() {
 
     const allActions = (actionsRes.data ?? []) as KpiData['allActions']
     const allPendingRecs = (pendingRecsRes.data ?? []) as KpiData['allPendingRecs']
-    const goals = (activeGoalsRes.data ?? []) as Goal[]
+    const goals = (activeGoalsRes.data ?? []) as GoalWithBudget[]
     const loadedAssets = (assetsRes.data ?? []) as { id: string; name: string; current_value: number }[]
     const loadedDebts = (debtsRes.data ?? []) as { id: string; name: string; current_balance: number }[]
 
@@ -742,10 +746,10 @@ export default function WillPage() {
         onClose={() => { setSubscriptionsOpen(false); setWillAdvice(null); setWillAdviceError(null); setScheduledActions({}); setSchedulerOpen(null) }}
         title="Abonnementen"
       >
-        <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50/50 p-4 font-mono text-sm">
+        <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 font-mono text-sm">
           {/* Header */}
           <div className="mb-3 text-center">
-            <p className="text-xs font-bold uppercase tracking-widest text-[var(--ink)]">ABONNEMENTEN</p>
+            <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">ABONNEMENTEN</p>
             <p className="mt-1 text-[11px] text-[var(--ink-3)]">Automatisch gedetecteerd uit transactiegeschiedenis</p>
           </div>
 
@@ -790,9 +794,9 @@ export default function WillPage() {
           {/* Totaalregel */}
           {subscriptions.length > 0 && (
             <>
-              <div className="mt-1 flex justify-between border-t-2 border-zinc-900 pt-2 font-bold">
-                <span>Totaal / maand</span>
-                <span className="tabular-nums">{formatCurrency(subscriptionMonthly)}</span>
+              <div className="mt-1 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
+                <span className="text-[var(--ink)]">Totaal / maand</span>
+                <span className="tabular-nums text-[var(--ink)]">{formatCurrency(subscriptionMonthly)}</span>
               </div>
 
               {/* FreedomTimeBadge */}
@@ -803,7 +807,7 @@ export default function WillPage() {
           )}
 
           {/* Footer */}
-          <p className="mt-3 text-center text-[10px] text-[var(--ink-3)]">
+          <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">
             Gebaseerd op transacties van de afgelopen 12 maanden
           </p>
         </div>
@@ -1194,7 +1198,7 @@ function GoalSummaryRow({
   progress,
   onClick,
 }: {
-  goal: Goal
+  goal: GoalWithBudget
   progress: { current: number; target: number; pct: number; onTrack: boolean; eta: string | null }
   onClick: () => void
 }) {
@@ -1210,7 +1214,14 @@ function GoalSummaryRow({
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between">
-          <p className="truncate text-sm font-medium text-[var(--ink)]">{goal.name}</p>
+          <div className="flex items-center gap-2 min-w-0">
+            <p className="truncate text-sm font-medium text-[var(--ink)]">{goal.name}</p>
+            {goal.budgets?.name && (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] bg-kern-50 text-kern-600 border border-kern-200">
+                via {goal.budgets.name}
+              </span>
+            )}
+          </div>
           <div className="ml-3 flex items-center gap-2">
             <span className="text-sm font-bold text-[var(--ink-2)]">{progress.pct}%</span>
             {progress.eta && (

@@ -117,7 +117,7 @@ export interface PersonaBudget {
   icon: string
   description: string
   default_limit: number
-  budget_type: 'income' | 'expense' | 'savings' | 'debt'
+  budget_type: 'income' | 'expense' | 'savings' | 'debt' | 'archive'
   is_essential: boolean
   priority_score: number
   sort_order: number
@@ -314,6 +314,13 @@ export function makeBudgets(overrides: Record<string, number>): PersonaBudget[] 
       children: [
         { name: 'Schulden & aflossingen', slug: S.SCHULDEN_AFLOSSINGEN, icon: 'CreditCard', description: 'Leningen en schulden aflossen', default_limit: overrides[S.SCHULDEN_AFLOSSINGEN] ?? 60 },
         { name: 'Extra aflossing hypotheek', slug: S.EXTRA_AFLOSSING_HYPOTHEEK, icon: 'HomeIcon', description: 'Vrijwillige extra hypotheekaflossing', default_limit: overrides[S.EXTRA_AFLOSSING_HYPOTHEEK] ?? 0 },
+      ],
+    },
+    {
+      name: 'Eigen rekening', slug: S.EIGEN_REKENING, icon: 'ArrowLeftRight', description: 'Overboekingen tussen eigen rekeningen — geen invloed op resultaten',
+      default_limit: 0, budget_type: 'archive', is_essential: false, priority_score: 1, sort_order: 99,
+      children: [
+        { name: 'Eigen rekening', slug: S.EIGEN_REKENING_SUB, icon: 'ArrowLeftRight', description: 'Overboekingen tussen eigen rekeningen', default_limit: 0 },
       ],
     },
   ]

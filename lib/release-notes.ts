@@ -44,6 +44,57 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'fin_prod_0.72',
+    date: '2026-02-21',
+    title: 'Budgetmodule & terugkerende transacties',
+    sections: [
+      {
+        module: 'De Kern — Budgetten',
+        color: 'amber',
+        items: [
+          {
+            title: 'Beschikbaar per envelop',
+            description: 'Elke budgetregel toont hoeveel er daadwerkelijk beschikbaar is: het effectieve limiet (inclusief rollover-carry en periode-overschrijvingen) minus wat al is uitgegeven. Zichtbaar in horizon-goud onder de voortgangsbalk. Bij overschrijding verdwijnt het label en neemt de bestaande markering het over.',
+          },
+          {
+            title: 'Inkomstendekking',
+            description: 'Banner bovenaan de budgetpagina toont welk percentage van de budgetten door verwacht inkomen wordt gedekt. Bij meer dan 100% verschijnt een waarschuwing.',
+          },
+          {
+            title: 'Ongecategoriseerde transacties',
+            description: 'Nieuwe banner telt alle transacties zonder budgetkoppeling en toont het totaalbedrag. Klikken navigeert direct naar de gefilterde transactielijst op de cash-pagina.',
+          },
+          {
+            title: 'Doeltype-uitleg in budgetformulier',
+            description: 'Het budgetformulier legt per doeltype (sparen, schuld, vaste last, etc.) uit wat het betekent en hoe de voortgang wordt berekend.',
+          },
+        ],
+      },
+      {
+        module: 'De Kern — Cash',
+        color: 'amber',
+        items: [
+          {
+            title: 'Facturenkalender',
+            description: 'Nieuwe kalenderweergave op de cash-pagina (derde tab). Toont terugkerende en geplande transacties per maand in een kalenderraster zodat je ziet wanneer welke lasten verwacht worden.',
+          },
+          {
+            title: 'Terugkerende transacties beheer',
+            description: 'Elke terugkerende boeking heeft een bewerkknop die een volledig formulier opent: naam, bedrag, type, frequentie, dag, budgetkoppeling, einddatum en actief-toggle. Deactiveren vraagt om bevestiging.',
+          },
+          {
+            title: 'Patroondetectie',
+            description: 'De Sparkles-knop in de terugkerende sectie analyseert de transactiegeschiedenis en detecteert automatisch patronen (maandelijks, wekelijks, kwartaal, jaarlijks). Gevonden patronen kunnen met één klik worden toegevoegd als terugkerende boeking.',
+          },
+          {
+            title: 'Categorisatieregels',
+            description: 'Nieuwe beheerinterface (Tag-knop) voor de categorisatieregels. Regels koppelen een tegenpartijnaam of omschrijving automatisch aan een budgetcategorie bij nieuwe transacties. Aanmaken, verwijderen en auto-apply toggle.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: 'fin_prod_0.71',
     date: '2026-02-20',
     title: 'Abonnementen, eigen overboekingen & kleurpersonalisatie',

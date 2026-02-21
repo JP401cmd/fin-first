@@ -10,6 +10,7 @@ interface BudgetTreeProps {
   spending: Record<string, number>
   budgetType: BudgetType
   onNavigate: (budgetId: string) => void
+  beschikbaarMap?: Record<string, number>
 }
 
 /* ── ChildBar ────────────────────────────────────────────────── */
@@ -17,6 +18,7 @@ interface BudgetTreeProps {
 function ChildBar({
   child,
   spent,
+  beschikbaar,
   budgetType,
   onNavigate,
   onHover,
@@ -24,12 +26,14 @@ function ChildBar({
 }: {
   child: Budget
   spent: number
+  beschikbaar?: number
   budgetType: BudgetType
   onNavigate: (id: string) => void
   onHover: (id: string | null) => void
   isHovered: boolean
 }) {
-  const limit = Number(child.default_limit)
+  // Use effective limit (incl. rollover carry) when available, otherwise fall back to default
+  const limit = beschikbaar !== undefined ? beschikbaar + spent : Number(child.default_limit)
   const pct = limit > 0 ? (spent / limit) * 100 : 0
   const overBudget = spent > limit && limit > 0
   const overPct = overBudget ? Math.min(((spent - limit) / limit) * 100, 40) : 0
@@ -106,7 +110,7 @@ function ChildBar({
         />
       </div>
 
-      {/* Amount label + freedom days */}
+      {/* Amount label + beschikbaar + freedom days */}
       <div className="w-28 shrink-0 text-right lg:w-32">
         <span className="text-xs text-[var(--ink-3)]">
           <span className={`font-medium ${overBudget ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
@@ -114,6 +118,15 @@ function ChildBar({
           </span>
           <span className="text-[var(--ink-3)]"> / {formatCurrency(limit)}</span>
         </span>
+        {beschikbaar !== undefined && !overBudget && (
+          <p className={`text-[10px] tabular-nums ${
+            beschikbaar <= 0
+              ? 'text-[var(--ink-4)]'
+              : 'text-[var(--hor-t)]'
+          }`}>
+            {formatCurrency(Math.max(0, beschikbaar))} vrij
+          </p>
+        )}
         <FreedomDaysLabel spent={spent} limit={limit} overBudget={overBudget} />
       </div>
     </div>
@@ -132,8 +145,8 @@ function FreedomDaysLabel({ spent, limit, overBudget }: { spent: number; limit: 
     if (overAmount < 100) return null
     const freedom = eurToFreedomTime(overAmount, dailyExpenseRate)
     return (
-      <p className="text-sm italic text-[var(--ink-3)]" data-testid="freedom-days-over">
-        <span className="text-red-500">{formatCurrency(overAmount)} over — {freedom.formattedDagen} ingeleverd</span>
+      <p className="text-[11px] italic text-[var(--ink-3)]" data-testid="freedom-days-over">
+        <span className="text-red-500">{formatCurrency(overAmount)} te veel — {freedom.formattedDagen} ingeleverd</span>
       </p>
     )
   }
@@ -142,7 +155,7 @@ function FreedomDaysLabel({ spent, limit, overBudget }: { spent: number; limit: 
   if (remaining < 100) return null
   const freedom = eurToFreedomTime(remaining, dailyExpenseRate)
   return (
-    <p className="text-sm italic text-[var(--ink-3)]" data-testid="freedom-days-remaining">
+    <p className="text-[11px] italic text-[var(--ink-3)]" data-testid="freedom-days-remaining">
       nog {freedom.formattedDagen} deze maand
     </p>
   )
@@ -307,11 +320,13 @@ function BezierConnectors({
 function TreeGroup({
   parent,
   spending,
+  beschikbaarMap,
   budgetType,
   onNavigate,
 }: {
   parent: BudgetWithChildren
   spending: Record<string, number>
+  beschikbaarMap?: Record<string, number>
   budgetType: BudgetType
   onNavigate: (id: string) => void
 }) {
@@ -321,13 +336,20 @@ function TreeGroup({
   const totalSpent = parent.children.length > 0
     ? parent.children.reduce((sum, c) => sum + (spending[c.id] ?? 0), 0)
     : (spending[parent.id] ?? 0)
+  // Use effective limit from beschikbaarMap when available (incl. rollover carry)
   const totalLimit = parent.children.length > 0
-    ? parent.children.reduce((sum, c) => sum + Number(c.default_limit), 0)
-    : Number(parent.default_limit)
+    ? parent.children.reduce((sum, c) =>
+        sum + (beschikbaarMap?.[c.id] !== undefined
+          ? beschikbaarMap[c.id] + (spending[c.id] ?? 0)
+          : Number(c.default_limit)), 0)
+    : (beschikbaarMap?.[parent.id] !== undefined
+        ? beschikbaarMap[parent.id] + (spending[parent.id] ?? 0)
+        : Number(parent.default_limit))
 
   const childIds = parent.children.map((c) => c.id)
 
   if (parent.children.length === 0) {
+    const beschikbaar = beschikbaarMap?.[parent.id]
     // No children — show single card
     return (
       <div
@@ -342,6 +364,13 @@ function TreeGroup({
           <p className="text-xs text-[var(--ink-3)]">
             {formatCurrency(totalSpent)} / {formatCurrency(totalLimit)}
           </p>
+          {beschikbaar !== undefined && totalSpent <= totalLimit && (
+            <p className={`text-[10px] tabular-nums ${
+              beschikbaar <= 0 ? 'text-[var(--ink-4)]' : 'text-[var(--hor-t)]'
+            }`}>
+              {formatCurrency(Math.max(0, beschikbaar))} vrij
+            </p>
+          )}
         </div>
       </div>
     )
@@ -380,6 +409,7 @@ function TreeGroup({
               key={child.id}
               child={child}
               spent={spending[child.id] ?? 0}
+              beschikbaar={beschikbaarMap?.[child.id]}
               budgetType={budgetType}
               onNavigate={onNavigate}
               onHover={setHoveredChild}
@@ -414,6 +444,7 @@ function TreeGroup({
               key={child.id}
               child={child}
               spent={spending[child.id] ?? 0}
+              beschikbaar={beschikbaarMap?.[child.id]}
               budgetType={budgetType}
               onNavigate={onNavigate}
               onHover={() => {}}
@@ -428,7 +459,7 @@ function TreeGroup({
 
 /* ── BudgetTree (top-level) ──────────────────────────────────── */
 
-export function BudgetTree({ groups, spending, budgetType, onNavigate }: BudgetTreeProps) {
+export function BudgetTree({ groups, spending, budgetType, onNavigate, beschikbaarMap }: BudgetTreeProps) {
   if (groups.length === 0) return null
 
   return (
@@ -438,6 +469,7 @@ export function BudgetTree({ groups, spending, budgetType, onNavigate }: BudgetT
           key={group.id}
           parent={group}
           spending={spending}
+          beschikbaarMap={beschikbaarMap}
           budgetType={budgetType}
           onNavigate={onNavigate}
         />

@@ -2,11 +2,25 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import {
+  CheckCircle2,
+  ChevronRight,
+  User,
+  Users,
+  Briefcase,
+  Sunset,
+  type LucideIcon,
+} from 'lucide-react'
 import { PERSONAS, PERSONA_KEYS, type PersonaKey } from '@/lib/test-personas'
 import { PersonaCard } from '@/components/app/persona-card'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { PHASES } from '@/lib/feature-phases'
 import { useMobilePreview, DEVICE_PRESETS } from '@/components/app/beheer/mobile-preview-provider'
+import { BUDGET_TEMPLATES, type BudgetTemplate } from '@/lib/budget-templates'
+import { createClient } from '@/lib/supabase/client'
+import { BottomSheet } from '@/components/app/bottom-sheet'
+
+const TEMPLATE_ICONS: Record<string, LucideIcon> = { User, Users, Briefcase, Sunset }
 
 const TABLE_LABELS: Record<string, string> = {
   profiles: 'Profiel',
@@ -56,6 +70,101 @@ export default function BeheerTestdataPage() {
   const [confirmPersona, setConfirmPersona] = useState<PersonaKey | null>(null)
   const [showOnboardingConfirm, setShowOnboardingConfirm] = useState(false)
   const [resettingOnboarding, setResettingOnboarding] = useState(false)
+
+  // Budget template state
+  const [detailTemplate, setDetailTemplate] = useState<BudgetTemplate | null>(null)
+  const [confirmTemplate, setConfirmTemplate] = useState<BudgetTemplate | null>(null)
+  const [applyingTemplate, setApplyingTemplate] = useState(false)
+  const [templateResult, setTemplateResult] = useState<{ name: string; inserted: number } | null>(null)
+  const [templateError, setTemplateError] = useState<string | null>(null)
+
+  async function handleApplyTemplate(template: BudgetTemplate) {
+    setConfirmTemplate(null)
+    setApplyingTemplate(true)
+    setTemplateResult(null)
+    setTemplateError(null)
+
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Niet ingelogd')
+
+      // 1. Get all existing budget IDs for this user
+      const { data: existingBudgets } = await supabase
+        .from('budgets')
+        .select('id, parent_id')
+
+      const allIds = (existingBudgets ?? []).map((b) => b.id)
+      const childIds = (existingBudgets ?? []).filter((b) => b.parent_id).map((b) => b.id)
+      const parentIds = (existingBudgets ?? []).filter((b) => !b.parent_id).map((b) => b.id)
+
+      if (allIds.length > 0) {
+        // 2. Nullify budget_id on transactions and splits
+        await supabase.from('transactions').update({ budget_id: null }).in('budget_id', allIds)
+        await supabase.from('transaction_splits').update({ budget_id: null }).in('budget_id', allIds)
+
+        // 3. Delete dependent budget records
+        await supabase.from('budget_rollovers').delete().in('budget_id', allIds)
+        await supabase.from('budget_amounts').delete().in('budget_id', allIds)
+
+        // 4. Delete child budgets first, then parents
+        if (childIds.length > 0) {
+          await supabase.from('budgets').delete().in('id', childIds)
+        }
+        if (parentIds.length > 0) {
+          await supabase.from('budgets').delete().in('id', parentIds)
+        }
+      }
+
+      // 5. Insert template budgets
+      const budgets = template.getBudgets()
+      let insertedCount = 0
+
+      for (const parent of budgets) {
+        const { data: parentRow, error: parentError } = await supabase
+          .from('budgets')
+          .insert({
+            user_id: user.id,
+            name: parent.name,
+            slug: parent.slug,
+            icon: parent.icon,
+            description: parent.description,
+            default_limit: parent.default_limit,
+            budget_type: parent.budget_type,
+            is_essential: parent.is_essential,
+            priority_score: parent.priority_score,
+            sort_order: parent.sort_order,
+          })
+          .select('id')
+          .single()
+
+        if (parentError || !parentRow) continue
+        insertedCount++
+
+        if (parent.children && parent.children.length > 0) {
+          const childRows = parent.children.map((child, idx) => ({
+            user_id: user.id,
+            parent_id: parentRow.id,
+            name: child.name,
+            slug: child.slug,
+            icon: child.icon,
+            description: child.description,
+            default_limit: child.default_limit,
+            budget_type: parent.budget_type,
+            sort_order: idx,
+          }))
+          const { data: inserted } = await supabase.from('budgets').insert(childRows).select('id')
+          insertedCount += inserted?.length ?? 0
+        }
+      }
+
+      setTemplateResult({ name: template.name, inserted: insertedCount })
+    } catch (e) {
+      setTemplateError(e instanceof Error ? e.message : 'Onbekende fout')
+    } finally {
+      setApplyingTemplate(false)
+    }
+  }
 
   async function handleSeed(personaKey: PersonaKey) {
     setConfirmPersona(null)
@@ -266,6 +375,201 @@ export default function BeheerTestdataPage() {
           </div>
         )}
       </div>
+
+      {/* Budget templates */}
+      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6">
+        <div className="mb-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-3)]">Beheer — Testdata</p>
+          <h3 className="mt-0.5 text-lg font-semibold text-[var(--ink)]">Budget templates laden</h3>
+          <p className="mt-1 text-sm text-[var(--ink-3)]">
+            Vervang alle bestaande budgetten met een preset. Transacties worden ontkoppeld maar <em>niet</em> verwijderd.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {BUDGET_TEMPLATES.map((template) => {
+            const Icon = TEMPLATE_ICONS[template.icon] ?? User
+            return (
+              <button
+                key={template.id}
+                type="button"
+                disabled={applyingTemplate || seeding}
+                onClick={() => { setTemplateResult(null); setTemplateError(null); setDetailTemplate(template) }}
+                className="relative overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-left transition-all hover:border-kern-300 hover:shadow-[var(--s1)] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <div className="absolute inset-x-0 top-0 h-[3px] rounded-t-[var(--r-lg)] bg-kern-600" />
+                <div className="mb-3 mt-1 flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-kern-50">
+                  <Icon className="h-4 w-4 text-kern-700" strokeWidth={1.5} />
+                </div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Template</p>
+                <p className="mt-0.5 text-sm font-semibold text-[var(--ink)]">{template.name}</p>
+                <p className="mt-1 text-[11px] leading-snug text-[var(--ink-3)]">{template.description}</p>
+                <div className="mt-3 flex items-center gap-0.5 text-[10px] font-semibold text-kern-700">
+                  <span>Bekijk</span>
+                  <ChevronRight className="h-3 w-3" />
+                </div>
+              </button>
+            )
+          })}
+        </div>
+
+        {applyingTemplate && (
+          <div className="mt-4 flex items-center gap-2 text-sm text-[var(--ink-3)]">
+            <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--border-md)] border-t-kern-600" />
+            <span>Template laden...</span>
+          </div>
+        )}
+
+        {templateResult && (
+          <div className="mt-4 flex items-center gap-2 rounded-[var(--r)] border border-kern-200 bg-kern-50 px-4 py-3 text-sm text-kern-700">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-kern-600" />
+            <span>
+              Template <strong>{templateResult.name}</strong> geladen — {templateResult.inserted} budgetten aangemaakt.
+            </span>
+          </div>
+        )}
+
+        {templateError && (
+          <div className="mt-4 rounded-[var(--r)] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {templateError}
+          </div>
+        )}
+      </div>
+
+      {/* Template detail BottomSheet */}
+      {detailTemplate && (
+        <BottomSheet
+          open={!!detailTemplate}
+          onClose={() => setDetailTemplate(null)}
+          title={detailTemplate.name}
+        >
+          <div className="px-5 pb-6 pt-2">
+            <p className="mb-4 text-sm text-[var(--ink-3)]">{detailTemplate.description}</p>
+
+            {/* Kassabon-stijl budget overzicht */}
+            <div className="mb-5 rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 font-mono text-sm">
+              <div className="border-b border-dashed border-[var(--border-ed)] px-4 pb-3 pt-4 text-center">
+                <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">Budget overzicht</p>
+                <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">Categorieën &amp; maandlimieten</p>
+              </div>
+
+              <div className="px-4 py-3">
+                {(() => {
+                  const budgets = detailTemplate.getBudgets()
+                  const income = budgets.filter((b) => b.budget_type === 'income')
+                  const expense = budgets.filter((b) => b.budget_type === 'expense')
+                  const savings = budgets.filter((b) => b.budget_type === 'savings')
+                  const debt = budgets.filter((b) => b.budget_type === 'debt')
+                  const totalIncome = income.reduce((s, b) => s + b.default_limit, 0)
+                  const totalExpense = expense.reduce((s, b) => s + b.default_limit, 0)
+                  const totalSavings = savings.reduce((s, b) => s + b.default_limit, 0)
+                  const totalDebt = debt.reduce((s, b) => s + b.default_limit, 0)
+
+                  const renderGroup = (items: typeof budgets, label: string) =>
+                    items.length > 0 ? (
+                      <div key={label} className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
+                        <p className="mb-1 font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-4)]">{label}</p>
+                        {items.map((b) => (
+                          <div key={b.slug} className="flex justify-between py-0.5">
+                            <span className="font-sans text-sm text-[var(--ink-2)]">
+                              {b.name}
+                              {b.children && b.children.length > 0 && (
+                                <span className="ml-1 text-[10px] text-[var(--ink-4)]">({b.children.length} sub)</span>
+                              )}
+                            </span>
+                            <span className="tabular-nums text-[var(--ink)]">
+                              {b.default_limit > 0 ? `€\u00a0${b.default_limit.toLocaleString('nl-NL')}` : '—'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null
+
+                  return (
+                    <>
+                      {renderGroup(income, 'Inkomen')}
+                      {renderGroup(expense, 'Uitgaven')}
+                      {renderGroup(savings, 'Sparen')}
+                      {renderGroup(debt, 'Schulden')}
+
+                      <div className="mt-2 border-t-2 border-[var(--ink)] pt-2 space-y-0.5">
+                        {totalIncome > 0 && (
+                          <div className="flex justify-between font-bold">
+                            <span className="font-sans text-[var(--ink)]">Totaal inkomen</span>
+                            <span className="tabular-nums text-[var(--ink)]">€&nbsp;{totalIncome.toLocaleString('nl-NL')}</span>
+                          </div>
+                        )}
+                        {totalExpense > 0 && (
+                          <div className="flex justify-between font-bold">
+                            <span className="font-sans text-[var(--ink)]">Totaal uitgaven</span>
+                            <span className="tabular-nums text-[var(--ink)]">€&nbsp;{totalExpense.toLocaleString('nl-NL')}</span>
+                          </div>
+                        )}
+                        {(totalSavings + totalDebt) > 0 && (
+                          <div className="flex justify-between font-bold">
+                            <span className="font-sans text-[var(--ink)]">Sparen &amp; schulden</span>
+                            <span className="tabular-nums text-[var(--ink)]">€&nbsp;{(totalSavings + totalDebt).toLocaleString('nl-NL')}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">
+                        Maandlimieten op categorieniveau — sub-budgetten eronder
+                      </p>
+                    </>
+                  )
+                })()}
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setDetailTemplate(null)}
+                className="flex-1 rounded-[var(--r)] border border-[var(--border-md)] py-2.5 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
+              >
+                Annuleren
+              </button>
+              <button
+                type="button"
+                disabled={applyingTemplate}
+                onClick={() => { setDetailTemplate(null); setConfirmTemplate(detailTemplate) }}
+                className="flex-1 rounded-[var(--r)] bg-kern-600 py-2.5 text-sm font-medium text-white transition-colors hover:bg-kern-700 disabled:opacity-50"
+              >
+                Template laden
+              </button>
+            </div>
+          </div>
+        </BottomSheet>
+      )}
+
+      {/* Template bevestigingsdialog */}
+      {confirmTemplate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-md rounded-[var(--r-lg)] bg-[var(--paper)] p-6 shadow-[var(--s2)]">
+            <h3 className="text-lg font-semibold text-[var(--ink)]">Template laden</h3>
+            <p className="mt-2 text-sm text-[var(--ink-2)]">
+              Dit wist <span className="font-semibold text-orange-600">alle bestaande budgetten</span> en vervangt ze met de{' '}
+              <span className="font-semibold">{confirmTemplate.name}</span>-template. Transacties blijven bewaard maar worden ontkoppeld. Doorgaan?
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmTemplate(null)}
+                className="rounded-[var(--r)] border border-[var(--border-md)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
+              >
+                Annuleren
+              </button>
+              <button
+                onClick={() => handleApplyTemplate(confirmTemplate)}
+                className="rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 transition-colors"
+              >
+                Bevestigen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Onboarding flow testen */}
       <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">

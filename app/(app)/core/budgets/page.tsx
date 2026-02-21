@@ -1,12 +1,11 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
-  ChevronLeft, ChevronRight, Plus, X, Pencil, Save, Trash2,
-  GitFork, Fingerprint, Workflow, CircleDot, AlertTriangle,
-  TrendingUp, AlertCircle, BarChart3,
+  ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, X, Pencil, Save, Trash2,
+  GitFork, Fingerprint, Workflow, CircleDot, AlertTriangle, CheckCircle2,
+  TrendingUp, AlertCircle, BarChart3, EyeOff, MessageCircle,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getDefaultBudgets, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
@@ -21,11 +20,34 @@ import { useDailyExpenseRate, eurToFreedomTime } from '@/components/app/freedom-
 import { BudgetSparkline, SparklineWithLabel, type SparklineDataPoint } from '@/components/app/budget-sparkline'
 import { computeBudgetForecast, getConfidenceLabel, getConfidenceColors, type BudgetForecast } from '@/lib/budget-forecast'
 import { OwnershipToggle, OwnershipBadge, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
+import { usePerspective } from '@/components/app/perspective-provider'
 import { SpendingConfidenceBadge, SpendingVarianceDetailPanel, calculateSpendingVariance, type SpendingVarianceData } from '@/components/app/spending-confidence-indicator'
+import { useChatContext } from '@/components/app/chat/chat-provider'
+import { GoalForm } from '@/components/app/goal-form'
+import { EnvelopeTransferSheet } from '@/components/app/envelope-transfer-sheet'
+import { UncategorizedTransactionsBanner } from '@/components/app/uncategorized-transactions-banner'
+
+type Goal = {
+  id: string
+  name: string
+  goal_type: string
+  target_value: number
+  current_value: number
+  target_date: string | null
+  icon: string
+  color: string
+  is_completed: boolean
+  budget_id: string | null
+}
+
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 export default function BudgetsPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { perspective } = usePerspective()
   const [budgets, setBudgets] = useState<BudgetWithChildren[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -43,22 +65,38 @@ export default function BudgetsPage() {
     return new Date(now.getFullYear(), now.getMonth(), 1)
   })
   const [spending, setSpending] = useState<Record<string, number>>({})
-  const [transactions, setTransactions] = useState<{ budget_id: string; amount: number; date: string; description: string; counterparty_name: string | null }[]>([])
+  const [transactions, setTransactions] = useState<{ budget_id: string; amount: number; date: string; description: string; counterparty_name: string | null; is_split_row?: boolean }[]>([])
   const [rollovers, setRollovers] = useState<BudgetRollover[]>([])
   const [budgetAmounts, setBudgetAmounts] = useState<{ id: string; budget_id: string; effective_from: string; amount: number }[]>([])
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null)
+  const [showAllocationModal, setShowAllocationModal] = useState(false)
+  const [goals, setGoals] = useState<Goal[]>([])
+  const [budgetRolloverHistory, setBudgetRolloverHistory] = useState<BudgetRollover[]>([])
+  const [loadingRolloverHistory, setLoadingRolloverHistory] = useState(false)
+  const [showArchive, setShowArchive] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showEnvelopeTransfer, setShowEnvelopeTransfer] = useState(false)
+  const [copyingMonth, setCopyingMonth] = useState(false)
+  const [uncategorizedCount, setUncategorizedCount] = useState(0)
+  const [uncategorizedTotal, setUncategorizedTotal] = useState(0)
 
-  const monthStart = monthDate.toISOString().split('T')[0]
-  const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1).toISOString().split('T')[0]
+  const monthStart = localDateStr(monthDate)
+  const monthEnd = localDateStr(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1))
 
   const loadSpending = useCallback(async () => {
     const supabase = createClient()
-    const { data } = await supabase
+    let spendQuery = supabase
       .from('transactions')
-      .select('budget_id, amount, date, description, counterparty_name')
+      .select('id, is_split, budget_id, amount, date, description, counterparty_name, transaction_type')
       .gte('date', monthStart)
       .lt('date', monthEnd)
       .order('date', { ascending: false })
+
+    if (perspective === 'personal') {
+      spendQuery = spendQuery.eq('ownership', 'personal')
+    }
+
+    const { data } = await spendQuery
 
     if (data && data.length > 0) {
       const map: Record<string, number> = {}
@@ -67,11 +105,62 @@ export default function BudgetsPage() {
           map[t.budget_id] = (map[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
         }
       }
+
+      // Add spending from split transactions
+      const splitTxIds = data.filter(t => t.is_split).map(t => t.id)
+      let splitRows: typeof transactions = []
+      if (splitTxIds.length > 0) {
+        const { data: splits } = await supabase
+          .from('transaction_splits')
+          .select('budget_id, amount, transactions(date, description, counterparty_name)')
+          .in('transaction_id', splitTxIds)
+        if (splits) {
+          for (const s of splits) {
+            if (s.budget_id) {
+              map[s.budget_id] = (map[s.budget_id] ?? 0) + Math.abs(Number(s.amount))
+            }
+          }
+          splitRows = (splits as unknown as Array<{
+            budget_id: string | null
+            amount: number
+            transactions: { date: string; description: string; counterparty_name: string | null } | null
+          }>)
+            .filter(s => s.budget_id && s.transactions)
+            .map(s => ({
+              budget_id: s.budget_id as string,
+              amount: s.amount,
+              date: (s.transactions as { date: string }).date,
+              description: (s.transactions as { description: string }).description,
+              counterparty_name: (s.transactions as { counterparty_name: string | null }).counterparty_name,
+              is_split_row: true,
+            }))
+        }
+      }
+
       setSpending(map)
-      setTransactions(data.filter(t => t.budget_id) as typeof transactions)
+      setTransactions([
+        ...data.filter(t => t.budget_id) as typeof transactions,
+        ...splitRows,
+      ])
+
+      // Compute uncategorized expenses (no budget_id, not a transfer, not income)
+      const uncategorized = data.filter(
+        (t) =>
+          !t.budget_id &&
+          !t.is_split &&
+          t.transaction_type !== 'transfer' &&
+          t.transaction_type !== 'income' &&
+          Number(t.amount) < 0,
+      )
+      setUncategorizedCount(uncategorized.length)
+      setUncategorizedTotal(
+        uncategorized.reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0),
+      )
     } else {
       setSpending({})
       setTransactions([])
+      setUncategorizedCount(0)
+      setUncategorizedTotal(0)
     }
 
     // Fetch rollovers for the current month period
@@ -91,13 +180,13 @@ export default function BudgetsPage() {
     if (!rolloverData || rolloverData.length === 0) {
       const prevPeriod = getPreviousPeriod(currentPeriod)
       const prevMonthDate = new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1)
-      const prevStart = prevMonthDate.toISOString().split('T')[0]
-      const prevEnd = monthDate.toISOString().split('T')[0]
+      const prevStart = localDateStr(prevMonthDate)
+      const prevEnd = localDateStr(monthDate)
 
       // Fetch previous month rollovers and spending
       const [prevRolloversRes, prevTxRes, budgetsForRolloverRes] = await Promise.all([
         supabase.from('budget_rollovers').select('*').eq('period', prevPeriod),
-        supabase.from('transactions').select('budget_id, amount').gte('date', prevStart).lt('date', prevEnd),
+        supabase.from('transactions').select('id, is_split, budget_id, amount').gte('date', prevStart).lt('date', prevEnd),
         supabase.from('budgets').select('id, default_limit, rollover_type, parent_id').not('parent_id', 'is', null),
       ])
 
@@ -110,6 +199,22 @@ export default function BudgetsPage() {
       for (const t of prevTx) {
         if (t.budget_id) {
           prevSpending[t.budget_id] = (prevSpending[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
+        }
+      }
+
+      // Add spending from split transactions (previous month)
+      const prevSplitTxIds = prevTx.filter(t => t.is_split).map(t => t.id)
+      if (prevSplitTxIds.length > 0) {
+        const { data: prevSplits } = await supabase
+          .from('transaction_splits')
+          .select('budget_id, amount')
+          .in('transaction_id', prevSplitTxIds)
+        if (prevSplits) {
+          for (const s of prevSplits) {
+            if (s.budget_id) {
+              prevSpending[s.budget_id] = (prevSpending[s.budget_id] ?? 0) + Math.abs(Number(s.amount))
+            }
+          }
         }
       }
 
@@ -149,15 +254,23 @@ export default function BudgetsPage() {
     }
 
     setRollovers((rolloverData ?? []) as BudgetRollover[])
-  }, [monthStart, monthEnd, monthDate])
+  }, [monthStart, monthEnd, monthDate, perspective])
 
   const loadBudgets = useCallback(async () => {
     try {
       const supabase = createClient()
-      const { data, error: fetchError } = await supabase
+      let query = supabase
         .from('budgets')
         .select('*')
+        .eq('is_archived', false)
         .order('sort_order', { ascending: true })
+
+      // Filter by perspective: personal shows only own budgets, household shows all
+      if (perspective === 'personal') {
+        query = query.eq('ownership', 'personal')
+      }
+
+      const { data, error: fetchError } = await query
 
       if (fetchError) throw fetchError
 
@@ -183,6 +296,15 @@ export default function BudgetsPage() {
     } finally {
       setLoading(false)
     }
+  }, [perspective])
+
+  const loadGoals = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('goals')
+      .select('id, name, goal_type, target_value, current_value, target_date, icon, color, is_completed, budget_id')
+      .order('sort_order', { ascending: true })
+    if (data) setGoals(data as Goal[])
   }, [])
 
   async function seedBudgets(supabase: ReturnType<typeof createClient>) {
@@ -237,13 +359,29 @@ export default function BudgetsPage() {
 
   useEffect(() => {
     loadBudgets()
-  }, [loadBudgets])
+    loadGoals()
+  }, [loadBudgets, loadGoals])
 
   useEffect(() => {
     if (!loading) {
       loadSpending()
     }
   }, [loading, loadSpending])
+
+  useEffect(() => {
+    if (!selectedBudgetId) { setBudgetRolloverHistory([]); return }
+    setLoadingRolloverHistory(true)
+    const supabase = createClient()
+    supabase
+      .from('budget_rollovers')
+      .select('id, budget_id, period, carried_amount, rollover_type, created_at')
+      .eq('budget_id', selectedBudgetId)
+      .order('period', { ascending: false })
+      .then(({ data }) => {
+        setBudgetRolloverHistory((data ?? []) as BudgetRollover[])
+        setLoadingRolloverHistory(false)
+      })
+  }, [selectedBudgetId])
 
   // Open modal from URL search params (e.g. ?budget=id&edit=true)
   useEffect(() => {
@@ -278,6 +416,12 @@ export default function BudgetsPage() {
   const selectedParent = selectedBudgetId
     ? budgets.find((b) => b.id === selectedBudgetId || b.children.some((c) => c.id === selectedBudgetId)) ?? null
     : null
+  // Siblings for ordering: parents of same type, or children of same parent
+  const selectedSiblings: Budget[] = selectedBudget
+    ? selectedBudget.parent_id
+      ? (selectedParent?.children ?? [])
+      : budgets.filter((b) => b.budget_type === selectedBudget.budget_type)
+    : []
 
   function prevMonth() {
     setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))
@@ -306,7 +450,7 @@ export default function BudgetsPage() {
     const carry = getCarriedAmount(budgetRollovers, formatPeriod(monthDate))
 
     // Check budget_amounts for period-specific limit override
-    const displayDate = monthDate.toISOString().split('T')[0]
+    const displayDate = localDateStr(monthDate)
     const applicable = budgetAmounts
       .filter(a => a.budget_id === budget.id && a.effective_from <= displayDate)
       .sort((a, b) => b.effective_from.localeCompare(a.effective_from))
@@ -328,10 +472,46 @@ export default function BudgetsPage() {
     return getCarriedAmount(budgetRollovers, formatPeriod(monthDate))
   }
 
+  async function copyFromLastMonth() {
+    if (copyingMonth) return
+    setCopyingMonth(true)
+    const supabase = createClient()
+    const prevPeriod = getPreviousPeriod(formatPeriod(monthDate))
+    const prevDate = `${prevPeriod}-01`
+    const currentDate = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}-01`
+
+    // Read all budget_amounts from previous month
+    const { data: prevAmounts } = await supabase
+      .from('budget_amounts')
+      .select('budget_id, amount')
+      .eq('effective_from', prevDate)
+
+    if (prevAmounts && prevAmounts.length > 0) {
+      // Delete existing current-month amounts for these budgets
+      const budgetIds = prevAmounts.map(a => a.budget_id)
+      await supabase.from('budget_amounts').delete()
+        .in('budget_id', budgetIds)
+        .eq('effective_from', currentDate)
+
+      // Insert previous month's amounts for current month
+      await supabase.from('budget_amounts').insert(
+        prevAmounts.map(a => ({
+          budget_id: a.budget_id,
+          effective_from: currentDate,
+          amount: Number(a.amount),
+        }))
+      )
+
+      await loadSpending()
+    }
+    setCopyingMonth(false)
+  }
+
   const incomeBudgets = budgets.filter((b) => b.budget_type === 'income')
   const expenseBudgets = budgets.filter((b) => b.budget_type === 'expense')
   const savingsBudgets = budgets.filter((b) => b.budget_type === 'savings')
   const debtBudgets = budgets.filter((b) => b.budget_type === 'debt')
+  const archiveBudgets = budgets.filter((b) => b.budget_type === 'archive')
 
   const totalIncome = incomeBudgets.reduce((sum, b) => sum + getParentEffectiveLimit(b), 0)
   const totalIncomeActual = incomeBudgets.reduce((sum, b) => sum + getParentSpent(b), 0)
@@ -341,6 +521,22 @@ export default function BudgetsPage() {
   const totalSavingsActual = savingsBudgets.reduce((sum, b) => sum + getParentSpent(b), 0)
   const totalDebtBudget = debtBudgets.reduce((sum, b) => sum + getParentEffectiveLimit(b), 0)
   const totalDebtActual = debtBudgets.reduce((sum, b) => sum + getParentSpent(b), 0)
+
+  const totalAllocated = totalExpenseBudget + totalSavingsBudget + totalDebtBudget
+  const teVerdelen = totalIncome - totalAllocated
+  const dekkingsgraad = totalIncome > 0 ? (totalAllocated / totalIncome) * 100 : 0
+
+  // F2-09: beschikbaar per sub-budget (effectieve limiet incl. rollover − uitgegeven)
+  const beschikbaarMap: Record<string, number> = {}
+  for (const group of budgets) {
+    const items = group.children.length > 0 ? group.children : [group as Budget]
+    for (const b of items) {
+      beschikbaarMap[b.id] = getEffectiveLimit(b) - (spending[b.id] ?? 0)
+    }
+  }
+
+  // F2-10: dekkingsratio werkelijk ontvangen inkomen vs. verwacht inkomen
+  const coverageRatio = totalIncome > 0 ? Math.min(1, totalIncomeActual / totalIncome) : 1
 
   const monthLabel = monthDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
 
@@ -371,7 +567,7 @@ export default function BudgetsPage() {
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       {/* Month selector */}
       <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex items-center justify-between gap-2">
           <button
             onClick={prevMonth}
             className="rounded-lg p-2 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
@@ -386,6 +582,20 @@ export default function BudgetsPage() {
             className="rounded-lg p-2 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
           >
             <ChevronRight className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={copyFromLastMonth}
+            disabled={copyingMonth}
+            title="Kopieer budgetbedragen van vorige maand"
+            className="ml-auto hidden sm:inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-50"
+          >
+            {copyingMonth ? (
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border border-[var(--ink-3)] border-t-transparent" />
+            ) : (
+              <Save className="h-3.5 w-3.5" />
+            )}
+            Kopieer vorige maand
           </button>
         </div>
 
@@ -414,6 +624,47 @@ export default function BudgetsPage() {
             <p className="text-[10px] text-red-500/70">vrijheid terugkopen</p>
           </div>
         </div>
+
+        {/* Te Verdelen + Dekkingsgraad */}
+        <div className={`mt-4 flex items-center justify-between gap-3 rounded-lg border px-4 py-3 ${teVerdelen >= 0 ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
+          <div>
+            <p className={`text-[10px] font-semibold uppercase tracking-wider ${teVerdelen >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>Te Verdelen</p>
+            <p className={`mt-0.5 font-mono text-lg font-bold ${teVerdelen >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+              {teVerdelen >= 0 ? '' : '–'}{formatCurrency(Math.abs(teVerdelen))}
+            </p>
+            <p className={`text-[11px] ${teVerdelen >= 0 ? 'text-emerald-600/70' : 'text-red-600/70'}`}>
+              {dekkingsgraad.toFixed(0)}% van inkomen toegewezen
+            </p>
+            {dekkingsgraad > 100 && (
+              <p className="mt-1 text-[11px] font-medium text-red-600">
+                Je hebt {formatCurrency(Math.abs(teVerdelen))} meer toegewezen dan je verwacht te verdienen.
+              </p>
+            )}
+          </div>
+          <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => setShowEnvelopeTransfer(true)}
+              className="rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--paper)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+            >
+              Verplaats →
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAllocationModal(true)}
+              className="rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--paper)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+            >
+              Budgetplan instellen
+            </button>
+          </div>
+        </div>
+
+        <UncategorizedTransactionsBanner
+          count={uncategorizedCount}
+          totalAmount={uncategorizedTotal}
+          onClick={() => router.push('/core/cash?filterBudget=uncategorized')}
+          formatCurrency={formatCurrency}
+        />
       </section>
 
       {/* View toggle + New budget button */}
@@ -465,18 +716,33 @@ export default function BudgetsPage() {
           </button>
         </div>
 
-        <Link
-          href="/core/budgets/new"
+        <button
+          type="button"
+          onClick={() => setShowCreateModal(true)}
           className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
         >
           <Plus className="h-4 w-4" />
           Nieuw budget
-        </Link>
+        </button>
       </div>
 
       {/* Budget groups */}
       {viewMode === 'tree' ? (
         <>
+          {/* F2-10: Inkomensdekking — één keer boven de secties */}
+          {coverageRatio < 0.99 && totalIncome > 0 && (
+            <div className={`mt-4 flex items-center gap-2 rounded-[var(--r)] border px-3 py-2 ${
+              coverageRatio >= 0.8
+                ? 'border-kern-200 bg-kern-50 text-kern-700'
+                : 'border-red-200 bg-red-50 text-red-700'
+            }`}>
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              <span className="font-sans text-[11px]">
+                <strong>{Math.round(coverageRatio * 100)}% gedekt</strong> — {formatCurrency(totalIncomeActual)} van {formatCurrency(totalIncome)} verwacht inkomen ontvangen
+              </span>
+            </div>
+          )}
+
           {incomeBudgets.length > 0 && (
             <div className="mt-4 sm:mt-8">
               <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Inkomen</h3>
@@ -485,6 +751,7 @@ export default function BudgetsPage() {
                 spending={spending}
                 budgetType="income"
                 onNavigate={(id) => openBudgetModal(id)}
+                beschikbaarMap={beschikbaarMap}
               />
             </div>
           )}
@@ -496,6 +763,7 @@ export default function BudgetsPage() {
                 spending={spending}
                 budgetType="expense"
                 onNavigate={(id) => openBudgetModal(id)}
+                beschikbaarMap={beschikbaarMap}
               />
             </div>
           )}
@@ -507,6 +775,7 @@ export default function BudgetsPage() {
                 spending={spending}
                 budgetType="savings"
                 onNavigate={(id) => openBudgetModal(id)}
+                beschikbaarMap={beschikbaarMap}
               />
             </div>
           )}
@@ -518,7 +787,32 @@ export default function BudgetsPage() {
                 spending={spending}
                 budgetType="debt"
                 onNavigate={(id) => openBudgetModal(id)}
+                beschikbaarMap={beschikbaarMap}
               />
+            </div>
+          )}
+          {archiveBudgets.length > 0 && (
+            <div className="mt-4 sm:mt-8">
+              <button
+                type="button"
+                className="mb-4 flex items-center gap-2 label-editorial text-[var(--ink-4)] hover:text-[var(--ink-3)] transition-colors"
+                onClick={() => setShowArchive((prev) => !prev)}
+              >
+                <EyeOff className="h-3.5 w-3.5" />
+                Verborgen
+                <span className="ml-1 text-[10px] normal-case tracking-normal font-normal text-[var(--ink-4)]">
+                  ({archiveBudgets.length} {archiveBudgets.length === 1 ? 'categorie' : 'categorieën'})
+                </span>
+                <ChevronDown className={`h-3 w-3 transition-transform ${showArchive ? 'rotate-180' : ''}`} />
+              </button>
+              {showArchive && (
+                <BudgetTree
+                  groups={archiveBudgets}
+                  spending={spending}
+                  budgetType="archive"
+                  onNavigate={(id) => openBudgetModal(id)}
+                />
+              )}
             </div>
           )}
         </>
@@ -555,11 +849,28 @@ export default function BudgetsPage() {
         />
       )}
 
+      {/* Budget allocation modal */}
+      {showAllocationModal && (
+        <BudgetAllocationModal
+          budgets={budgets}
+          budgetAmounts={budgetAmounts}
+          monthDate={monthDate}
+          totalIncome={totalIncome}
+          rollovers={rollovers}
+          onClose={() => setShowAllocationModal(false)}
+          onSaved={() => {
+            setShowAllocationModal(false)
+            loadSpending()
+          }}
+        />
+      )}
+
       {/* Budget detail modal */}
       {selectedBudget && modalStep === 'detail' && (
         <BudgetDetailModal
           budget={selectedBudget}
           parent={selectedParent}
+          siblings={selectedSiblings}
           spending={spending}
           transactions={transactions}
           rollovers={rollovers}
@@ -567,6 +878,8 @@ export default function BudgetsPage() {
           getSpent={getSpent}
           getEffectiveLimit={getEffectiveLimit}
           getBudgetCarry={getBudgetCarry}
+          goals={goals.filter(g => g.budget_id === selectedBudget?.id)}
+          rolloverHistory={budgetRolloverHistory}
           onClose={closeBudgetModal}
           onEdit={() => setModalStep('edit')}
           onSelectChild={(id) => openBudgetModal(id)}
@@ -574,6 +887,9 @@ export default function BudgetsPage() {
             closeBudgetModal()
             await loadBudgets()
             await loadSpending()
+          }}
+          onReorder={async () => {
+            await loadBudgets()
           }}
         />
       )}
@@ -597,6 +913,192 @@ export default function BudgetsPage() {
           }}
         />
       )}
+
+      {/* Budget create modal */}
+      {showCreateModal && (
+        <BudgetCreateModal
+          parentBudgets={budgets}
+          onClose={() => setShowCreateModal(false)}
+          onSaved={() => {
+            setShowCreateModal(false)
+            loadBudgets()
+            loadSpending()
+          }}
+        />
+      )}
+
+      {/* Envelope transfer sheet */}
+      {showEnvelopeTransfer && (
+        <EnvelopeTransferSheet
+          budgets={budgets}
+          budgetAmounts={budgetAmounts}
+          monthDate={monthDate}
+          onClose={() => setShowEnvelopeTransfer(false)}
+          onSaved={() => {
+            setShowEnvelopeTransfer(false)
+            loadSpending()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Budget allocation modal ──────────────────────────────────
+
+function BudgetAllocationModal({
+  budgets,
+  budgetAmounts,
+  monthDate,
+  totalIncome,
+  rollovers,
+  onClose,
+  onSaved,
+}: {
+  budgets: BudgetWithChildren[]
+  budgetAmounts: { id: string; budget_id: string; effective_from: string; amount: number }[]
+  monthDate: Date
+  totalIncome: number
+  rollovers: BudgetRollover[]
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const displayDate = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}-01`
+
+  const [localLimits, setLocalLimits] = useState<Record<string, string>>(() => {
+    const result: Record<string, string> = {}
+    const nonIncomeBudgets = budgets.filter(b => b.budget_type !== 'income' && b.budget_type !== 'archive')
+    for (const parent of nonIncomeBudgets) {
+      const items = parent.children.length > 0 ? parent.children : [parent]
+      for (const b of items) {
+        const applicable = budgetAmounts
+          .filter(a => a.budget_id === b.id && a.effective_from <= displayDate)
+          .sort((a, z) => z.effective_from.localeCompare(a.effective_from))
+        result[b.id] = String(applicable.length > 0 ? applicable[0].amount : b.default_limit)
+      }
+    }
+    return result
+  })
+
+  const [saving, setSaving] = useState(false)
+
+  // Rollovers are automatic carry-overs that already count as allocated on the main page.
+  // Include them here so that "te verdelen" matches the main page calculation.
+  const currentPeriod = formatPeriod(monthDate)
+  const totalCarry = Object.keys(localLimits).reduce((sum, budgetId) => {
+    const budgetRollovers = rollovers.filter(r => r.budget_id === budgetId)
+    return sum + getCarriedAmount(budgetRollovers, currentPeriod)
+  }, 0)
+
+  const localTotal = Object.values(localLimits).reduce((sum, v) => sum + (Number(v) || 0), 0)
+  const localTeVerdelen = totalIncome - localTotal - totalCarry
+
+  async function handleSave() {
+    if (saving) return
+    setSaving(true)
+    const effectiveDate = displayDate
+    const supabase = createClient()
+
+    for (const [budgetId, amount] of Object.entries(localLimits)) {
+      await supabase.from('budget_amounts').delete()
+        .eq('budget_id', budgetId).eq('effective_from', effectiveDate)
+      await supabase.from('budget_amounts').insert({
+        budget_id: budgetId,
+        effective_from: effectiveDate,
+        amount: Number(amount),
+      })
+    }
+
+    setSaving(false)
+    onSaved()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-lg overflow-y-auto rounded-2xl bg-[var(--paper)] shadow-xl"
+        style={{ maxHeight: '85vh' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-6 py-4">
+          <h2 className="text-lg font-semibold text-[var(--ink)]">Budgetplan instellen</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-5 px-6 py-4">
+          {/* Inkomen referentie (readonly) */}
+          <div className="flex items-center justify-between rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)]">Verwacht inkomen</p>
+            <p className="font-mono text-base font-bold text-[var(--ink)]">{formatCurrency(totalIncome)}</p>
+          </div>
+
+          {/* Per budget-groep */}
+          {(['expense', 'savings', 'debt'] as const).map(type => {
+            const groups = budgets.filter(b => b.budget_type === type)
+            if (groups.length === 0) return null
+            const typeLabel = type === 'expense' ? 'Uitgaven' : type === 'savings' ? 'Sparen' : 'Schulden'
+            return (
+              <div key={type} className="space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-3)]">{typeLabel}</p>
+                {groups.map(parent => {
+                  const items = parent.children.length > 0 ? parent.children : [parent]
+                  return items.map(b => (
+                    <div key={b.id} className="flex items-center gap-3">
+                      <span className="min-w-0 flex-1 truncate text-sm text-[var(--ink-2)]">{b.name}</span>
+                      <div className="relative w-28">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-[var(--ink-3)]">€</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={localLimits[b.id] ?? ''}
+                          onChange={e => setLocalLimits(prev => ({ ...prev, [b.id]: e.target.value }))}
+                          className="w-full rounded-[var(--r)] border border-[var(--border-md)] py-1.5 pl-6 pr-2 text-right font-mono text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                        />
+                      </div>
+                    </div>
+                  ))
+                })}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Footer: live te verdelen + opslaan */}
+        <div className="space-y-3 border-t border-[var(--border-ed)] px-6 py-4">
+          <div className={`flex items-center justify-between rounded-lg border px-3 py-2 ${localTeVerdelen >= 0 ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
+            <span className="text-xs font-medium text-[var(--ink-2)]">Te Verdelen</span>
+            <span className={`font-mono text-sm font-bold ${localTeVerdelen >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+              {localTeVerdelen >= 0 ? '' : '–'}{formatCurrency(Math.abs(localTeVerdelen))}
+            </span>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+            >
+              Annuleren
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="inline-flex items-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" />
+              {saving ? 'Opslaan...' : 'Opslaan'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -726,6 +1228,7 @@ function BudgetLegend({
 function BudgetDetailModal({
   budget,
   parent,
+  siblings,
   spending,
   transactions,
   rollovers,
@@ -733,28 +1236,59 @@ function BudgetDetailModal({
   getSpent,
   getEffectiveLimit,
   getBudgetCarry,
+  goals,
+  rolloverHistory,
   onClose,
   onEdit,
   onSelectChild,
   onDelete,
+  onReorder,
 }: {
   budget: Budget
   parent: BudgetWithChildren | null
+  siblings: Budget[]
   spending: Record<string, number>
-  transactions: { budget_id: string; amount: number; date: string; description: string; counterparty_name: string | null }[]
+  transactions: { budget_id: string; amount: number; date: string; description: string; counterparty_name: string | null; is_split_row?: boolean }[]
   rollovers: BudgetRollover[]
   monthDate: Date
   getSpent: (b: Budget) => number
   getEffectiveLimit: (b: Budget) => number
   getBudgetCarry: (b: Budget) => number
+  goals: Goal[]
+  rolloverHistory: BudgetRollover[]
   onClose: () => void
   onEdit: () => void
   onSelectChild: (id: string) => void
   onDelete: () => void
+  onReorder: () => void
 }) {
+  const { perspective } = usePerspective()
+  const { openWithMessage } = useChatContext()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [reordering, setReordering] = useState(false)
+
+  // Ordering helpers
+  const sortedSiblings = [...siblings].sort((a, b) => a.sort_order - b.sort_order)
+  const currentIndex = sortedSiblings.findIndex((s) => s.id === budget.id)
+  const canMoveUp = currentIndex > 0
+  const canMoveDown = currentIndex < sortedSiblings.length - 1
+
+  async function moveBudget(direction: 'up' | 'down') {
+    if (reordering) return
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+    const target = sortedSiblings[targetIndex]
+    if (!target) return
+    setReordering(true)
+    const supabase = createClient()
+    await Promise.all([
+      supabase.from('budgets').update({ sort_order: target.sort_order }).eq('id', budget.id),
+      supabase.from('budgets').update({ sort_order: budget.sort_order }).eq('id', target.id),
+    ])
+    setReordering(false)
+    onReorder()
+  }
   const { dailyExpenseRate, loading: rateLoading, source: rateSource } = useDailyExpenseRate()
   const hasFreedomData = !rateLoading && rateSource === 'transactions' && dailyExpenseRate > 0
   const budgetType = (budget.budget_type ?? 'expense') as BudgetType
@@ -773,6 +1307,7 @@ function BudgetDetailModal({
   const carry = isParent
     ? children.reduce((sum, c) => sum + getBudgetCarry(c), 0)
     : getBudgetCarry(budget)
+  const cumulativeCarry = rolloverHistory.reduce((sum, r) => sum + Number(r.carried_amount), 0)
 
   // Filter transactions for this budget (or children if parent)
   const budgetIds = isParent ? children.map(c => c.id) : [budget.id]
@@ -790,23 +1325,48 @@ function BudgetDetailModal({
       const months: { month: string; start: string; end: string; label: string }[] = []
       for (let i = 11; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-        const start = d.toISOString().split('T')[0]
-        const end = new Date(d.getFullYear(), d.getMonth() + 1, 1).toISOString().split('T')[0]
+        const start = localDateStr(d)
+        const end = localDateStr(new Date(d.getFullYear(), d.getMonth() + 1, 1))
         const label = d.toLocaleDateString('nl-NL', { month: 'short' })
         months.push({ month: start, start, end, label })
       }
 
-      const { data: txData } = await supabase
-        .from('transactions')
-        .select('budget_id, amount, date')
-        .in('budget_id', budgetIds)
-        .gte('date', months[0].start)
-        .lt('date', months[months.length - 1].end)
+      const [{ data: txData }, { data: splitTxInRange }, { data: amountData }] = await Promise.all([
+        supabase
+          .from('transactions')
+          .select('budget_id, amount, date')
+          .in('budget_id', budgetIds)
+          .gte('date', months[0].start)
+          .lt('date', months[months.length - 1].end),
+        supabase
+          .from('transactions')
+          .select('id, date')
+          .gte('date', months[0].start)
+          .lt('date', months[months.length - 1].end)
+          .eq('is_split', true),
+        supabase
+          .from('budget_amounts')
+          .select('budget_id, effective_from, amount')
+          .in('budget_id', budgetIds),
+      ])
 
-      const { data: amountData } = await supabase
-        .from('budget_amounts')
-        .select('budget_id, effective_from, amount')
-        .in('budget_id', budgetIds)
+      // Fetch split amounts for these budgets within the date range
+      const splitTxIds = (splitTxInRange ?? []).map(t => t.id)
+      const splitDateMap: Record<string, string> = {}
+      for (const t of (splitTxInRange ?? [])) splitDateMap[t.id] = t.date
+      let splitRows: { budget_id: string; amount: number; date: string }[] = []
+      if (splitTxIds.length > 0) {
+        const { data: splitData } = await supabase
+          .from('transaction_splits')
+          .select('budget_id, amount, transaction_id')
+          .in('budget_id', budgetIds)
+          .in('transaction_id', splitTxIds)
+        if (splitData) {
+          splitRows = splitData
+            .filter(s => s.budget_id && splitDateMap[s.transaction_id])
+            .map(s => ({ budget_id: s.budget_id, amount: Number(s.amount), date: splitDateMap[s.transaction_id] }))
+        }
+      }
 
       // Build limit change timeline
       const changes = (amountData ?? [])
@@ -816,7 +1376,9 @@ function BudgetDetailModal({
 
       const result = months.map(m => {
         const monthTx = (txData ?? []).filter(t => t.date >= m.start && t.date < m.end && budgetIds.includes(t.budget_id))
+        const monthSplits = splitRows.filter(s => s.date >= m.start && s.date < m.end)
         const monthSpent = monthTx.reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
+          + monthSplits.reduce((s, r) => s + Math.abs(r.amount), 0)
 
         // Calculate effective limit for this month
         let monthLimit = 0
@@ -841,7 +1403,9 @@ function BudgetDetailModal({
         for (const child of children) {
           childData[child.id] = months.map(m => {
             const monthTx = (txData ?? []).filter(t => t.date >= m.start && t.date < m.end && t.budget_id === child.id)
+            const monthChildSplits = splitRows.filter(s => s.date >= m.start && s.date < m.end && s.budget_id === child.id)
             const monthSpent = monthTx.reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
+              + monthChildSplits.reduce((s, r) => s + Math.abs(r.amount), 0)
             return { month: m.month, label: m.label, spent: monthSpent }
           })
         }
@@ -867,7 +1431,12 @@ function BudgetDetailModal({
             <BudgetIcon name={budget.icon} className={`h-5 w-5 ${colors.text}`} />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="font-semibold text-[var(--ink)]">{budget.name}</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="font-semibold text-[var(--ink)]">{budget.name}</h2>
+              {perspective === 'household' && budget.ownership === 'shared' && (
+                <OwnershipBadge ownership="shared" />
+              )}
+            </div>
             {budget.description && <p className="truncate text-xs text-[var(--ink-3)]">{budget.description}</p>}
           </div>
           <button onClick={onClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
@@ -939,9 +1508,199 @@ function BudgetDetailModal({
           </div>
 
           {carry > 0 && (
-            <p className="mt-2 text-xs text-blue-600">Doorgeschoven: +{formatCurrency(carry)}</p>
+            <div className={`mt-2 flex items-center gap-1.5 rounded border px-2 py-1.5 ${colors.bg} ${colors.border}`}>
+              <span className={`text-xs font-medium ${colors.text}`}>Doorgeschoven:</span>
+              <span className={`font-mono text-xs font-semibold ${colors.text}`}>+{formatCurrency(carry)}</span>
+            </div>
+          )}
+
+          {rolloverHistory.length > 1 && (
+            <div className="mt-3 border-t border-[var(--border-ed)] pt-3">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[.08em] text-[var(--ink-3)]">Overgedragen saldo</p>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {rolloverHistory.slice(0, 6).map((r) => (
+                  <div key={r.id} className="flex items-center justify-between text-xs">
+                    <span className="text-[var(--ink-3)]">{r.period}</span>
+                    <span className={`font-mono font-medium ${Number(r.carried_amount) > 0 ? colors.text : 'text-[var(--ink-4)]'}`}>
+                      {Number(r.carried_amount) > 0 ? '+' : ''}{formatCurrency(Number(r.carried_amount))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Doeltype — 4a: Vaste Maandlast */}
+          {budget.goal_type === 'vaste_maandlast' && (
+            <div className={`mt-2 flex items-center gap-2 rounded border px-2 py-1.5 ${spent <= limit ? 'bg-emerald-50 border-emerald-200' : 'bg-kern-50 border-kern-200'}`}>
+              {spent <= limit
+                ? <><CheckCircle2 className="h-4 w-4 text-emerald-600" /><span className="text-xs font-medium text-emerald-700">Gedekt</span></>
+                : <><AlertTriangle className="h-4 w-4 text-kern-600" /><span className="text-xs font-medium text-kern-700">Tekort: {formatCurrency(spent - limit)}</span></>
+              }
+            </div>
+          )}
+
+          {/* Doeltype — 4b: Bestedingslimiet */}
+          {budget.goal_type === 'bestedingslimiet' && pct >= 80 && (
+            <p className="mt-1 text-xs font-medium text-kern-700">
+              {pct >= 100 ? '⚠️ Limiet overschreden' : `⚠️ ${100 - pct}% resterend`}
+            </p>
+          )}
+
+          {/* Doeltype — 4d: Maandelijkse Reservering */}
+          {budget.goal_type === 'maandelijkse_reservering' && (
+            <div className="mt-2 rounded border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2">
+              <p className="text-[10px] text-[var(--ink-3)] uppercase tracking-[.08em]">Opgebouwd saldo</p>
+              <p className="font-mono text-base font-semibold text-[var(--ink)]">{formatCurrency(cumulativeCarry)}</p>
+              <p className="text-[10px] text-[var(--ink-3)] mt-0.5">Rollover staat automatisch aan</p>
+            </div>
           )}
         </div>
+
+        {/* Doeltype — 4c: Spaardoel (budget-native) — hidden when a De Wil goal is linked */}
+        {budget.goal_type === 'spaardoel' && budget.goal_amount && goals.length === 0 && (() => {
+          const maandenResterend = budget.goal_date
+            ? Math.max(1, (new Date(budget.goal_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30))
+            : null
+          const benodigdPerMaand = maandenResterend
+            ? Math.max(0, (budget.goal_amount - cumulativeCarry) / maandenResterend)
+            : null
+          const spaarProgress = Math.min(100, (cumulativeCarry / budget.goal_amount) * 100)
+          const opSchema = benodigdPerMaand !== null && spent >= benodigdPerMaand
+          return (
+            <div className="border-t border-[var(--border-ed)] px-6 py-4" data-testid="budget-native-spaardoel">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[.08em] text-[var(--ink-3)]">Spaardoel</p>
+                {budget.goal_date && (
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium uppercase ${opSchema ? `${colors.bg} ${colors.text} ${colors.border}` : 'bg-kern-50 text-kern-700 border-kern-200'}`}>
+                    {opSchema ? 'Op schema' : 'Achter op schema'}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-baseline gap-1 mb-1">
+                <span className="font-mono text-base font-semibold">{formatCurrency(cumulativeCarry)}</span>
+                <span className="font-mono text-xs text-[var(--ink-3)]">van {formatCurrency(budget.goal_amount)}</span>
+              </div>
+              {benodigdPerMaand !== null && (
+                <p className="text-xs text-[var(--ink-3)] mb-2">Benodigd: <span className="font-mono font-medium">{formatCurrency(benodigdPerMaand)}/mnd</span></p>
+              )}
+              <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+                <div className="h-full rounded-full" style={{ width: `${spaarProgress}%`, backgroundColor: colors.barHex }} />
+              </div>
+              <div className="mt-1 flex justify-between text-[10px] text-[var(--ink-3)]">
+                <span>{Math.round(spaarProgress)}% bereikt</span>
+                {budget.goal_date && <span>{new Date(budget.goal_date).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })}</span>}
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Doeltype — 4e: Periodieke Last (Sinking Fund) */}
+        {budget.goal_type === 'periodieke_last' && budget.goal_amount && (() => {
+          const maandenMap: Record<string, number> = { jaarlijks: 12, halfjaarlijks: 6, kwartaal: 3 }
+          const maanden = maandenMap[budget.goal_frequency ?? ''] ?? 12
+          const maandelijksBedrag = budget.goal_amount / maanden
+          const sinkProgress = Math.min(100, (cumulativeCarry / budget.goal_amount) * 100)
+          return (
+            <div className="border-t border-[var(--border-ed)] px-6 py-4" data-testid="budget-periodieke-last">
+              <p className="text-[10px] font-semibold uppercase tracking-[.08em] text-[var(--ink-3)] mb-2">Periodieke Last</p>
+              <div className="flex justify-between text-xs mb-2">
+                <span className="text-[var(--ink-3)]">Maandelijks reserveren</span>
+                <span className="font-mono font-semibold">{formatCurrency(maandelijksBedrag)}</span>
+              </div>
+              <div className="flex justify-between text-xs mb-2">
+                <span className="text-[var(--ink-3)]">Opgebouwd saldo</span>
+                <span className="font-mono font-semibold">{formatCurrency(cumulativeCarry)}</span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+                <div className="h-full rounded-full" style={{ width: `${sinkProgress}%`, backgroundColor: colors.barHex }} />
+              </div>
+              <p className="text-[10px] text-[var(--ink-3)] mt-1">Reset na uitgave · Doel: {formatCurrency(budget.goal_amount)}</p>
+            </div>
+          )
+        })()}
+
+        {/* Spaardoel section — only for savings budgets or when a goal is linked */}
+        {(budget.budget_type === 'savings' || goals.length > 0) && (() => {
+          const linkedGoal = goals[0] ?? null
+
+          if (!linkedGoal) {
+            // Show option to create/link a goal for savings budgets
+            if (budget.budget_type !== 'savings') return null
+            return (
+              <div className="border-t border-[var(--border-ed)] px-6 py-4" data-testid="budget-savings-goal-empty">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[.08em] text-[var(--ink-3)]">Spaardoel</p>
+                <p className="text-xs italic text-[var(--ink-3)] mb-2">
+                  Koppel een spaardoel aan dit budget om voortgang bij te houden.
+                </p>
+                <a
+                  href="/will"
+                  className="inline-flex items-center gap-1.5 rounded border border-[var(--border-ed)] px-2.5 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+                >
+                  Bekijk doelen →
+                </a>
+              </div>
+            )
+          }
+
+          const progress = linkedGoal.target_value > 0
+            ? Math.min(100, (cumulativeCarry / linkedGoal.target_value) * 100)
+            : 0
+          const goalRemaining = linkedGoal.target_value - cumulativeCarry
+          const isOnTrack = linkedGoal.target_date
+            ? (() => {
+                const monthsLeft = Math.max(1, (new Date(linkedGoal.target_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30))
+                const neededPerMonth = goalRemaining / monthsLeft
+                const avgMonthlySaving = rolloverHistory.length > 0
+                  ? cumulativeCarry / rolloverHistory.length
+                  : spent
+                return avgMonthlySaving >= neededPerMonth
+              })()
+            : null
+
+          return (
+            <div className="border-t border-[var(--border-ed)] px-6 py-4" data-testid="budget-savings-goal">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[.08em] text-[var(--ink-3)]">Spaardoel</p>
+                {linkedGoal.target_date && (
+                  <span className={`text-[10px] font-medium uppercase tracking-[.06em] px-2 py-0.5 rounded-full border ${
+                    isOnTrack
+                      ? `${colors.bg} ${colors.text} ${colors.border}`
+                      : 'bg-[#fff0ef] text-[#b33a2e] border-[#f5c5c0]'
+                  }`}>
+                    {isOnTrack ? 'Op schema' : 'Achter op schema'}
+                  </span>
+                )}
+              </div>
+              <p className="font-medium text-sm text-[var(--ink)] mb-1">{linkedGoal.name}</p>
+              <div className="flex items-baseline gap-1 mb-1">
+                <span className="font-mono text-base font-semibold text-[var(--ink)]">{formatCurrency(cumulativeCarry)}</span>
+                <span className="font-mono text-xs text-[var(--ink-3)]">van {formatCurrency(linkedGoal.target_value)}</span>
+              </div>
+              {hasFreedomData && cumulativeCarry >= 100 && (
+                <p className="text-xs italic text-[var(--ink-3)] mb-2">
+                  {eurToFreedomTime(cumulativeCarry, dailyExpenseRate).formattedDagen} vrijheid opgebouwd
+                </p>
+              )}
+              {/* Progress bar */}
+              <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+                <div
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{ width: `${progress}%`, backgroundColor: colors.barHex }}
+                />
+              </div>
+              <div className="mt-1 flex justify-between text-[10px] text-[var(--ink-3)]">
+                <span>{Math.round(progress)}% bereikt</span>
+                <span>
+                  {goalRemaining > 0 && <><span className="font-mono">{formatCurrency(goalRemaining)}</span> resterend</>}
+                  {linkedGoal.target_date && (
+                    <> · {new Date(linkedGoal.target_date).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })}</>
+                  )}
+                </span>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Budget forecast next month prediction with spending variance confidence */}
         {(() => {
@@ -1122,31 +1881,43 @@ function BudgetDetailModal({
               Transacties deze maand ({budgetTx.length})
             </p>
             <div className="max-h-48 space-y-1 overflow-y-auto">
-              {budgetTx.map((tx, i) => (
-                <div key={i} className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-[var(--subtle)]">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-medium text-[var(--ink-2)]">
-                      {tx.counterparty_name || tx.description}
-                    </p>
-                    <p className="text-[10px] text-[var(--ink-3)]">
-                      {new Date(tx.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
-                      {tx.counterparty_name && tx.description !== tx.counterparty_name && (
-                        <span className="ml-1">{tx.description}</span>
-                      )}
-                    </p>
-                  </div>
-                  <div className="ml-3 shrink-0 text-right">
-                    <span className={`text-xs font-medium ${Number(tx.amount) < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                      {formatCurrency(Math.abs(Number(tx.amount)))}
-                    </span>
-                    {hasFreedomData && Math.abs(Number(tx.amount)) >= 100 && (
-                      <p className="text-sm italic text-[var(--ink-3)]" data-testid="tx-freedom-time">
-                        {eurToFreedomTime(Math.abs(Number(tx.amount)), dailyExpenseRate).formattedDagen}
+              {budgetTx.map((tx, i) => {
+                const isSplitRow = tx.is_split_row === true
+                const isExpense = budgetType !== 'income'
+                const amountColor = isSplitRow
+                  ? (isExpense ? 'text-red-600' : 'text-emerald-600')
+                  : (Number(tx.amount) < 0 ? 'text-red-600' : 'text-emerald-600')
+                return (
+                  <div key={i} className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-[var(--subtle)]">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate text-xs font-medium text-[var(--ink-2)]">
+                          {tx.counterparty_name || tx.description}
+                        </p>
+                        {isSplitRow && (
+                          <GitFork className="h-3 w-3 shrink-0 text-[var(--ink-4)]" aria-label="Verdeeld" />
+                        )}
+                      </div>
+                      <p className="text-[10px] text-[var(--ink-3)]">
+                        {new Date(tx.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                        {tx.counterparty_name && tx.description !== tx.counterparty_name && (
+                          <span className="ml-1">{tx.description}</span>
+                        )}
                       </p>
-                    )}
+                    </div>
+                    <div className="ml-3 shrink-0 text-right">
+                      <span className={`text-xs font-medium ${amountColor}`}>
+                        {formatCurrency(Math.abs(Number(tx.amount)))}
+                      </span>
+                      {hasFreedomData && Math.abs(Number(tx.amount)) >= 100 && (
+                        <p className="text-sm italic text-[var(--ink-3)]" data-testid="tx-freedom-time">
+                          {eurToFreedomTime(Math.abs(Number(tx.amount)), dailyExpenseRate).formattedDagen}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
@@ -1238,15 +2009,15 @@ function BudgetDetailModal({
 
         {/* Delete confirmation */}
         {showDeleteConfirm && (
-          <div className="border-t border-red-200 bg-red-50 px-6 py-4" data-testid="budget-delete-confirm">
+          <div className="border-t border-orange-200 bg-orange-50 px-6 py-4" data-testid="budget-delete-confirm">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-600" />
               <div className="flex-1">
-                <p className="text-xs font-semibold text-red-800">Budget verwijderen?</p>
-                <p className="mt-1 text-xs text-red-700">
+                <p className="text-xs font-semibold text-orange-800">Budget archiveren?</p>
+                <p className="mt-1 text-xs text-orange-700">
                   {isParent
-                    ? `Dit verwijdert "${budget.name}" en alle ${children.length} subbudgetten. Transacties worden ontkoppeld maar niet verwijderd.`
-                    : `Dit verwijdert "${budget.name}". Transacties worden ontkoppeld maar niet verwijderd.`
+                    ? `Dit archiveert "${budget.name}" en alle ${children.length} subbudgetten. Budgetten met gekoppelde transacties kunnen niet worden gearchiveerd.`
+                    : `Dit archiveert "${budget.name}". Budgetten met gekoppelde transacties kunnen niet worden gearchiveerd.`
                   }
                 </p>
                 {deleteError && (
@@ -1263,25 +2034,25 @@ function BudgetDetailModal({
                         const res = await fetch(`/api/budgets/${budget.id}`, { method: 'DELETE' })
                         if (!res.ok) {
                           const data = await res.json()
-                          setDeleteError(data.error || 'Verwijderen mislukt')
+                          setDeleteError(data.error || 'Archiveren mislukt')
                           setDeleting(false)
                           return
                         }
                         onDelete()
                       } catch {
-                        setDeleteError('Netwerk fout bij verwijderen')
+                        setDeleteError('Netwerk fout bij archiveren')
                         setDeleting(false)
                       }
                     }}
-                    className="rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                    className="rounded-md bg-orange-600 px-3 py-1 text-xs font-medium text-white hover:bg-orange-700 disabled:opacity-50"
                     data-testid="budget-delete-confirm-btn"
                   >
-                    {deleting ? 'Verwijderen...' : 'Definitief verwijderen'}
+                    {deleting ? 'Archiveren...' : 'Archiveren'}
                   </button>
                   <button
                     type="button"
                     onClick={() => { setShowDeleteConfirm(false); setDeleteError(null) }}
-                    className="rounded-md border border-red-300 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+                    className="rounded-md border border-orange-300 px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
                     data-testid="budget-delete-cancel-btn"
                   >
                     Annuleren
@@ -1294,20 +2065,54 @@ function BudgetDetailModal({
 
         {/* Actions */}
         <div className="flex gap-2 border-t border-[var(--border-ed)] px-6 py-4">
+          {/* Ordering buttons */}
+          {siblings.length > 1 && (
+            <div className="flex gap-1">
+              <button
+                type="button"
+                disabled={!canMoveUp || reordering}
+                onClick={() => moveBudget('up')}
+                title="Omhoog"
+                className="inline-flex items-center justify-center rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-2 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-30"
+              >
+                <ChevronUp className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                disabled={!canMoveDown || reordering}
+                onClick={() => moveBudget('down')}
+                title="Omlaag"
+                className="inline-flex items-center justify-center rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-2 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-30"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
           <button
+            type="button"
+            onClick={() => openWithMessage(`Analyseer mijn ${budget.name} budget`)}
+            className="inline-flex flex-shrink-0 items-center justify-center gap-1.5 rounded-lg border border-wil-200 bg-wil-50 px-3 py-2 text-xs font-medium text-wil-700 transition-colors hover:bg-wil-100 hover:border-wil-300"
+            title="Vraag Will om advies over dit budget"
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            Vraag Will
+          </button>
+          <button
+            type="button"
             onClick={onEdit}
-            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-kern-600 px-3 py-2 text-xs font-medium text-white hover:bg-kern-700"
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-kern-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-kern-700"
           >
             <Pencil className="h-3.5 w-3.5" />
             Bewerken
           </button>
           <button
+            type="button"
             onClick={() => setShowDeleteConfirm(true)}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-[var(--paper)] px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 hover:border-red-300"
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-orange-200 bg-[var(--paper)] px-3 py-2 text-xs font-medium text-orange-600 transition-colors hover:bg-orange-50 hover:border-orange-300"
             data-testid="budget-delete-btn"
           >
             <Trash2 className="h-3.5 w-3.5" />
-            Verwijderen
+            Archiveren
           </button>
         </div>
       </div>
@@ -1346,9 +2151,21 @@ function BudgetEditModal({
   const [saving, setSaving] = useState(false)
   const [showIcons, setShowIcons] = useState(false)
   const [showCloseConfirm, setShowCloseConfirm] = useState(false)
+  const [nibudAmount, setNibudAmount] = useState<number | null>(null)
   // Household ownership
   const [ownership, setOwnership] = useState<OwnershipType>(budget.ownership ?? 'personal')
   const { hasHousehold, householdId } = useHouseholdStatus()
+  // Goal type fields
+  const [goalType, setGoalType] = useState(budget.goal_type ?? '')
+  const [goalAmount, setGoalAmount] = useState(budget.goal_amount ? String(budget.goal_amount) : '')
+  const [goalDate, setGoalDate] = useState(budget.goal_date ?? '')
+  const [goalFrequency, setGoalFrequency] = useState(budget.goal_frequency ?? '')
+  // De Wil goal linking
+  const [linkedGoalId, setLinkedGoalId] = useState<string>('')
+  const [availableSavingsGoals, setAvailableSavingsGoals] = useState<
+    { id: string; name: string; target_value: number; target_date: string | null }[]
+  >([])
+  const [showCreateGoal, setShowCreateGoal] = useState(false)
 
   // Track dirty state
   const isDirty = useMemo(() => {
@@ -1366,9 +2183,13 @@ function BudgetEditModal({
       isEssential !== (budget.is_essential ?? false) ||
       priorityScore !== (budget.priority_score ?? 3) ||
       isInflationIndexed !== (budget.is_inflation_indexed ?? false) ||
-      ownership !== (budget.ownership ?? 'personal')
+      ownership !== (budget.ownership ?? 'personal') ||
+      goalType !== (budget.goal_type ?? '') ||
+      goalAmount !== (budget.goal_amount ? String(budget.goal_amount) : '') ||
+      goalDate !== (budget.goal_date ?? '') ||
+      goalFrequency !== (budget.goal_frequency ?? '')
     )
-  }, [name, icon, description, defaultLimit, budgetType, interval, rolloverType, limitType, alertThreshold, maxSingleAmount, isEssential, priorityScore, isInflationIndexed, ownership, budget])
+  }, [name, icon, description, defaultLimit, budgetType, interval, rolloverType, limitType, alertThreshold, maxSingleAmount, isEssential, priorityScore, isInflationIndexed, ownership, goalType, goalAmount, goalDate, goalFrequency, budget])
 
   // beforeunload warning for page refresh
   useEffect(() => {
@@ -1381,6 +2202,48 @@ function BudgetEditModal({
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [isDirty])
+
+  // Load De Wil savings goals + existing linked goal
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('goals')
+      .select('id, name, target_value, target_date')
+      .eq('goal_type', 'savings')
+      .eq('is_completed', false)
+      .order('sort_order', { ascending: true })
+      .then(({ data }) => { if (data) setAvailableSavingsGoals(data) })
+    supabase
+      .from('goals')
+      .select('id')
+      .eq('budget_id', budget.id)
+      .maybeSingle()
+      .then(({ data }) => { if (data) setLinkedGoalId(data.id) })
+  }, [budget.id])
+
+  // Fetch NIBUD reference amount for child budgets with a slug
+  useEffect(() => {
+    if (!budget.slug || budget.parent_id === null) return // Only for child budgets with slugs
+
+    async function fetchNibud() {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('nibud_reference_data')
+        .select('basis_amount')
+        .eq('mapped_budget_slug', budget.slug)
+        .order('year', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (data) {
+        setNibudAmount(Number(data.basis_amount))
+      } else {
+        setNibudAmount(null)
+      }
+    }
+
+    fetchNibud()
+  }, [budget.slug, budget.parent_id])
 
   // Handle close with unsaved changes confirmation
   function handleClose() {
@@ -1441,6 +2304,10 @@ function BudgetEditModal({
         is_inflation_indexed: isInflationIndexed,
         ownership: ownership,
         household_id: ownership === 'shared' ? householdId : null,
+        goal_type: goalType || null,
+        goal_amount: parseFloat(goalAmount) || null,
+        goal_date: goalDate || null,
+        goal_frequency: goalFrequency || null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', budget.id)
@@ -1480,6 +2347,21 @@ function BudgetEditModal({
         })
     }
 
+    // Goal linking for spaardoel
+    if (!error && goalType === 'spaardoel') {
+      const { data: oldLinked } = await supabase.from('goals').select('id').eq('budget_id', budget.id)
+      for (const old of oldLinked ?? []) {
+        if (old.id !== linkedGoalId) {
+          await supabase.from('goals').update({ budget_id: null }).eq('id', old.id)
+        }
+      }
+      if (linkedGoalId) {
+        await supabase.from('goals').update({ budget_id: budget.id }).eq('id', linkedGoalId)
+      }
+    } else if (!error && budget.goal_type === 'spaardoel' && goalType !== 'spaardoel') {
+      await supabase.from('goals').update({ budget_id: null }).eq('budget_id', budget.id)
+    }
+
     setSaving(false)
     if (!error) onSaved()
   }
@@ -1488,6 +2370,7 @@ function BudgetEditModal({
   const inputCls = 'w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm text-[var(--ink)] focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500'
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={handleClose}>
       <div
         className="w-full max-w-lg overflow-y-auto rounded-2xl bg-[var(--paper)] shadow-xl"
@@ -1593,11 +2476,12 @@ function BudgetEditModal({
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Type</label>
-              <select value={budgetType} onChange={(e) => setBudgetType(e.target.value as 'income' | 'savings' | 'expense' | 'debt')} className={inputCls}>
+              <select value={budgetType} onChange={(e) => setBudgetType(e.target.value as 'income' | 'savings' | 'expense' | 'debt' | 'archive')} className={inputCls}>
                 <option value="expense">Uitgave</option>
                 <option value="income">Inkomen</option>
                 <option value="savings">Sparen</option>
                 <option value="debt">Schuld</option>
+                <option value="archive">Verborgen</option>
               </select>
             </div>
             <div>
@@ -1609,6 +2493,12 @@ function BudgetEditModal({
                 </div>
               ) : (
                 <input type="number" min="0" step="0.01" value={defaultLimit} onChange={(e) => setDefaultLimit(e.target.value)} className={inputCls} />
+              )}
+              {nibudAmount !== null && nibudAmount > 0 && (
+                <p className="mt-1 flex items-center gap-1 text-[10px] text-[var(--ink-3)]">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--ink-4)]" />
+                  NIBUD-richtlijn: <span className="font-mono font-medium text-[var(--ink-2)]">{formatCurrency(nibudAmount)}/mnd</span>
+                </p>
               )}
             </div>
             <div>
@@ -1633,6 +2523,117 @@ function BudgetEditModal({
               <p className="mt-1 text-xs text-[var(--ink-3)]">
                 Eerdere maanden behouden de oude limiet van {formatCurrency(Number(budget.default_limit))}
               </p>
+            </div>
+          )}
+
+          {/* Doeltype — alleen voor subbudgetten */}
+          {!isParent && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+                Doeltype <span className="font-normal text-[var(--ink-3)]">(optioneel)</span>
+              </label>
+              <p className="mb-2 text-[11px] text-[var(--ink-3)]">
+                Kies hoe dit budget werkt. Het doeltype bepaalt hoe overschotten en voortgang worden berekend.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {([
+                  { value: '', label: 'Geen' },
+                  { value: 'vaste_maandlast', label: 'Vaste maandlast' },
+                  { value: 'bestedingslimiet', label: 'Bestedingslimiet' },
+                  { value: 'spaardoel', label: 'Spaardoel' },
+                  { value: 'maandelijkse_reservering', label: 'Reservering' },
+                  { value: 'periodieke_last', label: 'Periodieke last' },
+                ] as const).map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      setGoalType(value)
+                      if (value !== 'spaardoel') { setGoalDate(''); if (value !== 'periodieke_last') setGoalAmount('') }
+                      if (value !== 'periodieke_last') setGoalFrequency('')
+                      if (value === 'maandelijkse_reservering') setRolloverType('carry-over')
+                    }}
+                    className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
+                      goalType === value
+                        ? 'bg-kern-50 border-kern-200 text-kern-700'
+                        : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {goalType !== '' && (
+                <div className="mt-2 rounded-lg border border-kern-200 bg-kern-50 px-3 py-2.5">
+                  <p className="text-[11px] leading-relaxed text-kern-700">
+                    {goalType === 'vaste_maandlast' && 'Een vaste terugkerende uitgave. Je ziet direct of je inkomsten dit dekken of tekortschiet.'}
+                    {goalType === 'bestedingslimiet' && 'Maximaal te besteden bedrag. Je ontvangt een melding zodra je de ingestelde drempel nadert.'}
+                    {goalType === 'spaardoel' && 'Spaart toe naar een doel. Vul een doelbedrag en einddatum in om de voortgang te volgen.'}
+                    {goalType === 'maandelijkse_reservering' && 'Bouwt maandelijks saldo op voor een toekomstige uitgave. Overschot wordt automatisch doorgeschoven naar de volgende maand.'}
+                    {goalType === 'periodieke_last' && 'Voor grote uitgaven die je periodiek verwacht, zoals een verzekering of vakantie. Je reserveert maandelijks een deel van het totaalbedrag.'}
+                  </p>
+                </div>
+              )}
+
+              {goalType === 'spaardoel' && (
+                <div className="mt-2">
+                  {availableSavingsGoals.length > 0 && (
+                    <select
+                      value={linkedGoalId}
+                      onChange={(e) => {
+                        const gid = e.target.value
+                        setLinkedGoalId(gid)
+                        if (gid) {
+                          const g = availableSavingsGoals.find(x => x.id === gid)
+                          if (g) { setGoalAmount(String(g.target_value)); setGoalDate(g.target_date ?? '') }
+                        } else {
+                          setGoalAmount(''); setGoalDate('')
+                        }
+                      }}
+                      className={inputCls}
+                    >
+                      <option value="">— Geen koppeling —</option>
+                      {availableSavingsGoals.map(g => (
+                        <option key={g.id} value={g.id}>{g.name}</option>
+                      ))}
+                    </select>
+                  )}
+                  {linkedGoalId && (
+                    <p className="mt-1 text-[11px] text-wil-600">Doelbedrag en einddatum worden overgenomen uit het gekoppelde doel.</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateGoal(true)}
+                    className="mt-1.5 inline-flex items-center gap-1.5 text-xs text-wil-600 hover:text-wil-700"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Maak nieuw doel aan in De Wil
+                  </button>
+                </div>
+              )}
+
+              {goalType === 'periodieke_last' && (
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Totaalbedrag (€)</label>
+                    <input type="number" min="0" step="0.01" value={goalAmount} onChange={(e) => setGoalAmount(e.target.value)} className={inputCls} placeholder="bijv. 600" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Frequentie</label>
+                    <select value={goalFrequency} onChange={(e) => setGoalFrequency(e.target.value)} className={inputCls}>
+                      <option value="">Kies frequentie</option>
+                      <option value="jaarlijks">Jaarlijks</option>
+                      <option value="halfjaarlijks">Halfjaarlijks</option>
+                      <option value="kwartaal">Kwartaal</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {goalType === 'maandelijkse_reservering' && (
+                <p className="mt-1.5 text-[10px] text-[var(--ink-3)]">Rollover wordt automatisch ingesteld op &apos;Doorschuiven&apos;.</p>
+              )}
             </div>
           )}
 
@@ -1739,5 +2740,580 @@ function BudgetEditModal({
         </div>
       </div>
     </div>
+
+    {showCreateGoal && (
+      <GoalForm
+        assets={[]}
+        debts={[]}
+        lockedToSavings
+        onClose={() => setShowCreateGoal(false)}
+        onSaved={async (newGoalId) => {
+          setShowCreateGoal(false)
+          if (newGoalId) {
+            const supabase = createClient()
+            const { data } = await supabase
+              .from('goals')
+              .select('id, name, target_value, target_date')
+              .eq('goal_type', 'savings')
+              .eq('is_completed', false)
+              .order('sort_order', { ascending: true })
+            setAvailableSavingsGoals(data ?? [])
+            setLinkedGoalId(newGoalId)
+            const newGoal = data?.find(g => g.id === newGoalId)
+            if (newGoal) { setGoalAmount(String(newGoal.target_value)); setGoalDate(newGoal.target_date ?? '') }
+          }
+        }}
+        initialValues={{ target_value: goalAmount || undefined, target_date: goalDate || undefined }}
+      />
+    )}
+    </>
+  )
+}
+
+// ── Budget create modal ──────────────────────────────────────
+
+function BudgetCreateModal({
+  parentBudgets,
+  onClose,
+  onSaved,
+}: {
+  parentBudgets: BudgetWithChildren[]
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [parentId, setParentId] = useState('new')
+  const [categoryName, setCategoryName] = useState('')
+  const [name, setName] = useState('')
+  const [icon, setIcon] = useState('Circle')
+  const [budgetType, setBudgetType] = useState<'expense' | 'income' | 'savings' | 'debt'>('expense')
+  const [defaultLimit, setDefaultLimit] = useState('')
+  const [interval, setInterval] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly')
+  const [ownership, setOwnership] = useState<OwnershipType>('personal')
+  const [goalType, setGoalType] = useState('')
+  const [goalAmount, setGoalAmount] = useState('')
+  const [goalDate, setGoalDate] = useState('')
+  const [goalFrequency, setGoalFrequency] = useState('')
+  const [rolloverType, setRolloverType] = useState<'reset' | 'carry-over' | 'invest-sweep'>('reset')
+  const [priorityScore, setPriorityScore] = useState(3)
+  const [isEssential, setIsEssential] = useState(false)
+  const [isInflationIndexed, setIsInflationIndexed] = useState(false)
+  const [description, setDescription] = useState('')
+  const [showIcons, setShowIcons] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false)
+  const { hasHousehold, householdId } = useHouseholdStatus()
+  // De Wil goal linking
+  const [linkedGoalId, setLinkedGoalId] = useState<string>('')
+  const [availableSavingsGoals, setAvailableSavingsGoals] = useState<
+    { id: string; name: string; target_value: number; target_date: string | null }[]
+  >([])
+  const [showCreateGoal, setShowCreateGoal] = useState(false)
+
+  const isDirty = name.trim() !== '' || categoryName.trim() !== '' || defaultLimit !== ''
+
+  // Load De Wil savings goals on mount
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('goals')
+      .select('id, name, target_value, target_date')
+      .eq('goal_type', 'savings')
+      .eq('is_completed', false)
+      .order('sort_order', { ascending: true })
+      .then(({ data }) => { if (data) setAvailableSavingsGoals(data) })
+  }, [])
+
+  function handleClose() {
+    if (isDirty) {
+      setShowCloseConfirm(true)
+    } else {
+      onClose()
+    }
+  }
+
+  async function handleSave() {
+    if (!name.trim()) { setError('Naam is verplicht'); return }
+    if (parentId === 'new' && !categoryName.trim()) { setError('Categorienaam is verplicht'); return }
+    setSaving(true)
+    setError('')
+
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setError('Niet ingelogd'); setSaving(false); return }
+
+    const ownershipFields = {
+      ownership,
+      household_id: ownership === 'shared' ? householdId : null,
+    }
+
+    let resolvedParentId: string | null = parentId === 'new' ? null : parentId
+
+    if (parentId === 'new') {
+      const { data: parentData, error: parentError } = await supabase
+        .from('budgets')
+        .insert({
+          user_id: user.id,
+          name: categoryName.trim(),
+          icon,
+          default_limit: 0,
+          budget_type: budgetType,
+          interval,
+          rollover_type: rolloverType,
+          is_essential: isEssential,
+          priority_score: priorityScore,
+          is_inflation_indexed: isInflationIndexed,
+          parent_id: null,
+          ...ownershipFields,
+        })
+        .select('id')
+        .single()
+
+      if (parentError || !parentData) {
+        setError(parentError?.message ?? 'Fout bij aanmaken categorie')
+        setSaving(false)
+        return
+      }
+      resolvedParentId = parentData.id
+    }
+
+    const { data: insertedBudget, error: insertError } = await supabase
+      .from('budgets')
+      .insert({
+        user_id: user.id,
+        name: name.trim(),
+        icon,
+        description: description.trim() || null,
+        default_limit: parseFloat(defaultLimit) || 0,
+        budget_type: budgetType,
+        interval,
+        rollover_type: goalType === 'maandelijkse_reservering' ? 'carry-over' : rolloverType,
+        limit_type: 'soft',
+        alert_threshold: 80,
+        max_single_transaction_amount: 0,
+        is_essential: isEssential,
+        priority_score: priorityScore,
+        is_inflation_indexed: isInflationIndexed,
+        parent_id: resolvedParentId,
+        goal_type: goalType || null,
+        goal_amount: parseFloat(goalAmount) || null,
+        goal_date: goalDate || null,
+        goal_frequency: goalFrequency || null,
+        sort_order: 0,
+        ...ownershipFields,
+      })
+      .select('id')
+      .single()
+
+    if (insertError) {
+      setSaving(false)
+      setError(insertError.message)
+      return
+    }
+
+    // Goal linking for spaardoel
+    if (goalType === 'spaardoel' && linkedGoalId && insertedBudget?.id) {
+      await supabase.from('goals').update({ budget_id: insertedBudget.id }).eq('id', linkedGoalId)
+    }
+
+    setSaving(false)
+    onSaved()
+  }
+
+  const SelectedIcon = iconMap[icon] ?? iconMap['Circle']
+  const inputCls = 'w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm text-[var(--ink)] focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500'
+
+  return (
+    <>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={handleClose}>
+      <div
+        className="w-full max-w-lg overflow-y-auto rounded-2xl bg-[var(--paper)] shadow-xl"
+        style={{ maxHeight: '90vh' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-6 py-4">
+          <h2 className="text-lg font-semibold text-[var(--ink)]">Nieuw budget</h2>
+          <button onClick={handleClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4 px-6 py-4">
+          {/* Unsaved changes close confirmation */}
+          {showCloseConfirm && (
+            <div className="rounded-lg border border-orange-300 bg-orange-50 p-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-600" />
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-orange-800">Onopgeslagen wijzigingen</p>
+                  <p className="mt-1 text-xs text-orange-700">
+                    Je hebt wijzigingen die nog niet zijn opgeslagen. Wil je deze verwijderen?
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="rounded-md bg-orange-600 px-3 py-1 text-xs font-medium text-white hover:bg-orange-700"
+                    >
+                      Wijzigingen verwijderen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowCloseConfirm(false)}
+                      className="rounded-md border border-orange-300 px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
+                    >
+                      Verder bewerken
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />
+              <p className="text-xs text-red-700">{error}</p>
+            </div>
+          )}
+
+          {/* STRUCTUUR */}
+          <div className="space-y-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-3)]">Structuur</p>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Hoofdcategorie</label>
+              <select value={parentId} onChange={(e) => setParentId(e.target.value)} className={inputCls}>
+                <option value="new">+ Nieuwe categorie</option>
+                {parentBudgets.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {parentId === 'new' && (
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Categorienaam</label>
+                <input
+                  value={categoryName}
+                  onChange={(e) => setCategoryName(e.target.value)}
+                  className={inputCls}
+                  placeholder="bijv. Wonen"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Type</label>
+              <div className="flex gap-1.5">
+                {(['expense', 'income', 'savings', 'debt'] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setBudgetType(t)}
+                    className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${
+                      budgetType === t
+                        ? 'border-kern-500 bg-kern-50 text-kern-700'
+                        : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
+                    }`}
+                  >
+                    {t === 'expense' ? 'Uitgave' : t === 'income' ? 'Inkomen' : t === 'savings' ? 'Sparen' : 'Schuld'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* IDENTITEIT */}
+          <div className="space-y-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-3)]">Identiteit</p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowIcons(!showIcons)}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border-ed)] text-[var(--ink-3)] hover:border-kern-300 hover:bg-kern-50"
+              >
+                <SelectedIcon className="h-5 w-5" />
+              </button>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className={`flex-1 ${inputCls}`}
+                placeholder="Naam van het budget"
+              />
+            </div>
+            {showIcons && (
+              <div className="flex flex-wrap gap-1">
+                {iconOptions.map((iconName) => {
+                  const Icon = iconMap[iconName]
+                  return (
+                    <button
+                      key={iconName}
+                      type="button"
+                      onClick={() => { setIcon(iconName); setShowIcons(false) }}
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg border text-xs transition-colors ${
+                        icon === iconName
+                          ? 'border-kern-500 bg-kern-50 text-kern-600'
+                          : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* FINANCIEEL */}
+          <div className="space-y-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-3)]">Financieel</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Limiet (€)</label>
+                <input type="number" min="0" step="0.01" value={defaultLimit} onChange={(e) => setDefaultLimit(e.target.value)} className={inputCls} placeholder="0" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Interval</label>
+                <select value={interval} onChange={(e) => setInterval(e.target.value as 'monthly' | 'quarterly' | 'yearly')} className={inputCls}>
+                  <option value="monthly">Maandelijks</option>
+                  <option value="quarterly">Per kwartaal</option>
+                  <option value="yearly">Jaarlijks</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* EIGENDOM */}
+          <OwnershipToggle
+            value={ownership}
+            onChange={setOwnership}
+            hasHousehold={hasHousehold}
+            compact
+          />
+
+          {/* DOELTYPE — alleen voor subbudgetten (bestaande parent geselecteerd) */}
+          {parentId !== 'new' && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+                Doeltype <span className="font-normal text-[var(--ink-3)]">(optioneel)</span>
+              </label>
+              <p className="mb-2 text-[11px] text-[var(--ink-3)]">
+                Kies hoe dit budget werkt. Het doeltype bepaalt hoe overschotten en voortgang worden berekend.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {([
+                  { value: '', label: 'Geen' },
+                  { value: 'vaste_maandlast', label: 'Vaste maandlast' },
+                  { value: 'bestedingslimiet', label: 'Bestedingslimiet' },
+                  { value: 'spaardoel', label: 'Spaardoel' },
+                  { value: 'maandelijkse_reservering', label: 'Reservering' },
+                  { value: 'periodieke_last', label: 'Periodieke last' },
+                ] as const).map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      setGoalType(value)
+                      if (value !== 'spaardoel') { setGoalDate(''); if (value !== 'periodieke_last') setGoalAmount('') }
+                      if (value !== 'periodieke_last') setGoalFrequency('')
+                      if (value === 'maandelijkse_reservering') setRolloverType('carry-over')
+                    }}
+                    className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
+                      goalType === value
+                        ? 'bg-kern-50 border-kern-200 text-kern-700'
+                        : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {goalType !== '' && (
+                <div className="mt-2 rounded-lg border border-kern-200 bg-kern-50 px-3 py-2.5">
+                  <p className="text-[11px] leading-relaxed text-kern-700">
+                    {goalType === 'vaste_maandlast' && 'Een vaste terugkerende uitgave. Je ziet direct of je inkomsten dit dekken of tekortschiet.'}
+                    {goalType === 'bestedingslimiet' && 'Maximaal te besteden bedrag. Je ontvangt een melding zodra je de ingestelde drempel nadert.'}
+                    {goalType === 'spaardoel' && 'Spaart toe naar een doel. Vul een doelbedrag en einddatum in om de voortgang te volgen.'}
+                    {goalType === 'maandelijkse_reservering' && 'Bouwt maandelijks saldo op voor een toekomstige uitgave. Overschot wordt automatisch doorgeschoven naar de volgende maand.'}
+                    {goalType === 'periodieke_last' && 'Voor grote uitgaven die je periodiek verwacht, zoals een verzekering of vakantie. Je reserveert maandelijks een deel van het totaalbedrag.'}
+                  </p>
+                </div>
+              )}
+
+              {goalType === 'spaardoel' && (
+                <div className="mt-2">
+                  {availableSavingsGoals.length > 0 && (
+                    <select
+                      value={linkedGoalId}
+                      onChange={(e) => {
+                        const gid = e.target.value
+                        setLinkedGoalId(gid)
+                        if (gid) {
+                          const g = availableSavingsGoals.find(x => x.id === gid)
+                          if (g) { setGoalAmount(String(g.target_value)); setGoalDate(g.target_date ?? '') }
+                        } else {
+                          setGoalAmount(''); setGoalDate('')
+                        }
+                      }}
+                      className={inputCls}
+                    >
+                      <option value="">— Geen koppeling —</option>
+                      {availableSavingsGoals.map(g => (
+                        <option key={g.id} value={g.id}>{g.name}</option>
+                      ))}
+                    </select>
+                  )}
+                  {linkedGoalId && (
+                    <p className="mt-1 text-[11px] text-wil-600">Doelbedrag en einddatum worden overgenomen uit het gekoppelde doel.</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateGoal(true)}
+                    className="mt-1.5 inline-flex items-center gap-1.5 text-xs text-wil-600 hover:text-wil-700"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Maak nieuw doel aan in De Wil
+                  </button>
+                </div>
+              )}
+
+              {goalType === 'periodieke_last' && (
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Totaalbedrag (€)</label>
+                    <input type="number" min="0" step="0.01" value={goalAmount} onChange={(e) => setGoalAmount(e.target.value)} className={inputCls} placeholder="bijv. 600" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Frequentie</label>
+                    <select value={goalFrequency} onChange={(e) => setGoalFrequency(e.target.value)} className={inputCls}>
+                      <option value="">Kies frequentie</option>
+                      <option value="jaarlijks">Jaarlijks</option>
+                      <option value="halfjaarlijks">Halfjaarlijks</option>
+                      <option value="kwartaal">Kwartaal</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {goalType === 'maandelijkse_reservering' && (
+                <p className="mt-1.5 text-[10px] text-[var(--ink-3)]">Rollover wordt automatisch ingesteld op &apos;Doorschuiven&apos;.</p>
+              )}
+            </div>
+          )}
+
+          {/* GEAVANCEERD */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center gap-1.5 text-xs font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)]"
+            >
+              <ChevronRight className={`h-3.5 w-3.5 transition-transform ${showAdvanced ? 'rotate-90' : ''}`} />
+              Geavanceerd
+            </button>
+            {showAdvanced && (
+              <div className="mt-3 space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Overschot-beheer</label>
+                  <select value={rolloverType} onChange={(e) => setRolloverType(e.target.value as 'reset' | 'carry-over' | 'invest-sweep')} className={inputCls}>
+                    <option value="reset">Reset</option>
+                    <option value="carry-over">Doorschuiven</option>
+                    <option value="invest-sweep">Beleggen-sweep</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Prioriteit</label>
+                  <div className="flex gap-1.5">
+                    {[1, 2, 3, 4, 5].map((score) => (
+                      <button
+                        key={score}
+                        type="button"
+                        onClick={() => setPriorityScore(score)}
+                        className={`flex h-8 w-8 items-center justify-center rounded-lg border text-xs font-medium transition-colors ${
+                          priorityScore === score
+                            ? 'border-kern-500 bg-kern-50 text-kern-700'
+                            : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:border-[var(--border-md)]'
+                        }`}
+                      >
+                        {score}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsEssential(!isEssential)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${isEssential ? 'bg-kern-500' : 'bg-zinc-300'}`}
+                    >
+                      <span className={`inline-block h-3.5 w-3.5 rounded-full bg-[var(--paper)] transition-transform ${isEssential ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    </button>
+                    <span className="text-xs text-[var(--ink-2)]">Essentieel</span>
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsInflationIndexed(!isInflationIndexed)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${isInflationIndexed ? 'bg-kern-500' : 'bg-zinc-300'}`}
+                    >
+                      <span className={`inline-block h-3.5 w-3.5 rounded-full bg-[var(--paper)] transition-transform ${isInflationIndexed ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    </button>
+                    <span className="text-xs text-[var(--ink-2)]">Inflatie-indexatie</span>
+                  </label>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Beschrijving (optioneel)</label>
+                  <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={inputCls} />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-[var(--border-ed)] px-6 py-4">
+          <button onClick={handleClose} className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]">
+            Annuleren
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !name.trim()}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+          >
+            <Save className="h-4 w-4" />
+            {saving ? 'Opslaan...' : 'Opslaan'}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    {showCreateGoal && (
+      <GoalForm
+        assets={[]}
+        debts={[]}
+        lockedToSavings
+        onClose={() => setShowCreateGoal(false)}
+        onSaved={async (newGoalId) => {
+          setShowCreateGoal(false)
+          if (newGoalId) {
+            const supabase = createClient()
+            const { data } = await supabase
+              .from('goals')
+              .select('id, name, target_value, target_date')
+              .eq('goal_type', 'savings')
+              .eq('is_completed', false)
+              .order('sort_order', { ascending: true })
+            setAvailableSavingsGoals(data ?? [])
+            setLinkedGoalId(newGoalId)
+            const newGoal = data?.find(g => g.id === newGoalId)
+            if (newGoal) { setGoalAmount(String(newGoal.target_value)); setGoalDate(newGoal.target_date ?? '') }
+          }
+        }}
+        initialValues={{ target_value: goalAmount || undefined, target_date: goalDate || undefined }}
+      />
+    )}
+    </>
   )
 }

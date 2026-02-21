@@ -139,8 +139,9 @@ export default function CorePage() {
           .limit(1),
         supabase
           .from('budgets')
-          .select('id, name, parent_id, default_limit, is_essential, interval')
-          .not('parent_id', 'is', null),
+          .select('id, name, parent_id, default_limit, is_essential, interval, budget_type')
+          .not('parent_id', 'is', null)
+          .not('budget_type', 'in', '("archive","income","savings")'),
         supabase
           .from('transactions')
           .select('amount')
@@ -255,8 +256,9 @@ export default function CorePage() {
       }
 
       // B: Essential children of non-essential parents — include them individually
+      const EXCLUDED_BUDGET_TYPES = ['archive', 'income', 'savings']
       const orphanEssentialChildren = allChildren.filter(
-        c => c.is_essential && !essentialParentIds.has(c.parent_id)
+        c => c.is_essential && !essentialParentIds.has(c.parent_id) && !EXCLUDED_BUDGET_TYPES.includes(c.budget_type ?? '')
       )
       for (const child of orphanEssentialChildren) {
         const childInterval = child.interval ?? 'monthly'
@@ -1084,11 +1086,11 @@ export default function CorePage() {
             </p>
           </div>
 
-          <div className="mb-1 border-b border-dashed border-[var(--border-md)] pb-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
+          <div className="mb-1 border-b border-dashed border-[var(--border-ed)] pb-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
             Je geschat jaarinkomen is de basis voor veel berekeningen, zoals je spaarquote en vrijheidspercentage. We tellen alle positieve transacties op over de afgelopen 12 maanden.
           </div>
 
-          <div className="border-b border-dashed border-[var(--border-md)] mb-2 pb-2 mt-2">
+          <div className="border-b border-dashed border-[var(--border-ed)] mb-2 pb-2 mt-2">
             {incomeByMonth.map(({ month, amount }) => {
               const [y, m] = month.split('-')
               const label = new Date(Number(y), Number(m) - 1).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
@@ -1107,7 +1109,7 @@ export default function CorePage() {
             </span>
           </div>
           {incomeMonths < 12 && data && (
-            <div className="mt-2 border-t border-dashed border-[var(--border-md)] pt-2">
+            <div className="mt-2 border-t border-dashed border-[var(--border-ed)] pt-2">
               <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
                 Gemiddeld per maand: {formatCurrency(incomeByMonth.reduce((s, i) => s + i.amount, 0) / incomeMonths)}
                 {' '}({incomeMonths} mnd) &rarr; geëxtrapoleerd naar 12 maanden
@@ -1124,11 +1126,11 @@ export default function CorePage() {
             </div>
           )}
 
-          <div className="mt-3 border-t border-dashed border-[var(--border-md)] pt-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
+          <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
             <p><strong className="text-[var(--ink-3)]">Formule:</strong> som van alle positieve transacties over {incomeMonths < 12 ? `${incomeMonths} maanden, gedeeld door ${incomeMonths} en vermenigvuldigd met 12` : 'de laatste 12 maanden'}</p>
           </div>
 
-          <p className="mt-3 text-center text-[10px] text-[var(--ink-3)]">Berekend op basis van werkelijke transacties</p>
+          <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">Berekend op basis van werkelijke transacties</p>
         </div>
       </BottomSheet>
 
@@ -1144,11 +1146,11 @@ export default function CorePage() {
             </p>
           </div>
 
-          <div className="mb-1 border-b border-dashed border-[var(--border-md)] pb-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
+          <div className="mb-1 border-b border-dashed border-[var(--border-ed)] pb-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
             Je spaarquote laat zien welk deel van je inkomen je overhoudt. Hoe hoger dit percentage, hoe sneller je financiële vrijheid groeit.
           </div>
 
-          <div className="border-b border-dashed border-[var(--border-md)] mb-2 pb-2 mt-2">
+          <div className="border-b border-dashed border-[var(--border-ed)] mb-2 pb-2 mt-2">
             <div className="flex justify-between py-0.5">
               <span className="text-[var(--ink-2)]">Jaarinkomen{savingsRateMonths < 12 ? ' (geëxtrapoleerd)' : ''}</span>
               <span className="tabular-nums text-[var(--ink)]">{formatCurrency(savingsReceiptData.extYearlyIncome)}</span>
@@ -1170,7 +1172,7 @@ export default function CorePage() {
           </div>
 
           {savingsRateMonths < 12 && (
-            <div className="mt-2 border-t border-dashed border-[var(--border-md)] pt-2">
+            <div className="mt-2 border-t border-dashed border-[var(--border-ed)] pt-2">
               <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
                 Werkelijk inkomen: {formatCurrency(savingsReceiptData.last12Income)} over {savingsRateMonths} mnd.
                 Werkelijke uitgaven: {formatCurrency(savingsReceiptData.last12Expenses)} over {savingsRateMonths} mnd.
@@ -1179,12 +1181,12 @@ export default function CorePage() {
             </div>
           )}
 
-          <div className="mt-3 border-t border-dashed border-[var(--border-md)] pt-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
+          <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
             <p><strong className="text-[var(--ink-3)]">Formule:</strong> (inkomen − uitgaven) / inkomen × 100%</p>
             <p className="mt-1">Een spaarquote van 50% betekent dat je voor elke gewerkte dag ook één dag vrijheid opbouwt.</p>
           </div>
 
-          <p className="mt-3 text-center text-[10px] text-[var(--ink-3)]">Berekend op basis van werkelijke transacties</p>
+          <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">Berekend op basis van werkelijke transacties</p>
         </div>
       </BottomSheet>
 
@@ -1196,13 +1198,13 @@ export default function CorePage() {
             <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">FIRE-berekening op basis van de 4%-regel</p>
           </div>
 
-          <div className="mb-1 border-b border-dashed border-[var(--border-md)] pb-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
+          <div className="mb-1 border-b border-dashed border-[var(--border-ed)] pb-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
             Het FIRE-bedrag is het vermogen waarmee je voor altijd van de opbrengsten kunt leven, zonder je kapitaal aan te spreken. Dit is gebaseerd op de &ldquo;4%-regel&rdquo;: je onttrekt jaarlijks 4% van je vermogen.
           </div>
 
           {data && (
             <>
-              <div className="border-b border-dashed border-[var(--border-md)] mb-2 pb-2 mt-2">
+              <div className="border-b border-dashed border-[var(--border-ed)] mb-2 pb-2 mt-2">
                 <div className="flex justify-between py-0.5">
                   <span className="text-[var(--ink-2)]">Maandelijkse uitgaven</span>
                   <span className="tabular-nums text-[var(--ink)]">{formatCurrency(data.monthlyExpenses)}</span>
@@ -1221,7 +1223,7 @@ export default function CorePage() {
                 <span className="tabular-nums font-bold text-[var(--ink)]">{formatCurrency(data.fireTarget)}</span>
               </div>
 
-              <div className="mt-3 border-b border-dashed border-[var(--border-md)] pb-2">
+              <div className="mt-3 border-b border-dashed border-[var(--border-ed)] pb-2">
                 <div className="flex justify-between py-0.5">
                   <span className="text-[var(--ink-2)]">Huidig netto vermogen</span>
                   <span className="tabular-nums text-[var(--ink)]">{formatCurrency(data.netWorth)}</span>
@@ -1240,12 +1242,12 @@ export default function CorePage() {
                 <FreedomTimeBadge amount={data.fireTarget} />
               </div>
 
-              <div className="mt-3 border-t border-dashed border-[var(--border-md)] pt-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
+              <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
                 <p><strong className="text-[var(--ink-3)]">De 4%-regel:</strong> Onderzoek (de &ldquo;Trinity Study&rdquo;) toont aan dat je 4% per jaar kunt onttrekken aan een gediversifieerde portefeuille zonder dat het kapitaal opraakt over 30+ jaar.</p>
                 <p className="mt-1"><strong className="text-[var(--ink-3)]">Formule:</strong> jaarlijkse uitgaven ÷ 0,04 = benodigd vermogen</p>
               </div>
 
-              <p className="mt-3 text-center text-[10px] text-[var(--ink-3)]">Berekend op basis van je huidige maandelijkse uitgaven</p>
+              <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">Berekend op basis van je huidige maandelijkse uitgaven</p>
             </>
           )}
         </div>
@@ -1259,11 +1261,11 @@ export default function CorePage() {
             <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">Vaste lasten op jaarbasis</p>
           </div>
 
-          <div className="mb-1 border-b border-dashed border-[var(--border-md)] pb-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
+          <div className="mb-1 border-b border-dashed border-[var(--border-ed)] pb-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
             Dit zijn de kosten die je sowieso maakt — vaste lasten, dagelijkse boodschappen en vervoer. Dit bedrag bepaalt hoeveel vermogen je nodig hebt voor volledige vrijheid.
           </div>
 
-          <div className="border-b border-dashed border-[var(--border-md)] mb-2 pb-2 mt-2">
+          <div className="border-b border-dashed border-[var(--border-ed)] mb-2 pb-2 mt-2">
             {mustExpenseItems.map((item) => {
               const intervalLabel = item.interval === 'monthly' ? '/mnd' : item.interval === 'quarterly' ? '/kwt' : '/jr'
               return (
@@ -1290,11 +1292,11 @@ export default function CorePage() {
             </div>
           )}
 
-          <div className="mt-3 border-t border-dashed border-[var(--border-md)] pt-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
+          <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
             <p><strong className="text-[var(--ink-3)]">Formule:</strong> per budget het limietbedrag omgerekend naar jaarbasis (maandelijks × 12, per kwartaal × 4, of jaarlijks × 1), alles opgeteld</p>
           </div>
 
-          <p className="mt-3 text-center text-[10px] text-[var(--ink-3)]">Berekend op basis van essentiële budgetinstellingen</p>
+          <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">Berekend op basis van essentiële budgetinstellingen</p>
         </div>
       </BottomSheet>
     </div>

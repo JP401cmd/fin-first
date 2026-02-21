@@ -68,6 +68,7 @@ export async function POST(request: Request) {
     target_date: body.target_date || null,
     linked_asset_id: body.linked_asset_id || null,
     linked_debt_id: body.linked_debt_id || null,
+    budget_id: body.budget_id || null,
     icon: body.icon || 'Target',
     color: body.color || 'teal',
   }

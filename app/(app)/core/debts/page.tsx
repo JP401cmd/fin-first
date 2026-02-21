@@ -30,6 +30,7 @@ import { type Asset, ASSET_TYPE_LABELS } from '@/lib/asset-data'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
 import { OwnershipToggle, OwnershipBadge, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
+import { usePerspective } from '@/components/app/perspective-provider'
 
 export default function DebtsPage() {
   const [debts, setDebts] = useState<Debt[]>([])
@@ -45,6 +46,7 @@ export default function DebtsPage() {
   const [userAssets, setUserAssets] = useState<Asset[]>([])
   const [dailyExpenses, setDailyExpenses] = useState(0)
   const seedingRef = useRef(false)
+  const { perspective } = usePerspective()
 
   // Load monthly expenses to compute daily expenses for freedom-time calculations
   const loadExpenses = useCallback(async () => {
@@ -54,12 +56,18 @@ export default function DebtsPage() {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
 
-      const { data } = await supabase
+      let expQuery = supabase
         .from('transactions')
         .select('amount')
         .lt('amount', 0)
         .gte('date', startOfMonth)
         .lte('date', endOfMonth)
+
+      if (perspective === 'personal') {
+        expQuery = expQuery.eq('ownership', 'personal')
+      }
+
+      const { data } = await expQuery
 
       if (data && data.length > 0) {
         const totalExpenses = data.reduce((sum: number, t: { amount: number }) => sum + Math.abs(Number(t.amount)), 0)
@@ -68,14 +76,18 @@ export default function DebtsPage() {
     } catch (err) {
       console.error('Error loading expenses for freedom-time:', err)
     }
-  }, [])
+  }, [perspective])
 
   const loadDebts = useCallback(async () => {
     try {
       const supabase = createClient()
-      const { data, error: fetchError } = await supabase
+      let query = supabase
         .from('debts')
         .select('*')
+      if (perspective === 'personal') {
+        query = query.eq('ownership', 'personal')
+      }
+      const { data, error: fetchError } = await query
         .order('sort_order', { ascending: true })
 
       if (fetchError) throw fetchError
@@ -97,7 +109,7 @@ export default function DebtsPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [perspective])
 
   async function seedDebts(supabase: ReturnType<typeof createClient>) {
     const { data: { user } } = await supabase.auth.getUser()

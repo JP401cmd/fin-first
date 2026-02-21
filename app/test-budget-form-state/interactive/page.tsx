@@ -37,6 +37,10 @@ const mockParentBudgets: Budget[] = [
     sort_order: 0,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
+    goal_type: null,
+    goal_amount: null,
+    goal_date: null,
+    goal_frequency: null,
   },
 ]
 
@@ -63,6 +67,10 @@ const mockEditBudget: Budget = {
   sort_order: 1,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
+  goal_type: null,
+  goal_amount: null,
+  goal_date: null,
+  goal_frequency: null,
 }
 
 export default function InteractiveTestPage() {

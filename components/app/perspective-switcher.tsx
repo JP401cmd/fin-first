@@ -12,14 +12,14 @@ const perspectiveIcons: Record<Perspective, typeof Users> = {
 
 const perspectiveColors: Record<Perspective, string> = {
   personal: 'text-[var(--ink-2)]',
-  household: 'text-teal-600',
-  partner: 'text-purple-600',
+  household: 'text-kern-600',
+  partner: 'text-[var(--ink-2)]',
 }
 
 const perspectiveActiveColors: Record<Perspective, string> = {
   personal: 'bg-[var(--subtle)] border-[var(--border-md)] text-[var(--ink)]',
-  household: 'bg-teal-50 border-teal-300 text-teal-900',
-  partner: 'bg-purple-50 border-purple-300 text-purple-900',
+  household: 'bg-kern-50 border-kern-300 text-kern-900',
+  partner: 'bg-[var(--subtle)] border-[var(--border-md)] text-[var(--ink)]',
 }
 
 export function PerspectiveSwitcher() {
@@ -99,7 +99,7 @@ export function PerspectiveSwitcher() {
                 data-active={isActive ? 'true' : 'false'}
               >
                 <div className={`flex h-7 w-7 items-center justify-center rounded-full ${
-                  isActive ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-[var(--ink-3)]'
+                  isActive ? 'bg-[var(--ink)] text-[var(--paper)]' : 'bg-[var(--subtle)] text-[var(--ink-3)]'
                 }`}>
                   <OptionIcon className="h-3.5 w-3.5" />
                 </div>

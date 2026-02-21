@@ -14,7 +14,7 @@ export type Budget = {
   icon: string
   description: string | null
   default_limit: number
-  budget_type: 'income' | 'expense' | 'savings' | 'debt'
+  budget_type: 'income' | 'expense' | 'savings' | 'debt' | 'archive'
   interval: 'monthly' | 'quarterly' | 'yearly'
   rollover_type: 'reset' | 'carry-over' | 'invest-sweep'
   limit_type: 'soft' | 'hard'
@@ -29,6 +29,11 @@ export type Budget = {
   // Household fields
   ownership: 'personal' | 'shared'
   household_id: string | null
+  // Goal type fields
+  goal_type: string | null
+  goal_amount: number | null
+  goal_date: string | null
+  goal_frequency: string | null
 }
 
 /** Stable budget slugs — use these for matching instead of display names. */
@@ -70,6 +75,8 @@ export const BUDGET_SLUGS = {
   SCHULDEN_AFLOSSINGEN_PARENT: 'schulden-aflossingen-parent',
   SCHULDEN_AFLOSSINGEN: 'schulden-aflossingen',
   EXTRA_AFLOSSING_HYPOTHEEK: 'extra-aflossing-hypotheek',
+  EIGEN_REKENING: 'eigen-rekening',
+  EIGEN_REKENING_SUB: 'eigen-rekening-sub',
 } as const
 
 export type BudgetAmount = {
@@ -90,7 +97,7 @@ type SeedBudget = {
   icon: string
   description: string
   default_limit: number
-  budget_type: 'income' | 'expense' | 'savings' | 'debt'
+  budget_type: 'income' | 'expense' | 'savings' | 'debt' | 'archive'
   is_essential: boolean
   priority_score: number
   sort_order: number
@@ -219,6 +226,26 @@ export function getDefaultBudgets(): SeedBudget[] {
       children: [
         { name: 'Schulden & aflossingen', slug: S.SCHULDEN_AFLOSSINGEN, icon: 'CreditCard', description: 'Leningen en schulden aflossen', default_limit: 60 },
         { name: 'Extra aflossing hypotheek', slug: S.EXTRA_AFLOSSING_HYPOTHEEK, icon: 'HomeIcon', description: 'Vrijwillige extra hypotheekaflossing', default_limit: 20 },
+      ],
+    },
+    {
+      name: 'Eigen rekening',
+      slug: S.EIGEN_REKENING,
+      icon: 'ArrowLeftRight',
+      description: 'Overboekingen tussen eigen rekeningen — geen invloed op resultaten',
+      default_limit: 0,
+      budget_type: 'archive',
+      is_essential: false,
+      priority_score: 1,
+      sort_order: 99,
+      children: [
+        {
+          name: 'Eigen rekening',
+          slug: S.EIGEN_REKENING_SUB,
+          icon: 'ArrowLeftRight',
+          description: 'Overboekingen tussen eigen rekeningen',
+          default_limit: 0,
+        },
       ],
     },
   ]

@@ -57,11 +57,20 @@ export function TransferConfirmSheet({
     if (!transaction) return
     setSaving(true)
     const supabase = createClient()
+
+    // Zoek het archive-budget voor eigen overboekingen
+    const { data: eigenBudget } = await supabase
+      .from('budgets')
+      .select('id')
+      .eq('slug', 'eigen-rekening-sub')
+      .limit(1)
+      .maybeSingle()
+
     await supabase
       .from('transactions')
       .update({
         transaction_type: 'transfer',
-        budget_id: null,
+        budget_id: eigenBudget?.id ?? null,
         category_source: 'transfer',
       })
       .eq('id', transaction.id)
@@ -89,7 +98,7 @@ export function TransferConfirmSheet({
   return (
     <BottomSheet open={!!transaction} onClose={onClose} title="Overboeking controleren">
       {/* Kassabon container */}
-      <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50/50 p-4 font-mono text-sm">
+      <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 font-mono text-sm">
         {/* Header */}
         <div className="mb-3 text-center">
           <p className="text-xs font-bold uppercase tracking-widest text-[var(--ink-2)]">
@@ -101,7 +110,7 @@ export function TransferConfirmSheet({
         </div>
 
         {/* Uitleg */}
-        <p className="mb-3 text-[11px] text-[var(--ink-4)]">
+        <p className="mb-3 font-sans text-[11px] text-[var(--ink-3)]">
           Het tegenpartij-IBAN van deze transactie komt overeen met een van jouw eigen rekeningen.
         </p>
 
@@ -138,7 +147,7 @@ export function TransferConfirmSheet({
         </div>
 
         {/* Scheidingslijn */}
-        <div className="my-3 border-b border-dashed border-zinc-300" />
+        <div className="my-3 border-b border-dashed border-[var(--border-ed)]" />
 
         {/* Rekening match */}
         {matchedAccount && (
@@ -156,7 +165,7 @@ export function TransferConfirmSheet({
         )}
 
         {/* Totaalregel */}
-        <div className="mt-3 border-t-2 border-zinc-900 pt-2">
+        <div className="mt-3 border-t-2 border-[var(--ink)] pt-2">
           <div className="flex justify-between font-bold">
             <span className="text-[var(--ink)]">Als overboeking</span>
             <span className="text-[var(--ink-2)]">geen budgetimpact</span>

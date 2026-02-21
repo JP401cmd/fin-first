@@ -184,7 +184,7 @@ ${nameVal}`
         {/* Opzegbrief preview */}
         <div>
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-[var(--ink-3)]">Opzegbrief preview</p>
-          <pre className="overflow-hidden whitespace-pre-wrap rounded-lg border border-dashed border-zinc-300 bg-zinc-50/50 p-4 font-mono text-[11px] leading-relaxed text-[var(--ink-2)]">
+          <pre className="overflow-hidden whitespace-pre-wrap rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 font-mono text-[11px] leading-relaxed text-[var(--ink-2)]">
             {letter}
           </pre>
         </div>

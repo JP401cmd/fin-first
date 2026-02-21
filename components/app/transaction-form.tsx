@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { X, Save, Trash2, Repeat } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X, Save, Trash2, Repeat, GitFork, Plus } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
 import type { Budget } from '@/lib/budget-data'
@@ -19,6 +19,7 @@ type Transaction = {
   is_income: boolean
   notes: string | null
   category_source: string
+  is_split?: boolean
 }
 
 type BudgetGroup = {
@@ -44,6 +45,38 @@ export function TransactionForm({
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+
+  type SplitRow = { id: string; budget_id: string; amount: string; description: string }
+  const [isSplit, setIsSplit] = useState(!!transaction?.is_split)
+  const [splitsLoading, setSplitsLoading] = useState(!!transaction?.is_split)
+  const [splitRows, setSplitRows] = useState<SplitRow[]>([
+    { id: crypto.randomUUID(), budget_id: '', amount: '', description: '' },
+    { id: crypto.randomUUID(), budget_id: '', amount: '', description: '' },
+  ])
+
+  // Load existing splits when editing a split transaction
+  useEffect(() => {
+    if (!transaction?.is_split || !transaction.id) return
+    const supabase = createClient()
+    supabase
+      .from('transaction_splits')
+      .select('id, budget_id, amount, description')
+      .eq('transaction_id', transaction.id)
+      .order('created_at', { ascending: true })
+      .then(({ data }) => {
+        if (data && data.length >= 2) {
+          setSplitRows(
+            data.map(r => ({
+              id: r.id,
+              budget_id: r.budget_id ?? '',
+              amount: String(Math.abs(Number(r.amount))),
+              description: r.description ?? '',
+            }))
+          )
+        }
+        setSplitsLoading(false)
+      })
+  }, [transaction?.id, transaction?.is_split])
 
   const [form, setForm] = useState({
     date: transaction?.date ?? new Date().toISOString().split('T')[0],
@@ -74,6 +107,19 @@ export function TransactionForm({
       setError('Bedrag is verplicht')
       return
     }
+    if (isSplit) {
+      const validRows = splitRows.filter(r => r.amount !== '' && parseFloat(r.amount) > 0)
+      if (validRows.length < 2) {
+        setError('Voeg minimaal 2 splits toe')
+        return
+      }
+      const splitTotal = validRows.reduce((s, r) => s + parseFloat(r.amount), 0)
+      const mainAmount = parseFloat(form.amount)
+      if (Math.abs(splitTotal - mainAmount) > 0.01) {
+        setError(`Splits (${splitTotal.toFixed(2)}) moeten optellen tot het totaalbedrag (${mainAmount.toFixed(2)})`)
+        return
+      }
+    }
 
     setSaving(true)
     setError('')
@@ -89,6 +135,10 @@ export function TransactionForm({
     const rawAmount = parseFloat(form.amount)
     const amount = form.is_income ? Math.abs(rawAmount) : -Math.abs(rawAmount)
 
+    const validSplitRows = isSplit
+      ? splitRows.filter(r => r.amount !== '' && parseFloat(r.amount) > 0)
+      : []
+
     const row = {
       user_id: user.id,
       account_id: accountId,
@@ -96,8 +146,10 @@ export function TransactionForm({
       amount,
       description: form.description.trim(),
       counterparty_name: form.counterparty_name.trim() || null,
-      budget_id: form.budget_id || null,
+      // When split, don't assign a single budget (splits handle that)
+      budget_id: isSplit ? null : (form.budget_id || null),
       is_income: form.is_income,
+      is_split: isSplit && validSplitRows.length >= 2,
       category_source: 'manual' as const,
       notes: form.notes.trim() || null,
     }
@@ -113,15 +165,46 @@ export function TransactionForm({
         setSaving(false)
         return
       }
+
+      // Manage splits for edited transactions
+      if (isSplit && validSplitRows.length >= 2) {
+        // Delete all existing splits, then re-insert
+        await supabase.from('transaction_splits').delete().eq('transaction_id', transaction.id)
+        await supabase.from('transaction_splits').insert(
+          validSplitRows.map(r => ({
+            transaction_id: transaction.id,
+            budget_id: r.budget_id || null,
+            amount: parseFloat(r.amount),
+            description: r.description.trim() || null,
+          }))
+        )
+      } else if (!isSplit && transaction.is_split) {
+        // User converted split back to regular — delete splits
+        await supabase.from('transaction_splits').delete().eq('transaction_id', transaction.id)
+      }
     } else {
-      const { error: insertError } = await supabase
+      const { data: insertedTx, error: insertError } = await supabase
         .from('transactions')
         .insert(row)
+        .select('id')
+        .single()
 
-      if (insertError) {
-        setError(insertError.message)
+      if (insertError || !insertedTx) {
+        setError(insertError?.message ?? 'Opslaan mislukt')
         setSaving(false)
         return
+      }
+
+      // Insert split rows if applicable
+      if (isSplit && validSplitRows.length >= 2) {
+        await supabase.from('transaction_splits').insert(
+          validSplitRows.map(r => ({
+            transaction_id: insertedTx.id,
+            budget_id: r.budget_id || null,
+            amount: parseFloat(r.amount),
+            description: r.description.trim() || null,
+          }))
+        )
       }
 
       // Create recurring template if toggled
@@ -277,30 +360,155 @@ export function TransactionForm({
               />
             </div>
 
-            {/* Budget */}
-            <div>
-              <label htmlFor="tx-budget" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
-                Budget
+            {/* Budget — hidden when split is active */}
+            {!isSplit && (
+              <div>
+                <label htmlFor="tx-budget" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
+                  Budget
+                </label>
+                <select
+                  id="tx-budget"
+                  value={form.budget_id}
+                  onChange={(e) => update('budget_id', e.target.value)}
+                  className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                >
+                  <option value="">Niet gecategoriseerd</option>
+                  {budgetGroups
+                    .filter((group) => group.children.length > 0)
+                    .map((group) => (
+                    <optgroup key={group.parent.id} label={group.parent.name}>
+                      {group.children.map((child) => (
+                        <option key={child.id} value={child.id}>
+                          {child.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Split toggle — available for both new and edit */}
+            <div className="rounded-lg border border-[var(--border-ed)] p-3">
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={isSplit}
+                  onChange={e => {
+                    setIsSplit(e.target.checked)
+                    if (e.target.checked) update('budget_id', '')
+                  }}
+                  className="h-4 w-4 rounded border-[var(--border-md)] text-kern-600 focus:ring-kern-500"
+                />
+                <GitFork className="h-4 w-4 text-[var(--ink-3)]" />
+                <span className="text-sm font-medium text-[var(--ink-2)]">Verdeel over meerdere budgetten</span>
               </label>
-              <select
-                id="tx-budget"
-                value={form.budget_id}
-                onChange={(e) => update('budget_id', e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
-              >
-                <option value="">Niet gecategoriseerd</option>
-                {budgetGroups
-                  .filter((group) => group.children.length > 0)
-                  .map((group) => (
-                  <optgroup key={group.parent.id} label={group.parent.name}>
-                    {group.children.map((child) => (
-                      <option key={child.id} value={child.id}>
-                        {child.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
+
+              {/* Warning when un-splitting an existing split transaction */}
+              {isEdit && transaction?.is_split && !isSplit && (
+                <p className="mt-2 text-xs text-amber-700">
+                  Let op: de bestaande splits worden verwijderd als je opslaat.
+                </p>
+              )}
+
+              {isSplit && (
+                <div className="mt-3 space-y-2 border-t border-[var(--border-ed)] pt-3">
+                  {splitsLoading ? (
+                    <p className="text-xs text-[var(--ink-3)]">Splits laden...</p>
+                  ) : (
+                    <>
+                      <p className="text-xs text-[var(--ink-3)]">
+                        Totaal: <span className="font-mono font-medium">{form.amount ? `€${form.amount}` : '€0'}</span>
+                        {' — '}
+                        Verdeeld: <span className={`font-mono font-medium ${
+                          Math.abs(splitRows.filter(r => r.amount).reduce((s, r) => s + parseFloat(r.amount || '0'), 0) - parseFloat(form.amount || '0')) > 0.01
+                            ? 'text-red-600' : 'text-emerald-600'
+                        }`}>
+                          €{splitRows.filter(r => r.amount).reduce((s, r) => s + parseFloat(r.amount || '0'), 0).toFixed(2)}
+                        </span>
+                      </p>
+                      {splitRows.map((row) => (
+                        <div key={row.id} className="flex items-start gap-2">
+                          <div className="flex-1 space-y-1.5">
+                            <select
+                              value={row.budget_id}
+                              onChange={e => setSplitRows(prev => prev.map(r => r.id === row.id ? { ...r, budget_id: e.target.value } : r))}
+                              className="w-full rounded-[var(--r-sm)] border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
+                            >
+                              <option value="">Geen budget</option>
+                              {budgetGroups.filter(g => g.children.length > 0).map(group => (
+                                <optgroup key={group.parent.id} label={group.parent.name}>
+                                  {group.children.map(child => (
+                                    <option key={child.id} value={child.id}>{child.name}</option>
+                                  ))}
+                                </optgroup>
+                              ))}
+                            </select>
+                            <div className="flex gap-2">
+                              <div className="relative w-28">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-[var(--ink-3)]">€</span>
+                                <input
+                                  type="number"
+                                  min="0.01"
+                                  step="0.01"
+                                  value={row.amount}
+                                  onChange={e => {
+                                    const val = e.target.value
+                                    setSplitRows(prev => {
+                                      const updated = prev.map(r => r.id === row.id ? { ...r, amount: val } : r)
+                                      // Auto-fill the other row when exactly 2 split rows exist
+                                      if (prev.length === 2 && val !== '') {
+                                        const total = parseFloat(form.amount || '0')
+                                        const entered = parseFloat(val) || 0
+                                        const remainder = Math.max(0, total - entered)
+                                        const otherId = prev.find(r => r.id !== row.id)?.id
+                                        if (otherId) {
+                                          return updated.map(r =>
+                                            r.id === otherId
+                                              ? { ...r, amount: remainder > 0 ? remainder.toFixed(2) : '' }
+                                              : r
+                                          )
+                                        }
+                                      }
+                                      return updated
+                                    })
+                                  }}
+                                  placeholder="0,00"
+                                  className="w-full rounded-[var(--r-sm)] border border-[var(--border-md)] py-1.5 pl-5 pr-2 text-right font-mono text-xs text-[var(--ink)] outline-none focus:border-kern-500"
+                                />
+                              </div>
+                              <input
+                                type="text"
+                                value={row.description}
+                                onChange={e => setSplitRows(prev => prev.map(r => r.id === row.id ? { ...r, description: e.target.value } : r))}
+                                placeholder="Omschrijving (optioneel)"
+                                className="flex-1 rounded-[var(--r-sm)] border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
+                              />
+                            </div>
+                          </div>
+                          {splitRows.length > 2 && (
+                            <button
+                              type="button"
+                              onClick={() => setSplitRows(prev => prev.filter(r => r.id !== row.id))}
+                              className="mt-1 rounded p-1 text-[var(--ink-4)] hover:text-red-600"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setSplitRows(prev => [...prev, { id: crypto.randomUUID(), budget_id: '', amount: '', description: '' }])}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-kern-600 hover:text-kern-700"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Regel toevoegen
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Recurring toggle — only for new transactions */}

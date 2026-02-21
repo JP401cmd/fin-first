@@ -222,19 +222,19 @@ export function HouseholdSection() {
 
   if (loading) {
     return (
-      <section className="mb-10 rounded-[var(--r-lg)] border border-teal-200 bg-[var(--paper)] p-6 sm:p-8" data-testid="household-section">
+      <section className="mb-10 rounded-[var(--r-lg)] border border-kern-200 bg-[var(--paper)] p-6 sm:p-8" data-testid="household-section">
         <div className="flex items-center justify-center py-8">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-teal-300 border-t-teal-600" />
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-kern-300 border-t-kern-600" />
         </div>
       </section>
     )
   }
 
   return (
-    <section className="mb-10 rounded-[var(--r-lg)] border border-teal-200 bg-[var(--paper)] p-6 sm:p-8" data-testid="household-section">
+    <section className="mb-10 rounded-[var(--r-lg)] border border-kern-200 bg-[var(--paper)] p-6 sm:p-8" data-testid="household-section">
       <div className="flex items-center gap-2 mb-1">
-        <Users className="h-4 w-4 text-teal-600" />
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-teal-600 uppercase">
+        <Users className="h-4 w-4 text-kern-600" />
+        <h2 className="text-xs font-semibold tracking-[0.15em] text-kern-600 uppercase">
           Huishouden
         </h2>
       </div>
@@ -260,13 +260,13 @@ export function HouseholdSection() {
       {status && !status.has_household && status.pending_invitations_received.length > 0 && (
         <div className="mb-6 space-y-3" data-testid="received-invitations">
           <h3 className="text-sm font-semibold text-[var(--ink-2)] flex items-center gap-2">
-            <Mail className="h-4 w-4 text-teal-500" />
+            <Mail className="h-4 w-4 text-kern-500" />
             Openstaande uitnodigingen
           </h3>
           {status.pending_invitations_received.map((invite) => (
             <div
               key={invite.id}
-              className="rounded-[var(--r-lg)] border border-teal-100 bg-teal-50/50 p-4"
+              className="rounded-[var(--r-lg)] border border-kern-100 bg-kern-50/50 p-4"
               data-testid="received-invitation-card"
             >
               <div className="flex items-start justify-between gap-3">
@@ -283,7 +283,7 @@ export function HouseholdSection() {
                   <button
                     onClick={() => handleAcceptDecline(invite.token, 'accept')}
                     disabled={accepting === invite.token}
-                    className="flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
+                    className="flex items-center gap-1 rounded-lg bg-kern-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-kern-700 disabled:opacity-50 transition-colors"
                     data-testid="accept-invite-btn"
                   >
                     <Check className="h-3 w-3" />
@@ -309,7 +309,7 @@ export function HouseholdSection() {
       {status && !status.has_household && (
         <div data-testid="invite-form">
           <h3 className="text-sm font-semibold text-[var(--ink-2)] flex items-center gap-2 mb-3">
-            <UserPlus className="h-4 w-4 text-teal-500" />
+            <UserPlus className="h-4 w-4 text-kern-500" />
             Partner uitnodigen
           </h3>
           <p className="text-xs text-[var(--ink-3)] mb-4">
@@ -327,7 +327,7 @@ export function HouseholdSection() {
                 value={householdName}
                 onChange={(e) => setHouseholdName(e.target.value)}
                 placeholder="Ons huishouden"
-                className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 data-testid="household-name-input"
               />
             </div>
@@ -341,7 +341,7 @@ export function HouseholdSection() {
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="partner@voorbeeld.nl"
-                className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
@@ -354,7 +354,7 @@ export function HouseholdSection() {
             <button
               onClick={handleInvite}
               disabled={sending || !inviteEmail.trim()}
-              className="flex items-center gap-2 rounded-lg bg-teal-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-700 disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg bg-kern-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-kern-700 disabled:opacity-50"
               data-testid="send-invite-btn"
             >
               <Mail className="h-4 w-4" />
@@ -368,7 +368,7 @@ export function HouseholdSection() {
       {status && status.has_household && (
         <div data-testid="household-active">
           {/* Household info */}
-          <div className="mb-5 rounded-[var(--r-lg)] bg-teal-50/50 border border-teal-100 p-4">
+          <div className="mb-5 rounded-[var(--r-lg)] bg-kern-50/50 border border-kern-100 p-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-zinc-800">
@@ -380,7 +380,7 @@ export function HouseholdSection() {
               </div>
               <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${
                 status.my_role === 'owner'
-                  ? 'bg-teal-100 text-teal-700 border border-teal-200'
+                  ? 'bg-kern-100 text-kern-700 border border-kern-200'
                   : 'bg-zinc-100 text-[var(--ink-2)] border border-[var(--border-ed)]'
               }`}>
                 {status.my_role === 'owner' ? 'Eigenaar' : 'Lid'}
@@ -399,7 +399,7 @@ export function HouseholdSection() {
                 className="flex items-center gap-3 rounded-lg border border-[var(--border-ed)] p-3"
                 data-testid="household-member"
               >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100 text-teal-600 text-sm font-bold">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-kern-100 text-kern-600 text-sm font-bold">
                   {(member.full_name || '?')[0].toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -470,7 +470,7 @@ export function HouseholdSection() {
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   placeholder="partner@voorbeeld.nl"
-                  className="flex-1 rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                  className="flex-1 rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault()
@@ -482,7 +482,7 @@ export function HouseholdSection() {
                 <button
                   onClick={handleInvite}
                   disabled={sending || !inviteEmail.trim()}
-                  className="flex items-center gap-1 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-1 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50 transition-colors"
                   data-testid="send-invite-btn"
                 >
                   <Mail className="h-4 w-4" />

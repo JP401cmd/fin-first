@@ -11,7 +11,7 @@ import {
   Vault, TrendingUp, CreditCard, HomeIcon,
   GraduationCap, RefreshCw, CalendarCheck, CircleDot,
   Gem, Bitcoin, LineChart, Building, Briefcase,
-  SlidersHorizontal, ArrowRightLeft,
+  SlidersHorizontal, ArrowRightLeft, ArrowLeftRight,
 } from 'lucide-react'
 
 export const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -25,7 +25,7 @@ export const iconMap: Record<string, React.ComponentType<{ className?: string }>
   Vault, TrendingUp, CreditCard, HomeIcon,
   GraduationCap, RefreshCw, CalendarCheck, CircleDot,
   Gem, Bitcoin, LineChart, Building, Briefcase,
-  Sliders: SlidersHorizontal, SlidersHorizontal, ArrowRightLeft,
+  Sliders: SlidersHorizontal, SlidersHorizontal, ArrowRightLeft, ArrowLeftRight,
 }
 
 export const iconOptions = Object.keys(iconMap)
@@ -38,7 +38,7 @@ export function BudgetIcon({ name, className }: { name: string; className?: stri
 import { formatCurrency as _formatCurrency, formatCurrencyDecimals as _formatCurrencyDecimals } from '@/lib/format'
 export { _formatCurrency as formatCurrency, _formatCurrencyDecimals as formatCurrencyDecimals }
 
-export type BudgetType = 'income' | 'expense' | 'savings' | 'debt'
+export type BudgetType = 'income' | 'expense' | 'savings' | 'debt' | 'archive'
 
 export function formatRollover(amount: number, type: string): string {
   if (amount <= 0) return ''
@@ -151,6 +151,28 @@ const TYPE_COLORS: Record<BudgetType, {
     barHex: 'var(--color-debt-400)',
     barHexWarn: 'var(--color-debt-500)',
     barHexLight: 'var(--color-debt-200)',
+  },
+  archive: {
+    bg: 'bg-zinc-50',
+    bgDark: 'bg-zinc-100',
+    text: 'text-zinc-500',
+    textLight: 'text-zinc-400',
+    border: 'border-zinc-200',
+    barDefault: 'bg-zinc-300',
+    barWarning: 'bg-zinc-400',
+    barLight: 'bg-zinc-100',
+    headerGradient: 'from-zinc-50 to-white',
+    hoverBorder: 'hover:border-zinc-200',
+    hoverBg: 'hover:bg-zinc-50',
+    buttonBg: 'bg-zinc-500 hover:bg-zinc-600',
+    gradient: 'from-zinc-50 to-white',
+    barWarn: 'bg-zinc-400',
+    spinner: 'border-zinc-400',
+    hex: 'var(--ink-4)',
+    hexLight: '#e4e4e7',
+    barHex: '#a1a1aa',
+    barHexWarn: '#71717a',
+    barHexLight: '#f4f4f5',
   },
 }
 

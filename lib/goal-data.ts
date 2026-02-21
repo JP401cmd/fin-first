@@ -15,6 +15,7 @@ export type Goal = {
   target_date: string | null
   linked_asset_id: string | null
   linked_debt_id: string | null
+  budget_id?: string | null
   icon: string
   color: string
   is_completed: boolean

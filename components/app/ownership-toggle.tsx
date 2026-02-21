@@ -39,8 +39,8 @@ export function OwnershipToggle({ value, onChange, hasHousehold, compact = false
             onClick={() => handleSelect('personal')}
             className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
               value === 'personal'
-                ? 'bg-zinc-900 text-white'
-                : 'bg-zinc-100 text-[var(--ink-3)] hover:bg-zinc-200'
+                ? 'bg-[var(--ink)] text-[var(--paper)]'
+                : 'bg-[var(--subtle)] text-[var(--ink-3)] hover:bg-[var(--border-ed)]'
             }`}
             data-testid="ownership-personal-btn"
           >
@@ -52,8 +52,8 @@ export function OwnershipToggle({ value, onChange, hasHousehold, compact = false
             onClick={() => handleSelect('shared')}
             className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
               value === 'shared'
-                ? 'bg-teal-600 text-white'
-                : 'bg-zinc-100 text-[var(--ink-3)] hover:bg-zinc-200'
+                ? 'bg-kern-600 text-white'
+                : 'bg-[var(--subtle)] text-[var(--ink-3)] hover:bg-[var(--border-ed)]'
             }`}
             data-testid="ownership-shared-btn"
           >
@@ -100,15 +100,15 @@ export function OwnershipToggle({ value, onChange, hasHousehold, compact = false
           onClick={() => handleSelect('shared')}
           className={`flex flex-1 items-center justify-center gap-2 rounded-[var(--r-lg)] border-2 px-4 py-3 text-sm font-medium transition-all ${
             value === 'shared'
-              ? 'border-teal-600 bg-teal-50 text-teal-900 shadow-[var(--s0)]'
+              ? 'border-kern-600 bg-kern-50 text-kern-900 shadow-[var(--s0)]'
               : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-[var(--border-md)] hover:bg-[var(--subtle)]'
           }`}
           data-testid="ownership-shared-btn"
         >
-          <Users className={`h-4 w-4 ${value === 'shared' ? 'text-teal-600' : 'text-[var(--ink-3)]'}`} />
+          <Users className={`h-4 w-4 ${value === 'shared' ? 'text-kern-600' : 'text-[var(--ink-3)]'}`} />
           <div className="text-left">
             <span className="block">Gedeeld</span>
-            <span className={`block text-[10px] font-normal ${value === 'shared' ? 'text-teal-600' : 'text-[var(--ink-3)]'}`}>
+            <span className={`block text-[10px] font-normal ${value === 'shared' ? 'text-kern-600' : 'text-[var(--ink-3)]'}`}>
               Samen met partner
             </span>
           </div>
@@ -135,7 +135,7 @@ export function OwnershipBadge({ ownership }: { ownership: OwnershipType }) {
 
   return (
     <span
-      className="inline-flex items-center gap-0.5 rounded-full bg-teal-50 px-1.5 py-0.5 text-[10px] font-medium text-teal-700 border border-teal-200"
+      className="inline-flex items-center gap-0.5 rounded-full bg-kern-50 px-1.5 py-0.5 text-[10px] font-medium text-kern-700 border border-kern-200"
       data-testid="ownership-badge-shared"
       title="Gedeeld met huishouden"
     >

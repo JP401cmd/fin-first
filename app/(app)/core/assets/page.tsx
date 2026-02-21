@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { OwnershipToggle, OwnershipBadge, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
+import { usePerspective } from '@/components/app/perspective-provider'
 import {
   type Asset,
   type AssetType,
@@ -42,6 +43,7 @@ export default function AssetsPage() {
   const [valuations, setValuations] = useState<Record<string, Valuation[]>>({})
   const [dailyExpenses, setDailyExpenses] = useState(0)
   const seedingRef = useRef(false)
+  const { perspective } = usePerspective()
 
   function getMortgageForAsset(assetId: string): { name: string; balance: number } | null {
     const m = mortgages.find((m) => m.linked_asset_id === assetId)
@@ -52,9 +54,13 @@ export default function AssetsPage() {
   const loadAssets = useCallback(async () => {
     try {
       const supabase = createClient()
-      const { data, error: fetchError } = await supabase
+      let query = supabase
         .from('assets')
         .select('*')
+      if (perspective === 'personal') {
+        query = query.eq('ownership', 'personal')
+      }
+      const { data, error: fetchError } = await query
         .order('sort_order', { ascending: true })
 
       if (fetchError) throw fetchError
@@ -107,7 +113,7 @@ export default function AssetsPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [perspective])
 
   async function seedAssets(supabase: ReturnType<typeof createClient>) {
     const { data: { user } } = await supabase.auth.getUser()
