@@ -574,6 +574,16 @@ body {
   animation: progIn 1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
+@keyframes drawPath {
+  from { stroke-dashoffset: 1; }
+  to   { stroke-dashoffset: 0; }
+}
+
+@keyframes fadeInFill {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 /* ── Print styles (PDF export) ──────────────────────────── */
 @media print {
   @page {

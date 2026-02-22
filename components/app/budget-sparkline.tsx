@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 export type SparklineDataPoint = {
   month: string  // YYYY-MM-DD
@@ -75,6 +76,7 @@ export function BudgetSparkline({
   className = '',
   testId,
 }: BudgetSparklineProps) {
+  const { ref, hasEntered } = useInViewAnimation({ duration: 400 })
   const { points, fillPath, linePath, trend, trendColor, hasData } = useMemo(() => {
     const values = data.map(d => d.spent)
     if (values.length < 2 || values.every(v => v === 0)) {
@@ -123,6 +125,7 @@ export function BudgetSparkline({
   if (!hasData) {
     return (
       <div
+        ref={ref}
         className={`inline-flex items-center ${className}`}
         data-testid={testId}
         data-trend="none"
@@ -143,8 +146,19 @@ export function BudgetSparkline({
     )
   }
 
+  // Animation timings (400ms line, fill starts at 65% = 260ms, endpoint dot at 350ms)
+  const lineAnim = hasEntered
+    ? 'drawPath 400ms cubic-bezier(.22,1,.36,1) both'
+    : 'none'
+  const fillAnim = hasEntered
+    ? 'fadeInFill 150ms ease-out 260ms both'
+    : 'none'
+  const dotOpacity = hasEntered ? 1 : 0
+  const dotTransition = hasEntered ? 'opacity 100ms ease-out 350ms' : 'none'
+
   return (
     <div
+      ref={ref}
       className={`inline-flex items-center ${className}`}
       data-testid={testId}
       data-trend={trend}
@@ -156,7 +170,8 @@ export function BudgetSparkline({
           <path
             d={fillPath}
             fill={trendColor}
-            opacity={0.12}
+            opacity={0}
+            style={{ animation: fillAnim, opacity: hasEntered ? 0.12 : 0 }}
           />
         )}
 
@@ -168,6 +183,10 @@ export function BudgetSparkline({
           strokeWidth={1.5}
           strokeLinecap="round"
           strokeLinejoin="round"
+          pathLength={1}
+          strokeDasharray={1}
+          strokeDashoffset={hasEntered ? undefined : 1}
+          style={{ animation: lineAnim }}
         />
 
         {/* Data point dots */}
@@ -178,6 +197,8 @@ export function BudgetSparkline({
             cy={pt.y}
             r={1.5}
             fill={trendColor}
+            opacity={dotOpacity}
+            style={{ transition: dotTransition }}
           />
         ))}
 
@@ -187,6 +208,8 @@ export function BudgetSparkline({
           cy={points[points.length - 1].y}
           r={2}
           fill={trendColor}
+          opacity={dotOpacity}
+          style={{ transition: dotTransition }}
         />
       </svg>
     </div>

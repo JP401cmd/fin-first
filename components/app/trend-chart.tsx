@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useRef } from 'react'
 import type { DomainColor } from '@/lib/navigation'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -135,6 +136,8 @@ export function TrendChart({
 }: TrendChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const [hoveredSeriesId, setHoveredSeriesId] = useState<string | null>(null)
+
+  const { ref, hasEntered, animationComplete } = useInViewAnimation({ duration: 700 })
 
   const tooltipFormat = formatTooltip || formatValue
   const theme = MODULE_COLORS[moduleColor]
@@ -332,9 +335,14 @@ export function TrendChart({
     )
   }
 
+  // Animation timings
+  const lineAnim = hasEntered ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) both' : 'none'
+  const fillAnim = hasEntered ? 'fadeInFill 250ms ease-out 455ms both' : 'none'
+  const projAnim = hasEntered ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) 595ms both' : 'none'
+
   // ── Render ──────────────────────────────────────────────────
   return (
-    <div className={className} data-testid={testId} data-mode={mode} data-module-color={moduleColor}>
+    <div ref={ref} className={className} data-testid={testId} data-mode={mode} data-module-color={moduleColor}>
       {/* Title */}
       {title && (
         <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]" data-testid={`${testId}-title`}>
@@ -433,6 +441,7 @@ export function TrendChart({
                   fill={`url(#trend-grad-${sp.id})`}
                   opacity={opacity}
                   className="transition-opacity duration-200"
+                  style={{ animation: fillAnim }}
                 />
               )}
 
@@ -443,6 +452,7 @@ export function TrendChart({
                   fill={`url(#trend-proj-grad-${sp.id})`}
                   opacity={opacity}
                   className="transition-opacity duration-200"
+                  style={{ animation: fillAnim }}
                 />
               )}
 
@@ -456,6 +466,8 @@ export function TrendChart({
                   strokeDasharray="6 4"
                   opacity={opacity * 0.7}
                   className="transition-opacity duration-200"
+                  pathLength={1}
+                  style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: projAnim }}
                 />
               )}
 
@@ -469,6 +481,8 @@ export function TrendChart({
                   strokeLinejoin="round"
                   opacity={opacity}
                   className="transition-opacity duration-200"
+                  pathLength={1}
+                  style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: lineAnim }}
                 />
               )}
 
@@ -486,9 +500,10 @@ export function TrendChart({
                     stroke="white"
                     strokeWidth={isHovered ? 2 : 1}
                     opacity={opacity}
-                    className="cursor-pointer transition-all duration-150"
-                    onMouseEnter={() => handleMouseEnter(i, sp.id)}
-                    onMouseLeave={handleMouseLeave}
+                    className="transition-all duration-150"
+                    style={{ cursor: animationComplete ? 'pointer' : 'default', pointerEvents: animationComplete ? 'auto' : 'none' }}
+                    onMouseEnter={animationComplete ? () => handleMouseEnter(i, sp.id) : undefined}
+                    onMouseLeave={animationComplete ? handleMouseLeave : undefined}
                   />
                 )
               })}
@@ -508,9 +523,10 @@ export function TrendChart({
                     strokeWidth={isHovered ? 2 : 1.5}
                     strokeDasharray="2 1"
                     opacity={opacity * 0.8}
-                    className="cursor-pointer transition-all duration-150"
-                    onMouseEnter={() => handleMouseEnter(i, sp.id)}
-                    onMouseLeave={handleMouseLeave}
+                    className="transition-all duration-150"
+                    style={{ cursor: animationComplete ? 'pointer' : 'default', pointerEvents: animationComplete ? 'auto' : 'none' }}
+                    onMouseEnter={animationComplete ? () => handleMouseEnter(i, sp.id) : undefined}
+                    onMouseLeave={animationComplete ? handleMouseLeave : undefined}
                   />
                 )
               })}
@@ -535,20 +551,26 @@ export function TrendChart({
                 const barY = d.value >= 0 ? yPos(d.value) : yPos(0)
                 const isHovered = hoveredIndex === i && (!hoveredSeriesId || hoveredSeriesId === sp.id)
 
+                const barAnimDelay = i * 40
+                const barAnimStyle = hasEntered
+                  ? { transition: `y 400ms cubic-bezier(.22,1,.36,1) ${barAnimDelay}ms, height 400ms cubic-bezier(.22,1,.36,1) ${barAnimDelay}ms` }
+                  : { transition: 'none' }
+
                 return (
                   <g key={`bar-${i}`}>
                     {/* Actual value bar */}
                     <rect
                       x={barX}
-                      y={barY}
+                      y={hasEntered ? barY : barY + Math.max(barH, 1)}
                       width={barWidth}
-                      height={Math.max(barH, 1)}
+                      height={hasEntered ? Math.max(barH, 1) : 0}
                       rx={2}
                       fill={sp.color}
                       opacity={isHovered ? opacity : opacity * 0.85}
-                      className="cursor-pointer transition-opacity duration-150"
-                      onMouseEnter={() => handleMouseEnter(i, sp.id)}
-                      onMouseLeave={handleMouseLeave}
+                      className="transition-opacity duration-150"
+                      style={{ ...barAnimStyle, cursor: animationComplete ? 'pointer' : 'default', pointerEvents: animationComplete ? 'auto' : 'none' }}
+                      onMouseEnter={animationComplete ? () => handleMouseEnter(i, sp.id) : undefined}
+                      onMouseLeave={animationComplete ? handleMouseLeave : undefined}
                     />
                     {/* Projected value bar (overlay, lighter) */}
                     {showProjected && d.projected != null && isFinite(d.projected) && (() => {

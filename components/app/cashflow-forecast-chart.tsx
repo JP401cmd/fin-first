@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { AlertTriangle } from 'lucide-react'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 export type ForecastPoint = {
   month: string
@@ -34,6 +35,7 @@ type Props = {
  */
 export function CashFlowForecastChart({ forecast, alerts, currentBalance }: Props) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const { ref, hasEntered, animationComplete } = useInViewAnimation({ duration: 700 })
 
   if (!forecast || forecast.length < 2) {
     return (
@@ -123,8 +125,14 @@ export function CashFlowForecastChart({ forecast, alerts, currentBalance }: Prop
   const areaGradientId = 'cashflow-area-gradient'
   const projGradientId = 'cashflow-proj-gradient'
 
+  // Animation timings
+  const lineAnim = hasEntered ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) both' : 'none'
+  const fillAnim = hasEntered ? 'fadeInFill 250ms ease-out 455ms both' : 'none'
+  const projLineAnim = hasEntered ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) 595ms both' : 'none'
+  const redZoneAnim = hasEntered ? 'fadeInFill 250ms ease-out 520ms both' : 'none'
+
   return (
-    <div data-testid="cashflow-forecast-chart">
+    <div ref={ref} data-testid="cashflow-forecast-chart">
       {/* Alerts */}
       {alerts.length > 0 && (
         <div className="mb-4 space-y-2" data-testid="cashflow-forecast-alerts">
@@ -194,6 +202,7 @@ export function CashFlowForecastChart({ forecast, alerts, currentBalance }: Prop
             height={paddingTop + chartHeight - dangerY}
             fill="#fef2f2"
             opacity="0.6"
+            style={{ animation: redZoneAnim }}
           />
         )}
 
@@ -222,11 +231,11 @@ export function CashFlowForecastChart({ forecast, alerts, currentBalance }: Prop
         )}
 
         {/* Area fill */}
-        <path d={areaPath} fill={`url(#${areaGradientId})`} />
+        <path d={areaPath} fill={`url(#${areaGradientId})`} style={{ animation: fillAnim }} />
 
         {/* Projected area overlay (lighter) */}
         {projectedAreaPath && (
-          <path d={projectedAreaPath} fill={`url(#${projGradientId})`} />
+          <path d={projectedAreaPath} fill={`url(#${projGradientId})`} style={{ animation: fillAnim }} />
         )}
 
         {/* Main line */}
@@ -236,6 +245,8 @@ export function CashFlowForecastChart({ forecast, alerts, currentBalance }: Prop
           stroke={mainColor}
           strokeWidth="2"
           strokeLinejoin="round"
+          pathLength={1}
+          style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: lineAnim }}
         />
 
         {/* Projected portion: dashed overlay line */}
@@ -254,6 +265,8 @@ export function CashFlowForecastChart({ forecast, alerts, currentBalance }: Prop
             strokeWidth="2"
             strokeDasharray="6 4"
             strokeLinejoin="round"
+            pathLength={1}
+            style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: projLineAnim }}
           />
         )}
 
@@ -296,9 +309,9 @@ export function CashFlowForecastChart({ forecast, alerts, currentBalance }: Prop
                 fill={point.isCurrentMonth ? mainColor : 'white'}
                 stroke={mainColor}
                 strokeWidth="2"
-                className="cursor-pointer"
-                onMouseEnter={() => setHoveredIndex(i)}
-                onMouseLeave={() => setHoveredIndex(null)}
+                style={{ cursor: animationComplete ? 'pointer' : 'default', pointerEvents: animationComplete ? 'auto' : 'none' }}
+                onMouseEnter={animationComplete ? () => setHoveredIndex(i) : undefined}
+                onMouseLeave={animationComplete ? () => setHoveredIndex(null) : undefined}
               />
               {/* Value label on hover */}
               {isHovered && (

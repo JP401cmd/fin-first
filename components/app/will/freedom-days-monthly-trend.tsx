@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { BarChart3 } from 'lucide-react'
 import { buildMonthlyFreedomData, type MonthlyFreedomData } from '@/lib/freedom-days-trend'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 // Re-export for consumers that import from component file
 export { buildMonthlyFreedomData, type MonthlyFreedomData }
@@ -20,6 +21,7 @@ interface FreedomDaysMonthlyTrendProps {
  * Used on De Wil overview page.
  */
 export function FreedomDaysMonthlyTrend({ completedActions }: FreedomDaysMonthlyTrendProps) {
+  const { ref, hasEntered } = useInViewAnimation({ duration: 400 + 35 * 12 })
   const monthlyData = useMemo(
     () => buildMonthlyFreedomData(completedActions),
     [completedActions]
@@ -60,7 +62,7 @@ export function FreedomDaysMonthlyTrend({ completedActions }: FreedomDaysMonthly
   const yMax = hasAnyData ? Math.max(...yTicks) : 2
 
   return (
-    <div data-testid="freedom-days-monthly-trend">
+    <div ref={ref} data-testid="freedom-days-monthly-trend">
       {/* Summary stats */}
       <div
         className="mb-4 flex flex-wrap gap-3 text-sm"
@@ -119,18 +121,26 @@ export function FreedomDaysMonthlyTrend({ completedActions }: FreedomDaysMonthly
             const y = padTop + chartH - barHeight
             const isCurrentMonth = i === monthlyData.length - 1
             const isBestMonth = m.days === stats.best && m.days > 0
+            const staggerDelay = i * 35
+            const barStyle = hasEntered
+              ? { transition: `y 400ms cubic-bezier(.22,1,.36,1) ${staggerDelay}ms, height 400ms cubic-bezier(.22,1,.36,1) ${staggerDelay}ms` }
+              : { transition: 'none' }
+            const labelStyle = hasEntered
+              ? { transition: `opacity 150ms ease-out ${staggerDelay + 300}ms`, opacity: 1 }
+              : { transition: 'none', opacity: 0 }
 
             return (
               <g key={m.month} data-testid={`trend-bar-${m.month}`}>
                 {/* Bar */}
                 <rect
                   x={x}
-                  y={y}
+                  y={hasEntered ? y : padTop + chartH}
                   width={barW}
-                  height={barHeight}
+                  height={hasEntered ? barHeight : 0}
                   rx={2}
                   fill={isCurrentMonth ? '#0d9488' : isBestMonth ? '#14b8a6' : '#5eead4'}
                   opacity={m.days > 0 ? 0.85 : 0}
+                  style={barStyle}
                 />
 
                 {/* Value label on top of bar */}
@@ -140,7 +150,7 @@ export function FreedomDaysMonthlyTrend({ completedActions }: FreedomDaysMonthly
                     y={y - 4}
                     textAnchor="middle"
                     className="fill-wil-700"
-                    style={{ fontSize: 9, fontWeight: 600 }}
+                    style={{ fontSize: 9, fontWeight: 600, ...labelStyle }}
                   >
                     +{formatDays(m.days)}
                   </text>

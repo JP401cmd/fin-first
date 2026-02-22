@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { NetWorthProjectionResult } from '@/lib/net-worth-projection'
 import { formatProjectedValue, getProjectionMessage } from '@/lib/net-worth-projection'
 import { TrendingUp, TrendingDown, Target, Info } from 'lucide-react'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 /**
  * Net worth growth projection chart for De Kern.
@@ -17,6 +18,7 @@ export function NetWorthProjectionChart({
   projection: NetWorthProjectionResult
 }) {
   const [hoveredPoint, setHoveredPoint] = useState<number | null>(null)
+  const { ref, hasEntered, animationComplete } = useInViewAnimation({ duration: 700 })
   const { points, fireTarget, fireReachedMonth, isGrowing, current } = projection
 
   if (points.length < 2) return null
@@ -86,8 +88,13 @@ export function NetWorthProjectionChart({
   const lineColor = isGrowing ? '#f59e0b' : '#ef4444'
   const fillColor = isGrowing ? '#f59e0b' : '#ef4444'
 
+  // Animation timings
+  const lineAnim = hasEntered ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) both' : 'none'
+  const fillAnim = hasEntered ? 'fadeInFill 250ms ease-out 455ms both' : 'none'
+  const dotTransition = hasEntered ? 'opacity 100ms ease-out 650ms' : 'none'
+
   return (
-    <div data-testid="net-worth-projection-section">
+    <div ref={ref} data-testid="net-worth-projection-section">
       {/* Contextual message */}
       <div
         className={`mb-4 flex items-start gap-2.5 rounded-[var(--r-lg)] border p-3.5 ${
@@ -180,7 +187,7 @@ export function NetWorthProjectionChart({
         )}
 
         {/* Area fill */}
-        <path d={areaPath} fill="url(#nwProjGrad)" />
+        <path d={areaPath} fill="url(#nwProjGrad)" style={{ animation: fillAnim }} />
 
         {/* "vandaag" vertical marker */}
         <line
@@ -204,7 +211,15 @@ export function NetWorthProjectionChart({
 
         {/* Projection line: solid for current, dashed for projected */}
         {/* First point (current) to rest (projected) */}
-        <path d={linePath} fill="none" stroke={lineColor} strokeWidth="2" strokeDasharray="6 3" />
+        <path
+          d={linePath}
+          fill="none"
+          stroke={lineColor}
+          strokeWidth="2"
+          strokeDasharray="6 3"
+          pathLength={1}
+          style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: lineAnim }}
+        />
         {/* Solid dot at current value */}
         <circle
           cx={xPos(0)}
@@ -213,6 +228,8 @@ export function NetWorthProjectionChart({
           fill={lineColor}
           stroke="white"
           strokeWidth="1.5"
+          opacity={hasEntered ? 1 : 0}
+          style={{ transition: dotTransition }}
         />
 
         {/* Data points at sampled intervals */}
@@ -227,9 +244,14 @@ export function NetWorthProjectionChart({
               fill={lineColor}
               stroke="white"
               strokeWidth="1"
-              onMouseEnter={() => setHoveredPoint(i)}
-              onMouseLeave={() => setHoveredPoint(null)}
-              style={{ cursor: 'pointer' }}
+              opacity={hasEntered ? 1 : 0}
+              style={{
+                transition: dotTransition,
+                cursor: animationComplete ? 'pointer' : 'default',
+                pointerEvents: animationComplete ? 'auto' : 'none',
+              }}
+              onMouseEnter={animationComplete ? () => setHoveredPoint(i) : undefined}
+              onMouseLeave={animationComplete ? () => setHoveredPoint(null) : undefined}
             />
           )
         })}

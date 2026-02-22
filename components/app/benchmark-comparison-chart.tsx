@@ -10,6 +10,7 @@ import {
   getAlphaDescription,
 } from '@/lib/benchmark-comparison'
 import { TrendingUp, TrendingDown, Minus, BarChart3, Info } from 'lucide-react'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 // ── Chart component ──────────────────────────────────────────
 
@@ -29,6 +30,7 @@ export function BenchmarkComparisonChart({
   loading,
 }: BenchmarkComparisonChartProps) {
   const [hoveredBenchmark, setHoveredBenchmark] = useState<BenchmarkId | null>(null)
+  const { ref, hasEntered, animationComplete } = useInViewAnimation({ duration: 800 })
   const [tooltipData, setTooltipData] = useState<{
     x: number
     y: number
@@ -238,8 +240,12 @@ export function BenchmarkComparisonChart({
   const bestBenchmark = sortedByReturn[0] ?? null
   const alphaVsBest = bestBenchmark ? getAlphaDescription(bestBenchmark.alpha) : null
 
+  // Animation timings (800ms for complex multi-line chart)
+  const lineAnim = hasEntered ? 'drawPath 800ms cubic-bezier(.22,1,.36,1) both' : 'none'
+  const fillAnim = hasEntered ? 'fadeInFill 250ms ease-out 520ms both' : 'none'
+
   return (
-    <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6" data-testid="benchmark-comparison-section">
+    <div ref={ref} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6" data-testid="benchmark-comparison-section">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -272,8 +278,8 @@ export function BenchmarkComparisonChart({
           height={height}
           viewBox={`0 0 ${width} ${height}`}
           className="overflow-visible"
-          onMouseMove={handleMouseMove}
-          onMouseLeave={() => setTooltipData(null)}
+          onMouseMove={animationComplete ? handleMouseMove : undefined}
+          onMouseLeave={animationComplete ? () => setTooltipData(null) : undefined}
           data-testid="benchmark-chart"
         >
           {/* Grid lines */}
@@ -348,9 +354,11 @@ export function BenchmarkComparisonChart({
                 strokeWidth={hoveredBenchmark === b.id ? 2.5 : 1.5}
                 strokeDasharray="4 3"
                 opacity={hoveredBenchmark && hoveredBenchmark !== b.id ? 0.3 : 0.7}
-                onMouseEnter={() => setHoveredBenchmark(b.id)}
-                onMouseLeave={() => setHoveredBenchmark(null)}
+                onMouseEnter={animationComplete ? () => setHoveredBenchmark(b.id) : undefined}
+                onMouseLeave={animationComplete ? () => setHoveredBenchmark(null) : undefined}
                 className="transition-opacity"
+                pathLength={1}
+                style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: lineAnim }}
               />
             )
           })}
@@ -367,6 +375,8 @@ export function BenchmarkComparisonChart({
                 strokeWidth={2.5}
                 opacity={hoveredBenchmark ? 0.5 : 1}
                 className="transition-opacity"
+                pathLength={1}
+                style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: lineAnim }}
               />
             )
           })()}

@@ -44,6 +44,14 @@ export function AnimatedProgressBar({
   useEffect(() => {
     if (!animateOnMount || hasAnimated) return
 
+    // Respect prefers-reduced-motion: skip animation
+    const prefersReduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (prefersReduced) {
+      setDisplayWidth(percentage)
+      setHasAnimated(true)
+      return
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
