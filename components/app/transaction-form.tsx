@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Save, Trash2, Repeat, GitFork, Plus } from 'lucide-react'
+import { X, Save, Trash2, Repeat, GitFork, Plus, History, ArrowRight, FileText } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
 import type { Budget } from '@/lib/budget-data'
@@ -27,6 +27,27 @@ type BudgetGroup = {
   children: Budget[]
 }
 
+type Phase = 'form' | 'scope' | 'saving'
+
+type PendingRow = {
+  user_id: string
+  account_id: string
+  date: string
+  amount: number
+  description: string
+  counterparty_name: string | null
+  budget_id: string | null
+  is_income: boolean
+  is_split: boolean
+  category_source: string
+  notes: string | null
+}
+
+function formatDateNL(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-')
+  return `${d}-${m}-${y}`
+}
+
 export function TransactionForm({
   transaction,
   accountId,
@@ -45,6 +66,8 @@ export function TransactionForm({
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [phase, setPhase] = useState<Phase>('form')
+  const [pendingRow, setPendingRow] = useState<PendingRow | null>(null)
 
   type SplitRow = { id: string; budget_id: string; amount: string; description: string }
   const [isSplit, setIsSplit] = useState(!!transaction?.is_split)
@@ -97,6 +120,76 @@ export function TransactionForm({
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
+  const matchName = form.counterparty_name.trim() || form.description.trim()
+  const matchField = form.counterparty_name.trim() ? 'counterparty_name' : 'description'
+
+  async function handleSaveWithScope(scope: 'single' | 'future' | 'all') {
+    if (!transaction || !pendingRow) return
+    setPhase('saving')
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      setError('Niet ingelogd')
+      setPhase('scope')
+      return
+    }
+
+    // 1. Update de huidige transactie altijd
+    const { error: updateError } = await supabase
+      .from('transactions')
+      .update({ ...pendingRow, updated_at: new Date().toISOString() })
+      .eq('id', transaction.id)
+
+    if (updateError) {
+      setError(updateError.message)
+      setPhase('scope')
+      return
+    }
+
+    // Delete splits if user converted split back to regular
+    if (transaction.is_split && !isSplit) {
+      await supabase.from('transaction_splits').delete().eq('transaction_id', transaction.id)
+    }
+
+    // 2. Bulk update (als scope niet 'single')
+    if (scope !== 'single' && matchName) {
+      let query = supabase
+        .from('transactions')
+        .update({ budget_id: form.budget_id || null, category_source: 'rule' })
+        .eq('user_id', user.id)
+        .neq('id', transaction.id)
+
+      if (matchField === 'counterparty_name') {
+        query = query.ilike('counterparty_name', matchName)
+      } else {
+        query = query.ilike('description', matchName)
+      }
+
+      if (scope === 'future') {
+        query = query.gte('date', transaction.date)
+      }
+
+      await query
+
+      // 3. Upsert category_correction rule
+      await supabase
+        .from('category_corrections')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('match_field', matchField)
+        .ilike('match_value', matchName)
+
+      await supabase.from('category_corrections').insert({
+        user_id: user.id,
+        match_field: matchField,
+        match_value: matchName,
+        budget_id: form.budget_id || null,
+      })
+    }
+
+    onSaved()
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.description.trim()) {
@@ -139,7 +232,7 @@ export function TransactionForm({
       ? splitRows.filter(r => r.amount !== '' && parseFloat(r.amount) > 0)
       : []
 
-    const row = {
+    const row: PendingRow = {
       user_id: user.id,
       account_id: accountId,
       date: form.date,
@@ -155,6 +248,15 @@ export function TransactionForm({
     }
 
     if (isEdit && transaction) {
+      // Intercept for scope-prompt when budget changed on a non-split transaction
+      const budgetChanged = !isSplit && (form.budget_id !== (transaction.budget_id ?? ''))
+      if (budgetChanged) {
+        setPendingRow(row)
+        setPhase('scope')
+        setSaving(false)
+        return
+      }
+
       const { error: updateError } = await supabase
         .from('transactions')
         .update({ ...row, updated_at: new Date().toISOString() })
@@ -257,8 +359,64 @@ export function TransactionForm({
     onSaved()
   }
 
+  const scopeOptions = [
+    {
+      scope: 'all' as const,
+      label: `Alle transacties van "${matchName}", ook eerder`,
+      icon: History,
+    },
+    {
+      scope: 'future' as const,
+      label: `Transacties van "${matchName}" vanaf ${transaction ? formatDateNL(transaction.date) : ''}`,
+      icon: ArrowRight,
+    },
+    {
+      scope: 'single' as const,
+      label: 'Alleen deze transactie',
+      icon: FileText,
+    },
+  ]
+
   return (
     <BottomSheet open={true} onClose={onClose} title={isEdit ? 'Transactie bewerken' : 'Nieuwe transactie'}>
+      {phase === 'scope' && (
+        <div className="p-6 flex flex-col gap-4">
+          <button
+            type="button"
+            onClick={() => setPhase('form')}
+            className="self-start inline-flex items-center gap-1.5 text-sm text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors"
+          >
+            ← Terug
+          </button>
+
+          <p className="text-sm font-semibold text-[var(--ink)]">
+            Budget gewijzigd — wat wil je aanpassen?
+          </p>
+
+          {error && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3">
+            {scopeOptions.map(({ scope, label, icon: Icon }) => (
+              <button
+                key={scope}
+                type="button"
+                onClick={() => handleSaveWithScope(scope)}
+                disabled={saving || (phase as string) === 'saving'}
+                className="flex items-start gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-left transition-all hover:border-kern-300 hover:shadow-[var(--s1)] disabled:opacity-50"
+              >
+                <Icon className="h-4 w-4 mt-0.5 shrink-0 text-kern-500" />
+                <span className="text-sm text-[var(--ink-2)]">{label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {phase !== 'scope' && (
         <form onSubmit={handleSubmit} className="p-6">
           {error && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -647,6 +805,7 @@ export function TransactionForm({
             </div>
           </div>
         </form>
+      )}
     </BottomSheet>
   )
 }

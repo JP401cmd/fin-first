@@ -26,6 +26,11 @@ export const PHASES: Phase[] = [
 
 export const FEATURES: FeatureDef[] = [
   { id: 'nibud_benchmark',      label: 'NIBUD Benchmark',        description: 'Vergelijking met NIBUD richtlijnen' },
+  // Widget sovereignty gates
+  { id: 'widget_assets',      label: 'Vermogen Widget',        description: 'Assets widget op dashboard' },
+  { id: 'widget_belasting',   label: 'Box 3 Widget',           description: 'Belasting widget op dashboard' },
+  { id: 'widget_holdings',    label: 'Beleggingen Widget',     description: 'Holdings widget op dashboard' },
+  { id: 'widget_monte_carlo', label: 'Monte Carlo Widget',     description: 'Monte Carlo widget op dashboard' },
   { id: 'box3_belasting',       label: 'Box 3 Belasting',        description: 'Vermogensbelasting berekening' },
   { id: 'budget_optimalisatie', label: 'Budget Optimalisatie',    description: 'Slimmer omgaan met uitgaven' },
   { id: 'schulden_aflosplan',   label: 'Schulden Aflosplan',     description: 'Strategisch schulden aflossen' },
@@ -130,4 +135,9 @@ export const DEFAULT_MATRIX: FeaturePhaseMatrix = {
   beslissingspatronen:       { recovery: false, stability: false, momentum: true,  mastery: true },
   // Kern — Spending patterns
   spending_patterns:         { recovery: false, stability: true,  momentum: true,  mastery: true },
+  // Widget sovereignty gates
+  widget_assets:             { recovery: false, stability: true,  momentum: true,  mastery: true },
+  widget_belasting:          { recovery: false, stability: true,  momentum: true,  mastery: true },
+  widget_holdings:           { recovery: false, stability: false, momentum: true,  mastery: true },
+  widget_monte_carlo:        { recovery: false, stability: false, momentum: true,  mastery: true },
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { FinnAvatar } from '@/components/app/avatars'
 import { RecommendationList } from '@/components/app/recommendation-list'
@@ -72,6 +73,17 @@ export default function WillPage() {
   const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([])
   const [subscriptionMonthly, setSubscriptionMonthly] = useState(0)
   const [subscriptionsOpen, setSubscriptionsOpen] = useState(false)
+
+  // Deep-link: open modal via ?modal= URL param (from dashboard widgets)
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  useEffect(() => {
+    const modal = searchParams.get('modal')
+    if (modal === 'subscriptions') {
+      setSubscriptionsOpen(true)
+      router.replace('/will', { scroll: false })
+    }
+  }, [searchParams, router])
   const [willAdvice, setWillAdvice] = useState<{
     intro: string
     items: { name: string; verdict: 'nuttig' | 'overlap' | 'niet_relevant'; toelichting: string; savingsMonthly: number }[]

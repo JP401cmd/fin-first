@@ -272,10 +272,14 @@ export async function GET(request: Request) {
     const totalDays = Math.max(1, Math.round((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000)))
     const dailyExpenseRate = totalExpenses / totalDays
 
-    // FIRE target
-    const avgMonthlyExpenses = monthsWithData.length > 0 ? totalExpenses / monthsWithData.length : 0
-    const yearlyExpenses = avgMonthlyExpenses * 12
-    const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / 0.04 : 0
+    // FIRE target — based on essential (must) expenses from budget settings
+    const yearlyMustExpenses = allBudgets
+      .filter(b => b.is_essential && b.budget_type === 'expense' && !b.parent_id)
+      .reduce((s, b) => {
+        const limit = Number(b.default_limit) || 0
+        return s + (b.interval === 'yearly' ? limit : limit * 12)
+      }, 0)
+    const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / 0.04 : 0
 
     // Total assets & debts
     const totalAssets = assets.reduce((sum, a) => sum + Number(a.current_value), 0)
@@ -480,7 +484,7 @@ export async function GET(request: Request) {
     let monthlyPassiveIncome: number | null = null
 
     const monthlyContributions = assets.reduce((sum, a) => sum + Number(a.monthly_contribution || 0), 0)
-    const yearlyMustExpenses = allBudgets
+    const yearlyMustExpensesHorizon = allBudgets
       .filter(b => b.is_essential && b.budget_type === 'expense' && !b.parent_id)
       .reduce((sum, b) => {
         const limit = Number(b.default_limit) || 0
@@ -488,6 +492,7 @@ export async function GET(request: Request) {
         if (b.interval === 'quarterly') return sum + limit * 4
         return sum + limit * 12
       }, 0)
+    const avgMonthlyExpenses = monthsWithData.length > 0 ? totalExpenses / monthsWithData.length : 0
 
     try {
       const horizonInput: HorizonInput = {
@@ -496,7 +501,7 @@ export async function GET(request: Request) {
         monthlyIncome: monthsWithData.length > 0 ? totalIncome / monthsWithData.length : 0,
         monthlyExpenses: avgMonthlyExpenses,
         monthlyContributions,
-        yearlyMustExpenses,
+        yearlyMustExpenses: yearlyMustExpensesHorizon,
         dateOfBirth: profile?.date_of_birth || null,
       }
       const fp = computeFireProjection(horizonInput)

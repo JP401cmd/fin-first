@@ -13,12 +13,17 @@
     "db:new": "npx supabase migration new",
     "db:status": "npx supabase migration list",
     "prepare": "husky",
-    "build:check": "next build"
+    "build:check": "next build",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.41",
     "@ai-sdk/openai": "^3.0.26",
     "@ai-sdk/react": "^3.0.80",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.95.3",
     "ai": "^6.0.78",
@@ -31,15 +36,20 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^5.1.4",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "husky": "^9.1.7",
+    "jsdom": "^28.1.0",
     "postgres": "^3.4.8",
     "supabase": "^2.76.8",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.0.18"
   }
 }

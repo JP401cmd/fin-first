@@ -47,15 +47,16 @@ export function computeCoreData(
 ): CoreData {
   const yearlyIncome = monthlyIncome * 12
   const yearlyExpenses = monthlyExpenses * 12
+  const effectiveYearlyExpenses = yearlyMustExpenses && yearlyMustExpenses > 0 ? yearlyMustExpenses : yearlyExpenses
   const monthlySavings = monthlyIncome - monthlyExpenses
   const netWorth = totalAssets - totalDebts
 
   // FIRE calculations
-  const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / SWR : 0
+  const fireTarget = effectiveYearlyExpenses > 0 ? effectiveYearlyExpenses / SWR : 0
   const freedomPercentage = fireTarget > 0 ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0) : 0
 
   // Freedom time: how long could you live off net worth
-  const freedomMonthsTotal = yearlyExpenses > 0 ? (netWorth / yearlyExpenses) * 12 : 0
+  const freedomMonthsTotal = effectiveYearlyExpenses > 0 ? (netWorth / effectiveYearlyExpenses) * 12 : 0
   const freedomYears = Math.floor(freedomMonthsTotal / 12)
   const freedomMonths = Math.floor(freedomMonthsTotal % 12)
 

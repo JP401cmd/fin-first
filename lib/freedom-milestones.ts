@@ -59,9 +59,11 @@ export function computeFreedomMilestones(
   annualReturn: number = DEFAULT_RETURN,
   inflationRate: number = INFLATION,
   swrRate: number = SWR,
+  yearlyMustExpenses: number = 0,
 ): FreedomMilestoneResult {
   const yearlyExpenses = monthlyExpenses * 12
-  const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / swrRate : 0
+  const effectiveYearlyExpenses = yearlyMustExpenses > 0 ? yearlyMustExpenses : yearlyExpenses
+  const fireTarget = effectiveYearlyExpenses > 0 ? effectiveYearlyExpenses / swrRate : 0
   const currentFreedomPct = fireTarget > 0
     ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0)
     : 0

@@ -113,7 +113,7 @@ export async function GET() {
     return s + (b.interval === 'yearly' ? limit : limit * 12)
   }, 0)
 
-  const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / SWR : 0
+  const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / SWR : 0
   const freedomPercentage = fireTarget > 0
     ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0)
     : 0
@@ -214,7 +214,7 @@ export async function GET() {
     },
     metrics: {
       fire_target: fireTarget,
-      yearly_expenses: yearlyExpenses,
+      yearly_must_expenses: yearlyMustExpenses,
       monthly_income: monthlyIncome,
       monthly_expenses: monthlyExpenses,
       resilience_breakdown: resilience.breakdown,

@@ -137,21 +137,86 @@ If the user asks you to modify code, explain that you're a project assistant and
 
         **When to use:** Any computed metric the user might wonder about — totals, percentages, targets, projections.
 
+        **Border hierarchy (three layers):**
+        | Layer | Color | Use |
+        |---|---|---|
+        | Container | `border-[var(--border-md)]` | Heavy dashed border around the whole kassabon |
+        | Scheidingslijnen | `border-[var(--border-ed)]` | Light dashed lines between sections |
+        | Totaalregel | `border-t-2 border-[var(--ink)]` | Double ink line = calculation closed |
+
         **Structure:**
-        1. **Header** — centered title (uppercase, tracking-widest) + subtitle with context (period, data source)
-        2. **Uitleg** (optional) — 1-2 sentences explaining what this metric means and why it matters, in `text-[11px] text-zinc-400`
+        1. **Header** — centered title (uppercase, tracking-[0.1em]) + subtitle with context (period, data source)
+        2. **Uitleg** (optional) — 1-2 sentences explaining what this metric means and why it matters
         3. **Regelitems** — line items that make up the calculation, `flex justify-between` with label left and `tabular-nums` amount right
-        4. **Scheidingslijnen** — `border-b border-dashed border-zinc-300` between sections
-        5. **Totaalregel** — `border-t-2 border-zinc-900` with bold result
+        4. **Scheidingslijnen** — `border-b border-dashed border-[var(--border-ed)]` between sections
+        5. **Totaalregel** — `border-t-2 border-[var(--ink)]` with bold result
         6. **Extra context** (optional) — extrapolation notes, intermediate results, "nog nodig" etc.
         7. **FreedomTimeBadge** — centered, when the total is an EUR amount
-        8. **Formule** (optional) — explain the formula used in `text-[11px] text-zinc-400`
-        9. **Footer** — `text-[10px] text-zinc-400` centered, describes data source
+        8. **Formule** (optional) — explain the formula used
+        9. **Footer** — `text-[10px] text-[var(--ink-4)]` centered, describes data source
 
         **Container styling:**
         ```
-        rounded-lg border border-dashed border-zinc-300 bg-zinc-50/50 p-4 font-mono text-sm
+        rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 font-mono text-sm
         ```
+
+        Use `KassabonShell` from `components/app/kassabon-shell.tsx` as the container instead of a bare `<div>`.
+
+        **Classes per section:**
+
+        Header:
+        ```tsx
+        <div className="mb-3 text-center">
+          <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">TITEL</p>
+          <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">periode / context</p>
+        </div>
+        ```
+
+        Uitleg (uitlegparagraaf):
+        ```tsx
+        <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
+          Uitleg tekst.
+        </div>
+        ```
+
+        Regelitems:
+        ```tsx
+        <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
+          <div className="flex justify-between py-0.5">
+            <span className="font-sans text-sm text-[var(--ink-2)]">Label</span>
+            <span className="tabular-nums text-[var(--ink)]">€ bedrag</span>
+          </div>
+        </div>
+        ```
+
+        Totaalregel:
+        ```tsx
+        <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
+          <span className="text-[var(--ink)]">Totaal</span>
+          <span className="tabular-nums text-[var(--ink)]">€ bedrag</span>
+        </div>
+        ```
+
+        Formule / context sectie:
+        ```tsx
+        <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
+          <p><strong className="font-semibold text-[var(--ink-3)]">Formule:</strong> ...</p>
+        </div>
+        ```
+
+        Footer:
+        ```tsx
+        <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">databron notitie</p>
+        ```
+
+        Waarschuwingsblok (bv. extrapolatie):
+        ```tsx
+        <div className="mb-2 rounded-[var(--r-sm)] border border-dashed border-kern-300 bg-kern-50/50 px-3 py-2 font-sans text-[11px] text-kern-700">
+          ∗ Geëxtrapoleerd — ...
+        </div>
+        ```
+
+        **BottomSheet title:** Use only the metric name — no "Kassabon:" prefix. The receipt container itself communicates the breakdown character visually.
 
         **Clickable card:** Convert the card's `<div>` to `<button type="button">` with:
         ```

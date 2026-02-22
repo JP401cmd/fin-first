@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowLeft, Upload, FileText, Check, AlertTriangle, X,
-  ChevronRight, Loader2, WifiOff, RefreshCw, ArrowLeftRight,
+  ChevronRight, Loader2, WifiOff, RefreshCw, ArrowLeftRight, Sparkles,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { parseMT940 } from '@/lib/parsers/mt940'
@@ -22,6 +22,14 @@ type Account = {
   iban: string | null
 }
 
+type AISuggestion = {
+  import_hash: string
+  budget_slug: string | null
+  budget_id: string | null
+  confidence: number
+  reasoning: string
+}
+
 type ImportRow = ParsedTransaction & {
   budget_id: string | null
   budgetName: string | null
@@ -29,6 +37,15 @@ type ImportRow = ParsedTransaction & {
   isDuplicate: boolean
   skipImport: boolean
   isTransfer: boolean
+  aiAccepted?: boolean
+}
+
+type BulkApplyPrompt = {
+  matchField: 'counterparty_name' | 'description'
+  matchValue: string
+  budgetId: string
+  budgetName: string
+  siblingCount: number
 }
 
 function isNetworkFailure(err: unknown): boolean {
@@ -43,7 +60,6 @@ function isNetworkFailure(err: unknown): boolean {
   if (err instanceof DOMException && err.name === 'AbortError') {
     return true
   }
-  // Supabase client errors with network-related messages
   if (err && typeof err === 'object' && 'message' in err) {
     const msg = String((err as { message: string }).message).toLowerCase()
     if (msg.includes('fetch') || msg.includes('network') || msg.includes('timeout') || msg.includes('econnrefused') || msg.includes('enotfound')) {
@@ -87,6 +103,12 @@ export default function ImportPage() {
   const [showColumnMapping, setShowColumnMapping] = useState(false)
   const [corrections, setCorrections] = useState<CategoryCorrection[]>([])
   const [ownIbans, setOwnIbans] = useState<Set<string>>(new Set())
+  const [aiSuggestions, setAiSuggestions] = useState<Map<string, AISuggestion>>(new Map())
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiReady, setAiReady] = useState(false)
+  const [aiError, setAiError] = useState(false)
+  const [bulkApplyPrompt, setBulkApplyPrompt] = useState<BulkApplyPrompt | null>(null)
+  const [checkingDups, setCheckingDups] = useState(false)
 
   const loadInitialData = useCallback(async () => {
     setLoading(true)
@@ -105,7 +127,6 @@ export default function ImportPage() {
         user ? supabase.from('user_own_ibans').select('iban').eq('user_id', user.id) : Promise.resolve({ data: [], error: null }),
       ])
 
-      // Check for network errors in any of the responses
       const anyError = accountsRes.error || budgetsRes.error || correctionsRes.error
       if (anyError && isNetworkFailure(anyError)) {
         setError('Kan geen verbinding maken met de server. Controleer je internetverbinding.')
@@ -119,7 +140,6 @@ export default function ImportPage() {
         if (accountsRes.data.length > 0) {
           setSelectedAccountId(accountsRes.data[0].id)
         }
-        // Build own IBAN set from bank_accounts + user_own_ibans
         const ibansFromAccounts = (accountsRes.data as Account[])
           .map((a) => a.iban)
           .filter(Boolean)
@@ -159,9 +179,166 @@ export default function ImportPage() {
     loadInitialData()
   }, [loadInitialData])
 
+  async function enrichWithAI(importRows: ImportRow[]) {
+    const toEnrich = importRows.filter((r) => !r.isTransfer && r.confidence < 0.7)
+    if (toEnrich.length === 0) return
+
+    setAiLoading(true)
+    setAiReady(false)
+    setAiError(false)
+    setAiSuggestions(new Map())
+
+    try {
+      const payload = toEnrich.map((r) => ({
+        import_hash: r.import_hash,
+        description: r.description,
+        counterparty_name: r.counterparty_name,
+        amount: r.amount,
+        reference: r.reference,
+      }))
+
+      const allResults: AISuggestion[] = []
+      for (let i = 0; i < payload.length; i += 20) {
+        const res = await fetch('/api/ai/categorize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transactions: payload.slice(i, i + 20) }),
+        })
+        if (!res.ok) throw new Error('AI niet beschikbaar')
+        const data = await res.json() as { results: AISuggestion[] }
+        allResults.push(...data.results)
+      }
+
+      const map = new Map<string, AISuggestion>()
+      for (const s of allResults) {
+        if (s.budget_id && s.confidence >= 0.5) {
+          map.set(s.import_hash, s)
+        }
+      }
+      setAiSuggestions(map)
+      setAiReady(true)
+    } catch {
+      setAiError(true)
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
   // Maximum file size: 10 MB
   const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
   const MAX_FILE_SIZE_LABEL = '10 MB'
+
+  // Check for duplicates against existing transactions.
+  // When called with rowsParam (after parsing), sets rows + goes to step 2.
+  // When called without param (retry), re-checks current rows state.
+  async function checkDuplicates(rowsParam?: ImportRow[]) {
+    setError('')
+    setIsNetworkError(false)
+    setCheckingDups(true)
+
+    // If called with fresh rows after parsing, set them immediately and go to step 2
+    if (rowsParam) {
+      setRows(rowsParam)
+      setStep(2)
+    }
+
+    const supabase = createClient()
+
+    let user: { id: string } | null = null
+    try {
+      const { data } = await supabase.auth.getUser()
+      user = data.user
+    } catch (err) {
+      if (isNetworkFailure(err)) {
+        setIsNetworkError(true)
+        setError('Geen internetverbinding. Controleer je netwerk en probeer het opnieuw.')
+      } else {
+        setError('Fout bij het controleren van je sessie.')
+      }
+      setCheckingDups(false)
+      return
+    }
+    if (!user) {
+      setCheckingDups(false)
+      return
+    }
+
+    const sourceRows = rowsParam ?? rows
+
+    const minDate = sourceRows.reduce((min, r) => r.date < min ? r.date : min, sourceRows[0].date)
+    const maxDate = sourceRows.reduce((max, r) => r.date > max ? r.date : max, sourceRows[0].date)
+
+    try {
+      // Single range-query: all transactions within the import's date range
+      // Replaces the fragile .in('import_hash', hashes) approach that silently failed on large imports
+      const { data: existing, error: queryError } = await supabase
+        .from('transactions')
+        .select('date, amount, description')
+        .eq('user_id', user.id)
+        .gte('date', minDate)
+        .lte('date', maxDate)
+
+      if (queryError) {
+        if (isNetworkFailure(queryError)) {
+          setIsNetworkError(true)
+          setError('Geen internetverbinding. Controleer je netwerk en probeer het opnieuw.')
+        } else {
+          setError(`Fout bij het controleren van duplicaten: ${queryError.message}`)
+        }
+        setCheckingDups(false)
+        return
+      }
+
+      // Build a content-Set with normalized keys
+      const contentSet = new Set<string>()
+      if (existing) {
+        for (const t of existing) {
+          // DB returns NUMERIC as string ("8.10", "100", "-143.13")
+          // parseFloat → String normalizes both sides to the same representation
+          const normalizedAmount = String(parseFloat(String(t.amount)))
+          const key = `${t.date}|${normalizedAmount}|${String(t.description ?? '').slice(0, 100)}`
+          contentSet.add(key)
+        }
+      }
+
+      const markDups = (r: ImportRow) => {
+        const normalizedAmount = String(parseFloat(String(r.amount)))
+        const contentKey = `${r.date}|${normalizedAmount}|${r.description.slice(0, 100)}`
+        const isDuplicate = contentSet.has(contentKey)
+        return {
+          ...r,
+          isDuplicate,
+          skipImport: isDuplicate ? true : r.skipImport,
+        }
+      }
+
+      // Phase 3: within-file dedup — same hash appearing more than once in the import
+      // (e.g. two identical transactions on the same day from the same merchant)
+      const seenInFile = new Set<string>()
+      const applyFileDedup = (r: ImportRow) => {
+        if (r.isDuplicate) { seenInFile.add(r.import_hash); return r }
+        if (seenInFile.has(r.import_hash)) return { ...r, isDuplicate: true, skipImport: true }
+        seenInFile.add(r.import_hash)
+        return r
+      }
+
+      if (rowsParam) {
+        setRows(rowsParam.map(markDups).map(applyFileDedup))
+      } else {
+        setRows((prev) => prev.map(markDups).map(applyFileDedup))
+      }
+
+      setCheckingDups(false)
+    } catch (err) {
+      if (isNetworkFailure(err)) {
+        setIsNetworkError(true)
+        setError('Geen internetverbinding. Controleer je netwerk en probeer het opnieuw.')
+      } else {
+        setError('Onverwachte fout bij het controleren van duplicaten. Probeer het opnieuw.')
+      }
+      setCheckingDups(false)
+    }
+  }
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -170,7 +347,6 @@ export default function ImportPage() {
     setFileName(file.name)
     setError('')
 
-    // File size validation
     if (file.size > MAX_FILE_SIZE_BYTES) {
       const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1)
       setError(
@@ -178,7 +354,6 @@ export default function ImportPage() {
         `De maximale bestandsgrootte is ${MAX_FILE_SIZE_LABEL}. ` +
         'Probeer een kleiner bestand te uploaden of splits het bestand op in meerdere delen.'
       )
-      // Reset the file input so user can try again
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
@@ -193,7 +368,6 @@ export default function ImportPage() {
       const format = detectFormat(content, file.name)
       setDetectedFormat(format)
 
-      // Get file extension for error messages
       const fileExt = file.name.split('.').pop()?.toLowerCase() || ''
 
       if (format === 'unknown') {
@@ -207,7 +381,6 @@ export default function ImportPage() {
       }
 
       if (format === 'csv') {
-        // For CSV: detect delimiter and show column mapping
         const semiCount = (content.split('\n')[0]?.match(/;/g) || []).length
         const commaCount = (content.split('\n')[0]?.match(/,/g) || []).length
         const tabCount = (content.split('\n')[0]?.match(/\t/g) || []).length
@@ -217,6 +390,10 @@ export default function ImportPage() {
           bestPreset = CSV_PRESETS.find(p => p.id === 'ing') ?? bestPreset
         } else if (tabCount > commaCount) {
           bestPreset = CSV_PRESETS.find(p => p.id === 'abn') ?? bestPreset
+        }
+        const firstLineLower = content.split('\n')[0]?.toLowerCase() ?? ''
+        if (firstLineLower.includes('tijdzone') || firstLineLower.includes('transactie-id')) {
+          bestPreset = CSV_PRESETS.find(p => p.id === 'paypal') ?? bestPreset
         }
 
         setCsvPreset(bestPreset)
@@ -262,7 +439,6 @@ export default function ImportPage() {
         return
       }
 
-      // Auto-categorize with transfer detection
       const importRows: ImportRow[] = parsed.map((tx) => {
         const isTransfer = isOwnAccountTransfer(tx.counterparty_iban, ownIbans)
         const cat = isTransfer
@@ -280,8 +456,8 @@ export default function ImportPage() {
         }
       })
 
-      setRows(importRows)
-      setStep(2)
+      // First check duplicates, then go to step 2
+      void checkDuplicates(importRows)
     } catch (err) {
       console.error('File processing error:', err)
       setError(
@@ -329,8 +505,8 @@ export default function ImportPage() {
         }
       })
 
-      setRows(importRows)
-      setStep(2)
+      // First check duplicates, then go to step 2
+      void checkDuplicates(importRows)
     } catch (err) {
       console.error('CSV parse error:', err)
       setError(
@@ -354,7 +530,6 @@ export default function ImportPage() {
     e.preventDefault()
     const file = e.dataTransfer.files[0]
     if (file) {
-      // Trigger via a synthetic change
       const dt = new DataTransfer()
       dt.items.add(file)
       if (fileInputRef.current) {
@@ -364,20 +539,21 @@ export default function ImportPage() {
     }
   }
 
-  function updateRowBudget(index: number, budgetId: string) {
+  function updateRowBudget(index: number, budgetId: string, source: 'user' | 'ai' = 'user') {
+    setBulkApplyPrompt(null)
     const row = rows[index]
+    const budget = budgets.find((b) => b.id === budgetId)
     setRows((prev) => prev.map((r, i) => {
       if (i !== index) return r
-      const budget = budgets.find((b) => b.id === budgetId)
       return {
         ...r,
         budget_id: budgetId || null,
         budgetName: budget?.name ?? null,
         confidence: budgetId ? 1.0 : 0,
+        aiAccepted: source === 'ai',
       }
     }))
 
-    // Save correction for future imports (fire-and-forget)
     if (budgetId && row) {
       const matchField = row.counterparty_name ? 'counterparty_name' : 'description'
       const matchValue = row.counterparty_name || row.description
@@ -386,7 +562,6 @@ export default function ImportPage() {
           const supabase = createClient()
           const { data: { user } } = await supabase.auth.getUser()
           if (!user) return
-          // Delete existing correction for this field+value, then insert new one
           await supabase.from('category_corrections')
             .delete()
             .eq('user_id', user.id)
@@ -400,73 +575,46 @@ export default function ImportPage() {
           })
         })()
       }
+
+      if (budget) {
+        const matchField = row.counterparty_name ? 'counterparty_name' as const : 'description' as const
+        const matchValue = row.counterparty_name || row.description
+        if (matchValue) {
+          const siblings = rows.filter((r, i) =>
+            i !== index &&
+            r.budget_id === null &&
+            !r.isTransfer &&
+            !r.skipImport &&
+            (matchField === 'counterparty_name'
+              ? r.counterparty_name?.toLowerCase() === matchValue.toLowerCase()
+              : r.description?.toLowerCase().includes(matchValue.toLowerCase()))
+          )
+          if (siblings.length > 0) {
+            setBulkApplyPrompt({ matchField, matchValue, budgetId, budgetName: budget.name, siblingCount: siblings.length })
+          }
+        }
+      }
     }
+  }
+
+  function applyToSiblings() {
+    if (!bulkApplyPrompt) return
+    const { matchField, matchValue, budgetId, budgetName } = bulkApplyPrompt
+    setRows((prev) => prev.map((r) => {
+      if (r.budget_id !== null || r.isTransfer || r.skipImport) return r
+      const matches = matchField === 'counterparty_name'
+        ? r.counterparty_name?.toLowerCase() === matchValue.toLowerCase()
+        : r.description?.toLowerCase().includes(matchValue.toLowerCase())
+      if (!matches) return r
+      return { ...r, budget_id: budgetId, budgetName, confidence: 1.0, aiAccepted: false }
+    }))
+    setBulkApplyPrompt(null)
   }
 
   function toggleSkip(index: number) {
     setRows((prev) => prev.map((r, i) =>
       i === index ? { ...r, skipImport: !r.skipImport } : r
     ))
-  }
-
-  async function checkDuplicates() {
-    setError('')
-    setIsNetworkError(false)
-
-    const supabase = createClient()
-
-    let user: { id: string } | null = null
-    try {
-      const { data } = await supabase.auth.getUser()
-      user = data.user
-    } catch (err) {
-      if (isNetworkFailure(err)) {
-        setIsNetworkError(true)
-        setError('Geen internetverbinding. Controleer je netwerk en probeer het opnieuw.')
-      } else {
-        setError('Fout bij het controleren van je sessie.')
-      }
-      return
-    }
-    if (!user) return
-
-    const hashes = rows.map((r) => r.import_hash)
-
-    try {
-      const { data: existing, error: queryError } = await supabase
-        .from('transactions')
-        .select('import_hash')
-        .eq('user_id', user.id)
-        .in('import_hash', hashes)
-
-      if (queryError) {
-        if (isNetworkFailure(queryError)) {
-          setIsNetworkError(true)
-          setError('Geen internetverbinding. Controleer je netwerk en probeer het opnieuw.')
-        } else {
-          setError(`Fout bij het controleren van duplicaten: ${queryError.message}`)
-        }
-        return
-      }
-
-      if (existing) {
-        const existingSet = new Set(existing.map((e) => e.import_hash))
-        setRows((prev) => prev.map((r) => ({
-          ...r,
-          isDuplicate: existingSet.has(r.import_hash),
-          skipImport: existingSet.has(r.import_hash) ? true : r.skipImport,
-        })))
-      }
-
-      setStep(3)
-    } catch (err) {
-      if (isNetworkFailure(err)) {
-        setIsNetworkError(true)
-        setError('Geen internetverbinding. Controleer je netwerk en probeer het opnieuw.')
-      } else {
-        setError('Onverwachte fout bij het controleren van duplicaten. Probeer het opnieuw.')
-      }
-    }
   }
 
   async function handleImport(retryFromBatch?: number) {
@@ -500,7 +648,15 @@ export default function ImportPage() {
 
     const toImport = rows.filter((r) => !r.skipImport)
 
-    const insertRows = toImport.map((r) => ({
+    // Safety net: remove any duplicate hashes that may have slipped through the check
+    const seenHashes = new Set<string>()
+    const toImportDeduped = toImport.filter((r) => {
+      if (seenHashes.has(r.import_hash)) return false
+      seenHashes.add(r.import_hash)
+      return true
+    })
+
+    const insertRows = toImportDeduped.map((r) => ({
       user_id: user!.id,
       account_id: selectedAccountId,
       date: r.date,
@@ -510,13 +666,12 @@ export default function ImportPage() {
       counterparty_iban: r.counterparty_iban,
       budget_id: r.isTransfer ? null : r.budget_id,
       is_income: r.amount > 0,
-      category_source: r.isTransfer ? 'transfer' : (r.budget_id ? 'rule' : 'import'),
+      category_source: r.isTransfer ? 'transfer' : (r.aiAccepted ? 'ai' : r.budget_id ? 'rule' : 'import'),
       import_hash: r.import_hash,
       reference: r.reference,
       transaction_type: r.isTransfer ? 'transfer' : r.transaction_type,
     }))
 
-    // Calculate batches
     const BATCH_SIZE = 50
     const batches: typeof insertRows[] = []
     for (let i = 0; i < insertRows.length; i += BATCH_SIZE) {
@@ -526,7 +681,6 @@ export default function ImportPage() {
     const startBatch = retryFromBatch ?? importedBatchIndex
     setImportProgress({ current: startBatch * BATCH_SIZE, total: insertRows.length })
 
-    // Insert in batches, resuming from the last successful batch
     for (let batchIdx = startBatch; batchIdx < batches.length; batchIdx++) {
       try {
         const { error: insertError } = await supabase
@@ -534,7 +688,6 @@ export default function ImportPage() {
           .insert(batches[batchIdx])
 
         if (insertError) {
-          // Check if this is a network-related Supabase error
           if (isNetworkFailure(insertError)) {
             const imported = batchIdx * BATCH_SIZE
             setImportedBatchIndex(batchIdx)
@@ -548,13 +701,11 @@ export default function ImportPage() {
             setImporting(false)
             return
           }
-          // Non-network database error
           setError(`Fout bij importeren: ${insertError.message}`)
           setImporting(false)
           return
         }
       } catch (err) {
-        // Catch network-level exceptions (fetch failures, timeouts)
         const imported = batchIdx * BATCH_SIZE
         setImportedBatchIndex(batchIdx)
         setImportProgress({ current: imported, total: insertRows.length })
@@ -573,23 +724,20 @@ export default function ImportPage() {
         return
       }
 
-      // Update progress after each successful batch
       const progressCount = Math.min((batchIdx + 1) * BATCH_SIZE, insertRows.length)
       setImportProgress({ current: progressCount, total: insertRows.length })
       setImportedBatchIndex(batchIdx + 1)
     }
 
-    // Reset batch tracking on success
     setImportedBatchIndex(0)
     setStep(4)
     setImporting(false)
 
-    // Trigger badge evaluation after successful import (fire-and-forget)
     fetch('/api/badges/evaluate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ trigger: 'import' }),
-    }).catch(() => {}) // Silent fail — badges are non-critical
+    }).catch(() => {})
   }
 
   const newCount = rows.filter((r) => !r.isDuplicate).length
@@ -654,7 +802,7 @@ export default function ImportPage() {
 
       {/* Steps indicator */}
       <div className="mb-5 sm:mb-8 flex items-center gap-2 text-sm">
-        {['Upload', 'Categoriseer', 'Dubbelingen', 'Klaar'].map((label, i) => {
+        {['Upload', 'Dubbelingen', 'Categoriseer', 'Klaar'].map((label, i) => {
           const stepNum = i + 1
           const isActive = step === stepNum
           const isDone = step > stepNum
@@ -693,7 +841,7 @@ export default function ImportPage() {
                     } else if (step === 3) {
                       handleImport()
                     } else if (step === 2) {
-                      checkDuplicates()
+                      void checkDuplicates()
                     } else {
                       setError('')
                       setIsNetworkError(false)
@@ -798,6 +946,21 @@ export default function ImportPage() {
                   ))}
                 </select>
               </div>
+
+              {csvPreset.id === 'paypal' && (
+                <div className="rounded-lg border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 text-sm">
+                  <p className="font-medium text-[var(--ink-2)]">Hoe exporteer je een PayPal CSV?</p>
+                  <ol className="mt-2 space-y-1 text-xs text-[var(--ink-3)] list-decimal list-inside">
+                    <li>Log in op paypal.com</li>
+                    <li>Ga naar <strong className="text-[var(--ink-2)]">Activiteiten</strong> → <strong className="text-[var(--ink-2)]">Alle transacties</strong></li>
+                    <li>Klik op <strong className="text-[var(--ink-2)]">Downloaden</strong> en kies <strong className="text-[var(--ink-2)]">CSV</strong></li>
+                    <li>Upload het gedownloade bestand hierboven</li>
+                  </ol>
+                  <p className="mt-2 text-xs text-[var(--ink-4)]">
+                    Alleen transacties met status "Voltooid" worden geïmporteerd. Bedragen zijn netto (incl. PayPal-kosten).
+                  </p>
+                </div>
+              )}
 
               {csvPreset.id === 'custom' && csvHeaders.length > 0 && (
                 <div className="space-y-3">
@@ -961,146 +1124,135 @@ export default function ImportPage() {
         </div>
       )}
 
-      {/* Step 2: Preview + categorization */}
+      {/* Step 2: Dubbelingen */}
       {step === 2 && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-[var(--ink-2)]">
-              <strong>{rows.length}</strong> transacties gevonden in <strong>{fileName}</strong>
-            </p>
-            <button
-              onClick={checkDuplicates}
-              className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
-            >
-              Volgende: dubbelingen checken
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Transfer banner */}
-          {rows.some((r) => r.isTransfer) && (
-            <div className="rounded-[var(--r-lg)] border border-[var(--hor-m)] bg-[var(--hor-l)] px-4 py-3 flex items-start gap-3">
-              <ArrowLeftRight className="h-4 w-4 text-[var(--hor-t)] mt-0.5 shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-[var(--ink-2)]">
-                  {rows.filter((r) => r.isTransfer).length} eigen {rows.filter((r) => r.isTransfer).length === 1 ? 'overboeking' : 'overboekingen'} herkend
-                </p>
-                <p className="text-xs italic text-[var(--ink-3)] font-[var(--font-source-serif)]">
-                  Deze transacties worden geïmporteerd maar tellen niet mee in budgetten of geldstroom.
-                </p>
-              </div>
+          {checkingDups ? (
+            <div className="flex items-center justify-center gap-3 py-16">
+              <Loader2 className="h-5 w-5 animate-spin text-kern-500" />
+              <p className="text-sm text-[var(--ink-2)]">Controleren op dubbelingen…</p>
             </div>
-          )}
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <div className="flex gap-4 text-sm">
+                  <span className="text-emerald-600"><strong>{newCount}</strong> nieuw</span>
+                  {dupCount > 0 && (
+                    <span className="text-orange-600"><strong>{dupCount}</strong> {dupCount === 1 ? 'duplicaat' : 'duplicaten'}</span>
+                  )}
+                </div>
+                <button
+                  onClick={() => setStep(3)}
+                  className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
+                >
+                  Volgende: categoriseren
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
 
-          <div className="overflow-x-auto rounded-xl border border-[var(--border-ed)]">
-            <table className="w-full text-sm">
-              <thead className="bg-[var(--subtle)] text-left">
-                <tr>
-                  <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Datum</th>
-                  <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Beschrijving</th>
-                  <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Bedrag</th>
-                  <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Budget</th>
-                  <th className="px-4 py-2 font-medium text-[var(--ink-3)] text-center">Match</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {rows.map((row, idx) => (
-                  <tr key={idx} className={row.isTransfer ? 'bg-[var(--subtle)]/50' : 'hover:bg-[var(--subtle)]'}>
-                    <td className="whitespace-nowrap px-4 py-2 text-[var(--ink-2)]">
-                      {new Date(row.date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
-                    </td>
-                    <td className="max-w-[300px] truncate px-4 py-2 text-[var(--ink)]">
-                      {row.description}
-                      {row.counterparty_name && (
-                        <span className="ml-1 text-xs text-[var(--ink-3)]">({row.counterparty_name})</span>
-                      )}
-                    </td>
-                    <td className={`whitespace-nowrap px-4 py-2 font-mono font-medium ${
-                      row.isTransfer ? 'text-[var(--ink-2)]' : row.amount > 0 ? 'text-emerald-600' : 'text-[var(--ink)]'
-                    }`}>
-                      {!row.isTransfer && (row.amount > 0 ? '+' : '')}{formatCurrency(row.amount)}
-                    </td>
-                    <td className="px-4 py-2">
-                      {row.isTransfer ? (
-                        <div className="flex items-center gap-2">
-                          <span className="rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[.06em] text-[var(--ink-3)]">
-                            Eigen rekening
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setRows((prev) => prev.map((r, i) =>
-                              i === idx ? { ...r, isTransfer: false, transaction_type: null } : r
-                            ))}
-                            className="text-[11px] italic text-[var(--ink-4)] hover:text-kern-600 font-[var(--font-source-serif)]"
-                          >
-                            Toch als uitgave?
-                          </button>
-                        </div>
-                      ) : (
-                        <select
-                          value={row.budget_id ?? ''}
-                          onChange={(e) => updateRowBudget(idx, e.target.value)}
-                          className="w-full max-w-[200px] rounded border border-[var(--border-ed)] px-2 py-1 text-xs outline-none focus:border-kern-500"
-                        >
-                          <option value="">Niet gecategoriseerd</option>
-                          {budgetGroups
-                            .filter((group) => group.children.length > 0)
-                            .map((group) => (
-                            <optgroup key={group.parent.id} label={group.parent.name}>
-                              {group.children.map((child) => (
-                                <option key={child.id} value={child.id}>{child.name}</option>
-                              ))}
-                            </optgroup>
-                          ))}
-                        </select>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      {row.isTransfer ? (
-                        <ArrowLeftRight className="mx-auto h-4 w-4 text-[var(--ink-3)]" />
-                      ) : row.confidence >= 0.9 ? (
-                        <Check className="mx-auto h-4 w-4 text-emerald-500" />
-                      ) : row.confidence >= 0.5 ? (
-                        <AlertTriangle className="mx-auto h-4 w-4 text-orange-500" />
-                      ) : (
-                        <X className="mx-auto h-4 w-4 text-red-400" />
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              {dupCount > 0 && (
+                <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-700">
+                  <strong>{dupCount}</strong> transactie(s) bestaan al in de database en worden overgeslagen. Je kunt ze hieronder aan- of uitvinken.
+                </div>
+              )}
+
+              <div className="overflow-x-auto rounded-xl border border-[var(--border-ed)]">
+                <table className="w-full text-sm">
+                  <thead className="bg-[var(--subtle)] text-left">
+                    <tr>
+                      <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Importeer</th>
+                      <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Datum</th>
+                      <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Beschrijving</th>
+                      <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Bedrag</th>
+                      <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100">
+                    {rows.map((row, idx) => (
+                      <tr key={idx} className={`${row.skipImport ? 'bg-[var(--subtle)] opacity-60' : 'hover:bg-[var(--subtle)]'}`}>
+                        <td className="px-4 py-2">
+                          <input
+                            type="checkbox"
+                            checked={!row.skipImport}
+                            onChange={() => toggleSkip(idx)}
+                            className="h-4 w-4 rounded border-[var(--border-md)] text-kern-600 focus:ring-kern-500"
+                          />
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-[var(--ink-2)]">
+                          {new Date(row.date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                        </td>
+                        <td className="max-w-[300px] truncate px-4 py-2 text-[var(--ink)]">
+                          {row.description}
+                          {row.counterparty_name && (
+                            <span className="ml-1 text-xs text-[var(--ink-3)]">({row.counterparty_name})</span>
+                          )}
+                        </td>
+                        <td className={`whitespace-nowrap px-4 py-2 font-mono font-medium ${
+                          row.amount > 0 ? 'text-emerald-600' : 'text-[var(--ink)]'
+                        }`}>
+                          {row.amount > 0 ? '+' : ''}{formatCurrency(row.amount)}
+                        </td>
+                        <td className="px-4 py-2">
+                          {row.isDuplicate ? (
+                            <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
+                              Duplicaat
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                              Nieuw
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       )}
 
-      {/* Step 3: Duplicate detection */}
+      {/* Step 3: Categoriseer + Importeer */}
       {step === 3 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <div className="flex gap-4 text-sm">
-              <span className="text-emerald-600"><strong>{newCount}</strong> nieuwe</span>
-              <span className="text-orange-600"><strong>{dupCount}</strong> duplicaten</span>
-            </div>
-            <button
-              onClick={() => handleImport()}
-              disabled={importing || toImportCount === 0}
-              className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
-            >
-              {importing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Importeren...
-                </>
-              ) : (
-                <>
-                  <Upload className="h-4 w-4" />
-                  {toImportCount} transacties importeren
-                </>
+            <p className="text-sm text-[var(--ink-2)]">
+              <strong>{toImportCount}</strong> transacties om te importeren uit <strong>{fileName}</strong>
+            </p>
+            <div className="flex items-center gap-2">
+              {/* Ask Will button — only show when AI hasn't been triggered yet */}
+              {!aiLoading && !aiReady && !aiError && (
+                <button
+                  type="button"
+                  onClick={() => void enrichWithAI(rows.filter(r => !r.skipImport))}
+                  className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-kern-300 px-3 py-1.5 text-xs font-medium text-kern-700 hover:bg-kern-50"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Vraag Will
+                </button>
               )}
-            </button>
+              <button
+                onClick={() => handleImport()}
+                disabled={importing || toImportCount === 0}
+                className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+              >
+                {importing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Importeren...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    {toImportCount} transacties importeren
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
+          {/* Import progress */}
           {importing && importProgress.total > 0 && (
             <div className="rounded-lg border border-kern-200 bg-kern-50 p-4">
               <div className="flex justify-between text-xs text-kern-700 mb-1">
@@ -1116,66 +1268,215 @@ export default function ImportPage() {
             </div>
           )}
 
-          {dupCount > 0 && (
-            <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-700">
-              <strong>{dupCount}</strong> transactie(s) bestaan al in de database en worden overgeslagen. Je kunt ze handmatig selecteren om toch te importeren.
+          {/* AI loading banner */}
+          {aiLoading && (
+            <div className="flex items-center gap-3 rounded-[var(--r-lg)] border border-dashed border-kern-200 bg-kern-50/50 px-4 py-3">
+              <Loader2 className="h-4 w-4 animate-spin text-kern-500 shrink-0" />
+              <p className="text-sm text-kern-700">
+                Will analyseert — {rows.filter((r) => !r.isTransfer && r.confidence < 0.7 && !r.skipImport).length} transacties worden bekeken…
+              </p>
             </div>
           )}
 
+          {/* AI ready banner */}
+          {aiReady && aiSuggestions.size > 0 && (
+            <div className="flex items-center justify-between gap-3 rounded-[var(--r-lg)] border border-kern-300 bg-kern-50 px-4 py-3">
+              <div className="flex items-center gap-3">
+                <Sparkles className="h-4 w-4 text-kern-600 shrink-0" />
+                <p className="text-sm font-medium text-kern-700">
+                  Will heeft {aiSuggestions.size} {aiSuggestions.size === 1 ? 'voorstel' : 'voorstellen'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setRows((prev) => prev.map((r) => {
+                    const s = aiSuggestions.get(r.import_hash)
+                    if (!s || !s.budget_id) return r
+                    const budget = budgets.find((b) => b.id === s.budget_id)
+                    return { ...r, budget_id: s.budget_id, budgetName: budget?.name ?? null, confidence: s.confidence, aiAccepted: true }
+                  }))
+                }}
+                className="inline-flex items-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-kern-700"
+              >
+                <Check className="h-3.5 w-3.5" />
+                Alles goedkeuren
+              </button>
+            </div>
+          )}
+
+          {/* AI error banner */}
+          {aiError && (
+            <div className="rounded-[var(--r-lg)] border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-700">
+              Will is even niet beschikbaar — categoriseer handmatig.
+            </div>
+          )}
+
+          {/* Bulk-apply prompt */}
+          {bulkApplyPrompt && (
+            <div className="flex items-center justify-between gap-3 rounded-[var(--r)] border border-dashed border-wil-300 bg-wil-50/50 px-4 py-3 text-sm">
+              <p className="text-[var(--ink-2)]">
+                <span className="font-medium text-[var(--ink)]">{bulkApplyPrompt.siblingCount}</span> andere{' '}
+                <span className="font-medium text-[var(--ink)]">'{bulkApplyPrompt.matchValue}'</span>-transacties.{' '}
+                Ook als <span className="font-medium text-[var(--ink)]">{bulkApplyPrompt.budgetName}</span>?
+              </p>
+              <div className="flex shrink-0 gap-2">
+                <button
+                  type="button"
+                  onClick={applyToSiblings}
+                  className="rounded-[var(--r-sm)] bg-wil-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-wil-700"
+                >
+                  Ja, allemaal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkApplyPrompt(null)}
+                  className="rounded-[var(--r-sm)] border border-[var(--border-md)] px-3 py-1.5 text-xs text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+                >
+                  Overslaan
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Transfer banner */}
+          {rows.some((r) => r.isTransfer && !r.skipImport) && (
+            <div className="rounded-[var(--r-lg)] border border-[var(--hor-m)] bg-[var(--hor-l)] px-4 py-3 flex items-start gap-3">
+              <ArrowLeftRight className="h-4 w-4 text-[var(--hor-t)] mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-[var(--ink-2)]">
+                  {rows.filter((r) => r.isTransfer && !r.skipImport).length} eigen {rows.filter((r) => r.isTransfer && !r.skipImport).length === 1 ? 'overboeking' : 'overboekingen'} herkend
+                </p>
+                <p className="text-xs italic text-[var(--ink-3)] font-[var(--font-source-serif)]">
+                  Deze transacties worden geïmporteerd maar tellen niet mee in budgetten of geldstroom.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Categorization table — only non-skipped rows */}
           <div className="overflow-x-auto rounded-xl border border-[var(--border-ed)]">
             <table className="w-full text-sm">
               <thead className="bg-[var(--subtle)] text-left">
                 <tr>
-                  <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Importeer</th>
                   <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Datum</th>
                   <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Beschrijving</th>
                   <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Bedrag</th>
                   <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Budget</th>
-                  <th className="px-4 py-2 font-medium text-[var(--ink-3)]">Status</th>
+                  <th className="px-4 py-2 font-medium text-[var(--ink-3)] text-center">Match</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
-                {rows.map((row, idx) => (
-                  <tr key={idx} className={`${row.skipImport ? 'bg-[var(--subtle)] opacity-60' : 'hover:bg-[var(--subtle)]'}`}>
-                    <td className="px-4 py-2">
-                      <input
-                        type="checkbox"
-                        checked={!row.skipImport}
-                        onChange={() => toggleSkip(idx)}
-                        className="h-4 w-4 rounded border-[var(--border-md)] text-kern-600 focus:ring-kern-500"
-                      />
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-2 text-[var(--ink-2)]">
-                      {new Date(row.date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
-                    </td>
-                    <td className="max-w-[250px] truncate px-4 py-2 text-[var(--ink)]">
-                      {row.description}
-                    </td>
-                    <td className={`whitespace-nowrap px-4 py-2 font-medium ${
-                      row.amount > 0 ? 'text-emerald-600' : 'text-[var(--ink)]'
-                    }`}>
-                      {row.amount > 0 ? '+' : ''}{formatCurrency(row.amount)}
-                    </td>
-                    <td className="px-4 py-2 text-xs text-[var(--ink-2)]">
-                      {row.isTransfer ? (
-                        <span className="rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[.06em] text-[var(--ink-3)]">
-                          Eigen rekening
-                        </span>
-                      ) : (row.budgetName ?? 'Niet gecategoriseerd')}
-                    </td>
-                    <td className="px-4 py-2">
-                      {row.isDuplicate ? (
-                        <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
-                          Duplicaat
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                          Nieuw
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {rows.map((row, realIdx) => {
+                  if (row.skipImport) return null
+                  return (
+                    <tr key={realIdx} className={row.isTransfer ? 'bg-[var(--subtle)]/50' : 'hover:bg-[var(--subtle)]'}>
+                      <td className="whitespace-nowrap px-4 py-2 text-[var(--ink-2)]">
+                        {new Date(row.date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                      </td>
+                      <td className="max-w-[300px] truncate px-4 py-2 text-[var(--ink)]">
+                        {row.description}
+                        {row.counterparty_name && (
+                          <span className="ml-1 text-xs text-[var(--ink-3)]">({row.counterparty_name})</span>
+                        )}
+                      </td>
+                      <td className={`whitespace-nowrap px-4 py-2 font-mono font-medium ${
+                        row.isTransfer ? 'text-[var(--ink-2)]' : row.amount > 0 ? 'text-emerald-600' : 'text-[var(--ink)]'
+                      }`}>
+                        {!row.isTransfer && (row.amount > 0 ? '+' : '')}{formatCurrency(row.amount)}
+                      </td>
+                      <td className="px-4 py-2">
+                        {row.isTransfer ? (
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[.06em] text-[var(--ink-3)]">
+                              Eigen rekening
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setRows((prev) => prev.map((r, i) =>
+                                i === realIdx ? { ...r, isTransfer: false, transaction_type: null } : r
+                              ))}
+                              className="text-[11px] italic text-[var(--ink-4)] hover:text-kern-600 font-[var(--font-source-serif)]"
+                            >
+                              Toch als uitgave?
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {/* AI proposal block */}
+                            {(() => {
+                              const s = aiSuggestions.get(row.import_hash)
+                              if (!s?.budget_id) return null
+                              if (row.aiAccepted) {
+                                return (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-medium text-emerald-700">
+                                    <Check className="h-2.5 w-2.5" />
+                                    Gekeurd
+                                  </span>
+                                )
+                              }
+                              return (
+                                <div className="rounded border border-dashed border-kern-200 bg-kern-50/50 px-2 py-1.5">
+                                  <p className="font-[var(--font-source-serif)] text-[10px] italic text-[var(--ink-3)] line-clamp-1">{s.reasoning}</p>
+                                  <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                    <span className="inline-flex items-center gap-0.5 rounded-full bg-kern-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[.06em] text-kern-700">
+                                      <Sparkles className="h-2.5 w-2.5" />
+                                      Will
+                                    </span>
+                                    <span className="text-[10px] font-medium text-[var(--ink-2)]">
+                                      {budgets.find((b) => b.id === s.budget_id)?.name}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => updateRowBudget(realIdx, s.budget_id!, 'ai')}
+                                      className="rounded-full bg-kern-600 px-2 py-0.5 text-[9px] font-medium text-white hover:bg-kern-700"
+                                    >
+                                      OK?
+                                    </button>
+                                  </div>
+                                </div>
+                              )
+                            })()}
+                            <select
+                              value={row.budget_id ?? ''}
+                              onChange={(e) => {
+                                if (e.target.value === '__transfer__') {
+                                  setRows((prev) => prev.map((r, i) => i === realIdx ? { ...r, isTransfer: true, transaction_type: 'transfer', budget_id: null, budgetName: null } : r))
+                                } else {
+                                  updateRowBudget(realIdx, e.target.value, 'user')
+                                }
+                              }}
+                              className="w-full max-w-[200px] rounded border border-[var(--border-ed)] px-2 py-1 text-xs outline-none focus:border-kern-500"
+                            >
+                              <option value="">Niet gecategoriseerd</option>
+                              <option value="__transfer__">↔ Eigen overboeking</option>
+                              {budgetGroups
+                                .filter((group) => group.children.length > 0)
+                                .map((group) => (
+                                <optgroup key={group.parent.id} label={group.parent.name}>
+                                  {group.children.map((child) => (
+                                    <option key={child.id} value={child.id}>{child.name}</option>
+                                  ))}
+                                </optgroup>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-center">
+                        {row.isTransfer ? (
+                          <ArrowLeftRight className="mx-auto h-4 w-4 text-[var(--ink-3)]" />
+                        ) : row.confidence >= 0.9 ? (
+                          <Check className="mx-auto h-4 w-4 text-emerald-500" />
+                        ) : row.confidence >= 0.5 ? (
+                          <AlertTriangle className="mx-auto h-4 w-4 text-orange-500" />
+                        ) : (
+                          <X className="mx-auto h-4 w-4 text-red-400" />
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

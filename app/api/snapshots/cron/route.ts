@@ -154,7 +154,7 @@ export async function GET(request: Request) {
         return s + (b.interval === 'yearly' ? limit : limit * 12)
       }, 0)
 
-      const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / SWR : 0
+      const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / SWR : 0
       const freedomPercentage = fireTarget > 0
         ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0)
         : 0

@@ -28,6 +28,8 @@ import { CategoryRulesSheet } from '@/components/app/category-rules-sheet'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { useHouseholdStatus } from '@/components/app/ownership-toggle'
 import { SettlementOverview } from '@/components/app/settlement-overview'
+import { UncategorizedTransactionsBanner } from '@/components/app/uncategorized-transactions-banner'
+import { AICategorizeSheet } from '@/components/app/ai-categorize-sheet'
 
 type Transaction = {
   id: string
@@ -38,6 +40,7 @@ type Transaction = {
   description: string
   counterparty_name: string | null
   counterparty_iban: string | null
+  import_hash: string | null
   is_income: boolean
   notes: string | null
   category_source: string
@@ -93,6 +96,7 @@ export default function CashPage() {
   const [showForm, setShowForm] = useState(false)
   const [editTransaction, setEditTransaction] = useState<Transaction | null>(null)
   const [showSankey, setShowSankey] = useState(true)
+  const [showAICategorize, setShowAICategorize] = useState(false)
   const [showAccountForm, setShowAccountForm] = useState(false)
   const [editAccount, setEditAccount] = useState<Account | null>(null)
   const [recurrings, setRecurrings] = useState<RecurringTransaction[]>([])
@@ -386,6 +390,7 @@ export default function CashPage() {
   // Calculate monthly totals — exclude transfers, use amount sign as source of truth
   const nonTransferTx = transactions.filter((t) => t.transaction_type !== 'transfer')
   const transferTx = transactions.filter((t) => t.transaction_type === 'transfer')
+  const uncatTx = nonTransferTx.filter((t) => !t.budget_id)
 
   const totalIncome = nonTransferTx
     .filter((t) => Number(t.amount) > 0)
@@ -1014,6 +1019,18 @@ export default function CashPage() {
         </p>
       )}
 
+      {/* Uncategorized transactions banner */}
+      {uncatTx.length > 0 && (
+        <div className="mt-3 sm:mt-6">
+          <UncategorizedTransactionsBanner
+            count={uncatTx.length}
+            totalAmount={uncatTx.reduce((s, t) => s + Math.abs(Number(t.amount)), 0)}
+            onClick={() => setShowAICategorize(true)}
+            formatCurrency={(v) => new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)}
+          />
+        </div>
+      )}
+
       {/* Sankey flow diagram */}
       {sankeyData && sankeyData.nodes.length > 0 && (
         <section className="mt-3 sm:mt-6">
@@ -1614,6 +1631,17 @@ export default function CashPage() {
         <CategoryRulesSheet
           budgets={budgets}
           onClose={() => setShowCategoryRules(false)}
+        />
+      )}
+
+      {/* AI categorize sheet */}
+      {showAICategorize && (
+        <AICategorizeSheet
+          transactions={uncatTx}
+          budgets={budgets}
+          budgetGroups={budgetGroups}
+          onClose={() => setShowAICategorize(false)}
+          onSaved={() => { void loadTransactions(selectedAccountId); setShowAICategorize(false) }}
         />
       )}
 

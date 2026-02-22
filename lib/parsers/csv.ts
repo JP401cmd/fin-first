@@ -91,6 +91,12 @@ export async function parseCSV(
 
     const fields = splitCSVLine(line, preset.delimiter)
 
+    // Filter by status column (e.g. PayPal: only import 'Voltooid' rows)
+    if (preset.statusColumn != null && preset.statusFilterValue) {
+      const statusValue = (fields[preset.statusColumn] ?? '').trim()
+      if (statusValue !== preset.statusFilterValue) continue
+    }
+
     const dateStr = fields[preset.dateColumn] ?? ''
     const amountStr = fields[preset.amountColumn] ?? ''
     const description = fields[preset.descriptionColumn] ?? ''

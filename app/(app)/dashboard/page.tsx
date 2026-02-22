@@ -10,8 +10,11 @@ import Link from 'next/link'
 import { StreakIndicator } from '@/components/app/streak-indicator'
 import { StreakBreakWarning } from '@/components/app/streak-break-warning'
 import {
-  ArrowRight, Zap, Compass, TrendingUp,
+  ArrowRight, Zap, Compass, TrendingUp, Settings2, Info,
 } from 'lucide-react'
+import { mergeWidgetPrefs } from '@/lib/widget-catalog'
+import type { DashboardData } from '@/components/widgets/widget-renderer'
+import { DraggableWidgetGrid } from '@/components/widgets/draggable-widget-grid'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -24,19 +27,22 @@ export default async function DashboardPage() {
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
   const [
     txResult, assetsResult, debtsResult, profileResult,
-    essentialBudgetsResult, actionsResult, _eventsResult,
-    _allBudgetsResult, _recsResult, childBudgetsResult,
+    essentialBudgetsResult, actionsResult, eventsResult,
+    allBudgetsResult, recsResult, childBudgetsResult,
+    goalsResult, recurringResult,
   ] = await Promise.all([
-    supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
+    supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('current_value, monthly_contribution').eq('is_active', true),
     supabase.from('debts').select('current_balance, debt_type').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth, last_known_phase').single(),
+    supabase.from('profiles').select('date_of_birth, last_known_phase, widget_prefs').single(),
     supabase.from('budgets').select('id, default_limit, interval').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
     supabase.from('actions').select('id, status, freedom_days_impact').in('status', ['open', 'completed']),
     supabase.from('life_events').select('id').eq('is_active', true),
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, alert_threshold, parent_id').is('parent_id', null),
-    supabase.from('recommendations').select('id, title').eq('status', 'pending').limit(1),
+    supabase.from('recommendations').select('id').eq('status', 'pending').limit(5),
     supabase.from('budgets').select('id, parent_id, default_limit').not('parent_id', 'is', null),
+    supabase.from('goals').select('id').eq('is_completed', false),
+    supabase.from('recurring_transactions').select('id').eq('is_active', true),
   ])
 
   // Core calculations
@@ -65,8 +71,50 @@ export default async function DashboardPage() {
     else yearlyMustExpenses += limit
   }
 
+  // Budget totals per type — limiet en werkelijke besteding
+  const allParentBudgets = (allBudgetsResult.data ?? []) as { id: string; budget_type: string; default_limit: number; interval: string }[]
+  // Map: budget_id → budget_type (voor zowel parent als child budgetten)
+  const budgetTypeMap = new Map<string, string>()
+  for (const b of allParentBudgets) budgetTypeMap.set(b.id, b.budget_type)
+  for (const c of allChildren) {
+    const parentType = budgetTypeMap.get(c.parent_id ?? '')
+    if (parentType) budgetTypeMap.set(c.id, parentType)
+  }
+
+  const BUDGET_TYPES = ['income', 'expense', 'savings', 'debt'] as const
+  const budgetLimits: Record<string, number> = { income: 0, expense: 0, savings: 0, debt: 0 }
+  for (const b of allParentBudgets) {
+    const type = b.budget_type as string
+    if (!BUDGET_TYPES.includes(type as typeof BUDGET_TYPES[number])) continue
+    const children = allChildren.filter(c => c.parent_id === b.id)
+    const limit = children.length > 0
+      ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
+      : Number(b.default_limit)
+    const monthlyLimit = b.interval === 'monthly' ? limit
+      : b.interval === 'quarterly' ? limit / 3
+      : limit / 12
+    budgetLimits[type] = (budgetLimits[type] ?? 0) + monthlyLimit
+  }
+
+  const budgetSpent: Record<string, number> = { income: 0, expense: 0, savings: 0, debt: 0 }
+  for (const tx of txResult.data ?? []) {
+    const amt = Number(tx.amount)
+    const budgetId = (tx as { budget_id?: string | null }).budget_id
+    if (!budgetId) continue
+    const type = budgetTypeMap.get(budgetId)
+    if (!type || !BUDGET_TYPES.includes(type as typeof BUDGET_TYPES[number])) continue
+    budgetSpent[type] = (budgetSpent[type] ?? 0) + Math.abs(amt)
+  }
+
+  const budgetTotals = {
+    income:  { limit: budgetLimits.income,  spent: budgetSpent.income },
+    expense: { limit: budgetLimits.expense, spent: budgetSpent.expense },
+    savings: { limit: budgetLimits.savings, spent: budgetSpent.savings },
+    debt:    { limit: budgetLimits.debt,    spent: budgetSpent.debt },
+  }
+
   const yearlyExpenses = monthlyExpenses * 12
-  const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / 0.04 : 0
+  const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / 0.04 : (yearlyExpenses > 0 ? yearlyExpenses / 0.04 : 0)
   const freedomPct = fireTarget > 0 ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0) : 0
 
   // FIRE projection
@@ -106,7 +154,39 @@ export default async function DashboardPage() {
 
   // Freedom milestone forecast for Jouw Pad widget
   const monthlySavings = monthlyIncome - monthlyExpenses
-  const milestoneResult = computeFreedomMilestones(netWorth, monthlyExpenses, monthlySavings)
+  const milestoneResult = computeFreedomMilestones(netWorth, monthlyExpenses, monthlySavings, undefined, undefined, undefined, yearlyMustExpenses)
+
+  // Widget prefs
+  const rawWidgetPrefs = profileResult.data?.widget_prefs as { widgets: { id: string; enabled: boolean; size: 'half' | 'full'; order: number }[] } | null
+  const widgetPrefs = mergeWidgetPrefs(rawWidgetPrefs)
+  const activeWidgets = widgetPrefs.widgets
+    .filter(w => w.enabled)
+    .sort((a, b) => a.order - b.order)
+
+  // DashboardData bundle for widgets
+  const dashboardData: DashboardData = {
+    netWorth,
+    totalAssets,
+    totalDebts,
+    monthlyIncome,
+    monthlyExpenses,
+    monthlyContributions,
+    yearlyMustExpenses,
+    budgetTotals,
+    freedomPct,
+    fireTarget,
+    fireProjResult,
+    openActions: openActions.length,
+    totalFreedomDaysOpen,
+    sovereigntyLevel,
+    currentPhaseId,
+    monthsCovered: monthlyExpenses > 0 ? netWorth / monthlyExpenses : 0,
+    hasConsumerDebt,
+    recommendations: (recsResult.data ?? []).length,
+    goals: (goalsResult.data ?? []).length,
+    recurringTransactions: (recurringResult.data ?? []).length,
+    lifeEvents: (eventsResult.data ?? []).length,
+  }
 
   // Dateline
   const dateStr = now.toLocaleDateString('nl-NL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
@@ -121,13 +201,13 @@ export default async function DashboardPage() {
         <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.11em' }} className="text-[var(--ink-3)]">{dateStr}</span>
         <div className="flex items-center gap-3">
           <StreakIndicator />
-          <span className="font-serif italic text-[13px] text-[var(--ink-3)] hidden sm:inline">Persoonlijk Financieel Dagblad</span>
+          <span className="font-serif italic text-[13px] text-[var(--ink-3)] hidden sm:inline">Vrijheids Dashboard</span>
         </div>
       </div>
 
       {/* Header */}
       <div className="mb-5 sm:mb-8">
-        <p className="label-editorial text-[var(--ink-3)] mb-1">Jouw financieel dagblad</p>
+        <p className="label-editorial text-[var(--ink-3)] mb-1">Jouw vrijheids dashboard</p>
         <h1 className="font-display text-[32px] font-bold text-[var(--ink)]" style={{ letterSpacing: '-0.03em' }}>
           Welkom terug, <em className="not-italic font-display italic text-kern-600">{displayName}</em>
         </h1>
@@ -151,18 +231,24 @@ export default async function DashboardPage() {
         >
           <div className="h-1 bg-kern-500" />
           <div className="p-4 sm:p-6">
-            <div className="mb-2 sm:mb-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-[var(--r)] bg-kern-50">
+            <div className="mb-2 sm:mb-4 flex items-start gap-3">
+              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-[var(--r)] bg-kern-50 shrink-0">
                 <FhinAvatar size={36} />
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <h2 className="font-display font-bold text-xl text-[var(--ink)]">De Kern</h2>
                 <p className="label-editorial text-kern-600">Financieel Fundament</p>
               </div>
+              <button
+                type="button"
+                title="Je financiële fundament. Inzicht in je vermogen, schulden en budgetten."
+                className="shrink-0 text-[var(--ink-4)] hover:text-[var(--ink-3)] transition-colors cursor-help mt-0.5"
+                aria-label="Meer info over De Kern"
+
+              >
+                <Info className="h-3.5 w-3.5" />
+              </button>
             </div>
-            <p className="mb-3 sm:mb-5 text-sm leading-relaxed text-[var(--ink-3)]">
-              Je financiele fundament. Inzicht in je vermogen, schulden en budgetten.
-            </p>
 
             {/* Preview metric — Vermogensgroei deze maand */}
             <div className="space-y-2 sm:space-y-3 border-t border-[var(--border-ed)] pt-3 sm:pt-4">
@@ -195,18 +281,24 @@ export default async function DashboardPage() {
         >
           <div className="h-1 bg-wil-500" />
           <div className="p-4 sm:p-6">
-            <div className="mb-2 sm:mb-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-[var(--r)] bg-wil-50">
+            <div className="mb-2 sm:mb-4 flex items-start gap-3">
+              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-[var(--r)] bg-wil-50 shrink-0">
                 <FinnAvatar size={36} />
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <h2 className="font-display font-bold text-xl text-[var(--ink)]">De Wil</h2>
                 <p className="label-editorial text-wil-600">Bewuste Actie</p>
               </div>
+              <button
+                type="button"
+                title="Bewuste keuzes en acties. Van inzicht naar impact."
+                className="shrink-0 text-[var(--ink-4)] hover:text-[var(--ink-3)] transition-colors cursor-help mt-0.5"
+                aria-label="Meer info over De Wil"
+
+              >
+                <Info className="h-3.5 w-3.5" />
+              </button>
             </div>
-            <p className="mb-3 sm:mb-5 text-sm leading-relaxed text-[var(--ink-3)]">
-              Bewuste keuzes en acties. Van inzicht naar impact.
-            </p>
 
             {/* Preview metric — X acties open — Y dagen te winnen */}
             <div className="space-y-2 sm:space-y-3 border-t border-[var(--border-ed)] pt-3 sm:pt-4">
@@ -238,18 +330,24 @@ export default async function DashboardPage() {
         >
           <div className="h-1 bg-horizon-500" />
           <div className="p-4 sm:p-6">
-            <div className="mb-2 sm:mb-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-[var(--r)] bg-horizon-50">
+            <div className="mb-2 sm:mb-4 flex items-start gap-3">
+              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-[var(--r)] bg-horizon-50 shrink-0">
                 <FfinAvatar size={36} />
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <h2 className="font-display font-bold text-xl text-[var(--ink)]">De Horizon</h2>
                 <p className="label-editorial text-horizon-600">Toekomstperspectief</p>
               </div>
+              <button
+                type="button"
+                title="Je pad naar financiële vrijheid. Projecties, scenario's en je tijdlijn."
+                className="shrink-0 text-[var(--ink-4)] hover:text-[var(--ink-3)] transition-colors cursor-help mt-0.5"
+                aria-label="Meer info over De Horizon"
+
+              >
+                <Info className="h-3.5 w-3.5" />
+              </button>
             </div>
-            <p className="mb-3 sm:mb-5 text-sm leading-relaxed text-[var(--ink-3)]">
-              Je pad naar financiele vrijheid. Projecties, scenario&apos;s en je tijdlijn.
-            </p>
 
             {/* Preview metric — Countdown: X jaar, Y maanden */}
             <div className="space-y-2 sm:space-y-3 border-t border-[var(--border-ed)] pt-3 sm:pt-4">
@@ -275,45 +373,39 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      {/* Freedom indicator — preview teaser linking to De Kern (primary owner) */}
-      <section className="mt-8" aria-label="Vrijheidsvoortgang" data-testid="dashboard-freedom-teaser">
-        <div className="card-editorial px-5 py-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <Compass className="h-3.5 w-3.5 text-horizon-600" />
-              <p className="label-editorial text-horizon-600">
-                Vrijheidsvoortgang
-              </p>
-              <span className="text-[var(--ink-4)]">·</span>
-              <span className="text-xs font-mono text-[var(--ink-3)]">
-                {formatCurrency(netWorth)} / {formatCurrency(fireTarget)}
-              </span>
+      {/* ── Mijn Dashboard — Widget Grid ────────────────────────── */}
+      <section className="mt-8" aria-label="Mijn Dashboard" data-testid="widget-grid">
+        {activeWidgets.length === 0 ? (
+          <>
+            <div className="mb-4 flex items-center justify-between border-b border-[var(--border-ed)] pb-2">
+              <h2 className="label-editorial text-[var(--ink-2)]">Mijn Dashboard</h2>
+              <Link
+                href="/identity/widgets"
+                className="flex items-center gap-1 text-xs text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)]"
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+                <span className="font-serif italic">Beheer widgets</span>
+                <ArrowRight className="h-3 w-3" />
+              </Link>
             </div>
-            <div className="mt-2 flex items-center gap-3">
-              <div className="h-[5px] flex-1 overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-horizon-400 to-horizon-600 animate-prog-in"
-                  style={{ width: `${Math.min(freedomPct, 100)}%` }}
-                />
-              </div>
-              <span className="text-sm font-mono font-medium text-[var(--ink-2)] tabular-nums">
-                {freedomPct.toFixed(1)}%
-              </span>
+            <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/50 py-12 text-center">
+              <p className="text-sm text-[var(--ink-3)]">Geen widgets ingeschakeld.</p>
+              <Link href="/identity/widgets" className="mt-2 inline-block font-serif italic text-xs text-kern-600 hover:underline">
+                Voeg widgets toe →
+              </Link>
             </div>
-            <p className="mt-1.5 font-serif italic text-[12px] text-[var(--ink-3)]">
-              {fireProjResult.fireDate === 'Bereikt!'
-                ? 'Je passief inkomen dekt je uitgaven — volledige vrijheid bereikt!'
-                : fireProjResult.fireDate === 'Niet haalbaar'
-                  ? 'Verhoog je spaarcapaciteit om volledige vrijheid te bereiken'
-                  : `Verwacht moment van volledige vrijheid: ${fireProjResult.fireDate}`
-              }
-            </p>
-          </div>
-        </div>
+          </>
+        ) : (
+          <DraggableWidgetGrid
+            initialPrefs={activeWidgets}
+            allPrefs={widgetPrefs.widgets}
+            data={dashboardData}
+          />
+        )}
       </section>
 
-      {/* Jouw Pad widget */}
-      <section className="mt-6">
+      {/* Jouw Pad widget (always shown below widgets, legacy) */}
+      <section className="mt-6" data-testid="jouw-pad-section">
         <JouwPadWidget
           level={sovereigntyLevel}
           phase={currentPhaseId}

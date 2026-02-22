@@ -44,6 +44,101 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'fin_prod_0.73',
+    date: '2026-02-22',
+    title: 'Widget dashboard, AI-categorisatie & transactiescope',
+    sections: [
+      {
+        module: 'Platform — Dashboard',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Modulair widget dashboard',
+            description: '20 onafhankelijke widgets verdeeld over De Kern, De Wil, De Horizon en Cross-module. Elk widget is in- of uitschakelbaar, heeft een half/full breedte en een volgorde die per gebruiker wordt opgeslagen in de database. Widgets zijn gated op sovereignty level.',
+          },
+          {
+            title: 'Draggable widget grid',
+            description: 'Nieuwe DraggableWidgetGrid component toont actieve widgets in een responsief 2-koloms raster. Instellingenknop opent widgetbeheer waarmee je de samenstelling van je dashboard kunt aanpassen zonder de pagina te verlaten.',
+          },
+          {
+            title: 'Widget API & persistentie',
+            description: 'Nieuw /api/widgets endpoint slaat widget-voorkeuren op in de widget_prefs kolom van het gebruikersprofiel. mergeWidgetPrefs() voegt nieuwe widgets automatisch toe en verwijdert verouderde entries.',
+          },
+          {
+            title: '20 widget-componenten',
+            description: 'Netto Vermogen, Cashflow Maand, Budgetten, Vermogen, Schulden, Beleggingen, Voorstellen, Acties, Doelen, FIRE Prognose, Monte Carlo, Levensgebeurtenissen, Spaarquote, Vrijheidsvoortgang, Abonnementen, Jouw Pad, Veerkracht Score, Box 3 Belasting, Vaste Lasten en NIBUD Benchmark.',
+          },
+          {
+            title: 'Deep-link modals vanuit widgets',
+            description: 'Widget-knoppen navigeren direct naar de juiste modulepagina én openen automatisch de bijbehorende modal via een ?modal= URL-parameter. Ondersteunde targets: projections, scenarios, simulations, withdrawal (Horizon) en subscriptions (Wil).',
+          },
+          {
+            title: 'Dashboard hernoemd naar Vrijheids Dashboard',
+            description: 'Dateline en koptegel bijgewerkt van "Persoonlijk Financieel Dagblad" naar "Vrijheids Dashboard" om de filosofische focus te versterken. Dashboard berekent budgetlimiet en besteding per type (income, expense, savings, debt) voor de widgets.',
+          },
+        ],
+      },
+      {
+        module: 'De Kern — Import',
+        color: 'amber',
+        items: [
+          {
+            title: 'AI-categorisatie bij import ("Vraag Will")',
+            description: 'Nieuwe Sparkles-knop in stap 3 van de importflow stuurt ongecategoriseerde transacties (vertrouwen < 70%) in batches van 20 naar /api/ai/categorize. Will geeft per rij een voorstel met redenering en betrouwbaarheidsscore. Accepteer alles met één klik of keur individueel goed via de inline "OK?"-knop.',
+          },
+          {
+            title: 'Verbeterde duplicaatdetectie via datumbereik',
+            description: 'Duplicaatcontrole gebruikt nu een efficiënte range-query (gte/lte op datum) in plaats van een fragiele hash-lookup. Normaliseert bedragen via parseFloat zodat "8.10" en "8.1" correct als hetzelfde worden herkend. Binnenbestand-duplicaten worden in een aparte pas gedetecteerd.',
+          },
+          {
+            title: 'Bulk-apply prompt bij categoriseren',
+            description: 'Wanneer je een transactie van tegenpartij X een budget geeft, verschijnt een banner met het aantal andere transacties van dezelfde tegenpartij in het importbestand. Met één klik pas je de categorie op alle toe.',
+          },
+          {
+            title: 'Eigen overboeking instellen via dropdown',
+            description: 'In de categorisatietabel kun je nu handmatig "↔ Eigen overboeking" kiezen voor elke rij. Zo markeer je overboekingen die niet automatisch zijn herkend zonder het formulier te verlaten.',
+          },
+          {
+            title: 'Importflow herzien: stap 2 & 3 samengevoegd',
+            description: 'De vorige drie-stappen flow is stroomlijnd: duplicaatdetectie loopt nu op de achtergrond terwijl de categorisatietabel direct zichtbaar is. Overgeslagen transacties (duplicaten, eigen overboekingen) worden verborgen in de tabel.',
+          },
+        ],
+      },
+      {
+        module: 'De Kern — Cash',
+        color: 'amber',
+        items: [
+          {
+            title: 'Ongecategoriseerde transacties banner',
+            description: 'Nieuwe UncategorizedTransactionsBanner op de cash-pagina toont het aantal en totaalbedrag van transacties zonder budgetkoppeling. Klikken opent de AI Categorize Sheet direct vanuit het transactieoverzicht.',
+          },
+          {
+            title: 'AI Categorize Sheet op cash-pagina',
+            description: 'Nieuwe AICategorizeSheet laat je ongecategoriseerde transacties vanuit het overzicht in bulk categoriseren met AI-hulp, los van de importflow.',
+          },
+          {
+            title: 'import_hash toegevoegd aan transacties',
+            description: 'Transactiemodel bevat nu import_hash als veld zodat AI-categorisatieresultaten per transactie bijgehouden kunnen worden.',
+          },
+        ],
+      },
+      {
+        module: 'De Kern — Transacties',
+        color: 'amber',
+        items: [
+          {
+            title: 'Transactiescope bij budgetwijziging',
+            description: 'Wanneer je het budget van een bestaande transactie aanpast, onderbreekt het formulier en vraagt: wil je alleen deze transactie wijzigen, alle toekomstige van dezelfde tegenpartij, of alle transacties ooit? De keuze bepaalt de reikwijdte van de bulk-update.',
+          },
+          {
+            title: 'Automatische categorisatieregel bij bulk-update',
+            description: 'Bij een scope-keuze van "toekomstig" of "alles" wordt automatisch een category_correction regel aangemaakt (of overschreven) zodat volgende imports deze tegenpartij direct correct categoriseren.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: 'fin_prod_0.72',
     date: '2026-02-21',
     title: 'Budgetmodule & terugkerende transacties',

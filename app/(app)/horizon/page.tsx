@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { FfinAvatar } from '@/components/app/avatars'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/components/app/budget-shared'
@@ -61,6 +62,20 @@ export default function HorizonPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeModal, setActiveModal] = useState<ActiveModal>(null)
+
+  // Deep-link: open modal via ?modal= URL param (from dashboard widgets)
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  useEffect(() => {
+    const modal = searchParams.get('modal')
+    if (!modal) return
+    if (modal === 'projections' || modal === 'scenarios' || modal === 'simulations' || modal === 'withdrawal') {
+      setActiveModal(modal)
+    } else if (modal === 'life_events') {
+      setShowForm(true)
+    }
+    router.replace('/horizon', { scroll: false })
+  }, [searchParams, router])
 
   // Income override for what-if analysis
   const [incomeOverride, setIncomeOverride] = useState<number | null>(null)

@@ -421,14 +421,15 @@ export function computeFireProjection(
   const inflationRate = inflationOverride ?? INFLATION
   const netWorth = totalAssets - totalDebts
   const yearlyExpenses = monthlyExpenses * 12
-  const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / swr : 0
+  const effectiveYearlyExpenses = yearlyMustExpenses > 0 ? yearlyMustExpenses : yearlyExpenses
+  const fireTarget = effectiveYearlyExpenses > 0 ? effectiveYearlyExpenses / swr : 0
   const freedomPercentage = fireTarget > 0 ? Math.min((netWorth / fireTarget) * 100, 100) : 0
   const monthlySavings = monthlyIncome - monthlyExpenses
   const savingsRate = monthlyIncome > 0 ? (monthlySavings / monthlyIncome) * 100 : 0
   const monthlyPassiveIncome = (netWorth * swr) / 12
 
   // Freedom time
-  const freedomMonthsTotal = yearlyExpenses > 0 ? (netWorth / yearlyExpenses) * 12 : 0
+  const freedomMonthsTotal = effectiveYearlyExpenses > 0 ? (netWorth / effectiveYearlyExpenses) * 12 : 0
   const freedomYears = Math.floor(Math.max(0, freedomMonthsTotal) / 12)
   const freedomMonths = Math.floor(Math.max(0, freedomMonthsTotal) % 12)
 

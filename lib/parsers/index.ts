@@ -50,6 +50,8 @@ export type CSVPreset = {
   creditColumn?: number
   signColumn?: number // column that indicates debit/credit (e.g. ING "Af Bij")
   signDebitValue?: string // value in signColumn that means debit/expense (e.g. "Af")
+  statusColumn?: number // column to check for row filtering
+  statusFilterValue?: string // only include rows where statusColumn equals this value
 }
 
 export const CSV_PRESETS: CSVPreset[] = [
@@ -93,6 +95,23 @@ export const CSV_PRESETS: CSVPreset[] = [
     referenceColumn: null,
     dateFormat: 'YYYYMMDD',
     hasHeader: true,
+  },
+  {
+    // PayPal NL CSV export via Activiteiten → Alle transacties downloaden → CSV
+    // Columns: Datum, Tijd, Tijdzone, Naam, Type, Status, Valuta, Bruto, Kosten, Netto, Saldo, ...Transactie-ID
+    id: 'paypal',
+    label: 'PayPal (CSV export)',
+    delimiter: ',',
+    dateColumn: 0,       // Datum (DD/MM/YYYY)
+    amountColumn: 9,     // Netto (incl. kosten, negatief = betaling)
+    descriptionColumn: 3, // Naam (tegenpartij / merchant)
+    counterpartyColumn: 3, // Naam
+    ibanColumn: null,
+    referenceColumn: 12, // Transactie-ID
+    dateFormat: 'DD/MM/YYYY',
+    hasHeader: true,
+    statusColumn: 5,           // Status kolom
+    statusFilterValue: 'Voltooid', // Sla geweigerde / in behandeling transacties over
   },
   {
     id: 'custom',

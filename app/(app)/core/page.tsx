@@ -300,7 +300,7 @@ export default function CorePage() {
 
       // Compute FIRE reachability for smart prioritization (Feature #255)
       const SWR = 0.04
-      const fireTarget = (monthlyExpenses * 12) > 0 ? (monthlyExpenses * 12) / SWR : 0
+      const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / SWR : ((monthlyExpenses * 12) > 0 ? (monthlyExpenses * 12) / SWR : 0)
       if (fireTarget > 0 && netWorth < fireTarget) {
         if (monthlySavings <= 0) {
           setFireUnreachable(true)
@@ -1206,13 +1206,15 @@ export default function CorePage() {
             <>
               <div className="border-b border-dashed border-[var(--border-ed)] mb-2 pb-2 mt-2">
                 <div className="flex justify-between py-0.5">
-                  <span className="text-[var(--ink-2)]">Maandelijkse uitgaven</span>
-                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(data.monthlyExpenses)}</span>
+                  <span className="text-[var(--ink-2)]">Jaarlijkse Must-uitgaven</span>
+                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(data.yearlyMustExpenses > 0 ? data.yearlyMustExpenses : data.monthlyExpenses * 12)}</span>
                 </div>
-                <div className="flex justify-between py-0.5">
-                  <span className="text-[var(--ink-2)]">× 12 maanden</span>
-                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(data.monthlyExpenses * 12)}</span>
-                </div>
+                {data.yearlyMustExpenses <= 0 && (
+                  <div className="flex justify-between py-0.5">
+                    <span className="text-[var(--ink-2)]">× 12 maanden</span>
+                    <span className="tabular-nums text-[var(--ink)]">{formatCurrency(data.monthlyExpenses * 12)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between py-0.5">
                   <span className="text-[var(--ink-2)]">÷ opnamepercentage (4%)</span>
                   <span className="tabular-nums text-[var(--ink-3)]">÷ 0,04</span>
@@ -1244,10 +1246,10 @@ export default function CorePage() {
 
               <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
                 <p><strong className="text-[var(--ink-3)]">De 4%-regel:</strong> Onderzoek (de &ldquo;Trinity Study&rdquo;) toont aan dat je 4% per jaar kunt onttrekken aan een gediversifieerde portefeuille zonder dat het kapitaal opraakt over 30+ jaar.</p>
-                <p className="mt-1"><strong className="text-[var(--ink-3)]">Formule:</strong> jaarlijkse uitgaven ÷ 0,04 = benodigd vermogen</p>
+                <p className="mt-1"><strong className="text-[var(--ink-3)]">Formule:</strong> {data.yearlyMustExpenses > 0 ? 'must-uitgaven' : 'jaarlijkse uitgaven'} ÷ 0,04 = benodigd vermogen</p>
               </div>
 
-              <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">Berekend op basis van je huidige maandelijkse uitgaven</p>
+              <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">{data.yearlyMustExpenses > 0 ? 'Berekend op basis van essentiële (must) budgetten' : 'Berekend op basis van je huidige maandelijkse uitgaven'}</p>
             </>
           )}
         </div>

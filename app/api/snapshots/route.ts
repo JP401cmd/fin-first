@@ -30,21 +30,20 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Fetch current expenses to compute freedom_percentage for each snapshot
-  const now = new Date()
-  const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split('T')[0]
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
-
-  const { data: expenses } = await supabase
-    .from('transactions')
-    .select('amount')
+  // Fetch essential budgets to compute freedom_percentage for each snapshot
+  const { data: essentialBudgets } = await supabase
+    .from('budgets')
+    .select('default_limit, interval')
     .eq('user_id', user.id)
-    .lt('amount', 0)
-    .gte('date', twelveMonthsAgo)
-    .lt('date', monthEnd)
+    .eq('is_essential', true)
+    .in('budget_type', ['expense'])
+    .is('parent_id', null)
 
-  const yearlyExpenses = Math.abs((expenses ?? []).reduce((s, t) => s + Number(t.amount), 0))
-  const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / SWR : 0
+  const yearlyMustExpenses = (essentialBudgets ?? []).reduce((s, b) => {
+    const limit = Number(b.default_limit) || 0
+    return s + (b.interval === 'yearly' ? limit : limit * 12)
+  }, 0)
+  const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / SWR : 0
 
   // Enrich snapshots with computed freedom_percentage
   const enriched = (snapshots ?? []).map(s => {
@@ -61,7 +60,7 @@ export async function GET() {
       net_worth_matches: Math.abs(netWorth - computedNetWorth) < 0.01,
       freedom_percentage: Math.round(freedom_percentage * 10) / 10,
       fire_target: fireTarget,
-      yearly_expenses: yearlyExpenses,
+      yearly_must_expenses: yearlyMustExpenses,
     }
   })
 
@@ -69,7 +68,7 @@ export async function GET() {
     snapshots: enriched,
     count: enriched.length,
     fire_target: fireTarget,
-    yearly_expenses: yearlyExpenses,
+    yearly_must_expenses: yearlyMustExpenses,
   })
 }
 
@@ -159,7 +158,7 @@ export async function POST() {
     return s + (b.interval === 'yearly' ? limit : limit * 12)
   }, 0)
 
-  const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / SWR : 0
+  const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / SWR : 0
   const freedomPercentage = fireTarget > 0
     ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0)
     : 0
@@ -262,7 +261,7 @@ export async function POST() {
       savings_rate: Math.round(fireProjection.savingsRate * 10) / 10,
       resilience_score: resilience.total,
       fire_target: fireTarget,
-      yearly_expenses: yearlyExpenses,
+      yearly_must_expenses: yearlyMustExpenses,
       net_worth_verified: netWorth === totalAssets - totalDebts,
     },
     calculation: {
