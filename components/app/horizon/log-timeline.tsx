@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import type { LifeEvent, LifeEventImpact } from '@/lib/horizon-data'
 import type { Action } from '@/lib/recommendation-data'
 import {
@@ -43,6 +44,11 @@ export function LogTimeline({
   actions: Action[]
   dateOfBirth: string | null
 }) {
+  const [animated, setAnimated] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setAnimated(true), 80)
+    return () => clearTimeout(t)
+  }, [])
   const W = 800
   const H = 160
   const PAD_L = 20
@@ -91,7 +97,7 @@ export function LogTimeline({
   const Y_EVENT = 30
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 200 }}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 200, animation: animated ? 'fadeInFill 500ms ease-out both' : 'none', opacity: animated ? undefined : 0 }}>
       {/* Main timeline line */}
       <line x1={PAD_L} y1={Y_LINE} x2={W - PAD_R} y2={Y_LINE} stroke="#e4e4e7" strokeWidth="2" />
 

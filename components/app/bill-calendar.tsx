@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { type RecurringTransaction } from '@/lib/recurring-data'
 
 export type { CalendarTransaction }
@@ -111,6 +112,7 @@ export function BillCalendar({
   currentBalance,
   onDayClick,
 }: BillCalendarProps) {
+  const { ref, hasEntered } = useInViewAnimation({ duration: 500 })
   const year = monthDate.getFullYear()
   const month = monthDate.getMonth()
 
@@ -265,7 +267,7 @@ export function BillCalendar({
   }, [dailyBalances, currentBalance, today, year, month])
 
   return (
-    <div className="flex flex-col gap-3">
+    <div ref={ref} className="flex flex-col gap-3">
       <div className="grid grid-cols-7 border-b border-[var(--border-ed)] pb-1">
         {DAY_HEADERS.map((h) => (
           <div
@@ -425,6 +427,9 @@ export function BillCalendar({
               strokeWidth={1.5}
               strokeLinecap="round"
               strokeLinejoin="round"
+              pathLength={1}
+              strokeDasharray={1}
+              style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: hasEntered ? 'drawPath 500ms cubic-bezier(.22,1,.36,1) both' : 'none' }}
             />
 
             {sparklineSvg.todayX >= 0 && (

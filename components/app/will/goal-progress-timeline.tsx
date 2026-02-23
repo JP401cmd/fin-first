@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { type Goal, computeGoalProgress, getGoalColorClasses } from '@/lib/goal-data'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { TrendingUp, TrendingDown, Minus, Flag, AlertTriangle, Clock } from 'lucide-react'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 type HistoryPoint = {
   date: string       // ISO date string
@@ -27,6 +28,7 @@ type GoalProgressTimelineProps = {
  * - Handles goals without deadlines gracefully
  */
 export function GoalProgressTimeline({ goal, history }: GoalProgressTimelineProps) {
+  const { ref, hasEntered } = useInViewAnimation({ duration: 700 })
   const colors = getGoalColorClasses(goal.color)
   const { pct, onTrack } = computeGoalProgress(goal)
   const isFreedm = goal.goal_type === 'freedom_days'
@@ -145,8 +147,12 @@ export function GoalProgressTimeline({ goal, history }: GoalProgressTimelineProp
 
   const fillOpacity = 0.08
 
+  const lineAnim = hasEntered ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) both' : 'none'
+  const fillAnim = hasEntered ? 'fadeInFill 250ms ease-out 455ms both' : 'none'
+  const projAnim = hasEntered ? 'drawPath 500ms cubic-bezier(.22,1,.36,1) 595ms both' : 'none'
+
   return (
-    <div data-testid="goal-timeline">
+    <div ref={ref} data-testid="goal-timeline">
       <p className="mb-2 text-xs font-semibold text-[var(--ink-3)] uppercase">
         Voortgang over tijd
       </p>
@@ -242,14 +248,26 @@ export function GoalProgressTimeline({ goal, history }: GoalProgressTimelineProp
               strokeWidth="1.5"
               strokeDasharray="4 3"
               opacity={0.4}
+              pathLength={1}
+              style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: projAnim }}
             />
           )}
 
           {/* Area fill */}
-          <path d={areaPath} fill={lineColor} fillOpacity={fillOpacity} />
+          <path d={areaPath} fill={lineColor} fillOpacity={fillOpacity} style={{ animation: fillAnim }} />
 
           {/* Main line */}
-          <path d={linePath} fill="none" stroke={lineColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d={linePath}
+            fill="none"
+            stroke={lineColor}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            pathLength={1}
+            strokeDasharray={1}
+            style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: lineAnim }}
+          />
 
           {/* Data points */}
           {sorted.map((p, i) => (

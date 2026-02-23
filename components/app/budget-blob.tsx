@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+
 import {
   computeBlobLayout,
   getGroupColors,
@@ -18,6 +20,7 @@ interface BudgetBlobProps {
 }
 
 export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
+  const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 600 })
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(900)
   const [hoveredCell, setHoveredCell] = useState<CellLayout | null>(null)
@@ -95,7 +98,8 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
   const dp = 'blob-'
 
   return (
-    <div className="mt-8" ref={containerRef} onMouseMove={handleMouseMove}>
+    <div className="mt-8" ref={inViewRef}>
+    <div ref={containerRef} onMouseMove={handleMouseMove}>
       {/* Filter bar */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {groups.map((g, i) => {
@@ -140,6 +144,7 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
           viewBox={`0 0 ${vbWidth} ${vbHeight}`}
           className="h-auto w-full"
           preserveAspectRatio="xMidYMid meet"
+          style={{ animation: hasEntered ? 'fadeInFill 500ms ease-out both' : 'none', opacity: hasEntered ? undefined : 0 }}
         >
           <defs>
             {/* Lobe radial gradients — watercolor wash effect */}
@@ -437,6 +442,7 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
           />
         )}
       </div>
+    </div>
     </div>
   )
 }

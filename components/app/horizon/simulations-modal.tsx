@@ -257,6 +257,11 @@ function ConeChart({
   hoveredYear: number | null
   onHover: (year: number | null) => void
 }) {
+  const [animated, setAnimated] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setAnimated(true), 100)
+    return () => clearTimeout(t)
+  }, [])
   const W = 600
   const H = 260
   const PAD = 50
@@ -317,9 +322,11 @@ function ConeChart({
         </>
       )}
 
-      <path d={bandPath} fill="#8B5CB8" opacity="0.08" />
-      <path d={innerBandPath} fill="#8B5CB8" opacity="0.12" />
-      <path d={linePath(percentiles.p50)} fill="none" stroke="#8B5CB8" strokeWidth="2.5" />
+      <path d={bandPath} fill="#8B5CB8" opacity="0.08" style={{ animation: animated ? 'fadeInFill 250ms ease-out 455ms both' : 'none' }} />
+      <path d={innerBandPath} fill="#8B5CB8" opacity="0.12" style={{ animation: animated ? 'fadeInFill 250ms ease-out 455ms both' : 'none' }} />
+      <path d={linePath(percentiles.p50)} fill="none" stroke="#8B5CB8" strokeWidth="2.5"
+        pathLength={1} strokeDasharray={1}
+        style={{ strokeDashoffset: animated ? undefined : 1, animation: animated ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) both' : 'none' }} />
 
       {Array.from({ length: years + 1 }, (_, yr) => (
         <rect
@@ -358,6 +365,12 @@ function ConeChart({
 }
 
 function HistogramChart({ buckets, max }: { buckets: { label: string; count: number }[]; max: number }) {
+  const [animated, setAnimated] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setAnimated(true), 100)
+    return () => clearTimeout(t)
+  }, [])
+
   const W = 600
   const H = 160
   const PAD = 40
@@ -369,10 +382,20 @@ function HistogramChart({ buckets, max }: { buckets: { label: string; count: num
         const bx = PAD + (i / buckets.length) * (W - PAD * 2) + 2
         const barH = (b.count / max) * (H - PAD * 2)
         const by = H - PAD - barH
+        const staggerDelay = i * 20
 
         return (
           <g key={i}>
-            <rect x={bx} y={by} width={barW} height={barH} rx={3} fill="#8B5CB8" opacity="0.7" />
+            <rect
+              x={bx}
+              y={animated ? by : H - PAD}
+              width={barW}
+              height={animated ? barH : 0}
+              rx={3}
+              fill="#8B5CB8"
+              opacity="0.7"
+              style={{ transition: animated ? `y 400ms cubic-bezier(.22,1,.36,1) ${staggerDelay}ms, height 400ms cubic-bezier(.22,1,.36,1) ${staggerDelay}ms` : 'none' }}
+            />
             <text x={bx + barW / 2} y={H - 10} textAnchor="middle" className="fill-zinc-400" style={{ fontSize: 8 }}>
               {b.label}
             </text>

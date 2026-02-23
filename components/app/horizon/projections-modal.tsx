@@ -207,6 +207,11 @@ function ThreeLineChart({
 }: {
   input: HorizonInput; returnRate: number; extraMonthly: number; workDays: number; fireTarget: number; swr: number
 }) {
+  const [animated, setAnimated] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setAnimated(true), 100)
+    return () => clearTimeout(t)
+  }, [])
   const incomeMultiplier = workDays / 5
   const adjusted: HorizonInput = {
     ...input,
@@ -277,12 +282,16 @@ function ThreeLineChart({
       )}
 
       {/* Cone fill */}
-      <path d={areaPath} fill="#8B5CB8" opacity="0.08" />
+      <path d={areaPath} fill="#8B5CB8" opacity="0.08" style={{ animation: animated ? 'fadeInFill 250ms ease-out 455ms both' : 'none' }} />
 
       {/* Lines */}
-      <path d={linePath(pesS)} fill="none" stroke="#d4a843" strokeWidth="1.5" strokeDasharray="4" />
-      <path d={linePath(expS)} fill="none" stroke="#8B5CB8" strokeWidth="2.5" />
-      <path d={linePath(optS)} fill="none" stroke="#10b981" strokeWidth="1.5" strokeDasharray="4" />
+      <path d={linePath(pesS)} fill="none" stroke="#d4a843" strokeWidth="1.5" strokeDasharray="4"
+        style={{ animation: animated ? 'fadeInFill 400ms ease-out 200ms both' : 'none', opacity: animated ? undefined : 0 }} />
+      <path d={linePath(expS)} fill="none" stroke="#8B5CB8" strokeWidth="2.5"
+        pathLength={1} strokeDasharray={1}
+        style={{ strokeDashoffset: animated ? undefined : 1, animation: animated ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) both' : 'none' }} />
+      <path d={linePath(optS)} fill="none" stroke="#10b981" strokeWidth="1.5" strokeDasharray="4"
+        style={{ animation: animated ? 'fadeInFill 400ms ease-out 200ms both' : 'none', opacity: animated ? undefined : 0 }} />
 
       {/* X-axis */}
       {expS.filter((_, i) => i % Math.max(1, Math.floor(expS.length / 8)) === 0 || i === expS.length - 1).map((d) => {

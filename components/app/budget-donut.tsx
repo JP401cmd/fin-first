@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { type BudgetWithChildren } from '@/lib/budget-data'
 import { BudgetIcon, formatCurrency, type BudgetType } from '@/components/app/budget-shared'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 interface BudgetDonutProps {
   groups: BudgetWithChildren[]
@@ -119,6 +120,7 @@ export function buildSegments(
 /* ── Component ──────────────────────────────────────────────────── */
 
 export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) {
+  const { ref, hasEntered, animationComplete } = useInViewAnimation({ duration: 900 })
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const [hoveredChildIdx, setHoveredChildIdx] = useState<number | null>(null)
@@ -250,7 +252,7 @@ export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) 
   }
 
   return (
-    <div className="mt-8">
+    <div className="mt-8" ref={ref}>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
         {/* Donut */}
         <div className="flex items-center justify-center">
@@ -280,6 +282,9 @@ export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) 
             {/* ── Single ring: budget (light) + spent overlay (dark) ── */}
             {arcs.map((arc, i) => {
               const dimmed = active !== null && active !== i
+              const staggerDelay = i * 60
+              const arcAnim = hasEntered ? `drawPath 700ms cubic-bezier(.22,1,.36,1) ${staggerDelay}ms both` : 'none'
+              const spentAnim = hasEntered ? `drawPath 500ms cubic-bezier(.22,1,.36,1) ${staggerDelay + 200}ms both` : 'none'
               return (
                 <g key={`ring-${i}`}>
                   {/* Budget arc (full segment, gradient) */}
@@ -289,14 +294,17 @@ export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) 
                     stroke={`url(#donut-budget-${i})`}
                     strokeWidth={ringWidth}
                     strokeLinecap="round"
+                    pathLength={1}
+                    strokeDasharray={1}
                     opacity={dimmed ? 0.2 : 1}
                     className="cursor-pointer transition-opacity duration-200"
-                    onMouseEnter={() => setHoveredIdx(i)}
-                    onMouseLeave={() => setHoveredIdx(null)}
-                    onClick={() => {
+                    style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: arcAnim }}
+                    onMouseEnter={animationComplete ? () => setHoveredIdx(i) : undefined}
+                    onMouseLeave={animationComplete ? () => setHoveredIdx(null) : undefined}
+                    onClick={animationComplete ? () => {
                       setSelectedIdx(selectedIdx === i ? null : i)
                       setHoveredChildIdx(null)
-                    }}
+                    } : undefined}
                   />
                   {/* Spent arc (overlaid on same ring, gradient) */}
                   {arc.spentEnd > arc.start && (
@@ -306,14 +314,17 @@ export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) 
                       stroke={`url(#donut-spent-${i})`}
                       strokeWidth={ringWidth}
                       strokeLinecap="round"
+                      pathLength={1}
+                      strokeDasharray={1}
                       opacity={dimmed ? 0.2 : 1}
                       className="cursor-pointer transition-opacity duration-200"
-                      onMouseEnter={() => setHoveredIdx(i)}
-                      onMouseLeave={() => setHoveredIdx(null)}
-                      onClick={() => {
+                      style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: spentAnim }}
+                      onMouseEnter={animationComplete ? () => setHoveredIdx(i) : undefined}
+                      onMouseLeave={animationComplete ? () => setHoveredIdx(null) : undefined}
+                      onClick={animationComplete ? () => {
                         setSelectedIdx(selectedIdx === i ? null : i)
                         setHoveredChildIdx(null)
-                      }}
+                      } : undefined}
                     />
                   )}
                   {/* Overspend glow */}

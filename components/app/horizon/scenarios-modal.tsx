@@ -295,6 +295,12 @@ function ResilienceBar({ label, value, max }: { label: string; value: number; ma
 }
 
 function DivergingPathsChart({ scenarios, fireTarget }: { scenarios: ScenarioPath[]; fireTarget: number }) {
+  const [animated, setAnimated] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setAnimated(true), 100)
+    return () => clearTimeout(t)
+  }, [])
+
   if (scenarios.length === 0) return null
 
   const W = 600
@@ -347,8 +353,11 @@ function DivergingPathsChart({ scenarios, fireTarget }: { scenarios: ScenarioPat
         </>
       )}
 
-      {sampled.map(s => (
-        <path key={s.name} d={linePath(s.months)} fill="none" stroke={colors[s.name] ?? '#71717a'} strokeWidth={s.name === 'current' ? '2.5' : '2'} />
+      {sampled.map((s, si) => (
+        <path key={s.name} d={linePath(s.months)} fill="none" stroke={colors[s.name] ?? '#71717a'} strokeWidth={s.name === 'current' ? '2.5' : '2'}
+          pathLength={1} strokeDasharray={1}
+          style={{ strokeDashoffset: animated ? undefined : 1, animation: animated ? `drawPath 700ms cubic-bezier(.22,1,.36,1) ${si * 100}ms both` : 'none' }}
+        />
       ))}
 
       {sampled[0]?.months.filter((_, i) => i % Math.max(1, Math.floor(sampled[0].months.length / 6)) === 0 || i === sampled[0].months.length - 1).map((d) => {
@@ -607,6 +616,12 @@ function PayoffComparisonChart({
 }: {
   snowball: StrategyMonth[]; avalanche: StrategyMonth[]; current: StrategyMonth[]
 }) {
+  const [animated, setAnimated] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setAnimated(true), 100)
+    return () => clearTimeout(t)
+  }, [])
+
   const maxMonths = Math.max(snowball.length, avalanche.length, current.length, 1)
   if (maxMonths <= 1) return null
 
@@ -658,13 +673,18 @@ function PayoffComparisonChart({
 
       {/* Lines */}
       {curS.length > 1 && (
-        <path d={linePath(curS)} fill="none" stroke="#a1a1aa" strokeWidth="1.5" strokeDasharray="4" />
+        <path d={linePath(curS)} fill="none" stroke="#a1a1aa" strokeWidth="1.5" strokeDasharray="4"
+          style={{ animation: animated ? 'fadeInFill 400ms ease-out 200ms both' : 'none', opacity: animated ? undefined : 0 }} />
       )}
       {snowS.length > 1 && (
-        <path d={linePath(snowS)} fill="none" stroke="#3b82f6" strokeWidth="2" />
+        <path d={linePath(snowS)} fill="none" stroke="#3b82f6" strokeWidth="2"
+          pathLength={1} strokeDasharray={1}
+          style={{ strokeDashoffset: animated ? undefined : 1, animation: animated ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) both' : 'none' }} />
       )}
       {avaS.length > 1 && (
-        <path d={linePath(avaS)} fill="none" stroke="#10b981" strokeWidth="2" />
+        <path d={linePath(avaS)} fill="none" stroke="#10b981" strokeWidth="2"
+          pathLength={1} strokeDasharray={1}
+          style={{ strokeDashoffset: animated ? undefined : 1, animation: animated ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) 100ms both' : 'none' }} />
       )}
 
       {/* X-axis labels */}

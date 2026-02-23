@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { Target, ArrowRightLeft, BarChart3, Globe, Briefcase, Edit3, X, Check, Info } from 'lucide-react'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { formatCurrency } from '@/components/app/budget-shared'
 import {
   type AllocationViewMode,
@@ -37,10 +38,12 @@ function AllocationDonut({
   slices,
   total,
   size = 160,
+  hasEntered = true,
 }: {
   slices: AllocationSlice[]
   total: number
   size?: number
+  hasEntered?: boolean
 }) {
   const cx = size / 2
   const cy = size / 2
@@ -62,11 +65,12 @@ function AllocationDonut({
       {slices.length === 0 && (
         <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e4e4e7" strokeWidth={strokeWidth} />
       )}
-      {slices.map((seg) => {
+      {slices.map((seg, segIdx) => {
         const dash = (seg.pct / 100) * circumference
         const gap = circumference - dash
         const currentOffset = offset
         offset += dash
+        const animDelay = segIdx * 60
         return (
           <circle
             key={seg.key}
@@ -76,9 +80,14 @@ function AllocationDonut({
             fill="none"
             stroke={seg.color}
             strokeWidth={strokeWidth}
-            strokeDasharray={`${dash} ${gap}`}
+            strokeDasharray={hasEntered ? `${dash} ${gap}` : `0 ${circumference}`}
             strokeDashoffset={-currentOffset}
             transform={`rotate(-90 ${cx} ${cy})`}
+            style={{
+              transition: hasEntered
+                ? `stroke-dasharray 500ms cubic-bezier(.22,1,.36,1) ${animDelay}ms`
+                : 'none',
+            }}
           />
         )
       })}
@@ -102,11 +111,13 @@ function ComparisonBar({
   currentPct,
   targetPct,
   color,
+  hasEntered = true,
 }: {
   label: string
   currentPct: number
   targetPct: number
   color: string
+  hasEntered?: boolean
 }) {
   const drift = currentPct - targetPct
   const isOver = drift > 2
@@ -127,8 +138,13 @@ function ComparisonBar({
       <div className="relative h-3 w-full rounded-full bg-zinc-100 overflow-hidden">
         {/* Current allocation bar */}
         <div
-          className="absolute inset-y-0 left-0 rounded-full transition-all duration-300"
-          style={{ width: `${Math.min(currentPct, 100)}%`, backgroundColor: color, opacity: 0.7 }}
+          className="absolute inset-y-0 left-0 rounded-full"
+          style={{
+            width: hasEntered ? `${Math.min(currentPct, 100)}%` : '0%',
+            backgroundColor: color,
+            opacity: 0.7,
+            transition: hasEntered ? 'width 600ms cubic-bezier(.22,1,.36,1)' : 'none',
+          }}
         />
         {/* Target marker */}
         <div
@@ -264,6 +280,7 @@ export default function PortfolioAllocationVisualization({
   holdings: HoldingForAllocation[]
   totalValue: number
 }) {
+  const { ref, hasEntered } = useInViewAnimation({ duration: 700 })
   const [viewMode, setViewMode] = useState<AllocationViewMode>('asset_class')
   const [showTargetComparison, setShowTargetComparison] = useState(false)
   const [showTargetEditor, setShowTargetEditor] = useState(false)
@@ -307,7 +324,7 @@ export default function PortfolioAllocationVisualization({
   }
 
   return (
-    <div data-testid="portfolio-allocation-visualization">
+    <div ref={ref} data-testid="portfolio-allocation-visualization">
       {/* View mode tabs */}
       <div className="flex items-center gap-1 mb-4" data-testid="allocation-view-tabs">
         {(Object.keys(VIEW_MODE_LABELS) as AllocationViewMode[]).map((mode) => {
@@ -357,7 +374,7 @@ export default function PortfolioAllocationVisualization({
 
       {/* Chart + Legend */}
       <div className="flex items-start gap-6">
-        <AllocationDonut slices={slices} total={totalValue} />
+        <AllocationDonut slices={slices} total={totalValue} hasEntered={hasEntered} />
         <div className="flex-1 space-y-1.5 max-h-52 overflow-y-auto">
           {slices.map((slice) => (
             <div key={slice.key} className="flex items-center gap-2" data-testid={`slice-${slice.key}`}>
@@ -420,6 +437,7 @@ export default function PortfolioAllocationVisualization({
                     currentPct={slice?.pct ?? 0}
                     targetPct={t.target_pct}
                     color={slice?.color ?? '#a1a1aa'}
+                    hasEntered={hasEntered}
                   />
                 )
               })}

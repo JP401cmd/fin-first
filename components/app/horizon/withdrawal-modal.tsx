@@ -394,6 +394,12 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
 }
 
 function DrawdownChart({ schedule }: { schedule: WithdrawalYear[] }) {
+  const [animated, setAnimated] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setAnimated(true), 100)
+    return () => clearTimeout(t)
+  }, [])
+
   if (schedule.length === 0) return null
 
   const W = 600
@@ -441,9 +447,11 @@ function DrawdownChart({ schedule }: { schedule: WithdrawalYear[] }) {
           <stop offset="100%" stopColor="#8B5CB8" stopOpacity="0" />
         </linearGradient>
       </defs>
-      <path d={areaPath} fill="url(#drawdownGradModal)" />
+      <path d={areaPath} fill="url(#drawdownGradModal)" style={{ animation: animated ? 'fadeInFill 250ms ease-out 455ms both' : 'none' }} />
 
-      <path d={linePath} fill="none" stroke="#8B5CB8" strokeWidth="2" />
+      <path d={linePath} fill="none" stroke="#8B5CB8" strokeWidth="2"
+        pathLength={1} strokeDasharray={1}
+        style={{ strokeDashoffset: animated ? undefined : 1, animation: animated ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) both' : 'none' }} />
 
       {schedule.some(s => s.endBalance <= 0) && (() => {
         const depIdx = schedule.findIndex(s => s.endBalance <= 0)

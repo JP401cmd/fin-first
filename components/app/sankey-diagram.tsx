@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { formatCurrency } from '@/components/app/budget-shared'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 export interface SankeyNode {
   id: string
@@ -489,6 +490,7 @@ function EuroCoin({
 }
 
 export function SankeyDiagram({ nodes, links, height: fixedHeight, aspectRatio = 2.5, onNodeClick, showAnimatedCoins = true }: SankeyDiagramProps) {
+  const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 600 })
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(800)
   const [hoveredNode, setHoveredNode] = useState<string | null>(null)
@@ -583,12 +585,14 @@ export function SankeyDiagram({ nodes, links, height: fixedHeight, aspectRatio =
   if (nodes.length === 0) return null
 
   return (
+    <div ref={inViewRef}>
     <div ref={containerRef} className="w-full">
       <svg
         width={containerWidth}
         height={height}
         viewBox={`0 0 ${containerWidth} ${height}`}
         className="block"
+        style={{ animation: hasEntered ? 'fadeInFill 500ms ease-out both' : 'none', opacity: hasEntered ? undefined : 0 }}
       >
         <defs>
           {/* Link gradients */}
@@ -688,6 +692,7 @@ export function SankeyDiagram({ nodes, links, height: fixedHeight, aspectRatio =
           </p>
         </div>
       )}
+    </div>
     </div>
   )
 }
