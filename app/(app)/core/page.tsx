@@ -57,8 +57,7 @@ export default function CorePage() {
   const [savingsRateMonths, setSavingsRateMonths] = useState(12)
   const [budgetCount, setBudgetCount] = useState(0)
   const [hasTransactions, setHasTransactions] = useState(false)
-  const [earnedBadges, setEarnedBadges] = useState<{ slug: string; earned_at: string }[]>([])
-  const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalCurrent: number; progressPct: number } | null>(null)
+const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalCurrent: number; progressPct: number } | null>(null)
   const [assetGrowthDirection, setAssetGrowthDirection] = useState<'up' | 'down' | 'flat'>('flat')
   const [overBudgetCount, setOverBudgetCount] = useState(0)
   const [budgetSparklines, setBudgetSparklines] = useState<{ id: string; name: string; icon: string; budgetType: string; data: SparklineDataPoint[] }[]>([])
@@ -92,6 +91,10 @@ export default function CorePage() {
   const [expandedOverviewGroupId, setExpandedOverviewGroupId] = useState<string | null>(null)
   // Savings rate kassabon data
   const [savingsReceiptData, setSavingsReceiptData] = useState<{extYearlyIncome: number; extYearlyExpenses: number; yearlySavings: number; last12Income: number; last12Expenses: number}>({extYearlyIncome: 0, extYearlyExpenses: 0, yearlySavings: 0, last12Income: 0, last12Expenses: 0})
+  // Net worth kassabon state
+  const [showNetWorthReceipt, setShowNetWorthReceipt] = useState(false)
+  const [assetsList, setAssetsList] = useState<Array<{name: string; current_value: number; net_worth_inclusion_pct: number}>>([])
+  const [debtsList, setDebtsList] = useState<Array<{name: string; current_balance: number; net_worth_inclusion_pct: number}>>([])
 
   const loadData = useCallback(async () => {
     try {
@@ -112,11 +115,11 @@ export default function CorePage() {
           .lt('date', monthEnd),
         supabase
           .from('assets')
-          .select('current_value')
+          .select('name, current_value, net_worth_inclusion_pct')
           .eq('is_active', true),
         supabase
           .from('debts')
-          .select('current_balance')
+          .select('name, current_balance, net_worth_inclusion_pct')
           .eq('is_active', true),
         supabase
           .from('transactions')
@@ -278,11 +281,17 @@ export default function CorePage() {
 
       setMustExpenseItems(expenseItems)
 
-      // Total assets
-      const totalAssets = assetsResult.data.reduce((s, a) => s + Number(a.current_value), 0)
+      // Total assets (weighted by net_worth_inclusion_pct)
+      const totalAssets = assetsResult.data.reduce((s, a) =>
+        s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
 
-      // Total debts
-      const totalDebts = debtsResult.data.reduce((s, d) => s + Number(d.current_balance), 0)
+      // Total debts (weighted by net_worth_inclusion_pct)
+      const totalDebts = debtsResult.data.reduce((s, d) =>
+        s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
+
+      // Store assets/debts lists for net worth kassabon
+      setAssetsList(assetsResult.data.map(a => ({ name: a.name, current_value: Number(a.current_value), net_worth_inclusion_pct: a.net_worth_inclusion_pct ?? 100 })))
+      setDebtsList(debtsResult.data.map(d => ({ name: d.name, current_balance: Number(d.current_balance), net_worth_inclusion_pct: d.net_worth_inclusion_pct ?? 100 })))
 
       const coreData = computeCoreData(monthlyIncome, monthlyExpenses, totalAssets, totalDebts, extrapolatedIncome, yearlyMustExpenses)
       setData(coreData)
@@ -435,23 +444,6 @@ export default function CorePage() {
         const snaps = snapshotResult.data as NetWorthSnapshot[]
         setSnapshots(snaps)
 
-      }
-
-      // Fetch earned badges for milestone markers on net worth chart
-      try {
-        const { data: badgesData } = await supabase.from('badges').select('id, slug')
-        const { data: userBadgesData } = await supabase.from('user_badges').select('badge_id, earned_at')
-        if (badgesData && userBadgesData) {
-          const idToSlug = new Map(badgesData.map((b: { id: string; slug: string }) => [b.id, b.slug]))
-          setEarnedBadges(
-            userBadgesData.map((ub: { badge_id: string; earned_at: string }) => ({
-              slug: idToSlug.get(ub.badge_id) ?? '',
-              earned_at: ub.earned_at,
-            })).filter((b: { slug: string }) => b.slug)
-          )
-        }
-      } catch {
-        // Badge fetch is non-critical; chart still works without badges
       }
 
       // Load 12-month budget spending sparklines per parent category
@@ -651,18 +643,26 @@ export default function CorePage() {
           </button>
 
           <div className="grid grid-cols-1 gap-3 sm:gap-5 sm:grid-cols-3">
-            <button
-              type="button"
-              onClick={() => setShowProjectionModal(true)}
-              className="cursor-pointer text-left transition-opacity hover:opacity-80"
-            >
-              <p className="label-editorial text-[var(--ink-3)]">Netto vermogen</p>
-              <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]">{formatCurrency(data.netWorth)}</p>
-              <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]" data-testid="net-worth-freedom-subtitle">
-                dat is {data.freedomYears > 0 ? `${data.freedomYears} jaar en ` : ''}{data.freedomMonths} maanden vrijheid
-              </p>
-              <NetWorthSparkline snapshots={snapshots} projection={nwProjection} />
-            </button>
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowNetWorthReceipt(true)}
+                className="w-full cursor-pointer text-left transition-opacity hover:opacity-80"
+              >
+                <p className="label-editorial text-[var(--ink-3)]">Netto vermogen</p>
+                <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]">{formatCurrency(data.netWorth)}</p>
+                <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]" data-testid="net-worth-freedom-subtitle">
+                  dat is {data.freedomYears > 0 ? `${data.freedomYears} jaar en ` : ''}{data.freedomMonths} maanden vrijheid
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowProjectionModal(true)}
+                className="mt-1 w-full cursor-pointer text-left"
+              >
+                <NetWorthSparkline snapshots={snapshots} projection={nwProjection} />
+              </button>
+            </div>
             <button
               type="button"
               onClick={() => setShowBudgetModal(true)}
@@ -986,7 +986,7 @@ export default function CorePage() {
                   {snapshotLoading ? 'Bezig...' : 'Snapshot nu'}
                 </button>
               </div>
-              <NetWorthChart snapshots={snapshots} fireTarget={data.fireTarget} earnedBadges={earnedBadges} />
+              <NetWorthChart snapshots={snapshots} fireTarget={data.fireTarget} earnedBadges={[]} />
             </section>
           )}
 
@@ -1299,6 +1299,78 @@ export default function CorePage() {
           </div>
 
           <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">Berekend op basis van essentiële budgetinstellingen</p>
+        </div>
+      </BottomSheet>
+
+      {/* === Kassabon Modal: Netto Vermogen === */}
+      <BottomSheet open={showNetWorthReceipt} onClose={() => setShowNetWorthReceipt(false)} title="Netto Vermogen">
+        <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 font-mono text-sm">
+          <div className="mb-3 text-center">
+            <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">NETTO VERMOGEN</p>
+            <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">Bezittingen minus schulden — huidig</p>
+          </div>
+
+          <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
+            Netto vermogen = alle activa minus alle schulden, gewogen naar het percentage dat je instelt per item.
+          </div>
+
+          {/* Bezittingen */}
+          {assetsList.length > 0 && (
+            <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
+              <p className="mb-1 font-sans text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-3)]">Bezittingen</p>
+              {assetsList.map((a) => {
+                const pct = a.net_worth_inclusion_pct ?? 100
+                const effectiveValue = a.current_value * (pct / 100)
+                return (
+                  <div key={a.name} className="flex justify-between py-0.5">
+                    <span className="font-sans text-sm text-[var(--ink-2)]">
+                      {a.name}
+                      {pct < 100 && (
+                        <span className="ml-1 text-[10px] text-[var(--ink-4)]">({pct}%)</span>
+                      )}
+                    </span>
+                    <span className="tabular-nums text-[var(--ink)]">{formatCurrency(effectiveValue)}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Schulden */}
+          {debtsList.length > 0 && (
+            <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
+              <p className="mb-1 font-sans text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-3)]">Schulden</p>
+              {debtsList.map((d) => {
+                const pct = d.net_worth_inclusion_pct ?? 100
+                const effectiveBalance = d.current_balance * (pct / 100)
+                return (
+                  <div key={d.name} className="flex justify-between py-0.5">
+                    <span className="font-sans text-sm text-[var(--ink-2)]">
+                      {d.name}
+                      {pct < 100 && (
+                        <span className="ml-1 text-[10px] text-[var(--ink-4)]">({pct}%)</span>
+                      )}
+                    </span>
+                    <span className="tabular-nums text-red-600">−{formatCurrency(effectiveBalance)}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {data && (
+            <>
+              <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
+                <span className="font-sans text-[var(--ink)]">Netto vermogen</span>
+                <span className={`tabular-nums ${data.netWorth >= 0 ? 'text-[var(--ink)]' : 'text-red-600'}`}>{formatCurrency(data.netWorth)}</span>
+              </div>
+              <div className="mt-3 flex justify-center">
+                <FreedomTimeBadge amount={Math.abs(data.netWorth)} />
+              </div>
+            </>
+          )}
+
+          <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">Berekend op basis van activa en schulden — gewogen naar het ingestelde inclusiepercentage</p>
         </div>
       </BottomSheet>
     </div>

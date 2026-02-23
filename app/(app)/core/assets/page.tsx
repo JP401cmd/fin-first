@@ -440,6 +440,11 @@ export default function AssetsPage() {
                     : ''}
                   {asset.institution ? ` \u2022 ${asset.institution}` : ''}
                 </p>
+                {(asset.net_worth_inclusion_pct ?? 100) < 100 && (
+                  <span className="mt-0.5 inline-block rounded bg-kern-50 border border-kern-200 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-kern-600">
+                    {asset.net_worth_inclusion_pct}% meegeteld
+                  </span>
+                )}
               </div>
               {/* Mini sparkline for asset card */}
               {(() => {
@@ -1709,6 +1714,7 @@ function AssetForm({
   const [monthlyContribution, setMonthlyContribution] = useState(String(asset?.monthly_contribution ?? '0'))
   const [institution, setInstitution] = useState(asset?.institution ?? '')
   const [notes, setNotes] = useState(asset?.notes ?? '')
+  const [netWorthInclusionPct, setNetWorthInclusionPct] = useState(asset?.net_worth_inclusion_pct ?? 100)
   const [saving, setSaving] = useState(false)
   // Type-specific state
   const [subtype, setSubtype] = useState(asset?.subtype ?? '')
@@ -1849,6 +1855,8 @@ function AssetForm({
       // Household fields
       ownership: ownership,
       household_id: ownership === 'shared' ? householdId : null,
+      // Net worth inclusion
+      net_worth_inclusion_pct: netWorthInclusionPct,
     }
 
     if (isEdit && asset) {
@@ -2195,6 +2203,35 @@ function AssetForm({
               </div>
             </div>
           )}
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+              Opnemen in netto vermogen
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="range" min={0} max={100} step={5}
+                value={netWorthInclusionPct}
+                onChange={(e) => setNetWorthInclusionPct(Number(e.target.value))}
+                className="flex-1 accent-kern-600"
+              />
+              <input
+                type="number" min={0} max={100}
+                value={netWorthInclusionPct}
+                onChange={(e) => setNetWorthInclusionPct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                className="w-16 rounded-[var(--r)] border border-[var(--border-ed)] px-2 py-1.5 text-sm text-center tabular-nums"
+              />
+              <span className="text-sm text-[var(--ink-3)]">%</span>
+            </div>
+            <p className="mt-1 text-[10px] text-[var(--ink-3)]">
+              Stel in welk percentage van deze asset in het netto vermogen wordt meegeteld.
+            </p>
+            {netWorthInclusionPct < 100 && Number(currentValue) > 0 && (
+              <p className="mt-1 font-mono text-[11px] tabular-nums text-kern-600">
+                Effectieve waarde: {formatCurrency(Number(currentValue) * netWorthInclusionPct / 100)}
+              </p>
+            )}
+          </div>
 
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Notities (optioneel)</label>

@@ -17,10 +17,6 @@ export interface YearInReviewData {
   netWorthGrowthPct: number | null
   netWorthByMonth: { month: string; value: number }[]
 
-  // Section 3: Badges earned
-  badgesEarned: { slug: string; name: string; icon: string; color: string; earned_at: string }[]
-  totalBadgesEarned: number
-
   // Section 4: Best and worst months
   bestMonth: { month: string; label: string; savings: number } | null
   worstMonth: { month: string; label: string; savings: number } | null
@@ -85,8 +81,6 @@ export async function GET(request: Request) {
     const [
       snapshotsResult,
       actionsResult,
-      badgesResult,
-      badgeSettingsResult,
       transactionsResult,
       profileResult,
       assetsResult,
@@ -109,21 +103,6 @@ export async function GET(request: Request) {
         .eq('status', 'completed')
         .gte('completed_at', yearStart)
         .lt('completed_at', yearEnd),
-
-      // Badges earned in the year (from user_badges table)
-      supabase
-        .from('user_badges')
-        .select('badge_id, earned_at, badges(slug, name, icon, color)')
-        .gte('earned_at', yearStart)
-        .lt('earned_at', yearEnd)
-        .order('earned_at', { ascending: true }),
-
-      // Fallback: badges from app_settings
-      supabase
-        .from('app_settings')
-        .select('value')
-        .eq('key', `earned_badges_${user.id}`)
-        .single(),
 
       // All transactions in the year
       supabase
@@ -168,8 +147,6 @@ export async function GET(request: Request) {
     // Safe data extraction
     const snapshots = snapshotsResult.status === 'fulfilled' ? (snapshotsResult.value.data ?? []) : []
     const actions = actionsResult.status === 'fulfilled' ? (actionsResult.value.data ?? []) : []
-    const userBadges = badgesResult.status === 'fulfilled' ? (badgesResult.value.data ?? []) : []
-    const badgeSettings = badgeSettingsResult.status === 'fulfilled' ? badgeSettingsResult.value.data : null
     const transactions = transactionsResult.status === 'fulfilled' ? (transactionsResult.value.data ?? []) : []
     const profile = profileResult.status === 'fulfilled' ? profileResult.value.data : null
     const assets = assetsResult.status === 'fulfilled' ? (assetsResult.value.data ?? []) : []
@@ -223,51 +200,6 @@ export async function GET(request: Request) {
       month: s.snapshot_date,
       value: Number(s.net_worth),
     }))
-
-    // ── Section 3: Badges earned ──
-    type BadgeJoin = {
-      badge_id: string
-      earned_at: string
-      badges: { slug: string; name: string; icon: string; color: string } | null
-    }
-
-    let badgesEarned: { slug: string; name: string; icon: string; color: string; earned_at: string }[] = []
-
-    if (userBadges.length > 0) {
-      badgesEarned = (userBadges as unknown as BadgeJoin[])
-        .filter(b => b.badges)
-        .map(b => ({
-          slug: b.badges!.slug,
-          name: b.badges!.name,
-          icon: b.badges!.icon,
-          color: b.badges!.color,
-          earned_at: b.earned_at,
-        }))
-    } else if (badgeSettings?.value) {
-      // Fallback: app_settings
-      try {
-        const settingsBadges = typeof badgeSettings.value === 'string'
-          ? JSON.parse(badgeSettings.value)
-          : badgeSettings.value
-
-        if (Array.isArray(settingsBadges)) {
-          badgesEarned = settingsBadges
-            .filter((b: { earned_at?: string }) => {
-              if (!b.earned_at) return false
-              return b.earned_at >= yearStart && b.earned_at < yearEnd
-            })
-            .map((b: { slug: string; name?: string; icon?: string; color?: string; earned_at: string }) => ({
-              slug: b.slug,
-              name: b.name || b.slug,
-              icon: b.icon || 'Award',
-              color: b.color || 'amber',
-              earned_at: b.earned_at,
-            }))
-        }
-      } catch {
-        // Parse error, skip
-      }
-    }
 
     // ── Section 4: Best and worst months ──
     type TxRow = { amount: number; date: string; is_income?: boolean }
@@ -365,10 +297,6 @@ export async function GET(request: Request) {
       netWorthGrowth: netWorthGrowth != null ? Math.round(netWorthGrowth) : null,
       netWorthGrowthPct: netWorthGrowthPct != null ? Math.round(netWorthGrowthPct * 10) / 10 : null,
       netWorthByMonth,
-
-      // Badges
-      badgesEarned,
-      totalBadgesEarned: badgesEarned.length,
 
       // Monthly overview
       bestMonth,

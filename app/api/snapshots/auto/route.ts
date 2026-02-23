@@ -52,12 +52,12 @@ export async function GET() {
   const [assetsResult, debtsResult, expensesResult, incomeResult, profileResult, budgetsResult] = await Promise.all([
     supabase
       .from('assets')
-      .select('current_value, monthly_contribution')
+      .select('current_value, monthly_contribution, net_worth_inclusion_pct')
       .eq('user_id', user.id)
       .eq('is_active', true),
     supabase
       .from('debts')
-      .select('current_balance, debt_type')
+      .select('current_balance, debt_type, net_worth_inclusion_pct')
       .eq('user_id', user.id)
       .eq('is_active', true),
     supabase
@@ -99,8 +99,8 @@ export async function GET() {
   const expenses = expensesResult.data ?? []
   const income = incomeResult.data ?? []
 
-  const totalAssets = assets.reduce((s, a) => s + Number(a.current_value), 0)
-  const totalDebts = debts.reduce((s, d) => s + Number(d.current_balance), 0)
+  const totalAssets = assets.reduce((s, a) => s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
+  const totalDebts = debts.reduce((s, d) => s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
   const netWorth = totalAssets - totalDebts
 
   const yearlyExpenses = Math.abs(expenses.reduce((s, t) => s + Number(t.amount), 0))

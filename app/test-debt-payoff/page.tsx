@@ -52,6 +52,7 @@ export default function TestDebtPayoffPage() {
     draagkrachtmeting_date: null,
     ownership: 'personal',
     household_id: null,
+    net_worth_inclusion_pct: 100,
   }), [balance, interestRate, monthlyPayment])
 
   const projection = useMemo(() => debtProjection(debt), [debt])

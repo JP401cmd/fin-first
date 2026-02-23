@@ -172,17 +172,6 @@ export async function POST(req: Request) {
       transactions_dup: duplicateCount,
     })
 
-    // Fire-and-forget badge evaluation
-    try {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-      fetch(`${appUrl}/api/badges/evaluate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      }).catch(() => {})
-    } catch {
-      // Ignore badge evaluation errors
-    }
-
     return NextResponse.json({
       new: insertedCount,
       duplicates: duplicateCount,

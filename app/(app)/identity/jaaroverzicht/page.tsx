@@ -5,7 +5,6 @@ import {
   Calendar,
   TrendingUp,
   TrendingDown,
-  Award,
   Target,
   Flame,
   ArrowUp,
@@ -37,14 +36,6 @@ interface MonthlyOverview {
   savings: number
 }
 
-interface BadgeData {
-  slug: string
-  name: string
-  icon: string
-  color: string
-  earned_at: string
-}
-
 interface FirePoint {
   percentage: number
   netWorth: number
@@ -64,9 +55,6 @@ interface YearInReviewData {
   netWorthGrowth: number | null
   netWorthGrowthPct: number | null
   netWorthByMonth: { month: string; value: number }[]
-
-  badgesEarned: BadgeData[]
-  totalBadgesEarned: number
 
   bestMonth: MonthlyOverview | null
   worstMonth: MonthlyOverview | null
@@ -99,21 +87,6 @@ function formatPct(value: number): string {
   return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`
 }
 
-// ── Badge Icon Mapping ──
-const BADGE_ICON_MAP: Record<string, string> = {
-  Star: '⭐', Award: '🏆', Trophy: '🏆', Shield: '🛡️', Target: '🎯',
-  Flame: '🔥', Zap: '⚡', Heart: '❤️', Crown: '👑', Medal: '🥇',
-  Rocket: '🚀', Diamond: '💎', Gem: '💎', Gift: '🎁', Sparkles: '✨',
-  CheckCircle: '✅', Lock: '🔓', Unlock: '🔓', Eye: '👁️', Calendar: '📅',
-  Clock: '⏰', PiggyBank: '🐷', TrendingUp: '📈', BarChart: '📊',
-  Wallet: '👛', Coins: '🪙', DollarSign: '💰', BanknoteIcon: '💵',
-  Calculator: '🧮', FileText: '📄', Search: '🔍', Compass: '🧭',
-  Map: '🗺️', Flag: '🏁', Mountain: '⛰️', Sun: '☀️', Moon: '🌙',
-}
-
-function getBadgeEmoji(icon: string): string {
-  return BADGE_ICON_MAP[icon] || '🏅'
-}
 
 // ── Canvas Renderer for PNG export ──
 function renderYearInReviewToCanvas(data: YearInReviewData): HTMLCanvasElement {
@@ -231,7 +204,6 @@ function renderYearInReviewToCanvas(data: YearInReviewData): HTMLCanvasElement {
 
   const fireText = data.fireProgressDelta != null ? formatPct(data.fireProgressDelta) : 'N/B'
   drawStat(pad, y, 'FIRE voortgang', fireText, PURPLE)
-  drawStat(pad + cw + 16, y, 'Badges verdiend', String(data.totalBadgesEarned), AMBER)
   y += ch + 32
 
   // Monthly bar chart for net worth
@@ -367,7 +339,7 @@ export default function JaaroverzichtPage() {
     if (!data) return null
     return {
       title: `Mijn TriFinity Jaaroverzicht ${data.year}`,
-      text: `Mijn ${data.year} in cijfers: ${data.freedomDaysWon} vrijheidsdagen gewonnen, ${data.totalBadgesEarned} badges verdiend${data.netWorthGrowthPct != null ? `, vermogen ${formatPct(data.netWorthGrowthPct)}` : ''} #TriFinity`,
+      text: `Mijn ${data.year} in cijfers: ${data.freedomDaysWon} vrijheidsdagen gewonnen${data.netWorthGrowthPct != null ? `, vermogen ${formatPct(data.netWorthGrowthPct)}` : ''} #TriFinity`,
       url: typeof window !== 'undefined' ? window.location.origin : '',
       contentType: 'milestone',
       privacyLevel: 'anonymous',
@@ -578,43 +550,6 @@ export default function JaaroverzichtPage() {
               )}
             </section>
 
-            {/* ═══ Section 3: Badges Earned ═══ */}
-            <section className="rounded-2xl bg-gradient-to-br from-kern-500/10 via-horizon-500/5 to-horizon-500/10 p-6 ring-1 ring-kern-500/20" data-testid="section-badges">
-              <div className="mb-4 flex items-center gap-2">
-                <Award className="h-5 w-5 text-kern-400" />
-                <h2 className="text-lg font-bold text-kern-400">Badges verdiend</h2>
-              </div>
-
-              {data.badgesEarned.length > 0 ? (
-                <>
-                  <p className="mb-3 text-center text-3xl font-bold text-kern-400" data-testid="badges-count">
-                    {data.totalBadgesEarned}
-                  </p>
-                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                    {data.badgesEarned.map((badge) => (
-                      <div
-                        key={badge.slug}
-                        className="flex flex-col items-center rounded-xl bg-zinc-800/50 p-3 text-center"
-                        title={badge.name}
-                      >
-                        <span className="text-2xl">{getBadgeEmoji(badge.icon)}</span>
-                        <p className="mt-1 text-[10px] font-medium text-zinc-300 line-clamp-2">
-                          {badge.name}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="py-6 text-center">
-                  <Sparkles className="mx-auto h-8 w-8 text-zinc-600" />
-                  <p className="mt-2 text-sm text-zinc-500">
-                    Nog geen badges verdiend dit jaar
-                  </p>
-                </div>
-              )}
-            </section>
-
             {/* ═══ Section 4: Best & Worst Months ═══ */}
             <section className="rounded-2xl bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 p-6 ring-1 ring-emerald-500/20" data-testid="section-months">
               <div className="mb-4 flex items-center gap-2">
@@ -790,13 +725,6 @@ export default function JaaroverzichtPage() {
                     <p className="text-lg font-bold text-emerald-400">
                       {data.savingsRate != null ? `${data.savingsRate}%` : 'N/B'}
                     </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 rounded-xl bg-zinc-800/50 p-3">
-                  <Award className="h-5 w-5 text-horizon-400 flex-shrink-0" />
-                  <div>
-                    <p className="text-[10px] text-zinc-500 uppercase">Badges</p>
-                    <p className="text-lg font-bold text-horizon-400">{data.totalBadgesEarned}</p>
                   </div>
                 </div>
               </div>

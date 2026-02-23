@@ -3,12 +3,9 @@ import { computeFireProjection, type HorizonInput } from '@/lib/horizon-data'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { FhinAvatar, FinnAvatar, FfinAvatar } from '@/components/app/avatars'
 import { JouwPadWidget } from '@/components/app/jouw-pad-widget'
-import { BadgeEvaluator } from '@/components/app/badge-evaluator'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { computeFreedomMilestones } from '@/lib/freedom-milestones'
 import Link from 'next/link'
-import { StreakIndicator } from '@/components/app/streak-indicator'
-import { StreakBreakWarning } from '@/components/app/streak-break-warning'
 import {
   ArrowRight, Zap, Compass, TrendingUp, Settings2, Info,
 } from 'lucide-react'
@@ -193,16 +190,10 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
-      {/* Badge evaluation on dashboard load */}
-      <BadgeEvaluator />
-
       {/* Dateline row */}
       <div className="flex items-center justify-between border-b border-[var(--border-ed)] pb-3 mb-6">
         <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.11em' }} className="text-[var(--ink-3)]">{dateStr}</span>
-        <div className="flex items-center gap-3">
-          <StreakIndicator />
-          <span className="font-serif italic text-[13px] text-[var(--ink-3)] hidden sm:inline">Vrijheids Dashboard</span>
-        </div>
+        <span className="font-serif italic text-[13px] text-[var(--ink-3)] hidden sm:inline">Vrijheids Dashboard</span>
       </div>
 
       {/* Header */}
@@ -214,11 +205,6 @@ export default async function DashboardPage() {
         <p className="mt-1 font-serif italic text-[13px] text-[var(--ink-3)]">
           TriFinity helpt je bewust omgaan met je opgeslagen levensenergie.
         </p>
-      </div>
-
-      {/* Streak break warning notification */}
-      <div className="mb-3 sm:mb-6" data-testid="streak-warning-section">
-        <StreakBreakWarning />
       </div>
 
       {/* Three module cards */}

@@ -128,7 +128,6 @@ export async function GET(request: Request) {
       assetsResult,
       debtsResult,
       actionsResult,
-      badgesResult,
       goalsResult,
       profileResult,
     ] = await Promise.allSettled([
@@ -149,11 +148,11 @@ export async function GET(request: Request) {
         .select('id, name, slug, icon, budget_type, default_limit, interval, is_essential, parent_id'),
       supabase
         .from('assets')
-        .select('id, name, asset_type, current_value, monthly_contribution, expected_return, is_active')
+        .select('id, name, asset_type, current_value, monthly_contribution, expected_return, is_active, net_worth_inclusion_pct')
         .eq('is_active', true),
       supabase
         .from('debts')
-        .select('id, name, debt_type, original_amount, current_balance, interest_rate, monthly_payment, is_active')
+        .select('id, name, debt_type, original_amount, current_balance, interest_rate, monthly_payment, is_active, net_worth_inclusion_pct')
         .eq('is_active', true),
       supabase
         .from('actions')
@@ -161,12 +160,6 @@ export async function GET(request: Request) {
         .eq('status', 'completed')
         .gte('completed_at', dateFrom)
         .lt('completed_at', dateTo),
-      supabase
-        .from('user_badges')
-        .select('badge_id, earned_at, badges(slug, name, icon, color)')
-        .gte('earned_at', dateFrom)
-        .lt('earned_at', dateTo)
-        .order('earned_at', { ascending: true }),
       supabase
         .from('goals')
         .select('id, name, goal_type, target_value, current_value, is_completed'),
@@ -180,10 +173,9 @@ export async function GET(request: Request) {
     type SnapshotRow = { snapshot_date: string; net_worth: number; total_assets: number; total_debts: number; freedom_percentage?: number }
     type TxRow = { id: string; amount: number; date: string; is_income: boolean; budget_id: string | null; description: string | null; counterparty_name: string | null }
     type BudgetRow = { id: string; name: string; slug: string; icon: string; budget_type: string; default_limit: number | null; interval: string | null; is_essential: boolean; parent_id: string | null }
-    type AssetRow = { id: string; name: string; asset_type: string; current_value: number; monthly_contribution: number; expected_return: number | null; is_active: boolean }
-    type DebtRow = { id: string; name: string; debt_type: string; original_amount: number; current_balance: number; interest_rate: number; monthly_payment: number; is_active: boolean }
+    type AssetRow = { id: string; name: string; asset_type: string; current_value: number; monthly_contribution: number; expected_return: number | null; is_active: boolean; net_worth_inclusion_pct: number }
+    type DebtRow = { id: string; name: string; debt_type: string; original_amount: number; current_balance: number; interest_rate: number; monthly_payment: number; is_active: boolean; net_worth_inclusion_pct: number }
     type ActionRow = { id: string; title: string; status: string; freedom_days_impact: number | null; completed_at: string }
-    type BadgeJoin = { badge_id: string; earned_at: string; badges: { slug: string; name: string; icon: string; color: string } | null }
     type GoalRow = { id: string; name: string; goal_type: string; target_value: number; current_value: number; is_completed: boolean }
 
     const snapshots = (snapshotsResult.status === 'fulfilled' ? snapshotsResult.value.data ?? [] : []) as SnapshotRow[]
@@ -192,7 +184,6 @@ export async function GET(request: Request) {
     const assets = (assetsResult.status === 'fulfilled' ? assetsResult.value.data ?? [] : []) as AssetRow[]
     const debts = (debtsResult.status === 'fulfilled' ? debtsResult.value.data ?? [] : []) as DebtRow[]
     const actions = (actionsResult.status === 'fulfilled' ? actionsResult.value.data ?? [] : []) as ActionRow[]
-    const userBadges = (badgesResult.status === 'fulfilled' ? badgesResult.value.data ?? [] : []) as unknown as BadgeJoin[]
     const goals = (goalsResult.status === 'fulfilled' ? goalsResult.value.data ?? [] : []) as GoalRow[]
     const profile = profileResult.status === 'fulfilled' ? profileResult.value.data : null
 
@@ -281,9 +272,9 @@ export async function GET(request: Request) {
       }, 0)
     const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / 0.04 : 0
 
-    // Total assets & debts
-    const totalAssets = assets.reduce((sum, a) => sum + Number(a.current_value), 0)
-    const totalDebts = debts.reduce((sum, d) => sum + Number(d.current_balance), 0)
+    // Total assets & debts (weighted by net_worth_inclusion_pct)
+    const totalAssets = assets.reduce((sum, a) => sum + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
+    const totalDebts = debts.reduce((sum, d) => sum + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
     const currentNetWorth = totalAssets - totalDebts
     const firePercentage = fireTarget > 0 ? Math.round(Math.min((currentNetWorth / fireTarget) * 100, 100) * 10) / 10 : null
 
@@ -423,17 +414,6 @@ export async function GET(request: Request) {
       pct: Number(g.target_value) > 0 ? Math.round((Number(g.current_value) / Number(g.target_value)) * 100) : 0,
       isCompleted: g.is_completed,
     }))
-
-    // Badges earned
-    const badgesEarned = userBadges
-      .filter(b => b.badges)
-      .map(b => ({
-        slug: b.badges!.slug,
-        name: b.badges!.name,
-        icon: b.badges!.icon,
-        color: b.badges!.color,
-        earnedAt: b.earned_at,
-      }))
 
     // ── HORIZON SECTION ──
 
@@ -645,7 +625,6 @@ Schrijf in het Nederlands, persoonlijk en bemoedigend. Gebruik de filosofie "gel
         topActions,
         spendingInsights,
         goalsProgress,
-        badgesEarned,
       },
 
       horizon: {

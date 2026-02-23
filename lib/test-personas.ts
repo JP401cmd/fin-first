@@ -196,13 +196,6 @@ export interface PersonaNetWorthSnapshot {
   net_worth: number
 }
 
-export interface PersonaStreak {
-  streak_type: 'login' | 'budget_compliance' | 'action_completion'
-  current_count: number
-  longest_count: number
-  last_activity_date_daysAgo: number // days ago from today
-}
-
 export interface PersonaValuation {
   assetName: string // matched to inserted asset name
   entity_type: string // 'asset'
@@ -241,7 +234,6 @@ export interface PersonaData {
   life_events: PersonaLifeEvent[]
   recommendations: PersonaRecommendation[]
   net_worth_snapshots: PersonaNetWorthSnapshot[]
-  streaks?: PersonaStreak[]
   valuations?: PersonaValuation[]
   holdings?: PersonaHolding[]
 }
@@ -644,10 +636,6 @@ const roosData: PersonaData = {
     { monthsAgo: 1, total_assets: 3500, total_debts: 21800, net_worth: -18300 },
     { monthsAgo: 0, total_assets: 3500, total_debts: 18500, net_worth: -22300 },
   ],
-  streaks: [
-    { streak_type: 'login', current_count: 3, longest_count: 8, last_activity_date_daysAgo: 0 },
-    { streak_type: 'budget_compliance', current_count: 0, longest_count: 2, last_activity_date_daysAgo: 14 },
-  ],
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -800,11 +788,6 @@ const daanData: PersonaData = {
     { monthsAgo: 2, total_assets: 9800, total_debts: 13960, net_worth: -4160 },
     { monthsAgo: 1, total_assets: 10700, total_debts: 13940, net_worth: -3240 },
     { monthsAgo: 0, total_assets: 11600, total_debts: 13900, net_worth: -2300 },
-  ],
-  streaks: [
-    { streak_type: 'login', current_count: 14, longest_count: 14, last_activity_date_daysAgo: 0 },
-    { streak_type: 'budget_compliance', current_count: 8, longest_count: 10, last_activity_date_daysAgo: 0 },
-    { streak_type: 'action_completion', current_count: 3, longest_count: 5, last_activity_date_daysAgo: 1 },
   ],
   valuations: [
     { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 8, value: 2200 },
@@ -1017,10 +1000,6 @@ const lisaData: PersonaData = {
     { monthsAgo: 1, total_assets: 447800, total_debts: 350000, net_worth: 97800 },
     { monthsAgo: 0, total_assets: 450000, total_debts: 350000, net_worth: 100000 },
   ],
-  streaks: [
-    { streak_type: 'login', current_count: 7, longest_count: 12, last_activity_date_daysAgo: 0 },
-    { streak_type: 'budget_compliance', current_count: 4, longest_count: 6, last_activity_date_daysAgo: 0 },
-  ],
   valuations: [
     { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 12, value: 33600 },
     { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 10, value: 35200 },
@@ -1195,11 +1174,6 @@ const willemData: PersonaData = {
     { monthsAgo: 2, total_assets: 1448000, total_debts: 0, net_worth: 1100000 },
     { monthsAgo: 1, total_assets: 1455000, total_debts: 0, net_worth: 1118000 },
     { monthsAgo: 0, total_assets: 1457000, total_debts: 0, net_worth: 1135000 },
-  ],
-  streaks: [
-    { streak_type: 'login', current_count: 22, longest_count: 30, last_activity_date_daysAgo: 0 },
-    { streak_type: 'budget_compliance', current_count: 18, longest_count: 22, last_activity_date_daysAgo: 0 },
-    { streak_type: 'action_completion', current_count: 12, longest_count: 15, last_activity_date_daysAgo: 1 },
   ],
   valuations: [
     { assetName: 'DEGIRO beleggingsportefeuille', entity_type: 'asset', monthsAgo: 12, value: 350000 },

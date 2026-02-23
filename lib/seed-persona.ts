@@ -51,16 +51,14 @@ export async function deleteAllUserData(
 ): Promise<Record<string, number>> {
   const summary: Record<string, number> = {}
 
-  // Batch 0: tables with no FK to other user tables (user_badges, user_streaks, user_feature_visits, next_step_completions)
+  // Batch 0: tables with no FK to other user tables (user_feature_visits, next_step_completions)
   // Also holding_transactions (FK to holdings) must be deleted before holdings
   const batch0Results = await Promise.all([
     deleteTable(supabase, 'holding_transactions', userId),
-    deleteTable(supabase, 'user_badges', userId),
-    deleteTable(supabase, 'user_streaks', userId),
     deleteTable(supabase, 'user_feature_visits', userId),
     deleteTable(supabase, 'next_step_completions', userId),
   ])
-  const batch0Tables = ['holding_transactions', 'user_badges', 'user_streaks', 'user_feature_visits', 'next_step_completions']
+  const batch0Tables = ['holding_transactions', 'user_feature_visits', 'next_step_completions']
   for (let i = 0; i < batch0Tables.length; i++) {
     summary[batch0Tables[i]] = batch0Results[i]
   }
@@ -469,23 +467,7 @@ export async function seedPersonaData(
 
   onProgress('Transacties toevoegen...', 'phase3', 'insert', summary.transactions)
 
-  // ── Phase 4: Streaks, Valuations, Holdings ────────────────────
-
-  // Streaks
-  if (persona.streaks && persona.streaks.length > 0) {
-    const streakRows = persona.streaks.map((s) => ({
-      user_id: userId,
-      streak_type: s.streak_type,
-      current_count: s.current_count,
-      longest_count: s.longest_count,
-      last_activity_date: daysAgo(s.last_activity_date_daysAgo),
-      started_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }))
-    const { error: streakErr } = await supabase.from('user_streaks').insert(streakRows)
-    if (streakErr) throw new Error(`Streaks insert mislukt: ${streakErr.message}`)
-    summary.user_streaks = streakRows.length
-  }
+  // ── Phase 4: Valuations, Holdings ────────────────────
 
   // Valuations
   if (persona.valuations && persona.valuations.length > 0) {
@@ -553,8 +535,8 @@ export async function seedPersonaData(
     summary.holding_transactions = holdingTxCount
   }
 
-  onProgress('Streaks, waarderingen & holdings toevoegen...', 'phase4', 'insert',
-    (summary.user_streaks ?? 0) + (summary.valuations ?? 0) + (summary.holdings ?? 0) + (summary.holding_transactions ?? 0))
+  onProgress('Waarderingen & holdings toevoegen...', 'phase4', 'insert',
+    (summary.valuations ?? 0) + (summary.holdings ?? 0) + (summary.holding_transactions ?? 0))
 
   return summary
 }

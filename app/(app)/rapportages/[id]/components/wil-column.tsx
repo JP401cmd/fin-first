@@ -96,25 +96,6 @@ export function WilColumn({ wil }: { wil: ReportWilSection }) {
         </div>
       )}
 
-      {/* Badges */}
-      {wil.badgesEarned.length > 0 && (
-        <div className="report-section">
-          <p className="report-kicker font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)] mb-3">
-            Badges
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {wil.badgesEarned.map(b => (
-              <span
-                key={b.slug}
-                className="inline-flex items-center gap-1 rounded-full bg-wil-50 px-2.5 py-1 font-inter text-[10px] font-medium text-wil-700 border border-wil-200"
-              >
-                {b.icon && <span className="text-xs">{b.icon}</span>}
-                {b.name}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

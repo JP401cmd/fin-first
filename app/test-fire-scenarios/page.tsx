@@ -69,6 +69,7 @@ const FIXTURE_DEBTS: Debt[] = [
     draagkrachtmeting_date: null,
     ownership: 'personal',
     household_id: null,
+    net_worth_inclusion_pct: 100,
   },
   {
     id: 'debt-2',
@@ -98,6 +99,7 @@ const FIXTURE_DEBTS: Debt[] = [
     draagkrachtmeting_date: null,
     ownership: 'personal',
     household_id: null,
+    net_worth_inclusion_pct: 100,
   },
   {
     id: 'debt-3',
@@ -127,6 +129,7 @@ const FIXTURE_DEBTS: Debt[] = [
     draagkrachtmeting_date: null,
     ownership: 'personal',
     household_id: null,
+    net_worth_inclusion_pct: 100,
   },
 ]
 

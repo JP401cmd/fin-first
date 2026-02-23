@@ -31,6 +31,10 @@ function extractCounterpartyIban(details: string): string | null {
   const ibanMatch = details.match(/\/IBAN\/([A-Z]{2}\d{2}[A-Z0-9]{4,30})/i)
   if (ibanMatch) return ibanMatch[1].trim()
 
+  // /CNTP/ subfield (Rabobank SEPA incasso/afschrijvingen)
+  const cntpMatch = details.match(/\/CNTP\/([A-Z]{2}\d{2}[A-Z0-9]{4,30})/i)
+  if (cntpMatch) return cntpMatch[1].trim()
+
   // Generic IBAN pattern
   const genericMatch = details.match(/\b([A-Z]{2}\d{2}[A-Z]{4}\d{10,18})\b/)
   if (genericMatch) return genericMatch[1]

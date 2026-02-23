@@ -34,7 +34,6 @@ export default function IdentityPage() {
   const featuresPerPhase = getFeaturesPerPhase()
 
   // Preview card data
-  const [badgeCount, setBadgeCount] = useState(0)
   const [activeNotifCount, setActiveNotifCount] = useState(0)
 
   // Demo user state
@@ -70,11 +69,10 @@ export default function IdentityPage() {
       threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
       const dateStr = threeMonthsAgo.toISOString().split('T')[0]
 
-      const [assetsRes, debtsRes, txRes, badgesRes, notifRes] = await Promise.all([
+      const [assetsRes, debtsRes, txRes, notifRes] = await Promise.all([
         supabase.from('assets').select('current_value').eq('is_active', true),
         supabase.from('debts').select('current_balance, debt_type').eq('is_active', true),
         supabase.from('transactions').select('amount, is_income').gte('date', dateStr),
-        supabase.from('user_badges').select('id', { count: 'exact', head: true }),
         supabase.from('app_settings').select('value').eq('key', `notifications_preferences_${user.id}`).maybeSingle(),
       ])
 
@@ -99,9 +97,6 @@ export default function IdentityPage() {
 
       setSovereigntyLevel(computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPct, hasConsumerDebt))
       setFinancialData({ netWorth, monthsCovered, freedomPct, hasConsumerDebt })
-
-      // Badge count
-      setBadgeCount(badgesRes.count ?? 0)
 
       // Notification prefs count
       if (notifRes.data?.value) {
@@ -258,7 +253,7 @@ export default function IdentityPage() {
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-[var(--ink)]">Voortgang</h3>
-                <p className="text-xs text-[var(--ink-3)]">{badgeCount} badge{badgeCount !== 1 ? 's' : ''} behaald</p>
+                <p className="text-xs text-[var(--ink-3)]">Bekijk je voortgang</p>
               </div>
             </div>
             <ChevronRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />

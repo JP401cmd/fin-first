@@ -1,4 +1,4 @@
-import { Wallet, Flame, RefreshCw, Lightbulb, BarChart3, Trophy, ArrowUpCircle } from 'lucide-react'
+import { Wallet, RefreshCw, Lightbulb, BarChart3, ArrowUpCircle } from 'lucide-react'
 import { DEFAULT_MATRIX, FEATURES, PHASES, type FeatureDef } from '@/lib/feature-phases'
 
 // ── Temporal Balance levels ──────────────────────────────────────────
@@ -204,10 +204,8 @@ export function getFeaturesPerPhase(): Record<string, FeatureDef[]> {
 
 export const NOTIFICATION_TYPES = [
   { type: 'budget', label: 'Budget alerts', description: 'Meldingen over budgetoverschrijdingen', icon: Wallet },
-  { type: 'streak', label: 'Streak waarschuwingen', description: 'Meldingen als je streak in gevaar is', icon: Flame },
   { type: 'sync', label: 'Synchronisatie', description: 'Updates over bankconnecties', icon: RefreshCw },
   { type: 'recommendation', label: 'Aanbevelingen', description: 'Financi\u00eble tips en suggesties', icon: Lightbulb },
   { type: 'insight', label: 'Inzichten', description: 'Patronen in je uitgaven', icon: BarChart3 },
-  { type: 'badge', label: 'Badges', description: 'Behaalde prestaties en badges', icon: Trophy },
   { type: 'levelup', label: 'Level-ups', description: 'Soevereiniteitsniveau wijzigingen', icon: ArrowUpCircle },
 ] as const

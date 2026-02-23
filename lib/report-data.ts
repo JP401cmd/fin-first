@@ -143,13 +143,6 @@ export interface ReportWilSection {
     pct: number
     isCompleted: boolean
   }[]
-  badgesEarned: {
-    slug: string
-    name: string
-    icon: string
-    color: string
-    earnedAt: string
-  }[]
 }
 
 export interface ReportHorizonSection {

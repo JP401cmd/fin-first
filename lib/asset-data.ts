@@ -68,6 +68,8 @@ export interface Asset {
   // Household fields
   ownership: 'personal' | 'shared'
   household_id: string | null
+  // Net worth inclusion
+  net_worth_inclusion_pct: number // 0–100, default 100
 }
 
 export const ASSET_TYPE_LABELS: Record<AssetType, string> = {

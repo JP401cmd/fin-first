@@ -277,6 +277,7 @@ export default function ImportPage() {
         .eq('user_id', user.id)
         .gte('date', minDate)
         .lte('date', maxDate)
+        .limit(50000)
 
       if (queryError) {
         if (isNetworkFailure(queryError)) {
@@ -733,11 +734,6 @@ export default function ImportPage() {
     setStep(4)
     setImporting(false)
 
-    fetch('/api/badges/evaluate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ trigger: 'import' }),
-    }).catch(() => {})
   }
 
   const newCount = rows.filter((r) => !r.isDuplicate).length

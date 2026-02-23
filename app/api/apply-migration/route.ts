@@ -4,54 +4,7 @@ import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 
 // Migration SQL statements - each must be executed individually
 const MIGRATION_STATEMENTS = [
-  // 1. badges table
-  `CREATE TABLE IF NOT EXISTS badges (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    slug TEXT UNIQUE NOT NULL,
-    name TEXT NOT NULL,
-    description TEXT NOT NULL,
-    icon TEXT NOT NULL DEFAULT 'trophy',
-    color TEXT NOT NULL DEFAULT 'amber',
-    category TEXT NOT NULL CHECK (category IN ('onboarding', 'consistency', 'financial_health', 'fire_milestones', 'actions', 'budget', 'exploration', 'sovereignty')),
-    criteria_type TEXT NOT NULL CHECK (criteria_type IN ('threshold', 'count', 'streak', 'milestone', 'manual')),
-    criteria_value JSONB NOT NULL DEFAULT '{}'::jsonb,
-    sort_order INT NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-  )`,
-  `ALTER TABLE badges ENABLE ROW LEVEL SECURITY`,
-  `CREATE POLICY "Badges are viewable by authenticated users" ON badges FOR SELECT TO authenticated USING (true)`,
-
-  // 2. user_badges table
-  `CREATE TABLE IF NOT EXISTS user_badges (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    badge_id UUID NOT NULL REFERENCES badges(id) ON DELETE CASCADE,
-    earned_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    notified BOOLEAN NOT NULL DEFAULT false,
-    UNIQUE(user_id, badge_id)
-  )`,
-  `ALTER TABLE user_badges ENABLE ROW LEVEL SECURITY`,
-  `CREATE POLICY "Users can view own badges" ON user_badges FOR SELECT TO authenticated USING (auth.uid() = user_id)`,
-  `CREATE POLICY "Users can insert own badges" ON user_badges FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id)`,
-  `CREATE POLICY "Users can update own badges" ON user_badges FOR UPDATE TO authenticated USING (auth.uid() = user_id)`,
-
-  // 3. user_streaks table
-  `CREATE TABLE IF NOT EXISTS user_streaks (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    streak_type TEXT NOT NULL CHECK (streak_type IN ('login', 'budget_compliance', 'action_completion')),
-    current_count INT NOT NULL DEFAULT 0,
-    longest_count INT NOT NULL DEFAULT 0,
-    last_activity_date DATE,
-    started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-  )`,
-  `ALTER TABLE user_streaks ENABLE ROW LEVEL SECURITY`,
-  `CREATE POLICY "Users can view own streaks" ON user_streaks FOR SELECT TO authenticated USING (auth.uid() = user_id)`,
-  `CREATE POLICY "Users can insert own streaks" ON user_streaks FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id)`,
-  `CREATE POLICY "Users can update own streaks" ON user_streaks FOR UPDATE TO authenticated USING (auth.uid() = user_id)`,
-
-  // 4. user_feature_visits table
+  // 1. user_feature_visits table
   `CREATE TABLE IF NOT EXISTS user_feature_visits (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -277,7 +230,7 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   const supabase = await createClient()
 
-  const requiredTables = ['badges', 'user_badges', 'user_streaks', 'user_feature_visits', 'holdings', 'holding_transactions', 'next_step_completions']
+  const requiredTables = ['user_feature_visits', 'holdings', 'holding_transactions', 'next_step_completions']
   const requiredColumns = ['freedom_percentage', 'fire_age', 'sovereignty_level', 'savings_rate', 'resilience_score']
 
   const tableStatus: Record<string, boolean> = {}

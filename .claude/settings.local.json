@@ -82,7 +82,12 @@
       "Bash(git ls-tree:*)",
       "Bash(wc:*)",
       "Bash(npx tsx:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(git stash drop:*)",
+      "Bash(python3:*)",
+      "WebFetch(domain:developer.paypal.com)",
+      "Bash(tail:*)",
+      "Bash(cd:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
