@@ -1,7 +1,10 @@
+'use client'
+
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { Check, Circle, Shield } from 'lucide-react'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 interface Props {
   size: WidgetSize
@@ -125,8 +128,11 @@ export function JouwPadWidgetWrapper({ size, data, href }: Props) {
 
   const levelDisplay = sovereigntyLevel < 0 ? `${sovereigntyLevel}` : `+${sovereigntyLevel}`
 
+  const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 700 })
+
   return (
     <WidgetShell module="cross" size={size} kicker="Jouw Pad" href={href}>
+    <div ref={inViewRef}>
 
       {/* ── Header: shield + fase + vrijheidsbadge ── */}
       <div className="flex items-center justify-between gap-2">
@@ -177,8 +183,11 @@ export function JouwPadWidgetWrapper({ size, data, href }: Props) {
                 >
                   {isActive && (
                     <div
-                      className={`h-full rounded-full ${pColors.bar} transition-all duration-700`}
-                      style={{ width: `${progressInPhase}%` }}
+                      className={`h-full rounded-full ${pColors.bar}`}
+                      style={{
+                        width:      hasEntered ? `${progressInPhase}%` : '0%',
+                        transition: hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1) 150ms' : 'none',
+                      }}
                     />
                   )}
                 </div>
@@ -254,6 +263,7 @@ export function JouwPadWidgetWrapper({ size, data, href }: Props) {
           </div>
         </div>
       )}
+    </div>
     </WidgetShell>
   )
 }

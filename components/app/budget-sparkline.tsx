@@ -76,7 +76,7 @@ export function BudgetSparkline({
   className = '',
   testId,
 }: BudgetSparklineProps) {
-  const { ref, hasEntered } = useInViewAnimation({ duration: 400 })
+  const { ref, hasEntered } = useInViewAnimation({ duration: 400, rootMargin: '0px' })
   const { points, fillPath, linePath, trend, trendColor, hasData } = useMemo(() => {
     const values = data.map(d => d.spent)
     if (values.length < 2 || values.every(v => v === 0)) {
@@ -150,9 +150,6 @@ export function BudgetSparkline({
   const lineAnim = hasEntered
     ? 'drawPath 400ms cubic-bezier(.22,1,.36,1) both'
     : 'none'
-  const fillAnim = hasEntered
-    ? 'fadeInFill 150ms ease-out 260ms both'
-    : 'none'
   const dotOpacity = hasEntered ? 1 : 0
   const dotTransition = hasEntered ? 'opacity 100ms ease-out 350ms' : 'none'
 
@@ -170,8 +167,10 @@ export function BudgetSparkline({
           <path
             d={fillPath}
             fill={trendColor}
-            opacity={0}
-            style={{ animation: fillAnim, opacity: hasEntered ? 0.12 : 0 }}
+            style={{
+              opacity:    hasEntered ? 0.12 : 0,
+              transition: hasEntered ? 'opacity 150ms ease-out 260ms' : 'none',
+            }}
           />
         )}
 

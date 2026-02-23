@@ -1,9 +1,12 @@
+'use client'
+
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { formatCurrency } from '@/lib/format'
 import type { DashboardData } from './widget-renderer'
 import { TrendingUp, ShoppingCart, PiggyBank, CreditCard } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 interface Props {
   size: WidgetSize
@@ -81,12 +84,13 @@ function progressPct(spent: number, limit: number): number {
 //   3.  €spent besteed  ·  65%  ·  budget €limit
 
 interface BudgetRowProps {
-  config: BudgetTypeConfig
-  limit:  number
-  spent:  number
+  config:     BudgetTypeConfig
+  limit:      number
+  spent:      number
+  hasEntered: boolean
 }
 
-function BudgetRow({ config, limit, spent }: BudgetRowProps) {
+function BudgetRow({ config, limit, spent, hasEntered }: BudgetRowProps) {
   const { icon: Icon, label, iconBg, iconText, labelText, barFillVar, barWarnVar } = config
   const hasData    = limit > 0
   const pct        = progressPct(spent, limit)
@@ -110,10 +114,11 @@ function BudgetRow({ config, limit, spent }: BudgetRowProps) {
       {/* Laag 2: voortgangsbalk — track neutraal, fill via inline style (CSS-variabelen) */}
       <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--border-ed)]">
         <div
-          className="h-full rounded-full transition-all duration-500"
+          className="h-full rounded-full"
           style={{
-            width:           `${pct}%`,
+            width:           hasEntered ? `${pct}%` : '0%',
             backgroundColor: hasData ? fillColor : 'transparent',
+            transition:      hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1)' : 'none',
           }}
         />
       </div>
@@ -140,6 +145,7 @@ function BudgetRow({ config, limit, spent }: BudgetRowProps) {
 export function BudgettenWidget({ size, data, href }: Props) {
   const isFullSize       = size === 'full'
   const { budgetTotals } = data
+  const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 600 })
 
   const nettoBalans =
     budgetTotals.income.spent
@@ -153,7 +159,7 @@ export function BudgettenWidget({ size, data, href }: Props) {
     <WidgetShell module="kern" size={size} kicker="Budgetten" href={href}>
 
       {/* ── Vier budget-rijen ── */}
-      <div className="flex flex-col gap-3">
+      <div ref={inViewRef} className="flex flex-col gap-3">
         {BUDGET_TYPE_CONFIGS.map((config) => {
           const typeData = budgetTotals[config.key]
           return (
@@ -162,6 +168,7 @@ export function BudgettenWidget({ size, data, href }: Props) {
               config={config}
               limit={typeData.limit}
               spent={typeData.spent}
+              hasEntered={hasEntered}
             />
           )
         })}
