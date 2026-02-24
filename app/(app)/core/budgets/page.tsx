@@ -26,6 +26,9 @@ import { useChatContext } from '@/components/app/chat/chat-provider'
 import { GoalForm } from '@/components/app/goal-form'
 import { EnvelopeTransferSheet } from '@/components/app/envelope-transfer-sheet'
 import { UncategorizedTransactionsBanner } from '@/components/app/uncategorized-transactions-banner'
+import { TransactionForm } from '@/components/app/transaction-form'
+import { BottomSheet } from '@/components/app/bottom-sheet'
+import { KassabonShell } from '@/components/app/kassabon-shell'
 
 type Goal = {
   id: string
@@ -48,6 +51,7 @@ export default function BudgetsPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { perspective } = usePerspective()
+  const { openWithMessage } = useChatContext()
   const [budgets, setBudgets] = useState<BudgetWithChildren[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -65,7 +69,7 @@ export default function BudgetsPage() {
     return new Date(now.getFullYear(), now.getMonth(), 1)
   })
   const [spending, setSpending] = useState<Record<string, number>>({})
-  const [transactions, setTransactions] = useState<{ budget_id: string; amount: number; date: string; description: string; counterparty_name: string | null; is_split_row?: boolean }[]>([])
+  const [transactions, setTransactions] = useState<{ id?: string; account_id?: string; budget_id: string; amount: number; date: string; description: string; counterparty_name: string | null; is_split_row?: boolean }[]>([])
   const [rollovers, setRollovers] = useState<BudgetRollover[]>([])
   const [budgetAmounts, setBudgetAmounts] = useState<{ id: string; budget_id: string; effective_from: string; amount: number }[]>([])
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null)
@@ -87,7 +91,7 @@ export default function BudgetsPage() {
     const supabase = createClient()
     let spendQuery = supabase
       .from('transactions')
-      .select('id, is_split, budget_id, amount, date, description, counterparty_name, transaction_type')
+      .select('id, account_id, is_split, budget_id, amount, date, description, counterparty_name, transaction_type')
       .gte('date', monthStart)
       .lt('date', monthEnd)
       .order('date', { ascending: false })
@@ -112,7 +116,7 @@ export default function BudgetsPage() {
       if (splitTxIds.length > 0) {
         const { data: splits } = await supabase
           .from('transaction_splits')
-          .select('budget_id, amount, transactions(date, description, counterparty_name)')
+          .select('transaction_id, budget_id, amount, transactions(id, account_id, date, description, counterparty_name)')
           .in('transaction_id', splitTxIds)
         if (splits) {
           for (const s of splits) {
@@ -121,12 +125,15 @@ export default function BudgetsPage() {
             }
           }
           splitRows = (splits as unknown as Array<{
+            transaction_id: string
             budget_id: string | null
             amount: number
-            transactions: { date: string; description: string; counterparty_name: string | null } | null
+            transactions: { id: string; account_id: string; date: string; description: string; counterparty_name: string | null } | null
           }>)
             .filter(s => s.budget_id && s.transactions)
             .map(s => ({
+              id: s.transaction_id,
+              account_id: (s.transactions as { account_id: string }).account_id,
               budget_id: s.budget_id as string,
               amount: s.amount,
               date: (s.transactions as { date: string }).date,
@@ -526,6 +533,33 @@ export default function BudgetsPage() {
   const teVerdelen = totalIncome - totalAllocated
   const dekkingsgraad = totalIncome > 0 ? (totalAllocated / totalIncome) * 100 : 0
 
+  // G3: Budget insights voor AI-kaart (overschreden + bijna vol)
+  const childBudgetsFlat = budgets.flatMap(g =>
+    g.children.length > 0 ? g.children : (g.budget_type !== 'income' ? [g as Budget] : [])
+  )
+  const overschredenInzichten = childBudgetsFlat
+    .filter(b => {
+      const lim = getEffectiveLimit(b)
+      return lim > 0 && (spending[b.id] ?? 0) >= lim
+    })
+    .map(b => {
+      const lim = getEffectiveLimit(b)
+      const spent = spending[b.id] ?? 0
+      return { name: b.name, spent, limit: lim, pct: Math.round((spent / lim) * 100) }
+    })
+  const bijnaVolInzichten = childBudgetsFlat
+    .filter(b => {
+      const lim = getEffectiveLimit(b)
+      const pct = lim > 0 ? (spending[b.id] ?? 0) / lim : 0
+      return pct >= 0.8 && pct < 1.0
+    })
+    .map(b => {
+      const lim = getEffectiveLimit(b)
+      const spent = spending[b.id] ?? 0
+      return { name: b.name, spent, limit: lim, pct: Math.round((spent / lim) * 100) }
+    })
+  const hasAIInsights = overschredenInzichten.length > 0 || bijnaVolInzichten.length > 0
+
   // F2-09: beschikbaar per sub-budget (effectieve limiet incl. rollover − uitgegeven)
   const beschikbaarMap: Record<string, number> = {}
   for (const group of budgets) {
@@ -666,6 +700,49 @@ export default function BudgetsPage() {
           formatCurrency={formatCurrency}
         />
       </section>
+
+      {/* G3: Will AI Budget Insights kaart */}
+      {hasAIInsights && (
+        <div className="mt-4 overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)]">
+          {/* Kleur-accent bovenaan — editorial pattern */}
+          <div className="h-1 bg-wil-500" />
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-4 py-2.5">
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-wil-50 px-2 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-[0.08em] text-wil-700">Will</span>
+              <span className="font-sans text-xs font-semibold text-[var(--ink-2)]">Budgetanalyse</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => openWithMessage('Analyseer mijn budgetten en geef me de belangrijkste inzichten over overschreden en bijna-volle categorieën')}
+              className="min-h-[44px] px-2 font-sans text-[11px] italic text-wil-600 hover:underline"
+            >
+              Vraag Will →
+            </button>
+          </div>
+          {/* Inzichten */}
+          <div className="space-y-2 px-4 py-3">
+            {overschredenInzichten.slice(0, 2).map(inzicht => (
+              <div key={inzicht.name} className="flex items-start gap-2">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
+                <p className="font-serif text-[13px] italic leading-snug text-[var(--ink-2)]">
+                  <strong className="not-italic font-semibold">{inzicht.name}</strong> is {inzicht.pct}% vol —{' '}
+                  <span className="text-[var(--ink-3)]">{formatCurrency(inzicht.spent)} van {formatCurrency(inzicht.limit)}</span>
+                </p>
+              </div>
+            ))}
+            {bijnaVolInzichten.slice(0, Math.max(0, 2 - Math.min(overschredenInzichten.length, 2))).map(inzicht => (
+              <div key={inzicht.name} className="flex items-start gap-2">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-wil-400" />
+                <p className="font-serif text-[13px] italic leading-snug text-[var(--ink-2)]">
+                  <strong className="not-italic font-semibold">{inzicht.name}</strong> is bijna vol — {inzicht.pct}%{' '}
+                  <span className="text-[var(--ink-3)]">({formatCurrency(inzicht.spent)} van {formatCurrency(inzicht.limit)})</span>
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* View toggle + New budget button */}
       <div className="mt-3 sm:mt-6 flex items-center justify-between">
@@ -873,6 +950,7 @@ export default function BudgetsPage() {
           siblings={selectedSiblings}
           spending={spending}
           transactions={transactions}
+          allBudgets={budgets}
           rollovers={rollovers}
           monthDate={monthDate}
           getSpent={getSpent}
@@ -890,6 +968,10 @@ export default function BudgetsPage() {
           }}
           onReorder={async () => {
             await loadBudgets()
+          }}
+          onGoalCreated={async () => {
+            await loadGoals()
+            await loadSpending()
           }}
         />
       )}
@@ -1231,6 +1313,7 @@ function BudgetDetailModal({
   siblings,
   spending,
   transactions,
+  allBudgets,
   rollovers,
   monthDate,
   getSpent,
@@ -1243,12 +1326,14 @@ function BudgetDetailModal({
   onSelectChild,
   onDelete,
   onReorder,
+  onGoalCreated,
 }: {
   budget: Budget
   parent: BudgetWithChildren | null
   siblings: Budget[]
   spending: Record<string, number>
-  transactions: { budget_id: string; amount: number; date: string; description: string; counterparty_name: string | null; is_split_row?: boolean }[]
+  transactions: { id?: string; account_id?: string; budget_id: string; amount: number; date: string; description: string; counterparty_name: string | null; is_split_row?: boolean }[]
+  allBudgets: BudgetWithChildren[]
   rollovers: BudgetRollover[]
   monthDate: Date
   getSpent: (b: Budget) => number
@@ -1261,6 +1346,7 @@ function BudgetDetailModal({
   onSelectChild: (id: string) => void
   onDelete: () => void
   onReorder: () => void
+  onGoalCreated?: () => void
 }) {
   const { perspective } = usePerspective()
   const { openWithMessage } = useChatContext()
@@ -1268,6 +1354,109 @@ function BudgetDetailModal({
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [reordering, setReordering] = useState(false)
+  const [showCreateGoalForm, setShowCreateGoalForm] = useState(false)
+  const [goalForm, setGoalForm] = useState({ name: '', target_value: '', target_date: '' })
+  const [goalSaving, setGoalSaving] = useState(false)
+  const [goalError, setGoalError] = useState('')
+  const [showRolloverOverride, setShowRolloverOverride] = useState(false)
+  const [overrideAmount, setOverrideAmount] = useState('')
+  const [overrideSaving, setOverrideSaving] = useState(false)
+  const [showVarianceDetail, setShowVarianceDetail] = useState(false)
+  const [showForecastModal, setShowForecastModal] = useState(false)
+  type FullTx = { id: string; account_id: string; budget_id: string | null; date: string; amount: number; description: string; counterparty_name: string | null; counterparty_iban: string | null; is_income: boolean; notes: string | null; category_source: string; is_split?: boolean }
+  const [txToEdit, setTxToEdit] = useState<FullTx | null>(null)
+
+  async function openTransaction(id: string) {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('transactions')
+      .select('id, account_id, budget_id, date, amount, description, counterparty_name, counterparty_iban, is_income, notes, category_source, is_split')
+      .eq('id', id)
+      .single()
+    if (data) setTxToEdit(data as FullTx)
+  }
+
+  type HistTxRow = { id: string; account_id: string; amount: number; date: string; description: string; counterparty_name: string | null }
+  const [selectedHistMonth, setSelectedHistMonth] = useState<string | null>(null)
+  const [histMonthTx, setHistMonthTx] = useState<HistTxRow[]>([])
+  const [histMonthTxLoading, setHistMonthTxLoading] = useState(false)
+
+  async function selectHistMonth(monthStart: string) {
+    if (selectedHistMonth === monthStart) {
+      setSelectedHistMonth(null)
+      setHistMonthTx([])
+      return
+    }
+    setSelectedHistMonth(monthStart)
+    setHistMonthTxLoading(true)
+    const supabase = createClient()
+    const d = new Date(monthStart)
+    const monthEnd = localDateStr(new Date(d.getFullYear(), d.getMonth() + 1, 1))
+    const { data } = await supabase
+      .from('transactions')
+      .select('id, account_id, amount, date, description, counterparty_name')
+      .in('budget_id', budgetIds)
+      .gte('date', monthStart)
+      .lt('date', monthEnd)
+      .order('date', { ascending: false })
+    setHistMonthTx((data ?? []) as HistTxRow[])
+    setHistMonthTxLoading(false)
+  }
+
+  async function handleCreateGoal() {
+    if (!goalForm.name.trim() || !goalForm.target_value) {
+      setGoalError('Naam en doelbedrag zijn verplicht')
+      return
+    }
+    setGoalSaving(true)
+    setGoalError('')
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setGoalError('Niet ingelogd'); setGoalSaving(false); return }
+    const { error: insertError } = await supabase.from('goals').insert({
+      user_id: user.id,
+      name: goalForm.name.trim(),
+      goal_type: 'savings',
+      target_value: parseFloat(goalForm.target_value),
+      current_value: 0,
+      target_date: goalForm.target_date || null,
+      budget_id: budget.id,
+      icon: 'Target',
+      color: 'teal',
+    })
+    if (insertError) { setGoalError(insertError.message); setGoalSaving(false); return }
+    setGoalSaving(false)
+    setShowCreateGoalForm(false)
+    setGoalForm({ name: '', target_value: '', target_date: '' })
+    onGoalCreated?.()
+  }
+
+  async function handleRolloverOverride() {
+    if (!overrideAmount) return
+    setOverrideSaving(true)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setOverrideSaving(false); return }
+    const period = formatPeriod(monthDate)
+    const existingRollover = rolloverHistory.find(r => r.period === period)
+    if (existingRollover) {
+      await supabase.from('budget_rollovers')
+        .update({ carried_amount: parseFloat(overrideAmount) })
+        .eq('id', existingRollover.id)
+    } else {
+      await supabase.from('budget_rollovers').insert({
+        user_id: user.id,
+        budget_id: budget.id,
+        period,
+        carried_amount: parseFloat(overrideAmount),
+        rollover_type: budget.rollover_type ?? 'carry-over',
+      })
+    }
+    setOverrideSaving(false)
+    setShowRolloverOverride(false)
+    setOverrideAmount('')
+    onGoalCreated?.() // reuse to trigger parent refresh (loadSpending)
+  }
 
   // Ordering helpers
   const sortedSiblings = [...siblings].sort((a, b) => a.sort_order - b.sort_order)
@@ -1417,8 +1606,10 @@ function BudgetDetailModal({
   }, [budget.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const maxHistoryValue = Math.max(...history.map(h => Math.max(h.spent, h.limit)), 1)
+  const budgetGroups = allBudgets.map(b => ({ parent: b as Budget, children: (b as BudgetWithChildren).children ?? [] }))
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
         className="w-full max-w-lg overflow-y-auto rounded-2xl bg-[var(--paper)] shadow-xl"
@@ -1516,7 +1707,42 @@ function BudgetDetailModal({
 
           {rolloverHistory.length > 1 && (
             <div className="mt-3 border-t border-[var(--border-ed)] pt-3">
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[.08em] text-[var(--ink-3)]">Overgedragen saldo</p>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-[10px] font-semibold uppercase tracking-[.08em] text-[var(--ink-3)]">Overgedragen saldo</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOverrideAmount(String(carry || 0))
+                    setShowRolloverOverride(v => !v)
+                  }}
+                  className="text-[10px] font-medium text-[var(--ink-4)] hover:text-kern-600"
+                >
+                  {showRolloverOverride ? 'Annuleren' : 'Override →'}
+                </button>
+              </div>
+              {showRolloverOverride && (
+                <div className="mb-3 flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-[var(--ink-3)]">€</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={overrideAmount}
+                      onChange={e => setOverrideAmount(e.target.value)}
+                      className="w-full rounded-[var(--r-sm)] border border-[var(--border-md)] py-1.5 pl-6 pr-2 text-right font-mono text-sm text-[var(--ink)] outline-none focus:border-kern-500"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRolloverOverride}
+                    disabled={overrideSaving}
+                    className="rounded-[var(--r-sm)] bg-kern-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+                  >
+                    {overrideSaving ? '...' : 'Instellen'}
+                  </button>
+                </div>
+              )}
               <div className="space-y-1 max-h-32 overflow-y-auto">
                 {rolloverHistory.slice(0, 6).map((r) => (
                   <div key={r.id} className="flex items-center justify-between text-xs">
@@ -1630,15 +1856,86 @@ function BudgetDetailModal({
             return (
               <div className="border-t border-[var(--border-ed)] px-6 py-4" data-testid="budget-savings-goal-empty">
                 <p className="mb-2 text-[10px] font-semibold uppercase tracking-[.08em] text-[var(--ink-3)]">Spaardoel</p>
-                <p className="text-xs italic text-[var(--ink-3)] mb-2">
-                  Koppel een spaardoel aan dit budget om voortgang bij te houden.
-                </p>
-                <a
-                  href="/will"
-                  className="inline-flex items-center gap-1.5 rounded border border-[var(--border-ed)] px-2.5 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-                >
-                  Bekijk doelen →
-                </a>
+                {!showCreateGoalForm ? (
+                  <>
+                    <p className="text-xs italic text-[var(--ink-3)] mb-3">
+                      Koppel een spaardoel aan dit budget om voortgang bij te houden.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowCreateGoalForm(true)}
+                        className="inline-flex items-center gap-1.5 rounded border border-[var(--border-ed)] bg-[var(--paper)] px-2.5 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+                      >
+                        <Plus className="h-3 w-3" />
+                        Spaardoel aanmaken
+                      </button>
+                      <a
+                        href="/will"
+                        className="text-xs italic text-[var(--ink-3)] hover:text-[var(--ink-2)]"
+                      >
+                        Bekijk doelen →
+                      </a>
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    {goalError && (
+                      <p className="text-xs text-red-600">{goalError}</p>
+                    )}
+                    <div>
+                      <label className="mb-1 block text-[10px] font-medium uppercase tracking-[.06em] text-[var(--ink-3)]">Naam</label>
+                      <input
+                        type="text"
+                        value={goalForm.name}
+                        onChange={e => setGoalForm(p => ({ ...p, name: e.target.value }))}
+                        placeholder="bijv. Noodfonds"
+                        className="w-full rounded-[var(--r)] border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="mb-1 block text-[10px] font-medium uppercase tracking-[.06em] text-[var(--ink-3)]">Doelbedrag (€)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={goalForm.target_value}
+                          onChange={e => setGoalForm(p => ({ ...p, target_value: e.target.value }))}
+                          placeholder="0"
+                          className="w-full rounded-[var(--r)] border border-[var(--border-md)] px-3 py-2 text-sm font-mono text-[var(--ink)] outline-none focus:border-kern-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[10px] font-medium uppercase tracking-[.06em] text-[var(--ink-3)]">Doeldatum (opt.)</label>
+                        <input
+                          type="date"
+                          value={goalForm.target_date}
+                          onChange={e => setGoalForm(p => ({ ...p, target_date: e.target.value }))}
+                          className="w-full rounded-[var(--r)] border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCreateGoal}
+                        disabled={goalSaving}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-3 py-2 text-xs font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+                      >
+                        <Save className="h-3 w-3" />
+                        {goalSaving ? 'Opslaan...' : 'Aanmaken'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowCreateGoalForm(false); setGoalError('') }}
+                        className="rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-xs font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)]"
+                      >
+                        Annuleren
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )
           }
@@ -1698,110 +1995,6 @@ function BudgetDetailModal({
                   )}
                 </span>
               </div>
-            </div>
-          )
-        })()}
-
-        {/* Budget forecast next month prediction with spending variance confidence */}
-        {(() => {
-          const monthlySpending = history.map(h => h.spent)
-          if (monthlySpending.length < 3) return null
-          const forecast = computeBudgetForecast(monthlySpending, limit, budget.name)
-          const varianceData = calculateSpendingVariance(monthlySpending, budget.name)
-
-          if (!forecast.hasSufficientData) {
-            return (
-              <div className="border-t border-[var(--border-ed)] px-6 py-4" data-testid="budget-forecast-section">
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingUp className="h-4 w-4 text-[var(--ink-3)]" />
-                  <p className="text-xs font-semibold text-[var(--ink-3)] uppercase">Voorspelling volgende maand</p>
-                </div>
-                <p className="text-xs text-[var(--ink-3)] italic" data-testid="budget-forecast-insufficient">
-                  {forecast.message}
-                </p>
-                {/* Variance detail for insufficient data */}
-                <SpendingVarianceDetailPanel data={varianceData} className="mt-2" />
-              </div>
-            )
-          }
-
-          const confColors = getConfidenceColors(forecast.confidence)
-          const confLabel = getConfidenceLabel(forecast.confidence)
-
-          return (
-            <div className="border-t border-[var(--border-ed)] px-6 py-4" data-testid="budget-forecast-section">
-              <div className="flex items-center gap-2 mb-3">
-                <TrendingUp className="h-4 w-4 text-purple-500" />
-                <p className="text-xs font-semibold text-[var(--ink-3)] uppercase">Voorspelling volgende maand</p>
-              </div>
-
-              {/* Predicted amount */}
-              <div className="rounded-[var(--r-lg)] border border-purple-200 bg-gradient-to-r from-purple-50 to-white p-4" data-testid="budget-forecast-card">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs text-purple-600 font-medium">Verwachte uitgaven</p>
-                    <p className="text-2xl font-bold text-[var(--ink)] mt-0.5" data-testid="budget-forecast-amount">
-                      {formatCurrency(forecast.predicted)}
-                    </p>
-                    {hasFreedomData && forecast.predicted >= 100 && (
-                      <p className="text-sm italic text-[var(--ink-3)] mt-0.5">
-                        ≈ {eurToFreedomTime(forecast.predicted, dailyExpenseRate).formattedDagen}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Spending variance confidence badge with signal bars */}
-                  <SpendingConfidenceBadge data={varianceData} />
-                </div>
-
-                {/* Contextual message */}
-                <p className="text-xs text-[var(--ink-3)] mt-2" data-testid="budget-forecast-message">
-                  {forecast.message}
-                </p>
-
-                {/* Confidence detail */}
-                <div className="mt-2 flex items-center gap-3 text-[10px] text-[var(--ink-3)]">
-                  <span>Gebaseerd op {forecast.monthsUsed} maanden</span>
-                  <span>•</span>
-                  <span>{forecast.confidencePercent}% betrouwbaarheid</span>
-                </div>
-
-                {/* Budget limit comparison bar */}
-                {limit > 0 && (
-                  <div className="mt-3">
-                    <div className="flex items-center justify-between text-[10px] text-[var(--ink-3)] mb-1">
-                      <span>Voorspeld vs limiet</span>
-                      <span>{Math.round((forecast.predicted / limit) * 100)}%</span>
-                    </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          forecast.exceedsLimit ? 'bg-red-500' : forecast.predicted / limit > 0.8 ? 'bg-kern-400' : 'bg-purple-400'
-                        }`}
-                        style={{ width: `${Math.min((forecast.predicted / limit) * 100, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Spending variance detail panel */}
-              <SpendingVarianceDetailPanel data={varianceData} className="mt-3" />
-
-              {/* Alert when predicted exceeds limit */}
-              {forecast.exceedsLimit && forecast.alertMessage && (
-                <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3" data-testid="budget-forecast-alert">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-medium text-red-700" data-testid="budget-forecast-alert-message">
-                      {forecast.alertMessage}
-                    </p>
-                    <p className="text-[10px] text-red-500 mt-0.5">
-                      Limiet: {formatCurrency(limit)} — Verwacht: {formatCurrency(forecast.predicted)}
-                    </p>
-                  </div>
-                </div>
-              )}
             </div>
           )
         })()}
@@ -1887,8 +2080,15 @@ function BudgetDetailModal({
                 const amountColor = isSplitRow
                   ? (isExpense ? 'text-red-600' : 'text-emerald-600')
                   : (Number(tx.amount) < 0 ? 'text-red-600' : 'text-emerald-600')
+                const canOpen = !!(tx.id && tx.account_id)
                 return (
-                  <div key={i} className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-[var(--subtle)]">
+                  <button
+                    key={i}
+                    type="button"
+                    disabled={!canOpen}
+                    onClick={() => canOpen && openTransaction(tx.id!)}
+                    className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-[var(--subtle)] disabled:cursor-default"
+                  >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <p className="truncate text-xs font-medium text-[var(--ink-2)]">
@@ -1915,40 +2115,43 @@ function BudgetDetailModal({
                         </p>
                       )}
                     </div>
-                  </div>
+                  </button>
                 )
               })}
             </div>
           </div>
         )}
 
-        {/* 12-month spending sparkline trend */}
-        {history.length >= 2 && (
-          <div className="border-t border-[var(--border-ed)] px-6 py-4" data-testid="budget-sparkline-section">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-[var(--ink-3)] uppercase">Uitgaventrend</p>
-              <SparklineWithLabel
-                data={history.map(h => ({ month: h.month, label: h.label, spent: h.spent }))}
-                width={100}
-                height={28}
-                isIncome={budgetType === 'income'}
-                testId="budget-detail-sparkline"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* 12-month spending history */}
+        {/* Bestedingshistorie — sparkline + 12-maanden barchart */}
         {history.length > 0 && (
-          <div className="border-t border-[var(--border-ed)] px-6 py-4">
-            <p className="mb-3 text-xs font-semibold text-[var(--ink-3)] uppercase">Laatste 12 maanden</p>
+          <div className="border-t border-[var(--border-ed)] px-6 py-4" data-testid="budget-sparkline-section">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold text-[var(--ink-3)] uppercase">Bestedingshistorie</p>
+              {history.length >= 2 && (
+                <SparklineWithLabel
+                  data={history.map(h => ({ month: h.month, label: h.label, spent: h.spent }))}
+                  width={100}
+                  height={28}
+                  isIncome={budgetType === 'income'}
+                  testId="budget-detail-sparkline"
+                />
+              )}
+            </div>
             <div className="flex items-end gap-1" style={{ height: 80 }}>
               {history.map((h) => {
                 const spentH = (h.spent / maxHistoryValue) * 100
                 const limitH = (h.limit / maxHistoryValue) * 100
                 const over = h.spent > h.limit && h.limit > 0
+                const isSelected = selectedHistMonth === h.month
                 return (
-                  <div key={h.month} className="group relative flex flex-1 flex-col items-center" style={{ height: '100%' }}>
+                  <button
+                    key={h.month}
+                    type="button"
+                    onClick={() => selectHistMonth(h.month)}
+                    className="group relative flex flex-1 flex-col items-center focus-visible:outline-none"
+                    style={{ height: '100%' }}
+                    title={`${h.label}: ${formatCurrency(h.spent)}`}
+                  >
                     {/* Limit indicator line */}
                     {h.limit > 0 && (
                       <div
@@ -1959,25 +2162,293 @@ function BudgetDetailModal({
                     {/* Spent bar */}
                     <div className="mt-auto w-full">
                       <div
-                        className="w-full rounded-t"
+                        className="w-full rounded-t transition-opacity"
                         style={{
                           height: `${Math.max(spentH * 0.8, 2)}px`,
                           backgroundColor: over ? '#f87171' : colors.barHex,
+                          opacity: selectedHistMonth && !isSelected ? 0.35 : 1,
+                          outline: isSelected ? `2px solid ${colors.barHex}` : undefined,
+                          outlineOffset: isSelected ? '2px' : undefined,
                         }}
                       />
                     </div>
                     {/* Month label */}
-                    <p className="mt-1 text-[9px] text-[var(--ink-3)]">{h.label}</p>
+                    <p className={`mt-1 text-[9px] transition-colors ${isSelected ? 'font-semibold text-[var(--ink-2)]' : 'text-[var(--ink-3)]'}`}>{h.label}</p>
                     {/* Tooltip */}
                     <div className="pointer-events-none absolute -top-10 z-10 rounded bg-zinc-800 px-2 py-1 text-[10px] text-white opacity-0 shadow-[var(--s2)] transition-opacity group-hover:opacity-100">
                       {formatCurrency(h.spent)} / {formatCurrency(h.limit)}
                     </div>
-                  </div>
+                  </button>
                 )
               })}
             </div>
+
+            {/* Uitklappanel voor geselecteerde maand */}
+            {selectedHistMonth && (() => {
+              const hEntry = history.find(h => h.month === selectedHistMonth)
+              if (!hEntry) return null
+              return (
+                <div style={{ animation: 'fadeUp 0.2s ease-out both' }} className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-xs font-semibold text-[var(--ink-2)]">
+                      {new Date(selectedHistMonth).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })}
+                    </p>
+                    <div className="flex items-center gap-3 text-[10px] text-[var(--ink-3)]">
+                      <span>{formatCurrency(hEntry.spent)} besteed</span>
+                      {hEntry.limit > 0 && <span>/ {formatCurrency(hEntry.limit)} limiet</span>}
+                      {hEntry.limit > 0 && (
+                        <span className={hEntry.spent > hEntry.limit ? 'font-semibold text-red-600' : 'text-emerald-600'}>
+                          {hEntry.spent > hEntry.limit ? '+' : '-'}{formatCurrency(Math.abs(hEntry.spent - hEntry.limit))}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {histMonthTxLoading ? (
+                    <p className="text-[11px] italic text-[var(--ink-4)]">Laden…</p>
+                  ) : histMonthTx.length === 0 ? (
+                    <p className="text-[11px] italic text-[var(--ink-4)]">Geen transacties gevonden.</p>
+                  ) : (
+                    <div className="max-h-48 space-y-0.5 overflow-y-auto">
+                      {histMonthTx.map((tx) => (
+                        <button
+                          key={tx.id}
+                          type="button"
+                          onClick={() => openTransaction(tx.id)}
+                          className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-[var(--subtle)]"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs font-medium text-[var(--ink-2)]">
+                              {tx.counterparty_name || tx.description}
+                            </p>
+                            <p className="text-[10px] text-[var(--ink-3)]">
+                              {new Date(tx.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                              {tx.counterparty_name && tx.description !== tx.counterparty_name && (
+                                <span className="ml-1">{tx.description}</span>
+                              )}
+                            </p>
+                          </div>
+                          <span className={`ml-3 shrink-0 text-xs font-medium tabular-nums ${Number(tx.amount) < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                            {formatCurrency(Math.abs(Number(tx.amount)))}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         )}
+
+        {/* Budget forecast next month prediction with spending variance confidence */}
+        {(() => {
+          const monthlySpending = history.map(h => h.spent)
+          if (monthlySpending.length < 3) return null
+          const forecast = computeBudgetForecast(monthlySpending, limit, budget.name)
+          const varianceData = calculateSpendingVariance(monthlySpending, budget.name)
+
+          if (!forecast.hasSufficientData) {
+            return (
+              <div className="border-t border-[var(--border-ed)] px-6 py-4" data-testid="budget-forecast-section">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingUp className="h-4 w-4 text-[var(--ink-3)]" />
+                  <p className="text-xs font-semibold text-[var(--ink-3)] uppercase">Voorspelling volgende maand</p>
+                </div>
+                <p className="text-xs text-[var(--ink-3)] italic" data-testid="budget-forecast-insufficient">
+                  {forecast.message}
+                </p>
+                {/* Variance detail for insufficient data */}
+                <SpendingVarianceDetailPanel data={varianceData} className="mt-2" />
+              </div>
+            )
+          }
+
+          const confColors = getConfidenceColors(forecast.confidence)
+          const confLabel = getConfidenceLabel(forecast.confidence)
+
+          return (
+            <>
+            <div className="border-t border-[var(--border-ed)] px-6 py-4" data-testid="budget-forecast-section">
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp className="h-4 w-4 text-[var(--ink-3)]" />
+                <p className="text-xs font-semibold text-[var(--ink-3)] uppercase">Voorspelling volgende maand</p>
+              </div>
+
+              {/* Predicted amount */}
+              <div className="rounded-[var(--r-lg)] border border-[var(--border-md)] bg-[var(--subtle)]/50 p-4" data-testid="budget-forecast-card">
+                <div className="flex items-start justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setShowForecastModal(true)}
+                    className="text-left transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kern-300 rounded"
+                    title="Bekijk de berekening"
+                  >
+                    <p className="text-xs text-[var(--ink-3)] font-medium">Verwachte uitgaven</p>
+                    <p className="text-2xl font-bold text-[var(--ink)] mt-0.5" data-testid="budget-forecast-amount">
+                      {formatCurrency(forecast.predicted)}
+                    </p>
+                    {hasFreedomData && forecast.predicted >= 100 && (
+                      <p className="font-serif text-sm italic text-[var(--ink-3)] mt-0.5">
+                        ≈ {eurToFreedomTime(forecast.predicted, dailyExpenseRate).formattedDagen}
+                      </p>
+                    )}
+                    <p className="text-[10px] text-kern-500 mt-1">Hoe berekend? →</p>
+                  </button>
+
+                  {/* Spending variance confidence badge with signal bars — klikbaar voor details */}
+                  <button
+                    type="button"
+                    onClick={() => setShowVarianceDetail(v => !v)}
+                    className="flex items-center gap-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-md)]"
+                    aria-expanded={showVarianceDetail}
+                    aria-label="Betrouwbaarheid details tonen"
+                  >
+                    <SpendingConfidenceBadge data={varianceData} />
+                    {showVarianceDetail
+                      ? <ChevronUp className="h-3 w-3 text-[var(--ink-3)]" />
+                      : <ChevronDown className="h-3 w-3 text-[var(--ink-3)]" />
+                    }
+                  </button>
+                </div>
+
+                {/* Contextual message */}
+                <p className="text-xs text-[var(--ink-3)] mt-2" data-testid="budget-forecast-message">
+                  {forecast.message}
+                </p>
+
+                {/* Confidence detail */}
+                <div className="mt-2 flex items-center gap-3 text-[10px] text-[var(--ink-3)]">
+                  <span>Gebaseerd op {forecast.monthsUsed} maanden</span>
+                  <span>•</span>
+                  <span>{forecast.confidencePercent}% betrouwbaarheid</span>
+                </div>
+
+                {/* Budget limit comparison bar */}
+                {limit > 0 && (
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between text-[10px] text-[var(--ink-3)] mb-1">
+                      <span>Voorspeld vs limiet</span>
+                      <span>{Math.round((forecast.predicted / limit) * 100)}%</span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          forecast.exceedsLimit ? 'bg-red-500' : forecast.predicted / limit > 0.8 ? 'bg-kern-400' : 'bg-[var(--border-md)]'
+                        }`}
+                        style={{ width: `${Math.min((forecast.predicted / limit) * 100, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Spending variance detail panel — conditioneel achter badge-klik */}
+              {showVarianceDetail && (
+                <div style={{ animation: 'fadeUp 0.25s ease-out both' }}>
+                  <SpendingVarianceDetailPanel data={varianceData} className="mt-3" />
+                </div>
+              )}
+
+              {/* Alert when predicted exceeds limit */}
+              {forecast.exceedsLimit && forecast.alertMessage && (
+                <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3" data-testid="budget-forecast-alert">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-medium text-red-700" data-testid="budget-forecast-alert-message">
+                      {forecast.alertMessage}
+                    </p>
+                    <p className="text-[10px] text-red-500 mt-0.5">
+                      Limiet: {formatCurrency(limit)} — Verwacht: {formatCurrency(forecast.predicted)}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+            <BottomSheet
+              open={showForecastModal}
+              onClose={() => setShowForecastModal(false)}
+              title="Verwachte uitgaven"
+            >
+              <div className="p-4 sm:p-6">
+              <KassabonShell>
+                {/* Header */}
+                <div className="mb-3 text-center">
+                  <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">VOORSPELLING VOLGENDE MAAND</p>
+                  <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">{budget.name} — gewogen voortschrijdend gemiddelde</p>
+                </div>
+                {/* Uitleg */}
+                <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
+                  Berekend op basis van je laatste {forecast.monthsUsed} maanden. Recentere maanden tellen zwaarder mee in de voorspelling.
+                </div>
+                {/* Maandwaarden */}
+                <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
+                  {forecast.monthlyValues.map((val, i) => {
+                    const d = new Date(monthDate)
+                    d.setMonth(d.getMonth() - (forecast.monthlyValues.length - 1 - i))
+                    const label = d.toLocaleDateString('nl-NL', { month: 'short', year: '2-digit' })
+                    const isZero = val === 0
+                    return (
+                      <div key={i} className={`flex justify-between py-0.5 ${isZero ? 'opacity-40' : ''}`}>
+                        <span className="font-sans text-sm text-[var(--ink-2)]">{label}{isZero ? ' (geen data)' : ` × ${i + 1}`}</span>
+                        <span className="tabular-nums text-[var(--ink)]">{isZero ? '—' : formatCurrency(val)}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+                {/* Statistieken */}
+                <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
+                  <div className="flex justify-between py-0.5">
+                    <span className="font-sans text-sm text-[var(--ink-3)]">Gemiddelde (enkelvoudig)</span>
+                    <span className="tabular-nums text-[var(--ink-3)]">{formatCurrency(forecast.mean)}</span>
+                  </div>
+                  <div className="flex justify-between py-0.5">
+                    <span className="font-sans text-sm text-[var(--ink-3)]">Standaardafwijking</span>
+                    <span className="tabular-nums text-[var(--ink-3)]">± {formatCurrency(forecast.stdDev)}</span>
+                  </div>
+                </div>
+                {/* Totaalregel */}
+                <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
+                  <span className="text-[var(--ink)]">Verwacht volgende maand</span>
+                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(forecast.predicted)}</span>
+                </div>
+                {/* Freedom badge */}
+                {hasFreedomData && forecast.predicted >= 100 && (
+                  <div className="mt-3 rounded-[var(--r)] border border-[var(--hor-m)] bg-[var(--hor-l)] px-3 py-2 text-center">
+                    <p className="font-playfair text-xl font-bold text-[var(--hor-t)]">
+                      {eurToFreedomTime(forecast.predicted, dailyExpenseRate).formattedDagen}
+                    </p>
+                    <p className="font-sans text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">VRIJHEIDSTIJD</p>
+                  </div>
+                )}
+                {/* Limiet vergelijking */}
+                {limit > 0 && (
+                  <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2">
+                    <div className="flex justify-between py-0.5 font-sans text-[11px]">
+                      <span className="text-[var(--ink-3)]">Budgetlimiet</span>
+                      <span className="tabular-nums text-[var(--ink-3)]">{formatCurrency(limit)}</span>
+                    </div>
+                    <div className={`flex justify-between py-0.5 font-sans text-[11px] font-medium ${forecast.exceedsLimit ? 'text-red-600' : 'text-emerald-600'}`}>
+                      <span>{forecast.exceedsLimit ? 'Verwachte overschrijding' : 'Verwachte ruimte'}</span>
+                      <span className="tabular-nums">{forecast.exceedsLimit ? '+' : ''}{formatCurrency(Math.abs(forecast.predicted - limit))}</span>
+                    </div>
+                  </div>
+                )}
+                {/* Formule */}
+                <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
+                  <p><strong className="font-semibold text-[var(--ink-3)]">Formule:</strong> gewogen gemiddelde — maand 1 × 1, … maand {forecast.monthsUsed} × {forecast.monthsUsed}, gedeeld door de som der gewichten</p>
+                </div>
+                {/* Betrouwbaarheid */}
+                <div className="mt-2 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] text-[var(--ink-3)]">
+                  <p>Betrouwbaarheid: <strong className="text-[var(--ink-2)]">{getConfidenceLabel(forecast.confidence)}</strong> ({forecast.confidencePercent}%)</p>
+                </div>
+                {/* Footer */}
+                <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">Gebaseerd op {forecast.monthsUsed} maanden transactiedata</p>
+              </KassabonShell>
+              </div>
+            </BottomSheet>
+            </>
+          )
+        })()}
 
         {/* Limit change history */}
         {limitHistory.length > 1 && (
@@ -2117,6 +2588,19 @@ function BudgetDetailModal({
         </div>
       </div>
     </div>
+    {txToEdit && (
+      <TransactionForm
+        transaction={txToEdit}
+        accountId={txToEdit.account_id}
+        budgetGroups={budgetGroups}
+        onClose={() => setTxToEdit(null)}
+        onSaved={() => {
+          setTxToEdit(null)
+          onGoalCreated?.()
+        }}
+      />
+    )}
+    </>
   )
 }
 
