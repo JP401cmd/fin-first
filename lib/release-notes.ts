@@ -44,6 +44,94 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'fin_prod_0.75',
+    date: '2026-02-25',
+    title: 'Grafiek-animaties, kassabon forecasts & Will insights',
+    sections: [
+      {
+        module: 'Platform — Animaties',
+        color: 'zinc',
+        items: [
+          {
+            title: 'useInViewAnimation hook',
+            description: 'Nieuwe hook lib/hooks/use-in-view-animation.ts met IntersectionObserver (once: true), hasEntered + animationComplete flags en ingebouwde prefers-reduced-motion ondersteuning. Alle grafiek-componenten gebruiken deze hook voor consistente viewport-triggered build-animaties.',
+          },
+          {
+            title: 'Nieuwe CSS keyframes: drawPath & fadeInFill',
+            description: 'globals.css bevat twee nieuwe keyframes: drawPath voor SVG-lijn draw-animaties (strokeDashoffset 1→0) en fadeInFill voor fill-areas (opacity 0→target). Worden gebruikt door alle grafiek-componenten en sparklines.',
+          },
+          {
+            title: 'Lijn- en staafgrafieken animeren bij viewport-entry',
+            description: 'BudgetSparkline (400ms pathLength draw), TrendChart (700ms lijn, 455ms fill, 40ms/kolom stagger voor balken), NetWorthProjectionChart (700ms lijn, 455ms fill, 650ms dots), CashFlowForecastChart (700ms + projected + red-zone), BenchmarkComparisonChart (800ms lijnen, 520ms fill) en FreedomDaysMonthlyTrend (bars met 35ms/bar stagger) trekken hun lijnen en balken visueel op bij het betreden van de viewport.',
+          },
+          {
+            title: 'Horizon modal-animaties (mount-based)',
+            description: 'Alle Horizon-modals gebruiken mount-based animaties (100ms setTimeout) in plaats van IntersectionObserver, omdat BottomSheet-content altijd in-viewport staat. ProjectionsModal (ThreeLineChart), SimulationsModal (ConeChart + HistogramChart met 20ms/bar stagger), ScenariosModal (DivergingPathsChart met 100ms inter-lijn stagger), WithdrawalModal (DrawdownChart) en LogTimeline animeren bij modal-opening.',
+          },
+          {
+            title: 'Overige SVG-componenten met viewport-animatie',
+            description: 'GoalProgressTimeline (hoofdlijn draw + fill), SankeyDiagram (fade-in bij viewport), BudgetBlob (fade-in), BillCalendar sparkline (draw), BudgetDonut en PortfolioAllocationChart.',
+          },
+          {
+            title: 'Budgetten-widget & jouw-pad-widget animaties',
+            description: 'budgetten-widget en jouw-pad-widget-wrapper zijn omgezet naar \'use client\' met useInViewAnimation: begrotingsbalken animeren 0→target bij viewport-entry, fase-balk animeert met 150ms delay.',
+          },
+          {
+            title: 'BudgetSparkline bugfixes',
+            description: 'rootMargin ingesteld op \'0px\' zodat de draw-animatie ook correct vuurt vanuit BottomSheet-modals. Fill-opacity bug opgelost: fadeInFill keyframe overschreef inline opacity 0.12 — nu via CSS transition afgehandeld.',
+          },
+          {
+            title: 'AnimatedProgressBar prefers-reduced-motion fix',
+            description: 'AnimatedProgressBar animeerde altijd, ook als prefers-reduced-motion actief was. Bugfix zorgt dat de balk direct op de doelwaarde staat voor gebruikers die animaties uitzetten.',
+          },
+        ],
+      },
+      {
+        module: 'De Kern — Budgetten',
+        color: 'amber',
+        items: [
+          {
+            title: 'G1: Forecast kassabon modal',
+            description: 'Het forecast-bedrag in het budget-detailpaneel is nu klikbaar. Opent een BottomSheet met een kassabon (KassabonShell): maandwaarden × gewichten, statistieken, totaalregel, freedom badge, limietvergelijking, formule en betrouwbaarheidsscore.',
+          },
+          {
+            title: 'G3: Will AI budget insights kaart',
+            description: 'Nieuwe AI-inzichtenkaart tussen de KPI-sectie en de weergave-toggle op /core/budgets. Toont conditioneel maximaal 2 overschreden of bijna-volle budgetten, met een "Vraag Will →" link naar de chat. Gebruikt het editorial card-patroon (accent bar + neutrale border).',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: 'fin_prod_0.74',
+    date: '2026-02-23',
+    title: 'Opruimen badges/streaks & UX verbeteringen',
+    sections: [
+      {
+        module: 'Platform — Opruimen',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Badges & streaks systeem verwijderd',
+            description: 'Het gehele badges- en streakssysteem is uit de codebase verwijderd: lib/badges.ts, badge-evaluator, badge-grid, badge-notifier, badge-grid, streak-indicator, streak-records, streak-break-warning, toast-provider en de bijbehorende hooks (use-badge-evaluation, use-unnotified-badges). Het systeem was nog niet productierijp en creëerde onnodig technische schuld.',
+          },
+          {
+            title: 'Verify API-routes verwijderd',
+            description: 'Alle verify-* API-routes (verify-badge-grid, verify-badge-idempotency, verify-badge-schema, verify-badge-share, verify-badge-toast, verify-empty-badge-eval, verify-streak-*) zijn verwijderd. Deze routes werden alleen gebruikt voor feature-verificatie, niet door de productie-app.',
+          },
+          {
+            title: 'Test-pagina\'s opgeruimd',
+            description: 'Meer dan 15 losstaande /test-* pagina\'s (test-badge-*, test-streak-*, test-fire-scenarios, test-debt-payoff, test-portfolio-projection) zijn verwijderd. Ze bevinden zich niet meer in de Next.js app router en worden dus ook niet meer gebundeld.',
+          },
+          {
+            title: 'Action board vereenvoudigd',
+            description: 'components/app/action-board.tsx bijgewerkt: streakIndicator en badgeNotifier imports en rendering verwijderd. Cleaner component zonder ongebruikte dependencies.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: 'fin_prod_0.73',
     date: '2026-02-22',
     title: 'Widget dashboard, AI-categorisatie & transactiescope',
