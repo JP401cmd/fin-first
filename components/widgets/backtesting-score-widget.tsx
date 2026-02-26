@@ -1,0 +1,69 @@
+import { WidgetShell } from './widget-shell'
+import type { WidgetSize } from '@/lib/widget-catalog'
+import type { DashboardData } from './widget-renderer'
+import { ShieldCheck, ShieldAlert } from 'lucide-react'
+
+interface Props {
+  size: WidgetSize
+  data: DashboardData
+  href?: string
+}
+
+export function BacktestingScoreWidget({ size, data, href }: Props) {
+  const { backtestSuccessRate, backtestNamedPaths } = data
+
+  if (backtestSuccessRate == null) {
+    return (
+      <WidgetShell module="horizon" size={size} kicker="Historische Weerbaarheid" href={href}>
+        <p className="text-xs text-[var(--ink-3)]">Onvoldoende data voor backtesting</p>
+      </WidgetShell>
+    )
+  }
+
+  const successColor =
+    backtestSuccessRate >= 85 ? 'text-emerald-600' :
+    backtestSuccessRate >= 65 ? 'text-horizon-600' : 'text-red-600'
+
+  const successes = backtestNamedPaths?.filter(p => p.success).length ?? 0
+  const total = backtestNamedPaths?.length ?? 0
+
+  return (
+    <WidgetShell module="horizon" size={size} kicker="Historische Weerbaarheid" href={href}>
+      <div className="flex items-center gap-2 mt-0.5">
+        {backtestSuccessRate >= 75
+          ? <ShieldCheck className="h-5 w-5 text-emerald-500 shrink-0" />
+          : <ShieldAlert className="h-5 w-5 text-red-400 shrink-0" />
+        }
+        <div>
+          <p className={`font-mono text-2xl font-semibold tabular-nums leading-none ${successColor}`}>
+            {backtestSuccessRate}%
+          </p>
+          <p className="text-[10px] text-[var(--ink-3)] mt-0.5">historische succeskans</p>
+        </div>
+      </div>
+
+      {backtestNamedPaths && backtestNamedPaths.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {backtestNamedPaths.map(p => (
+            <span
+              key={p.label}
+              className={`inline-flex items-center gap-1 rounded-[var(--r-sm)] border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide
+                ${p.success
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-red-200 bg-red-50 text-red-700'
+                }`}
+            >
+              {p.success ? '✓' : '✗'} {p.label}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {size === 'full' && total > 0 && (
+        <p className="mt-3 font-serif italic text-[11px] text-[var(--ink-3)]">
+          {successes} van {total} historische crises overleefd — klik voor volledige analyse
+        </p>
+      )}
+    </WidgetShell>
+  )
+}

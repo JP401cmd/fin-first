@@ -21,14 +21,12 @@ import { Box3ScenarioModal } from '@/components/app/core/box3-scenario-modal'
 import { Box3PartnerModal } from '@/components/app/core/box3-partner-modal'
 import {
   Info, Receipt, ArrowRightLeft, Users, Lightbulb,
-  Clock, Percent, CalendarDays, ShieldCheck, Target, TrendingDown, Calculator, AlertTriangle, Check,
+  Clock, Percent, CalendarDays, ShieldCheck, Target, TrendingDown, Calculator, AlertTriangle,
 } from 'lucide-react'
 import {
   NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF, BOX3_DRAG, NL_INFLATIE, NL_SWR, NL_MULTIPLIER,
   CLASSIC_MULTIPLIER, DEFAULT_RETURN,
-  type FireMethod,
 } from '@/lib/horizon-data'
-import { useFireMethod } from '@/lib/hooks/use-fire-method'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -45,13 +43,7 @@ function KpiTooltip({ text }: { text: string }) {
   )
 }
 
-// Local derived constants
-const CLASSIC_SWR = 0.04
-const EXTRA_PCTS = (NL_MULTIPLIER / CLASSIC_MULTIPLIER - 1) * 100  // ≈ +39%
-
 export default function BelastingPage() {
-  const { method: fireMethod, setMethod: setFireMethod, loading: fireMethodLoading } = useFireMethod()
-  const [savedConfirm, setSavedConfirm] = useState(false)
   const [assets, setAssets] = useState<Asset[]>([])
   const [debts, setDebts] = useState<Debt[]>([])
   const [dailyExpenses, setDailyExpenses] = useState(0)
@@ -67,11 +59,6 @@ export default function BelastingPage() {
   const [showVrijheidsdagenKassabon, setShowVrijheidsdagenKassabon] = useState(false)
   const [showHeffingsvrijKassabon, setShowHeffingsvrijKassabon] = useState(false)
 
-  async function handleSetFireMethod(m: FireMethod) {
-    await setFireMethod(m)
-    setSavedConfirm(true)
-    setTimeout(() => setSavedConfirm(false), 2500)
-  }
 
   const loadData = useCallback(async () => {
     try {
@@ -557,52 +544,6 @@ export default function BelastingPage() {
           </div>
         </KassabonShell>
 
-        {/* FIRE-methode keuze toggle */}
-        <div className="mt-4 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4">
-          <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
-            FIRE-methode voor jouw doelvermogen
-          </p>
-          <p className="mb-3 font-sans text-xs text-[var(--ink-4)]">
-            De actieve methode bepaalt je FIRE-target door de hele app.
-          </p>
-          <div className="flex rounded-[var(--r)] border border-[var(--border-md)] overflow-hidden">
-            <button
-              type="button"
-              disabled={fireMethodLoading}
-              onClick={() => handleSetFireMethod('classic')}
-              className={[
-                'flex-1 py-2.5 px-3 font-sans text-xs font-medium transition-colors',
-                fireMethod === 'classic'
-                  ? 'bg-kern-50 border-r border-kern-200 text-kern-700'
-                  : 'bg-[var(--paper)] border-r border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]',
-              ].join(' ')}
-            >
-              {fireMethod === 'classic' && <span className="mr-1">✓</span>}
-              Klassiek (4%-regel)
-            </button>
-            <button
-              type="button"
-              disabled={fireMethodLoading}
-              onClick={() => handleSetFireMethod('nl')}
-              className={[
-                'flex-1 py-2.5 px-3 font-sans text-xs font-medium transition-colors',
-                fireMethod === 'nl'
-                  ? 'bg-kern-50 text-kern-700'
-                  : 'bg-[var(--paper)] text-[var(--ink-3)] hover:bg-[var(--subtle)]',
-              ].join(' ')}
-            >
-              {fireMethod === 'nl' && <span className="mr-1">✓</span>}
-              NL-FIRE (2,88%)
-            </button>
-          </div>
-          {savedConfirm && (
-            <p className="mt-2 flex items-center gap-1 font-sans text-[11px] text-kern-600">
-              <Check className="h-3 w-3" />
-              Opgeslagen als je FIRE-doel door de app
-            </p>
-          )}
-        </div>
-
         {/* Impact vergelijking — twee kaartjes */}
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           {/* Classic FIRE */}
@@ -618,7 +559,7 @@ export default function BelastingPage() {
             <div className="space-y-1.5">
               <div className="flex justify-between">
                 <span className="font-sans text-xs text-[var(--ink-3)]">Safe Withdrawal Rate</span>
-                <span className="font-mono text-sm font-semibold text-[var(--ink)]">{(CLASSIC_SWR * 100).toFixed(2)}%</span>
+                <span className="font-mono text-sm font-semibold text-[var(--ink)]">4,00%</span>
               </div>
               <div className="flex justify-between">
                 <span className="font-sans text-xs text-[var(--ink-3)]">Multiplier</span>
@@ -669,7 +610,7 @@ export default function BelastingPage() {
                 </p>
                 <FreedomTimeBadge amount={Math.round(displayExpenses * NL_MULTIPLIER)} className="mt-1.5" />
                 <span className="mt-2 inline-block rounded-full border border-kern-100 bg-kern-50 px-2 py-0.5 font-sans text-[10px] font-medium text-kern-700">
-                  +{EXTRA_PCTS.toFixed(0)}% meer dan klassiek
+                  +{((NL_MULTIPLIER / CLASSIC_MULTIPLIER - 1) * 100).toFixed(0)}% meer dan klassiek
                 </span>
               </div>
             </div>

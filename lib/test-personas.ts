@@ -165,6 +165,7 @@ export interface PersonaLifeEvent {
   icon: string
   is_active: boolean
   sort_order: number
+  is_indexed?: boolean
 }
 
 export interface PersonaRecommendation {
@@ -563,6 +564,7 @@ const roosData: PersonaData = {
   life_events: [
     { name: 'Scheiding afgerond', event_type: 'custom', target_age: 38, target_date: '2024-03-15', one_time_cost: 3500, monthly_cost_change: 400, monthly_income_change: 0, duration_months: 0, icon: 'HeartCrack', is_active: false, sort_order: 0 },
     { name: 'Schuldhulpverlening overwegen', event_type: 'custom', target_age: null, target_date: monthsAgo(-6), one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 0, duration_months: 12, icon: 'LifeBuoy', is_active: true, sort_order: 1 },
+    { name: 'AOW', event_type: 'aow', target_age: 67, target_date: '2053-03-01', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 1380, duration_months: 0, icon: 'Landmark', is_active: true, sort_order: 2, is_indexed: true },
   ],
   recommendations: [
     {
@@ -736,6 +738,7 @@ const daanData: PersonaData = {
   life_events: [
     { name: 'Eerste baan gestart', event_type: 'career_change', target_age: 24, target_date: '2024-02-01', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 3400, duration_months: 0, icon: 'Briefcase', is_active: false, sort_order: 0 },
     { name: 'Eigen woning kopen', event_type: 'move', target_age: 30, target_date: '2030-01-01', one_time_cost: 25000, monthly_cost_change: 200, monthly_income_change: 0, duration_months: 0, icon: 'Home', is_active: true, sort_order: 1 },
+    { name: 'AOW', event_type: 'aow', target_age: 67, target_date: '2067-01-01', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 1380, duration_months: 0, icon: 'Landmark', is_active: true, sort_order: 2, is_indexed: true },
   ],
   recommendations: [
     {
@@ -931,6 +934,7 @@ const lisaData: PersonaData = {
   life_events: [
     { name: 'Kinderen naar middelbare school', event_type: 'children', target_age: 48, target_date: '2029-09-01', one_time_cost: 1500, monthly_cost_change: -200, monthly_income_change: 0, duration_months: 72, icon: 'GraduationCap', is_active: true, sort_order: 0 },
     { name: 'Sabbatical jaar', event_type: 'sabbatical', target_age: 50, target_date: '2031-07-01', one_time_cost: 5000, monthly_cost_change: 500, monthly_income_change: -4200, duration_months: 6, icon: 'Palmtree', is_active: true, sort_order: 1 },
+    { name: 'AOW', event_type: 'aow', target_age: 67, target_date: '2048-07-01', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 940, duration_months: 0, icon: 'Landmark', is_active: true, sort_order: 2, is_indexed: true },
   ],
   recommendations: [
     {
@@ -1120,6 +1124,7 @@ const willemData: PersonaData = {
   life_events: [
     { name: 'Hypotheek afgelost', event_type: 'custom', target_age: 56, target_date: '2024-06-01', one_time_cost: 0, monthly_cost_change: -1200, monthly_income_change: 0, duration_months: 0, icon: 'PartyPopper', is_active: false, sort_order: 0 },
     { name: 'Vervroegd pensioen', event_type: 'early_retirement', target_age: 60, target_date: '2028-11-30', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: -5500, duration_months: 0, icon: 'Sunset', is_active: true, sort_order: 1 },
+    { name: 'AOW', event_type: 'aow', target_age: 67, target_date: '2035-11-01', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 940, duration_months: 0, icon: 'Landmark', is_active: true, sort_order: 2, is_indexed: true },
   ],
   recommendations: [
     {

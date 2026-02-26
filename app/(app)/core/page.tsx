@@ -3,13 +3,13 @@
 import { useEffect, useState, useCallback } from 'react'
 import { FhinAvatar } from '@/components/app/avatars'
 import { computeCoreData, type CoreData } from '@/lib/mock-data'
-import { useFireMethod } from '@/lib/hooks/use-fire-method'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, BudgetIcon } from '@/components/app/budget-shared'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { shouldAlert } from '@/lib/budget-alerts'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
+import { NL_SWR } from '@/lib/horizon-data'
 import type { Budget } from '@/lib/budget-data'
 import type { NetWorthSnapshot } from '@/lib/net-worth-data'
 import {
@@ -48,7 +48,7 @@ const DynDebtsPage = dynamic(() => import('@/app/(app)/core/debts/page'), {
 
 export default function CorePage() {
   const router = useRouter()
-  const { swr: fireSwr } = useFireMethod()
+  const fireSwr = NL_SWR
   const [data, setData] = useState<CoreData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -712,7 +712,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                     <p className="font-mono text-2xl font-bold text-[var(--ink)]">{data.freeDaysPerYear}</p>
                     <span className="text-sm text-[var(--ink-3)]">vrije dagen/jaar</span>
                   </button>
-                  <HeroTooltip text="Klik op het getal voor de volledige berekening. Hoeveel dagen per jaar je passief inkomen (4% SWR op must-uitgaven) je dagelijkse kosten dekt." />
+                  <HeroTooltip text={`Klik op het getal voor de volledige berekening. Hoeveel dagen per jaar je passief inkomen (${(fireSwr * 100).toFixed(2)}% NL-SWR op must-uitgaven) je dagelijkse kosten dekt.`} />
                 </div>
                 <p className="text-[10px] text-[var(--ink-4)]">gedekt door passief inkomen</p>
               </div>
@@ -1203,10 +1203,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
 
           <div className="mb-1 border-b border-dashed border-[var(--border-ed)] pb-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
             Het FIRE-bedrag is het vermogen waarmee je voor altijd van de opbrengsten kunt leven, zonder je kapitaal aan te spreken.{' '}
-            {fireSwr === 0.04
-              ? <>Dit is gebaseerd op de &ldquo;4%-regel&rdquo;: je onttrekt jaarlijks 4% van je vermogen.</>
-              : <>Dit gebruikt de NL-FIRE methode ({(fireSwr * 100).toFixed(2)}%), die rekening houdt met de Nederlandse Box 3 vermogensrendementsheffing.</>
-            }
+            Dit gebruikt de NL-FIRE methode ({(fireSwr * 100).toFixed(2)}%), die rekening houdt met de Nederlandse Box 3 vermogensrendementsheffing en inflatie.
           </div>
 
           {data && (
@@ -1258,9 +1255,9 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
               </div>
 
               <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
-                <p><strong className="text-[var(--ink-3)]">De 4%-regel:</strong> Onderzoek (de &ldquo;Trinity Study&rdquo;) toont aan dat je 4% per jaar kunt onttrekken aan een gediversifieerde portefeuille zonder dat het kapitaal opraakt over 30+ jaar.</p>
+                <p><strong className="text-[var(--ink-3)]">NL-FIRE methode:</strong> Na Box 3-heffing ({(2.117).toFixed(1)}%) en inflatie ({(2).toFixed(0)}%) resteert {(fireSwr * 100).toFixed(2)}% als veilige opnamerate voor Nederlandse beleggers.</p>
                 <p className="mt-1"><strong className="text-[var(--ink-3)]">Formule:</strong>{' '}
-                  {retirementMethodUsed === 'essential_budgets' ? 'must-uitgaven' : 'jaarlijkse uitgave na retirement'} ÷ {(fireSwr * 100).toFixed(0)}% = benodigd vermogen
+                  {retirementMethodUsed === 'essential_budgets' ? 'must-uitgaven' : 'jaarlijkse uitgave na retirement'} ÷ {(fireSwr * 100).toFixed(2)}% = benodigd vermogen
                 </p>
               </div>
 
@@ -1492,10 +1489,10 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 )}
               </div>
 
-              {/* Formule & 4%-regel uitleg */}
+              {/* Formule & NL-FIRE uitleg */}
               <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-                <p><strong className="font-semibold text-[var(--ink-3)]">Formule:</strong> Vrije dagen = (Netto vermogen × 4%) ÷ ({usingMustExpenses ? 'Must-uitgaven' : 'Jaarlijkse uitgaven'} ÷ 365)</p>
-                <p className="mt-1.5"><strong className="font-semibold text-[var(--ink-3)]">De 4%-regel</strong> (Trinity Study, 1998): je kunt jaarlijks 4% van je beleggingsportefeuille opnemen zonder dat je vermogen in 30+ jaar uitgeput raakt — mits breed gespreid belegd. Dit is de internationale standaard voor FIRE-berekeningen.</p>
+                <p><strong className="font-semibold text-[var(--ink-3)]">Formule:</strong> Vrije dagen = (Netto vermogen × {(fireSwr * 100).toFixed(2)}%) ÷ ({usingMustExpenses ? 'Must-uitgaven' : 'Jaarlijkse uitgaven'} ÷ 365)</p>
+                <p className="mt-1.5"><strong className="font-semibold text-[var(--ink-3)]">NL-FIRE methode ({(fireSwr * 100).toFixed(2)}%)</strong>: na Box 3-vermogensbelasting en inflatie is {(fireSwr * 100).toFixed(2)}% de realistische opnamerate voor Nederlandse beleggers.</p>
                 <p className="mt-1.5">365 vrije dagen betekent volledige financiële vrijheid: FIRE bereikt.</p>
               </div>
 

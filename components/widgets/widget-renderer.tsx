@@ -19,9 +19,15 @@ import { VeerkrachtScoreWidget } from './veerkracht-score-widget'
 import { BelastingBox3Widget } from './belasting-box3-widget'
 import { TerugkerendeTransactiesWidget } from './terugkerende-transacties-widget'
 import { NibudBenchmarkWidget } from './nibud-benchmark-widget'
+import { VrijheidsScenarioWidget } from './vrijheidsscenario-widget'
+import { SimVermogenspadWidget } from './sim-vermogenspad-widget'
+import { PassiefInkomenWidget } from './passief-inkomen-widget'
+import { Box3DragWidget } from './box3-drag-widget'
+import { VrijheidsMijlpalenWidget } from './vrijheidsmijlpalen-widget'
+import { BacktestingScoreWidget } from './backtesting-score-widget'
 import { getWidgetDef, WIDGET_HREFS } from '@/lib/widget-catalog'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import type { FireProjection } from '@/lib/horizon-data'
+import type { FireProjection, FireRange } from '@/lib/horizon-data'
 
 // ── DashboardData bundle ──────────────────────────────────────
 // All data the dashboard page fetches and passes down to widgets.
@@ -82,11 +88,20 @@ export interface DashboardData {
   topGoals: TopGoal[]
   recurringTransactions: number
   lifeEvents: number
+  // Fractionele FIRE-leeftijd uit simulatie-engine (uit snapshot, null als nog niet berekend)
+  fireAgeFractional: number | null
   // Historical net worth (up to 12 monthly snapshots, ascending)
   netWorthHistory: { month: string; value: number }[]
   // Asset breakdown per type
   assetsByType: { type: string; value: number; purchaseValue: number; expectedReturn: number }[]
   totalPurchaseValue: number
+  // Horizon: scenario range (optimistic/expected/pessimistic FIRE ages)
+  fireRange: FireRange | null
+  // Horizon: simplified sim rows for vermogenspad chart (age + portfolio + phase)
+  simRows: { age: number; endPortfolio: number; phase: string }[] | null
+  // Horizon: backtesting success rate + named crash paths
+  backtestSuccessRate: number | null
+  backtestNamedPaths: { label: string; success: boolean }[] | null
 }
 
 // ── Gating: widget id → min sovereignty level ─────────────────
@@ -100,6 +115,12 @@ const WIDGET_MIN_LEVEL: Record<string, number> = {
   levensgebeurtenissen: 1,
   veerkracht_score: 1,
   belasting_box3: 1,
+  vrijheidsscenarios: 1,
+  sim_vermogenspad: 1,
+  passief_inkomen: 1,
+  box3_drag: 1,
+  vrijheidsmijlpalen: 0,
+  backtesting_score: 3,
 }
 
 interface WidgetRendererProps {
@@ -169,6 +190,18 @@ export function WidgetRenderer({ id, size, data }: WidgetRendererProps) {
       return <TerugkerendeTransactiesWidget size={size} data={data} href={href} />
     case 'nibud_benchmark':
       return <NibudBenchmarkWidget size={size} data={data} href={href} />
+    case 'vrijheidsscenarios':
+      return <VrijheidsScenarioWidget size={size} data={data} href={href} />
+    case 'sim_vermogenspad':
+      return <SimVermogenspadWidget size={size} data={data} href={href} />
+    case 'passief_inkomen':
+      return <PassiefInkomenWidget size={size} data={data} href={href} />
+    case 'box3_drag':
+      return <Box3DragWidget size={size} data={data} href={href} />
+    case 'vrijheidsmijlpalen':
+      return <VrijheidsMijlpalenWidget size={size} data={data} href={href} />
+    case 'backtesting_score':
+      return <BacktestingScoreWidget size={size} data={data} href={href} />
     default:
       return null
   }

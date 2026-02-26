@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { useFireMethod } from '@/lib/hooks/use-fire-method'
+import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
 import { FfinAvatar } from '@/components/app/avatars'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/components/app/budget-shared'
@@ -10,7 +10,7 @@ import {
   computeFireProjection, computeFireRange, projectForward,
   computeResilienceScore, formatFireAge, formatCountdown,
   computeLifeEventImpact, ageAtDate,
-  LIFE_EVENT_CATALOG, DEFAULT_RETURN,
+  LIFE_EVENT_CATALOG, DEFAULT_RETURN, NL_SWR, NL_AOW_AGE, NL_AOW_MONTHLY,
   type HorizonInput, type FireProjection, type FireRange,
   type ProjectionMonth, type ResilienceScore,
   type LifeEvent, type LifeEventImpact,
@@ -37,6 +37,7 @@ import { DiscoverCarousel } from '@/components/app/discover-carousel'
 import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
 import { NextStepSection, computeAllHorizonSteps } from '@/components/app/next-step-card'
 import { HouseholdFireSection } from '@/components/app/household-fire-section'
+import { SimChartWidget } from '@/components/app/horizon/sim-chart-widget'
 
 type ActiveModal = null | 'projections' | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting'
 
@@ -50,7 +51,7 @@ type SnapshotForTrend = {
 }
 
 export default function HorizonPage() {
-  const { swr: fireSwr } = useFireMethod()
+  const fireSwr = NL_SWR
   const [input, setInput] = useState<HorizonInput | null>(null)
   const [fire, setFire] = useState<FireProjection | null>(null)
   const [range, setRange] = useState<FireRange | null>(null)
@@ -91,10 +92,18 @@ export default function HorizonPage() {
   const [formName, setFormName] = useState('')
   const [formType, setFormType] = useState('custom')
   const [formAge, setFormAge] = useState<number | ''>('')
-  const [formCost, setFormCost] = useState<number | ''>(0)
-  const [formMonthlyCost, setFormMonthlyCost] = useState<number | ''>(0)
-  const [formMonthlyIncome, setFormMonthlyIncome] = useState<number | ''>(0)
   const [formDuration, setFormDuration] = useState<number | ''>(0)
+  const [formIsIndexed, setFormIsIndexed] = useState(true)
+  const [formDirection, setFormDirection] = useState<'income' | 'expense'>('expense')
+  const [formDurationType, setFormDurationType] = useState<'one_time' | 'period' | 'continuous'>('one_time')
+  const [formAmount, setFormAmount] = useState<number | ''>(0)
+
+  // Simulatie-engine met echte app-data (fractionele FIRE-leeftijd + kasstromen)
+  const { result: simResult, cashflows: simCashflows } = useHorizonFireSim(
+    input || loading
+      ? { horizonInput: input, lifeEvents: events }
+      : null,
+  )
 
   const loadData = useCallback(async () => {
     try {
@@ -207,7 +216,29 @@ export default function HorizonPage() {
 
       setInput(horizonInput)
 
-      const loadedEvents = (eventsResult.data ?? []) as LifeEvent[]
+      let loadedEvents = (eventsResult.data ?? []) as LifeEvent[]
+      const hasAow = loadedEvents.some(ev => ev.event_type === 'aow')
+      if (!hasAow) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          await supabase.from('life_events').insert({
+            user_id: user.id,
+            name: 'AOW',
+            event_type: 'aow',
+            target_age: NL_AOW_AGE,
+            monthly_income_change: NL_AOW_MONTHLY,
+            monthly_cost_change: 0,
+            one_time_cost: 0,
+            duration_months: 0,
+            is_indexed: true,
+            is_active: true,
+            icon: 'Landmark',
+            sort_order: -1,
+          })
+          const refreshed = await supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true })
+          loadedEvents = (refreshed.data ?? []) as LifeEvent[]
+        }
+      }
       setEvents(loadedEvents)
       setActions((actionsResult.data ?? []) as Action[])
       setDebts((fullDebtsResult.data ?? []) as Debt[])
@@ -264,11 +295,32 @@ export default function HorizonPage() {
     const catalog = LIFE_EVENT_CATALOG[type]
     setFormType(type)
     setFormName(catalog?.label ?? '')
-    setFormCost(catalog?.defaultCost ?? 0)
-    setFormMonthlyCost(catalog?.defaultMonthlyCost ?? 0)
-    setFormMonthlyIncome(catalog?.defaultMonthlyIncome ?? 0)
     setFormDuration(catalog?.defaultDuration ?? 0)
-    setFormAge(currentAge ? currentAge + 5 : '')
+    setFormAge(catalog?.defaultAge !== undefined ? catalog.defaultAge : (currentAge ? currentAge + 5 : ''))
+    setFormIsIndexed(true)
+    // Determine duration type and direction from catalog defaults
+    const hasCost = (catalog?.defaultCost ?? 0) !== 0
+    const hasMonthlyIncome = (catalog?.defaultMonthlyIncome ?? 0) !== 0
+    const hasMonthlyExpense = (catalog?.defaultMonthlyCost ?? 0) !== 0
+    const defaultDur = catalog?.defaultDuration ?? 0
+    if (hasCost) {
+      setFormDurationType('one_time')
+      const cost = catalog!.defaultCost
+      setFormDirection(cost > 0 ? 'expense' : 'income')
+      setFormAmount(Math.abs(cost))
+    } else if (hasMonthlyIncome) {
+      setFormDurationType(defaultDur > 0 ? 'period' : 'continuous')
+      setFormDirection(catalog!.defaultMonthlyIncome > 0 ? 'income' : 'expense')
+      setFormAmount(Math.abs(catalog!.defaultMonthlyIncome))
+    } else if (hasMonthlyExpense) {
+      setFormDurationType(defaultDur > 0 ? 'period' : 'continuous')
+      setFormDirection('expense')
+      setFormAmount(Math.abs(catalog!.defaultMonthlyCost))
+    } else {
+      setFormDurationType('one_time')
+      setFormDirection('expense')
+      setFormAmount(0)
+    }
     setEditingEvent(null)
     setShowForm(true)
   }
@@ -276,11 +328,31 @@ export default function HorizonPage() {
   function openEditForm(ev: LifeEvent) {
     setFormType(ev.event_type)
     setFormName(ev.name)
-    setFormCost(Number(ev.one_time_cost))
-    setFormMonthlyCost(Number(ev.monthly_cost_change))
-    setFormMonthlyIncome(Number(ev.monthly_income_change))
     setFormDuration(Number(ev.duration_months))
     setFormAge(ev.target_age ?? '')
+    setFormIsIndexed(ev.is_indexed ?? true)
+    // Derive UI state from stored values
+    const cost = Number(ev.one_time_cost)
+    const monthlyIncome = Number(ev.monthly_income_change)
+    const monthlyCost = Number(ev.monthly_cost_change)
+    const durMonths = Number(ev.duration_months)
+    if (cost !== 0) {
+      setFormDurationType('one_time')
+      setFormDirection(cost > 0 ? 'expense' : 'income')
+      setFormAmount(Math.abs(cost))
+    } else if (monthlyIncome !== 0) {
+      setFormDurationType(durMonths > 0 ? 'period' : 'continuous')
+      setFormDirection(monthlyIncome > 0 ? 'income' : 'expense')
+      setFormAmount(Math.abs(monthlyIncome))
+    } else if (monthlyCost !== 0) {
+      setFormDurationType(durMonths > 0 ? 'period' : 'continuous')
+      setFormDirection('expense')
+      setFormAmount(Math.abs(monthlyCost))
+    } else {
+      setFormDurationType('one_time')
+      setFormDirection('expense')
+      setFormAmount(0)
+    }
     setEditingEvent(ev)
     setShowForm(true)
   }
@@ -291,18 +363,34 @@ export default function HorizonPage() {
     if (!user) return
 
     const icon = LIFE_EVENT_CATALOG[formType]?.icon ?? 'Calendar'
+    const amount = Number(formAmount) || 0
+    const durMonths = formDurationType === 'period' ? Number(formDuration) || 0 : 0
+
+    let oneTimeCost = 0
+    let monthlyCostChange = 0
+    let monthlyIncomeChange = 0
+
+    if (formDurationType === 'one_time') {
+      oneTimeCost = formDirection === 'expense' ? amount : -amount
+    } else if (formDirection === 'income') {
+      monthlyIncomeChange = amount
+    } else {
+      monthlyCostChange = amount
+    }
 
     const payload = {
       user_id: user.id,
       name: formName,
       event_type: formType,
       target_age: formAge || null,
-      one_time_cost: Number(formCost) || 0,
-      monthly_cost_change: Number(formMonthlyCost) || 0,
-      monthly_income_change: Number(formMonthlyIncome) || 0,
-      duration_months: Number(formDuration) || 0,
+      one_time_cost: oneTimeCost,
+      monthly_cost_change: monthlyCostChange,
+      monthly_income_change: monthlyIncomeChange,
+      duration_months: durMonths,
+      is_indexed: formIsIndexed,
       icon,
       sort_order: events.length,
+      is_active: true,
     }
 
     if (editingEvent) {
@@ -366,10 +454,12 @@ export default function HorizonPage() {
           </div>
 
           <div className="mb-3 sm:mb-5" data-testid="hero-primary-metric">
-            {fire.fireAge !== null ? (
+            {(simResult?.fireAgeFractional ?? fire.fireAge) !== null ? (
               <>
                 <span data-testid="hero-fire-age" className="font-display text-[36px] sm:text-[44px] md:text-[52px] font-bold tracking-tight text-[var(--ink)]">
-                  {Math.round(fire.fireAge)}
+                  {simResult?.fireAgeFractional != null
+                    ? simResult.fireAgeFractional.toFixed(1)
+                    : Math.round(fire.fireAge!)}
                 </span>
                 <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">jaar — FIRE leeftijd</span>
               </>
@@ -397,48 +487,24 @@ export default function HorizonPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:gap-5 sm:grid-cols-3">
-            <div data-testid="hero-countdown">
-              <p className="label-editorial text-[var(--ink-3)]">Aftellen</p>
-              <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]">
-                {fire.countdownDays > 0 ? `${fire.countdownDays.toLocaleString('nl-NL')} dagen` : fire.fireDate}
-              </p>
-              <p className="font-serif italic text-sm text-[var(--ink-3)]">tot volledige vrijheid</p>
-            </div>
-            <div data-testid="hero-passive-income">
-              <p className="label-editorial text-[var(--ink-3)]">Passief inkomen</p>
-              <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]">
-                {formatCurrency(fire.monthlyPassiveIncome + monthlyDividendIncome)}/mnd
-              </p>
-              <p className="font-serif italic text-sm text-[var(--ink-3)]">uit vermogen + dividenden</p>
-            </div>
-            <div data-testid="hero-fire-date">
-              <p className="label-editorial text-[var(--ink-3)]">Volledige vrijheid</p>
-              <p className="mt-1 font-mono text-2xl font-bold capitalize text-[var(--ink)]">{fire.fireDate}</p>
-              {fire.fireAge !== null && (
-                <p className="font-serif italic text-sm text-[var(--ink-3)]">
-                  op leeftijd {formatFireAge(fire.fireAge)}
-                </p>
-              )}
-            </div>
-          </div>
         </div>
       </section>
 
-      {/* === Next Step Card === */}
-      <section className="mt-6">
-        <NextStepSection
-          steps={computeAllHorizonSteps({
-            hasFireProjection: fire.fireAge !== null,
-            eventCount: events.length,
-            freedomPct: fire.freedomPercentage,
-          })}
-          moduleColor="purple"
-        />
-      </section>
+      {/* === 2. Simulatie Prognose Widget === */}
+      {simResult && (
+        <section className="mt-4 sm:mt-6">
+          <SimChartWidget
+            simResult={simResult}
+            cashflows={simCashflows}
+            currentAge={currentAge}
+            retirementExpenseMethod={null}
+            yearlyExpenses={effectiveInput?.yearlyMustExpenses ?? 0}
+          />
+        </section>
+      )}
 
-      {/* === 2. KPI Cards (White cards, subtle borders) === */}
-      <section className="mt-4 sm:mt-8 grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4" data-testid="horizon-kpis">
+      {/* === 3. KPI Cards (White cards, subtle borders) === */}
+      <section className="mt-4 sm:mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4" data-testid="horizon-kpis">
         <div className="card-editorial p-3 sm:p-5" data-testid="kpi-fire-age">
           <div className="mb-2 sm:mb-3 flex items-center justify-between">
             <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
@@ -448,11 +514,23 @@ export default function HorizonPage() {
           </div>
           <p className="label-editorial text-[var(--ink-3)]">Vrijheidsleeftijd</p>
           <p className="mt-1 font-mono text-2xl sm:text-3xl font-bold text-[var(--ink)]">
-            {fire.fireAge !== null ? Math.round(fire.fireAge) : '-'}
+            {simResult?.fireAgeFractional != null
+              ? simResult.fireAgeFractional.toFixed(1)
+              : fire.fireAge !== null ? Math.round(fire.fireAge) : '-'}
           </p>
+          {simResult?.fireAgeFractional != null && (
+            <p className="mt-0.5 text-[10px] text-horizon-400">
+              via simulatie-engine
+            </p>
+          )}
           {range.optimistic.fireAge !== null && range.pessimistic.fireAge !== null && (
             <p className="mt-1 text-xs text-[var(--ink-4)]">
               range: {Math.round(range.optimistic.fireAge)}-{Math.round(range.pessimistic.fireAge)}
+            </p>
+          )}
+          {(fire.monthlyPassiveIncome + monthlyDividendIncome) > 0 && (
+            <p className="mt-1.5 text-[10px] text-[var(--ink-4)]" data-testid="kpi-fire-age-passive">
+              {formatCurrency(fire.monthlyPassiveIncome + monthlyDividendIncome)}/mnd passief
             </p>
           )}
         </div>
@@ -469,6 +547,9 @@ export default function HorizonPage() {
             {fire.countdownDays > 0 ? fire.countdownDays.toLocaleString('nl-NL') : '0'}
           </p>
           <p className="mt-1 text-xs text-[var(--ink-4)]">dagen tot volledige vrijheid</p>
+          {fire.fireDate && fire.countdownDays > 0 && (
+            <p className="mt-0.5 text-[10px] capitalize text-[var(--ink-4)]" data-testid="kpi-countdown-date">{fire.fireDate}</p>
+          )}
         </div>
 
         <div className="card-editorial p-3 sm:p-5" data-testid="kpi-fire-target">
@@ -505,7 +586,19 @@ export default function HorizonPage() {
         </FeatureGate>
       </section>
 
-      {/* === 2b. Household FIRE Projections === */}
+      {/* === 4. Next Step Card === */}
+      <section className="mt-6">
+        <NextStepSection
+          steps={computeAllHorizonSteps({
+            hasFireProjection: fire.fireAge !== null,
+            eventCount: events.length,
+            freedomPct: fire.freedomPercentage,
+          })}
+          moduleColor="purple"
+        />
+      </section>
+
+      {/* === 5. Household FIRE Projections === */}
       <HouseholdFireSection />
 
       {/* === 3. Alerts === */}
@@ -927,6 +1020,11 @@ export default function HorizonPage() {
                               {formatCurrency(Number(ev.one_time_cost))} eenmalig
                             </span>
                           )}
+                          {Number(ev.one_time_cost) < 0 && (
+                            <span className="rounded-[var(--r)] bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-600">
+                              {formatCurrency(Math.abs(Number(ev.one_time_cost)))} eenmalig inkomen
+                            </span>
+                          )}
                           {Number(ev.monthly_cost_change) > 0 && (
                             <span className="rounded-[var(--r)] bg-red-50 px-2 py-1 text-xs font-medium text-red-600">
                               +{formatCurrency(Number(ev.monthly_cost_change))}/mnd
@@ -935,6 +1033,11 @@ export default function HorizonPage() {
                           {Number(ev.monthly_income_change) !== 0 && (
                             <span className={`rounded-[var(--r)] px-2 py-1 text-xs font-medium ${Number(ev.monthly_income_change) < 0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
                               {Number(ev.monthly_income_change) > 0 ? '+' : ''}{formatCurrency(Number(ev.monthly_income_change))}/mnd inkomen
+                            </span>
+                          )}
+                          {ev.is_indexed && Number(ev.monthly_income_change) > 0 && (
+                            <span className="rounded-[var(--r)] bg-horizon-50 px-2 py-1 text-xs font-medium text-horizon-600">
+                              ↑ geïndexeerd
                             </span>
                           )}
                         </div>
@@ -1077,74 +1180,130 @@ export default function HorizonPage() {
       {/* === Event Form Modal === */}
       {showForm && (
         <BottomSheet open={true} onClose={() => { setShowForm(false); setEditingEvent(null) }} title={editingEvent ? 'Evenement bewerken' : 'Nieuw evenement'}>
-            <div className="space-y-4 p-6">
-              {/* Template tip */}
-              {LIFE_EVENT_CATALOG[formType]?.tip && !editingEvent && (
-                <div className="rounded-[var(--r)] bg-horizon-50 p-3 text-xs text-horizon-700">
-                  <span className="font-medium">Tip:</span> {LIFE_EVENT_CATALOG[formType].tip}
-                </div>
-              )}
-
-              <div>
-                <label className="text-xs font-medium text-[var(--ink-3)]">Naam</label>
-                <input
-                  type="text" value={formName} onChange={e => setFormName(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
-                />
+          <div className="space-y-4 p-6">
+            {/* Template tip */}
+            {LIFE_EVENT_CATALOG[formType]?.tip && !editingEvent && (
+              <div className="rounded-[var(--r)] bg-horizon-50 p-3 text-xs text-horizon-700">
+                <span className="font-medium">Tip:</span> {LIFE_EVENT_CATALOG[formType].tip}
               </div>
+            )}
 
-              <div>
-                <label className="text-xs font-medium text-[var(--ink-3)]">Leeftijd</label>
-                <input
-                  type="number" value={formAge} onChange={e => setFormAge(e.target.value ? Number(e.target.value) : '')}
-                  className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
-                  placeholder="bijv. 45"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-[var(--ink-3)]">Eenmalige kosten</label>
-                  <input
-                    type="number" value={formCost} onChange={e => setFormCost(e.target.value ? Number(e.target.value) : '')}
-                    className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-[var(--ink-3)]">Duur (maanden)</label>
-                  <input
-                    type="number" value={formDuration} onChange={e => setFormDuration(e.target.value ? Number(e.target.value) : '')}
-                    className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-[var(--ink-3)]">Maandelijkse kosten</label>
-                  <input
-                    type="number" value={formMonthlyCost} onChange={e => setFormMonthlyCost(e.target.value ? Number(e.target.value) : '')}
-                    className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-[var(--ink-3)]">Inkomenswijziging/mnd</label>
-                  <input
-                    type="number" value={formMonthlyIncome} onChange={e => setFormMonthlyIncome(e.target.value ? Number(e.target.value) : '')}
-                    className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
-                    placeholder="bijv. -1000"
-                  />
-                </div>
-              </div>
-
-              <button
-                onClick={saveEvent}
-                disabled={!formName}
-                className="w-full rounded-[var(--r)] bg-horizon-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-horizon-700 disabled:opacity-50"
-              >
-                {editingEvent ? 'Opslaan' : 'Toevoegen'}
-              </button>
+            {/* Naam */}
+            <div>
+              <label className="text-xs font-medium text-[var(--ink-3)]">Naam</label>
+              <input
+                type="text" value={formName} onChange={e => setFormName(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+              />
             </div>
+
+            {/* Leeftijd */}
+            <div>
+              <label className="text-xs font-medium text-[var(--ink-3)]">Vanaf welke leeftijd?</label>
+              <input
+                type="number" value={formAge} onChange={e => setFormAge(e.target.value ? Number(e.target.value) : '')}
+                className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                placeholder="bijv. 45"
+              />
+            </div>
+
+            {/* Duratie-type */}
+            <div>
+              <label className="text-xs font-medium text-[var(--ink-3)]">Type</label>
+              <div className="mt-1 flex gap-2">
+                {(['one_time', 'period', 'continuous'] as const).map(dt => (
+                  <button
+                    key={dt}
+                    type="button"
+                    onClick={() => setFormDurationType(dt)}
+                    className={`flex-1 rounded-[var(--r)] border px-3 py-2 text-xs font-medium transition-colors ${
+                      formDurationType === dt
+                        ? 'border-horizon-400 bg-horizon-50 text-horizon-700'
+                        : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200'
+                    }`}
+                  >
+                    {dt === 'one_time' ? 'Eenmalig' : dt === 'period' ? 'Tijdelijk' : 'Continu'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Richting + bedrag */}
+            <div>
+              <label className="text-xs font-medium text-[var(--ink-3)]">
+                {formDurationType === 'one_time' ? 'Bedrag' : 'Maandbedrag'}
+              </label>
+              <div className="mt-1 flex gap-2">
+                <div className="flex overflow-hidden rounded-[var(--r)] border border-[var(--border-ed)]">
+                  <button
+                    type="button"
+                    onClick={() => setFormDirection('income')}
+                    className={`px-3 py-2 text-xs font-medium transition-colors ${
+                      formDirection === 'income'
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-[var(--paper)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
+                    }`}
+                  >
+                    Inkomen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormDirection('expense')}
+                    className={`px-3 py-2 text-xs font-medium transition-colors ${
+                      formDirection === 'expense'
+                        ? 'bg-red-500 text-white'
+                        : 'bg-[var(--paper)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
+                    }`}
+                  >
+                    Kosten
+                  </button>
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  value={formAmount}
+                  onChange={e => setFormAmount(e.target.value ? Number(e.target.value) : '')}
+                  className="min-w-0 flex-1 rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            {/* Duur (alleen bij Tijdelijk) */}
+            {formDurationType === 'period' && (
+              <div>
+                <label className="text-xs font-medium text-[var(--ink-3)]">Duur (maanden)</label>
+                <input
+                  type="number"
+                  value={formDuration}
+                  onChange={e => setFormDuration(e.target.value ? Number(e.target.value) : '')}
+                  className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                  placeholder="bijv. 12"
+                />
+              </div>
+            )}
+
+            {/* Indexering (alleen bij recurring) */}
+            {formDurationType !== 'one_time' && (
+              <label className="flex cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={formIsIndexed}
+                  onChange={e => setFormIsIndexed(e.target.checked)}
+                  className="h-4 w-4 rounded border-[var(--border-md)] accent-horizon-600"
+                />
+                <span className="text-sm text-[var(--ink-2)]">Bedrag groeit mee met inflatie (~2%/jaar)</span>
+              </label>
+            )}
+
+            <button
+              onClick={saveEvent}
+              disabled={!formName}
+              className="w-full rounded-[var(--r)] bg-horizon-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-horizon-700 disabled:opacity-50"
+            >
+              {editingEvent ? 'Opslaan' : 'Toevoegen'}
+            </button>
+          </div>
         </BottomSheet>
       )}
 

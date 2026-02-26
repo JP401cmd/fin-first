@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeFireProjection, getSwrForMethod, type HorizonInput, type FireMethod, DEFAULT_RETURN } from '@/lib/horizon-data'
+import { computeFireProjection, computeFireRange, runBacktest, ageAtDate, NL_SWR, NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF, type HorizonInput, DEFAULT_RETURN } from '@/lib/horizon-data'
+import { runSimulation } from '@/lib/fire-simulation'
 import { computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { FhinAvatar, FinnAvatar, FfinAvatar } from '@/components/app/avatars'
@@ -34,7 +35,7 @@ export default async function DashboardPage() {
     supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct').eq('is_active', true),
     supabase.from('debts').select('current_balance, debt_type, net_worth_inclusion_pct').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth, last_known_phase, widget_prefs, fire_method, retirement_expense_method, retirement_expense_custom_amount').single(),
+    supabase.from('profiles').select('date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount').single(),
     supabase.from('budgets').select('id, default_limit, interval').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
     supabase.from('actions')
       .select('id, title, status, freedom_days_impact, priority_score, due_date, source, completed_at')
@@ -45,7 +46,7 @@ export default async function DashboardPage() {
     supabase.from('budgets').select('id, parent_id, default_limit').not('parent_id', 'is', null),
     supabase.from('goals').select('id, name, goal_type, current_value, target_value, target_date, color, icon').eq('is_completed', false).order('sort_order', { ascending: true }),
     supabase.from('recurring_transactions').select('id').eq('is_active', true),
-    supabase.from('net_worth_snapshots').select('snapshot_date, net_worth').gte('snapshot_date', twelveMonthsAgo).order('snapshot_date', { ascending: true }).limit(12),
+    supabase.from('net_worth_snapshots').select('snapshot_date, net_worth, fire_age').gte('snapshot_date', twelveMonthsAgo).order('snapshot_date', { ascending: true }).limit(12),
     supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
     supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
   ])
@@ -149,8 +150,7 @@ export default async function DashboardPage() {
     }
   }
 
-  const fireMethod = (profileResult.data?.fire_method ?? 'classic') as FireMethod
-  const fireSwr = getSwrForMethod(fireMethod)
+  const fireSwr = NL_SWR
 
   const yearlyRetirementExpenses = computeRetirementExpenses(
     profileResult.data?.retirement_expense_method as RetirementExpenseMethod,
@@ -170,6 +170,46 @@ export default async function DashboardPage() {
     dateOfBirth: profileResult.data?.date_of_birth ?? null,
   }
   const fireProjResult = computeFireProjection(horizonInput, DEFAULT_RETURN, fireSwr)
+
+  // Horizon extra: scenario range (optimistic / expected / pessimistic)
+  const fireRange = computeFireRange(horizonInput, fireSwr)
+
+  // Horizon extra: sim rows for vermogenspad chart
+  const dob = profileResult.data?.date_of_birth ?? null
+  let simRows: { age: number; endPortfolio: number; phase: string }[] | null = null
+  if (dob && netWorth > 0) {
+    try {
+      const currentAge = ageAtDate(dob)
+      const simResult = runSimulation(
+        currentAge,
+        90,
+        netWorth,
+        yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses : monthlyExpenses * 12,
+        monthlyContributions * 12,
+        DEFAULT_RETURN,
+        'nl_box3',
+        0.02,
+        [],
+      )
+      simRows = simResult.rows.map(r => ({ age: r.age, endPortfolio: r.endPortfolio, phase: r.phase }))
+    } catch {
+      simRows = null
+    }
+  }
+
+  // Horizon extra: backtesting success rate + named crash paths
+  let backtestSuccessRate: number | null = null
+  let backtestNamedPaths: { label: string; success: boolean }[] | null = null
+  if (netWorth > 0 && dob) {
+    try {
+      const btr = runBacktest(horizonInput)
+      backtestSuccessRate = Math.round(btr.successRate * 100)
+      backtestNamedPaths = btr.namedPaths.map(p => ({ label: p.label ?? p.startYear.toString(), success: p.success }))
+    } catch {
+      backtestSuccessRate = null
+      backtestNamedPaths = null
+    }
+  }
 
   // Will calculations
   const allActions = actionsResult.data ?? []
@@ -235,10 +275,18 @@ export default async function DashboardPage() {
     .sort((a, b) => a.order - b.order)
 
   // Net worth history: monthly snapshots for the sparkline
-  const netWorthHistory = (netWorthSnapshotsResult.data ?? []).map(s => ({
+  const snapshotRows = netWorthSnapshotsResult.data ?? []
+  const netWorthHistory = snapshotRows.map(s => ({
     month: s.snapshot_date as string,
     value: Number(s.net_worth),
   }))
+  // Meest recente fire_age uit snapshot (gezet door useHorizonFireSim bij bezoek /horizon)
+  const latestSnapshotFireAge = snapshotRows
+    .filter(s => (s as { fire_age?: number | null }).fire_age != null)
+    .at(-1)
+  const fireAgeFractional = latestSnapshotFireAge
+    ? Number((latestSnapshotFireAge as { fire_age?: number | null }).fire_age)
+    : null
 
   // DashboardData bundle for widgets
   const dashboardData: DashboardData = {
@@ -253,6 +301,7 @@ export default async function DashboardPage() {
     freedomPct,
     fireTarget,
     fireProjResult,
+    fireAgeFractional,
     openActions: openActions.length,
     totalFreedomDaysOpen,
     completedActionsThisMonth,
@@ -278,6 +327,10 @@ export default async function DashboardPage() {
     netWorthHistory,
     assetsByType,
     totalPurchaseValue,
+    fireRange,
+    simRows,
+    backtestSuccessRate,
+    backtestNamedPaths,
   }
 
   // Dateline

@@ -213,6 +213,7 @@ export async function seedPersonaData(
     icon: e.icon,
     is_active: e.is_active,
     sort_order: e.sort_order,
+    is_indexed: e.is_indexed ?? false,
   }))
 
   const snapshotRows = persona.net_worth_snapshots.map((s) => ({

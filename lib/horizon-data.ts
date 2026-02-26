@@ -25,10 +25,10 @@ export const NL_SWR = DEFAULT_RETURN - BOX3_DRAG - NL_INFLATIE // ≈ 0.02883
 export const NL_MULTIPLIER = 1 / NL_SWR        // ≈ 34.7×
 export const CLASSIC_MULTIPLIER = 1 / SWR      // = 25×
 
-export type FireMethod = 'classic' | 'nl'
+export type FireMethod = 'nl'
 
-export function getSwrForMethod(method: FireMethod): number {
-  return method === 'nl' ? NL_SWR : SWR
+export function getSwrForMethod(_method: FireMethod): number {
+  return NL_SWR
 }
 
 // ── Types ────────────────────────────────────────────────────
@@ -177,6 +177,7 @@ export interface LifeEvent {
   icon: string
   is_active: boolean
   sort_order: number
+  is_indexed: boolean
 }
 
 export interface LifeEventImpact {
@@ -208,6 +209,7 @@ export const LIFE_EVENT_CATALOG: Record<string, {
   defaultMonthlyCost: number
   defaultMonthlyIncome: number
   defaultDuration: number
+  defaultAge?: number
   description: string
   tip?: string
 }> = {
@@ -349,6 +351,26 @@ export const LIFE_EVENT_CATALOG: Record<string, {
     defaultDuration: 36,
     description: 'Extra inkomstenbron naast je baan',
     tip: 'Positieve inkomenswijziging versnelt je FIRE-datum',
+  },
+  aow: {
+    label: 'AOW',
+    icon: 'Landmark',
+    defaultCost: 0,
+    defaultMonthlyCost: 0,
+    defaultMonthlyIncome: 1380,
+    defaultDuration: 0,
+    defaultAge: 67,
+    description: 'AOW staatspension (alleenstaand, 2025)',
+    tip: 'AOW start op leeftijd 67 en wordt jaarlijks geïndexeerd. Het bedrag is bruto.',
+  },
+  pension: {
+    label: 'Aanvullend pensioen',
+    icon: 'PiggyBank',
+    defaultCost: 0,
+    defaultMonthlyCost: 0,
+    defaultMonthlyIncome: 0,
+    defaultDuration: 0,
+    description: 'Aanvullend bedrijfspensioen of privépensioen',
   },
   custom: {
     label: 'Anders',

@@ -89,7 +89,10 @@
       "Bash(tail:*)",
       "Bash(cd:*)",
       "WebFetch(domain:earlyretirementcalc.com)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "WebFetch(domain:www.geldnerd.nl)",
+      "Bash(grep BOX3_DRAG:*)",
+      "Bash(/dev/null:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

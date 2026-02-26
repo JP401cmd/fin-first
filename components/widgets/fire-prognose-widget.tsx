@@ -10,7 +10,7 @@ interface Props {
 }
 
 export function FirePrognoseWidget({ size, data, href }: Props) {
-  const { fireProjResult, freedomPct } = data
+  const { fireProjResult, freedomPct, fireAgeFractional } = data
 
   const isReached = fireProjResult.fireDate === 'Bereikt!'
   const isNotFeasible = fireProjResult.fireDate === 'Niet haalbaar'
@@ -35,9 +35,15 @@ export function FirePrognoseWidget({ size, data, href }: Props) {
               <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
                 {fireProjResult.countdownYears}j {fireProjResult.countdownMonths}m
               </p>
-              <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-                Verwacht: {fireProjResult.fireDate}
-              </p>
+              {fireAgeFractional != null ? (
+                <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+                  Vrijheidsleeftijd: <span className="font-mono font-semibold text-horizon-600">{fireAgeFractional.toFixed(1)}</span> jaar
+                </p>
+              ) : (
+                <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+                  Verwacht: {fireProjResult.fireDate}
+                </p>
+              )}
             </>
           )}
         </div>

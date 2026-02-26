@@ -63,6 +63,11 @@ const mockData: DashboardData = {
   netWorthHistory: [],
   assetsByType: [],
   totalPurchaseValue: 0,
+  fireAgeFractional: null,
+  fireRange: null,
+  simRows: null,
+  backtestSuccessRate: null,
+  backtestNamedPaths: null,
 }
 
 const makePrefs = (ids: string[], sizes: ('half' | 'full')[] = []): WidgetPref[] =>
