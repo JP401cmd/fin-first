@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Playfair_Display, Source_Serif_4, DM_Mono, Inter } from "next/font/google";
+import { Playfair_Display, Source_Serif_4, DM_Mono, Inter, Andada_Pro } from "next/font/google";
 import "./globals.css";
 
 const playfair = Playfair_Display({
@@ -26,6 +26,13 @@ const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600"],
+});
+
+const andadaPro = Andada_Pro({
+  variable: "--font-andada",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
 });
 
 export const viewport: Viewport = {
@@ -55,7 +62,7 @@ export default function RootLayout({
   return (
     <html lang="nl">
       <body
-        className={`${playfair.variable} ${sourceSerif.variable} ${dmMono.variable} ${inter.variable} antialiased`}
+        className={`${playfair.variable} ${sourceSerif.variable} ${dmMono.variable} ${inter.variable} ${andadaPro.variable} antialiased`}
       >
         {children}
       </body>

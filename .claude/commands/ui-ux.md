@@ -59,6 +59,17 @@ TriFinity is een **persoonlijk financieel dagblad**, geen fintech-dashboard. Elk
 - [ ] Transitions 0.15-0.2s, geen abrupte veranderingen?
 - [ ] Focus state zichtbaar voor keyboard-navigatie?
 
+### Grafiek-animaties
+- [ ] Elke chart/sparkline/voortgangsbalk gebruikt `useInViewAnimation` (`lib/hooks/use-in-view-animation.ts`)?
+- [ ] SVG-paden: `pathLength={1}` + `strokeDasharray="1"` + `strokeDashoffset={hasEntered ? 0 : 1}`?
+- [ ] Balken starten op `width: '0%'` vóór viewport-intrede (niet direct op doelwaarde)?
+- [ ] Inline `transition` style i.p.v. Tailwind `transition-*` (voor delay + cubic-bezier controle)?
+- [ ] `transition: 'none'` bewaker voor pre-entered state?
+- [ ] Stagger-timing aanwezig: 60ms per rij, 80ms per SVG-pad?
+- [ ] `prefers-reduced-motion` gerespecteerd (hook handelt dit intern af)?
+- [ ] Animaties herhalen bij pagina-navigatie (component remount reset hook state)?
+- [ ] `duration` dekt de volledige animatiesequentie?
+
 ### Consistentie
 - [ ] Past het in het bestaande design systeem?
 - [ ] Geen nieuwe kleuren, fonts of patronen zonder goede reden?

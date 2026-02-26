@@ -987,6 +987,14 @@ function HoldingForm({
 }) {
   const [name, setName] = useState('')
   const [ticker, setTicker] = useState('')
+  const [tickerStatus, setTickerStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle')
+  const [tickerInfo, setTickerInfo] = useState<{
+    displayName?: string
+    price?: number
+    currency?: string
+    hint?: string
+  } | null>(null)
+  const tickerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [units, setUnits] = useState('')
   const [avgPrice, setAvgPrice] = useState('')
   const [currentPrice, setCurrentPrice] = useState('')
@@ -1006,6 +1014,37 @@ function HoldingForm({
   } | null>(null)
   // Idempotency key to prevent duplicate submissions on back-button / re-render
   const idempotencyKeyRef = useRef<string>(crypto.randomUUID())
+
+  const validateTicker = useCallback((value: string) => {
+    if (tickerDebounceRef.current) clearTimeout(tickerDebounceRef.current)
+    const trimmed = value.trim().toUpperCase()
+    if (!trimmed) {
+      setTickerStatus('idle')
+      setTickerInfo(null)
+      return
+    }
+    setTickerStatus('checking')
+    tickerDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/prices/${encodeURIComponent(trimmed)}`)
+        const data = await res.json()
+        if (data.available) {
+          setTickerStatus('valid')
+          setTickerInfo({
+            displayName: data.displayName,
+            price: data.price,
+            currency: data.currency,
+          })
+        } else {
+          setTickerStatus('invalid')
+          setTickerInfo({ hint: data.hint })
+        }
+      } catch {
+        setTickerStatus('idle')
+        setTickerInfo(null)
+      }
+    }, 600)
+  }, [])
 
   async function handleSave(forceDuplicate = false) {
     if (!name || submitted) return
@@ -1142,10 +1181,31 @@ function HoldingForm({
               <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Ticker / ISIN</label>
               <input
                 value={ticker}
-                onChange={(e) => setTicker(e.target.value)}
+                onChange={(e) => {
+                  setTicker(e.target.value)
+                  validateTicker(e.target.value)
+                }}
                 className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
                 placeholder="VWRL"
               />
+              {tickerStatus === 'checking' && (
+                <p className="mt-1 flex items-center gap-1 font-sans text-[11px] text-[var(--ink-3)]">
+                  <span className="inline-block h-3 w-3 animate-spin rounded-full border border-[var(--border-md)] border-t-transparent" />
+                  Ticker controleren…
+                </p>
+              )}
+              {tickerStatus === 'valid' && tickerInfo && (
+                <p className="mt-1 font-sans text-[11px] text-kern-700">
+                  ✓ {tickerInfo.displayName ?? ticker.toUpperCase()} —{' '}
+                  {tickerInfo.currency} {tickerInfo.price?.toFixed(2)}
+                </p>
+              )}
+              {tickerStatus === 'invalid' && (
+                <p className="mt-1 font-sans text-[11px] text-[var(--ink-3)]">
+                  Ticker niet gevonden.{' '}
+                  {tickerInfo?.hint ?? 'Voeg een beurs-suffix toe, bijv. .AS (Amsterdam), .DE (Frankfurt), .L (Londen).'}
+                </p>
+              )}
             </div>
           </div>
 
@@ -1283,6 +1343,14 @@ function HoldingEditForm({
 
   const [name, setName] = useState(draft?.name ?? holding.name)
   const [ticker, setTicker] = useState(draft?.ticker ?? (holding.ticker || ''))
+  const [tickerStatus, setTickerStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle')
+  const [tickerInfo, setTickerInfo] = useState<{
+    displayName?: string
+    price?: number
+    currency?: string
+    hint?: string
+  } | null>(null)
+  const tickerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [units, setUnits] = useState(draft?.units ?? String(holding.units))
   const [avgPrice, setAvgPrice] = useState(draft?.avgPrice ?? String(holding.avg_purchase_price))
   const [currentPrice, setCurrentPrice] = useState(draft?.currentPrice ?? String(holding.current_price ?? ''))
@@ -1295,6 +1363,37 @@ function HoldingEditForm({
     message: string
     server_state: Record<string, unknown>
   } | null>(null)
+
+  const validateTicker = useCallback((value: string) => {
+    if (tickerDebounceRef.current) clearTimeout(tickerDebounceRef.current)
+    const trimmed = value.trim().toUpperCase()
+    if (!trimmed) {
+      setTickerStatus('idle')
+      setTickerInfo(null)
+      return
+    }
+    setTickerStatus('checking')
+    tickerDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/prices/${encodeURIComponent(trimmed)}`)
+        const data = await res.json()
+        if (data.available) {
+          setTickerStatus('valid')
+          setTickerInfo({
+            displayName: data.displayName,
+            price: data.price,
+            currency: data.currency,
+          })
+        } else {
+          setTickerStatus('invalid')
+          setTickerInfo({ hint: data.hint })
+        }
+      } catch {
+        setTickerStatus('idle')
+        setTickerInfo(null)
+      }
+    }, 600)
+  }, [])
 
   // Track dirty state (form values differ from original holding)
   const isDirty = useMemo(() => {
@@ -1581,9 +1680,30 @@ function HoldingEditForm({
               <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Ticker / ISIN</label>
               <input
                 value={ticker}
-                onChange={(e) => setTicker(e.target.value)}
+                onChange={(e) => {
+                  setTicker(e.target.value)
+                  validateTicker(e.target.value)
+                }}
                 className="w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm"
               />
+              {tickerStatus === 'checking' && (
+                <p className="mt-1 flex items-center gap-1 font-sans text-[11px] text-[var(--ink-3)]">
+                  <span className="inline-block h-3 w-3 animate-spin rounded-full border border-[var(--border-md)] border-t-transparent" />
+                  Ticker controleren…
+                </p>
+              )}
+              {tickerStatus === 'valid' && tickerInfo && (
+                <p className="mt-1 font-sans text-[11px] text-kern-700">
+                  ✓ {tickerInfo.displayName ?? ticker.toUpperCase()} —{' '}
+                  {tickerInfo.currency} {tickerInfo.price?.toFixed(2)}
+                </p>
+              )}
+              {tickerStatus === 'invalid' && (
+                <p className="mt-1 font-sans text-[11px] text-[var(--ink-3)]">
+                  Ticker niet gevonden.{' '}
+                  {tickerInfo?.hint ?? 'Voeg een beurs-suffix toe, bijv. .AS (Amsterdam), .DE (Frankfurt), .L (Londen).'}
+                </p>
+              )}
             </div>
           </div>
 

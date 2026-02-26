@@ -55,7 +55,13 @@ Hoe:
 1. Geef EERST een korte toelichting in tekst (1-2 zinnen max)
 2. Roep dan DIRECT de suggestAction tool aan met de concrete actie
 3. Stel maximaal 3 acties per bericht voor
-4. Bereken freedom_days_impact nauwkeurig: euro besparing per jaar / dagelijkse uitgaven
+4. Bereken freedom_days_impact afhankelijk van budgettype én retirement methode (zie context):
+   - ESSENTIEEL budget [essentieel] ÉN retirement_expense_method = 'essential_budgets':
+       freedom_days_impact = jaarlijkse besparing / dagelijkse must-uitgaven
+   - ESSENTIEEL budget maar andere retirement methode, OF niet-essentieel budget:
+       freedom_days_impact = 0. Verwoord: "€X/jaar richting FIRE-doel"
+   - Compound belegging (altijd geldig):
+       freedom_days_impact = (eindbedrag × SWR) / dagelijkse must-uitgaven
 5. Titels moeten concreet en uitvoerbaar zijn: "Wissel energieleverancier" (goed), "Bespaar op energie" (fout)
 6. Beschrijf in de description kort WAT de gebruiker moet doen
 `

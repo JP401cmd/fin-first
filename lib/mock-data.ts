@@ -44,7 +44,9 @@ export function computeCoreData(
   totalDebts: number,
   last12MonthsIncome?: number,
   yearlyMustExpenses?: number,
+  swrOverride?: number,
 ): CoreData {
+  const swr = swrOverride ?? SWR
   const yearlyIncome = monthlyIncome * 12
   const yearlyExpenses = monthlyExpenses * 12
   const effectiveYearlyExpenses = yearlyMustExpenses && yearlyMustExpenses > 0 ? yearlyMustExpenses : yearlyExpenses
@@ -52,7 +54,7 @@ export function computeCoreData(
   const netWorth = totalAssets - totalDebts
 
   // FIRE calculations
-  const fireTarget = effectiveYearlyExpenses > 0 ? effectiveYearlyExpenses / SWR : 0
+  const fireTarget = effectiveYearlyExpenses > 0 ? effectiveYearlyExpenses / swr : 0
   const freedomPercentage = fireTarget > 0 ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0) : 0
 
   // Freedom time: how long could you live off net worth
@@ -67,9 +69,11 @@ export function computeCoreData(
   const dailyExpense = monthlyExpenses > 0 ? yearlyExpenses / 365 : 0
   const daysWonPerMonth = dailyExpense > 0 ? Math.round(monthlySavings / dailyExpense) : 0
 
-  // Free days per year (passive income from net worth at SWR / daily expenses)
-  const passiveIncome = netWorth * SWR
-  const freeDaysPerYear = dailyExpense > 0 ? Math.round(passiveIncome / dailyExpense) : 0
+  // Free days per year (passive income from net worth at SWR / daily must expenses)
+  // Uses must expenses (same basis as FIRE calculations), falls back to total expenses
+  const dailyMustExpense = effectiveYearlyExpenses > 0 ? effectiveYearlyExpenses / 365 : dailyExpense
+  const passiveIncome = netWorth * swr
+  const freeDaysPerYear = dailyMustExpense > 0 ? Math.round(passiveIncome / dailyMustExpense) : 0
 
   // Expected FIRE date
   let yearsToFire = 0

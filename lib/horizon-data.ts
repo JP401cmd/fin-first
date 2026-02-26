@@ -5,6 +5,8 @@
  * Pure functions, no Supabase dependency.
  */
 
+import { MSCI_REAL_RETURNS, NAMED_PERIODS } from './msci-data'
+
 // ── Constants ────────────────────────────────────────────────
 
 export const SWR = 0.04
@@ -13,6 +15,21 @@ export const DEFAULT_VOLATILITY = 0.15
 export const NL_AOW_AGE = 67
 export const NL_AOW_MONTHLY = 1380 // alleenstaand, bruto 2025
 export const INFLATION = 0.02
+
+// NL-FIRE constanten (Box 3, 2025)
+export const NL_FICTIEF_BELEGGINGEN = 0.0588   // 5.88% — forfaitair rendement beleggingen 2025
+export const BOX3_TARIEF = 0.36                 // 36% — belastingtarief Box 3
+export const BOX3_DRAG = NL_FICTIEF_BELEGGINGEN * BOX3_TARIEF // ≈ 2.117%
+export const NL_INFLATIE = 0.02                 // 2.00% — langjarig NL inflatiegemiddelde
+export const NL_SWR = DEFAULT_RETURN - BOX3_DRAG - NL_INFLATIE // ≈ 0.02883
+export const NL_MULTIPLIER = 1 / NL_SWR        // ≈ 34.7×
+export const CLASSIC_MULTIPLIER = 1 / SWR      // = 25×
+
+export type FireMethod = 'classic' | 'nl'
+
+export function getSwrForMethod(method: FireMethod): number {
+  return method === 'nl' ? NL_SWR : SWR
+}
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -26,6 +43,23 @@ export interface HorizonInput {
   dateOfBirth: string | null // ISO date
   expectedReturn?: number // annual decimal, default 0.07
 }
+
+export interface FutureCashflow {
+  id: string
+  name: string
+  monthlyAmount: number    // positief = inkomen, negatief = uitgave
+  fromAge: number          // leeftijd waarop de kasstroom begint
+  toAge: number | null     // null = levenslang (tot levensverwachting 90)
+  oneTimeAmount?: number   // eenmalig bedrag op fromAge (erfenis etc.)
+}
+
+export const CASHFLOW_CATALOG: Omit<FutureCashflow, 'id'>[] = [
+  { name: 'AOW (alleenstaand)',  monthlyAmount: 1380, fromAge: 67, toAge: null },
+  { name: 'AOW (per partner)',   monthlyAmount: 940,  fromAge: 67, toAge: null },
+  { name: 'Aanvullend pensioen', monthlyAmount: 0,    fromAge: 65, toAge: null },
+  { name: 'Deeltijds werken',    monthlyAmount: 0,    fromAge: 55, toAge: 67 },
+  { name: 'Erfenis',             monthlyAmount: 0,    fromAge: 0,  toAge: null, oneTimeAmount: 0 },
+]
 
 export interface FireProjection {
   fireTarget: number
@@ -506,17 +540,19 @@ export function computeFireRange(
 
 /**
  * Month-by-month forward projection.
+ * Optionally accepts future cashflows (AOW, pension, part-time) to include age-based income adjustments.
  */
 export function projectForward(
   input: HorizonInput,
   months: number,
   annualReturn: number = DEFAULT_RETURN,
   swrOverride?: number,
+  cashflows?: FutureCashflow[],
 ): ProjectionMonth[] {
   const { totalAssets, totalDebts, monthlyIncome, monthlyExpenses, dateOfBirth } = input
   const swr = swrOverride ?? SWR
   const monthlyReturn = annualReturn / 12
-  const monthlySavings = monthlyIncome - monthlyExpenses
+  const baseMonthlySavings = monthlyIncome - monthlyExpenses
   let netWorth = totalAssets - totalDebts
   const now = new Date()
   const currentAge = dateOfBirth ? ageAtDate(dateOfBirth) : null
@@ -528,19 +564,39 @@ export function projectForward(
     const age = currentAge !== null ? currentAge + m / 12 : null
     const passiveIncome = (netWorth * swr) / 12
 
+    // Cashflow adjustments based on age
+    let cashflowIncome = 0
+    if (age !== null && cashflows && cashflows.length > 0) {
+      for (const cf of cashflows) {
+        const toAgeBound = cf.toAge ?? 90
+        if (age >= cf.fromAge && age <= toAgeBound) {
+          cashflowIncome += cf.monthlyAmount
+        }
+        // One-time amount: add when crossing fromAge threshold
+        if (cf.oneTimeAmount && m > 0) {
+          const prevAge = currentAge !== null ? currentAge + (m - 1) / 12 : null
+          if (prevAge !== null && prevAge < cf.fromAge && age >= cf.fromAge) {
+            netWorth += cf.oneTimeAmount
+          }
+        }
+      }
+    }
+
+    const effectiveMonthlySavings = baseMonthlySavings + cashflowIncome
+
     result.push({
       month: m,
       date: date.toISOString().split('T')[0],
       netWorth: Math.round(netWorth),
       passiveIncome: Math.round(passiveIncome),
       age,
-      contributions: m === 0 ? 0 : monthlySavings,
+      contributions: m === 0 ? 0 : effectiveMonthlySavings,
       growth: m === 0 ? 0 : Math.round(netWorth * monthlyReturn),
     })
 
     if (m < months) {
       const growth = netWorth * monthlyReturn
-      netWorth = netWorth + growth + monthlySavings
+      netWorth = netWorth + growth + effectiveMonthlySavings
     }
   }
 
@@ -627,6 +683,7 @@ export function computeScenarios(
 
 /**
  * Monte Carlo simulation: 1000 paths over N years.
+ * Optionally accepts future cashflows (AOW, pension, part-time) to adjust yearly savings.
  */
 export function runMonteCarlo(
   input: HorizonInput,
@@ -634,12 +691,13 @@ export function runMonteCarlo(
   years: number = 40,
   swrOverride?: number,
   volatilityOverride?: number,
+  cashflows?: FutureCashflow[],
 ): MonteCarloResult {
   const { totalAssets, totalDebts, monthlyIncome, monthlyExpenses, dateOfBirth } = input
   const swr = swrOverride ?? SWR
   const volatility = volatilityOverride ?? DEFAULT_VOLATILITY
   const netWorth = totalAssets - totalDebts
-  const monthlySavings = monthlyIncome - monthlyExpenses
+  const baseMonthlySavings = monthlyIncome - monthlyExpenses
   const yearlyExpenses = monthlyExpenses * 12
   const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / swr : 0
   const currentAge = dateOfBirth ? ageAtDate(dateOfBirth) : null
@@ -657,7 +715,20 @@ export function runMonteCarlo(
 
     for (let y = 1; y <= years; y++) {
       const annualReturn = rng.normal(DEFAULT_RETURN, volatility)
-      nw = nw * (1 + annualReturn) + monthlySavings * 12
+
+      // Cashflow adjustments for this year
+      let cashflowYearly = 0
+      if (cashflows && cashflows.length > 0 && currentAge !== null) {
+        const age = currentAge + y
+        for (const cf of cashflows) {
+          const toAgeBound = cf.toAge ?? 90
+          if (age >= cf.fromAge && age <= toAgeBound) {
+            cashflowYearly += cf.monthlyAmount * 12
+          }
+        }
+      }
+
+      nw = nw * (1 + annualReturn) + baseMonthlySavings * 12 + cashflowYearly
       nw = Math.max(0, nw)
       path.push(Math.round(nw))
 
@@ -882,7 +953,9 @@ export function computeLifeEventImpact(
   const adjustedFire = adjustedProjection.countdownDays
 
   const fireDelayMonths = Math.round((adjustedFire - baseFire) / 30.44)
-  const dailyExpense = input.monthlyExpenses > 0 ? (input.monthlyExpenses * 12) / 365 : 0
+  const dailyExpense = input.yearlyMustExpenses > 0
+    ? input.yearlyMustExpenses / 365
+    : (input.monthlyExpenses > 0 ? (input.monthlyExpenses * 12) / 365 : 0)
   const freedomDaysLost = dailyExpense > 0 ? Math.round(totalCost / dailyExpense) : 0
 
   return {
@@ -931,5 +1004,135 @@ export function computeResilienceScore(input: HorizonInput): ResilienceScore {
     total,
     breakdown: { emergency, diversification, debtRatio: debtScore, savingsRate: savingsScore },
     label,
+  }
+}
+
+// ── Backtesting ───────────────────────────────────────────────
+
+export interface BacktestPath {
+  startYear: number
+  label?: string
+  description?: string
+  color?: string
+  values: number[]        // portfolio value per year (year 0 = start)
+  success: boolean        // portfolio intact at end of period
+  depletionYear: number | null  // year portfolio ran out (null = never)
+  fireAgeReached: number | null // age at which FIRE target was crossed
+}
+
+export interface BacktestResult {
+  years: number
+  allPaths: BacktestPath[]
+  namedPaths: BacktestPath[]
+  successRate: number
+  worstCase: BacktestPath
+  medianPath: BacktestPath
+  bestCase: BacktestPath
+  bandMin: number[]
+  bandMax: number[]
+  bandP25: number[]
+  bandP75: number[]
+}
+
+/**
+ * Backtest against historical MSCI World real returns (1970–2024).
+ * Simulates all available start years and returns success rates and statistics.
+ */
+export function runBacktest(
+  input: HorizonInput,
+  years: number = 30,
+  swrOverride?: number,
+): BacktestResult {
+  const { totalAssets, totalDebts, monthlyIncome, monthlyExpenses, dateOfBirth } = input
+  const swr = swrOverride ?? SWR
+  const netWorth = totalAssets - totalDebts
+  const monthlySavings = monthlyIncome - monthlyExpenses
+  const yearlyExpenses = monthlyExpenses * 12
+  const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / swr : 0
+  const currentAge = dateOfBirth ? ageAtDate(dateOfBirth) : null
+
+  // Available start years: 1970 to (2024 - years)
+  const maxStartYear = 2024 - years
+  const startYears: number[] = []
+  for (let y = 1970; y <= maxStartYear; y++) {
+    startYears.push(y)
+  }
+
+  const allPaths: BacktestPath[] = startYears.map(startYear => {
+    let nw = netWorth
+    const values: number[] = [Math.round(nw)]
+    let depletionYear: number | null = null
+    let fireAgeReached: number | null = null
+
+    for (let y = 1; y <= years; y++) {
+      const dataYear = startYear + y - 1
+      const realReturn = MSCI_REAL_RETURNS[dataYear] ?? DEFAULT_RETURN
+      nw = nw * (1 + realReturn) + monthlySavings * 12
+      if (nw <= 0) {
+        nw = 0
+        if (depletionYear === null) depletionYear = y
+      }
+      values.push(Math.round(nw))
+
+      if (fireAgeReached === null && fireTarget > 0 && nw >= fireTarget && currentAge !== null) {
+        fireAgeReached = currentAge + y
+      }
+    }
+
+    // Match named period
+    const namedPeriod = NAMED_PERIODS.find(p => p.startYear === startYear)
+
+    return {
+      startYear,
+      label: namedPeriod?.label,
+      description: namedPeriod?.description,
+      color: namedPeriod?.color,
+      values,
+      success: nw > 0,
+      depletionYear,
+      fireAgeReached,
+    }
+  })
+
+  const successCount = allPaths.filter(p => p.success).length
+  const successRate = allPaths.length > 0 ? successCount / allPaths.length : 0
+
+  // Named paths
+  const namedPaths = NAMED_PERIODS
+    .map(period => allPaths.find(p => p.startYear === period.startYear))
+    .filter((p): p is BacktestPath => p !== undefined)
+
+  // Sort by final value for worst/median/best
+  const sortedByFinal = [...allPaths].sort((a, b) => (a.values[years] ?? 0) - (b.values[years] ?? 0))
+  const worstCase = sortedByFinal[0] ?? allPaths[0]
+  const medianPath = sortedByFinal[Math.floor(sortedByFinal.length / 2)] ?? allPaths[0]
+  const bestCase = sortedByFinal[sortedByFinal.length - 1] ?? allPaths[allPaths.length - 1]
+
+  // Band calculations per year
+  const bandMin: number[] = []
+  const bandMax: number[] = []
+  const bandP25: number[] = []
+  const bandP75: number[] = []
+
+  for (let y = 0; y <= years; y++) {
+    const vals = allPaths.map(p => p.values[y] ?? 0).sort((a, b) => a - b)
+    bandMin.push(vals[0] ?? 0)
+    bandMax.push(vals[vals.length - 1] ?? 0)
+    bandP25.push(vals[Math.floor(vals.length * 0.25)] ?? 0)
+    bandP75.push(vals[Math.floor(vals.length * 0.75)] ?? 0)
+  }
+
+  return {
+    years,
+    allPaths,
+    namedPaths,
+    successRate,
+    worstCase,
+    medianPath,
+    bestCase,
+    bandMin,
+    bandMax,
+    bandP25,
+    bandP75,
   }
 }

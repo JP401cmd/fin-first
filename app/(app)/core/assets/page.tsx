@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import {
   Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2, BarChart3, ChevronDown, ChevronUp, Briefcase, AlertCircle,
 } from 'lucide-react'
@@ -887,6 +888,7 @@ function MiniSparkline({
 // ── Valuation trend section for detail modal ─────────────────
 
 function ValuationTrendSection({ valuations }: { valuations: Valuation[] }) {
+  const { ref: chartRef, hasEntered: chartEntered } = useInViewAnimation({ duration: 600 })
   const [showAll, setShowAll] = useState(false)
   const INITIAL_SHOW = 10
 
@@ -949,7 +951,7 @@ function ValuationTrendSection({ valuations }: { valuations: Valuation[] }) {
 
       {/* Line chart */}
       {sorted.length >= 2 ? (
-        <div className="mb-3 rounded-[var(--r)] bg-[var(--subtle)] p-3" data-testid="valuation-line-chart">
+        <div ref={chartRef} className="mb-3 rounded-[var(--r)] bg-[var(--subtle)] p-3" data-testid="valuation-line-chart">
           <svg viewBox={`0 0 ${W} ${H}`} className="h-36 w-full" preserveAspectRatio="xMidYMid meet">
             {/* Grid lines and Y labels */}
             {yTicks.map((val, i) => (
@@ -969,10 +971,13 @@ function ValuationTrendSection({ valuations }: { valuations: Valuation[] }) {
             ))}
 
             {/* Area fill */}
-            <path d={areaPath} fill={fillColor} fillOpacity="0.08" />
+            <path d={areaPath} fill={fillColor}
+              style={{ opacity: chartEntered ? 0.08 : 0, transition: chartEntered ? 'opacity 250ms ease-out 455ms' : 'none' }} />
 
             {/* Line */}
-            <path d={linePath} fill="none" stroke={strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={linePath} fill="none" stroke={strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              pathLength={1} strokeDasharray={1}
+              style={{ strokeDashoffset: chartEntered ? undefined : 1, animation: chartEntered ? 'drawPath 600ms cubic-bezier(.22,1,.36,1) both' : 'none' }} />
 
             {/* Data points */}
             {sorted.map((v, i) => (
@@ -1555,6 +1560,7 @@ function AllocationPie({
   total: number
   dailyExpenses: number
 }) {
+  const { ref, hasEntered } = useInViewAnimation({ duration: 700 })
   const size = 120
   const cx = size / 2
   const cy = size / 2
@@ -1571,8 +1577,9 @@ function AllocationPie({
   let offset = 0
 
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
-      {segments.map((seg) => {
+    <div ref={ref} className="shrink-0">
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      {segments.map((seg, i) => {
         const dash = seg.pct * circumference
         const gap = circumference - dash
         const currentOffset = offset
@@ -1587,9 +1594,10 @@ function AllocationPie({
             fill="none"
             stroke={seg.color}
             strokeWidth={strokeWidth}
-            strokeDasharray={`${dash} ${gap}`}
+            strokeDasharray={hasEntered ? `${dash} ${gap}` : `0 ${circumference}`}
             strokeDashoffset={-currentOffset}
             transform={`rotate(-90 ${cx} ${cy})`}
+            style={{ transition: hasEntered ? `stroke-dasharray 600ms cubic-bezier(.22,1,.36,1) ${i * 80}ms` : 'none' }}
           />
         )
       })}
@@ -1611,6 +1619,7 @@ function AllocationPie({
         </text>
       )}
     </svg>
+    </div>
   )
 }
 
@@ -1623,6 +1632,7 @@ function ProjectionChart({
   data: ReturnType<typeof projectPortfolio>
   currentValue: number
 }) {
+  const { ref, hasEntered } = useInViewAnimation({ duration: 600 })
   if (data.length === 0) return <div className="flex h-40 items-center justify-center text-xs text-[var(--ink-3)]">Geen data</div>
 
   const w = 400
@@ -1650,6 +1660,7 @@ function ProjectionChart({
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map((t) => Math.round(maxVal * t))
 
   return (
+    <div ref={ref}>
     <svg viewBox={`0 0 ${w} ${h}`} className="mt-3 h-auto w-full" preserveAspectRatio="xMidYMid meet" data-testid="projection-area-chart">
       {yTicks.map((val) => (
         <g key={val}>
@@ -1665,8 +1676,11 @@ function ProjectionChart({
         stroke="#f59e0b" strokeWidth="0.5" strokeDasharray="3 3"
       />
 
-      <path d={areaPath} fill="#10b981" fillOpacity="0.12" />
-      <path d={linePath} fill="none" stroke="#10b981" strokeWidth="1.5" />
+      <path d={areaPath} fill="#10b981"
+        style={{ opacity: hasEntered ? 0.12 : 0, transition: hasEntered ? 'opacity 250ms ease-out 455ms' : 'none' }} />
+      <path d={linePath} fill="none" stroke="#10b981" strokeWidth="1.5"
+        pathLength={1} strokeDasharray={1}
+        style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: hasEntered ? 'drawPath 600ms cubic-bezier(.22,1,.36,1) both' : 'none' }} />
 
       {sampled.filter((_, i) => i % Math.max(1, Math.floor(sampled.length / 5)) === 0).map((d) => (
         <text key={d.month} x={x(d.month)} y={h - 5} textAnchor="middle" fontSize="7" fill="#a1a1aa">
@@ -1674,6 +1688,7 @@ function ProjectionChart({
         </text>
       ))}
     </svg>
+    </div>
   )
 }
 

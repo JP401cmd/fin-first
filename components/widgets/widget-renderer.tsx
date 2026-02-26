@@ -27,6 +27,26 @@ import type { FireProjection } from '@/lib/horizon-data'
 // All data the dashboard page fetches and passes down to widgets.
 // No individual widget does its own Supabase calls.
 
+export interface TopAction {
+  id: string
+  title: string
+  freedom_days_impact: number | null
+  priority_score: number | null
+  due_date: string | null
+  source: string
+}
+
+export interface TopGoal {
+  id: string
+  name: string
+  goal_type: string
+  current_value: number
+  target_value: number
+  target_date: string | null
+  color: string
+  icon: string
+}
+
 export interface DashboardData {
   // Core financial
   netWorth: number
@@ -49,6 +69,8 @@ export interface DashboardData {
   // Actions
   openActions: number
   totalFreedomDaysOpen: number
+  completedActionsThisMonth: number
+  topOpenActions: TopAction[]
   // Sovereignty
   sovereigntyLevel: number
   currentPhaseId: string
@@ -57,8 +79,14 @@ export interface DashboardData {
   // Extra fetches
   recommendations: number
   goals: number
+  topGoals: TopGoal[]
   recurringTransactions: number
   lifeEvents: number
+  // Historical net worth (up to 12 monthly snapshots, ascending)
+  netWorthHistory: { month: string; value: number }[]
+  // Asset breakdown per type
+  assetsByType: { type: string; value: number; purchaseValue: number; expectedReturn: number }[]
+  totalPurchaseValue: number
 }
 
 // ── Gating: widget id → min sovereignty level ─────────────────

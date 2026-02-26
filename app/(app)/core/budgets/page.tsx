@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import {
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, X, Pencil, Save, Trash2,
   GitFork, Fingerprint, Workflow, CircleDot, AlertTriangle, CheckCircle2,
@@ -13,8 +14,6 @@ import { BudgetIcon, formatCurrency, getTypeColors, iconMap, iconOptions, type B
 import { buildSegments, groupColor, childColor } from '@/components/app/budget-donut'
 import { type BudgetRollover, formatPeriod, getCarriedAmount, getPreviousPeriod, computeRollover } from '@/lib/budget-rollover'
 import { BudgetTree } from '@/components/app/budget-tree'
-import { BudgetBlob } from '@/components/app/budget-blob'
-import { BudgetSankey } from '@/components/app/budget-sankey'
 import { BudgetDonut } from '@/components/app/budget-donut'
 import { useDailyExpenseRate, eurToFreedomTime } from '@/components/app/freedom-time-label'
 import { BudgetSparkline, SparklineWithLabel, type SparklineDataPoint } from '@/components/app/budget-sparkline'
@@ -29,6 +28,25 @@ import { UncategorizedTransactionsBanner } from '@/components/app/uncategorized-
 import { TransactionForm } from '@/components/app/transaction-form'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
+
+// Spinner shown while lazy viz chunks load
+function VizSkeleton() {
+  return (
+    <div className="flex h-64 items-center justify-center rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)]">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-300 border-t-kern-500" />
+    </div>
+  )
+}
+
+// Lazy-load less-common visualizations to keep initial bundle small
+const BudgetBlob = dynamic(
+  () => import('@/components/app/budget-blob').then(m => ({ default: m.BudgetBlob })),
+  { loading: () => <VizSkeleton /> }
+)
+const BudgetSankey = dynamic(
+  () => import('@/components/app/budget-sankey').then(m => ({ default: m.BudgetSankey })),
+  { loading: () => <VizSkeleton /> }
+)
 
 type Goal = {
   id: string
@@ -369,11 +387,11 @@ export default function BudgetsPage() {
     loadGoals()
   }, [loadBudgets, loadGoals])
 
+  // Run loadSpending independently — no longer gated on loadBudgets completing.
+  // loadSpending has no dependency on budgets state, so it can fetch in parallel.
   useEffect(() => {
-    if (!loading) {
-      loadSpending()
-    }
-  }, [loading, loadSpending])
+    loadSpending()
+  }, [loadSpending])
 
   useEffect(() => {
     if (!selectedBudgetId) { setBudgetRolloverHistory([]); return }
@@ -452,14 +470,35 @@ export default function BudgetsPage() {
     return parent.children.reduce((sum, c) => sum + getSpent(c), 0)
   }
 
+  // Pre-indexed lookups: O(1) access instead of O(N) filter on every call.
+  const budgetAmountsIndex = useMemo(() => {
+    const idx: Record<string, { budget_id: string; effective_from: string; amount: number }[]> = {}
+    for (const a of budgetAmounts) {
+      if (!idx[a.budget_id]) idx[a.budget_id] = []
+      idx[a.budget_id].push(a)
+    }
+    return idx
+  }, [budgetAmounts])
+
+  const rolloversIndex = useMemo(() => {
+    const idx: Record<string, BudgetRollover[]> = {}
+    for (const r of rollovers) {
+      if (!idx[r.budget_id]) idx[r.budget_id] = []
+      idx[r.budget_id].push(r)
+    }
+    return idx
+  }, [rollovers])
+
+  const currentPeriodLabel = useMemo(() => formatPeriod(monthDate), [monthDate])
+  const displayDate = useMemo(() => localDateStr(monthDate), [monthDate])
+
   function getEffectiveLimit(budget: Budget): number {
-    const budgetRollovers = rollovers.filter((r) => r.budget_id === budget.id)
-    const carry = getCarriedAmount(budgetRollovers, formatPeriod(monthDate))
+    const budgetRollovers = rolloversIndex[budget.id] ?? []
+    const carry = getCarriedAmount(budgetRollovers, currentPeriodLabel)
 
     // Check budget_amounts for period-specific limit override
-    const displayDate = localDateStr(monthDate)
-    const applicable = budgetAmounts
-      .filter(a => a.budget_id === budget.id && a.effective_from <= displayDate)
+    const applicable = (budgetAmountsIndex[budget.id] ?? [])
+      .filter(a => a.effective_from <= displayDate)
       .sort((a, b) => b.effective_from.localeCompare(a.effective_from))
 
     const baseLimit = applicable.length > 0
@@ -475,8 +514,8 @@ export default function BudgetsPage() {
   }
 
   function getBudgetCarry(budget: Budget): number {
-    const budgetRollovers = rollovers.filter((r) => r.budget_id === budget.id)
-    return getCarriedAmount(budgetRollovers, formatPeriod(monthDate))
+    const budgetRollovers = rolloversIndex[budget.id] ?? []
+    return getCarriedAmount(budgetRollovers, currentPeriodLabel)
   }
 
   async function copyFromLastMonth() {
@@ -576,9 +615,67 @@ export default function BudgetsPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
-        <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+        {/* Month selector skeleton */}
+        <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+          <div className="mb-6 flex items-center justify-between gap-2">
+            <div className="h-9 w-9 animate-pulse rounded-lg bg-[var(--subtle)]" />
+            <div className="h-6 w-36 animate-pulse rounded-md bg-[var(--subtle)]" />
+            <div className="h-9 w-9 animate-pulse rounded-lg bg-[var(--subtle)]" />
+            <div className="ml-auto hidden h-8 w-36 animate-pulse rounded-[var(--r)] bg-[var(--subtle)] sm:block" />
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[1,2,3,4].map(i => (
+              <div key={i} className="flex flex-col items-center gap-2">
+                <div className="h-3 w-16 animate-pulse rounded bg-[var(--subtle)]" />
+                <div className="h-7 w-24 animate-pulse rounded-md bg-[var(--subtle)]" />
+                <div className="h-3 w-20 animate-pulse rounded bg-[var(--subtle)]" />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* View mode toggle skeleton */}
+        <div className="mt-6 flex items-center gap-2">
+          {[1,2,3,4].map(i => (
+            <div key={i} className="h-8 w-20 animate-pulse rounded-[var(--r)] bg-[var(--subtle)]" />
+          ))}
+        </div>
+
+        {/* Budget tree skeleton */}
+        <div className="mt-6 space-y-4">
+          {[1,2,3].map(group => (
+            <div key={group} className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+              {/* Group header */}
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 animate-pulse rounded-lg bg-[var(--subtle)]" />
+                  <div>
+                    <div className="h-4 w-28 animate-pulse rounded bg-[var(--subtle)]" />
+                    <div className="mt-1 h-3 w-20 animate-pulse rounded bg-[var(--subtle)]" />
+                  </div>
+                </div>
+                <div className="h-5 w-16 animate-pulse rounded bg-[var(--subtle)]" />
+              </div>
+              {/* Progress bar skeleton */}
+              <div className="mb-4 h-1.5 w-full animate-pulse rounded-full bg-[var(--subtle)]" />
+              {/* Child rows */}
+              <div className="space-y-2 pl-4">
+                {[1,2,3].map(child => (
+                  <div key={child} className="flex items-center justify-between py-1">
+                    <div className="flex items-center gap-2">
+                      <div className="h-6 w-6 animate-pulse rounded-md bg-[var(--subtle)]" />
+                      <div className="h-4 w-24 animate-pulse rounded bg-[var(--subtle)]" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="h-2 w-20 animate-pulse rounded-full bg-[var(--subtle)]" />
+                      <div className="h-4 w-14 animate-pulse rounded bg-[var(--subtle)]" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     )

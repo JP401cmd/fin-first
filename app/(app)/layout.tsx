@@ -25,6 +25,17 @@ import {
   DEFAULT_PHASE_COLORS,
 } from '@/lib/color-palette'
 import type { ModuleColorConfig, BudgetColorConfig, PhaseColorConfig } from '@/lib/color-palette'
+import type { FontTheme } from '@/components/app/module-color-provider'
+
+function generateFontVars(theme: string): Record<string, string> {
+  if (theme === 'andada') {
+    return { '--font-playfair': 'var(--font-andada)', '--font-source-serif': 'var(--font-andada)' }
+  }
+  if (theme === 'digital') {
+    return { '--font-playfair': 'var(--font-inter)', '--font-source-serif': 'var(--font-inter)' }
+  }
+  return {}
+}
 
 export default async function AppLayout({
   children,
@@ -45,7 +56,7 @@ export default async function AppLayout({
   const dateStr = threeMonthsAgo.toISOString().split('T')[0]
 
   const [profileRes, assetsRes, debtsRes, txRes, matrixRes] = await Promise.all([
-    supabase.from('profiles').select('role, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors').eq('id', user.id).single(),
+    supabase.from('profiles').select('role, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme').eq('id', user.id).single(),
     supabase.from('assets').select('current_value').eq('is_active', true),
     supabase.from('debts').select('current_balance, debt_type').eq('is_active', true),
     supabase.from('transactions').select('amount, is_income').gte('date', dateStr),
@@ -136,6 +147,8 @@ export default async function AppLayout({
   }
 
   const colorVars = generateAllColorVars({ modules: moduleColors, budget: budgetColors, phase: phaseColors })
+  const fontVars = generateFontVars(profile?.typography_theme ?? 'editorial')
+  const allVars = { ...colorVars, ...fontVars }
 
   return (
     <MobilePreviewProvider>
@@ -146,8 +159,8 @@ export default async function AppLayout({
           <PerspectiveProvider>
             <ChatProvider>
               <NotificationProvider>
-                <ModuleColorProvider initialConfig={moduleColors} initialBudgetConfig={budgetColors} initialPhaseConfig={phaseColors}>
-                  <div className="min-h-screen bg-[var(--bg)]" style={colorVars as React.CSSProperties}>
+                <ModuleColorProvider initialConfig={moduleColors} initialBudgetConfig={budgetColors} initialPhaseConfig={phaseColors} initialFontTheme={(profile?.typography_theme as FontTheme) ?? 'editorial'}>
+                  <div className="min-h-screen bg-[var(--bg)]" data-app-root style={allVars as React.CSSProperties}>
                     <ChatLayoutWrapper>
                       <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
                       <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation}>

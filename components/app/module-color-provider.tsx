@@ -10,6 +10,8 @@ import {
   DEFAULT_PHASE_COLORS,
 } from '@/lib/color-palette'
 
+export type FontTheme = 'editorial' | 'andada' | 'digital'
+
 type ModuleColorContextType = {
   // Module colors (unchanged API)
   config: ModuleColorConfig
@@ -25,6 +27,10 @@ type ModuleColorContextType = {
   phaseConfig: PhaseColorConfig
   setPhaseConfig: (config: PhaseColorConfig) => void
   getPhaseHex: (phase: PhaseColorName, shade?: Shade) => string
+
+  // Font theme
+  fontTheme: FontTheme
+  setFontTheme: (theme: FontTheme) => void
 }
 
 const ModuleColorContext = createContext<ModuleColorContextType | null>(null)
@@ -40,11 +46,13 @@ export function ModuleColorProvider({
   initialConfig,
   initialBudgetConfig,
   initialPhaseConfig,
+  initialFontTheme = 'editorial',
   children,
 }: {
   initialConfig: ModuleColorConfig
   initialBudgetConfig?: BudgetColorConfig
   initialPhaseConfig?: PhaseColorConfig
+  initialFontTheme?: FontTheme
   children: React.ReactNode
 }) {
   const [config, setConfigState] = useState<ModuleColorConfig>(initialConfig)
@@ -54,6 +62,7 @@ export function ModuleColorProvider({
   const [phaseConfig, setPhaseConfigState] = useState<PhaseColorConfig>(
     initialPhaseConfig ?? DEFAULT_PHASE_COLORS
   )
+  const [fontTheme, setFontThemeState] = useState<FontTheme>(initialFontTheme)
 
   // Refs to avoid stale closures when any one config setter is called
   const moduleRef = useRef(config)
@@ -90,9 +99,32 @@ export function ModuleColorProvider({
     applyVars()
   }, [applyVars])
 
+  const applyFontVars = useCallback((theme: FontTheme) => {
+    const pairs: [string, string] | null =
+      theme === 'andada' ? ['var(--font-andada)', 'var(--font-andada)'] :
+      theme === 'digital' ? ['var(--font-inter)', 'var(--font-inter)'] :
+      null
+    const targets = [document.body, document.querySelector('[data-app-root]')].filter(Boolean) as HTMLElement[]
+    for (const el of targets) {
+      if (pairs) {
+        el.style.setProperty('--font-playfair', pairs[0])
+        el.style.setProperty('--font-source-serif', pairs[1])
+      } else {
+        el.style.removeProperty('--font-playfair')
+        el.style.removeProperty('--font-source-serif')
+      }
+    }
+  }, [])
+
+  const setFontTheme = useCallback((theme: FontTheme) => {
+    setFontThemeState(theme)
+    applyFontVars(theme)
+  }, [applyFontVars])
+
   // Apply on mount (in case server-side style and client config diverge)
   useEffect(() => {
     applyVars()
+    applyFontVars(initialFontTheme)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const getHex = useCallback((module: ModuleName, shade: Shade = 500): string => {
@@ -118,6 +150,7 @@ export function ModuleColorProvider({
       config, setConfig, getHex,
       budgetConfig, setBudgetConfig, getBudgetHex,
       phaseConfig, setPhaseConfig, getPhaseHex,
+      fontTheme, setFontTheme,
     }}>
       {children}
     </ModuleColorContext.Provider>
@@ -140,6 +173,12 @@ export function usePhaseColors() {
   const ctx = useContext(ModuleColorContext)
   if (!ctx) throw new Error('usePhaseColors must be used within ModuleColorProvider')
   return { phaseConfig: ctx.phaseConfig, setPhaseConfig: ctx.setPhaseConfig, getPhaseHex: ctx.getPhaseHex }
+}
+
+export function useFontTheme() {
+  const ctx = useContext(ModuleColorContext)
+  if (!ctx) throw new Error('useFontTheme must be used within ModuleColorProvider')
+  return { fontTheme: ctx.fontTheme, setFontTheme: ctx.setFontTheme }
 }
 
 /**

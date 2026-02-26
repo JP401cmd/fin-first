@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { computeCoreData } from '@/lib/mock-data'
 import { section, formatCurrency, formatFreedomTime, formatPercentage } from './formatter'
+import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 
 const TEMPORAL_LABELS: Record<number, string> = {
   1: 'De Levensgenieter (level 1) — Comfort > Snelheid',
@@ -16,8 +17,8 @@ const TEMPORAL_LABELS: Record<number, string> = {
  * Uses real Supabase data.
  */
 export async function buildSharedContext(supabase: SupabaseClient): Promise<string> {
-  // Fetch assets, debts, transactions, and user profile
-  const [assetsResult, debtsResult, transactionsResult, profileResult] = await Promise.all([
+  // Fetch assets, debts, transactions, user profile, and essential budgets
+  const [assetsResult, debtsResult, transactionsResult, profileResult, essentialBudgetsResult, allChildrenResult] = await Promise.all([
     supabase
       .from('assets')
       .select('current_value')
@@ -29,16 +30,18 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     supabase
       .from('transactions')
       .select('amount, is_income, date')
-      .gte('date', getMonthsAgoDate(3))
+      .gte('date', getMonthsAgoDate(12))
       .order('date', { ascending: false }),
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return { data: null }
       return supabase
         .from('profiles')
-        .select('full_name, temporal_balance, household_type, date_of_birth')
+        .select('full_name, temporal_balance, household_type, date_of_birth, retirement_expense_method, retirement_expense_custom_amount')
         .eq('id', user.id)
         .single()
     }),
+    supabase.from('budgets').select('*').eq('is_essential', true),
+    supabase.from('budgets').select('*').not('parent_id', 'is', null),
   ])
 
   const assets = assetsResult.data ?? []
@@ -61,6 +64,24 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
   const monthlyIncome = Math.round(totalIncome / monthsOfData)
   const monthlyExpenses = Math.round(totalExpenses / monthsOfData)
 
+  const last12Income = totalIncome  // already summed over the now-12-month window
+  const extrapolatedYearlyIncome = monthsOfData > 0 ? (last12Income / monthsOfData) * 12 : 0
+
+  // Compute must-expenses from essential budgets
+  const { yearlyMustExpenses } = computeYearlyMustExpenses(
+    essentialBudgetsResult.data ?? [],
+    allChildrenResult.data ?? [],
+  )
+  const monthlyMustExpenses = yearlyMustExpenses > 0 ? Math.round(yearlyMustExpenses / 12) : 0
+
+  const yearlyRetirementExpenses = computeRetirementExpenses(
+    profile?.retirement_expense_method as RetirementExpenseMethod,
+    yearlyMustExpenses,
+    extrapolatedYearlyIncome,
+    profile?.retirement_expense_custom_amount,
+  )
+  const monthlyRetirementExpenses = yearlyRetirementExpenses > 0 ? Math.round(yearlyRetirementExpenses / 12) : 0
+
   // If no transaction data, return minimal context
   if (totalAssets === 0 && totalDebts === 0 && transactions.length === 0) {
     return section('FINANCIEEL OVERZICHT', 'Nog geen financiële data beschikbaar. Vraag de gebruiker om assets, schulden of transacties toe te voegen.')
@@ -82,7 +103,7 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     identitySection = section('GEBRUIKERSPROFIEL', identityLines.join('\n')) + '\n'
   }
 
-  const core = computeCoreData(monthlyIncome, monthlyExpenses, totalAssets, totalDebts)
+  const core = computeCoreData(monthlyIncome, monthlyExpenses, totalAssets, totalDebts, undefined, yearlyRetirementExpenses)
 
   const lines = [
     `Netto vermogen: ${formatCurrency(core.netWorth)}`,
@@ -91,6 +112,8 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     `FIRE-doel: ${formatCurrency(core.fireTarget)}`,
     `Verwachte FIRE-datum: ${core.expectedFireDate || 'onbekend'}`,
     `Maandinkomen: ${formatCurrency(core.monthlyIncome)} | Maanduitgaven: ${formatCurrency(core.monthlyExpenses)}`,
+    monthlyMustExpenses > 0 ? `Must-uitgaven (essentieel): ${formatCurrency(monthlyMustExpenses)}/mnd` : null,
+    monthlyRetirementExpenses > 0 ? `Jaarlijkse uitgave na retirement: ${formatCurrency(monthlyRetirementExpenses)}/mnd (methode: ${profile?.retirement_expense_method ?? 'essential_budgets'}) — basis voor FIRE & vrijheidsdagen` : null,
     `Spaarquote: ${formatPercentage(core.savingsRate)}`,
     `Dagen vrijheid verdiend per maand: ${core.daysWonPerMonth}`,
     `Vrije dagen per jaar (passief inkomen): ${core.freeDaysPerYear}`,
@@ -98,14 +121,13 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     `Dagelijkse uitgaven: ${formatCurrency(Math.round(core.yearlyExpenses / 365))}`,
   ]
 
-  return identitySection + section('FINANCIEEL OVERZICHT', lines.join('\n'))
+  return identitySection + section('FINANCIEEL OVERZICHT', (lines.filter(Boolean) as string[]).join('\n'))
 }
 
-/** Get a date string N months ago in YYYY-MM-DD format */
+/** Get a date string N months ago in YYYY-MM-DD format (UTC, no timezone shift) */
 function getMonthsAgoDate(months: number): string {
-  const d = new Date()
-  d.setMonth(d.getMonth() - months)
-  return d.toISOString().split('T')[0]
+  const now = new Date()
+  return new Date(Date.UTC(now.getFullYear(), now.getMonth() - months, 1)).toISOString().split('T')[0]
 }
 
 /** Count distinct year-month combinations in transactions */

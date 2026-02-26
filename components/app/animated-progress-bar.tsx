@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 type AnimatedProgressBarProps = {
   /** Progress value 0-100 */
@@ -15,6 +15,8 @@ type AnimatedProgressBarProps = {
   animateOnMount?: boolean
   /** Animation duration in ms */
   duration?: number
+  /** Delay in ms before hasEntered triggers. Use 300 for modal/BottomSheet context. */
+  triggerDelay?: number
   /** Show shimmer effect on completion */
   shimmerOnComplete?: boolean
   /** Additional className for the container */
@@ -29,86 +31,34 @@ export function AnimatedProgressBar({
   colorClass = 'bg-teal-500',
   heightClass = 'h-2',
   animateOnMount = true,
-  duration = 1200,
+  duration = 800,
   shimmerOnComplete = false,
   className = '',
+  triggerDelay,
   'data-testid': testId,
 }: AnimatedProgressBarProps) {
   const percentage = Math.min(Math.max((value / max) * 100, 0), 100)
-  const [displayWidth, setDisplayWidth] = useState(animateOnMount ? 0 : percentage)
-  const [hasAnimated, setHasAnimated] = useState(!animateOnMount)
-  const prevValueRef = useRef(animateOnMount ? 0 : percentage)
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  // Observe when element enters viewport to trigger animation
-  useEffect(() => {
-    if (!animateOnMount || hasAnimated) return
-
-    // Respect prefers-reduced-motion: skip animation
-    const prefersReduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (prefersReduced) {
-      setDisplayWidth(percentage)
-      setHasAnimated(true)
-      return
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && !hasAnimated) {
-            setHasAnimated(true)
-            animateTo(percentage)
-          }
-        })
-      },
-      { threshold: 0.1 }
-    )
-
-    const el = containerRef.current
-    if (el) observer.observe(el)
-    return () => { if (el) observer.unobserve(el) }
-  }, [animateOnMount, hasAnimated, percentage])
-
-  // Animate on value change
-  useEffect(() => {
-    if (!hasAnimated) return
-    if (prevValueRef.current !== percentage) {
-      animateTo(percentage)
-      prevValueRef.current = percentage
-    }
-  }, [percentage, hasAnimated])
-
-  function animateTo(target: number) {
-    const start = displayWidth
-    const startTime = Date.now()
-    const step = () => {
-      const elapsed = Date.now() - startTime
-      const progress = Math.min(elapsed / duration, 1)
-      // Ease out quart for smooth deceleration
-      const eased = 1 - Math.pow(1 - progress, 4)
-      setDisplayWidth(start + (target - start) * eased)
-      if (progress < 1) requestAnimationFrame(step)
-    }
-    requestAnimationFrame(step)
-  }
+  const { ref: inViewRef, hasEntered, animationComplete } = useInViewAnimation({ duration, triggerDelay })
 
   const isComplete = percentage >= 100
-  const showShimmer = shimmerOnComplete && isComplete
+  const showShimmer = shimmerOnComplete && isComplete && (!animateOnMount || animationComplete)
 
   return (
     <div
-      ref={containerRef}
+      ref={inViewRef}
       className={`overflow-hidden rounded-full bg-zinc-100 ${heightClass} ${className}`}
       data-testid={testId}
       data-progress={percentage}
     >
       <div
-        className={`${heightClass} rounded-full transition-colors ${colorClass} relative ${
+        className={`${heightClass} rounded-full ${colorClass} relative ${
           showShimmer ? 'animate-progress-shimmer' : ''
         }`}
         style={{
-          width: `${displayWidth}%`,
-          transition: hasAnimated ? 'none' : undefined,
+          width: animateOnMount ? (hasEntered ? `${percentage}%` : '0%') : `${percentage}%`,
+          transition: animateOnMount && hasEntered
+            ? `width ${duration}ms cubic-bezier(.22,1,.36,1)`
+            : 'none',
         }}
         data-testid={testId ? `${testId}-fill` : undefined}
       >

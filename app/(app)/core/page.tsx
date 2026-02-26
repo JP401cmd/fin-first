@@ -3,11 +3,13 @@
 import { useEffect, useState, useCallback } from 'react'
 import { FhinAvatar } from '@/components/app/avatars'
 import { computeCoreData, type CoreData } from '@/lib/mock-data'
+import { useFireMethod } from '@/lib/hooks/use-fire-method'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, BudgetIcon } from '@/components/app/budget-shared'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { shouldAlert } from '@/lib/budget-alerts'
+import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import type { Budget } from '@/lib/budget-data'
 import type { NetWorthSnapshot } from '@/lib/net-worth-data'
 import {
@@ -46,6 +48,7 @@ const DynDebtsPage = dynamic(() => import('@/app/(app)/core/debts/page'), {
 
 export default function CorePage() {
   const router = useRouter()
+  const { swr: fireSwr } = useFireMethod()
   const [data, setData] = useState<CoreData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -93,8 +96,15 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   const [savingsReceiptData, setSavingsReceiptData] = useState<{extYearlyIncome: number; extYearlyExpenses: number; yearlySavings: number; last12Income: number; last12Expenses: number}>({extYearlyIncome: 0, extYearlyExpenses: 0, yearlySavings: 0, last12Income: 0, last12Expenses: 0})
   // Net worth kassabon state
   const [showNetWorthReceipt, setShowNetWorthReceipt] = useState(false)
+  const [showFreeDaysReceipt, setShowFreeDaysReceipt] = useState(false)
   const [assetsList, setAssetsList] = useState<Array<{name: string; current_value: number; net_worth_inclusion_pct: number}>>([])
   const [debtsList, setDebtsList] = useState<Array<{name: string; current_balance: number; net_worth_inclusion_pct: number}>>([])
+  const [rawFinancials, setRawFinancials] = useState<{
+    monthlyIncome: number; monthlyExpenses: number; totalAssets: number
+    totalDebts: number; extrapolatedIncome: number; yearlyMustExpenses: number
+    yearlyRetirementExpenses?: number
+  } | null>(null)
+  const [retirementMethodUsed, setRetirementMethodUsed] = useState<RetirementExpenseMethod>('essential_budgets')
 
   const loadData = useCallback(async () => {
     try {
@@ -102,12 +112,12 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
 
       // Get current month boundaries
       const now = new Date()
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
-      const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split('T')[0]
+      const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0]
+      const monthEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1)).toISOString().split('T')[0]
+      const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
 
       // Fetch all in parallel
-      const [txResult, assetsResult, debtsResult, income12Result, essentialBudgetsResult, earliestIncomeResult, childBudgetsResult, expense12Result, earliestTxResult] = await Promise.all([
+      const [txResult, assetsResult, debtsResult, income12Result, essentialBudgetsResult, earliestIncomeResult, childBudgetsResult, expense12Result, earliestTxResult, profileResult] = await Promise.all([
         supabase
           .from('transactions')
           .select('amount')
@@ -157,6 +167,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           .gte('date', twelveMonthsAgo)
           .order('date', { ascending: true })
           .limit(1),
+        supabase.from('profiles').select('retirement_expense_method, retirement_expense_custom_amount').single(),
       ])
 
       if (txResult.error) throw txResult.error
@@ -187,7 +198,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         const earliest = new Date(earliestIncomeDate)
         actualIncomeMonths = Math.max(1,
           (now.getFullYear() - earliest.getFullYear()) * 12 +
-          (now.getMonth() - earliest.getMonth()) + 1
+          (now.getMonth() - earliest.getMonth())
         )
         actualIncomeMonths = Math.min(actualIncomeMonths, 12)
         if (actualIncomeMonths < 12) {
@@ -216,7 +227,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         const earliest = new Date(earliestTxDate)
         savingsRateDataMonths = Math.max(1,
           (now.getFullYear() - earliest.getFullYear()) * 12 +
-          (now.getMonth() - earliest.getMonth()) + 1
+          (now.getMonth() - earliest.getMonth())
         )
         savingsRateDataMonths = Math.min(savingsRateDataMonths, 12)
       }
@@ -231,55 +242,23 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       setSavingsRateMonths(savingsRateDataMonths)
       setSavingsReceiptData({ extYearlyIncome, extYearlyExpenses, yearlySavings, last12Income: last12MonthsIncome, last12Expenses: last12MonthsExpenses })
 
-      // Yearly must expenses from essential budgets (sum of children per parent)
+      // Yearly must expenses from essential budgets (gedeelde utility — zelfde logica als /horizon)
       const allChildren = childBudgetsResult.data ?? []
-      let yearlyMustExpenses = 0
-      const expenseItems: {name: string; monthlyAmount: number; annualAmount: number; interval: string}[] = []
-      const essentialParentIds = new Set((essentialBudgetsResult.data ?? []).map(b => b.id))
-
-      // A: Essential parent budgets — if they have essential children, only count those; otherwise count all children (backwards compat)
-      for (const b of essentialBudgetsResult.data) {
-        const children = allChildren.filter(c => c.parent_id === b.id)
-        const essentialChildren = children.filter(c => c.is_essential)
-        const relevantChildren = essentialChildren.length > 0 ? essentialChildren : children
-        const limit = relevantChildren.length > 0
-          ? relevantChildren.reduce((sum, c) => sum + Number(c.default_limit), 0)
-          : Number(b.default_limit)
-        let annual = 0
-        if (b.interval === 'monthly') annual = limit * 12
-        else if (b.interval === 'quarterly') annual = limit * 4
-        else annual = limit
-        yearlyMustExpenses += annual
-        expenseItems.push({
-          name: b.name ?? 'Onbekend budget',
-          monthlyAmount: annual / 12,
-          annualAmount: annual,
-          interval: b.interval ?? 'monthly',
-        })
-      }
-
-      // B: Essential children of non-essential parents — include them individually
-      const EXCLUDED_BUDGET_TYPES = ['archive', 'income', 'savings']
-      const orphanEssentialChildren = allChildren.filter(
-        c => c.is_essential && !essentialParentIds.has(c.parent_id) && !EXCLUDED_BUDGET_TYPES.includes(c.budget_type ?? '')
+      const { yearlyMustExpenses, expenseItems } = computeYearlyMustExpenses(
+        essentialBudgetsResult.data ?? [],
+        allChildren,
       )
-      for (const child of orphanEssentialChildren) {
-        const childInterval = child.interval ?? 'monthly'
-        const childLimit = Number(child.default_limit)
-        let annual = 0
-        if (childInterval === 'monthly') annual = childLimit * 12
-        else if (childInterval === 'quarterly') annual = childLimit * 4
-        else annual = childLimit
-        yearlyMustExpenses += annual
-        expenseItems.push({
-          name: child.name ?? 'Onbekend budget',
-          monthlyAmount: annual / 12,
-          annualAmount: annual,
-          interval: childInterval,
-        })
-      }
 
       setMustExpenseItems(expenseItems)
+
+      const activeRetirementMethod = (profileResult.data?.retirement_expense_method as RetirementExpenseMethod) ?? 'essential_budgets'
+      const yearlyRetirementExpenses = computeRetirementExpenses(
+        activeRetirementMethod,
+        yearlyMustExpenses,
+        extrapolatedIncome,
+        profileResult.data?.retirement_expense_custom_amount,
+      )
+      setRetirementMethodUsed(activeRetirementMethod)
 
       // Total assets (weighted by net_worth_inclusion_pct)
       const totalAssets = assetsResult.data.reduce((s, a) =>
@@ -293,23 +272,16 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       setAssetsList(assetsResult.data.map(a => ({ name: a.name, current_value: Number(a.current_value), net_worth_inclusion_pct: a.net_worth_inclusion_pct ?? 100 })))
       setDebtsList(debtsResult.data.map(d => ({ name: d.name, current_balance: Number(d.current_balance), net_worth_inclusion_pct: d.net_worth_inclusion_pct ?? 100 })))
 
-      const coreData = computeCoreData(monthlyIncome, monthlyExpenses, totalAssets, totalDebts, extrapolatedIncome, yearlyMustExpenses)
-      setData(coreData)
+      setRawFinancials({ monthlyIncome, monthlyExpenses, totalAssets, totalDebts, extrapolatedIncome, yearlyMustExpenses, yearlyRetirementExpenses })
 
-      // Compute net worth projection (1-5 year short-term view)
       const netWorth = totalAssets - totalDebts
       const monthlySavings = monthlyIncome - monthlyExpenses
-      if (monthlyIncome > 0 || monthlyExpenses > 0 || netWorth !== 0) {
-        const projResult = computeNetWorthProjection(netWorth, monthlySavings, coreData.fireTarget)
-        setNwProjection(projResult)
-      }
 
       // Set next step data
       setHasTransactions((txResult.data?.length ?? 0) > 0)
 
       // Compute FIRE reachability for smart prioritization (Feature #255)
-      const SWR = 0.04
-      const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / SWR : ((monthlyExpenses * 12) > 0 ? (monthlyExpenses * 12) / SWR : 0)
+      const fireTarget = yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses / fireSwr : ((monthlyExpenses * 12) > 0 ? (monthlyExpenses * 12) / fireSwr : 0)
       if (fireTarget > 0 && netWorth < fireTarget) {
         if (monthlySavings <= 0) {
           setFireUnreachable(true)
@@ -457,8 +429,8 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           const sparkMonths: { month: string; start: string; end: string; label: string }[] = []
           for (let i = 11; i >= 0; i--) {
             const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-            const start = d.toISOString().split('T')[0]
-            const end = new Date(d.getFullYear(), d.getMonth() + 1, 1).toISOString().split('T')[0]
+            const start = new Date(Date.UTC(d.getFullYear(), d.getMonth(), 1)).toISOString().split('T')[0]
+            const end = new Date(Date.UTC(d.getFullYear(), d.getMonth() + 1, 1)).toISOString().split('T')[0]
             const label = d.toLocaleDateString('nl-NL', { month: 'short' })
             sparkMonths.push({ month: start, start, end, label })
           }
@@ -558,8 +530,25 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
     loadData()
   }, [loadData])
 
+  useEffect(() => {
+    if (!rawFinancials) return
+    const coreData = computeCoreData(
+      rawFinancials.monthlyIncome, rawFinancials.monthlyExpenses,
+      rawFinancials.totalAssets, rawFinancials.totalDebts,
+      rawFinancials.extrapolatedIncome,
+      rawFinancials.yearlyRetirementExpenses ?? rawFinancials.yearlyMustExpenses,
+      fireSwr,
+    )
+    setData(coreData)
+    const netWorth = rawFinancials.totalAssets - rawFinancials.totalDebts
+    const monthlySavings = rawFinancials.monthlyIncome - rawFinancials.monthlyExpenses
+    if (rawFinancials.monthlyIncome > 0 || rawFinancials.monthlyExpenses > 0 || netWorth !== 0) {
+      const projResult = computeNetWorthProjection(netWorth, monthlySavings, coreData.fireTarget)
+      setNwProjection(projResult)
+    }
+  }, [rawFinancials, fireSwr])
 
-  if (loading) {
+  if (loading || !data) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
         <div className="flex items-center justify-center py-20">
@@ -713,12 +702,20 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
               </p>
 
               {/* Vrije dagen per jaar */}
-              <div className="mt-3 flex items-center gap-1.5">
-                <p className="font-mono text-2xl font-bold text-[var(--ink)]">{data.freeDaysPerYear}</p>
-                <span className="text-sm text-[var(--ink-3)]">vrije dagen/jaar</span>
-                <HeroTooltip text="Hoeveel dagen per jaar je passief inkomen (4% SWR op vermogen) je dagelijkse uitgaven dekt." />
+              <div className="mt-3">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowFreeDaysReceipt(true)}
+                    className="flex items-center gap-1.5 text-left transition-all hover:opacity-70"
+                  >
+                    <p className="font-mono text-2xl font-bold text-[var(--ink)]">{data.freeDaysPerYear}</p>
+                    <span className="text-sm text-[var(--ink-3)]">vrije dagen/jaar</span>
+                  </button>
+                  <HeroTooltip text="Klik op het getal voor de volledige berekening. Hoeveel dagen per jaar je passief inkomen (4% SWR op must-uitgaven) je dagelijkse kosten dekt." />
+                </div>
+                <p className="text-[10px] text-[var(--ink-4)]">gedekt door passief inkomen</p>
               </div>
-              <p className="text-[10px] text-[var(--ink-4)]">gedekt door passief inkomen</p>
             </div>
           </div>
         </div>
@@ -920,6 +917,12 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             <p className="mt-1 text-2xl font-bold text-[var(--ink)]">{formatCurrency(data.yearlyMustExpenses)}</p>
             <FreedomTimeBadge amount={data.yearlyMustExpenses} className="mt-1" />
             <p className="mt-1 text-xs text-[var(--ink-3)]">essentiële kosten per jaar</p>
+            <p className="mt-2 text-[11px] italic text-[var(--ink-3)]">
+              Stel je eigen jaarlijkse uitgave na retirement in via{' '}
+              <a href="/identity/profiel" className="text-[var(--kern-t)] underline-offset-2 hover:underline" onClick={(e) => e.stopPropagation()}>
+                Identiteit → Profiel
+              </a>.
+            </p>
           </button>
         </div>
       </section>
@@ -1195,18 +1198,28 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 font-mono text-sm">
           <div className="mb-3 text-center">
             <p className="text-xs font-bold uppercase tracking-widest text-[var(--ink-3)]">Benodigd voor volledige vrijheid</p>
-            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">FIRE-berekening op basis van de 4%-regel</p>
+            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">FIRE-berekening ({(fireSwr * 100).toFixed(2)}% opnamepercentage)</p>
           </div>
 
           <div className="mb-1 border-b border-dashed border-[var(--border-ed)] pb-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
-            Het FIRE-bedrag is het vermogen waarmee je voor altijd van de opbrengsten kunt leven, zonder je kapitaal aan te spreken. Dit is gebaseerd op de &ldquo;4%-regel&rdquo;: je onttrekt jaarlijks 4% van je vermogen.
+            Het FIRE-bedrag is het vermogen waarmee je voor altijd van de opbrengsten kunt leven, zonder je kapitaal aan te spreken.{' '}
+            {fireSwr === 0.04
+              ? <>Dit is gebaseerd op de &ldquo;4%-regel&rdquo;: je onttrekt jaarlijks 4% van je vermogen.</>
+              : <>Dit gebruikt de NL-FIRE methode ({(fireSwr * 100).toFixed(2)}%), die rekening houdt met de Nederlandse Box 3 vermogensrendementsheffing.</>
+            }
           </div>
 
           {data && (
             <>
               <div className="border-b border-dashed border-[var(--border-ed)] mb-2 pb-2 mt-2">
                 <div className="flex justify-between py-0.5">
-                  <span className="text-[var(--ink-2)]">Jaarlijkse Must-uitgaven</span>
+                  <span className="text-[var(--ink-2)]">
+                    {retirementMethodUsed === 'essential_budgets'
+                      ? 'Jaarlijkse must-uitgaven'
+                      : retirementMethodUsed === 'custom_amount'
+                      ? 'Jaarlijkse uitgave (eigen bedrag)'
+                      : 'Jaarlijkse uitgave (geschat jaarinkomen)'}
+                  </span>
                   <span className="tabular-nums text-[var(--ink)]">{formatCurrency(data.yearlyMustExpenses > 0 ? data.yearlyMustExpenses : data.monthlyExpenses * 12)}</span>
                 </div>
                 {data.yearlyMustExpenses <= 0 && (
@@ -1216,8 +1229,8 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                   </div>
                 )}
                 <div className="flex justify-between py-0.5">
-                  <span className="text-[var(--ink-2)]">÷ opnamepercentage (4%)</span>
-                  <span className="tabular-nums text-[var(--ink-3)]">÷ 0,04</span>
+                  <span className="text-[var(--ink-2)]">÷ opnamepercentage ({(fireSwr * 100).toFixed(2)}%)</span>
+                  <span className="tabular-nums text-[var(--ink-3)]">÷ {fireSwr.toFixed(4).replace('.', ',')}</span>
                 </div>
               </div>
               <div className="border-b-2 border-[var(--ink)] pb-2 flex justify-between">
@@ -1246,10 +1259,18 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
 
               <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
                 <p><strong className="text-[var(--ink-3)]">De 4%-regel:</strong> Onderzoek (de &ldquo;Trinity Study&rdquo;) toont aan dat je 4% per jaar kunt onttrekken aan een gediversifieerde portefeuille zonder dat het kapitaal opraakt over 30+ jaar.</p>
-                <p className="mt-1"><strong className="text-[var(--ink-3)]">Formule:</strong> {data.yearlyMustExpenses > 0 ? 'must-uitgaven' : 'jaarlijkse uitgaven'} ÷ 0,04 = benodigd vermogen</p>
+                <p className="mt-1"><strong className="text-[var(--ink-3)]">Formule:</strong>{' '}
+                  {retirementMethodUsed === 'essential_budgets' ? 'must-uitgaven' : 'jaarlijkse uitgave na retirement'} ÷ {(fireSwr * 100).toFixed(0)}% = benodigd vermogen
+                </p>
               </div>
 
-              <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">{data.yearlyMustExpenses > 0 ? 'Berekend op basis van essentiële (must) budgetten' : 'Berekend op basis van je huidige maandelijkse uitgaven'}</p>
+              <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">
+                {retirementMethodUsed === 'essential_budgets'
+                  ? 'Berekend op basis van essentiële (must) budgetten'
+                  : retirementMethodUsed === 'custom_amount'
+                  ? 'Berekend op basis van je eigen ingestelde jaaruitgave'
+                  : 'Berekend op basis van je geschat jaarinkomen (12 mnd)'}
+              </p>
             </>
           )}
         </div>
@@ -1372,6 +1393,117 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
 
           <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">Berekend op basis van activa en schulden — gewogen naar het ingestelde inclusiepercentage</p>
         </div>
+      </BottomSheet>
+
+      {/* === Kassabon Modal: Vrije Dagen per Jaar === */}
+      <BottomSheet open={showFreeDaysReceipt} onClose={() => setShowFreeDaysReceipt(false)} title="Vrije Dagen per Jaar">
+        {(() => {
+          const effectiveMustExpenses = data && data.yearlyMustExpenses > 0 ? data.yearlyMustExpenses : (data ? data.yearlyExpenses : 0)
+          const dailyExpense = effectiveMustExpenses > 0 ? effectiveMustExpenses / 365 : 0
+          const passiveIncome = data ? data.netWorth * fireSwr : 0
+          const freeDays = data ? data.freeDaysPerYear : 0
+          const remainingDays = Math.max(0, 365 - freeDays)
+          const freedomPct = effectiveMustExpenses > 0 ? Math.min(100, (freeDays / 365) * 100) : 0
+          const usingMustExpenses = data ? data.yearlyMustExpenses > 0 : false
+          return (
+            <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 font-mono text-sm">
+              {/* Header */}
+              <div className="mb-3 text-center">
+                <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">VRIJE DAGEN PER JAAR</p>
+                <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">op basis van netto vermogen & jaarlijkse uitgaven</p>
+              </div>
+
+              {/* Uitleg */}
+              <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
+                Een vrije dag is een dag waarop je niet hoeft te werken om je kosten te dekken — je vermogen betaalt die dag voor jou. Dit is de kernmeting van financiële vrijheid: hoeveel van de 365 dagen per jaar werkt je geld, in plaats van jij?
+              </div>
+
+              {/* Sectie 1: Kostprijs vrije dag */}
+              <div className="mt-2">
+                <p className="mb-1 font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Stap 1 — Wat kost één vrije dag?</p>
+                <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
+                  <div className="flex justify-between py-0.5">
+                    <span className="font-sans text-sm text-[var(--ink-2)]">{usingMustExpenses ? 'Jaarlijkse must-uitgaven' : 'Jaarlijkse uitgaven'}</span>
+                    <span className="tabular-nums text-[var(--ink)]">{formatCurrency(effectiveMustExpenses)}</span>
+                  </div>
+                  <div className="flex justify-between py-0.5">
+                    <span className="font-sans text-sm text-[var(--ink-3)]">÷ 365 dagen per jaar</span>
+                    <span className="tabular-nums text-[var(--ink-3)]">÷ 365</span>
+                  </div>
+                </div>
+                <div className="mb-3 flex justify-between border-b border-dashed border-[var(--border-ed)] pb-2 font-semibold">
+                  <span className="font-sans text-sm text-[var(--ink)]">Kostprijs per vrije dag</span>
+                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(dailyExpense)}</span>
+                </div>
+              </div>
+
+              {/* Sectie 2: Passief inkomen */}
+              <div className="mt-2">
+                <p className="mb-1 font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Stap 2 — Hoeveel genereert je vermogen?</p>
+                <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
+                  <div className="flex justify-between py-0.5">
+                    <span className="font-sans text-sm text-[var(--ink-2)]">Netto vermogen</span>
+                    <span className="tabular-nums text-[var(--ink)]">{data ? formatCurrency(data.netWorth) : '—'}</span>
+                  </div>
+                  <div className="flex justify-between py-0.5">
+                    <span className="font-sans text-sm text-[var(--ink-3)]">× {(fireSwr * 100).toFixed(2)}% opnamepercentage (SWR)</span>
+                    <span className="tabular-nums text-[var(--ink-3)]">× {fireSwr.toFixed(4).replace('.', ',')}</span>
+                  </div>
+                </div>
+                <div className="mb-3 flex justify-between border-b border-dashed border-[var(--border-ed)] pb-2 font-semibold">
+                  <span className="font-sans text-sm text-[var(--ink)]">Passief inkomen per jaar</span>
+                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(passiveIncome)}</span>
+                </div>
+              </div>
+
+              {/* Totaalregel */}
+              <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
+                <span className="font-sans text-[var(--ink)]">Vrije dagen per jaar</span>
+                <span className="tabular-nums text-[var(--ink)]">{freeDays} dagen</span>
+              </div>
+
+              {/* Voortgang richting 365 dagen */}
+              <div className="mt-4 border-t border-dashed border-[var(--border-ed)] pt-3">
+                <p className="mb-2 font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Voortgang richting volledige vrijheid</p>
+                <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
+                  <div className="flex justify-between py-0.5">
+                    <span className="font-sans text-sm text-[var(--ink-2)]">Vrije dagen nu</span>
+                    <span className="tabular-nums text-[var(--ink)]">{freeDays} / 365</span>
+                  </div>
+                  {remainingDays > 0 && (
+                    <div className="flex justify-between py-0.5">
+                      <span className="font-sans text-sm text-[var(--ink-3)]">Nog te bereiken</span>
+                      <span className="tabular-nums text-[var(--ink-3)]">{remainingDays} dagen</span>
+                    </div>
+                  )}
+                </div>
+                {/* Voortgangsbalk */}
+                <div className="mb-1 h-[5px] w-full overflow-hidden rounded-full border border-[var(--border-ed)] bg-[var(--subtle)]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-kern-600 via-kern-400 to-kern-300 transition-all duration-700"
+                    style={{ width: `${freedomPct}%` }}
+                  />
+                </div>
+                <p className="font-sans text-[10px] text-[var(--ink-4)]">{freedomPct.toFixed(1)}% van volledige vrijheid (365 vrije dagen)</p>
+                {freeDays >= 365 && (
+                  <div className="mt-2 rounded-[var(--r-sm)] border border-dashed border-kern-300 bg-kern-50/50 px-3 py-2 font-sans text-[11px] text-kern-700">
+                    Je hebt volledige financiële vrijheid bereikt — je vermogen dekt al je kosten.
+                  </div>
+                )}
+              </div>
+
+              {/* Formule & 4%-regel uitleg */}
+              <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
+                <p><strong className="font-semibold text-[var(--ink-3)]">Formule:</strong> Vrije dagen = (Netto vermogen × 4%) ÷ ({usingMustExpenses ? 'Must-uitgaven' : 'Jaarlijkse uitgaven'} ÷ 365)</p>
+                <p className="mt-1.5"><strong className="font-semibold text-[var(--ink-3)]">De 4%-regel</strong> (Trinity Study, 1998): je kunt jaarlijks 4% van je beleggingsportefeuille opnemen zonder dat je vermogen in 30+ jaar uitgeput raakt — mits breed gespreid belegd. Dit is de internationale standaard voor FIRE-berekeningen.</p>
+                <p className="mt-1.5">365 vrije dagen betekent volledige financiële vrijheid: FIRE bereikt.</p>
+              </div>
+
+              {/* Footer */}
+              <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">Berekend op basis van huidig netto vermogen en jaarlijkse uitgaven</p>
+            </div>
+          )
+        })()}
       </BottomSheet>
     </div>
   )

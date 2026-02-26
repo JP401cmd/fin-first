@@ -91,6 +91,38 @@ For every piece of UI you review, systematically evaluate:
 - Are error messages helpful and specific?
 - Are empty states informative and encouraging?
 
+**9. Grafiek-animaties (Chart Animation Standards)**
+
+## Trigger-regels (KRITISCH)
+- **Pagina-component** (scrollbare inhoud) → gebruik `useInViewAnimation` uit `lib/hooks/use-in-view-animation.ts`
+- **Modal/BottomSheet-component** (altijd zichtbaar bij openen) → gebruik `useModalAnimation` uit `lib/hooks/use-modal-animation.ts`
+- Nooit een bare `useState + useEffect + setTimeout` constructie gebruiken — altijd via een van deze hooks
+
+## Unified timing (alle charts MOETEN dit volgen)
+| Element | Duur | Bezier | Delay |
+|---|---|---|---|
+| SVG lijn draw | 700ms | `.22,1,.36,1` | 0ms |
+| SVG fill fade | 250ms ease-out | n.v.t. | 455ms |
+| SVG meerdere lijnen stagger | 80ms per lijn | `.22,1,.36,1` | 0ms |
+| Progress bar fill | 700ms | `.22,1,.36,1` | 0ms |
+| Rij/item stagger | 60ms per rij | `.22,1,.36,1` | 0ms |
+| Modal open delay | 100ms | n.v.t. | — |
+
+**Verboden:** stagger < 60ms (was 20ms in histogram), duration < 400ms voor lijn-charts
+
+## Checklist per chart-component
+- [ ] Pagina-component: `useInViewAnimation` met `ref` op wrapper div
+- [ ] Modal-component: `useModalAnimation` (geen ref nodig)
+- [ ] SVG paths: `pathLength={1}` + `strokeDasharray="1"` + conditionale `strokeDashoffset`
+- [ ] Pre-entered guard: `transition: hasEntered ? '...' : 'none'` (geen flash bij mount)
+- [ ] `animationComplete` gebruikt om hover-handlers te gaten
+- [ ] `duration` prop = totale animatie-sequentie (inclusief stagger van laatste element)
+- [ ] `prefers-reduced-motion` wordt automatisch gerespecteerd door de hook
+- [ ] Animaties herhalen bij pagina-navigatie (component remount reset hook state)
+- [ ] `LogTimeline`: tijdlijn-lijn gebruikt `drawPath` via `<path pathLength={1}>` (niet `fadeInFill` op root `<svg>`)
+- [ ] `LogTimeline` timing-volgorde: lijn (t=0ms, 500ms) → labels (t=300ms) → huidig-marker (t=400ms) → FIRE-markers (t=500ms) → events/acties (t=600ms)
+- [ ] Als `useInViewAnimation` in een modal wordt gebruikt (bijv. veerkrachtsbalken), dan `forModal: true` of `triggerDelay` instellen
+
 ## Your Output Format
 
 Structure every review as follows:
@@ -128,3 +160,4 @@ Structure every review as follows:
 8. **Prioritize.** Distinguish between critical issues (❌) and nice-to-haves (⚠️). Don't overwhelm with nitpicks when there are fundamental problems.
 9. **You are read-only.** You review and recommend — you do not modify source code files yourself. If fixes are needed, provide the exact changes for the coding agent to implement.
 10. **Proactief.** If you notice patterns across multiple files that indicate a systemic issue, flag it as a broader recommendation.
+11. **Modal-animaties via de juiste hook.** Charts in BottomSheet modals MOETEN `useModalAnimation()` gebruiken (of `useInViewAnimation({ forModal: true })` als viewport-triggering gewenst is). Bare `useState + setTimeout` constructies zijn verboden — ze worden niet automatisch gereset bij sluiten/heropenen van modals.

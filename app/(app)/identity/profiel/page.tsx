@@ -3,12 +3,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { HouseholdSection } from '@/components/app/household-section'
-import { useModuleColors, useBudgetColors, usePhaseColors } from '@/components/app/module-color-provider'
+import { useModuleColors, useBudgetColors, usePhaseColors, useFontTheme } from '@/components/app/module-color-provider'
+import type { FontTheme } from '@/components/app/module-color-provider'
 import { generatePalette, DEFAULT_MODULE_COLORS, DEFAULT_BUDGET_COLORS, DEFAULT_PHASE_COLORS, SHADES } from '@/lib/color-palette'
 import type { ModuleColorConfig, ModuleName, BudgetColorConfig, PhaseColorConfig } from '@/lib/color-palette'
 import { ColorPickerCard } from '@/components/app/color-picker-card'
 import type { ColorPreset } from '@/components/app/color-picker-card'
-import { Palette, RotateCcw } from 'lucide-react'
+import { Palette, RotateCcw, Type } from 'lucide-react'
+import { type RetirementExpenseMethod } from '@/lib/budget-utils'
 
 type HouseholdType = 'solo' | 'samen' | 'gezin'
 
@@ -32,6 +34,10 @@ export default function ProfielPage() {
   const [hasCar, setHasCar] = useState(false)
   const [netMonthlyIncome, setNetMonthlyIncome] = useState<string>('')
   const [childAgeInput, setChildAgeInput] = useState('')
+
+  // Retirement expense method state
+  const [retirementMethod, setRetirementMethod] = useState<RetirementExpenseMethod>('essential_budgets')
+  const [retirementCustomAmount, setRetirementCustomAmount] = useState<string>('')
 
   // UI state
   const [loading, setLoading] = useState(true)
@@ -60,6 +66,8 @@ export default function ProfielPage() {
         setEnergyLabel(data.energy_label ?? null)
         setHasCar(data.has_car ?? false)
         setNetMonthlyIncome(data.net_monthly_income ? String(data.net_monthly_income) : '')
+        setRetirementMethod((data.retirement_expense_method as RetirementExpenseMethod) ?? 'essential_budgets')
+        setRetirementCustomAmount(data.retirement_expense_custom_amount ? String(data.retirement_expense_custom_amount) : '')
         // Load module colors into the provider
         if (data.module_colors) {
           const mc = data.module_colors as Record<string, string>
@@ -122,6 +130,8 @@ export default function ProfielPage() {
         energy_label: energyLabel,
         has_car: hasCar,
         net_monthly_income: netMonthlyIncome ? Number(netMonthlyIncome) : null,
+        retirement_expense_method: retirementMethod,
+        retirement_expense_custom_amount: retirementCustomAmount ? Number(retirementCustomAmount) : null,
         updated_at: new Date().toISOString(),
       })
 
@@ -132,7 +142,7 @@ export default function ProfielPage() {
       setTimeout(() => setSaveMessage(null), 3000)
     }
     setSaving(false)
-  }, [supabase, fullName, dateOfBirth, country, householdType, numberOfChildren, childrenAges, housingType, energyLabel, hasCar, netMonthlyIncome])
+  }, [supabase, fullName, dateOfBirth, country, householdType, numberOfChildren, childrenAges, housingType, energyLabel, hasCar, netMonthlyIncome, retirementMethod, retirementCustomAmount])
 
   if (loading) {
     return (
@@ -420,6 +430,141 @@ export default function ProfielPage() {
         </div>
       </section>
 
+      {/* ── Jaarlijkse uitgave na retirement ─────────────────────── */}
+      <section className="mb-5 sm:mb-8 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-8">
+        <div className="mb-4">
+          <h2 className="label-editorial text-[var(--ink-2)]">
+            Jaarlijkse uitgave na retirement
+          </h2>
+          <p className="mt-1 font-sans text-sm text-[var(--ink-3)]">
+            Hoeveel je per jaar uitgeeft nadat je financieel vrij bent. Dit bepaalt je FIRE-doel en vrijheidsdagen.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {/* Method 1: Essentiële budgetten */}
+          <button
+            type="button"
+            onClick={() => setRetirementMethod('essential_budgets')}
+            className={`min-h-[80px] rounded-[var(--r-lg)] border p-4 text-left transition-all ${
+              retirementMethod === 'essential_budgets'
+                ? 'border-[var(--kern-m)] bg-[var(--kern-l)] shadow-sm'
+                : 'border-[var(--border-ed)] hover:border-[var(--border-md)] hover:shadow-sm'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                Methode 1
+              </p>
+              {retirementMethod === 'essential_budgets' && (
+                <span className="shrink-0 rounded-full bg-[var(--kern-m)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--kern-t)]">
+                  Actief
+                </span>
+              )}
+            </div>
+            <p className="mt-1 font-medium text-[var(--ink)]">Essentiële budgetten</p>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--ink-3)]">
+              Gebaseerd op je must-budgetten in De Kern. Automatisch bijgewerkt als je budgetten wijzigt.
+            </p>
+          </button>
+
+          {/* Method 2: Zelf instellen */}
+          <button
+            type="button"
+            onClick={() => setRetirementMethod('custom_amount')}
+            className={`min-h-[80px] rounded-[var(--r-lg)] border p-4 text-left transition-all ${
+              retirementMethod === 'custom_amount'
+                ? 'border-[var(--kern-m)] bg-[var(--kern-l)] shadow-sm'
+                : 'border-[var(--border-ed)] hover:border-[var(--border-md)] hover:shadow-sm'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                Methode 2
+              </p>
+              {retirementMethod === 'custom_amount' && (
+                <span className="shrink-0 rounded-full bg-[var(--kern-m)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--kern-t)]">
+                  Actief
+                </span>
+              )}
+            </div>
+            <p className="mt-1 font-medium text-[var(--ink)]">Zelf instellen</p>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--ink-3)]">
+              Geef zelf een jaarlijks bedrag op in huidige prijzen.
+            </p>
+            {retirementMethod === 'custom_amount' && (
+              <div className="mt-3">
+                <label htmlFor="retirementCustomAmount" className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                  Jaarlijks bedrag (€)
+                </label>
+                <div className="relative mt-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-3)]">&euro;</span>
+                  <input
+                    id="retirementCustomAmount"
+                    type="number"
+                    min={0}
+                    step={500}
+                    value={retirementCustomAmount}
+                    onChange={(e) => setRetirementCustomAmount(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    placeholder="bijv. 30000"
+                    className="w-full rounded-[var(--r-sm)] border border-[var(--border-md)] bg-[var(--subtle)] py-2 pr-3 pl-7 font-mono text-sm tabular-nums"
+                  />
+                </div>
+              </div>
+            )}
+          </button>
+
+          {/* Method 3: Huidig inkomen */}
+          <button
+            type="button"
+            onClick={() => setRetirementMethod('current_income')}
+            className={`min-h-[80px] rounded-[var(--r-lg)] border p-4 text-left transition-all ${
+              retirementMethod === 'current_income'
+                ? 'border-[var(--kern-m)] bg-[var(--kern-l)] shadow-sm'
+                : 'border-[var(--border-ed)] hover:border-[var(--border-md)] hover:shadow-sm'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                Methode 3
+              </p>
+              {retirementMethod === 'current_income' && (
+                <span className="shrink-0 rounded-full bg-[var(--kern-m)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--kern-t)]">
+                  Actief
+                </span>
+              )}
+            </div>
+            <p className="mt-1 font-medium text-[var(--ink)]">Geschat jaarinkomen</p>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--ink-3)]">
+              Gebaseerd op je geschat jaarinkomen uit de afgelopen 12 maanden transacties. Voor wie na retirement dezelfde levensstijl wil handhaven.
+            </p>
+          </button>
+        </div>
+
+        <p className="mt-3 text-xs text-[var(--ink-3)]">
+          De gekozen methode bepaalt het FIRE-doel, alle vrijheidsdagen-berekeningen en de dagprijs in De Kern, De Horizon en de belastingpagina.
+        </p>
+
+        <div className="mt-4 flex items-center gap-3">
+          <button
+            onClick={saveProfile}
+            disabled={saving}
+            className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
+          >
+            {saving ? 'Opslaan...' : 'Opslaan'}
+          </button>
+          {saveMessage && (
+            <span className={`text-sm ${saveMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+              {saveMessage.text}
+            </span>
+          )}
+        </div>
+      </section>
+
+      {/* ── Typografie ────────────────────────────────────────────── */}
+      <TypographieSection />
+
       {/* ── Module Kleuren ────────────────────────────────────────── */}
       <ModuleColorSection />
 
@@ -432,6 +577,143 @@ export default function ProfielPage() {
       {/* ── Huishouden Management ────────────────────────────────── */}
       <HouseholdSection />
     </div>
+  )
+}
+
+// ── Typography Theme Section ─────────────────────────────────────────────
+
+const FONT_THEMES: { id: FontTheme; label: string; description: string; headingSample: string; bodySample: string; headingStyle: React.CSSProperties; bodyStyle: React.CSSProperties }[] = [
+  {
+    id: 'editorial',
+    label: 'Redactioneel',
+    description: 'Playfair Display + Source Serif 4 — krantenstijl, klassiek',
+    headingSample: 'Geld is opgeslagen tijd',
+    bodySample: 'Elke euro vertegenwoordigt een stukje levenstijd.',
+    headingStyle: { fontFamily: 'var(--font-playfair-orig, var(--font-playfair))', fontWeight: 700 },
+    bodyStyle: { fontFamily: 'var(--font-source-serif-orig, var(--font-source-serif))', fontStyle: 'italic' },
+  },
+  {
+    id: 'andada',
+    label: 'Andada Pro',
+    description: 'Andada Pro — humanistisch serif, scherm-geoptimaliseerd',
+    headingSample: 'Geld is opgeslagen tijd',
+    bodySample: 'Elke euro vertegenwoordigt een stukje levenstijd.',
+    headingStyle: { fontFamily: 'var(--font-andada)', fontWeight: 700 },
+    bodyStyle: { fontFamily: 'var(--font-andada)', fontStyle: 'italic' },
+  },
+  {
+    id: 'digital',
+    label: 'Digitaal',
+    description: 'Inter — helder, modern schreefloos',
+    headingSample: 'Geld is opgeslagen tijd',
+    bodySample: 'Elke euro vertegenwoordigt een stukje levenstijd.',
+    headingStyle: { fontFamily: 'var(--font-inter)', fontWeight: 700 },
+    bodyStyle: { fontFamily: 'var(--font-inter)' },
+  },
+]
+
+function TypographieSection() {
+  const supabase = createClient()
+  const { fontTheme, setFontTheme } = useFontTheme()
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Load from DB on mount
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase.from('profiles').select('typography_theme').eq('id', user.id).single()
+      if (data?.typography_theme) {
+        setFontTheme(data.typography_theme as FontTheme)
+      }
+    }
+    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleSelect = (theme: FontTheme) => {
+    setFontTheme(theme)
+  }
+
+  const saveTheme = async () => {
+    setSaving(true)
+    setMessage(null)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setMessage({ type: 'error', text: 'Niet ingelogd.' }); setSaving(false); return }
+    const { error } = await supabase.from('profiles').update({ typography_theme: fontTheme }).eq('id', user.id)
+    if (error) {
+      setMessage({ type: 'error', text: 'Opslaan mislukt. Probeer opnieuw.' })
+    } else {
+      setMessage({ type: 'success', text: 'Typografie opgeslagen!' })
+      setTimeout(() => setMessage(null), 3000)
+    }
+    setSaving(false)
+  }
+
+  return (
+    <section className="mb-5 sm:mb-8 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-8">
+      <div className="flex items-center gap-2">
+        <Type className="h-4 w-4 text-[var(--ink-3)]" />
+        <h2 className="label-editorial text-[var(--ink-2)]">Typografie</h2>
+      </div>
+      <p className="mt-1 mb-3 sm:mb-6 text-sm text-[var(--ink-3)]">
+        Kies een letterstijl die past bij jou. De preview werkt direct.
+      </p>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {FONT_THEMES.map((theme) => {
+          const isSelected = fontTheme === theme.id
+          return (
+            <button
+              key={theme.id}
+              type="button"
+              onClick={() => handleSelect(theme.id)}
+              className={`rounded-xl border p-4 text-left transition-all ${
+                isSelected
+                  ? 'border-[var(--kern-m)] bg-[var(--kern-l)] shadow-sm'
+                  : 'border-[var(--border-ed)] bg-[var(--subtle)] hover:border-[var(--border-md)] hover:shadow-sm'
+              }`}
+            >
+              <div className="mb-3 border-b border-dashed border-[var(--border-ed)] pb-3">
+                <p className="mb-0.5 text-lg leading-tight text-[var(--ink)]" style={theme.headingStyle}>
+                  {theme.headingSample}
+                </p>
+                <p className="text-[13px] leading-relaxed text-[var(--ink-3)]" style={theme.bodyStyle}>
+                  {theme.bodySample}
+                </p>
+              </div>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium text-[var(--ink)]">{theme.label}</p>
+                  <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">{theme.description}</p>
+                </div>
+                {isSelected && (
+                  <span className="mt-0.5 shrink-0 rounded-full bg-[var(--kern-m)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--kern-t)]">
+                    Actief
+                  </span>
+                )}
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="mt-3 sm:mt-6 flex items-center gap-3">
+        <button
+          onClick={saveTheme}
+          disabled={saving}
+          className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
+        >
+          {saving ? 'Opslaan...' : 'Typografie opslaan'}
+        </button>
+        {message && (
+          <span className={`text-sm ${message.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+            {message.text}
+          </span>
+        )}
+      </div>
+    </section>
   )
 }
 

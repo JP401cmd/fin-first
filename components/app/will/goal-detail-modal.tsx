@@ -10,6 +10,7 @@ import {
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { GoalForm } from '@/components/app/goal-form'
 import { GoalProgressTimeline, buildGoalHistory } from '@/components/app/will/goal-progress-timeline'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 type Asset = { id: string; name: string; current_value: number }
 type Debt = { id: string; name: string; current_balance: number }
@@ -262,6 +263,7 @@ function GoalCard({
   const typeLabel = GOAL_TYPE_LABELS[goal.goal_type as GoalType] ?? goal.goal_type
   const isFreedm = goal.goal_type === 'freedom_days'
   const isLinked = !!(goal.linked_asset_id || goal.linked_debt_id)
+  const { ref: inViewRef, hasEntered } = useInViewAnimation({ threshold: 0.1, duration: 600, triggerDelay: 300 })
 
   const [showContrib, setShowContrib] = useState(false)
   const [contributions, setContributions] = useState<GoalContribution[]>([])
@@ -395,12 +397,15 @@ function GoalCard({
                 {eta && ` · ${eta}`}
               </span>
             </div>
-            <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-zinc-100">
+            <div ref={inViewRef} className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-zinc-100">
               <div
-                className={`h-full rounded-full transition-all duration-500 ${
+                className={`h-full rounded-full ${
                   goal.is_completed ? 'bg-emerald-500' : colors.bar
                 }`}
-                style={{ width: `${pct}%` }}
+                style={{
+                  width: hasEntered ? `${pct}%` : '0%',
+                  transition: hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1)' : 'none',
+                }}
               />
             </div>
           </div>

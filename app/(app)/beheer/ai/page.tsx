@@ -9,6 +9,10 @@ interface Settings {
   ai_model_openai: string
   anthropic_api_key: string
   openai_api_key: string
+  ai_model_mistral: string
+  mistral_api_key: string
+  ollama_base_url: string
+  ai_model_ollama: string
   ai_system_prompt_override: string
 }
 
@@ -18,6 +22,10 @@ const DEFAULT_SETTINGS: Settings = {
   ai_model_openai: 'gpt-4o',
   anthropic_api_key: '',
   openai_api_key: '',
+  ai_model_mistral: 'mistral-large-latest',
+  mistral_api_key: '',
+  ollama_base_url: 'http://localhost:11434',
+  ai_model_ollama: 'llama3.2',
   ai_system_prompt_override: '',
 }
 
@@ -139,25 +147,55 @@ export default function BeheerAIPage() {
             />
             <span className="text-sm font-medium text-[var(--ink-2)]">OpenAI</span>
           </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="provider"
+              value="mistral"
+              checked={settings.ai_provider === 'mistral'}
+              onChange={() => setSettings({ ...settings, ai_provider: 'mistral' })}
+              className="accent-kern-600"
+            />
+            <span className="text-sm font-medium text-[var(--ink-2)]">Mistral</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="provider"
+              value="ollama"
+              checked={settings.ai_provider === 'ollama'}
+              onChange={() => setSettings({ ...settings, ai_provider: 'ollama' })}
+              className="accent-kern-600"
+            />
+            <span className="text-sm font-medium text-[var(--ink-2)]">Ollama (lokaal)</span>
+          </label>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-[var(--ink-2)] mb-1">
-            Model ({settings.ai_provider === 'anthropic' ? 'Anthropic' : 'OpenAI'})
+            Model ({settings.ai_provider === 'anthropic' ? 'Anthropic' : settings.ai_provider === 'openai' ? 'OpenAI' : settings.ai_provider === 'mistral' ? 'Mistral' : 'Ollama'})
           </label>
           <input
             type="text"
             value={
               settings.ai_provider === 'anthropic'
                 ? settings.ai_model_anthropic
-                : settings.ai_model_openai
+                : settings.ai_provider === 'openai'
+                  ? settings.ai_model_openai
+                  : settings.ai_provider === 'mistral'
+                    ? settings.ai_model_mistral
+                    : settings.ai_model_ollama
             }
             onChange={(e) =>
               setSettings({
                 ...settings,
                 [settings.ai_provider === 'anthropic'
                   ? 'ai_model_anthropic'
-                  : 'ai_model_openai']: e.target.value,
+                  : settings.ai_provider === 'openai'
+                    ? 'ai_model_openai'
+                    : settings.ai_provider === 'mistral'
+                      ? 'ai_model_mistral'
+                      : 'ai_model_ollama']: e.target.value,
               })
             }
             className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500"
@@ -215,6 +253,47 @@ export default function BeheerAIPage() {
                 Key is geconfigureerd. Laat leeg om niet te wijzigen, of voer een nieuwe key in.
               </p>
             )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[var(--ink-2)] mb-1">
+              Mistral API Key
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="password"
+                value={settings.mistral_api_key}
+                onChange={(e) =>
+                  setSettings({ ...settings, mistral_api_key: e.target.value })
+                }
+                className="flex-1 rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500"
+                placeholder="..."
+              />
+              <StatusBadge configured={settings.mistral_api_key !== '' && !settings.mistral_api_key.includes('***')} />
+            </div>
+            {settings.mistral_api_key.includes('***') && (
+              <p className="mt-1 text-xs text-[var(--ink-3)]">
+                Key is geconfigureerd. Laat leeg om niet te wijzigen, of voer een nieuwe key in.
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[var(--ink-2)] mb-1">
+              Ollama Base URL
+            </label>
+            <input
+              type="text"
+              value={settings.ollama_base_url}
+              onChange={(e) =>
+                setSettings({ ...settings, ollama_base_url: e.target.value })
+              }
+              className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-kern-500 focus:outline-none focus:ring-1 focus:ring-kern-500"
+              placeholder="http://localhost:11434"
+            />
+            <p className="mt-1 text-xs text-[var(--ink-3)]">
+              Standaard: http://localhost:11434 — vereist een lokale Ollama instantie.
+            </p>
           </div>
         </div>
       </div>

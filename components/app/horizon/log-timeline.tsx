@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import type { LifeEvent, LifeEventImpact } from '@/lib/horizon-data'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { Action } from '@/lib/recommendation-data'
 import {
   Calendar, Globe, Baby, Hammer, GraduationCap, Briefcase,
@@ -44,11 +44,7 @@ export function LogTimeline({
   actions: Action[]
   dateOfBirth: string | null
 }) {
-  const [animated, setAnimated] = useState(false)
-  useEffect(() => {
-    const t = setTimeout(() => setAnimated(true), 80)
-    return () => clearTimeout(t)
-  }, [])
+  const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 800 })
   const W = 800
   const H = 160
   const PAD_L = 20
@@ -97,32 +93,45 @@ export function LogTimeline({
   const Y_EVENT = 30
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 200, animation: animated ? 'fadeInFill 500ms ease-out both' : 'none', opacity: animated ? undefined : 0 }}>
-      {/* Main timeline line */}
-      <line x1={PAD_L} y1={Y_LINE} x2={W - PAD_R} y2={Y_LINE} stroke="#e4e4e7" strokeWidth="2" />
+    <div ref={inViewRef}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 200 }}>
+      {/* Main timeline line — draws left-to-right (t=0ms, 500ms) */}
+      <path
+        d={`M${PAD_L} ${Y_LINE} L${W - PAD_R} ${Y_LINE}`}
+        stroke="#e4e4e7" strokeWidth="2" fill="none"
+        pathLength={1} strokeDasharray={1}
+        style={{
+          strokeDashoffset: hasEntered ? undefined : 1,
+          animation: hasEntered ? 'drawPath 500ms cubic-bezier(.22,1,.36,1) both' : 'none',
+        }}
+      />
 
-      {/* Time labels along bottom */}
-      {timeLabels.map((tl) => {
-        const px = x(tl.months, false)
-        return (
-          <g key={tl.label}>
-            <line x1={px} y1={Y_LINE - 4} x2={px} y2={Y_LINE + 4} stroke="#d4d4d8" strokeWidth="1" />
-            <text x={px} y={Y_LABELS} textAnchor="middle" className="fill-zinc-400" style={{ fontSize: 9 }}>
-              {tl.label}
-            </text>
-          </g>
-        )
-      })}
+      {/* Time labels along bottom — fade in at t=300ms */}
+      <g style={{ opacity: hasEntered ? 1 : 0, transition: hasEntered ? 'opacity 200ms ease-out 300ms' : 'none' }}>
+        {timeLabels.map((tl) => {
+          const px = x(tl.months, false)
+          return (
+            <g key={tl.label}>
+              <line x1={px} y1={Y_LINE - 4} x2={px} y2={Y_LINE + 4} stroke="#d4d4d8" strokeWidth="1" />
+              <text x={px} y={Y_LABELS} textAnchor="middle" className="fill-zinc-400" style={{ fontSize: 9 }}>
+                {tl.label}
+              </text>
+            </g>
+          )
+        })}
+      </g>
 
-      {/* Current position marker */}
-      <circle cx={x(currentAge)} cy={Y_LINE} r="6" fill="#8B5CB8" />
-      <text x={x(currentAge)} y={Y_LINE + 20} textAnchor="middle" style={{ fontSize: 9, fontWeight: 600 }} className="fill-horizon-600">
-        {currentAge}j
-      </text>
+      {/* Current position marker — fade in at t=400ms */}
+      <g style={{ opacity: hasEntered ? 1 : 0, transition: hasEntered ? 'opacity 200ms ease-out 400ms' : 'none' }}>
+        <circle cx={x(currentAge)} cy={Y_LINE} r="6" fill="#8B5CB8" />
+        <text x={x(currentAge)} y={Y_LINE + 20} textAnchor="middle" style={{ fontSize: 9, fontWeight: 600 }} className="fill-horizon-600">
+          {currentAge}j
+        </text>
+      </g>
 
-      {/* Base FIRE marker */}
+      {/* Base FIRE marker — fade in at t=500ms */}
       {baseFireAge != null && (
-        <>
+        <g style={{ opacity: hasEntered ? 1 : 0, transition: hasEntered ? 'opacity 200ms ease-out 500ms' : 'none' }}>
           <circle cx={x(baseFireAge)} cy={Y_LINE} r="6" fill="#10b981" />
           <text x={x(baseFireAge)} y={Y_LINE + 20} textAnchor="middle" style={{ fontSize: 9, fontWeight: 600 }} className="fill-emerald-600">
             FIRE {baseFireAge}j
@@ -142,48 +151,53 @@ export function LogTimeline({
               </text>
             </>
           )}
-        </>
+        </g>
       )}
 
-      {/* Action markers (teal, above timeline) */}
-      {actions.map((action) => {
-        const months = actionToMonths(action)
-        const px = x(months, false)
-        return (
-          <g key={action.id}>
-            <line x1={px} y1={Y_ACTION + 8} x2={px} y2={Y_LINE - 6} stroke="#14b8a6" strokeWidth="1.5" strokeDasharray="3" />
-            <circle cx={px} cy={Y_ACTION} r="7" fill="#14b8a6" opacity="0.2" stroke="#14b8a6" strokeWidth="1" />
-            <text x={px} y={Y_ACTION + 3} textAnchor="middle" style={{ fontSize: 7, fontWeight: 500 }} className="fill-teal-700">
-              {action.freedom_days_impact != null ? `${Math.round(action.freedom_days_impact)}d` : ''}
-            </text>
-          </g>
-        )
-      })}
-
-      {/* Life event markers (purple, above timeline) */}
-      {events.map((ev, i) => {
-        if (!ev.target_age) return null
-        const px = x(Number(ev.target_age))
-        const impact = impacts[i]
-
-        return (
-          <g key={ev.id}>
-            <line x1={px} y1={Y_EVENT + 8} x2={px} y2={Y_LINE - 6} stroke="#8B5CB8" strokeWidth="1.5" strokeDasharray="3" />
-            <circle cx={px} cy={Y_EVENT - 2} r="8" fill="#8B5CB8" opacity="0.15" stroke="#8B5CB8" strokeWidth="1" />
-            <text x={px} y={Y_EVENT + 2} textAnchor="middle" style={{ fontSize: 7, fontWeight: 500 }} className="fill-horizon-700">
-              {ev.name.substring(0, 4)}
-            </text>
-            <text x={px} y={Y_EVENT - 10} textAnchor="middle" style={{ fontSize: 8 }} className="fill-horizon-500">
-              {ev.target_age}j
-            </text>
-            {impact && impact.fireDelayMonths > 0 && (
-              <text x={px} y={Y_LINE - 10} textAnchor="middle" style={{ fontSize: 7 }} className="fill-red-500">
-                +{impact.fireDelayMonths}m
+      {/* Action markers (teal, above timeline) — fade in at t=600ms */}
+      <g style={{ opacity: hasEntered ? 1 : 0, transition: hasEntered ? 'opacity 200ms ease-out 600ms' : 'none' }}>
+        {actions.map((action) => {
+          const months = actionToMonths(action)
+          const px = x(months, false)
+          return (
+            <g key={action.id}>
+              <line x1={px} y1={Y_ACTION + 8} x2={px} y2={Y_LINE - 6} stroke="#14b8a6" strokeWidth="1.5" strokeDasharray="3" />
+              <circle cx={px} cy={Y_ACTION} r="7" fill="#14b8a6" opacity="0.2" stroke="#14b8a6" strokeWidth="1" />
+              <text x={px} y={Y_ACTION + 3} textAnchor="middle" style={{ fontSize: 7, fontWeight: 500 }} className="fill-teal-700">
+                {action.freedom_days_impact != null ? `${Math.round(action.freedom_days_impact)}d` : ''}
               </text>
-            )}
-          </g>
-        )
-      })}
+            </g>
+          )
+        })}
+      </g>
+
+      {/* Life event markers (purple, above timeline) — fade in at t=600ms */}
+      <g style={{ opacity: hasEntered ? 1 : 0, transition: hasEntered ? 'opacity 200ms ease-out 600ms' : 'none' }}>
+        {events.map((ev, i) => {
+          if (!ev.target_age) return null
+          const px = x(Number(ev.target_age))
+          const impact = impacts[i]
+
+          return (
+            <g key={ev.id}>
+              <line x1={px} y1={Y_EVENT + 8} x2={px} y2={Y_LINE - 6} stroke="#8B5CB8" strokeWidth="1.5" strokeDasharray="3" />
+              <circle cx={px} cy={Y_EVENT - 2} r="8" fill="#8B5CB8" opacity="0.15" stroke="#8B5CB8" strokeWidth="1" />
+              <text x={px} y={Y_EVENT + 2} textAnchor="middle" style={{ fontSize: 7, fontWeight: 500 }} className="fill-horizon-700">
+                {ev.name.substring(0, 4)}
+              </text>
+              <text x={px} y={Y_EVENT - 10} textAnchor="middle" style={{ fontSize: 8 }} className="fill-horizon-500">
+                {ev.target_age}j
+              </text>
+              {impact && impact.fireDelayMonths > 0 && (
+                <text x={px} y={Y_LINE - 10} textAnchor="middle" style={{ fontSize: 7 }} className="fill-red-500">
+                  +{impact.fireDelayMonths}m
+                </text>
+              )}
+            </g>
+          )
+        })}
+      </g>
     </svg>
+    </div>
   )
 }

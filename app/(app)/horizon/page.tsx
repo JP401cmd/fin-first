@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { useFireMethod } from '@/lib/hooks/use-fire-method'
 import { FfinAvatar } from '@/components/app/avatars'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/components/app/budget-shared'
@@ -9,12 +10,13 @@ import {
   computeFireProjection, computeFireRange, projectForward,
   computeResilienceScore, formatFireAge, formatCountdown,
   computeLifeEventImpact, ageAtDate,
-  LIFE_EVENT_CATALOG,
+  LIFE_EVENT_CATALOG, DEFAULT_RETURN,
   type HorizonInput, type FireProjection, type FireRange,
   type ProjectionMonth, type ResilienceScore,
   type LifeEvent, type LifeEventImpact,
 } from '@/lib/horizon-data'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
+import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import type { Debt } from '@/lib/debt-data'
 import { ActionCard } from '@/components/app/action-card'
 import { LogTimeline, EVENT_ICONS } from '@/components/app/horizon/log-timeline'
@@ -22,10 +24,11 @@ import { ProjectionsModal } from '@/components/app/horizon/projections-modal'
 import { ScenariosModal } from '@/components/app/horizon/scenarios-modal'
 import { SimulationsModal } from '@/components/app/horizon/simulations-modal'
 import { WithdrawalModal } from '@/components/app/horizon/withdrawal-modal'
+import { BacktestingModal } from '@/components/app/horizon/backtesting-modal'
 import {
   Hourglass, TrendingUp, Percent, Shield, Info,
   AlertTriangle, Calendar, BarChart3, Clock, FlaskConical, Landmark,
-  Plus, X, Trash2, Edit3, Zap, Target,
+  Plus, X, Trash2, Edit3, Zap, Target, History,
   DollarSign, Wallet, PiggyBank, Check, Pencil,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -35,7 +38,7 @@ import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
 import { NextStepSection, computeAllHorizonSteps } from '@/components/app/next-step-card'
 import { HouseholdFireSection } from '@/components/app/household-fire-section'
 
-type ActiveModal = null | 'projections' | 'scenarios' | 'simulations' | 'withdrawal'
+type ActiveModal = null | 'projections' | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting'
 
 // Snapshot type for resilience trend data
 type SnapshotForTrend = {
@@ -47,6 +50,7 @@ type SnapshotForTrend = {
 }
 
 export default function HorizonPage() {
+  const { swr: fireSwr } = useFireMethod()
   const [input, setInput] = useState<HorizonInput | null>(null)
   const [fire, setFire] = useState<FireProjection | null>(null)
   const [range, setRange] = useState<FireRange | null>(null)
@@ -69,7 +73,7 @@ export default function HorizonPage() {
   useEffect(() => {
     const modal = searchParams.get('modal')
     if (!modal) return
-    if (modal === 'projections' || modal === 'scenarios' || modal === 'simulations' || modal === 'withdrawal') {
+    if (modal === 'projections' || modal === 'scenarios' || modal === 'simulations' || modal === 'withdrawal' || modal === 'backtesting') {
       setActiveModal(modal)
     } else if (modal === 'life_events') {
       setShowForm(true)
@@ -96,17 +100,18 @@ export default function HorizonPage() {
     try {
       const supabase = createClient()
       const now = new Date()
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
-      const oneYearFromNow = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()).toISOString().split('T')[0]
+      const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0]
+      const monthEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1)).toISOString().split('T')[0]
+      const oneYearFromNow = new Date(Date.UTC(now.getFullYear() + 1, now.getMonth(), now.getDate())).toISOString().split('T')[0]
       const today = now.toISOString().split('T')[0]
+      const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
 
-      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, actionsResult, childBudgetsResult, fullDebtsResult, snapshotsResult] = await Promise.all([
+      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, actionsResult, childBudgetsResult, fullDebtsResult, snapshotsResult, income12Result, earliestIncomeResult] = await Promise.all([
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
-        supabase.from('assets').select('current_value, monthly_contribution').eq('is_active', true),
-        supabase.from('debts').select('current_balance').eq('is_active', true),
-        supabase.from('profiles').select('date_of_birth').single(),
-        supabase.from('budgets').select('id, default_limit, interval').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
+        supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
+        supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
+        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount').single(),
+        supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
         supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         supabase
           .from('actions')
@@ -116,12 +121,14 @@ export default function HorizonPage() {
           .gte('scheduled_week', today)
           .lte('scheduled_week', oneYearFromNow)
           .order('scheduled_week', { ascending: true }),
-        supabase.from('budgets').select('id, parent_id, default_limit').not('parent_id', 'is', null),
+        supabase.from('budgets').select('id, name, parent_id, default_limit, is_essential, interval, budget_type').not('parent_id', 'is', null).not('budget_type', 'in', '("archive","income","savings")'),
         supabase.from('debts').select('*').eq('is_active', true),
         supabase
           .from('net_worth_snapshots')
           .select('snapshot_date, resilience_score, net_worth, freedom_percentage, fire_age')
           .order('snapshot_date', { ascending: true }),
+        supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
+        supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
       ])
 
       let monthlyIncome = 0
@@ -132,21 +139,38 @@ export default function HorizonPage() {
         else monthlyExpenses += Math.abs(amt)
       }
 
-      const totalAssets = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.current_value), 0)
-      const totalDebts = (debtsResult.data ?? []).reduce((s, d) => s + Number(d.current_balance), 0)
+      const totalAssets = (assetsResult.data ?? []).reduce((s, a) =>
+        s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
+      const totalDebts = (debtsResult.data ?? []).reduce((s, d) =>
+        s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
       const monthlyContributions = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.monthly_contribution), 0)
 
-      const allChildren = childBudgetsResult.data ?? []
-      let yearlyMustExpenses = 0
-      for (const b of essentialBudgetsResult.data ?? []) {
-        const children = allChildren.filter(c => c.parent_id === b.id)
-        const limit = children.length > 0
-          ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
-          : Number(b.default_limit)
-        if (b.interval === 'monthly') yearlyMustExpenses += limit * 12
-        else if (b.interval === 'quarterly') yearlyMustExpenses += limit * 4
-        else yearlyMustExpenses += limit
+      const last12Income = income12Result.data?.reduce((s, t) => s + Number(t.amount), 0) ?? 0
+      let extrapolatedIncome = last12Income
+      const earliestIncomeDate = earliestIncomeResult.data?.[0]?.date
+      if (earliestIncomeDate && last12Income > 0) {
+        const earliest = new Date(earliestIncomeDate)
+        const incomeMonths = Math.max(1, Math.min(12,
+          (now.getFullYear() - earliest.getFullYear()) * 12 +
+          (now.getMonth() - earliest.getMonth())
+        ))
+        if (incomeMonths < 12) {
+          extrapolatedIncome = (last12Income / incomeMonths) * 12
+        }
       }
+
+      const allChildren = childBudgetsResult.data ?? []
+      const { yearlyMustExpenses } = computeYearlyMustExpenses(
+        essentialBudgetsResult.data ?? [],
+        allChildren,
+      )
+
+      const yearlyRetirementExpenses = computeRetirementExpenses(
+        profileResult.data?.retirement_expense_method as RetirementExpenseMethod,
+        yearlyMustExpenses,
+        extrapolatedIncome,
+        profileResult.data?.retirement_expense_custom_amount,
+      )
 
       const dob = profileResult.data?.date_of_birth ?? null
 
@@ -165,7 +189,7 @@ export default function HorizonPage() {
 
       const horizonInput: HorizonInput = {
         totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
-        monthlyContributions, yearlyMustExpenses, dateOfBirth: dob,
+        monthlyContributions, yearlyMustExpenses: yearlyRetirementExpenses, dateOfBirth: dob,
       }
 
       // Process snapshot data for resilience score
@@ -182,10 +206,6 @@ export default function HorizonPage() {
       }
 
       setInput(horizonInput)
-      setFire(computeFireProjection(horizonInput))
-      setRange(computeFireRange(horizonInput))
-      setProjection(projectForward(horizonInput, 360))
-      setResilience(computeResilienceScore(horizonInput))
 
       const loadedEvents = (eventsResult.data ?? []) as LifeEvent[]
       setEvents(loadedEvents)
@@ -211,21 +231,21 @@ export default function HorizonPage() {
       : input
     : null
 
-  // Recalculate projections when income override changes
+  // Recalculate projections when income override, input, or FIRE method changes
   useEffect(() => {
     if (!effectiveInput) return
-    setFire(computeFireProjection(effectiveInput))
-    setRange(computeFireRange(effectiveInput))
+    setFire(computeFireProjection(effectiveInput, DEFAULT_RETURN, fireSwr))
+    setRange(computeFireRange(effectiveInput, fireSwr))
     setProjection(projectForward(effectiveInput, 360))
     setResilience(computeResilienceScore(effectiveInput))
     if (events.length > 0) {
       setImpacts(computeCumulativeImpacts(effectiveInput, events))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [incomeOverride])
+  }, [incomeOverride, input, fireSwr])
 
   const currentAge = effectiveInput?.dateOfBirth ? ageAtDate(effectiveInput.dateOfBirth) : null
-  const baseFire = effectiveInput ? computeFireProjection(effectiveInput) : null
+  const baseFire = effectiveInput ? computeFireProjection(effectiveInput, DEFAULT_RETURN, fireSwr) : null
   const totalDelayMonths = impacts.reduce((s, i) => s + i.fireDelayMonths, 0)
   const adjustedFireAge = baseFire?.fireAge != null ? baseFire.fireAge + totalDelayMonths / 12 : null
 
@@ -456,7 +476,7 @@ export default function HorizonPage() {
             <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
               <Target className="h-4 w-4 sm:h-5 sm:w-5 text-horizon-600" />
             </div>
-            <KpiTooltip text="Het doelbedrag voor volledige financiële vrijheid, berekend als je jaarlijkse uitgaven × 25 (4%-regel)." />
+            <KpiTooltip text={`Het doelbedrag voor volledige financiële vrijheid, berekend als je jaarlijkse uitgaven ÷ ${(fireSwr * 100).toFixed(2)}% opnamepercentage.`} />
           </div>
           <p className="label-editorial text-[var(--ink-3)]">FIRE Doelbedrag</p>
           <p className="mt-1 text-2xl sm:text-3xl font-bold text-horizon-600">{formatCurrency(fire.fireTarget)}</p>
@@ -800,6 +820,15 @@ export default function HorizonPage() {
             subtitle="hoe je vermogen opneemt"
           />
         </FeatureGate>
+        <FeatureGate featureId="backtesting_simulatie" fallback="locked">
+          <ExploreCard
+            onClick={() => setActiveModal('backtesting')}
+            icon={<History className="h-5 w-5 text-horizon-600" />}
+            title="Veerkrachtcheck"
+            value="1970 – heden"
+            subtitle="55 jaar marktgeschiedenis"
+          />
+        </FeatureGate>
       </section>
 
       {/* === 7. Tijdlijn + Levensgebeurtenissen (Primary Content) === */}
@@ -1126,6 +1155,7 @@ export default function HorizonPage() {
           <ScenariosModal input={effectiveInput} debts={debts} open={activeModal === 'scenarios'} onClose={() => setActiveModal(null)} />
           <SimulationsModal input={effectiveInput} open={activeModal === 'simulations'} onClose={() => setActiveModal(null)} />
           <WithdrawalModal input={effectiveInput} open={activeModal === 'withdrawal'} onClose={() => setActiveModal(null)} />
+          <BacktestingModal input={effectiveInput} swr={fireSwr} open={activeModal === 'backtesting'} onClose={() => setActiveModal(null)} />
         </>
       )}
     </div>

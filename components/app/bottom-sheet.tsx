@@ -41,7 +41,7 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
       style={{ right: 'var(--chat-sidebar-width, 0px)' }}
       onClick={handleBackdrop}
     >
-      <div className="w-full max-h-[92vh] overflow-y-auto bg-[var(--paper)] rounded-t-[var(--r-lg)] shadow-[var(--s2)] md:mx-4 md:max-w-lg md:rounded-[var(--r-lg)] safe-bottom">
+      <div className="w-full max-h-[92vh] overflow-y-auto bg-[var(--paper)] rounded-t-[var(--r-lg)] shadow-[var(--s2)] md:mx-4 md:max-w-lg md:rounded-[var(--r-lg)] safe-bottom animate-sheet-enter">
         {/* Drag handle — mobile only */}
         <div className="flex justify-center pt-3 md:hidden">
           <div className="h-1 w-10 rounded-full bg-[var(--border-md)]" />

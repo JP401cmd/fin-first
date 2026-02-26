@@ -12,6 +12,7 @@ const tabs = [
   { label: 'Database', href: '/beheer/migration' },
   { label: 'Mobile Preview', href: '/beheer/testdata#mobile-preview' },
   { label: 'GoCardless', href: '/beheer/gocardless' },
+  { label: 'Tiers', href: '/beheer/tiers', activeClass: 'border-[var(--ink)] text-[var(--ink)]' },
 ] as const
 
 export function BeheerNav() {
@@ -22,13 +23,14 @@ export function BeheerNav() {
       {tabs.map((tab) => {
         const basePath = tab.href.split('#')[0]
         const isActive = tab.href.includes('#') ? false : pathname === basePath
+        const activeClass = 'activeClass' in tab ? tab.activeClass : 'border-amber-500 text-amber-700'
         return (
           <Link
             key={tab.href}
             href={tab.href}
             className={`whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
               isActive
-                ? 'border-amber-500 text-amber-700'
+                ? activeClass
                 : 'border-transparent text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)]'
             }`}
           >

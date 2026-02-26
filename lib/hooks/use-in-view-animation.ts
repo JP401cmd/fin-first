@@ -13,6 +13,15 @@ export type UseInViewAnimationOptions = {
   delay?: number
   /** Whether to only trigger once (disconnects observer after first entry). Default: true */
   once?: boolean
+  /** Delay in ms after the IntersectionObserver trigger before hasEntered becomes true.
+   *  Use ~300 for modal/BottomSheet context so the bar starts after the open animation. */
+  triggerDelay?: number
+  /**
+   * Set true for charts inside BottomSheet modals.
+   * Presets rootMargin:'0px' and threshold:0 so the animation
+   * fires immediately when the modal content mounts.
+   */
+  forModal?: boolean
 }
 
 export type UseInViewAnimationReturn = {
@@ -35,12 +44,15 @@ export function useInViewAnimation(
   options: UseInViewAnimationOptions = {},
 ): UseInViewAnimationReturn {
   const {
-    threshold = 0.15,
-    rootMargin = '0px 0px -40px 0px',
     duration = 700,
     delay = 0,
     once = true,
+    triggerDelay = 0,
+    forModal = false,
   } = options
+
+  const resolvedRootMargin = forModal ? '0px' : (options.rootMargin ?? '0px 0px -40px 0px')
+  const resolvedThreshold  = forModal ? 0      : (options.threshold  ?? 0.15)
 
   const ref = useRef<HTMLDivElement | null>(null)
   const [hasEntered, setHasEntered] = useState(false)
@@ -65,23 +77,28 @@ export function useInViewAnimation(
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting) {
-            setHasEntered(true)
             if (once) observer.disconnect()
 
-            const timeout = setTimeout(() => {
-              setAnimationComplete(true)
-            }, duration + delay + 50)
+            const enter = () => {
+              setHasEntered(true)
+              setTimeout(() => setAnimationComplete(true), duration + delay + 50)
+            }
 
-            return () => clearTimeout(timeout)
+            if (triggerDelay > 0) {
+              const delayTimer = setTimeout(enter, triggerDelay)
+              return () => clearTimeout(delayTimer)
+            } else {
+              enter()
+            }
           }
         }
       },
-      { threshold, rootMargin },
+      { threshold: resolvedThreshold, rootMargin: resolvedRootMargin },
     )
 
     observer.observe(el)
     return () => observer.disconnect()
-  }, [threshold, rootMargin, duration, delay, once])
+  }, [resolvedThreshold, resolvedRootMargin, duration, delay, once, triggerDelay])
 
   return { ref, hasEntered, animationComplete }
 }

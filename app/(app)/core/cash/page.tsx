@@ -11,6 +11,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { isOwnAccountTransfer } from '@/lib/parsers/categorize'
 import { TransferConfirmSheet } from '@/components/app/transfer-confirm-sheet'
+import { ManualTransferSheet } from '@/components/app/manual-transfer-sheet'
 import { PendingTransferBanner } from '@/components/app/pending-transfer-banner'
 import { CashFlowForecastChart, type ForecastPoint, type ForecastAlert } from '@/components/app/cashflow-forecast-chart'
 import { FeatureGate } from '@/components/app/feature-gate'
@@ -135,6 +136,7 @@ export default function CashPage() {
 
   // Tab state
   const [activeTab, setActiveTab] = useState<'transacties' | 'kalender'>('transacties')
+  const [showManualTransfer, setShowManualTransfer] = useState(false)
 
   // Split transaction expansion state
   const [expandedSplitId, setExpandedSplitId] = useState<string | null>(null)
@@ -885,6 +887,15 @@ export default function CashPage() {
             <Plus className="h-4 w-4" />
             Nieuwe transactie
           </button>
+          {accounts.length >= 2 && (
+            <button
+              onClick={() => setShowManualTransfer(true)}
+              className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+            >
+              <ArrowLeftRight className="h-4 w-4" />
+              Overboeking
+            </button>
+          )}
         </div>
 
         {/* Month selector */}
@@ -1631,6 +1642,18 @@ export default function CashPage() {
         <CategoryRulesSheet
           budgets={budgets}
           onClose={() => setShowCategoryRules(false)}
+        />
+      )}
+
+      {/* Manual transfer sheet */}
+      {showManualTransfer && (
+        <ManualTransferSheet
+          accounts={accounts}
+          onClose={() => setShowManualTransfer(false)}
+          onSaved={() => {
+            setShowManualTransfer(false)
+            void loadTransactions(selectedAccountId)
+          }}
         />
       )}
 

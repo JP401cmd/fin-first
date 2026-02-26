@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useModalAnimation } from '@/lib/hooks/use-modal-animation'
 import { formatCurrency } from '@/components/app/budget-shared'
 import {
   computeWithdrawal, computeFireProjection, ageAtDate,
@@ -394,11 +395,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
 }
 
 function DrawdownChart({ schedule }: { schedule: WithdrawalYear[] }) {
-  const [animated, setAnimated] = useState(false)
-  useEffect(() => {
-    const t = setTimeout(() => setAnimated(true), 100)
-    return () => clearTimeout(t)
-  }, [])
+  const { hasEntered: animated } = useModalAnimation({ delay: 100, duration: 750 })
 
   if (schedule.length === 0) return null
 

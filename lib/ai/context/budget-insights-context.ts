@@ -12,11 +12,13 @@ export async function buildBudgetInsightsContext(supabase: SupabaseClient): Prom
 
   // 12 months ago for trend data
   const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split('T')[0]
+  // 3 months ago for income coverage check
+  const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1).toISOString().split('T')[0]
 
-  const [budgetsResult, currentTxResult, historicalTxResult, nibudResult] = await Promise.all([
+  const [budgetsResult, currentTxResult, historicalTxResult, nibudResult, incomeResult, profileResult] = await Promise.all([
     supabase
       .from('budgets')
-      .select('id, parent_id, name, slug, default_limit, budget_type')
+      .select('id, parent_id, name, slug, default_limit, budget_type, is_essential')
       .eq('is_archived', false)
       .order('sort_order', { ascending: true }),
     supabase
@@ -35,12 +37,25 @@ export async function buildBudgetInsightsContext(supabase: SupabaseClient): Prom
       .from('nibud_reference_data')
       .select('mapped_budget_slug, basis_amount')
       .eq('year', now.getFullYear()),
+    supabase
+      .from('transactions')
+      .select('amount')
+      .eq('is_income', true)
+      .gte('date', threeMonthsAgo)
+      .lte('date', monthEnd),
+    supabase
+      .from('profiles')
+      .select('retirement_expense_method')
+      .single(),
   ])
 
   const budgets = budgetsResult.data ?? []
   const currentTx = currentTxResult.data ?? []
   const historicalTx = historicalTxResult.data ?? []
   const nibudData = nibudResult.data ?? []
+  const incomeTx = incomeResult.data ?? []
+  const retirementMethod = profileResult.data?.retirement_expense_method ?? 'essential_budgets'
+  const usesEssentialBudgets = retirementMethod === 'essential_budgets'
 
   if (budgets.length === 0) return ''
 
@@ -136,26 +151,34 @@ export async function buildBudgetInsightsContext(supabase: SupabaseClient): Prom
   }
 
   // === 10.4: Vrijheidstijd impact ===
-  const freedomLines: string[] = []
+  const vrijheidsLines: string[] = []
+  const fireLines: string[] = []
   if (dailyExpenseRate > 0) {
     for (const b of childBudgets) {
       const limit = Number(b.default_limit)
       if (limit < 50) continue
-      const vrijheidsDagenPerMaand = limit / dailyExpenseRate
-      if (vrijheidsDagenPerMaand >= 0.5) {
-        const dagenPerJaar = Math.round(vrijheidsDagenPerMaand * 12)
-        freedomLines.push(`${b.name}: ${formatCurrency(limit)}/mnd = ${dagenPerJaar} vrijheidsdagen/jaar`)
+      const isEssential = (b as { is_essential?: boolean }).is_essential ?? false
+      const dagenPerJaar = Math.round((limit / dailyExpenseRate) * 12)
+
+      if (isEssential && usesEssentialBudgets && dagenPerJaar >= 1) {
+        // Beide voorwaarden OK → echte vrijheidsdagen claim
+        vrijheidsLines.push(`${b.name}: ${formatCurrency(limit)}/mnd = ${dagenPerJaar} vrijheidsdagen/jaar`)
+      } else if (limit >= 50) {
+        // Niet-essentieel OF andere retirement methode → besparingspotentieel
+        fireLines.push(`${b.name}: ${formatCurrency(limit)}/mnd = ${formatCurrency(limit * 12)}/jaar richting FIRE-doel`)
       }
     }
-    // Sort by impact desc, take top 8
-    freedomLines.sort((a, b) => {
-      const getVal = (s: string) => {
-        const m = s.match(/= (\d+) vrijheidsdagen/)
-        return m ? parseInt(m[1]) : 0
-      }
-      return getVal(b) - getVal(a)
+    // Sort desc, top 5 per categorie
+    vrijheidsLines.sort((a, b) => {
+      const get = (s: string) => parseInt(s.match(/= (\d+) vrijheidsdagen/)?.[1] ?? '0')
+      return get(b) - get(a)
     })
-    freedomLines.splice(8)
+    vrijheidsLines.splice(5)
+    fireLines.sort((a, b) => {
+      const get = (s: string) => parseFloat(s.match(/= €([\d.,]+)/)?.[1]?.replace(',', '.') ?? '0')
+      return get(b) - get(a)
+    })
+    fireLines.splice(5)
   }
 
   // === Build output ===
@@ -173,11 +196,33 @@ export async function buildBudgetInsightsContext(supabase: SupabaseClient): Prom
   if (nibudLines.length > 0) {
     parts.push(section('NIBUD VERGELIJKING', bulletList(nibudLines)))
   }
-  if (freedomLines.length > 0 && dailyExpenseRate > 0) {
+  if (vrijheidsLines.length > 0 && dailyExpenseRate > 0) {
     parts.push(section(
-      'VRIJHEIDSTIJD IMPACT PER BUDGET',
-      `Dagelijkse uitgaven: ${formatCurrency(dailyExpenseRate)}/dag\n` + bulletList(freedomLines)
+      'ESSENTIËLE BUDGETTEN — VRIJHEIDSDAGEN PER JAAR',
+      `Dagelijkse must-uitgaven: ${formatCurrency(dailyExpenseRate)}/dag\n` + bulletList(vrijheidsLines)
     ))
+  }
+  if (fireLines.length > 0) {
+    const fireLabel = usesEssentialBudgets
+      ? 'NIET-ESSENTIËLE BUDGETTEN — BESPARINGSPOTENTIEEL RICHTING FIRE'
+      : 'BUDGETTEN — BESPARINGSPOTENTIEEL RICHTING FIRE (retirement methode: geen essentiële budgetten)'
+    parts.push(section(fireLabel, bulletList(fireLines)))
+  }
+
+  // === 10.5: Dekkingsgraad waarschuwing ===
+  const avgMonthlyIncome = incomeTx.length > 0
+    ? incomeTx.reduce((s, t) => s + Math.abs(Number(t.amount)), 0) / 3
+    : 0
+  if (avgMonthlyIncome > 0) {
+    const totalAllocated = childBudgets
+      .reduce((s, b) => s + Number(b.default_limit), 0)
+    const dekkingsgraad = (totalAllocated / avgMonthlyIncome) * 100
+    if (dekkingsgraad > 100) {
+      parts.push(section(
+        '⚠️ DEKKINGSGRAAD WAARSCHUWING',
+        `${dekkingsgraad.toFixed(0)}% van inkomen toegewezen — ${formatCurrency(totalAllocated)} budget vs ${formatCurrency(avgMonthlyIncome)} gemiddeld maandinkomen (3-maands gem.). Je hebt meer gebudgetteerd dan je verdient.`
+      ))
+    }
   }
 
   return parts.join('\n')

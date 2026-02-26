@@ -95,8 +95,7 @@ export async function buildWilContext(supabase: SupabaseClient): Promise<string>
     if (!nonEssentialParentIds.has(child.parent_id ?? '')) continue
     const spent = spendingByBudget[child.id] ?? 0
     if (spent > 0) {
-      const freedomDays = Math.round(spent / dailyExpense)
-      opportunities.push(`${child.name}: ${formatCurrency(spent)}/mnd (~ ${freedomDays} dagen vrijheid/mnd)`)
+      opportunities.push(`${child.name}: ${formatCurrency(spent)}/mnd (= ${formatCurrency(spent * 12)}/jaar richting FIRE-doel)`)
     }
   }
 

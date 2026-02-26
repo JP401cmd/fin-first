@@ -252,12 +252,12 @@ function NibudDetailModal({
 
           {noData.length > 0 && (
             <p className="text-xs text-[var(--ink-3)]">
-              {noData.length} NIBUD-{noData.length === 1 ? 'categorie heeft' : 'categorien hebben'} nog geen transactiedata.
+              {noData.length} NIBUD-{noData.length === 1 ? 'categorie heeft' : 'categorien hebben'} nog geen budgetlimiet ingesteld.
             </p>
           )}
 
           <p className="text-[10px] leading-relaxed text-[var(--ink-4)]">
-            Referentiebedragen zijn indicatief. Vergelijkbare huishoudens geven gemiddeld deze bedragen uit — jouw situatie kan bewust anders zijn.
+            Referentiebedragen zijn indicatief. De check vergelijkt jouw ingestelde budgetten met NIBUD-normen — jouw situatie kan bewust anders zijn.
           </p>
         </div>
       </div>
@@ -325,7 +325,7 @@ function DetailRow({
           />
         </div>
         <div className="flex justify-between text-[10px] text-[var(--ink-3)]">
-          <span>Jij: &euro;{Math.round(b.user_spending)}/mnd</span>
+          <span>Budget: &euro;{Math.round(b.user_spending)}/mnd</span>
           <span>NIBUD: &euro;{Math.round(referenceAmount)}/mnd</span>
         </div>
       </div>

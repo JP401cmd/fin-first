@@ -73,6 +73,8 @@ export default function WillPage() {
   const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([])
   const [subscriptionMonthly, setSubscriptionMonthly] = useState(0)
   const [subscriptionsOpen, setSubscriptionsOpen] = useState(false)
+  const [detectingAlgo, setDetectingAlgo] = useState(false)
+  const [detectingAI, setDetectingAI] = useState(false)
 
   // Deep-link: open modal via ?modal= URL param (from dashboard widgets)
   const searchParams = useSearchParams()
@@ -105,6 +107,34 @@ export default function WillPage() {
   const [opzegModalSub, setOpzegModalSub] = useState<SubscriptionItem | null>(null)
   const [opzegInitialMetadata, setOpzegInitialMetadata] = useState<CancellationMetadata | undefined>(undefined)
   const [userProfile, setUserProfile] = useState<{ full_name: string | null }>({ full_name: null })
+  const handleRedetectAlgo = async () => {
+    setDetectingAlgo(true)
+    try {
+      const res = await fetch('/api/subscriptions')
+      const data = await res.json()
+      if (data.subscriptions) {
+        setSubscriptions(data.subscriptions as SubscriptionItem[])
+        setSubscriptionMonthly(data.totalMonthly ?? 0)
+      }
+    } finally {
+      setDetectingAlgo(false)
+    }
+  }
+
+  const handleRedetectAI = async () => {
+    setDetectingAI(true)
+    try {
+      const res = await fetch('/api/subscriptions/detect-ai', { method: 'POST' })
+      const data = await res.json()
+      if (data.subscriptions) {
+        setSubscriptions(data.subscriptions as SubscriptionItem[])
+        setSubscriptionMonthly(data.totalMonthly ?? 0)
+      }
+    } finally {
+      setDetectingAI(false)
+    }
+  }
+
   const handleFetchWillAdvice = async () => {
     if (subscriptions.length === 0) return
     setWillAdviceLoading(true)
@@ -817,6 +847,31 @@ export default function WillPage() {
               </div>
             </>
           )}
+
+          {/* Herdetectie */}
+          <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-3">
+            <p className="mb-2 text-center font-sans text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
+              Detectie opnieuw uitvoeren
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleRedetectAlgo}
+                disabled={detectingAlgo || detectingAI}
+                className="flex-1 rounded-[var(--r-sm)] border border-dashed border-[var(--border-md)] px-3 py-2 font-sans text-[11px] text-[var(--ink-2)] transition-colors hover:border-wil-300 hover:text-wil-700 disabled:opacity-40"
+              >
+                {detectingAlgo ? 'Bezig…' : '⟳ Algoritmisch'}
+              </button>
+              <button
+                type="button"
+                onClick={handleRedetectAI}
+                disabled={detectingAlgo || detectingAI}
+                className="flex-1 rounded-[var(--r-sm)] border border-dashed border-wil-200 bg-wil-50/40 px-3 py-2 font-sans text-[11px] text-wil-700 transition-colors hover:border-wil-400 hover:bg-wil-50 disabled:opacity-40"
+              >
+                {detectingAI ? 'AI analyseert…' : '✦ AI detectie'}
+              </button>
+            </div>
+          </div>
 
           {/* Footer */}
           <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">

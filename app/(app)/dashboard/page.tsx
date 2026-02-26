@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeFireProjection, type HorizonInput } from '@/lib/horizon-data'
+import { computeFireProjection, getSwrForMethod, type HorizonInput, type FireMethod, DEFAULT_RETURN } from '@/lib/horizon-data'
+import { computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { FhinAvatar, FinnAvatar, FfinAvatar } from '@/components/app/avatars'
 import { JouwPadWidget } from '@/components/app/jouw-pad-widget'
@@ -10,7 +11,7 @@ import {
   ArrowRight, Zap, Compass, TrendingUp, Settings2, Info,
 } from 'lucide-react'
 import { mergeWidgetPrefs } from '@/lib/widget-catalog'
-import type { DashboardData } from '@/components/widgets/widget-renderer'
+import type { DashboardData, TopAction, TopGoal } from '@/components/widgets/widget-renderer'
 import { DraggableWidgetGrid } from '@/components/widgets/draggable-widget-grid'
 
 export default async function DashboardPage() {
@@ -20,26 +21,33 @@ export default async function DashboardPage() {
 
   // Parallel data fetches for all module previews
   const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+  const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0]
+  const monthEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1)).toISOString().split('T')[0]
+  const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
   const [
     txResult, assetsResult, debtsResult, profileResult,
     essentialBudgetsResult, actionsResult, eventsResult,
     allBudgetsResult, recsResult, childBudgetsResult,
-    goalsResult, recurringResult,
+    goalsResult, recurringResult, netWorthSnapshotsResult,
+    income12Result, earliestIncomeResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
-    supabase.from('assets').select('current_value, monthly_contribution').eq('is_active', true),
-    supabase.from('debts').select('current_balance, debt_type').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth, last_known_phase, widget_prefs').single(),
+    supabase.from('assets').select('current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct').eq('is_active', true),
+    supabase.from('debts').select('current_balance, debt_type, net_worth_inclusion_pct').eq('is_active', true),
+    supabase.from('profiles').select('date_of_birth, last_known_phase, widget_prefs, fire_method, retirement_expense_method, retirement_expense_custom_amount').single(),
     supabase.from('budgets').select('id, default_limit, interval').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
-    supabase.from('actions').select('id, status, freedom_days_impact').in('status', ['open', 'completed']),
+    supabase.from('actions')
+      .select('id, title, status, freedom_days_impact, priority_score, due_date, source, completed_at')
+      .in('status', ['open', 'postponed', 'completed']),
     supabase.from('life_events').select('id').eq('is_active', true),
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, alert_threshold, parent_id').is('parent_id', null),
-    supabase.from('recommendations').select('id').eq('status', 'pending').limit(5),
+    supabase.from('recommendations').select('id, freedom_days_per_year, status').in('status', ['pending', 'postponed']),
     supabase.from('budgets').select('id, parent_id, default_limit').not('parent_id', 'is', null),
-    supabase.from('goals').select('id').eq('is_completed', false),
+    supabase.from('goals').select('id, name, goal_type, current_value, target_value, target_date, color, icon').eq('is_completed', false).order('sort_order', { ascending: true }),
     supabase.from('recurring_transactions').select('id').eq('is_active', true),
+    supabase.from('net_worth_snapshots').select('snapshot_date, net_worth').gte('snapshot_date', twelveMonthsAgo).order('snapshot_date', { ascending: true }).limit(12),
+    supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
+    supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
   ])
 
   // Core calculations
@@ -51,10 +59,27 @@ export default async function DashboardPage() {
     else monthlyExpenses += Math.abs(amt)
   }
 
-  const totalAssets = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.current_value), 0)
-  const totalDebts = (debtsResult.data ?? []).reduce((s, d) => s + Number(d.current_balance), 0)
+  const totalAssets = (assetsResult.data ?? []).reduce((s, a) =>
+    s + Number(a.current_value) * (((a as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100), 0)
+  const totalDebts = (debtsResult.data ?? []).reduce((s, d) =>
+    s + Number(d.current_balance) * (((d as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100), 0)
   const netWorth = totalAssets - totalDebts
   const monthlyContributions = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.monthly_contribution), 0)
+
+  // Asset breakdown per type
+  const assetsByType = Object.values(
+    (assetsResult.data ?? []).reduce((acc, a) => {
+      const type = (a as { asset_type?: string | null }).asset_type ?? 'other'
+      if (!acc[type]) acc[type] = { type, value: 0, purchaseValue: 0, weightedReturn: 0 }
+      acc[type].value += Number(a.current_value)
+      acc[type].purchaseValue += Number((a as { purchase_value?: number | null }).purchase_value ?? 0)
+      acc[type].weightedReturn += Number(a.current_value) * Number((a as { expected_return?: number | null }).expected_return ?? 0)
+      return acc
+    }, {} as Record<string, { type: string; value: number; purchaseValue: number; weightedReturn: number }>)
+  ).map(g => ({ ...g, expectedReturn: g.value > 0 ? g.weightedReturn / g.value : 0 }))
+   .sort((a, b) => b.value - a.value)
+
+  const totalPurchaseValue = assetsByType.reduce((s, a) => s + a.purchaseValue, 0)
 
   const allChildren = childBudgetsResult.data ?? []
   let yearlyMustExpenses = 0
@@ -110,22 +135,71 @@ export default async function DashboardPage() {
     debt:    { limit: budgetLimits.debt,    spent: budgetSpent.debt },
   }
 
+  const last12Income = income12Result.data?.reduce((s, t) => s + Number(t.amount), 0) ?? 0
+  let extrapolatedIncome = last12Income
+  const earliestIncomeDateD = earliestIncomeResult.data?.[0]?.date
+  if (earliestIncomeDateD && last12Income > 0) {
+    const earliest = new Date(earliestIncomeDateD)
+    const incomeMonths = Math.max(1, Math.min(12,
+      (now.getFullYear() - earliest.getFullYear()) * 12 +
+      (now.getMonth() - earliest.getMonth())
+    ))
+    if (incomeMonths < 12) {
+      extrapolatedIncome = (last12Income / incomeMonths) * 12
+    }
+  }
+
+  const fireMethod = (profileResult.data?.fire_method ?? 'classic') as FireMethod
+  const fireSwr = getSwrForMethod(fireMethod)
+
+  const yearlyRetirementExpenses = computeRetirementExpenses(
+    profileResult.data?.retirement_expense_method as RetirementExpenseMethod,
+    yearlyMustExpenses,
+    extrapolatedIncome,
+    profileResult.data?.retirement_expense_custom_amount,
+  )
+
   const yearlyExpenses = monthlyExpenses * 12
-  const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / 0.04 : (yearlyExpenses > 0 ? yearlyExpenses / 0.04 : 0)
+  const fireTarget = yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses / fireSwr : (yearlyExpenses > 0 ? yearlyExpenses / fireSwr : 0)
   const freedomPct = fireTarget > 0 ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0) : 0
 
   // FIRE projection
   const horizonInput: HorizonInput = {
     totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
-    monthlyContributions, yearlyMustExpenses,
+    monthlyContributions, yearlyMustExpenses: yearlyRetirementExpenses,
     dateOfBirth: profileResult.data?.date_of_birth ?? null,
   }
-  const fireProjResult = computeFireProjection(horizonInput)
+  const fireProjResult = computeFireProjection(horizonInput, DEFAULT_RETURN, fireSwr)
 
   // Will calculations
   const allActions = actionsResult.data ?? []
-  const openActions = allActions.filter(a => a.status === 'open')
-  const totalFreedomDaysOpen = openActions.reduce((s, a) => s + (Number(a.freedom_days_impact) || 0), 0)
+  const openActions = allActions.filter(a => a.status === 'open' || a.status === 'postponed')
+  const openActionDays = openActions.reduce((s, a) => s + (Number(a.freedom_days_impact) || 0), 0)
+  const pendingRecDays = (recsResult.data ?? []).reduce((s, r) => s + (Number((r as { freedom_days_per_year?: number | null }).freedom_days_per_year) || 0), 0)
+  const totalFreedomDaysOpen = openActionDays + pendingRecDays
+
+  // Acties afgerond deze maand
+  const completedActionsThisMonth = allActions.filter(a => {
+    if (a.status !== 'completed' || !(a as { completed_at?: string | null }).completed_at) return false
+    const completedAt = (a as { completed_at?: string | null }).completed_at!
+    return completedAt >= monthStart && completedAt < monthEnd
+  }).length
+
+  // Top 5 open acties gesorteerd op prioriteit
+  const topOpenActions: TopAction[] = openActions
+    .sort((a, b) => (Number((b as { priority_score?: number | null }).priority_score) || 0) - (Number((a as { priority_score?: number | null }).priority_score) || 0))
+    .slice(0, 5)
+    .map(a => {
+      const act = a as { id: string; title: string; freedom_days_impact?: number | null; priority_score?: number | null; due_date?: string | null; source?: string }
+      return {
+        id: act.id,
+        title: act.title,
+        freedom_days_impact: act.freedom_days_impact != null ? Number(act.freedom_days_impact) : null,
+        priority_score: act.priority_score != null ? Number(act.priority_score) : null,
+        due_date: act.due_date ?? null,
+        source: act.source ?? '',
+      }
+    })
 
   // Daily expenses for freedom-time calculations
   const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 0
@@ -160,6 +234,12 @@ export default async function DashboardPage() {
     .filter(w => w.enabled)
     .sort((a, b) => a.order - b.order)
 
+  // Net worth history: monthly snapshots for the sparkline
+  const netWorthHistory = (netWorthSnapshotsResult.data ?? []).map(s => ({
+    month: s.snapshot_date as string,
+    value: Number(s.net_worth),
+  }))
+
   // DashboardData bundle for widgets
   const dashboardData: DashboardData = {
     netWorth,
@@ -175,14 +255,29 @@ export default async function DashboardPage() {
     fireProjResult,
     openActions: openActions.length,
     totalFreedomDaysOpen,
+    completedActionsThisMonth,
+    topOpenActions,
     sovereigntyLevel,
     currentPhaseId,
     monthsCovered: monthlyExpenses > 0 ? netWorth / monthlyExpenses : 0,
     hasConsumerDebt,
-    recommendations: (recsResult.data ?? []).length,
+    recommendations: (recsResult.data ?? []).filter(r => (r as { status: string }).status === 'pending').length,
     goals: (goalsResult.data ?? []).length,
+    topGoals: (goalsResult.data ?? []).slice(0, 3).map(g => ({
+      id: (g as { id: string }).id,
+      name: (g as { name: string }).name,
+      goal_type: (g as { goal_type: string }).goal_type,
+      current_value: Number((g as { current_value: unknown }).current_value ?? 0),
+      target_value: Number((g as { target_value: unknown }).target_value ?? 0),
+      target_date: (g as { target_date?: string | null }).target_date ?? null,
+      color: (g as { color?: string }).color ?? 'teal',
+      icon: (g as { icon?: string }).icon ?? 'Target',
+    })) satisfies TopGoal[],
     recurringTransactions: (recurringResult.data ?? []).length,
     lifeEvents: (eventsResult.data ?? []).length,
+    netWorthHistory,
+    assetsByType,
+    totalPurchaseValue,
   }
 
   // Dateline

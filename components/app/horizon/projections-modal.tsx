@@ -1,13 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useModalAnimation } from '@/lib/hooks/use-modal-animation'
 import { formatCurrency } from '@/components/app/budget-shared'
 import {
   computeFireProjection, computeFireRange, projectForward,
   formatFireAge,
+  CASHFLOW_CATALOG,
   type HorizonInput, type FireProjection, type FireRange, type ProjectionMonth,
+  type FutureCashflow,
 } from '@/lib/horizon-data'
-import { X, ChevronDown, ChevronUp } from 'lucide-react'
+import { X, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { FeatureGate } from '@/components/app/feature-gate'
 
@@ -16,6 +19,9 @@ type Props = {
   open: boolean
   onClose: () => void
 }
+
+let _cfIdCounter = 0
+function newCfId() { return `cf-${++_cfIdCounter}` }
 
 export function ProjectionsModal({ input, open, onClose }: Props) {
   const [fire, setFire] = useState<FireProjection | null>(null)
@@ -28,6 +34,15 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
   const [returnRate, setReturnRate] = useState(7)
   const [inflation, setInflation] = useState(2)
   const [showParams, setShowParams] = useState(false)
+
+  // Future cashflows
+  const [cashflows, setCashflows] = useState<FutureCashflow[]>([])
+  const [showCashflowForm, setShowCashflowForm] = useState(false)
+  const [cfName, setCfName] = useState('')
+  const [cfAmount, setCfAmount] = useState<number | ''>('')
+  const [cfFromAge, setCfFromAge] = useState<number | ''>(67)
+  const [cfToAge, setCfToAge] = useState<number | '' | null>(null)
+  const [cfLifelong, setCfLifelong] = useState(true)
 
   // Recalculate when parameters change
   useEffect(() => {
@@ -54,7 +69,56 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
       expected: f,
       pessimistic: computeFireProjection(effectiveInput, Math.max(r - 0.03, 0.02), s, inf),
     })
-  }, [input, extraMonthly, workDays, swr, returnRate, inflation, open])
+  }, [input, extraMonthly, workDays, swr, returnRate, inflation, open, cashflows])
+
+  function addCatalogCashflow(template: Omit<FutureCashflow, 'id'>) {
+    const newCf: FutureCashflow = { ...template, id: newCfId() }
+    setCashflows(prev => [...prev, newCf])
+  }
+
+  function addCustomCashflow() {
+    if (!cfName || cfAmount === '') return
+    const newCf: FutureCashflow = {
+      id: newCfId(),
+      name: cfName,
+      monthlyAmount: Number(cfAmount),
+      fromAge: Number(cfFromAge) || 67,
+      toAge: cfLifelong ? null : (cfToAge !== null && cfToAge !== '' ? Number(cfToAge) : null),
+    }
+    setCashflows(prev => [...prev, newCf])
+    setCfName('')
+    setCfAmount('')
+    setCfFromAge(67)
+    setCfToAge(null)
+    setCfLifelong(true)
+    setShowCashflowForm(false)
+  }
+
+  function removeCashflow(id: string) {
+    setCashflows(prev => prev.filter(cf => cf.id !== id))
+  }
+
+  // Compute impact badge for a single cashflow
+  function getCashflowImpactMonths(cf: FutureCashflow): number | null {
+    if (!fire) return null
+    const r = returnRate / 100
+    const s = swr / 100
+    const inf = inflation / 100
+    const incomeMultiplier = workDays / 5
+    const effectiveInput: HorizonInput = {
+      ...input,
+      monthlyIncome: input.monthlyIncome * incomeMultiplier + extraMonthly,
+    }
+    const baseCountdown = computeFireProjection(effectiveInput, r, s, inf).countdownDays
+    const withCf = computeFireProjection(effectiveInput, r, s, inf)
+    // Approximate: monthly cashflow adds to savings
+    const cfInput: HorizonInput = {
+      ...effectiveInput,
+      monthlyIncome: effectiveInput.monthlyIncome + cf.monthlyAmount,
+    }
+    const cfCountdown = computeFireProjection(cfInput, r, s, inf).countdownDays
+    return Math.round((baseCountdown - cfCountdown) / 30)
+  }
 
   if (!open || !fire || !range) return null
 
@@ -183,6 +247,149 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
             </FeatureGate>
           </section>
 
+          {/* Future Cashflows */}
+          <section className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
+                  Toekomstige vrijheidsbronnen
+                </h2>
+                <p className="mt-0.5 text-xs text-[var(--ink-4)]">AOW, pensioen, bijverdienste</p>
+              </div>
+              <button
+                onClick={() => setShowCashflowForm(!showCashflowForm)}
+                className="flex items-center gap-1 rounded-[var(--r)] bg-horizon-50 border border-horizon-200 px-3 py-1.5 text-xs font-medium text-horizon-600 hover:bg-horizon-100"
+              >
+                <Plus className="h-3 w-3" />
+                Toevoegen
+              </button>
+            </div>
+
+            {/* Catalog pills */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {CASHFLOW_CATALOG.slice(0, 4).map(template => (
+                <button
+                  key={template.name}
+                  type="button"
+                  onClick={() => addCatalogCashflow(template)}
+                  className="rounded-full border border-horizon-200 bg-horizon-50 px-3 py-1 text-[11px] font-medium text-horizon-700 hover:bg-horizon-100"
+                >
+                  + {template.name}
+                </button>
+              ))}
+            </div>
+
+            {/* Added cashflows list */}
+            {cashflows.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {cashflows.map(cf => {
+                  const impactMonths = getCashflowImpactMonths(cf)
+                  return (
+                    <div key={cf.id} className="flex items-center justify-between gap-3 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/50 px-3 py-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[var(--ink)]">{cf.name}</p>
+                        <p className="text-[10px] text-[var(--ink-3)]">
+                          {formatCurrency(cf.monthlyAmount)}/mnd · v.a. leeftijd {cf.fromAge}
+                          {cf.toAge !== null ? ` t/m ${cf.toAge}` : ' · levenslang'}
+                        </p>
+                      </div>
+                      {impactMonths !== null && impactMonths !== 0 && (
+                        <span className={`shrink-0 rounded-[var(--r-sm)] px-2 py-0.5 text-[10px] font-semibold ${
+                          impactMonths > 0
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'bg-red-50 text-red-700'
+                        }`}>
+                          {impactMonths > 0 ? `−${impactMonths}` : `+${Math.abs(impactMonths)}`} mnd
+                        </span>
+                      )}
+                      <button
+                        onClick={() => removeCashflow(cf.id)}
+                        className="shrink-0 rounded p-1 text-[var(--ink-4)] hover:text-red-500"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Inline form */}
+            {showCashflowForm && (
+              <div className="mt-4 space-y-3 rounded-[var(--r)] border border-horizon-200 bg-horizon-50/30 p-4">
+                <div>
+                  <label className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">Naam</label>
+                  <input
+                    type="text"
+                    value={cfName}
+                    onChange={e => setCfName(e.target.value)}
+                    placeholder="bijv. Aanvullend pensioen"
+                    className="mt-1 w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-1.5 text-sm focus:border-horizon-500 focus:outline-none"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">Bedrag/mnd (€)</label>
+                    <input
+                      type="number"
+                      value={cfAmount}
+                      onChange={e => setCfAmount(e.target.value ? Number(e.target.value) : '')}
+                      placeholder="1380"
+                      className="mt-1 w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-1.5 text-sm focus:border-horizon-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">Vanaf leeftijd</label>
+                    <input
+                      type="number"
+                      value={cfFromAge}
+                      onChange={e => setCfFromAge(e.target.value ? Number(e.target.value) : '')}
+                      className="mt-1 w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-1.5 text-sm focus:border-horizon-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCfLifelong(!cfLifelong)}
+                    className={`rounded-full px-3 py-1 text-[11px] font-medium border ${
+                      cfLifelong
+                        ? 'bg-horizon-600 text-white border-horizon-600'
+                        : 'bg-[var(--paper)] text-[var(--ink-2)] border-[var(--border-ed)]'
+                    }`}
+                  >
+                    Levenslang
+                  </button>
+                  {!cfLifelong && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-[10px] text-[var(--ink-3)]">Tot leeftijd</label>
+                      <input
+                        type="number"
+                        value={cfToAge ?? ''}
+                        onChange={e => setCfToAge(e.target.value ? Number(e.target.value) : null)}
+                        className="w-16 rounded-[var(--r)] border border-[var(--border-ed)] px-2 py-1 text-sm focus:border-horizon-500 focus:outline-none"
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={addCustomCashflow}
+                    className="rounded-[var(--r)] bg-horizon-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-horizon-700"
+                  >
+                    Toevoegen
+                  </button>
+                  <button
+                    onClick={() => setShowCashflowForm(false)}
+                    className="rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-1.5 text-sm font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)]"
+                  >
+                    Annuleren
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+
           {/* Projection chart with 3 lines */}
           <section>
             <div className="mb-4">
@@ -194,7 +401,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
               </p>
             </div>
             <div className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
-              <ThreeLineChart input={input} returnRate={returnRate} extraMonthly={extraMonthly} workDays={workDays} fireTarget={fire.fireTarget} swr={swr} />
+              <ThreeLineChart input={input} returnRate={returnRate} extraMonthly={extraMonthly} workDays={workDays} fireTarget={fire.fireTarget} swr={swr} cashflows={cashflows} />
             </div>
           </section>
         </div>
@@ -203,15 +410,11 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
 }
 
 function ThreeLineChart({
-  input, returnRate, extraMonthly, workDays, fireTarget, swr,
+  input, returnRate, extraMonthly, workDays, fireTarget, swr, cashflows,
 }: {
-  input: HorizonInput; returnRate: number; extraMonthly: number; workDays: number; fireTarget: number; swr: number
+  input: HorizonInput; returnRate: number; extraMonthly: number; workDays: number; fireTarget: number; swr: number; cashflows?: FutureCashflow[]
 }) {
-  const [animated, setAnimated] = useState(false)
-  useEffect(() => {
-    const t = setTimeout(() => setAnimated(true), 100)
-    return () => clearTimeout(t)
-  }, [])
+  const { hasEntered: animated } = useModalAnimation({ delay: 100, duration: 800 })
   const incomeMultiplier = workDays / 5
   const adjusted: HorizonInput = {
     ...input,
@@ -220,9 +423,9 @@ function ThreeLineChart({
 
   const r = returnRate / 100
   const s = swr / 100
-  const optimistic = projectForward(adjusted, 480, Math.min(r + 0.02, 0.12), s)
-  const expected = projectForward(adjusted, 480, r, s)
-  const pessimistic = projectForward(adjusted, 480, Math.max(r - 0.03, 0.02), s)
+  const optimistic = projectForward(adjusted, 480, Math.min(r + 0.02, 0.12), s, cashflows)
+  const expected = projectForward(adjusted, 480, r, s, cashflows)
+  const pessimistic = projectForward(adjusted, 480, Math.max(r - 0.03, 0.02), s, cashflows)
 
   // Sample every 12 months
   const sample = (data: ProjectionMonth[]) => data.filter((_, i) => i % 12 === 0 || i === data.length - 1)
@@ -282,7 +485,7 @@ function ThreeLineChart({
       )}
 
       {/* Cone fill */}
-      <path d={areaPath} fill="#8B5CB8" opacity="0.08" style={{ animation: animated ? 'fadeInFill 250ms ease-out 455ms both' : 'none' }} />
+      <path d={areaPath} fill="#8B5CB8" style={{ opacity: animated ? 0.08 : 0, transition: animated ? 'opacity 250ms ease-out 455ms' : 'none' }} />
 
       {/* Lines */}
       <path d={linePath(pesS)} fill="none" stroke="#d4a843" strokeWidth="1.5" strokeDasharray="4"

@@ -4,6 +4,7 @@ import { useRef, useLayoutEffect, useState, useCallback, useEffect } from 'react
 import { BudgetIcon, formatCurrency, getTypeColors, type BudgetType } from '@/components/app/budget-shared'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
 import { useDailyExpenseRate, eurToFreedomTime } from '@/components/app/freedom-time-label'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 interface BudgetTreeProps {
   groups: BudgetWithChildren[]
@@ -23,6 +24,8 @@ function ChildBar({
   onNavigate,
   onHover,
   isHovered,
+  hasEntered,
+  rowIndex,
 }: {
   child: Budget
   spent: number
@@ -31,6 +34,8 @@ function ChildBar({
   onNavigate: (id: string) => void
   onHover: (id: string | null) => void
   isHovered: boolean
+  hasEntered: boolean
+  rowIndex: number
 }) {
   // Use effective limit (incl. rollover carry) when available, otherwise fall back to default
   const limit = beschikbaar !== undefined ? beschikbaar + spent : Number(child.default_limit)
@@ -57,6 +62,10 @@ function ChildBar({
       onMouseEnter={() => onHover(child.id)}
       onMouseLeave={() => onHover(null)}
       data-child-id={child.id}
+      style={{
+        animation: hasEntered ? `fadeUp 0.4s ease-out ${rowIndex * 60}ms both` : 'none',
+        opacity: hasEntered ? undefined : 0,
+      }}
     >
       {/* Icon */}
       <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${colors.bg}`}>
@@ -75,15 +84,27 @@ function ChildBar({
 
         {/* Fill */}
         <div
-          className="absolute inset-y-1 left-0 rounded-full transition-all duration-500"
-          style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: fillColorHex }}
+          className="absolute inset-y-1 left-0 rounded-full"
+          style={{
+            width: hasEntered ? `${Math.min(pct, 100)}%` : '0%',
+            backgroundColor: fillColorHex,
+            transition: hasEntered
+              ? `width 500ms cubic-bezier(.22,1,.36,1) ${150 + rowIndex * 60}ms`
+              : 'none',
+          }}
         />
 
         {/* Over-budget extension */}
         {overBudget && (
           <div
             className="absolute inset-y-1 rounded-r-full bg-red-500/70"
-            style={{ left: '100%', width: `${overPct}%` }}
+            style={{
+              left: '100%',
+              width: hasEntered ? `${overPct}%` : '0%',
+              transition: hasEntered
+                ? `width 500ms cubic-bezier(.22,1,.36,1) ${200 + rowIndex * 60}ms`
+                : 'none',
+            }}
           />
         )}
 
@@ -169,12 +190,14 @@ function ParentNode({
   totalLimit,
   budgetType,
   onNavigate,
+  hasEntered,
 }: {
   parent: Budget
   totalSpent: number
   totalLimit: number
   budgetType: BudgetType
   onNavigate: (id: string) => void
+  hasEntered: boolean
 }) {
   const colors = getTypeColors(budgetType)
   const pct = totalLimit > 0 ? Math.min(Math.round((totalSpent / totalLimit) * 100), 100) : 0
@@ -184,6 +207,10 @@ function ParentNode({
       className="flex w-40 cursor-pointer flex-col items-center gap-2 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 shadow-[var(--s0)] transition-shadow hover:shadow-md"
       onClick={() => onNavigate(parent.id)}
       data-parent-id={parent.id}
+      style={{
+        animation: hasEntered ? 'fadeUp 0.4s ease-out both' : 'none',
+        opacity: hasEntered ? undefined : 0,
+      }}
     >
       <div className={`flex h-10 w-10 items-center justify-center rounded-full ${colors.bgDark}`}>
         <BudgetIcon name={parent.icon} className={`h-5 w-5 ${colors.text}`} />
@@ -198,10 +225,11 @@ function ParentNode({
       {/* Mini progress bar */}
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
         <div
-          className="h-full rounded-full transition-all duration-500"
+          className="h-full rounded-full"
           style={{
-            width: `${pct}%`,
+            width: hasEntered ? `${pct}%` : '0%',
             backgroundColor: totalSpent > totalLimit ? '#ef4444' : pct > 80 ? colors.barHexWarn : colors.barHex,
+            transition: hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1) 150ms' : 'none',
           }}
         />
       </div>
@@ -219,6 +247,7 @@ function BezierConnectors({
   budgetType,
   spending,
   budgets,
+  hasEntered,
 }: {
   containerRef: React.RefObject<HTMLDivElement | null>
   parentId: string
@@ -227,9 +256,10 @@ function BezierConnectors({
   budgetType: BudgetType
   spending: Record<string, number>
   budgets: Budget[]
+  hasEntered: boolean
 }) {
   const [paths, setPaths] = useState<
-    { d: string; childId: string; overBudget: boolean }[]
+    { d: string; childId: string; overBudget: boolean; pathIndex: number }[]
   >([])
   const [svgSize, setSvgSize] = useState({ w: 0, h: 0 })
   const colors = getTypeColors(budgetType)
@@ -248,7 +278,7 @@ function BezierConnectors({
     const px = pRect.right - rect.left
     const py = pRect.top + pRect.height / 2 - rect.top
 
-    const newPaths: { d: string; childId: string; overBudget: boolean }[] = []
+    const newPaths: { d: string; childId: string; overBudget: boolean; pathIndex: number }[] = []
 
     for (const childId of childIds) {
       const childEl = container.querySelector(`[data-child-id="${childId}"]`)
@@ -269,7 +299,7 @@ function BezierConnectors({
       const limit = budget ? Number(budget.default_limit) : 0
       const overBudget = spent > limit && limit > 0
 
-      newPaths.push({ d, childId, overBudget })
+      newPaths.push({ d, childId, overBudget, pathIndex: newPaths.length })
     }
 
     setPaths(newPaths)
@@ -283,9 +313,16 @@ function BezierConnectors({
     const container = containerRef.current
     if (!container) return
 
-    const observer = new ResizeObserver(() => measure())
+    let rafId: number | null = null
+    const observer = new ResizeObserver(() => {
+      if (rafId !== null) cancelAnimationFrame(rafId)
+      rafId = requestAnimationFrame(() => { measure(); rafId = null })
+    })
     observer.observe(container)
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+      if (rafId !== null) cancelAnimationFrame(rafId)
+    }
   }, [containerRef, measure])
 
   if (paths.length === 0 || svgSize.w === 0) return null
@@ -297,7 +334,7 @@ function BezierConnectors({
       height={svgSize.h}
       style={{ overflow: 'visible' }}
     >
-      {paths.map(({ d, childId, overBudget }) => {
+      {paths.map(({ d, childId, overBudget, pathIndex }) => {
         const isActive = hoveredChild === childId
         return (
           <path
@@ -307,7 +344,14 @@ function BezierConnectors({
             stroke={overBudget ? '#ef4444' : colors.hex}
             strokeWidth={isActive ? 2 : 1.5}
             opacity={isActive ? 0.8 : 0.3}
-            className="transition-all duration-200"
+            pathLength={1}
+            strokeDasharray="1"
+            strokeDashoffset={hasEntered ? 0 : 1}
+            style={{
+              transition: hasEntered
+                ? `stroke-dashoffset 600ms cubic-bezier(.22,1,.36,1) ${80 + pathIndex * 80}ms, opacity 200ms ease`
+                : 'none',
+            }}
           />
         )
       })}
@@ -332,6 +376,7 @@ function TreeGroup({
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [hoveredChild, setHoveredChild] = useState<string | null>(null)
+  const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 900 })
 
   const totalSpent = parent.children.length > 0
     ? parent.children.reduce((sum, c) => sum + (spending[c.id] ?? 0), 0)
@@ -353,8 +398,13 @@ function TreeGroup({
     // No children — show single card
     return (
       <div
+        ref={inViewRef}
         className="flex cursor-pointer items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 transition-shadow hover:shadow-md"
         onClick={() => onNavigate(parent.id)}
+        style={{
+          animation: hasEntered ? 'fadeUp 0.4s ease-out both' : 'none',
+          opacity: hasEntered ? undefined : 0,
+        }}
       >
         <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${getTypeColors(budgetType).bg}`}>
           <BudgetIcon name={parent.icon} className={`h-5 w-5 ${getTypeColors(budgetType).text}`} />
@@ -377,7 +427,7 @@ function TreeGroup({
   }
 
   return (
-    <div className="mb-6">
+    <div ref={inViewRef} className="mb-6">
       {/* Desktop: tree layout */}
       <div ref={containerRef} className="relative hidden items-start gap-6 md:flex">
         {/* SVG overlay */}
@@ -389,6 +439,7 @@ function TreeGroup({
           budgetType={budgetType}
           spending={spending}
           budgets={parent.children}
+          hasEntered={hasEntered}
         />
 
         {/* Parent node (left) */}
@@ -399,12 +450,13 @@ function TreeGroup({
             totalLimit={totalLimit}
             budgetType={budgetType}
             onNavigate={onNavigate}
+            hasEntered={hasEntered}
           />
         </div>
 
         {/* Children (right) */}
         <div className="min-w-0 flex-1 space-y-0.5">
-          {parent.children.map((child) => (
+          {parent.children.map((child, index) => (
             <ChildBar
               key={child.id}
               child={child}
@@ -414,6 +466,8 @@ function TreeGroup({
               onNavigate={onNavigate}
               onHover={setHoveredChild}
               isHovered={hoveredChild === child.id}
+              hasEntered={hasEntered}
+              rowIndex={index}
             />
           ))}
         </div>
@@ -425,6 +479,10 @@ function TreeGroup({
         <div
           className={`flex cursor-pointer items-center gap-3 rounded-t-xl border border-[var(--border-ed)] bg-gradient-to-r p-3 ${getTypeColors(budgetType).headerGradient}`}
           onClick={() => onNavigate(parent.id)}
+          style={{
+            animation: hasEntered ? 'fadeUp 0.4s ease-out both' : 'none',
+            opacity: hasEntered ? undefined : 0,
+          }}
         >
           <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${getTypeColors(budgetType).bgDark}`}>
             <BudgetIcon name={parent.icon} className={`h-5 w-5 ${getTypeColors(budgetType).text}`} />
@@ -439,7 +497,7 @@ function TreeGroup({
 
         {/* Children indented */}
         <div className="rounded-b-xl border border-t-0 border-[var(--border-ed)] bg-[var(--paper)]">
-          {parent.children.map((child) => (
+          {parent.children.map((child, index) => (
             <ChildBar
               key={child.id}
               child={child}
@@ -449,6 +507,8 @@ function TreeGroup({
               onNavigate={onNavigate}
               onHover={() => {}}
               isHovered={false}
+              hasEntered={hasEntered}
+              rowIndex={index}
             />
           ))}
         </div>

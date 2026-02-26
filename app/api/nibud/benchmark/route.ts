@@ -45,43 +45,26 @@ export async function GET() {
     })
   }
 
-  // Get user spending from last 3 months of transactions
-  const threeMonthsAgo = new Date()
-  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
-  const dateStr = threeMonthsAgo.toISOString().split('T')[0]
-
-  const [budgetsRes, txRes] = await Promise.all([
-    supabase
-      .from('budgets')
-      .select('id, slug, budget_type')
-      .eq('user_id', user.id)
-      .order('sort_order'),
-    supabase
-      .from('transactions')
-      .select('budget_id, amount, is_income')
-      .eq('user_id', user.id)
-      .gte('date', dateStr),
-  ])
+  const budgetsRes = await supabase
+    .from('budgets')
+    .select('id, slug, budget_type, default_limit, interval')
+    .eq('user_id', user.id)
+    .order('sort_order')
 
   const budgets = budgetsRes.data ?? []
-  const transactions = txRes.data ?? []
 
-  // Aggregate spending per budget slug
-  const spendingByBudgetId = new Map<string, number>()
-  for (const tx of transactions) {
-    if (tx.is_income || !tx.budget_id) continue
-    const current = spendingByBudgetId.get(tx.budget_id) ?? 0
-    spendingByBudgetId.set(tx.budget_id, current + Math.abs(Number(tx.amount)))
-  }
-
-  const spendingBySlug: Record<string, number> = {}
+  // Normaliseer budget naar maandbedrag per slug
+  const budgetBySlug: Record<string, number> = {}
   for (const budget of budgets) {
     if (!budget.slug || budget.budget_type === 'income') continue
-    const totalSpent = spendingByBudgetId.get(budget.id) ?? 0
-    const monthlyAvg = Math.round(totalSpent / 3)
-    if (monthlyAvg > 0) {
-      spendingBySlug[budget.slug] = (spendingBySlug[budget.slug] ?? 0) + monthlyAvg
-    }
+    const limit = Number(budget.default_limit) || 0
+    if (limit <= 0) continue
+    const monthly = budget.interval === 'yearly'
+      ? limit / 12
+      : budget.interval === 'quarterly'
+        ? limit / 3
+        : limit
+    budgetBySlug[budget.slug] = (budgetBySlug[budget.slug] ?? 0) + Math.round(monthly)
   }
 
   // Build slug → budget id map for deep-linking
@@ -90,10 +73,10 @@ export async function GET() {
     if (budget.slug) slugToId[budget.slug] = budget.id
   }
 
-  const totalMonthly = Object.values(spendingBySlug).reduce((s, v) => s + v, 0)
+  const totalMonthly = Object.values(budgetBySlug).reduce((s, v) => s + v, 0)
   const dailyExpense = totalMonthly > 0 ? (totalMonthly * 12) / 365 : 1
 
-  const benchmarks = calculateBenchmarks(references, spendingBySlug, dailyExpense, slugToId)
+  const benchmarks = calculateBenchmarks(references, budgetBySlug, dailyExpense, slugToId)
 
   const householdLabels: Record<string, string> = {
     alleenstaand: 'Alleenstaand',

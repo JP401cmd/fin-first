@@ -223,8 +223,9 @@ export async function buildRecommendationContext(supabase: SupabaseClient): Prom
 
       const freedomDaysPerYear = Math.round((totalMonthly * 12) / dailyExpense)
 
+      // Abonnementen zijn niet-essentieel → besparingspotentieel, geen "vrijheidsdagen per jaar" claim
       const subLines: string[] = [
-        `Totaal: ${formatCurrency(Math.round(totalMonthly))}/maand — dat kost ~${freedomDaysPerYear} vrijheidsdagen/jaar`,
+        `Totaal: ${formatCurrency(Math.round(totalMonthly))}/maand — ${formatCurrency(Math.round(totalMonthly * 12))}/jaar besparingspotentieel richting FIRE-doel (~${freedomDaysPerYear} dagen als ze essentieel zouden zijn)`,
         '',
       ]
 

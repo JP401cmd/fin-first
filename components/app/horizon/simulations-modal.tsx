@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
+import { useModalAnimation } from '@/lib/hooks/use-modal-animation'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { X, ChevronDown, ChevronUp } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -257,11 +258,7 @@ function ConeChart({
   hoveredYear: number | null
   onHover: (year: number | null) => void
 }) {
-  const [animated, setAnimated] = useState(false)
-  useEffect(() => {
-    const t = setTimeout(() => setAnimated(true), 100)
-    return () => clearTimeout(t)
-  }, [])
+  const { hasEntered: animated } = useModalAnimation({ delay: 100, duration: 750 })
   const W = 600
   const H = 260
   const PAD = 50
@@ -322,8 +319,8 @@ function ConeChart({
         </>
       )}
 
-      <path d={bandPath} fill="#8B5CB8" opacity="0.08" style={{ animation: animated ? 'fadeInFill 250ms ease-out 455ms both' : 'none' }} />
-      <path d={innerBandPath} fill="#8B5CB8" opacity="0.12" style={{ animation: animated ? 'fadeInFill 250ms ease-out 455ms both' : 'none' }} />
+      <path d={bandPath} fill="#8B5CB8" style={{ opacity: animated ? 0.08 : 0, transition: animated ? 'opacity 250ms ease-out 455ms' : 'none' }} />
+      <path d={innerBandPath} fill="#8B5CB8" style={{ opacity: animated ? 0.12 : 0, transition: animated ? 'opacity 250ms ease-out 455ms' : 'none' }} />
       <path d={linePath(percentiles.p50)} fill="none" stroke="#8B5CB8" strokeWidth="2.5"
         pathLength={1} strokeDasharray={1}
         style={{ strokeDashoffset: animated ? undefined : 1, animation: animated ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) both' : 'none' }} />
@@ -365,11 +362,7 @@ function ConeChart({
 }
 
 function HistogramChart({ buckets, max }: { buckets: { label: string; count: number }[]; max: number }) {
-  const [animated, setAnimated] = useState(false)
-  useEffect(() => {
-    const t = setTimeout(() => setAnimated(true), 100)
-    return () => clearTimeout(t)
-  }, [])
+  const { hasEntered: animated } = useModalAnimation({ delay: 100, duration: 700 })
 
   const W = 600
   const H = 160
@@ -382,7 +375,7 @@ function HistogramChart({ buckets, max }: { buckets: { label: string; count: num
         const bx = PAD + (i / buckets.length) * (W - PAD * 2) + 2
         const barH = (b.count / max) * (H - PAD * 2)
         const by = H - PAD - barH
-        const staggerDelay = i * 20
+        const staggerDelay = i * 60
 
         return (
           <g key={i}>

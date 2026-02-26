@@ -87,7 +87,9 @@
       "Bash(python3:*)",
       "WebFetch(domain:developer.paypal.com)",
       "Bash(tail:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "WebFetch(domain:earlyretirementcalc.com)",
+      "Bash(cat:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { ArrowRight, Shield, Check, Circle, Target, Clock, Ban, Flag } from 'lucide-react'
 import type { FreedomMilestone } from '@/lib/freedom-milestones'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 // Phase definitions matching identity page
 const PHASES = [
@@ -98,6 +99,7 @@ interface JouwPadWidgetProps {
 }
 
 export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCovered = 0, hasConsumerDebt = false, milestones, nextMilestoneMessage }: JouwPadWidgetProps) {
+  const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 800 })
   const currentPhase = PHASES.find(p => p.id === phase) ?? PHASES[0]
   const colors = phaseColors[currentPhase.color]
   const levelName = LEVEL_NAMES[level] ?? 'Onbekend'
@@ -120,6 +122,7 @@ export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCo
       data-testid="jouw-pad-widget"
       className={`group block rounded-[var(--r-lg)] border ${colors.border} ${colors.bg} p-5 transition-all hover:shadow-md`}
     >
+      <div ref={inViewRef}>
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
           <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${colors.badge}`}>
@@ -162,12 +165,21 @@ export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCo
                 <div className={`h-1.5 rounded-full ${isPast ? pColors.bar : isActive ? 'bg-zinc-200' : 'bg-zinc-100'} overflow-hidden`}>
                   {isActive && (
                     <div
-                      className={`h-full rounded-full ${pColors.bar} transition-all duration-700`}
-                      style={{ width: `${Math.min(progressInPhase, 100)}%` }}
+                      className={`h-full rounded-full ${pColors.bar}`}
+                      style={{
+                        width: hasEntered ? `${Math.min(progressInPhase, 100)}%` : '0%',
+                        transition: hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1) 150ms' : 'none',
+                      }}
                     />
                   )}
                   {isPast && (
-                    <div className={`h-full rounded-full ${pColors.bar}`} style={{ width: '100%' }} />
+                    <div
+                      className={`h-full rounded-full ${pColors.bar}`}
+                      style={{
+                        width: hasEntered ? '100%' : '0%',
+                        transition: hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1)' : 'none',
+                      }}
+                    />
                   )}
                 </div>
               </div>
@@ -317,6 +329,7 @@ export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCo
           </p>
         </div>
       )}
+      </div>
     </Link>
   )
 }

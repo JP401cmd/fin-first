@@ -27,22 +27,38 @@ export function Header() {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 transition-all md:px-12 ${
-        scrolled ? 'bg-white/90 backdrop-blur-xl border-b border-zinc-200 shadow-sm' : ''
+      className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 transition-all duration-300 md:px-12 ${
+        scrolled
+          ? 'bg-[var(--bg)]/95 backdrop-blur-xl border-b-2 border-[var(--ink)] shadow-[var(--s0)]'
+          : ''
       }`}
     >
-      <Link href="/" className="text-xl font-bold text-zinc-900">
-        TriFinity
+      {/* Wordmark: tf. */}
+      <Link href="/" className="flex items-center">
+        <span className="font-display text-[26px] font-bold leading-none text-[var(--ink)]">t</span>
+        <span className="font-display text-[26px] font-bold leading-none text-kern-600">f.</span>
+        <span className="ml-2.5 hidden font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-4)] sm:inline">
+          TriFinity
+        </span>
       </Link>
 
-      <div className="flex items-center gap-8">
-        <a href="#features" className="hidden text-sm text-zinc-500 hover:text-zinc-900 transition-colors md:block">
-          Features
+      <div className="flex items-center gap-6 md:gap-8">
+        <a
+          href="#domeinen"
+          className="hidden font-sans text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink)] md:block"
+        >
+          Domeinen
         </a>
-        <a href="#ai-coaches" className="hidden text-sm text-zinc-500 hover:text-zinc-900 transition-colors md:block">
+        <a
+          href="#coach"
+          className="hidden font-sans text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink)] md:block"
+        >
           AI Coach
         </a>
-        <a href="#voor-wie" className="hidden text-sm text-zinc-500 hover:text-zinc-900 transition-colors md:block">
+        <a
+          href="#voor-wie"
+          className="hidden font-sans text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink)] md:block"
+        >
           Voor wie
         </a>
 
@@ -50,27 +66,27 @@ export function Header() {
           <div className="relative">
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="flex items-center gap-2 rounded-full bg-zinc-100 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-200"
+              className="flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--paper)] px-3 py-1.5 transition-all hover:border-[var(--ink-3)] hover:shadow-[var(--s0)]"
             >
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-900 text-xs font-medium text-white">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--ink)] font-sans text-xs font-medium text-[var(--bg)]">
                 {user.email?.[0]?.toUpperCase() ?? '?'}
               </span>
-              <span className="hidden max-w-[140px] truncate sm:inline">
+              <span className="hidden max-w-[140px] truncate font-sans text-[11px] text-[var(--ink-2)] sm:inline">
                 {user.email}
               </span>
             </button>
             {menuOpen && (
-              <div className="absolute right-0 mt-2 w-44 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+              <div className="absolute right-0 mt-2 w-44 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] py-1 shadow-[var(--s2)]">
                 <Link
                   href="/dashboard"
-                  className="block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+                  className="block px-4 py-2 font-sans text-sm text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
                   onClick={() => setMenuOpen(false)}
                 >
                   Dashboard
                 </Link>
                 <Link
                   href="/logout"
-                  className="block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+                  className="block px-4 py-2 font-sans text-sm text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
                   onClick={() => setMenuOpen(false)}
                 >
                   Uitloggen
@@ -81,7 +97,7 @@ export function Header() {
         ) : (
           <Link
             href="/login"
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 transition-colors"
+            className="rounded-[var(--r)] border-2 border-[var(--ink)] bg-[var(--ink)] px-4 py-2 font-sans text-sm font-medium text-[var(--bg)] transition-all hover:bg-[var(--ink-2)] hover:border-[var(--ink-2)]"
           >
             Start je reis
           </Link>

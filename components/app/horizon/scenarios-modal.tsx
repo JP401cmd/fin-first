@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { useModalAnimation } from '@/lib/hooks/use-modal-animation'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { X, ArrowDown, ArrowUp, TrendingDown } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -26,6 +28,7 @@ export function ScenariosModal({ input, debts = [], open, onClose }: Props) {
   const [resilience, setResilience] = useState<ResilienceScore | null>(null)
   const [weather, setWeather] = useState<MarketWeather>('normal')
   const [selectedScenario, setSelectedScenario] = useState<ScenarioPath | null>(null)
+  const { ref: resilienceRef, hasEntered: resilienceEntered } = useInViewAnimation({ duration: 600 })
 
   useEffect(() => {
     if (!open) return
@@ -142,13 +145,13 @@ export function ScenariosModal({ input, debts = [], open, onClose }: Props) {
                     <span className="absolute text-2xl font-bold text-[var(--ink)]">{resilience.total}</span>
                   </div>
 
-                  <div className="flex-1">
+                  <div ref={resilienceRef} className="flex-1">
                     <p className="text-lg font-bold text-[var(--ink)]">{resilience.label}</p>
                     <div className="mt-3 space-y-2">
-                      <ResilienceBar label="Noodfonds" value={resilience.breakdown.emergency} max={25} />
-                      <ResilienceBar label="Diversificatie" value={resilience.breakdown.diversification} max={25} />
-                      <ResilienceBar label="Schuldratio" value={resilience.breakdown.debtRatio} max={25} />
-                      <ResilienceBar label="Spaarquote" value={resilience.breakdown.savingsRate} max={25} />
+                      <ResilienceBar label="Noodfonds" value={resilience.breakdown.emergency} max={25} hasEntered={resilienceEntered} />
+                      <ResilienceBar label="Diversificatie" value={resilience.breakdown.diversification} max={25} hasEntered={resilienceEntered} />
+                      <ResilienceBar label="Schuldratio" value={resilience.breakdown.debtRatio} max={25} hasEntered={resilienceEntered} />
+                      <ResilienceBar label="Spaarquote" value={resilience.breakdown.savingsRate} max={25} hasEntered={resilienceEntered} />
                     </div>
                   </div>
                 </div>
@@ -196,6 +199,7 @@ function ScenarioDetailModal({
   fireTarget: number
   onClose: () => void
 }) {
+  const { ref: yearBarsRef, hasEntered: yearBarsEntered } = useInViewAnimation({ threshold: 0.1, duration: 500 })
   const colorMap: Record<string, { border: string; text: string; bg: string }> = {
     drifter: { border: 'border-red-200', text: 'text-red-600', bg: 'bg-red-50' },
     current: { border: 'border-horizon-200', text: 'text-horizon-600', bg: 'bg-horizon-50' },
@@ -231,10 +235,10 @@ function ScenarioDetailModal({
           </p>
         </div>
 
-        <div className="border-t border-[var(--border-ed)] px-6 py-4">
+        <div ref={yearBarsRef} className="border-t border-[var(--border-ed)] px-6 py-4">
           <p className="mb-3 text-xs font-semibold text-[var(--ink-3)] uppercase">Projectie per 5 jaar</p>
           <div className="space-y-2">
-            {yearlyPoints.map((pt) => {
+            {yearlyPoints.map((pt, i) => {
               const year = Math.round(pt.month / 12)
               const pctOfFire = fireTarget > 0 ? Math.round((pt.netWorth / fireTarget) * 100) : 0
               return (
@@ -244,8 +248,14 @@ function ScenarioDetailModal({
                   </span>
                   <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100">
                     <div
-                      className="h-full rounded-full transition-all"
-                      style={{ width: `${Math.min(pctOfFire, 100)}%`, backgroundColor: scenario.name === 'drifter' ? '#f87171' : scenario.name === 'optimizer' ? '#34d399' : '#a78bfa' }}
+                      className="h-full rounded-full"
+                      style={{
+                        width: yearBarsEntered ? `${Math.min(pctOfFire, 100)}%` : '0%',
+                        backgroundColor: scenario.name === 'drifter' ? '#f87171' : scenario.name === 'optimizer' ? '#34d399' : '#a78bfa',
+                        transition: yearBarsEntered
+                          ? `width 500ms cubic-bezier(.22,1,.36,1) ${i * 60}ms`
+                          : 'none',
+                      }}
                     />
                   </div>
                   <span className="w-20 shrink-0 text-right text-xs font-medium text-[var(--ink-2)]">
@@ -278,15 +288,18 @@ function ScenarioDetailModal({
   )
 }
 
-function ResilienceBar({ label, value, max }: { label: string; value: number; max: number }) {
+function ResilienceBar({ label, value, max, hasEntered }: { label: string; value: number; max: number; hasEntered: boolean }) {
   const pct = (value / max) * 100
   return (
     <div className="flex items-center gap-3">
       <span className="w-24 text-xs text-[var(--ink-3)]">{label}</span>
       <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100">
         <div
-          className="h-full rounded-full bg-horizon-500 transition-all duration-500"
-          style={{ width: `${pct}%` }}
+          className="h-full rounded-full bg-horizon-500"
+          style={{
+            width: hasEntered ? `${pct}%` : '0%',
+            transition: hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1)' : 'none',
+          }}
         />
       </div>
       <span className="w-8 text-right text-xs font-medium text-[var(--ink-2)]">{value}/{max}</span>
@@ -295,11 +308,7 @@ function ResilienceBar({ label, value, max }: { label: string; value: number; ma
 }
 
 function DivergingPathsChart({ scenarios, fireTarget }: { scenarios: ScenarioPath[]; fireTarget: number }) {
-  const [animated, setAnimated] = useState(false)
-  useEffect(() => {
-    const t = setTimeout(() => setAnimated(true), 100)
-    return () => clearTimeout(t)
-  }, [])
+  const { hasEntered: animated } = useModalAnimation({ delay: 100, duration: 900 })
 
   if (scenarios.length === 0) return null
 
@@ -356,7 +365,7 @@ function DivergingPathsChart({ scenarios, fireTarget }: { scenarios: ScenarioPat
       {sampled.map((s, si) => (
         <path key={s.name} d={linePath(s.months)} fill="none" stroke={colors[s.name] ?? '#71717a'} strokeWidth={s.name === 'current' ? '2.5' : '2'}
           pathLength={1} strokeDasharray={1}
-          style={{ strokeDashoffset: animated ? undefined : 1, animation: animated ? `drawPath 700ms cubic-bezier(.22,1,.36,1) ${si * 100}ms both` : 'none' }}
+          style={{ strokeDashoffset: animated ? undefined : 1, animation: animated ? `drawPath 700ms cubic-bezier(.22,1,.36,1) ${si * 80}ms both` : 'none' }}
         />
       ))}
 
@@ -616,11 +625,7 @@ function PayoffComparisonChart({
 }: {
   snowball: StrategyMonth[]; avalanche: StrategyMonth[]; current: StrategyMonth[]
 }) {
-  const [animated, setAnimated] = useState(false)
-  useEffect(() => {
-    const t = setTimeout(() => setAnimated(true), 100)
-    return () => clearTimeout(t)
-  }, [])
+  const { hasEntered: animated } = useModalAnimation({ delay: 100, duration: 800 })
 
   const maxMonths = Math.max(snowball.length, avalanche.length, current.length, 1)
   if (maxMonths <= 1) return null

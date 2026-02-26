@@ -31,6 +31,7 @@ import { FeatureGate } from '@/components/app/feature-gate'
 import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
 import { OwnershipToggle, OwnershipBadge, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
 import { usePerspective } from '@/components/app/perspective-provider'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 export default function DebtsPage() {
   const [debts, setDebts] = useState<Debt[]>([])
@@ -47,6 +48,7 @@ export default function DebtsPage() {
   const [dailyExpenses, setDailyExpenses] = useState(0)
   const seedingRef = useRef(false)
   const { perspective } = usePerspective()
+  const { ref: debtListRef, hasEntered: debtListEntered } = useInViewAnimation({ duration: 800 })
 
   // Load monthly expenses to compute daily expenses for freedom-time calculations
   const loadExpenses = useCallback(async () => {
@@ -431,7 +433,8 @@ export default function DebtsPage() {
 
       {/* Debt list */}
       <section className="mt-3 sm:mt-6 space-y-2">
-        {debts.map((debt) => {
+        <div ref={debtListRef}>
+        {debts.map((debt, debtIndex) => {
           const balance = Number(debt.current_balance)
           const original = Number(debt.original_amount)
           const pct = original > 0 ? ((original - balance) / original) * 100 : 0
@@ -482,14 +485,20 @@ export default function DebtsPage() {
                 </div>
                 <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
                   <div
-                    className="h-full rounded-full bg-kern-500 transition-all"
-                    style={{ width: `${Math.min(pct, 100)}%` }}
+                    className="h-full rounded-full bg-kern-500"
+                    style={{
+                      width: debtListEntered ? `${Math.min(pct, 100)}%` : '0%',
+                      transition: debtListEntered
+                        ? `width 500ms cubic-bezier(.22,1,.36,1) ${100 + debtIndex * 80}ms`
+                        : 'none',
+                    }}
                   />
                 </div>
               </div>
             </div>
           )
         })}
+        </div>
 
         {debts.length === 0 && (
           <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-8 text-center">
@@ -812,6 +821,7 @@ function DebtDetailModal({
 // ── Payoff chart (SVG area chart) ────────────────────────────
 
 function PayoffChart({ months, debts }: { months: ReturnType<typeof simulatePayoff>; debts: Debt[] }) {
+  const { ref, hasEntered } = useInViewAnimation({ duration: 500 })
   if (months.length === 0) return null
 
   const w = 800
@@ -875,7 +885,9 @@ function PayoffChart({ months, debts }: { months: ReturnType<typeof simulatePayo
   if (maxMonth > 6) xTicks.push(maxMonth)
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="h-auto w-full" preserveAspectRatio="xMidYMid meet">
+    <div ref={ref}>
+    <svg viewBox={`0 0 ${w} ${h}`} className="h-auto w-full" preserveAspectRatio="xMidYMid meet"
+      style={{ opacity: hasEntered ? undefined : 0, animation: hasEntered ? 'fadeInFill 500ms ease-out both' : 'none' }}>
       {/* Grid lines */}
       {yTicks.map((val) => (
         <g key={val}>
@@ -909,6 +921,7 @@ function PayoffChart({ months, debts }: { months: ReturnType<typeof simulatePayo
         </g>
       ))}
     </svg>
+    </div>
   )
 }
 
@@ -925,6 +938,7 @@ function DebtPayoffTrajectoryChart({
   snowballSummary: ReturnType<typeof payoffSummary>
   avalancheSummary: ReturnType<typeof payoffSummary>
 }) {
+  const { ref, hasEntered } = useInViewAnimation({ duration: 700 })
   if (snowballMonths.length === 0 && avalancheMonths.length === 0) return null
 
   const w = 800
@@ -1025,7 +1039,7 @@ function DebtPayoffTrajectoryChart({
   const avalanchePayoffMonth = avalancheMonths.length
 
   return (
-    <div data-testid="debt-payoff-trajectory-chart">
+    <div ref={ref} data-testid="debt-payoff-trajectory-chart">
       <p className="mb-2 text-xs font-semibold text-[var(--ink-3)] uppercase">Schuld-trajectvergelijking</p>
       <svg viewBox={`0 0 ${w} ${h}`} className="h-auto w-full" preserveAspectRatio="xMidYMid meet">
         <defs>
@@ -1053,8 +1067,10 @@ function DebtPayoffTrajectoryChart({
         ))}
 
         {/* Fill areas */}
-        <path d={snowballFill} fill="url(#snowball-fill-grad)" />
-        <path d={avalancheFill} fill="url(#avalanche-fill-grad)" />
+        <path d={snowballFill} fill="url(#snowball-fill-grad)"
+          style={{ animation: hasEntered ? 'fadeInFill 250ms ease-out 455ms both' : 'none', opacity: hasEntered ? undefined : 0 }} />
+        <path d={avalancheFill} fill="url(#avalanche-fill-grad)"
+          style={{ animation: hasEntered ? 'fadeInFill 250ms ease-out 455ms both' : 'none', opacity: hasEntered ? undefined : 0 }} />
 
         {/* Per-debt lines (thin, for additional detail) */}
         {perDebtPaths.map((dp) => (
@@ -1087,6 +1103,9 @@ function DebtPayoffTrajectoryChart({
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
+          pathLength={1}
+          strokeDasharray={1}
+          style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: hasEntered ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) both' : 'none' }}
           data-testid="snowball-trajectory-line"
         />
 
@@ -1098,6 +1117,9 @@ function DebtPayoffTrajectoryChart({
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
+          pathLength={1}
+          strokeDasharray={1}
+          style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: hasEntered ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) 80ms both' : 'none' }}
           data-testid="avalanche-trajectory-line"
         />
 
@@ -1866,6 +1888,7 @@ function DebtTrajectoryChart({
   debt: Debt
   valuations: Valuation[] | undefined
 }) {
+  const { ref, hasEntered } = useInViewAnimation({ duration: 750 })
   const w = 600
   const h = 220
   const pad = { top: 16, right: 24, bottom: 32, left: 58 }
@@ -2002,7 +2025,7 @@ function DebtTrajectoryChart({
   const transitionY = yPos(balance)
 
   return (
-    <div data-testid="debt-trajectory-chart">
+    <div ref={ref} data-testid="debt-trajectory-chart">
       <p className="mb-2 text-xs font-semibold text-[var(--ink-3)] uppercase">Schuldverloop</p>
       <svg viewBox={`0 0 ${w} ${h}`} className="h-auto w-full" preserveAspectRatio="xMidYMid meet">
         <defs>
@@ -2043,10 +2066,12 @@ function DebtTrajectoryChart({
         </text>
 
         {/* Actual balance fill area */}
-        <path d={actualFill} fill={`url(#actual-fill-${debt.id})`} />
+        <path d={actualFill} fill={`url(#actual-fill-${debt.id})`}
+          style={{ animation: hasEntered ? 'fadeInFill 250ms ease-out 455ms both' : 'none', opacity: hasEntered ? undefined : 0 }} />
 
         {/* Projected balance fill area */}
-        <path d={projectedFill} fill={`url(#projected-fill-${debt.id})`} />
+        <path d={projectedFill} fill={`url(#projected-fill-${debt.id})`}
+          style={{ animation: hasEntered ? 'fadeInFill 250ms ease-out 535ms both' : 'none', opacity: hasEntered ? undefined : 0 }} />
 
         {/* Actual balance line (solid blue) */}
         <path
@@ -2056,6 +2081,9 @@ function DebtTrajectoryChart({
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
+          pathLength={1}
+          strokeDasharray={1}
+          style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: hasEntered ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) both' : 'none' }}
           data-testid="actual-balance-line"
         />
 
@@ -2068,6 +2096,8 @@ function DebtTrajectoryChart({
           strokeDasharray="6,3"
           strokeLinecap="round"
           strokeLinejoin="round"
+          pathLength={1}
+          style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: hasEntered ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) 80ms both' : 'none' }}
           data-testid="projected-balance-line"
         />
 

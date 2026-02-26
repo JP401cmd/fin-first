@@ -226,6 +226,30 @@ If the user asks you to modify code, explain that you're a project assistant and
         **Reference implementation:** `app/(app)/core/page.tsx` — kassabon modals for Geschat Jaarinkomen, Must Uitgaven, Spaarquote, and FIRE-bedrag.
       </kassabon>
     </ui_patterns>
+
+    <calculation_principles>
+      ### Vrijheidsdagen — berekeningsprincipe
+
+      "Vrijheidsdagen per jaar" = (vermogen × SWR) / dagelijkse must-uitgave.
+      Dit is het aantal dagen per jaar dat je portfolio de kosten dekt.
+
+      **Enige geldige claim: "win je N vrijheidsdagen per jaar"** bij budgetbesparing:
+      - Voorwaarde 1: budget heeft `is_essential = true`
+      - Voorwaarde 2: gebruiker heeft `retirement_expense_method = 'essential_budgets'`
+
+      Als een of beide ontbreken → gebruik "bespaart €X/jaar richting FIRE-doel" of "bereikt FIRE eerder".
+
+      **Formule (correct):**
+      - Essentieel + essential_budgets methode: `vrijheidsdagen = jaarlijkse_besparing / dagelijkse_must_uitgaven`
+      - Compound belegging (altijd geldig): `vrijheidsdagen = (eindbedrag × SWR) / dagelijkse_must_uitgaven`
+      - Overig: geen vrijheidsdagen per jaar — uitdrukken in euro's per jaar of FIRE-tijdwinst
+
+      **Niet correct:**
+      - `vrijheidsdagen = saving / daily_expense` voor niet-essentiële budgetten
+      - "Win je N vrijheidsdagen" als retirement method niet 'essential_budgets' is
+
+      **Relevante code:** `lib/budget-utils.ts::computeRetirementExpenses()`, `lib/budget-utils.ts::RetirementExpenseMethod`
+    </calculation_principles>
   </existing_architecture>
 
   <security_and_a
@@ -469,6 +493,27 @@ Mobiel (<560px):
 - **AI-personages**: `blink` (2.5s interval), `breathe` (subtiel Y-axis), `talk` (mond-animatie)
 - **Badge unlock**: `badge-shimmer` + `badge-scale-in` + `badge-unlock-glow`
 - **GEEN**: Bounce, shake, infinite spin, decoratieve animaties
+
+#### Grafiek-animaties (viewport-triggered via `useInViewAnimation`)
+
+Alle charts, sparklines, voortgangsbalken en boomdiagrammen gebruiken `lib/hooks/use-in-view-animation.ts` voor viewport-triggered build-animaties. Animaties herhalen bij pagina-navigatie (component remount reset de hook-state).
+
+| Component | Patroon | Timing |
+|---|---|---|
+| SVG lijn/sparkline | `pathLength={1}`, `strokeDasharray="1"`, `strokeDashoffset` 1→0 | 400ms cubic-bezier |
+| Voortgangsbalk fill | `width: hasEntered ? target% : '0%'` inline style | 500ms cubic-bezier, per-rij stagger |
+| Grafiek-rij entrance | `fadeUp 0.4s ease-out {delay}ms both` inline animation | 60ms stagger per rij |
+| Budget-tree parent | `fadeUp` geen delay | t=0ms |
+| Budget-tree bezier | `strokeDashoffset` 1→0 | 600ms, 80ms per pad |
+| Budget-tree child bars | rij fadeUp + fill-transition | gecombineerd stagger |
+
+**Regels:**
+- Gebruik altijd inline `transition` style (niet Tailwind `transition-*`) voor delay + cubic-bezier controle
+- Voeg `transition: 'none'` bewaker toe voor pre-entered state (voorkomt flash bij mount)
+- `prefers-reduced-motion` wordt intern door de hook afgehandeld — geen extra code nodig
+- Geef `duration` mee dat de volledige animatiesequentie dekt
+
+**Referentie-implementaties:** `components/app/budget-sparkline.tsx` (SVG draw) en `components/app/budget-tree.tsx` (full stagger met bezier + bars)
 
 ### Interactie-principes
 

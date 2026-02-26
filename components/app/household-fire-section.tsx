@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { formatCurrency } from '@/components/app/budget-shared'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { formatFireAge } from '@/lib/horizon-data'
 import {
   Users, TrendingUp, Hourglass, Percent, Target, User,
@@ -135,9 +136,11 @@ export function HouseholdFireSection() {
 
   const { combined, partners, comparison, householdName } = data
   const hasMultiplePartners = partners.length >= 2
+  const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 1100 })
 
   return (
     <section className="mt-10" data-testid="household-fire-section">
+      <div ref={inViewRef}>
       {/* Section Header */}
       <div className="mb-5">
         <div className="flex items-center gap-2">
@@ -201,8 +204,11 @@ export function HouseholdFireSection() {
         <div className="mt-4">
           <div className="h-2.5 w-full overflow-hidden rounded-full bg-horizon-100">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-horizon-600 to-horizon-400 transition-all duration-1000"
-              style={{ width: `${Math.max(Math.min(combined.projection.freedomPercentage, 100), 0)}%` }}
+              className="h-full rounded-full bg-gradient-to-r from-horizon-600 to-horizon-400"
+              style={{
+                width: hasEntered ? `${Math.max(Math.min(combined.projection.freedomPercentage, 100), 0)}%` : '0%',
+                transition: hasEntered ? 'width 1000ms cubic-bezier(.22,1,.36,1)' : 'none',
+              }}
               data-testid="combined-progress-bar"
             />
           </div>
@@ -268,6 +274,7 @@ export function HouseholdFireSection() {
                 partner={partner}
                 partnerIndex={idx}
                 otherPartner={partners.find(p => p.userId !== partner.userId) ?? null}
+                hasEntered={hasEntered}
               />
             ))}
           </div>
@@ -284,6 +291,7 @@ export function HouseholdFireSection() {
                 formatted: formatCurrency(p.financials.netWorth),
               }))}
               testId="comparison-net-worth"
+              hasEntered={hasEntered}
             />
 
             <ComparisonBar
@@ -294,6 +302,7 @@ export function HouseholdFireSection() {
                 formatted: formatCurrency(p.financials.monthlyIncome),
               }))}
               testId="comparison-income"
+              hasEntered={hasEntered}
             />
 
             <ComparisonBar
@@ -304,6 +313,7 @@ export function HouseholdFireSection() {
                 formatted: `${p.projection.savingsRate.toFixed(1)}%`,
               }))}
               testId="comparison-savings-rate"
+              hasEntered={hasEntered}
             />
 
             <ComparisonBar
@@ -314,6 +324,7 @@ export function HouseholdFireSection() {
                 formatted: `${p.projection.freedomPercentage.toFixed(1)}%`,
               }))}
               testId="comparison-freedom-pct"
+              hasEntered={hasEntered}
             />
 
             <ComparisonBar
@@ -325,6 +336,7 @@ export function HouseholdFireSection() {
               }))}
               testId="comparison-fire-age"
               invertColors
+              hasEntered={hasEntered}
             />
           </div>
 
@@ -368,6 +380,7 @@ export function HouseholdFireSection() {
           </p>
         </div>
       )}
+      </div>
     </section>
   )
 }
@@ -402,10 +415,12 @@ function PartnerCard({
   partner,
   partnerIndex,
   otherPartner,
+  hasEntered,
 }: {
   partner: PartnerProjection
   partnerIndex: number
   otherPartner: PartnerProjection | null
+  hasEntered: boolean
 }) {
   const colors = partnerIndex === 0
     ? { border: 'border-horizon-200', bg: 'bg-horizon-50/30', accent: 'text-horizon-700', icon: 'bg-horizon-100 text-horizon-600', bar: 'from-horizon-600 to-horizon-400' }
@@ -462,8 +477,11 @@ function PartnerCard({
       <div className="mt-3">
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-200/50">
           <div
-            className={`h-full rounded-full bg-gradient-to-r ${colors.bar} transition-all duration-1000`}
-            style={{ width: `${Math.max(Math.min(partner.projection.freedomPercentage, 100), 0)}%` }}
+            className={`h-full rounded-full bg-gradient-to-r ${colors.bar}`}
+            style={{
+              width: hasEntered ? `${Math.max(Math.min(partner.projection.freedomPercentage, 100), 0)}%` : '0%',
+              transition: hasEntered ? 'width 1000ms cubic-bezier(.22,1,.36,1)' : 'none',
+            }}
           />
         </div>
         <div className="mt-0.5 flex justify-between text-[9px] text-[var(--ink-3)]">
@@ -504,11 +522,13 @@ function ComparisonBar({
   values,
   testId,
   invertColors = false,
+  hasEntered,
 }: {
   label: string
   values: Array<{ name: string; value: number; formatted: string }>
   testId: string
   invertColors?: boolean
+  hasEntered: boolean
 }) {
   const maxValue = Math.max(...values.map(v => Math.abs(v.value)), 1)
 
@@ -528,8 +548,11 @@ function ComparisonBar({
               <span className="w-16 shrink-0 text-xs text-[var(--ink-3)] truncate">{v.name}</span>
               <div className="h-5 flex-1 overflow-hidden rounded-full bg-zinc-100">
                 <div
-                  className={`h-full rounded-full ${barColor} transition-all duration-700`}
-                  style={{ width: `${Math.max(pct, 2)}%` }}
+                  className={`h-full rounded-full ${barColor}`}
+                  style={{
+                    width: hasEntered ? `${Math.max(pct, 2)}%` : '0%',
+                    transition: hasEntered ? `width 700ms cubic-bezier(.22,1,.36,1) ${i * 80}ms` : 'none',
+                  }}
                 />
               </div>
               <span className="w-20 shrink-0 text-right text-xs font-medium text-[var(--ink-2)]">{v.formatted}</span>

@@ -28,7 +28,7 @@ export async function GET() {
         .order('date', { ascending: true }),
       supabase
         .from('recurring_transactions')
-        .select('counterparty_name, amount, name')
+        .select('id, counterparty_name, amount, name, frequency')
         .eq('is_active', true),
       supabase
         .from('budgets')
@@ -40,11 +40,37 @@ export async function GET() {
     const existingRecurrings = recurringResult.data ?? []
     const budgets = budgetResult.data ?? []
 
+    // Convert to monthly amount equivalent
+    function toMonthly(amount: number, frequency: string): number {
+      const abs = Math.abs(amount)
+      switch (frequency) {
+        case 'weekly': return (abs * 52) / 12
+        case 'quarterly': return abs / 3
+        case 'yearly': return abs / 12
+        default: return abs // monthly
+      }
+    }
+
+    // Build confirmed subscriptions directly from DB (expenses only: amount < 0)
+    const confirmedSubscriptions = existingRecurrings.filter(r => Number(r.amount) < 0).map(r => ({
+      id: r.id,
+      name: r.name || r.counterparty_name || 'Onbekend',
+      averageAmount: Math.abs(Number(r.amount)),
+      monthlyAmount: toMonthly(Number(r.amount), r.frequency ?? 'monthly'),
+      frequency: (r.frequency ?? 'monthly') as 'monthly' | 'weekly' | 'quarterly' | 'yearly',
+      nextDate: null as string | null,
+      confidence: 'high' as const,
+      isVariableAmount: false,
+      occurrences: null as number | null,
+      alreadyConfirmed: true,
+    }))
+
     if (transactions.length < 3) {
+      const totalMonthly = confirmedSubscriptions.reduce((sum, s) => sum + s.monthlyAmount, 0)
       return NextResponse.json({
-        subscriptions: [],
-        totalMonthly: 0,
-        count: 0,
+        subscriptions: confirmedSubscriptions,
+        totalMonthly: Math.round(totalMonthly * 100) / 100,
+        count: confirmedSubscriptions.length,
       })
     }
 
@@ -71,18 +97,7 @@ export async function GET() {
         d.confidence !== 'low',
     )
 
-    // Convert to monthly amount equivalent
-    function toMonthly(amount: number, frequency: string): number {
-      const abs = Math.abs(amount)
-      switch (frequency) {
-        case 'weekly': return (abs * 52) / 12
-        case 'quarterly': return abs / 3
-        case 'yearly': return abs / 12
-        default: return abs // monthly
-      }
-    }
-
-    const subscriptions = detected.map(d => ({
+    const detectedSubscriptions = detected.map(d => ({
       id: d.key,
       name: d.counterpartyName || d.commonDescription,
       averageAmount: Math.abs(d.averageAmount),
@@ -95,12 +110,16 @@ export async function GET() {
       alreadyConfirmed: d.alreadyExists,
     }))
 
-    const totalMonthly = subscriptions.reduce((sum, s) => sum + s.monthlyAmount, 0)
+    // Merge: confirmed first, then new auto-detections that aren't already confirmed
+    const newDetections = detectedSubscriptions.filter(s => !s.alreadyConfirmed)
+    const merged = [...confirmedSubscriptions, ...newDetections]
+
+    const totalMonthly = merged.reduce((sum, s) => sum + s.monthlyAmount, 0)
 
     return NextResponse.json({
-      subscriptions,
+      subscriptions: merged,
       totalMonthly: Math.round(totalMonthly * 100) / 100,
-      count: subscriptions.length,
+      count: merged.length,
     })
   } catch (err) {
     console.error('[/api/subscriptions]', err)

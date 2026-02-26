@@ -9,10 +9,14 @@ export const freedomCalcTool = tool({
   description: 'Bereken hoeveel dagen vrijheid een bedrag in euro vertegenwoordigt op basis van de dagelijkse uitgaven van de gebruiker. Gebruik dit om bedragen te vertalen naar vrijheidstijd.',
   inputSchema: z.object({
     amount: z.number().describe('Het bedrag in euro om te vertalen naar vrijheidsdagen'),
-    monthlyExpenses: z.number().optional().describe('Optioneel: maandelijkse uitgaven om dagprijs te berekenen (default: €2.510)'),
+    monthlyMustExpenses: z.number().optional().describe('Maandelijkse must-uitgaven (essentiële kosten) van de gebruiker. Gebruik de waarde uit de context. Geen default — gebruik de juiste waarde uit de gebruikerscontext.'),
+    monthlyExpenses: z.number().optional().describe('Fallback: totale maandelijkse uitgaven als must-uitgaven niet beschikbaar zijn.'),
   }),
-  execute: async ({ amount, monthlyExpenses }) => {
-    const monthly = monthlyExpenses ?? 2510
+  execute: async ({ amount, monthlyMustExpenses, monthlyExpenses }) => {
+    const monthly = monthlyMustExpenses ?? monthlyExpenses
+    if (!monthly) {
+      return { error: 'Geen uitgavendata beschikbaar om vrijheidsdagen te berekenen.' }
+    }
     const yearlyExpenses = monthly * 12
     const dailyExpense = yearlyExpenses / 365
 
