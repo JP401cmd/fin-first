@@ -21,9 +21,6 @@ export async function GET() {
   const corePagePath = join(cwd, 'app/(app)/core/page.tsx')
   const coreSource = existsSync(corePagePath) ? readFileSync(corePagePath, 'utf8') : ''
 
-  const badgesPath = join(cwd, 'lib/badges.ts')
-  const badgesSource = existsSync(badgesPath) ? readFileSync(badgesPath, 'utf8') : ''
-
   // ─── Test 1: Detect net worth milestone crossings in historical data ─────
   try {
     const hasDetectMilestones = coreSource.includes('function detectMilestones')
@@ -81,30 +78,6 @@ export async function GET() {
     })
   } catch (e) {
     results.push({ name: 'Show date when milestone was reached', pass: false, detail: String(e) })
-  }
-
-  // ─── Test 4: Connect to badge system — earning milestone triggers badge ─────
-  try {
-    const hasBadgeSlug = coreSource.includes('badgeSlug')
-    const hasBadgeEarnedAt = coreSource.includes('badgeEarnedAt')
-    const fetchesBadges = coreSource.includes("from('badges')") && coreSource.includes("from('user_badges')")
-    const hasEarnedBadgesState = coreSource.includes('setEarnedBadges')
-    const passesBadgesToChart = coreSource.includes('earnedBadges={earnedBadges}') || coreSource.includes('earnedBadges=')
-    const showsBadgeIndicator = coreSource.includes('Badge verdiend') || coreSource.includes('🏅')
-
-    // Badge definitions in badges.ts
-    const hasMilestoneBadgeDefs = badgesSource.includes('positief_vermogen') && badgesSource.includes('eerste_10k') && badgesSource.includes('100k_club')
-
-    const pass = hasBadgeSlug && hasBadgeEarnedAt && fetchesBadges && hasEarnedBadgesState && hasMilestoneBadgeDefs
-    results.push({
-      name: 'Connect to badge system — earning milestone triggers badge',
-      pass,
-      detail: pass
-        ? `Badge integration: slugs mapped to milestones, fetched from user_badges, passed to chart, badge indicator (🏅) shown`
-        : `badgeSlug: ${hasBadgeSlug}, badgeEarnedAt: ${hasBadgeEarnedAt}, fetchBadges: ${fetchesBadges}, earnedState: ${hasEarnedBadgesState}, chartProp: ${passesBadgesToChart}, indicator: ${showsBadgeIndicator}, badgeDefs: ${hasMilestoneBadgeDefs}`,
-    })
-  } catch (e) {
-    results.push({ name: 'Connect to badge system — earning milestone triggers badge', pass: false, detail: String(e) })
   }
 
   // ─── Test 5: Support milestones: €10K, €25K, €50K, €100K, €250K, €500K, €1M ─────

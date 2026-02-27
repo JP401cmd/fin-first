@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { computeSovereigntyLevel, PHASES, levelToPhaseId } from '@/lib/feature-phases'
+import { NL_SWR } from '@/lib/horizon-data'
 import { ChevronRight, User, Trophy, Share2, Settings, FileText } from 'lucide-react'
 import {
   temporalLevels,
@@ -89,7 +90,7 @@ export default function IdentityPage() {
       const monthsCovered = monthlyExpenses > 0 ? netWorth / monthlyExpenses : 0
 
       const yearlyExpenses = monthlyExpenses * 12
-      const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / 0.04 : 0
+      const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / NL_SWR : 0
       const freedomPct = fireTarget > 0 ? (netWorth / fireTarget) * 100 : 0
 
       const consumerDebtTypes = ['personal_loan', 'credit_card', 'revolving_credit', 'payment_plan', 'car_loan']

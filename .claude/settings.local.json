@@ -92,7 +92,12 @@
       "Bash(cat:*)",
       "WebFetch(domain:www.geldnerd.nl)",
       "Bash(grep BOX3_DRAG:*)",
-      "Bash(/dev/null:*)"
+      "Bash(/dev/null:*)",
+      "Bash(sed:*)",
+      "Bash(git log:*)",
+      "Bash(npx jest:*)",
+      "Bash(git stash:*)",
+      "Bash(npx vitest:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

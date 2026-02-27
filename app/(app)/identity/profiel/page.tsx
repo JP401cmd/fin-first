@@ -11,6 +11,7 @@ import { ColorPickerCard } from '@/components/app/color-picker-card'
 import type { ColorPreset } from '@/components/app/color-picker-card'
 import { Palette, RotateCcw, Type } from 'lucide-react'
 import { type RetirementExpenseMethod } from '@/lib/budget-utils'
+import { type FireEndStrategy, STRATEGY_LABELS, parseFireStrategy } from '@/lib/fire-strategy'
 
 type HouseholdType = 'solo' | 'samen' | 'gezin'
 
@@ -38,6 +39,11 @@ export default function ProfielPage() {
   // Retirement expense method state
   const [retirementMethod, setRetirementMethod] = useState<RetirementExpenseMethod>('essential_budgets')
   const [retirementCustomAmount, setRetirementCustomAmount] = useState<string>('')
+
+  // FIRE end strategy state
+  const [fireEndStrategy, setFireEndStrategy] = useState<FireEndStrategy>('deplete')
+  const [fireEndAge, setFireEndAge] = useState(90)
+  const [fireLegacyAmount, setFireLegacyAmount] = useState<string>('')
 
   // UI state
   const [loading, setLoading] = useState(true)
@@ -68,6 +74,11 @@ export default function ProfielPage() {
         setNetMonthlyIncome(data.net_monthly_income ? String(data.net_monthly_income) : '')
         setRetirementMethod((data.retirement_expense_method as RetirementExpenseMethod) ?? 'essential_budgets')
         setRetirementCustomAmount(data.retirement_expense_custom_amount ? String(data.retirement_expense_custom_amount) : '')
+        // Load FIRE end strategy
+        const fs = parseFireStrategy(data)
+        setFireEndStrategy(fs.strategy)
+        setFireEndAge(fs.endAge)
+        setFireLegacyAmount(fs.legacyAmount ? String(fs.legacyAmount) : '')
         // Load module colors into the provider
         if (data.module_colors) {
           const mc = data.module_colors as Record<string, string>
@@ -132,6 +143,9 @@ export default function ProfielPage() {
         net_monthly_income: netMonthlyIncome ? Number(netMonthlyIncome) : null,
         retirement_expense_method: retirementMethod,
         retirement_expense_custom_amount: retirementCustomAmount ? Number(retirementCustomAmount) : null,
+        fire_end_strategy: fireEndStrategy,
+        fire_end_age: fireEndAge,
+        fire_legacy_amount: fireLegacyAmount ? Number(fireLegacyAmount) : null,
         updated_at: new Date().toISOString(),
       })
 
@@ -142,7 +156,7 @@ export default function ProfielPage() {
       setTimeout(() => setSaveMessage(null), 3000)
     }
     setSaving(false)
-  }, [supabase, fullName, dateOfBirth, country, householdType, numberOfChildren, childrenAges, housingType, energyLabel, hasCar, netMonthlyIncome, retirementMethod, retirementCustomAmount])
+  }, [supabase, fullName, dateOfBirth, country, householdType, numberOfChildren, childrenAges, housingType, energyLabel, hasCar, netMonthlyIncome, retirementMethod, retirementCustomAmount, fireEndStrategy, fireEndAge, fireLegacyAmount])
 
   if (loading) {
     return (
@@ -544,6 +558,172 @@ export default function ProfielPage() {
 
         <p className="mt-3 text-xs text-[var(--ink-3)]">
           De gekozen methode bepaalt het FIRE-doel, alle vrijheidsdagen-berekeningen en de dagprijs in De Kern, De Horizon en de belastingpagina.
+        </p>
+
+        <div className="mt-4 flex items-center gap-3">
+          <button
+            onClick={saveProfile}
+            disabled={saving}
+            className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
+          >
+            {saving ? 'Opslaan...' : 'Opslaan'}
+          </button>
+          {saveMessage && (
+            <span className={`text-sm ${saveMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+              {saveMessage.text}
+            </span>
+          )}
+        </div>
+      </section>
+
+      {/* ── FIRE Eindstrategie ─────────────────────────────────── */}
+      <section className="mb-5 sm:mb-8 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-8">
+        <div className="mb-4">
+          <h2 className="label-editorial text-[var(--ink-2)]">
+            FIRE Eindstrategie
+          </h2>
+          <p className="mt-1 font-sans text-sm text-[var(--ink-3)]">
+            Wat moet er met je vermogen gebeuren nadat je financieel vrij bent?
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {/* Strategy 1: Deplete */}
+          <button
+            type="button"
+            onClick={() => setFireEndStrategy('deplete')}
+            className={`min-h-[80px] rounded-[var(--r-lg)] border p-4 text-left transition-all ${
+              fireEndStrategy === 'deplete'
+                ? 'border-[var(--hor-m)] bg-[var(--hor-l)] shadow-sm'
+                : 'border-[var(--border-ed)] hover:border-[var(--border-md)] hover:shadow-sm'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                Strategie 1
+              </p>
+              {fireEndStrategy === 'deplete' && (
+                <span className="shrink-0 rounded-full bg-[var(--hor-m)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--hor-t)]">
+                  Actief
+                </span>
+              )}
+            </div>
+            <p className="mt-1 font-medium text-[var(--ink)]">{STRATEGY_LABELS.deplete.name}</p>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--ink-3)]">
+              {STRATEGY_LABELS.deplete.subtitle}. Het laagste FIRE-doel.
+            </p>
+            {fireEndStrategy === 'deplete' && (
+              <div className="mt-3">
+                <label className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                  Eindleeftijd
+                </label>
+                <input
+                  type="range"
+                  min={60}
+                  max={120}
+                  step={1}
+                  value={fireEndAge}
+                  onChange={(e) => setFireEndAge(Number(e.target.value))}
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-1 w-full cursor-pointer accent-[var(--hor-t)]"
+                />
+                <span className="font-mono text-sm tabular-nums text-[var(--ink-2)]">{fireEndAge} jaar</span>
+              </div>
+            )}
+          </button>
+
+          {/* Strategy 2: Legacy */}
+          <button
+            type="button"
+            onClick={() => setFireEndStrategy('legacy')}
+            className={`min-h-[80px] rounded-[var(--r-lg)] border p-4 text-left transition-all ${
+              fireEndStrategy === 'legacy'
+                ? 'border-[var(--hor-m)] bg-[var(--hor-l)] shadow-sm'
+                : 'border-[var(--border-ed)] hover:border-[var(--border-md)] hover:shadow-sm'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                Strategie 2
+              </p>
+              {fireEndStrategy === 'legacy' && (
+                <span className="shrink-0 rounded-full bg-[var(--hor-m)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--hor-t)]">
+                  Actief
+                </span>
+              )}
+            </div>
+            <p className="mt-1 font-medium text-[var(--ink)]">{STRATEGY_LABELS.legacy.name}</p>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--ink-3)]">
+              {STRATEGY_LABELS.legacy.subtitle}. Tussenliggend FIRE-doel.
+            </p>
+            {fireEndStrategy === 'legacy' && (
+              <div className="mt-3 space-y-3" onClick={(e) => e.stopPropagation()}>
+                <div>
+                  <label className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                    Eindleeftijd
+                  </label>
+                  <input
+                    type="range"
+                    min={60}
+                    max={120}
+                    step={1}
+                    value={fireEndAge}
+                    onChange={(e) => setFireEndAge(Number(e.target.value))}
+                    className="mt-1 w-full cursor-pointer accent-[var(--hor-t)]"
+                  />
+                  <span className="font-mono text-sm tabular-nums text-[var(--ink-2)]">{fireEndAge} jaar</span>
+                </div>
+                <div>
+                  <label htmlFor="fireLegacyAmount" className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                    Erfenisbedrag (€)
+                  </label>
+                  <div className="relative mt-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-3)]">&euro;</span>
+                    <input
+                      id="fireLegacyAmount"
+                      type="number"
+                      min={0}
+                      step={10000}
+                      value={fireLegacyAmount}
+                      onChange={(e) => setFireLegacyAmount(e.target.value)}
+                      placeholder="bijv. 200000"
+                      className="w-full rounded-[var(--r-sm)] border border-[var(--border-md)] bg-[var(--subtle)] py-2 pr-3 pl-7 font-mono text-sm tabular-nums"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </button>
+
+          {/* Strategy 3: Perpetual */}
+          <button
+            type="button"
+            onClick={() => setFireEndStrategy('perpetual')}
+            className={`min-h-[80px] rounded-[var(--r-lg)] border p-4 text-left transition-all ${
+              fireEndStrategy === 'perpetual'
+                ? 'border-[var(--hor-m)] bg-[var(--hor-l)] shadow-sm'
+                : 'border-[var(--border-ed)] hover:border-[var(--border-md)] hover:shadow-sm'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                Strategie 3
+              </p>
+              {fireEndStrategy === 'perpetual' && (
+                <span className="shrink-0 rounded-full bg-[var(--hor-m)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--hor-t)]">
+                  Actief
+                </span>
+              )}
+            </div>
+            <p className="mt-1 font-medium text-[var(--ink)]">{STRATEGY_LABELS.perpetual.name}</p>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--ink-3)]">
+              {STRATEGY_LABELS.perpetual.subtitle}. Het hoogste FIRE-doel.
+            </p>
+          </button>
+        </div>
+
+        <p className="mt-3 text-xs text-[var(--ink-3)]">
+          De gekozen strategie bepaalt hoeveel vermogen je nodig hebt voor FIRE en hoe de simulatiegrafiek eruitziet.
         </p>
 
         <div className="mt-4 flex items-center gap-3">

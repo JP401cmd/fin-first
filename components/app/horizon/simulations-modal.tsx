@@ -6,7 +6,7 @@ import { formatCurrency } from '@/components/app/budget-shared'
 import { X, ChevronDown, ChevronUp } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
-  runMonteCarlo, ageAtDate,
+  runMonteCarlo, ageAtDate, NL_SWR,
   type HorizonInput, type MonteCarloResult,
 } from '@/lib/horizon-data'
 
@@ -74,7 +74,9 @@ export function SimulationsModal({ input, open, onClose }: Props) {
     )
   }
 
-  const fireTarget = (input.monthlyExpenses * 12) / 0.04
+  const fireTarget = input.yearlyMustExpenses > 0
+    ? input.yearlyMustExpenses / NL_SWR
+    : (input.monthlyExpenses * 12) / NL_SWR
 
   return (
     <BottomSheet open={true} onClose={onClose} title="Monte Carlo Simulaties">
@@ -448,7 +450,7 @@ function SimulationDetailModal({
               </div>
               <div className="rounded-lg bg-[var(--subtle)] p-4 text-sm text-[var(--ink-2)]">
                 <p>De FIRE-kans is het percentage simulaties waarin je doelvermogen van {formatCurrency(fireTarget)} wordt bereikt binnen 40 jaar.</p>
-                <p className="mt-2">Dit doelvermogen is gebaseerd op de 4%-regel: je jaarlijkse uitgaven gedeeld door 0,04.</p>
+                <p className="mt-2">Dit doelvermogen is gebaseerd op de NL-aangepaste opnamerate ({(NL_SWR * 100).toFixed(2)}%): je pensioenuitgaven gedeeld door {NL_SWR.toFixed(4)}.</p>
               </div>
             </>
           )}

@@ -2,7 +2,6 @@ import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { formatCurrency } from '@/lib/format'
-import { NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF } from '@/lib/horizon-data'
 
 interface Props {
   size: WidgetSize
@@ -11,12 +10,12 @@ interface Props {
 }
 
 export function Box3DragWidget({ size, data, href }: Props) {
-  const { totalAssets, yearlyMustExpenses } = data
+  const { totalAssets, yearlyMustExpenses, box3Belasting } = data
 
-  // Jaarlijkse Box 3-belasting op het totale vermogen
-  const annualDrag = totalAssets * NL_FICTIEF_BELEGGINGEN * BOX3_TARIEF
+  // Use pre-computed Box 3 belasting (full calculateBox3 calculation)
+  const annualDrag = box3Belasting ?? 0
   const dailyMustExpense = yearlyMustExpenses > 0 ? yearlyMustExpenses / 365 : 0
-  const freedomDaysLost = dailyMustExpense > 0 ? Math.round(annualDrag / dailyMustExpense) : null
+  const freedomDaysLost = dailyMustExpense > 0 && annualDrag > 0 ? Math.round(annualDrag / dailyMustExpense) : null
 
   const pctOfAssets = totalAssets > 0 ? (annualDrag / totalAssets) * 100 : 0
 
@@ -31,7 +30,7 @@ export function Box3DragWidget({ size, data, href }: Props) {
         </div>
 
         <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-          {pctOfAssets.toFixed(2)}% van je vermogen ({(NL_FICTIEF_BELEGGINGEN * BOX3_TARIEF * 100).toFixed(2)}% drag)
+          {pctOfAssets.toFixed(2)}% effectief tarief
         </p>
 
         {freedomDaysLost != null && (

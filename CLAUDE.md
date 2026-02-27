@@ -250,6 +250,22 @@ If the user asks you to modify code, explain that you're a project assistant and
 
       **Relevante code:** `lib/budget-utils.ts::computeRetirementExpenses()`, `lib/budget-utils.ts::RetirementExpenseMethod`
     </calculation_principles>
+
+    <single_source_of_truth>
+      ### Single Source of Truth — berekeningsprincipe
+
+      **Principe:** Elk financieel getal mag op slechts één plek worden berekend. Andere pagina's/widgets nemen het resultaat over of roepen dezelfde pure functie aan met identieke inputs.
+
+      **Concreet voor FIRE-simulatie:**
+      - `runSimulation()` wordt aangeroepen met life events via `lifeEventsToCashflows(lifeEventsData)` — nooit met lege `[]`
+      - `/horizon`, `/core` en `/dashboard` gebruiken allemaal dezelfde berekening; het getal is identiek
+      - AOW/pensioen/levensgebeurtenissen worden altijd meegenomen (ze staan in `life_events` tabel, is_active = true)
+
+      **Relevante code:**
+      - `lib/fire-simulation.ts` — `runSimulation()`, `lifeEventsToCashflows()`
+      - `lib/horizon-data.ts` — `LifeEvent` type
+      - Implementatie op alle pagina's: `app/(app)/horizon/page.tsx`, `app/(app)/core/page.tsx`, `app/(app)/dashboard/page.tsx`
+    </single_source_of_truth>
   </existing_architecture>
 
   <security_and_a

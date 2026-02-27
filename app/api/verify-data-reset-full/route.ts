@@ -7,18 +7,15 @@ import { computeFeatureAccess } from '@/lib/compute-feature-access'
  *
  * Tests:
  * 1. Reset API endpoint exists and requires auth
- * 2. deleteAllUserData covers ALL 24 tables (including user_badges, user_streaks, holdings, etc.)
+ * 2. deleteAllUserData covers ALL 21 tables (including holdings, user_feature_visits, etc.)
  * 3. deleteAllUserData clears data correctly (functional test with dummy ID)
  * 4. Profile is reset to defaults (onboarding_completed=false, etc.)
  * 5. Sovereignty level resets when financial data is cleared
- * 6. user_badges table is cleared by reset
- * 7. user_streaks table is cleared by reset
- * 8. User can start fresh onboarding (onboarding_completed=false)
- * 9. Identity page has "Alles wissen" reset button
- * 10. Beheer testdata page has reset trigger
- * 11. Reset also clears app_settings fallback entries for badges/streaks
- * 12. Reset endpoint returns correct response format
- * 13. All tables have zero records after reset for a test user
+ * 6. User can start fresh onboarding (onboarding_completed=false)
+ * 7. Identity page has "Alles wissen" reset button
+ * 8. Beheer testdata page has reset trigger
+ * 9. Reset endpoint returns correct response format
+ * 10. All tables have zero records after reset for a test user
  */
 export async function GET() {
   const results: Record<string, { pass: boolean; detail: string }> = {}
@@ -52,8 +49,8 @@ export async function GET() {
 
     // All tables that should be covered
     const expectedTables = [
-      // Batch 0: gamification + holding_transactions
-      'holding_transactions', 'user_badges', 'user_streaks', 'user_feature_visits', 'next_step_completions',
+      // Batch 0: holding_transactions + feature tracking
+      'holding_transactions', 'user_feature_visits', 'next_step_completions',
       // Batch 0b: holdings
       'holdings',
       // Batch 1a: deepest leaves
@@ -158,53 +155,7 @@ export async function GET() {
     results['sovereignty_level_resets'] = { pass: false, detail: `Error: ${e instanceof Error ? e.message : String(e)}` }
   }
 
-  // Test 6: user_badges table is included in deleteAllUserData
-  total++
-  try {
-    const supabase = await createClient()
-    const testId = '00000000-0000-0000-0000-000000000003'
-    const summary = await deleteAllUserData(supabase, testId)
-
-    if ('user_badges' in summary) {
-      results['badges_cleared_by_reset'] = {
-        pass: true,
-        detail: `user_badges is deleted in batch 0 of deleteAllUserData. Count for empty user: ${summary.user_badges}`
-      }
-      passing++
-    } else {
-      results['badges_cleared_by_reset'] = {
-        pass: false,
-        detail: `user_badges NOT found in deleteAllUserData summary. Keys: ${Object.keys(summary).join(', ')}`
-      }
-    }
-  } catch (e) {
-    results['badges_cleared_by_reset'] = { pass: false, detail: `Error: ${e instanceof Error ? e.message : String(e)}` }
-  }
-
-  // Test 7: user_streaks table is included in deleteAllUserData
-  total++
-  try {
-    const supabase = await createClient()
-    const testId = '00000000-0000-0000-0000-000000000004'
-    const summary = await deleteAllUserData(supabase, testId)
-
-    if ('user_streaks' in summary) {
-      results['streaks_cleared_by_reset'] = {
-        pass: true,
-        detail: `user_streaks is deleted in batch 0 of deleteAllUserData. Count for empty user: ${summary.user_streaks}`
-      }
-      passing++
-    } else {
-      results['streaks_cleared_by_reset'] = {
-        pass: false,
-        detail: `user_streaks NOT found in deleteAllUserData summary. Keys: ${Object.keys(summary).join(', ')}`
-      }
-    }
-  } catch (e) {
-    results['streaks_cleared_by_reset'] = { pass: false, detail: `Error: ${e instanceof Error ? e.message : String(e)}` }
-  }
-
-  // Test 8: onboarding_completed is set to false (enables fresh onboarding)
+  // Test 6: onboarding_completed is set to false (enables fresh onboarding)
   total++
   try {
     // The onboarding page checks profile.onboarding_completed:
@@ -220,7 +171,7 @@ export async function GET() {
     results['fresh_onboarding_enabled'] = { pass: false, detail: `Error: ${e instanceof Error ? e.message : String(e)}` }
   }
 
-  // Test 9: Identity page has "Alles wissen" reset button
+  // Test 7: Identity page has "Alles wissen" reset button
   total++
   try {
     // Code review of app/(app)/identity/page.tsx confirms:
@@ -237,7 +188,7 @@ export async function GET() {
     results['identity_page_reset_button'] = { pass: false, detail: `Error: ${e instanceof Error ? e.message : String(e)}` }
   }
 
-  // Test 10: Beheer testdata page has reset trigger
+  // Test 8: Beheer testdata page has reset trigger
   total++
   try {
     results['beheer_testdata_reset'] = {
@@ -249,23 +200,7 @@ export async function GET() {
     results['beheer_testdata_reset'] = { pass: false, detail: `Error: ${e instanceof Error ? e.message : String(e)}` }
   }
 
-  // Test 11: Reset also clears app_settings fallback entries for badges/streaks
-  total++
-  try {
-    // The reset endpoint now also deletes app_settings entries:
-    // - earned_badges_{user_id} (badge fallback storage)
-    // - streaks_{user_id} (streak fallback storage)
-    // This ensures both primary tables AND fallback storage are cleared
-    results['app_settings_fallback_cleared'] = {
-      pass: true,
-      detail: 'Reset clears app_settings entries: earned_badges_{user_id} and streaks_{user_id}. This ensures both user_badges/user_streaks tables AND app_settings fallback storage are wiped clean.'
-    }
-    passing++
-  } catch (e) {
-    results['app_settings_fallback_cleared'] = { pass: false, detail: `Error: ${e instanceof Error ? e.message : String(e)}` }
-  }
-
-  // Test 12: Reset endpoint returns correct response format
+  // Test 9: Reset endpoint returns correct response format
   total++
   try {
     results['response_format_correct'] = {
@@ -277,7 +212,7 @@ export async function GET() {
     results['response_format_correct'] = { pass: false, detail: `Error: ${e instanceof Error ? e.message : String(e)}` }
   }
 
-  // Test 13: Full end-to-end reset test with authenticated user or dry run
+  // Test 10: Full end-to-end reset test with authenticated user or dry run
   total++
   try {
     const supabase = await createClient()
@@ -286,31 +221,25 @@ export async function GET() {
     if (user) {
       // Authenticated — actually test the reset
       // Check data before
-      const [assetsBefore, debtsBefore, txBefore, badgesBefore, streaksBefore] = await Promise.all([
+      const [assetsBefore, debtsBefore, txBefore] = await Promise.all([
         supabase.from('assets').select('id', { count: 'exact' }).eq('user_id', user.id),
         supabase.from('debts').select('id', { count: 'exact' }).eq('user_id', user.id),
         supabase.from('transactions').select('id', { count: 'exact' }).eq('user_id', user.id),
-        supabase.from('user_badges').select('id', { count: 'exact' }).eq('user_id', user.id),
-        supabase.from('user_streaks').select('id', { count: 'exact' }).eq('user_id', user.id),
       ])
 
       // Run reset
       const summary = await deleteAllUserData(supabase, user.id)
 
       // Check data after
-      const [assetsAfter, debtsAfter, txAfter, badgesAfter, streaksAfter] = await Promise.all([
+      const [assetsAfter, debtsAfter, txAfter] = await Promise.all([
         supabase.from('assets').select('id', { count: 'exact' }).eq('user_id', user.id),
         supabase.from('debts').select('id', { count: 'exact' }).eq('user_id', user.id),
         supabase.from('transactions').select('id', { count: 'exact' }).eq('user_id', user.id),
-        supabase.from('user_badges').select('id', { count: 'exact' }).eq('user_id', user.id),
-        supabase.from('user_streaks').select('id', { count: 'exact' }).eq('user_id', user.id),
       ])
 
       const allCleared = (assetsAfter.count ?? 0) === 0 &&
         (debtsAfter.count ?? 0) === 0 &&
-        (txAfter.count ?? 0) === 0 &&
-        (badgesAfter.count ?? 0) === 0 &&
-        (streaksAfter.count ?? 0) === 0
+        (txAfter.count ?? 0) === 0
 
       // Compute sovereignty level after reset
       const sovAfter = computeFeatureAccess({
@@ -323,8 +252,8 @@ export async function GET() {
       results['full_reset_e2e'] = {
         pass: allCleared,
         detail: allCleared
-          ? `Full reset verified. Before: ${assetsBefore.count} assets, ${debtsBefore.count} debts, ${txBefore.count} tx, ${badgesBefore.count} badges, ${streaksBefore.count} streaks. After: all 0. Sovereignty: level=${sovAfter.level}, phase="${sovAfter.phase}". Delete summary: ${JSON.stringify(summary)}`
-          : `Data not fully cleared. After: ${assetsAfter.count} assets, ${debtsAfter.count} debts, ${txAfter.count} tx, ${badgesAfter.count} badges, ${streaksAfter.count} streaks`
+          ? `Full reset verified. Before: ${assetsBefore.count} assets, ${debtsBefore.count} debts, ${txBefore.count} tx. After: all 0. Sovereignty: level=${sovAfter.level}, phase="${sovAfter.phase}". Delete summary: ${JSON.stringify(summary)}`
+          : `Data not fully cleared. After: ${assetsAfter.count} assets, ${debtsAfter.count} debts, ${txAfter.count} tx`
       }
       if (allCleared) passing++
     } else {

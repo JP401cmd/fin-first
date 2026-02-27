@@ -9,7 +9,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { shouldAlert } from '@/lib/budget-alerts'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
-import { NL_SWR } from '@/lib/horizon-data'
+import { NL_SWR, DEFAULT_RETURN, NL_INFLATIE, ageAtDate, type LifeEvent } from '@/lib/horizon-data'
+import { runSimulation, lifeEventsToCashflows } from '@/lib/fire-simulation'
+import { parseFireStrategy } from '@/lib/fire-strategy'
 import type { Budget } from '@/lib/budget-data'
 import type { NetWorthSnapshot } from '@/lib/net-worth-data'
 import {
@@ -78,6 +80,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   const [totalBudgetSpent, setTotalBudgetSpent] = useState(0)
   const [budgetSpendingHistory, setBudgetSpendingHistory] = useState<{ label: string; spent: number; isProjection: boolean }[]>([])
   const [showBudgetModal, setShowBudgetModal] = useState(false)
+  const [coreSimTarget, setCoreSimTarget] = useState<number | null>(null)
   // Modal state
   const [activeModal, setActiveModal] = useState<'cash' | 'budgets' | 'assets' | 'debts' | null>(null)
   const [showProjectionModal, setShowProjectionModal] = useState(false)
@@ -531,6 +534,30 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   }, [loadData])
 
   useEffect(() => {
+    if (!data) return
+    async function runCoreSimulation() {
+      const sb = createClient()
+      const [profileResult, lifeEventsResult, assetsContribResult] = await Promise.all([
+        sb.from('profiles').select('date_of_birth, fire_end_strategy, fire_end_age, fire_legacy_amount').single(),
+        sb.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
+        sb.from('assets').select('monthly_contribution').eq('is_active', true),
+      ])
+      if (!profileResult.data?.date_of_birth || !data) return
+      const currentAge = ageAtDate(profileResult.data.date_of_birth, new Date())
+      const yearlyExp = data.yearlyMustExpenses > 0 ? data.yearlyMustExpenses : 0
+      if (!yearlyExp) return
+      const monthlyContributions = (assetsContribResult.data ?? [])
+        .reduce((s, a) => s + Number((a as { monthly_contribution?: number | null }).monthly_contribution ?? 0), 0)
+      const annualSavings = monthlyContributions * 12
+      const cashflows = lifeEventsToCashflows((lifeEventsResult.data ?? []) as LifeEvent[])
+      const fireStrategy = parseFireStrategy(profileResult.data)
+      const simResult = runSimulation(currentAge, fireStrategy.endAge, data.netWorth, yearlyExp, annualSavings, DEFAULT_RETURN, 'nl_box3', NL_INFLATIE, cashflows, fireStrategy)
+      if (simResult.requiredFirePortfolio > 0) setCoreSimTarget(simResult.requiredFirePortfolio)
+    }
+    runCoreSimulation()
+  }, [data])
+
+  useEffect(() => {
     if (!rawFinancials) return
     const coreData = computeCoreData(
       rawFinancials.monthlyIncome, rawFinancials.monthlyExpenses,
@@ -612,7 +639,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
 
           <div className="mb-3 sm:mb-5">
             <span className="font-display text-[36px] sm:text-[44px] md:text-[52px] font-bold tracking-tight text-[var(--ink)]">
-              {data.freedomPercentage.toFixed(1)}%
+              {((data.netWorth / (coreSimTarget ?? data.fireTarget)) * 100).toFixed(1)}%
             </span>
             <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">vrijheid bereikt</span>
           </div>
@@ -621,12 +648,12 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-kern-600 via-kern-400 to-kern-300 transition-all duration-1000"
-                style={{ width: `${Math.max(Math.min(data.freedomPercentage, 100), 0)}%` }}
+                style={{ width: `${Math.max(Math.min((data.netWorth / (coreSimTarget ?? data.fireTarget)) * 100, 100), 0)}%` }}
               />
             </div>
             <div className="mt-2 flex justify-between text-xs text-[var(--ink-4)]">
               <span>0%</span>
-              <span className="font-mono">{formatCurrency(data.fireTarget)} — volledige vrijheid</span>
+              <span className="font-mono">{formatCurrency(coreSimTarget ?? data.fireTarget)} — volledige vrijheid</span>
               <span>100%</span>
             </div>
           </button>
@@ -989,7 +1016,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                   {snapshotLoading ? 'Bezig...' : 'Snapshot nu'}
                 </button>
               </div>
-              <NetWorthChart snapshots={snapshots} fireTarget={data.fireTarget} earnedBadges={[]} />
+              <NetWorthChart snapshots={snapshots} fireTarget={coreSimTarget ?? data.fireTarget} earnedBadges={[]} />
             </section>
           )}
 
@@ -1194,15 +1221,22 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       </BottomSheet>
 
       {/* === Kassabon Modal: FIRE Target === */}
-      <BottomSheet open={showFireReceipt} onClose={() => setShowFireReceipt(false)} title="Kassabon: Volledige Vrijheid">
+      <BottomSheet open={showFireReceipt} onClose={() => setShowFireReceipt(false)} title="Volledige Vrijheid">
         <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 font-mono text-sm">
           <div className="mb-3 text-center">
             <p className="text-xs font-bold uppercase tracking-widest text-[var(--ink-3)]">Benodigd voor volledige vrijheid</p>
-            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">FIRE-berekening ({(fireSwr * 100).toFixed(2)}% opnamepercentage)</p>
+            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">
+              {coreSimTarget
+                ? 'Simulatie tot leeftijd 90 (NL-FIRE methode)'
+                : `Statische berekening (${(fireSwr * 100).toFixed(2)}% opnamepercentage)`}
+            </p>
           </div>
 
           <div className="mb-1 border-b border-dashed border-[var(--border-ed)] pb-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
-            Het FIRE-bedrag is het vermogen waarmee je voor altijd van de opbrengsten kunt leven, zonder je kapitaal aan te spreken.{' '}
+            {coreSimTarget
+              ? 'Het benodigde vermogen zodat je portfolio tot leeftijd 90 voldoende is om van te leven — berekend via levenslange simulatie (opbouw + verbruik).'
+              : 'Het FIRE-bedrag is het vermogen waarmee je permanent van de portefeuillerendementen kunt leven, zonder je kapitaal aan te spreken.'
+            }{' '}
             Dit gebruikt de NL-FIRE methode ({(fireSwr * 100).toFixed(2)}%), die rekening houdt met de Nederlandse Box 3 vermogensrendementsheffing en inflatie.
           </div>
 
@@ -1225,15 +1259,28 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                     <span className="tabular-nums text-[var(--ink)]">{formatCurrency(data.monthlyExpenses * 12)}</span>
                   </div>
                 )}
-                <div className="flex justify-between py-0.5">
-                  <span className="text-[var(--ink-2)]">÷ opnamepercentage ({(fireSwr * 100).toFixed(2)}%)</span>
-                  <span className="tabular-nums text-[var(--ink-3)]">÷ {fireSwr.toFixed(4).replace('.', ',')}</span>
-                </div>
+                {!coreSimTarget && (
+                  <div className="flex justify-between py-0.5">
+                    <span className="text-[var(--ink-2)]">÷ opnamepercentage ({(fireSwr * 100).toFixed(2)}%)</span>
+                    <span className="tabular-nums text-[var(--ink-3)]">÷ {fireSwr.toFixed(4).replace('.', ',')}</span>
+                  </div>
+                )}
+                {coreSimTarget && (
+                  <div className="py-0.5 font-sans text-[11px] italic text-[var(--ink-3)]">
+                    Berekend via levenslange simulatie (7% groei − Box3 − inflatie, tot 90 jaar)
+                  </div>
+                )}
               </div>
               <div className="border-b-2 border-[var(--ink)] pb-2 flex justify-between">
                 <span className="font-bold text-[var(--ink)]">FIRE-bedrag</span>
-                <span className="tabular-nums font-bold text-[var(--ink)]">{formatCurrency(data.fireTarget)}</span>
+                <span className="tabular-nums font-bold text-[var(--ink)]">{formatCurrency(coreSimTarget ?? data.fireTarget)}</span>
               </div>
+
+              {coreSimTarget && coreSimTarget !== data.fireTarget && (
+                <div className="mt-2 rounded-[var(--r-sm)] border border-dashed border-horizon-300 bg-horizon-50/50 px-3 py-2 font-sans text-[11px] text-horizon-700">
+                  ∗ Incl. simulatie tot leeftijd 90 — voor AOW/pensioen zie De Horizon
+                </div>
+              )}
 
               <div className="mt-3 border-b border-dashed border-[var(--border-ed)] pb-2">
                 <div className="flex justify-between py-0.5">
@@ -1242,22 +1289,25 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 </div>
                 <div className="flex justify-between py-0.5">
                   <span className="text-[var(--ink-2)]">Nog nodig</span>
-                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(Math.max(0, data.fireTarget - data.netWorth))}</span>
+                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(Math.max(0, (coreSimTarget ?? data.fireTarget) - data.netWorth))}</span>
                 </div>
                 <div className="flex justify-between py-0.5">
                   <span className="text-[var(--ink-2)]">Voortgang</span>
-                  <span className="tabular-nums font-medium text-kern-600">{data.freedomPercentage.toFixed(1)}%</span>
+                  <span className="tabular-nums font-medium text-kern-600">{((data.netWorth / (coreSimTarget ?? data.fireTarget)) * 100).toFixed(1)}%</span>
                 </div>
               </div>
 
               <div className="mt-2 flex justify-center">
-                <FreedomTimeBadge amount={data.fireTarget} />
+                <FreedomTimeBadge amount={coreSimTarget ?? data.fireTarget} />
               </div>
 
               <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 text-[11px] text-[var(--ink-3)] leading-relaxed">
-                <p><strong className="text-[var(--ink-3)]">NL-FIRE methode:</strong> Na Box 3-heffing ({(2.117).toFixed(1)}%) en inflatie ({(2).toFixed(0)}%) resteert {(fireSwr * 100).toFixed(2)}% als veilige opnamerate voor Nederlandse beleggers.</p>
-                <p className="mt-1"><strong className="text-[var(--ink-3)]">Formule:</strong>{' '}
-                  {retirementMethodUsed === 'essential_budgets' ? 'must-uitgaven' : 'jaarlijkse uitgave na retirement'} ÷ {(fireSwr * 100).toFixed(2)}% = benodigd vermogen
+                <p><strong className="text-[var(--ink-3)]">NL-FIRE methode:</strong> Verwacht rendement 7% − Box 3-heffing {(2.117).toFixed(1)}% − inflatie {(2).toFixed(0)}% = {(fireSwr * 100).toFixed(2)}% veilige opnamerate voor Nederlandse beleggers.</p>
+                <p className="mt-1">
+                  {coreSimTarget
+                    ? <><strong className="font-semibold text-[var(--ink-3)]">Methode:</strong> Portfolio-simulatie — jaarlijkse groei (7%) minus kosten en Box3, tot portfolio nul bereikt op 90 jaar.</>
+                    : <><strong className="font-semibold text-[var(--ink-3)]">Formule:</strong> {retirementMethodUsed === 'essential_budgets' ? 'must-uitgaven' : 'jaarlijkse uitgave na retirement'} ÷ {(fireSwr * 100).toFixed(2)}% = benodigd vermogen</>
+                  }
                 </p>
               </div>
 

@@ -24,29 +24,31 @@ function yearsToDate(years: number): string {
 }
 
 export function VrijheidsMijlpalenWidget({ size, data, href }: Props) {
-  const { freedomPct, fireTarget, netWorth, fireProjResult } = data
+  const { freedomPct, fireTarget, netWorth, fireProjResult, simRequiredPortfolio } = data
+  const effectiveFire = simRequiredPortfolio ?? fireTarget
+  const effectivePct = effectiveFire > 0 ? Math.min((netWorth / effectiveFire) * 100, 100) : freedomPct
 
   // Monthly savings approximation using countdown
   const countdownYears = fireProjResult.countdownYears + fireProjResult.countdownMonths / 12
-  const monthlySavingsApprox = countdownYears > 0 && fireTarget > 0
-    ? (fireTarget - netWorth) / (countdownYears * 12)
+  const monthlySavingsApprox = countdownYears > 0 && effectiveFire > 0
+    ? (effectiveFire - netWorth) / (countdownYears * 12)
     : 0
 
   const getMilestoneDate = (targetPct: number): string | null => {
-    const targetAmount = fireTarget * (targetPct / 100)
+    const targetAmount = effectiveFire * (targetPct / 100)
     if (netWorth >= targetAmount) return null // Already reached
     if (monthlySavingsApprox <= 0) return null
     const monthsNeeded = (targetAmount - netWorth) / monthlySavingsApprox
     return yearsToDate(monthsNeeded / 12)
   }
 
-  const activeMilestoneIdx = MILESTONES.findIndex(m => freedomPct < m.pct)
+  const activeMilestoneIdx = MILESTONES.findIndex(m => effectivePct < m.pct)
 
   return (
     <WidgetShell module="horizon" size={size} kicker="Vrijheidsmijlpalen" href={href}>
       <div className="mt-1 space-y-2">
         {MILESTONES.map((m, i) => {
-          const reached = freedomPct >= m.pct
+          const reached = effectivePct >= m.pct
           const isActive = i === activeMilestoneIdx
           const date = reached ? null : getMilestoneDate(m.pct)
 

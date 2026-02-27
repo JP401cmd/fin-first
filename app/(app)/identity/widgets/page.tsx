@@ -31,6 +31,7 @@ import {
 } from '@/lib/widget-catalog'
 import { reassignOrders } from '@/lib/widget-order'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
+import { NL_SWR } from '@/lib/horizon-data'
 
 // Map widget sovereignty gates to feature ids
 const GATED_WIDGET_FEATURE: Record<string, string> = {
@@ -204,7 +205,7 @@ export default function WidgetsPage() {
         return dt === 'credit_card' || dt === 'personal_loan' || dt === 'consumer'
       })
       const yearlyExpenses = monthlyExpenses * 12
-      const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / 0.04 : 0
+      const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / NL_SWR : 0
       const freedomPct = fireTarget > 0 ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0) : 0
       const level = computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPct, hasConsumerDebt)
       setSovereigntyLevel(level)

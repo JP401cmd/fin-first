@@ -14,7 +14,9 @@ interface Props {
 }
 
 export function VrijheidsvoortgangWidget({ size, data, href }: Props) {
-  const { netWorth, fireTarget, freedomPct, fireProjResult } = data
+  const { netWorth, fireTarget, freedomPct, fireProjResult, simRequiredPortfolio } = data
+  const effectiveFire = simRequiredPortfolio ?? fireTarget
+  const effectivePct = effectiveFire > 0 ? Math.min((netWorth / effectiveFire) * 100, 100) : freedomPct
   const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 700 })
 
   return (
@@ -23,7 +25,7 @@ export function VrijheidsvoortgangWidget({ size, data, href }: Props) {
         <div className="flex items-center gap-2 mb-2">
           <Compass className="h-3.5 w-3.5 text-horizon-600 shrink-0" />
           <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
-            {freedomPct.toFixed(1)}%
+            {effectivePct.toFixed(1)}%
           </p>
         </div>
 
@@ -32,14 +34,14 @@ export function VrijheidsvoortgangWidget({ size, data, href }: Props) {
           <div
             className="h-full rounded-full bg-gradient-to-r from-horizon-400 to-horizon-600"
             style={{
-              width: hasEntered ? `${Math.min(freedomPct, 100)}%` : '0%',
+              width: hasEntered ? `${Math.min(effectivePct, 100)}%` : '0%',
               transition: hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1)' : 'none',
             }}
           />
         </div>
 
         <p className="text-xs text-[var(--ink-3)] font-mono tabular-nums">
-          {formatCurrency(netWorth)} / {formatCurrency(fireTarget)}
+          {formatCurrency(netWorth)} / {formatCurrency(effectiveFire)}{simRequiredPortfolio ? ' (simulatie)' : ''}
         </p>
 
         <p className="mt-1.5 font-serif italic text-[11px] text-[var(--ink-3)]">

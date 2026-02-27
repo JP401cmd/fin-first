@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { getDefaultBudgets } from '@/lib/budget-data'
+import { NL_AOW_AGE, NL_AOW_MONTHLY } from '@/lib/horizon-data'
 
 const bodySchema = z.object({
   identity: z.object({
@@ -244,6 +245,22 @@ export async function POST(req: Request) {
       const { error: debtErr } = await supabase.from('debts').insert(rows)
       if (debtErr) throw new Error(`Schulden opslaan mislukt: ${debtErr.message}`)
     }
+
+    // 6. Seed default AOW life event
+    await supabase.from('life_events').insert({
+      user_id: user.id,
+      name: 'AOW',
+      event_type: 'aow',
+      target_age: NL_AOW_AGE,
+      monthly_income_change: NL_AOW_MONTHLY,
+      monthly_cost_change: 0,
+      one_time_cost: 0,
+      duration_months: 0,
+      is_indexed: true,
+      is_active: true,
+      icon: 'Landmark',
+      sort_order: 0,
+    })
 
     return Response.json({ success: true })
   } catch (err) {

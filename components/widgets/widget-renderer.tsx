@@ -28,6 +28,7 @@ import { BacktestingScoreWidget } from './backtesting-score-widget'
 import { getWidgetDef, WIDGET_HREFS } from '@/lib/widget-catalog'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { FireProjection, FireRange } from '@/lib/horizon-data'
+import type { FireEndStrategy } from '@/lib/fire-strategy'
 
 // ── DashboardData bundle ──────────────────────────────────────
 // All data the dashboard page fetches and passes down to widgets.
@@ -99,9 +100,16 @@ export interface DashboardData {
   fireRange: FireRange | null
   // Horizon: simplified sim rows for vermogenspad chart (age + portfolio + phase)
   simRows: { age: number; endPortfolio: number; phase: string }[] | null
+  // Horizon: requiredFirePortfolio uit runSimulation (null als geen birth_date)
+  simRequiredPortfolio: number | null
   // Horizon: backtesting success rate + named crash paths
   backtestSuccessRate: number | null
   backtestNamedPaths: { label: string; success: boolean }[] | null
+  // Box 3: pre-computed belasting from full calculateBox3() (null if no assets)
+  box3Belasting: number | null
+  // FIRE end strategy
+  fireEndStrategy: FireEndStrategy
+  fireEndAge: number
 }
 
 // ── Gating: widget id → min sovereignty level ─────────────────

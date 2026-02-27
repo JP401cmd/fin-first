@@ -8,7 +8,7 @@ import { X, ArrowDown, ArrowUp, TrendingDown } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
   computeScenarios, computeResilienceScore,
-  MARKET_WEATHER, type MarketWeather, type HorizonInput,
+  MARKET_WEATHER, NL_SWR, type MarketWeather, type HorizonInput,
   type ScenarioPath, type ResilienceScore,
 } from '@/lib/horizon-data'
 import {
@@ -41,7 +41,9 @@ export function ScenariosModal({ input, debts = [], open, onClose }: Props) {
   const drifter = scenarios.find(s => s.name === 'drifter')
   const current = scenarios.find(s => s.name === 'current')
   const optimizer = scenarios.find(s => s.name === 'optimizer')
-  const fireTarget = (input.monthlyExpenses * 12) / 0.04
+  const fireTarget = input.yearlyMustExpenses > 0
+    ? input.yearlyMustExpenses / NL_SWR
+    : (input.monthlyExpenses * 12) / NL_SWR
 
   return (
     <BottomSheet open={true} onClose={onClose} title="Toekomstpaden">

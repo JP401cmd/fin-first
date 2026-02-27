@@ -1,7 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeFireProjection, computeFireRange, runBacktest, ageAtDate, NL_SWR, NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF, type HorizonInput, DEFAULT_RETURN } from '@/lib/horizon-data'
-import { runSimulation } from '@/lib/fire-simulation'
+import { computeFireProjection, computeFireRange, runBacktest, ageAtDate, NL_SWR, NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF, type HorizonInput, type LifeEvent, DEFAULT_RETURN } from '@/lib/horizon-data'
+import { runSimulation, lifeEventsToCashflows } from '@/lib/fire-simulation'
+import { parseFireStrategy, type FireEndStrategy } from '@/lib/fire-strategy'
 import { computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
+import { calculateBox3, type TaxYear } from '@/lib/box3-data'
+import type { Asset } from '@/lib/asset-data'
+import type { Debt } from '@/lib/debt-data'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { FhinAvatar, FinnAvatar, FfinAvatar } from '@/components/app/avatars'
 import { JouwPadWidget } from '@/components/app/jouw-pad-widget'
@@ -33,14 +37,14 @@ export default async function DashboardPage() {
     income12Result, earliestIncomeResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
-    supabase.from('assets').select('current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct').eq('is_active', true),
-    supabase.from('debts').select('current_balance, debt_type, net_worth_inclusion_pct').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount').single(),
+    supabase.from('assets').select('id, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
+    supabase.from('debts').select('id, current_balance, debt_type, net_worth_inclusion_pct, is_tax_deductible, linked_asset_id').eq('is_active', true),
+    supabase.from('profiles').select('date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount').single(),
     supabase.from('budgets').select('id, default_limit, interval').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
     supabase.from('actions')
       .select('id, title, status, freedom_days_impact, priority_score, due_date, source, completed_at')
       .in('status', ['open', 'postponed', 'completed']),
-    supabase.from('life_events').select('id').eq('is_active', true),
+    supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, alert_threshold, parent_id').is('parent_id', null),
     supabase.from('recommendations').select('id, freedom_days_per_year, status').in('status', ['pending', 'postponed']),
     supabase.from('budgets').select('id, parent_id, default_limit').not('parent_id', 'is', null),
@@ -177,23 +181,29 @@ export default async function DashboardPage() {
   // Horizon extra: sim rows for vermogenspad chart
   const dob = profileResult.data?.date_of_birth ?? null
   let simRows: { age: number; endPortfolio: number; phase: string }[] | null = null
+  let simRequiredPortfolio: number | null = null
+  const fireStrategy = parseFireStrategy(profileResult.data ?? {})
   if (dob && netWorth > 0) {
     try {
       const currentAge = ageAtDate(dob)
+      const simCashflows = lifeEventsToCashflows((eventsResult.data ?? []) as LifeEvent[])
       const simResult = runSimulation(
         currentAge,
-        90,
+        fireStrategy.endAge,
         netWorth,
         yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses : monthlyExpenses * 12,
         monthlyContributions * 12,
         DEFAULT_RETURN,
         'nl_box3',
         0.02,
-        [],
+        simCashflows,
+        fireStrategy,
       )
       simRows = simResult.rows.map(r => ({ age: r.age, endPortfolio: r.endPortfolio, phase: r.phase }))
+      simRequiredPortfolio = simResult.requiredFirePortfolio > 0 ? simResult.requiredFirePortfolio : null
     } catch {
       simRows = null
+      simRequiredPortfolio = null
     }
   }
 
@@ -208,6 +218,26 @@ export default async function DashboardPage() {
     } catch {
       backtestSuccessRate = null
       backtestNamedPaths = null
+    }
+  }
+
+  // Box 3 belasting — zelfde berekening als /core/belasting (default: 2025, geen partner)
+  let box3Belasting: number | null = null
+  const rawAssets = assetsResult.data ?? []
+  const rawDebts = debtsResult.data ?? []
+  if (rawAssets.length > 0) {
+    try {
+      const dailyExp = yearlyMustExpenses > 0 ? yearlyMustExpenses / 365 : (monthlyExpenses > 0 ? monthlyExpenses / 30 : 0)
+      const box3Result = calculateBox3({
+        assets: rawAssets as unknown as Asset[],
+        debts: rawDebts as unknown as Debt[],
+        hasPartner: false,
+        dailyExpenses: dailyExp,
+        year: 2025,
+      })
+      box3Belasting = box3Result.belasting
+    } catch {
+      box3Belasting = null
     }
   }
 
@@ -329,8 +359,12 @@ export default async function DashboardPage() {
     totalPurchaseValue,
     fireRange,
     simRows,
+    simRequiredPortfolio,
     backtestSuccessRate,
     backtestNamedPaths,
+    box3Belasting,
+    fireEndStrategy: fireStrategy.strategy,
+    fireEndAge: fireStrategy.endAge,
   }
 
   // Dateline

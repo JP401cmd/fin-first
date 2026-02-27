@@ -66,8 +66,12 @@ const mockData: DashboardData = {
   fireAgeFractional: null,
   fireRange: null,
   simRows: null,
+  simRequiredPortfolio: null,
   backtestSuccessRate: null,
   backtestNamedPaths: null,
+  box3Belasting: null,
+  fireEndStrategy: 'deplete',
+  fireEndAge: 90,
 }
 
 const makePrefs = (ids: string[], sizes: ('half' | 'full')[] = []): WidgetPref[] =>

@@ -283,28 +283,6 @@ export async function GET() {
     })
   }
 
-  // Test 9: badges and user_badges tables are queryable for badge connection
-  try {
-    const [badgesResult, userBadgesResult] = await Promise.all([
-      supabase.from('badges').select('id, slug').limit(5),
-      supabase.from('user_badges').select('badge_id, earned_at').limit(5),
-    ])
-
-    results.push({
-      name: 'Badge tables accessible for chart integration',
-      passed: !badgesResult.error && !userBadgesResult.error,
-      details: !badgesResult.error && !userBadgesResult.error
-        ? `badges: ${badgesResult.data?.length ?? 0} rows, user_badges: ${userBadgesResult.data?.length ?? 0} rows`
-        : `badges: ${badgesResult.error?.message ?? 'OK'}, user_badges: ${userBadgesResult.error?.message ?? 'OK'}`,
-    })
-  } catch (err) {
-    results.push({
-      name: 'Badge tables accessible for chart integration',
-      passed: false,
-      details: `Exception: ${err instanceof Error ? err.message : 'unknown'}`,
-    })
-  }
-
   // Test 10: FIRE milestone badge slugs are used in getNetWorthMilestones
   {
     const milestones = getNetWorthMilestones(500000)

@@ -44,6 +44,220 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'fin_prod_0.77',
+    date: '2026-02-27',
+    title: 'Simulatie-engine, 6 nieuwe horizon-widgets & AOW/pensioen',
+    sections: [
+      {
+        module: 'De Horizon — Simulatie-engine',
+        color: 'purple',
+        items: [
+          {
+            title: 'Nieuwe FIRE simulatie-engine',
+            description:
+              'lib/fire-simulation.ts: volledig nieuwe pure-function simulatie-engine met runSimulation(), lifeEventsToCashflows() en SimResult type. Ondersteunt opbouw- en pensioenfase, Box 3-belastingdrag, inflatiecorrectie, en combineert levensgebeurtenissen (AOW, pensioen) als cashflows. Single source of truth voor /horizon, /core en /dashboard.',
+          },
+          {
+            title: 'AOW & aanvullend pensioen als levensgebeurtenissen',
+            description:
+              'LIFE_EVENT_CATALOG in horizon-data.ts uitgebreid met AOW (inkomen vanaf AOW-leeftijd) en aanvullend pensioen. Worden automatisch meegenomen in de simulatie via lifeEventsToCashflows(). Gebruikers kunnen bedragen en startleeftijd aanpassen.',
+          },
+          {
+            title: 'Horizon pagina grote UX-herwerking',
+            description:
+              'De /horizon pagina is grondig herschreven: nieuwe hero met simulatieresultaten, verbeterde KPI-kaarten met FIRE-leeftijd (fractioneel), portfoliowaarde bij FIRE, en impliciete onttrekkingsratio. Simulatie-engine vervangt de oude computeFireProjection voor de hoofdberekening.',
+          },
+          {
+            title: 'useHorizonFireSim hook',
+            description:
+              'Nieuwe gedeelde hook lib/hooks/use-horizon-fire-sim.ts bundelt het laden van profiel, vermogen, budgetten en levensgebeurtenissen en roept runSimulation() aan. Gebruikt door /horizon, /core en /dashboard voor consistente FIRE-berekeningen.',
+          },
+        ],
+      },
+      {
+        module: 'De Horizon — Widgets',
+        color: 'purple',
+        items: [
+          {
+            title: '6 nieuwe dashboard-widgets',
+            description:
+              'Zes horizon-widgets toegevoegd aan het widget-systeem: Vrijheidsscenario\'s (optimistisch/basis/conservatief FIRE-leeftijd), Vermogenspad (mini sim-chart met opbouw→pensioen), Passief Inkomen (SWR-gebaseerde maandelijkse schatting), Box 3-belastingdrag (jaarlijkse Box 3-last), Vrijheidsmijlpalen (Coast/Barista/Lean/Full FIRE), en Historische Weerbaarheid (backtesting successcore).',
+          },
+          {
+            title: 'Sim-chart component & widget',
+            description:
+              'Nieuw SimChart (components/app/horizon/sim-chart.tsx) met SVG-area chart die opbouw- en pensioenfase visualiseert, inclusief FIRE-marker en leeftijdslabels. SimChartWidget wrapper voor gebruik in het dashboard-grid.',
+          },
+          {
+            title: 'Widget-catalog uitgebreid',
+            description:
+              'lib/widget-catalog.ts bevat nu 6 nieuwe catalog-entries met beschrijvingen, standaard-grootte en hrefs naar /horizon. WIDGET_MIN_LEVEL gating toegevoegd voor elk nieuw widget.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'FIRE-sim tool pagina',
+            description:
+              'Nieuwe interactieve pagina /tools/fire-sim met sliders voor leeftijd, vermogen, inkomen, uitgaven en rendement. Toont real-time simulatieresultaten met de sim-chart en gedetailleerde jaarlijkse tabel.',
+          },
+          {
+            title: 'FireMethod vereenvoudigd',
+            description:
+              'useFireMethod hook vereenvoudigd: gebruikt nu altijd de NL-SWR methode. Verwijdert complexiteit van meerdere berekeningsmethoden.',
+          },
+          {
+            title: 'DashboardData uitgebreid',
+            description:
+              'DashboardData type en server-side data-bundel uitgebreid met fireAgeFractional (sub-jaar precisie), fireRange (optimistisch/basis/conservatief), simRows (simulatiepad), backtestSuccessRate en backtestNamedPaths voor de nieuwe widgets.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: 'fin_prod_0.76',
+    date: '2026-02-26',
+    title: 'Tiers-systeem, backtesting, landing redesign & grote UX-batch',
+    sections: [
+      {
+        module: 'Platform — Tiers',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Commercieel tier-systeem',
+            description:
+              'Nieuw tier-configuratiesysteem (lib/tier-config.ts) met drie niveaus: Gratis, Connected en AI. Bevat een feature-matrix die per tier bepaalt welke functies beschikbaar zijn. Los van het sovereignty-level featuregating-systeem.',
+          },
+          {
+            title: 'Beheer/tiers admin pagina',
+            description:
+              'Nieuwe admin-pagina /beheer/tiers met overzicht van alle tiers, hun features, en de mogelijkheid om gebruikers aan een tier toe te wijzen. Inclusief tier-assign en tier-config API-routes.',
+          },
+          {
+            title: 'Subscription AI-detectie',
+            description:
+              'Nieuwe API-route /api/subscriptions/detect-ai voor automatische detectie van AI-gerelateerde abonnementen in transactiedata. Helpt bij het categoriseren van AI-uitgaven.',
+          },
+        ],
+      },
+      {
+        module: 'De Horizon — Backtesting',
+        color: 'purple',
+        items: [
+          {
+            title: 'Backtesting modal met MSCI-data',
+            description:
+              'Nieuwe backtesting-modal op /horizon met historische MSCI World-rendementen (lib/msci-data.ts). Simuleert de FIRE-strategie over alle mogelijke historische perioden en toont succespercentage, worst/best case en pad-visualisaties.',
+          },
+          {
+            title: 'Projections modal uitgebreid',
+            description:
+              'De projecties-modal op /horizon is grondig uitgebreid met meer scenario\'s, verbeterde grafieken en gedetailleerdere breakdown van de FIRE-projectie.',
+          },
+          {
+            title: 'Log-timeline verbeterd',
+            description:
+              'De log-timeline component is visueel en functioneel verbeterd met betere animaties en duidelijkere tijdlijnweergave.',
+          },
+        ],
+      },
+      {
+        module: 'Landing',
+        color: 'blue',
+        items: [
+          {
+            title: 'Volledige landing page redesign',
+            description:
+              'Hero, features-sectie, header en footer volledig herschreven in het editorial design language. Nieuwe feature-showcase met interactieve module-tabs (Kern, Wil, Horizon), verbeterde typografie en responsive layout.',
+          },
+        ],
+      },
+      {
+        module: 'De Kern',
+        color: 'amber',
+        items: [
+          {
+            title: 'Box 3 belasting pagina groot uitgebreid',
+            description:
+              'De /core/belasting pagina is grondig uitgebreid met gedetailleerde Box 3-berekeningen, vermogenscategorieën (spaargeld, beleggingen, schulden), forfaitaire rendementen en heffingsvrij vermogen. Inclusief kassabon-breakdowns.',
+          },
+          {
+            title: 'Budgets loading state',
+            description:
+              'Nieuwe loading.tsx voor /core/budgets met skeleton-states die het editorial design volgen.',
+          },
+          {
+            title: 'Handmatige overboekingen',
+            description:
+              'Nieuwe ManualTransferSheet component voor het handmatig invoeren van overboekingen tussen eigen rekeningen, zodat deze niet als uitgave/inkomen worden geteld.',
+          },
+        ],
+      },
+      {
+        module: 'Dashboard — Widgets',
+        color: 'blue',
+        items: [
+          {
+            title: 'Netto vermogen widget verbeterd',
+            description:
+              'Netto-vermogen-widget uitgebreid met sparkline-grafiek, delta-indicator (maandelijkse verandering), en verbeterde vrijheidstijd-weergave.',
+          },
+          {
+            title: 'Doelen widget verbeterd',
+            description:
+              'Doelen-widget grondig verbeterd met voortgangsbalken, deadline-indicatoren, en compactere layout voor meerdere doelen.',
+          },
+          {
+            title: 'Assets & holdings widgets verbeterd',
+            description:
+              'Assets- en holdings-widgets uitgebreid met betere allocatie-visualisatie, rendementsindicatoren en compactere dataweergave.',
+          },
+          {
+            title: 'Acties & vrijheidsvoortgang widgets',
+            description:
+              'Acties-widget uitgebreid met prioriteitsindicatoren en impact-scores. Vrijheidsvoortgang-widget verbeterd met duidelijkere voortgangsbalk en mijlpalen.',
+          },
+        ],
+      },
+      {
+        module: 'Identiteit',
+        color: 'rose',
+        items: [
+          {
+            title: 'Profiel pagina uitgebreid',
+            description:
+              'De /identity/profiel pagina is grondig uitgebreid met meer persoonlijke financiële gegevens, FIRE-instellingen, huishoudsamenstelling en pensioengegevens.',
+          },
+        ],
+      },
+      {
+        module: 'Platform — AI',
+        color: 'zinc',
+        items: [
+          {
+            title: 'AI-context verbeterd',
+            description:
+              'Shared-, wil- en budget-insights context modules uitgebreid met betere data-bundeling. Freedom-calc tool verbeterd met nauwkeurigere berekeningen. AI-recommendations DNA verfijnd.',
+          },
+          {
+            title: 'useModalAnimation hook',
+            description:
+              'Nieuwe hook lib/hooks/use-modal-animation.ts specifiek voor mount-based animaties in BottomSheet-modals (100ms setTimeout trigger). Vervangt useInViewAnimation voor modal-context.',
+          },
+          {
+            title: 'ModuleColorProvider',
+            description:
+              'Nieuwe React context provider die de huidige module-kleur (kern/wil/horizon) beschikbaar maakt voor child-componenten. Voorkomt prop-drilling van module-kleuren.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: 'fin_prod_0.75',
     date: '2026-02-25',
     title: 'Grafiek-animaties, kassabon forecasts & Will insights',

@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { computeFireProjection, computeResilienceScore, type HorizonInput } from '@/lib/horizon-data'
-import { computeSovereigntyLevel } from '@/lib/feature-phases'
+import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 
 const SWR = 0.04
 
@@ -181,6 +181,14 @@ export async function GET() {
   } else {
     snapshot = fullSnapshot
   }
+
+  // Sync last_known_phase to profiles (fire-and-forget — layout also handles this on page load,
+  // but cron-triggered snapshots would otherwise leave profiles stale)
+  supabase
+    .from('profiles')
+    .update({ last_known_phase: levelToPhaseId(sovereigntyLevel) })
+    .eq('id', user.id)
+    .then(() => {}) // Non-critical
 
   // Trigger badge evaluation after snapshot creation (fire-and-forget, server-side)
   // This evaluates badges after monthly close/snapshot events

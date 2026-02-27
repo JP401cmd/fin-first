@@ -42,6 +42,14 @@ export async function POST() {
 
   const context = await buildRecommendationContext(supabase)
 
+  // Fetch budgets + profile for freedom_days validation
+  const [{ data: budgets }, { data: profile }] = await Promise.all([
+    supabase.from('budgets').select('slug, is_essential'),
+    supabase.from('profiles').select('retirement_expense_method').eq('id', user.id).single(),
+  ])
+  const budgetMap = new Map((budgets ?? []).map(b => [b.slug, b.is_essential]))
+  const usesEssentialBudgets = (profile?.retirement_expense_method ?? 'essential_budgets') === 'essential_budgets'
+
   let model
   try {
     model = await getModel(supabase)
@@ -75,6 +83,16 @@ export async function POST() {
   const insertedRecommendations = []
 
   for (const rec of object.recommendations) {
+    // Enforce freedom_days_per_year rules: only valid for essential budgets + essential_budgets method
+    const slug = rec.related_budget_slug
+    const isEssential = slug ? (budgetMap.get(slug) ?? false) : false
+    const freedomDaysAllowed = isEssential && usesEssentialBudgets
+    const validFreedomDays = freedomDaysAllowed ? rec.freedom_days_per_year : 0
+    const validActions = rec.actions.map(a => ({
+      ...a,
+      freedom_days_impact: freedomDaysAllowed ? a.freedom_days_impact : 0,
+    }))
+
     const { data, error } = await supabase
       .from('recommendations')
       .insert({
@@ -84,12 +102,12 @@ export async function POST() {
         recommendation_type: rec.recommendation_type,
         euro_impact_monthly: rec.euro_impact_monthly,
         euro_impact_yearly: rec.euro_impact_yearly,
-        freedom_days_per_year: rec.freedom_days_per_year,
+        freedom_days_per_year: validFreedomDays,
         current_value: rec.current_value ?? null,
         proposed_value: rec.proposed_value ?? null,
         related_budget_slug: rec.related_budget_slug ?? null,
         priority_score: Math.max(1, Math.min(5, Math.round(rec.priority_score))),
-        suggested_actions: rec.actions,
+        suggested_actions: validActions,
         ai_generation_id: generationId,
         status: 'pending',
       })

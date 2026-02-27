@@ -10,14 +10,8 @@ export async function POST() {
   }
 
   try {
-    // Delete all user financial data (includes user_badges, user_streaks tables)
+    // Delete all user financial data
     await deleteAllUserData(supabase, user.id)
-
-    // Clear app_settings fallback entries for badges and streaks
-    await Promise.all([
-      supabase.from('app_settings').delete().eq('key', `earned_badges_${user.id}`),
-      supabase.from('app_settings').delete().eq('key', `streaks_${user.id}`),
-    ])
 
     // Reset profile to minimal state
     await supabase

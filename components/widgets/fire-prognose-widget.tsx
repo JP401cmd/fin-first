@@ -2,6 +2,7 @@ import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { Compass } from 'lucide-react'
 import type { DashboardData } from './widget-renderer'
+import { NL_SWR } from '@/lib/horizon-data'
 
 interface Props {
   size: WidgetSize
@@ -63,7 +64,7 @@ export function FirePrognoseWidget({ size, data, href }: Props) {
             />
           </div>
           <p className="mt-3 font-serif italic text-[12px] text-[var(--ink-3)]">
-            Gebaseerd op 4% opnameregel — klik voor details
+            Gebaseerd op NL FIRE-model ({(NL_SWR * 100).toFixed(2)}% opnameregel) — klik voor details
           </p>
         </div>
       )}

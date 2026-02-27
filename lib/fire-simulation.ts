@@ -6,6 +6,7 @@
  */
 
 import { BOX3_DRAG, type LifeEvent } from '@/lib/horizon-data'
+import { type FireEndStrategy, type FireStrategyConfig, DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,12 @@ export interface SimResult {
   implicitWithdrawalRate: number
   /** Classic 25× comparison target */
   classic25xTarget: number
+  /** Which strategy was used */
+  strategy: FireEndStrategy
+  /** Target end portfolio (0 for deplete, indexed legacy amount, 0 for perpetual) */
+  targetEndPortfolio: number
+  /** Effective end age used for display (chart x-axis) */
+  displayEndAge: number
 }
 
 // ── Simulation Engine ───────────────────────────────────────────────────────
@@ -64,11 +71,37 @@ export function runSimulation(
   returnModel: ReturnModel,
   inflation: number,        // decimal, e.g. 0.02
   cashflows: SimCashflow[],
+  strategyConfig?: FireStrategyConfig,
 ): SimResult {
+  // Resolve strategy (default = deplete@endAge for backward compat)
+  const cfg = strategyConfig ?? DEFAULT_FIRE_STRATEGY
+  const strategy = cfg.strategy
+  const effectiveEndAge = strategy === 'perpetual' ? Math.max(endAge, 100) : cfg.endAge
+  const legacyAmount = cfg.legacyAmount
+  // Display horizon: for perpetual use config.endAge (or 100); for others use effectiveEndAge
+  const displayEndAge = strategy === 'perpetual' ? cfg.endAge : effectiveEndAge
+
   // Nominaal netto rendement — consistent voor zowel opbouw als afbouw
   const portReturn = returnModel === 'nl_box3'
     ? grossReturn - BOX3_DRAG
     : grossReturn
+
+  // Perpetual met negatief reëel rendement is onmogelijk
+  if (strategy === 'perpetual' && portReturn <= inflation) {
+    return {
+      rows: [],
+      fireAge: null,
+      fireAgeFractional: null,
+      firePortfolioAtFire: Math.round(currentPortfolio),
+      requiredFirePortfolio: 0,
+      fireReachable: false,
+      implicitWithdrawalRate: 0,
+      classic25xTarget: Math.round(yearlyExpenses * 25),
+      strategy,
+      targetEndPortfolio: 0,
+      displayEndAge,
+    }
+  }
 
   const classic25xTarget = Math.round(yearlyExpenses * 25)
 
@@ -100,11 +133,12 @@ export function runSimulation(
     startPortfolio: number,
     startAge: number,
     generateRows: boolean,
+    simEndAge: number = effectiveEndAge,
   ): { rows: SimRow[]; endPortfolio: number } {
     const rows: SimRow[] = []
     let portfolio = startPortfolio
 
-    for (let age = startAge; age < endAge; age++) {
+    for (let age = startAge; age < simEndAge; age++) {
       const startPf = portfolio
 
       // Apply one-time cashflows to portfolio BEFORE growth
@@ -148,20 +182,37 @@ export function runSimulation(
   }
 
   /**
-   * Binary search: minimum portfolio at candidateFireAge such that
-   * decumulation results in endPortfolio ≈ 0 at endAge.
+   * Binary search: minimum portfolio at candidateFireAge such that the
+   * decumulation meets the strategy target at the verification horizon.
    */
   function requiredAt(candidateFireAge: number): number {
+    // Verification horizon: perpetual simulates 100 years post-FIRE
+    const verifyEndAge = strategy === 'perpetual'
+      ? candidateFireAge + 100
+      : effectiveEndAge
+
     let lo = 0
-    let hi = Math.max(yearlyExpenses * 200, currentPortfolio * 10, 10_000_000)
+    let hi = Math.max(
+      yearlyExpenses * (strategy === 'perpetual' ? 500 : 200),
+      currentPortfolio * 10,
+      10_000_000,
+    )
+
+    // Indexed legacy target on endAge
+    const indexedLegacy = strategy === 'legacy'
+      ? legacyAmount * Math.pow(1 + inflation, effectiveEndAge - currentAge)
+      : 0
 
     for (let iter = 0; iter < 60; iter++) {
       const mid = (lo + hi) / 2
-      const { endPortfolio } = simulateDecumulation(mid, candidateFireAge, false)
-      if (endPortfolio >= 0) {
-        hi = mid
+      const { endPortfolio: ep } = simulateDecumulation(mid, candidateFireAge, false, verifyEndAge)
+
+      if (strategy === 'legacy') {
+        if (ep >= indexedLegacy) hi = mid; else lo = mid
       } else {
-        lo = mid
+        // deplete: endPortfolio >= 0 at endAge
+        // perpetual: endPortfolio >= 0 at fireAge+100 (effectively perpetual)
+        if (ep >= 0) hi = mid; else lo = mid
       }
       if (hi - lo < 10) break
     }
@@ -175,7 +226,7 @@ export function runSimulation(
   let computedFireAge: number | null = null
   const accRows: SimRow[] = []
 
-  for (let age = currentAge; age < endAge; age++) {
+  for (let age = currentAge; age < effectiveEndAge; age++) {
     const req = requiredAt(age)
     if (portfolio >= req) {
       computedFireAge = age
@@ -220,10 +271,13 @@ export function runSimulation(
       fireAge: null,
       fireAgeFractional: null,
       firePortfolioAtFire: Math.round(portfolio),
-      requiredFirePortfolio: Math.round(requiredAt(endAge - 1)),
+      requiredFirePortfolio: Math.round(requiredAt(effectiveEndAge - 1)),
       fireReachable: false,
       implicitWithdrawalRate: 0,
       classic25xTarget,
+      strategy,
+      targetEndPortfolio: strategy === 'legacy' ? legacyAmount : 0,
+      displayEndAge,
     }
   }
 
@@ -246,7 +300,7 @@ export function runSimulation(
     fractionalFireAge = (computedFireAge - 1) + Math.max(0, Math.min(1, t))
   }
 
-  const { rows: decRows } = simulateDecumulation(requiredFirePortfolioExact, computedFireAge, true)
+  const { rows: decRows } = simulateDecumulation(requiredFirePortfolioExact, computedFireAge, true, displayEndAge)
 
   const implicitWithdrawalRate = requiredFirePortfolio > 0
     ? yearlyExpenses / requiredFirePortfolio
@@ -261,6 +315,11 @@ export function runSimulation(
     fireReachable: true,
     implicitWithdrawalRate,
     classic25xTarget,
+    strategy,
+    targetEndPortfolio: strategy === 'legacy'
+      ? Math.round(legacyAmount * Math.pow(1 + inflation, effectiveEndAge - currentAge))
+      : 0,
+    displayEndAge,
   }
 }
 

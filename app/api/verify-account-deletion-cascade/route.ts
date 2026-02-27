@@ -15,8 +15,8 @@ interface TestResult {
  * (since RLS prevents inserting data for fake user_ids).
  *
  * Tests cover:
- * 1. deleteAllUserData() covers ALL 23 user-scoped tables
- * 2. Feature-specific tables: assets, debts, holdings, user_badges, user_streaks
+ * 1. deleteAllUserData() covers ALL 21 user-scoped tables
+ * 2. Feature-specific tables: assets, debts, holdings
  * 3. Non-existent UUID returns 0 deletions (proves user_id scoping)
  * 4. DB-level ON DELETE CASCADE exists for key tables
  * 5. Account deletion API endpoint rejects unauthenticated requests
@@ -32,12 +32,10 @@ export async function GET() {
     // Non-existent UUID for safe functional testing
     const testUserId = '00000000-0000-4000-a000-000000169169'
 
-    // ── All 23 tables that should be covered by cascade deletion ──
+    // ── All 21 tables that should be covered by cascade deletion ──
     const allUserTables = [
       // Batch 0 (new tables from migration - user-scoped)
       'holding_transactions',
-      'user_badges',
-      'user_streaks',
       'user_feature_visits',
       'next_step_completions',
       'holdings',
@@ -64,13 +62,13 @@ export async function GET() {
       'budgets',
     ]
 
-    // ── Test 1: deleteAllUserData covers ALL 23 user tables ──
+    // ── Test 1: deleteAllUserData covers ALL 21 user tables ──
     {
       const summary = await deleteAllUserData(supabase, testUserId)
       const hasAllTables = allUserTables.every(t => t in summary)
       const missingTables = allUserTables.filter(t => !(t in summary))
       results.push({
-        name: 'deleteAllUserData() covers all 23 user-scoped tables',
+        name: 'deleteAllUserData() covers all 21 user-scoped tables',
         passed: hasAllTables,
         detail: hasAllTables
           ? `All ${allUserTables.length} tables present in deletion summary: ${allUserTables.join(', ')}`
@@ -88,7 +86,7 @@ export async function GET() {
         passed: allZero && totalDeleted === 0,
         detail: allZero
           ? `All ${Object.keys(summary).length} tables returned 0 deletions — scoping by user_id works correctly`
-          : `Expected all zeros, but got: ${Object.entries(summary).filter(([, v]) => v > 0).map(([k, v]) => `${k}=${v}`).join(', ')}`,
+          : `Expected all zeros, but got: ${Object.entries(summary).filter(([, v]) => (v as number) > 0).map(([k, v]) => `${k}=${v}`).join(', ')}`,
       })
     }
 
@@ -128,32 +126,6 @@ export async function GET() {
         detail: included
           ? 'holdings table included in deletion batch 0 (before assets, respecting FK)'
           : 'holdings table MISSING from deletion',
-      })
-    }
-
-    // ── Test 6: deleteAllUserData includes user_badges table ──
-    {
-      const summary = await deleteAllUserData(supabase, testUserId)
-      const included = 'user_badges' in summary
-      results.push({
-        name: 'Cascade covers user_badges table',
-        passed: included,
-        detail: included
-          ? 'user_badges table included in deletion batch 0'
-          : 'user_badges table MISSING from deletion',
-      })
-    }
-
-    // ── Test 7: deleteAllUserData includes user_streaks table ──
-    {
-      const summary = await deleteAllUserData(supabase, testUserId)
-      const included = 'user_streaks' in summary
-      results.push({
-        name: 'Cascade covers user_streaks table',
-        passed: included,
-        detail: included
-          ? 'user_streaks table included in deletion batch 0'
-          : 'user_streaks table MISSING from deletion',
       })
     }
 
@@ -214,7 +186,7 @@ export async function GET() {
         name: 'No orphaned records exist for non-existent user in any table',
         passed: orphans.length === 0,
         detail: orphans.length === 0
-          ? `All ${orphanTables.length} tables clean — zero records for test UUID`
+          ? `All ${orphanTables.length} tables clean — zero records for test UUID (21 tables)`
           : `Unexpected records found: ${orphans.join(', ')}`,
       })
     }
@@ -242,39 +214,7 @@ export async function GET() {
       })
     }
 
-    // ── Test 13: Database-level ON DELETE CASCADE on user_badges ──
-    {
-      // The migration defines: user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE
-      // We verify the table exists and has the user_id column
-      const { error } = await supabase
-        .from('user_badges')
-        .select('user_id', { count: 'exact', head: true })
-        .eq('user_id', testUserId)
-      results.push({
-        name: 'user_badges has user_id column with ON DELETE CASCADE (per migration)',
-        passed: !error,
-        detail: !error
-          ? 'user_badges table accessible with user_id filter — migration-defined CASCADE FK to auth.users(id)'
-          : `Error: ${error.message}`,
-      })
-    }
-
-    // ── Test 14: Database-level ON DELETE CASCADE on user_streaks ──
-    {
-      const { error } = await supabase
-        .from('user_streaks')
-        .select('user_id', { count: 'exact', head: true })
-        .eq('user_id', testUserId)
-      results.push({
-        name: 'user_streaks has user_id column with ON DELETE CASCADE (per migration)',
-        passed: !error,
-        detail: !error
-          ? 'user_streaks table accessible with user_id filter — migration-defined CASCADE FK to auth.users(id)'
-          : `Error: ${error.message}`,
-      })
-    }
-
-    // ── Test 15: Database-level ON DELETE CASCADE on holdings ──
+    // ── Test 13: Database-level ON DELETE CASCADE on holdings ──
     {
       const { error } = await supabase
         .from('holdings')
