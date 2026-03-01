@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { computeSovereigntyLevel, PHASES, levelToPhaseId } from '@/lib/feature-phases'
 import { NL_SWR, ageAtDate } from '@/lib/horizon-data'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, ChevronDown, LayoutDashboard, Landmark, Zap, Compass, BookOpen } from 'lucide-react'
 import {
   temporalLevels,
   chronologyPhases,
@@ -16,6 +16,64 @@ import {
   featureIcons,
   getFeaturesPerPhase,
 } from '@/lib/identity-constants'
+
+/* ── Helper components for user guide ─────────────────────── */
+
+function GuideAccordion({
+  id,
+  icon,
+  title,
+  tagline,
+  color,
+  open,
+  onToggle,
+  children,
+}: {
+  id: string
+  icon: React.ReactNode
+  title: string
+  tagline: string
+  color: string
+  open: boolean
+  onToggle: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)]" data-testid={`guide-${id}`}>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-[var(--subtle)]/60"
+      >
+        <div
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r-sm)]"
+          style={{ backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`, color }}
+        >
+          {icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-[var(--ink)]">{title}</p>
+          <p className="text-[11px] text-[var(--ink-3)]">{tagline}</p>
+        </div>
+        <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-[var(--ink-4)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="border-t border-[var(--border-ed)] px-3 pb-3 pt-2">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function GuideItem({ children }: { children: React.ReactNode }) {
+  return (
+    <li className="flex items-start gap-2 text-[12px] leading-relaxed text-[var(--ink-2)]">
+      <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-[var(--ink-3)]" />
+      <span>{children}</span>
+    </li>
+  )
+}
 
 export default function IdentityPage() {
   const router = useRouter()
@@ -44,6 +102,8 @@ export default function IdentityPage() {
 
   // UI state
   const [loading, setLoading] = useState(true)
+  const [guideOpen, setGuideOpen] = useState(false)
+  const [guideSection, setGuideSection] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadData() {
@@ -248,6 +308,164 @@ export default function IdentityPage() {
           <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />
         </div>
       </Link>
+
+      {/* ── Zo werkt TriFinity — gebruikersinstructies ──────────── */}
+      <section className="mb-5 sm:mb-8 card-editorial overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setGuideOpen(!guideOpen)}
+          className="flex w-full items-center justify-between p-4 sm:p-8 text-left transition-colors hover:bg-[var(--subtle)]/50"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] border border-[var(--border-ed)]">
+              <BookOpen className="h-4 w-4 text-[var(--ink-2)]" />
+            </div>
+            <div>
+              <h2 className="font-display text-lg font-bold text-[var(--ink)]" style={{ letterSpacing: '-0.02em' }}>
+                Zo werkt TriFinity
+              </h2>
+              <p className="text-[12px] text-[var(--ink-3)]">Korte rondleiding door de app</p>
+            </div>
+          </div>
+          <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${guideOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {guideOpen && (
+          <div className="border-t border-[var(--border-ed)] px-4 pb-5 pt-4 sm:px-8 sm:pb-8">
+            {/* Filosofie */}
+            <div className="mb-5 rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4">
+              <p className="font-serif italic text-sm leading-relaxed text-[var(--ink-2)]">
+                &ldquo;Geld is opgeslagen tijd.&rdquo; Elke euro die je verdient, spaart of uitgeeft
+                vertegenwoordigt een stukje van je levenstijd. TriFinity vertaalt al je financiële
+                gegevens naar <strong className="font-semibold text-[var(--ink)]">vrijheidstijd</strong> —
+                dagen, maanden en jaren dat je niet hoeft te werken.
+              </p>
+            </div>
+
+            {/* Kernbegrippen — snelle rij */}
+            <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[
+                { label: 'Vrijheidsdagen', desc: 'Dagen die je vermogen dekt' },
+                { label: 'Kassabon', desc: 'Tik op een getal → zie hoe het berekend is' },
+                { label: 'Soevereiniteit', desc: 'Je niveau op de reis naar vrijheid' },
+                { label: 'FIRE', desc: 'Het moment dat werken optioneel wordt' },
+              ].map((item) => (
+                <div key={item.label} className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] p-2.5">
+                  <p className="text-[11px] font-semibold text-[var(--ink)]">{item.label}</p>
+                  <p className="mt-0.5 text-[11px] leading-snug text-[var(--ink-3)]">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+
+            <p className="label-editorial text-[var(--ink-3)] mb-3">De vier onderdelen</p>
+
+            {/* Onderdelen — accordion */}
+            <div className="space-y-2">
+              {/* Dashboard */}
+              <GuideAccordion
+                id="dashboard"
+                icon={<LayoutDashboard className="h-4 w-4" />}
+                title="Dashboard"
+                tagline="Alles in één oogopslag"
+                color="var(--ink-2)"
+                open={guideSection === 'dashboard'}
+                onToggle={() => setGuideSection(guideSection === 'dashboard' ? null : 'dashboard')}
+              >
+                <ul className="space-y-1.5">
+                  <GuideItem>Je startpagina met een samenvatting van alle drie de modules.</GuideItem>
+                  <GuideItem>Elk blok toont de belangrijkste metric — tik erop om naar de module te gaan.</GuideItem>
+                  <GuideItem>Onderaan kun je widgets toevoegen en herschikken naar jouw voorkeur.</GuideItem>
+                  <GuideItem>De volgorde aanpassen? Ga naar <span className="font-semibold">Identiteit → Instellingen → Widgets</span>.</GuideItem>
+                </ul>
+              </GuideAccordion>
+
+              {/* De Kern */}
+              <GuideAccordion
+                id="kern"
+                icon={<Landmark className="h-4 w-4" />}
+                title="De Kern"
+                tagline="Je financiële fundament"
+                color="var(--kern-t, #58362d)"
+                open={guideSection === 'kern'}
+                onToggle={() => setGuideSection(guideSection === 'kern' ? null : 'kern')}
+              >
+                <p className="mb-2 text-[12px] text-[var(--ink-3)]">
+                  Hier staat alles wat je hebt en wat er binnenkomt en uitgaat.
+                </p>
+                <ul className="space-y-1.5">
+                  <GuideItem><strong>Overzicht</strong> — Netto vermogen, jaarinkomen, uitgaven en FIRE-bedrag. Tik op een getal voor de kassabon.</GuideItem>
+                  <GuideItem><strong>Budgetten</strong> — Stel maandbudgetten in per categorie. Zie direct hoeveel je deze maand al hebt uitgegeven en hoeveel ruimte er nog is.</GuideItem>
+                  <GuideItem><strong>Kas</strong> — Al je transacties en bankrekeningen. Koppel een bank of importeer een bestand (MT940, CSV, OFX).</GuideItem>
+                  <GuideItem><strong>Bezittingen</strong> — Vastgoed, beleggingen, crypto, pensioen — alles op één plek met groeiprojecties.</GuideItem>
+                  <GuideItem><strong>Schulden</strong> — Overzicht van leningen met aflosstrategie (sneeuwbal of lawine).</GuideItem>
+                  <GuideItem><strong>Belasting</strong> — Box 3 berekening en optimalisatietips.</GuideItem>
+                </ul>
+              </GuideAccordion>
+
+              {/* De Wil */}
+              <GuideAccordion
+                id="wil"
+                icon={<Zap className="h-4 w-4" />}
+                title="De Wil"
+                tagline="Wat je nu kunt doen"
+                color="var(--will-t, #2e2437)"
+                open={guideSection === 'wil'}
+                onToggle={() => setGuideSection(guideSection === 'wil' ? null : 'wil')}
+              >
+                <p className="mb-2 text-[12px] text-[var(--ink-3)]">
+                  De module die je financiën omzet in concrete acties.
+                </p>
+                <ul className="space-y-1.5">
+                  <GuideItem><strong>Aanbevelingen</strong> — AI-coaches analyseren je situatie en geven persoonlijke tips. Elke tip toont hoeveel vrijheidsdagen je ermee wint.</GuideItem>
+                  <GuideItem><strong>Acties</strong> — Zet een aanbeveling om in een actie, of maak er zelf een. Vink af als je klaar bent.</GuideItem>
+                  <GuideItem><strong>Doelen</strong> — Stel spaardoelen in en volg de voortgang visueel.</GuideItem>
+                  <GuideItem><strong>Abonnementen</strong> — Automatisch gedetecteerde terugkerende kosten. Bekijk wat je kunt besparen.</GuideItem>
+                </ul>
+              </GuideAccordion>
+
+              {/* De Horizon */}
+              <GuideAccordion
+                id="horizon"
+                icon={<Compass className="h-4 w-4" />}
+                title="De Horizon"
+                tagline="Je pad naar vrijheid"
+                color="var(--hor-t, #8a6e42)"
+                open={guideSection === 'horizon'}
+                onToggle={() => setGuideSection(guideSection === 'horizon' ? null : 'horizon')}
+              >
+                <p className="mb-2 text-[12px] text-[var(--ink-3)]">
+                  Kijk verder dan vandaag — wanneer wordt werken optioneel?
+                </p>
+                <ul className="space-y-1.5">
+                  <GuideItem><strong>FIRE Countdown</strong> — Hoeveel jaar, maanden en dagen tot financiële vrijheid. Gebaseerd op je echte data.</GuideItem>
+                  <GuideItem><strong>Vermogenspad</strong> — Grafiek van je vermogensgroei in de tijd met optimistisch, verwacht en pessimistisch scenario.</GuideItem>
+                  <GuideItem><strong>Levensgebeurtenissen</strong> — Voeg AOW, pensioen, kinderen of een huis toe en zie direct het effect op je FIRE-datum.</GuideItem>
+                  <GuideItem><strong>Simulaties</strong> — Monte Carlo analyse toont hoe bestendig je plan is tegen beurscrashes.</GuideItem>
+                  <GuideItem><strong>Onttrekkingsstrategie</strong> — Bereken hoeveel je veilig per jaar kunt opnemen (SWR).</GuideItem>
+                </ul>
+              </GuideAccordion>
+            </div>
+
+            {/* Pro tips */}
+            <div className="mt-5 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/50 p-4">
+              <p className="label-editorial text-[var(--ink-3)] mb-2">Snelle tips</p>
+              <ul className="space-y-1">
+                {[
+                  'Tik op elk bedrag met een kassabon-icoon om de berekening te zien.',
+                  'Je dashboard-widgets zijn aanpasbaar via Instellingen.',
+                  'Nieuwe features worden automatisch ontgrendeld als je soevereiniteitsniveau stijgt.',
+                  'Gebruik de AI-chat (rechtsonder) voor vragen over je financiën.',
+                ].map((tip, i) => (
+                  <li key={i} className="flex items-start gap-2 text-[12px] leading-relaxed text-[var(--ink-2)]">
+                    <span className="mt-0.5 shrink-0 text-[var(--ink-3)]">{i + 1}.</span>
+                    <span>{tip}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* ── The Temporal Balance ──────────────────────────────────── */}
       <section className="mb-5 sm:mb-8 card-editorial p-4 sm:p-8">
