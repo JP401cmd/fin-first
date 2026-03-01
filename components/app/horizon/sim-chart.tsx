@@ -40,6 +40,7 @@ export function SimChart({
   baselineRows,
   scenarioOverlays,
   monteCarloOverlay,
+  baselineFireAge,
 }: {
   rows: SimRow[]
   fireAge: number | null
@@ -55,6 +56,8 @@ export function SimChart({
   baselineRows?: SimRow[]
   scenarioOverlays?: ScenarioOverlay[]
   monteCarloOverlay?: MonteCarloOverlay
+  /** Optional baseline FIRE age for delta annotation (what-if mode) */
+  baselineFireAge?: number | null
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
 
@@ -482,6 +485,24 @@ export function SimChart({
           <text x={xFire + 4} y={PAD.top + 24} fontSize={8}
             fill={COLOR_OPBOUW} fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
             FIRE {fireAgeFractional.toFixed(1)}
+          </text>
+        )}
+
+        {/* FIRE age delta label (what-if mode) */}
+        {xFire !== null && yFireDot !== null && fireAgeFractional !== null && baselineFireAge != null &&
+          fireAgeFractional > minAge && fireAgeFractional < maxAge &&
+          Math.abs(fireAgeFractional - baselineFireAge) > 0.1 && (
+          <text
+            x={xFire}
+            y={yFireDot - 14}
+            textAnchor="middle"
+            fontSize={9}
+            fontWeight={700}
+            fontFamily="var(--font-dm-mono, monospace)"
+            fill={fireAgeFractional < baselineFireAge ? COLOR_OPBOUW : COLOR_AFBOUW}
+          >
+            {fireAgeFractional < baselineFireAge ? '' : '+'}
+            {(fireAgeFractional - baselineFireAge).toFixed(1)} jr
           </text>
         )}
 

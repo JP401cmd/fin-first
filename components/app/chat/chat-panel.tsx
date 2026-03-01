@@ -205,7 +205,7 @@ function ActionSuggestionCard({
 /* ── Main ChatPanel ────────────────────────────────────────────────── */
 
 export function ChatPanel() {
-  const { isOpen, close, toggle, pendingMessage, clearPendingMessage, isPinned, togglePin } = useChatContext()
+  const { isOpen, close, toggle, pendingMessage, clearPendingMessage, isPinned, togglePin, autoOpenMessage, setAutoOpenMessage } = useChatContext()
   const router = useRouter()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -251,6 +251,16 @@ export function ChatPanel() {
       clearPendingMessage()
     }
   }, [isOpen, pendingMessage, isStreaming, sendMessage, clearPendingMessage])
+
+  // Auto-send scenario context message when chat opens from whatif page (first open only)
+  const autoSentRef = useRef(false)
+  useEffect(() => {
+    if (isOpen && autoOpenMessage && !isStreaming && messages.length === 0 && !autoSentRef.current) {
+      autoSentRef.current = true
+      sendMessage({ text: autoOpenMessage })
+      setAutoOpenMessage(null)
+    }
+  }, [isOpen, autoOpenMessage, isStreaming, messages.length, sendMessage, setAutoOpenMessage])
 
   const submit = () => {
     const text = input.trim()

@@ -5,7 +5,7 @@ import { ChevronLeft, Sparkles } from 'lucide-react'
 
 export function WhatIfHeader() {
   return (
-    <div className="mb-6">
+    <div className="mb-4">
       {/* Back link */}
       <Link
         href="/horizon"
@@ -27,11 +27,6 @@ export function WhatIfHeader() {
       <h1 className="mt-1 font-display text-[28px] font-bold leading-tight tracking-tight text-[var(--ink)] sm:text-[36px]">
         Jouw toekomst, jouw keuze
       </h1>
-
-      {/* Subtitle */}
-      <p className="mt-1 font-serif text-[13px] italic text-[var(--ink-3)]">
-        Speel met de knoppen en ontdek hoe keuzes je toekomst veranderen.
-      </p>
     </div>
   )
 }

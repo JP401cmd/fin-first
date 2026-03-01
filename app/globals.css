@@ -782,18 +782,63 @@ body {
   }
 }
 
-/* ── What-If dimension shift effect ──────────────────────── */
-@keyframes whatif-enter {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+/* ── What-If dimension shift ─────────────────────────────── */
+
+/*
+ * Three-phase dimensional transition:
+ *   1. SNAP — reality ends decisively (0→300ms)
+ *   2. HOLD — golden threshold, the in-between (300→1400ms)
+ *   3. PART — gold fades, new world is already there (1400→2800ms)
+ */
+
+/* Veil: snaps to full gold fast, holds, then slowly parts */
+@keyframes whatif-veil {
+  0%   { opacity: 0; }
+  10%  { opacity: 1; }
+  50%  { opacity: 1; }
+  80%  { opacity: 0.08; }
+  100% { opacity: 0; visibility: hidden; }
+}
+
+/* World: entire what-if reality focuses into existence at once */
+@keyframes whatif-world-in {
+  0%   { opacity: 0; transform: scale(0.97); filter: blur(6px); }
+  100% { opacity: 1; transform: scale(1);    filter: blur(0px); }
 }
 
 .whatif-dimension {
+  position: relative;
   background-color: #f5f3ed;
-  background-image: radial-gradient(ellipse at 50% 0%, rgba(61,48,72,0.04), transparent 70%);
-  animation: whatif-enter 400ms ease-out both;
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(196, 160, 107, 0.04), transparent 60%),
+    radial-gradient(ellipse at 80% 100%, rgba(61, 48, 72, 0.02), transparent 50%);
 }
 
-.animate-whatif-enter {
-  animation: whatif-enter 400ms ease-out both;
+/* Horizon-gold veil — solid enough to feel like a true threshold */
+.whatif-dimension::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background:
+    radial-gradient(
+      ellipse at 50% 40%,
+      rgba(196, 160, 107, 0.85),
+      rgba(196, 160, 107, 0.6) 40%,
+      rgba(196, 160, 107, 0.35) 70%,
+      rgba(180, 150, 100, 0.15)
+    );
+  pointer-events: none;
+  animation: whatif-veil 2800ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Single wrapper for all page content — enters as one cohesive world */
+.whatif-world {
+  animation: whatif-world-in 800ms cubic-bezier(0.16, 1, 0.3, 1) 1200ms both;
+}
+
+/* Reduced motion: skip the spectacle, keep the background shift */
+@media (prefers-reduced-motion: reduce) {
+  .whatif-dimension::before { animation: none; opacity: 0; }
+  .whatif-world { animation: none; opacity: 1; }
 }

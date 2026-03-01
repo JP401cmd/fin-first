@@ -4,6 +4,7 @@ import { getModel, AIConfigError } from '@/lib/ai/config'
 import { buildSystemPrompt, type AIDomain } from '@/lib/ai/dna'
 import { buildContext } from '@/lib/ai/context/builder'
 import { getTools } from '@/lib/ai/tools'
+import { WHATIF_PROMPT } from '@/lib/ai/dna/wil'
 
 /* AI response timeout in milliseconds (60 seconds) */
 const AI_TIMEOUT_MS = 60_000
@@ -16,9 +17,10 @@ export async function POST(req: Request) {
     return new Response('Unauthorized', { status: 401 })
   }
 
-  const { messages, domain = 'wil' } = await req.json() as {
+  const { messages, domain = 'wil', context: chatContext } = await req.json() as {
     messages: UIMessage[]
     domain?: AIDomain
+    context?: string
   }
 
   const validDomains: AIDomain[] = ['kern', 'wil', 'horizon']
@@ -36,10 +38,10 @@ export async function POST(req: Request) {
 
   /* Build context and prompts — catch errors to avoid crashing the stream */
   let systemPrompt: string
-  let context: string
+  let financialContext: string
   try {
     systemPrompt = await buildSystemPrompt(safeDomain, supabase)
-    context = await buildContext(supabase)
+    financialContext = await buildContext(supabase)
   } catch (err) {
     console.error('[AI Chat] Context build failed:', err)
     return Response.json(
@@ -48,7 +50,12 @@ export async function POST(req: Request) {
     )
   }
 
-  const tools = getTools(safeDomain, supabase)
+  // Replace entire system prompt in whatif mode — different personality
+  if (chatContext === 'whatif') {
+    systemPrompt = WHATIF_PROMPT
+  }
+
+  const tools = getTools(safeDomain, supabase, chatContext)
   const modelMessages = await convertToModelMessages(messages)
 
   /* Create an AbortController that fires on timeout */
@@ -61,7 +68,7 @@ export async function POST(req: Request) {
   try {
     const result = streamText({
       model,
-      system: systemPrompt + '\n\n' + context,
+      system: systemPrompt + '\n\n' + financialContext,
       messages: modelMessages,
       tools,
       stopWhen: stepCountIs(5),

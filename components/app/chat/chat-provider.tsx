@@ -13,6 +13,9 @@ type ChatContextType = {
   isPinned: boolean
   togglePin: () => void
   setIsPinned: (pinned: boolean) => void
+  /** Auto-message to send when chat is opened from a specific page context */
+  autoOpenMessage: string | null
+  setAutoOpenMessage: (msg: string | null) => void
 }
 
 const ChatContext = createContext<ChatContextType | null>(null)
@@ -29,6 +32,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
   const [pendingMessage, setPendingMessage] = useState<string | null>(null)
   const [isPinned, setIsPinnedState] = useState(false)
+  const [autoOpenMessage, setAutoOpenMessageState] = useState<string | null>(null)
 
   // Restore pin state from localStorage on mount
   useEffect(() => {
@@ -86,11 +90,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const setAutoOpenMessage = useCallback((msg: string | null) => {
+    setAutoOpenMessageState(msg)
+  }, [])
+
   return (
     <ChatContext.Provider value={{
       isOpen, open, close, toggle, openWithMessage,
       pendingMessage, clearPendingMessage,
       isPinned, togglePin, setIsPinned,
+      autoOpenMessage, setAutoOpenMessage,
     }}>
       {children}
     </ChatContext.Provider>

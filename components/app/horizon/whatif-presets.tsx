@@ -25,7 +25,7 @@ const PRESETS: Preset[] = [
     id: 'part-time',
     label: 'Part-time',
     description: '4 dagen per week werken',
-    icon: <Briefcase className="h-4 w-4" />,
+    icon: <Briefcase className="h-3.5 w-3.5" />,
     apply: (b) => ({
       ...b,
       workDaysPerWeek: 4,
@@ -37,7 +37,7 @@ const PRESETS: Preset[] = [
     id: 'raise',
     label: 'Loonsverhoging',
     description: '+10% bruto inkomen',
-    icon: <TrendingUp className="h-4 w-4" />,
+    icon: <TrendingUp className="h-3.5 w-3.5" />,
     apply: (b) => ({
       ...b,
       monthlyIncome: Math.round(b.monthlyIncome * 1.1 / 100) * 100,
@@ -48,7 +48,7 @@ const PRESETS: Preset[] = [
     id: 'frugal',
     label: 'Zuinig leven',
     description: 'Spaarquote +15 procentpunt',
-    icon: <PiggyBank className="h-4 w-4" />,
+    icon: <PiggyBank className="h-3.5 w-3.5" />,
     apply: (b) => ({
       ...b,
       savingsRate: Math.min(80, b.savingsRate + 15),
@@ -59,7 +59,7 @@ const PRESETS: Preset[] = [
     id: 'fire-sprinter',
     label: 'FIRE sprinter',
     description: 'Maximaal versnellen',
-    icon: <Rocket className="h-4 w-4" />,
+    icon: <Rocket className="h-3.5 w-3.5" />,
     apply: (b) => ({
       ...b,
       savingsRate: Math.min(80, b.savingsRate + 10),
@@ -71,7 +71,7 @@ const PRESETS: Preset[] = [
     id: 'sabbatical',
     label: 'Mini-sabbatical',
     description: '3 dagen, lager inkomen',
-    icon: <Palmtree className="h-4 w-4" />,
+    icon: <Palmtree className="h-3.5 w-3.5" />,
     apply: (b) => ({
       ...b,
       workDaysPerWeek: 3,
@@ -118,56 +118,32 @@ export function WhatIfPresets({
   const effectiveActive = isActivePresetStillMatching ? activePreset : null
 
   return (
-    <div className="card-editorial overflow-hidden">
-      <div className="px-4 py-3">
-        <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-wil-600">
-          Snelle scenario&apos;s
-        </p>
-        <p className="mt-0.5 font-sans text-[11px] text-[var(--ink-3)]">
-          Klik om een scenario te laden — klik nogmaals om te resetten
-        </p>
-      </div>
+    <div className="flex flex-wrap gap-2">
+      {PRESETS.map(preset => {
+        const isActive = effectiveActive === preset.id
 
-      {/* Horizontal scrollable preset strip */}
-      <div className="scrollbar-none flex gap-2 overflow-x-auto px-4 pb-4">
-        {PRESETS.map(preset => {
-          const isActive = effectiveActive === preset.id
-
-          return (
-            <button
-              key={preset.id}
-              type="button"
-              aria-pressed={effectiveActive === preset.id}
-              onClick={() => handlePresetClick(preset)}
-              className={`group flex shrink-0 min-h-[44px] flex-col rounded-[var(--r)] border px-3 py-2.5 text-left transition-all ${
-                isActive
-                  ? 'border-wil-400 bg-wil-50 shadow-sm'
-                  : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-wil-300 hover:shadow-sm'
-              }`}
-              style={{ minWidth: '140px', maxWidth: '170px' }}
-            >
-              <div className="flex items-center gap-1.5">
-                <span className={isActive ? 'text-wil-600' : 'text-[var(--ink-3)] group-hover:text-wil-500'}>
-                  {preset.icon}
-                </span>
-                <span className={`font-sans text-xs font-semibold ${
-                  isActive ? 'text-wil-700' : 'text-[var(--ink)]'
-                }`}>
-                  {preset.label}
-                </span>
-              </div>
-              <p className="mt-1 font-sans text-[10px] leading-snug text-[var(--ink-3)]">
-                {preset.description}
-              </p>
-              <span className={`mt-1.5 font-mono text-[10px] ${
-                isActive ? 'text-wil-600' : 'text-[var(--ink-4)]'
-              }`}>
-                {preset.summary(baseline)}
-              </span>
-            </button>
-          )
-        })}
-      </div>
+        return (
+          <button
+            key={preset.id}
+            type="button"
+            aria-pressed={effectiveActive === preset.id}
+            title={preset.description}
+            onClick={() => handlePresetClick(preset)}
+            className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3.5 py-2 transition-all ${
+              isActive
+                ? 'border-wil-400 bg-wil-50 text-wil-700 shadow-sm'
+                : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] hover:border-wil-300 hover:shadow-sm'
+            }`}
+          >
+            <span className={isActive ? 'text-wil-600' : 'text-[var(--ink-3)]'}>
+              {preset.icon}
+            </span>
+            <span className="font-sans text-xs font-semibold">
+              {preset.label}
+            </span>
+          </button>
+        )
+      })}
     </div>
   )
 }

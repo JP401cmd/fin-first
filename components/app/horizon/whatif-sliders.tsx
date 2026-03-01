@@ -57,7 +57,7 @@ function SliderRow({
   maxLabel: string
 }) {
   return (
-    <div className="py-2">
+    <div className="py-1.5">
       <div className="mb-1 flex items-center justify-between">
         <span className="font-sans text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
           {label}
@@ -102,7 +102,7 @@ export function WhatIfSliders({ overrides, baseline, onChange }: WhatIfSlidersPr
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center justify-between px-4 py-3 text-left md:hidden"
+        className="flex w-full items-center justify-between px-4 py-2.5 text-left md:hidden"
       >
         <div>
           <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-wil-600">
@@ -120,7 +120,7 @@ export function WhatIfSliders({ overrides, baseline, onChange }: WhatIfSlidersPr
       </button>
 
       {/* Desktop: always-visible label */}
-      <div className="hidden px-4 pt-4 md:block">
+      <div className="hidden px-4 pb-3 pt-3 md:block">
         <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-wil-600">
           Scenario-parameters
         </p>
@@ -128,77 +128,87 @@ export function WhatIfSliders({ overrides, baseline, onChange }: WhatIfSlidersPr
 
       {/* Sliders — expandable on mobile, always visible on desktop */}
       <div className={`px-4 pb-4 ${expanded ? 'block' : 'hidden'} md:block`}>
-        <div className="divide-y divide-dashed divide-[var(--border-ed)]">
-          <SliderRow
-            label="Maandinkomen"
-            value={overrides.monthlyIncome}
-            baseValue={baseline.monthlyIncome}
-            min={0}
-            max={15000}
-            step={100}
-            formatValue={formatCurrency}
-            formatDelta={v => formatCurrency(v) + '/mnd'}
-            onChange={v => set('monthlyIncome', v)}
-            minLabel="€ 0"
-            maxLabel="€ 15.000"
-          />
+        {/* First 4 sliders: 2-col grid on desktop */}
+        <div className="xl:grid xl:grid-cols-2 xl:gap-x-6">
+          <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
+            <SliderRow
+              label="Maandinkomen"
+              value={overrides.monthlyIncome}
+              baseValue={baseline.monthlyIncome}
+              min={0}
+              max={15000}
+              step={100}
+              formatValue={formatCurrency}
+              formatDelta={v => formatCurrency(v) + '/mnd'}
+              onChange={v => set('monthlyIncome', v)}
+              minLabel="€ 0"
+              maxLabel="€ 15.000"
+            />
+          </div>
 
-          <SliderRow
-            label="Werkdagen per week"
-            value={overrides.workDaysPerWeek}
-            baseValue={baseline.workDaysPerWeek}
-            min={1}
-            max={5}
-            step={1}
-            formatValue={v => `${v} dagen`}
-            formatDelta={v => `${v} dag${Math.abs(v) !== 1 ? 'en' : ''}`}
-            onChange={v => set('workDaysPerWeek', v)}
-            minLabel="1 dag"
-            maxLabel="5 dagen"
-          />
+          <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
+            <SliderRow
+              label="Werkdagen per week"
+              value={overrides.workDaysPerWeek}
+              baseValue={baseline.workDaysPerWeek}
+              min={1}
+              max={5}
+              step={1}
+              formatValue={v => `${v} dagen`}
+              formatDelta={v => `${v} dag${Math.abs(v) !== 1 ? 'en' : ''}`}
+              onChange={v => set('workDaysPerWeek', v)}
+              minLabel="1 dag"
+              maxLabel="5 dagen"
+            />
+          </div>
 
-          <SliderRow
-            label="Spaarquote"
-            value={overrides.savingsRate}
-            baseValue={baseline.savingsRate}
-            min={0}
-            max={80}
-            step={1}
-            formatValue={v => `${Math.round(v)}%`}
-            formatDelta={v => `${Math.round(v)}%`}
-            onChange={v => set('savingsRate', v)}
-            minLabel="0%"
-            maxLabel="80%"
-          />
+          <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
+            <SliderRow
+              label="Spaarquote"
+              value={overrides.savingsRate}
+              baseValue={baseline.savingsRate}
+              min={0}
+              max={80}
+              step={1}
+              formatValue={v => `${Math.round(v)}%`}
+              formatDelta={v => `${Math.round(v)}%`}
+              onChange={v => set('savingsRate', v)}
+              minLabel="0%"
+              maxLabel="80%"
+            />
+          </div>
 
-          <SliderRow
-            label="Verwacht rendement"
-            value={overrides.expectedReturn}
-            baseValue={baseline.expectedReturn}
-            min={2}
-            max={12}
-            step={0.5}
-            formatValue={v => `${v.toFixed(1)}%`}
-            formatDelta={v => `${v.toFixed(1)}%`}
-            onChange={v => set('expectedReturn', v)}
-            minLabel="2%"
-            maxLabel="12%"
-          />
-
-          <SliderRow
-            label="Extra maandelijkse inleg"
-            value={overrides.extraContribution}
-            baseValue={baseline.extraContribution}
-            min={0}
-            max={5000}
-            step={50}
-            formatValue={formatCurrency}
-            formatDelta={v => formatCurrency(v) + '/mnd'}
-            onChange={v => set('extraContribution', v)}
-            minLabel="€ 0"
-            maxLabel="€ 5.000"
-          />
+          <div className="border-b border-dashed border-[var(--border-ed)] xl:border-b-0">
+            <SliderRow
+              label="Verwacht rendement"
+              value={overrides.expectedReturn}
+              baseValue={baseline.expectedReturn}
+              min={2}
+              max={12}
+              step={0.5}
+              formatValue={v => `${v.toFixed(1)}%`}
+              formatDelta={v => `${v.toFixed(1)}%`}
+              onChange={v => set('expectedReturn', v)}
+              minLabel="2%"
+              maxLabel="12%"
+            />
+          </div>
         </div>
+
+        {/* 5th slider: full width */}
+        <SliderRow
+          label="Extra maandelijkse inleg"
+          value={overrides.extraContribution}
+          baseValue={baseline.extraContribution}
+          min={0}
+          max={5000}
+          step={50}
+          formatValue={formatCurrency}
+          formatDelta={v => formatCurrency(v) + '/mnd'}
+          onChange={v => set('extraContribution', v)}
+          minLabel="€ 0"
+          maxLabel="€ 5.000"
+        />
 
         {/* Reset button */}
         {JSON.stringify(overrides) !== JSON.stringify(baseline) && (
