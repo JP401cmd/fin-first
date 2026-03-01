@@ -31,7 +31,7 @@ const PRESETS: Preset[] = [
       workDaysPerWeek: 4,
       monthlyIncome: b.monthlyIncome,
     }),
-    summary: (b) => `${b.workDaysPerWeek} → 4 dagen`,
+    summary: (b) => b.workDaysPerWeek <= 4 ? '4 dagen/week' : `${b.workDaysPerWeek} → 4 dagen`,
   },
   {
     id: 'raise',
@@ -78,7 +78,7 @@ const PRESETS: Preset[] = [
       monthlyIncome: b.monthlyIncome,
       savingsRate: Math.max(0, b.savingsRate - 10),
     }),
-    summary: (b) => `${b.workDaysPerWeek} → 3 dagen, −10% sparen`,
+    summary: (b) => b.workDaysPerWeek <= 3 ? '3 dagen/week, −10% sparen' : `${b.workDaysPerWeek} → 3 dagen, −10% sparen`,
   },
 ]
 
@@ -129,7 +129,7 @@ export function WhatIfPresets({
       </div>
 
       {/* Horizontal scrollable preset strip */}
-      <div className="scrollbar-hide flex gap-2 overflow-x-auto px-4 pb-4">
+      <div className="scrollbar-none flex gap-2 overflow-x-auto px-4 pb-4">
         {PRESETS.map(preset => {
           const isActive = effectiveActive === preset.id
 
