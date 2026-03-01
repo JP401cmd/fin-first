@@ -24,6 +24,7 @@ import { SimChart } from '@/components/app/horizon/sim-chart'
 import { WhatIfHeader } from '@/components/app/horizon/whatif-header'
 import { WhatIfSliders, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
 import { WhatIfEventsPanel, type WhatIfEvent } from '@/components/app/horizon/whatif-events'
+import { WhatIfActions } from '@/components/app/horizon/whatif-actions'
 import { Loader2, AlertTriangle, Hourglass, TrendingUp } from 'lucide-react'
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -324,6 +325,14 @@ export default function WhatIfPage() {
     ? whatIfFireAge - baselineFireAge
     : null
 
+  // Annual savings for scenario summary
+  const whatIfAnnualSavings = whatIfInput
+    ? Math.max(0, (whatIfInput.monthlyIncome - whatIfInput.monthlyExpenses) * 12) + (overrides?.extraContribution ?? 0) * 12
+    : 0
+  const baselineAnnualSavings = input
+    ? Math.max(0, (input.monthlyIncome - input.monthlyExpenses) * 12)
+    : 0
+
   // ── Loading state ────────────────────────────────────────
   if (loading) {
     return (
@@ -517,6 +526,18 @@ export default function WhatIfPage() {
             onRemoveEvent={handleRemoveEvent}
             baselineFireAge={baselineFireAge}
             computeImpact={computeImpact}
+          />
+        </div>
+
+        {/* ── Scenario Actions ────────────────────────────────── */}
+        <div className="animate-whatif-enter mt-4" style={{ animationDelay: '500ms' }}>
+          <WhatIfActions
+            overrides={overrides}
+            baseline={baseline}
+            baselineFireAge={baselineFireAge}
+            whatIfFireAge={whatIfFireAge}
+            whatIfAnnualSavings={whatIfAnnualSavings}
+            baselineAnnualSavings={baselineAnnualSavings}
           />
         </div>
 
