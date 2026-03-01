@@ -23,6 +23,7 @@ import { parseFireStrategy, type FireStrategyConfig, STRATEGY_LABELS } from '@/l
 import { SimChart } from '@/components/app/horizon/sim-chart'
 import { WhatIfHeader } from '@/components/app/horizon/whatif-header'
 import { WhatIfSliders, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
+import { WhatIfEventsPanel, type WhatIfEvent } from '@/components/app/horizon/whatif-events'
 import { Loader2, AlertTriangle, Hourglass, TrendingUp } from 'lucide-react'
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -39,7 +40,7 @@ function formatFireAge(age: number | null): string {
 export default function WhatIfPage() {
   // ── Base data state ──────────────────────────────────────
   const [input, setInput] = useState<HorizonInput | null>(null)
-  const [events, setEvents] = useState<LifeEvent[]>([])
+  const [events, setEvents] = useState<WhatIfEvent[]>([])
   const [fireStrategy, setFireStrategy] = useState<FireStrategyConfig | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -119,7 +120,7 @@ export default function WhatIfPage() {
       }
 
       setInput(horizonInput)
-      setEvents((eventsResult.data ?? []) as LifeEvent[])
+      setEvents((eventsResult.data ?? []).map(e => ({ ...e } as WhatIfEvent)))
 
       // Initialize sliders from real data
       const savingsRate = monthlyIncome > 0
@@ -142,6 +143,27 @@ export default function WhatIfPage() {
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
+
+  // ── Event handlers ─────────────────────────────────────────
+  const handleToggleEvent = useCallback((id: string) => {
+    setEvents(prev => prev.map(e =>
+      e.id === id ? { ...e, whatIfDisabled: !e.whatIfDisabled } : e
+    ))
+  }, [])
+
+  const handleAddEvent = useCallback((event: WhatIfEvent) => {
+    setEvents(prev => [...prev, event])
+  }, [])
+
+  const handleRemoveEvent = useCallback((id: string) => {
+    setEvents(prev => prev.filter(e => e.id !== id))
+  }, [])
+
+  // ── Active events (for simulation) ────────────────────────
+  const activeEvents = useMemo(() =>
+    events.filter(e => !e.whatIfDisabled),
+    [events]
+  )
 
   // ── Derived baseline values (snapshot of real data) ──────
   const baseline = useMemo<WhatIfOverrides | null>(() => {
@@ -193,7 +215,7 @@ export default function WhatIfPage() {
 
     const annualSavings = (input.monthlyContributions ?? 0) * 12
     const strategyForSim = fireStrategy ?? { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 }
-    const cashflows = lifeEventsToCashflows(events)
+    const cashflows = lifeEventsToCashflows(activeEvents)
 
     const result = runSimulation(
       currentAge,
@@ -209,7 +231,7 @@ export default function WhatIfPage() {
     )
 
     return { result, cashflows }
-  }, [input, events, fireStrategy])
+  }, [input, activeEvents, fireStrategy])
 
   // ── Run what-if simulation ───────────────────────────────
   const whatIfSim = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
@@ -227,7 +249,7 @@ export default function WhatIfPage() {
     const annualSavings = Math.max(0, adjustedSavings) + (overrides?.extraContribution ?? 0) * 12
     const grossReturn = whatIfInput.expectedReturn ?? DEFAULT_RETURN
     const strategyForSim = fireStrategy ?? { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 }
-    const cashflows = lifeEventsToCashflows(events)
+    const cashflows = lifeEventsToCashflows(activeEvents)
 
     const result = runSimulation(
       currentAge,
@@ -243,7 +265,56 @@ export default function WhatIfPage() {
     )
 
     return { result, cashflows }
-  }, [whatIfInput, events, fireStrategy, overrides?.extraContribution])
+  }, [whatIfInput, activeEvents, fireStrategy, overrides?.extraContribution])
+
+  // ── Impact computation (per-event FIRE delta) ──────────────
+  const computeImpact = useCallback((eventId: string) => {
+    if (!whatIfInput || !fireStrategy) return null
+
+    const event = events.find(e => e.id === eventId)
+    if (!event) return null
+
+    const currentAge = whatIfInput.dateOfBirth ? ageAtDate(whatIfInput.dateOfBirth) : null
+    if (currentAge === null) return null
+
+    const currentPortfolio = Math.max(0, whatIfInput.totalAssets - whatIfInput.totalDebts)
+    const yearlyExpenses = whatIfInput.yearlyMustExpenses > 0 ? whatIfInput.yearlyMustExpenses : 0
+    if (yearlyExpenses <= 0) return null
+
+    const adjustedSavings = (whatIfInput.monthlyIncome - whatIfInput.monthlyExpenses) * 12
+    const annualSavings = Math.max(0, adjustedSavings) + (overrides?.extraContribution ?? 0) * 12
+    const grossReturn = whatIfInput.expectedReturn ?? DEFAULT_RETURN
+    const strategyForSim = fireStrategy ?? { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 }
+
+    // Simulate WITH this event (all active events)
+    const eventsWithThis = activeEvents.some(e => e.id === eventId)
+      ? activeEvents
+      : [...activeEvents, event]
+    const cfWith = lifeEventsToCashflows(eventsWithThis)
+    const simWith = runSimulation(currentAge, strategyForSim.endAge, currentPortfolio, yearlyExpenses, annualSavings, grossReturn, 'nl_box3', INFLATION, cfWith, strategyForSim)
+
+    // Simulate WITHOUT this event
+    const eventsWithout = activeEvents.filter(e => e.id !== eventId)
+    const cfWithout = lifeEventsToCashflows(eventsWithout)
+    const simWithout = runSimulation(currentAge, strategyForSim.endAge, currentPortfolio, yearlyExpenses, annualSavings, grossReturn, 'nl_box3', INFLATION, cfWithout, strategyForSim)
+
+    // Calculate total cost of the event
+    const oneTimeCost = Number(event.one_time_cost ?? 0)
+    const monthlyCost = Number(event.monthly_cost_change ?? 0)
+    const monthlyIncome = Number(event.monthly_income_change ?? 0)
+    const duration = Number(event.duration_months ?? 0) || 240 // assume 20yr if no duration
+    const totalCost = oneTimeCost + (monthlyCost - monthlyIncome) * (Number(event.duration_months ?? 0) > 0 ? duration : 0)
+
+    const fireAgeWith = simWith.fireAgeFractional
+    const fireAgeWithout = simWithout.fireAgeFractional
+
+    let deltaMonths: number | null = null
+    if (fireAgeWith !== null && fireAgeWithout !== null) {
+      deltaMonths = Math.round((fireAgeWith - fireAgeWithout) * 12)
+    }
+
+    return { event, fireAgeWith, fireAgeWithout, deltaMonths, totalCost }
+  }, [whatIfInput, events, activeEvents, fireStrategy, overrides?.extraContribution])
 
   // ── Derived values for display ───────────────────────────
   const currentAge = input?.dateOfBirth ? ageAtDate(input.dateOfBirth) : null
@@ -298,7 +369,7 @@ export default function WhatIfPage() {
             {/* FIRE leeftijd */}
             <div className="card-editorial p-3">
               <div className="flex items-center gap-1.5">
-                <Hourglass className="h-3.5 w-3.5 text-wil-500" />
+                <Hourglass className="h-3.5 w-3.5 text-horizon-500" />
                 <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
                   FIRE leeftijd
                 </span>
@@ -313,10 +384,10 @@ export default function WhatIfPage() {
               )}
             </div>
 
-            {/* Vrijheidspercentage */}
+            {/* Doelbedrag */}
             <div className="card-editorial p-3">
               <div className="flex items-center gap-1.5">
-                <TrendingUp className="h-3.5 w-3.5 text-wil-500" />
+                <TrendingUp className="h-3.5 w-3.5 text-horizon-500" />
                 <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
                   Doelbedrag
                 </span>
@@ -403,7 +474,7 @@ export default function WhatIfPage() {
                       }`}
                     >
                       {cf.direction === 'income' ? '↑' : '↓'}{' '}
-                      {cf.id === 'aow-prefill' ? 'AOW (staatspension)' : cf.name} (leeftijd {cf.fromAge})
+                      {cf.name} (leeftijd {cf.fromAge})
                     </span>
                   ))}
                 </div>
@@ -434,6 +505,18 @@ export default function WhatIfPage() {
             overrides={overrides}
             baseline={baseline}
             onChange={setOverrides}
+          />
+        </div>
+
+        {/* ── Life Events ─────────────────────────────────── */}
+        <div className="animate-whatif-enter mt-4" style={{ animationDelay: '400ms' }}>
+          <WhatIfEventsPanel
+            events={events}
+            onToggleEvent={handleToggleEvent}
+            onAddEvent={handleAddEvent}
+            onRemoveEvent={handleRemoveEvent}
+            baselineFireAge={baselineFireAge}
+            computeImpact={computeImpact}
           />
         </div>
 
