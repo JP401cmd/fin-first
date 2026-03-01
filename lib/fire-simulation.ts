@@ -347,10 +347,9 @@ export function lifeEventsToCashflows(events: LifeEvent[]): SimCashflow[] {
         name: ev.name,
         type: 'one_time',
         direction: cost > 0 ? 'expense' : 'income',
-        // Engine verwacht maandbedrag voor one_time dat intern × 12 gebruikt wordt.
-        // Maar één-malig bedrag is een totaalbedrag — we geven het direct als jaarsbedrag
-        // door amount/12 te doen zodat engine × 12 = het originele bedrag oplevert.
-        amount: Math.abs(cost) / 12,
+        // Eenmalig bedrag — direct als totaalbedrag doorgeven.
+        // oneTimeAmount() past dit 1x toe op de exacte leeftijd.
+        amount: Math.abs(cost),
         fromAge: age,
         toAge: age,
         indexed: false,

@@ -11,42 +11,66 @@ interface BudgetDonutProps {
   onNavigate: (budgetId: string) => void
 }
 
-/* ── Colour palette ─────────────────────────────────────────────── */
+/* ── CSS-variable colour helpers ─────────────────────────────── */
 
-export const PALETTE = [
-  { h: 142 },  // groen — inkomen
-  { h: 25 },   // oranje — vaste lasten
-  { h: 350 },  // rose — dagelijks
-  { h: 200 },  // blauw — vervoer
-  { h: 265 },  // paars — leuke dingen
-  { h: 45 },   // amber — sparen
-  { h: 170 },  // teal
-  { h: 310 },  // fuchsia
-]
+const VALID_SHADES = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]
 
-export function groupColor(idx: number) {
-  const p = PALETTE[idx % PALETTE.length]
+function snapToShade(n: number): number {
+  let best = VALID_SHADES[0]
+  let bestDist = Math.abs(n - best)
+  for (const s of VALID_SHADES) {
+    const d = Math.abs(n - s)
+    if (d < bestDist) { best = s; bestDist = d }
+  }
+  return best
+}
+
+function cssType(bt: BudgetType): string {
+  return bt === 'archive' ? 'other' : bt
+}
+
+/** Outer ring: distribute shades 200–400 (budget track) and 500–700 (spent fill) */
+function segmentColors(type: BudgetType, idx: number, total: number) {
+  const t = total > 1 ? idx / (total - 1) : 0.5
+  const ct = cssType(type)
   return {
-    h: p.h,
-    budget: `hsl(${p.h}, 45%, 82%)`,
-    spent: `hsl(${p.h}, 65%, 50%)`,
-    bg: `hsl(${p.h}, 50%, 96%)`,
-    text: `hsl(${p.h}, 60%, 35%)`,
-    border: `hsl(${p.h}, 45%, 85%)`,
+    budget: `var(--color-${ct}-${snapToShade(200 + t * 200)})`,
+    spent: `var(--color-${ct}-${snapToShade(500 + t * 200)})`,
   }
 }
 
-export function childColor(parentH: number, childIdx: number, total: number) {
-  const spread = Math.min(total * 8, 40)
-  const offset = total > 1 ? -spread / 2 + (childIdx / (total - 1)) * spread : 0
-  const h = parentH + offset
+/** Inner ring: shades 100–300 (budget track) and 400–600 (spent fill) */
+function childSegColors(type: BudgetType, idx: number, total: number) {
+  const t = total > 1 ? idx / (total - 1) : 0.5
+  const ct = cssType(type)
   return {
-    budget: `hsl(${h}, 45%, 80%)`,
-    spent: `hsl(${h}, 60%, 48%)`,
+    budget: `var(--color-${ct}-${snapToShade(100 + t * 200)})`,
+    spent: `var(--color-${ct}-${snapToShade(400 + t * 200)})`,
   }
 }
 
-/* ── SVG arc helper ─────────────────────────────────────────────── */
+/** Legend + external consumers: fixed type-based colours via CSS vars */
+export function typeColors(budgetType: BudgetType) {
+  const t = cssType(budgetType)
+  return {
+    budget: `var(--color-${t}-200)`,
+    spent: `var(--color-${t}-500)`,
+    bg: `var(--color-${t}-50)`,
+    text: `var(--color-${t}-600)`,
+    border: `var(--color-${t}-200)`,
+  }
+}
+
+export function childTypeColors(budgetType: BudgetType, idx: number, total: number) {
+  const t = cssType(budgetType)
+  const frac = total > 1 ? idx / (total - 1) : 0.5
+  return {
+    budget: `var(--color-${t}-${snapToShade(100 + frac * 200)})`,
+    spent: `var(--color-${t}-${snapToShade(400 + frac * 200)})`,
+  }
+}
+
+/* ── SVG arc helper ──────────────────────────────────────────── */
 
 function describeArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number): string {
   const clampedEnd = Math.min(endAngle, startAngle + 359.999)
@@ -61,7 +85,7 @@ function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
   return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) }
 }
 
-/* ── Segment data ───────────────────────────────────────────────── */
+/* ── Segment data ────────────────────────────────────────────── */
 
 export interface ChildSeg {
   id: string
@@ -117,86 +141,103 @@ export function buildSegments(
     .filter((s) => s.limit > 0)
 }
 
-/* ── Component ──────────────────────────────────────────────────── */
+/* ── Type labels ─────────────────────────────────────────────── */
 
-export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) {
-  const { ref, hasEntered, animationComplete } = useInViewAnimation({ duration: 900 })
+const TYPE_LABELS: Record<string, string> = {
+  income: 'Inkomen',
+  expense: 'Uitgaven',
+  savings: 'Sparen',
+  debt: 'Schulden',
+  archive: 'Archief',
+}
+
+/* ── TypeDonut (internal sub-component) ──────────────────────── */
+
+interface InnerArc {
+  start: number
+  end: number
+  spentEnd: number
+  isOver: boolean
+  childIdx: number
+}
+
+interface OuterArc {
+  start: number
+  end: number
+  spentEnd: number
+  isOver: boolean
+  innerArcs: InnerArc[]
+}
+
+interface TypeDonutProps {
+  budgetType: BudgetType
+  segments: Segment[]
+  onNavigate: (budgetId: string) => void
+}
+
+function TypeDonut({ budgetType, segments, onNavigate }: TypeDonutProps) {
+  const { ref, hasEntered, animationComplete } = useInViewAnimation({ duration: 1200 })
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
-  const [hoveredChildIdx, setHoveredChildIdx] = useState<number | null>(null)
-
-  const segments = useMemo(() => buildSegments(groups, spending), [groups, spending])
+  const [hoveredChild, setHoveredChild] = useState<{ parentIdx: number; childIdx: number } | null>(null)
 
   const totalBudget = segments.reduce((s, seg) => s + seg.limit, 0)
   const totalSpent = segments.reduce((s, seg) => s + seg.spent, 0)
 
-  // SVG dimensions
-  const size = 400
+  const size = 300
   const cx = size / 2
   const cy = size / 2
-  const ringR = 155          // single ring radius
-  const ringWidth = 44        // single ring width
-  const innerR = 108          // inner mini-donut radius (when selected)
-  const innerWidth = 34
+  const outerR = 120
+  const outerWidth = 36
+  const innerR = 78
+  const innerWidth = 28
   const gap = 1.2
+  const innerGap = 1.5
+  const ct = cssType(budgetType)
 
-  // Build main ring arcs (budget = full, spent = overlay)
-  const arcs = useMemo(() => {
+  // Build outer + inner arcs
+  const arcData = useMemo<OuterArc[]>(() => {
     if (totalBudget <= 0) return []
     let angle = 0
     return segments.map((seg) => {
-      const budgetSweep = (seg.limit / totalBudget) * 360
+      const sweep = (seg.limit / totalBudget) * 360
       const start = angle + gap / 2
-      const end = start + budgetSweep - gap
-
-      // Spent portion within this segment's arc
+      const end = start + Math.max(sweep - gap, 0.5)
       const spentRatio = seg.limit > 0 ? Math.min(seg.spent / seg.limit, 1) : 0
-      const spentSweep = budgetSweep * spentRatio
+      const spentSweep = sweep * spentRatio
       const spentEnd = start + Math.max(spentSweep - gap, 0)
-
       const isOver = seg.spent > seg.limit && seg.limit > 0
 
-      angle += budgetSweep
-      return { start, end: Math.max(end, start + 0.5), spentEnd, isOver }
+      // Inner arcs: full 360° circle for children of this parent
+      const childTotalLimit = seg.children.reduce((s, c) => s + c.limit, 0)
+      const innerArcs: InnerArc[] = []
+
+      if (childTotalLimit > 0) {
+        let childAngle = 0
+        seg.children.forEach((child, ci) => {
+          const childSweep = (child.limit / childTotalLimit) * 360
+          const cStart = childAngle + innerGap / 2
+          const cEnd = cStart + Math.max(childSweep - innerGap, 0.5)
+          const cSpentRatio = child.limit > 0 ? Math.min(child.spent / child.limit, 1) : 0
+          const cSpentSweep = childSweep * cSpentRatio
+          const cSpentEnd = cStart + Math.max(cSpentSweep - innerGap, 0)
+          const cIsOver = child.spent > child.limit && child.limit > 0
+          innerArcs.push({ start: cStart, end: cEnd, spentEnd: cSpentEnd, isOver: cIsOver, childIdx: ci })
+          childAngle += childSweep
+        })
+      }
+
+      angle += sweep
+      return { start, end, spentEnd, isOver, innerArcs }
     })
-  }, [segments, totalBudget, gap])
+  }, [segments, totalBudget, gap, innerGap])
 
-  // Mini donut arcs for selected segment's children
-  const selectedSeg = selectedIdx !== null ? segments[selectedIdx] : null
-  const showMiniDonut = selectedIdx !== null && selectedSeg !== null && selectedSeg.children.length > 0
-
-  const miniArcs = useMemo(() => {
-    if (!selectedSeg || selectedSeg.children.length === 0) return []
-
-    const totalChildLimit = selectedSeg.children.reduce((s, c) => s + c.limit, 0)
-    if (totalChildLimit <= 0) return []
-
-    const miniGap = 2
-    let angle = 0
-    return selectedSeg.children.map((child, ci) => {
-      const childSweep = (child.limit / totalChildLimit) * 360
-      const start = angle + miniGap / 2
-      const end = start + Math.max(childSweep - miniGap, 0.5)
-
-      const spentRatio = child.limit > 0 ? Math.min(child.spent / child.limit, 1) : 0
-      const spentSweep = childSweep * spentRatio
-      const spentEnd = start + Math.max(spentSweep - miniGap, 0)
-
-      const isOver = child.spent > child.limit && child.limit > 0
-
-      angle += childSweep
-      return { start, end, spentEnd, isOver, child, ci }
-    })
-  }, [selectedSeg])
-
+  // Active state
   const active = hoveredIdx ?? selectedIdx
   const activeSeg = active !== null ? segments[active] : null
-  const activeChild = hoveredChildIdx !== null && selectedSeg
-    ? selectedSeg.children[hoveredChildIdx]
-    : null
+  const activeChild = hoveredChild !== null ? segments[hoveredChild.parentIdx]?.children[hoveredChild.childIdx] : null
 
   const pctUsed = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0
-  const parentColor = selectedIdx !== null ? groupColor(segments[selectedIdx].colorIdx) : null
 
   // Center text
   let centerContent: React.ReactNode
@@ -204,203 +245,212 @@ export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) 
     const childPct = activeChild.limit > 0 ? Math.round((activeChild.spent / activeChild.limit) * 100) : 0
     centerContent = (
       <g>
-        <text x={cx} y={cy - 18} textAnchor="middle" className="fill-zinc-700 text-[11px] font-semibold">
+        <text x={cx} y={cy - 14} textAnchor="middle" className="fill-[var(--ink-2)] font-sans text-[10px] font-semibold">
           {activeChild.name}
         </text>
-        <text x={cx} y={cy + 2} textAnchor="middle" className="fill-zinc-500 text-[10px]">
+        <text x={cx} y={cy + 4} textAnchor="middle" className="fill-[var(--ink-3)] font-mono text-[9px]">
           {formatCurrency(activeChild.spent)} / {formatCurrency(activeChild.limit)}
         </text>
-        <text x={cx} y={cy + 20} textAnchor="middle"
-          className={`text-[11px] font-bold ${activeChild.spent > activeChild.limit ? 'fill-red-500' : 'fill-emerald-600'}`}
+        <text x={cx} y={cy + 18} textAnchor="middle"
+          className={`font-mono text-[10px] font-bold ${activeChild.spent > activeChild.limit ? 'fill-red-500' : 'fill-[var(--ink)]'}`}
         >
           {childPct}%
         </text>
       </g>
     )
   } else if (activeSeg) {
+    const segPct = activeSeg.limit > 0 ? Math.round((activeSeg.spent / activeSeg.limit) * 100) : 0
     centerContent = (
       <g>
-        <text x={cx} y={cy - 18} textAnchor="middle" className="fill-zinc-900 text-[13px] font-bold">
+        <text x={cx} y={cy - 14} textAnchor="middle" className="fill-[var(--ink)] font-sans text-[11px] font-bold">
           {activeSeg.name}
         </text>
-        <text x={cx} y={cy + 4} textAnchor="middle" className="fill-zinc-600 text-[11px]">
+        <text x={cx} y={cy + 4} textAnchor="middle" className="fill-[var(--ink-3)] font-mono text-[9px]">
           {formatCurrency(activeSeg.spent)} / {formatCurrency(activeSeg.limit)}
         </text>
-        <text x={cx} y={cy + 22} textAnchor="middle"
-          className={`text-[12px] font-semibold ${activeSeg.spent > activeSeg.limit ? 'fill-red-500' : 'fill-emerald-600'}`}
+        <text x={cx} y={cy + 18} textAnchor="middle"
+          className={`font-mono text-[10px] font-semibold ${activeSeg.spent > activeSeg.limit ? 'fill-red-500' : 'fill-[var(--ink)]'}`}
         >
-          {activeSeg.limit > 0 ? Math.round((activeSeg.spent / activeSeg.limit) * 100) : 0}% besteed
+          {segPct}% besteed
         </text>
       </g>
     )
   } else {
     centerContent = (
       <g>
-        <text x={cx} y={cy - 12} textAnchor="middle" className="fill-zinc-900 text-[16px] font-bold">
+        <text x={cx} y={cy - 10} textAnchor="middle" className="fill-[var(--ink)] font-mono text-[14px] font-bold">
           {formatCurrency(totalSpent)}
         </text>
-        <text x={cx} y={cy + 8} textAnchor="middle" className="fill-zinc-400 text-[11px]">
+        <text x={cx} y={cy + 6} textAnchor="middle" className="fill-[var(--ink-4)] font-sans text-[9px]">
           van {formatCurrency(totalBudget)}
         </text>
-        <text x={cx} y={cy + 26} textAnchor="middle"
-          className={`text-[12px] font-semibold ${pctUsed > 100 ? 'fill-red-500' : 'fill-zinc-500'}`}
+        <text x={cx} y={cy + 20} textAnchor="middle"
+          className={`font-mono text-[10px] font-semibold ${pctUsed > 100 ? 'fill-red-500' : 'fill-[var(--ink-3)]'}`}
         >
-          {pctUsed}% besteed
+          {pctUsed}%
         </text>
       </g>
     )
   }
 
+  const c = typeColors(budgetType)
+
   return (
-    <div className="mt-8" ref={ref}>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
-        {/* Donut */}
-        <div className="flex items-center justify-center">
+    <div
+      ref={ref}
+      className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)]"
+    >
+      {/* 3px accent top */}
+      <div className="h-[3px]" style={{ backgroundColor: `var(--color-${ct}-500)` }} />
+
+      <div className="p-4">
+        {/* Type title */}
+        <p className="mb-3 text-center font-sans text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+          {TYPE_LABELS[budgetType] ?? budgetType}
+        </p>
+
+        {/* SVG donut */}
+        <div className="flex justify-center">
           <svg
             viewBox={`0 0 ${size} ${size}`}
-            className="h-auto w-full max-w-[420px]"
+            className="h-auto w-full max-w-[280px]"
             style={{ overflow: 'visible' }}
           >
-            <defs>
-              {segments.map((seg, i) => {
-                const c = groupColor(seg.colorIdx)
-                return (
-                  <g key={`grad-${i}`}>
-                    <linearGradient id={`donut-budget-${i}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor={`hsl(${c.h}, 50%, 88%)`} />
-                      <stop offset="100%" stopColor={`hsl(${c.h}, 40%, 76%)`} />
-                    </linearGradient>
-                    <linearGradient id={`donut-spent-${i}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor={`hsl(${c.h}, 60%, 55%)`} />
-                      <stop offset="100%" stopColor={`hsl(${c.h}, 70%, 40%)`} />
-                    </linearGradient>
-                  </g>
-                )
-              })}
-            </defs>
-
-            {/* ── Single ring: budget (light) + spent overlay (dark) ── */}
-            {arcs.map((arc, i) => {
+            {arcData.map((arc, i) => {
               const dimmed = active !== null && active !== i
-              const staggerDelay = i * 60
-              const arcAnim = hasEntered ? `drawPath 700ms cubic-bezier(.22,1,.36,1) ${staggerDelay}ms both` : 'none'
-              const spentAnim = hasEntered ? `drawPath 500ms cubic-bezier(.22,1,.36,1) ${staggerDelay + 200}ms both` : 'none'
+              const colors = segmentColors(budgetType, i, segments.length)
+              const stagger = i * 60
+              const budgetAnim = hasEntered ? `drawPath 700ms cubic-bezier(.22,1,.36,1) ${stagger}ms both` : 'none'
+              const spentAnim = hasEntered ? `drawPath 500ms cubic-bezier(.22,1,.36,1) ${stagger + 200}ms both` : 'none'
+
               return (
-                <g key={`ring-${i}`}>
-                  {/* Budget arc (full segment, gradient) */}
+                <g key={`outer-${i}`}>
+                  {/* Budget arc (track — light colour, full segment) */}
                   <path
-                    d={describeArc(cx, cy, ringR - ringWidth / 2, arc.start, arc.end)}
+                    d={describeArc(cx, cy, outerR - outerWidth / 2, arc.start, arc.end)}
                     fill="none"
-                    stroke={`url(#donut-budget-${i})`}
-                    strokeWidth={ringWidth}
-                    strokeLinecap="round"
+                    strokeWidth={outerWidth}
+                    strokeLinecap="butt"
                     pathLength={1}
                     strokeDasharray={1}
                     opacity={dimmed ? 0.2 : 1}
                     className="cursor-pointer transition-opacity duration-200"
-                    style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: arcAnim }}
-                    onMouseEnter={animationComplete ? () => setHoveredIdx(i) : undefined}
+                    style={{
+                      stroke: colors.budget,
+                      strokeDashoffset: hasEntered ? undefined : 1,
+                      animation: budgetAnim,
+                    }}
+                    onMouseEnter={animationComplete ? () => { setHoveredIdx(i); setHoveredChild(null) } : undefined}
                     onMouseLeave={animationComplete ? () => setHoveredIdx(null) : undefined}
                     onClick={animationComplete ? () => {
                       setSelectedIdx(selectedIdx === i ? null : i)
-                      setHoveredChildIdx(null)
+                      setHoveredChild(null)
                     } : undefined}
                   />
-                  {/* Spent arc (overlaid on same ring, gradient) */}
+
+                  {/* Spent arc (fill — dark colour, proportional) */}
                   {arc.spentEnd > arc.start && (
                     <path
-                      d={describeArc(cx, cy, ringR - ringWidth / 2, arc.start, arc.spentEnd)}
+                      d={describeArc(cx, cy, outerR - outerWidth / 2, arc.start, arc.spentEnd)}
                       fill="none"
-                      stroke={`url(#donut-spent-${i})`}
-                      strokeWidth={ringWidth}
-                      strokeLinecap="round"
+                      strokeWidth={outerWidth}
+                      strokeLinecap="butt"
                       pathLength={1}
                       strokeDasharray={1}
                       opacity={dimmed ? 0.2 : 1}
                       className="cursor-pointer transition-opacity duration-200"
-                      style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: spentAnim }}
-                      onMouseEnter={animationComplete ? () => setHoveredIdx(i) : undefined}
+                      style={{
+                        stroke: colors.spent,
+                        strokeDashoffset: hasEntered ? undefined : 1,
+                        animation: spentAnim,
+                      }}
+                      onMouseEnter={animationComplete ? () => { setHoveredIdx(i); setHoveredChild(null) } : undefined}
                       onMouseLeave={animationComplete ? () => setHoveredIdx(null) : undefined}
                       onClick={animationComplete ? () => {
                         setSelectedIdx(selectedIdx === i ? null : i)
-                        setHoveredChildIdx(null)
+                        setHoveredChild(null)
                       } : undefined}
                     />
                   )}
+
                   {/* Overspend glow */}
                   {arc.isOver && (
                     <path
-                      d={describeArc(cx, cy, ringR - ringWidth / 2, arc.start, arc.end)}
+                      d={describeArc(cx, cy, outerR - outerWidth / 2, arc.start, arc.end)}
                       fill="none"
                       stroke="#ef4444"
-                      strokeWidth={ringWidth + 6}
-                      strokeLinecap="round"
+                      strokeWidth={outerWidth + 6}
+                      strokeLinecap="butt"
                       opacity={dimmed ? 0.06 : 0.25}
                       className="pointer-events-none"
                     />
                   )}
-                </g>
-              )
-            })}
 
-            {/* ── Mini donut (inner ring: children of selected) ────── */}
-            {showMiniDonut && parentColor && miniArcs.map((arc) => {
-              const dimmedChild = hoveredChildIdx !== null && hoveredChildIdx !== arc.ci
-              const spread = Math.min(miniArcs.length * 8, 40)
-              const offset = miniArcs.length > 1 ? -spread / 2 + (arc.ci / (miniArcs.length - 1)) * spread : 0
-              const ch = parentColor.h + offset
-              return (
-                <g key={`mini-${arc.ci}`}>
-                  <defs>
-                    <linearGradient id={`donut-child-budget-${arc.ci}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor={`hsl(${ch}, 50%, 86%)`} />
-                      <stop offset="100%" stopColor={`hsl(${ch}, 40%, 74%)`} />
-                    </linearGradient>
-                    <linearGradient id={`donut-child-spent-${arc.ci}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor={`hsl(${ch}, 55%, 53%)`} />
-                      <stop offset="100%" stopColor={`hsl(${ch}, 65%, 38%)`} />
-                    </linearGradient>
-                  </defs>
-                  {/* Child budget arc (gradient) */}
-                  <path
-                    d={describeArc(cx, cy, innerR - innerWidth / 2, arc.start, arc.end)}
-                    fill="none"
-                    stroke={`url(#donut-child-budget-${arc.ci})`}
-                    strokeWidth={innerWidth}
-                    strokeLinecap="round"
-                    opacity={dimmedChild ? 0.25 : 1}
-                    className="cursor-pointer transition-opacity duration-200"
-                    onMouseEnter={() => setHoveredChildIdx(arc.ci)}
-                    onMouseLeave={() => setHoveredChildIdx(null)}
-                    onClick={() => onNavigate(arc.child.id)}
-                  />
-                  {/* Child spent arc (gradient, overlaid) */}
-                  {arc.spentEnd > arc.start && (
-                    <path
-                      d={describeArc(cx, cy, innerR - innerWidth / 2, arc.start, arc.spentEnd)}
-                      fill="none"
-                      stroke={`url(#donut-child-spent-${arc.ci})`}
-                      strokeWidth={innerWidth}
-                      strokeLinecap="round"
-                      opacity={dimmedChild ? 0.25 : 1}
-                      className="cursor-pointer transition-opacity duration-200"
-                      onMouseEnter={() => setHoveredChildIdx(arc.ci)}
-                      onMouseLeave={() => setHoveredChildIdx(null)}
-                      onClick={() => onNavigate(arc.child.id)}
-                    />
-                  )}
-                  {/* Child overspend glow */}
-                  {arc.isOver && (
-                    <path
-                      d={describeArc(cx, cy, innerR - innerWidth / 2, arc.start, arc.end)}
-                      fill="none"
-                      stroke="#ef4444"
-                      strokeWidth={innerWidth + 4}
-                      strokeLinecap="round"
-                      opacity={dimmedChild ? 0.06 : 0.25}
-                      className="pointer-events-none"
-                    />
-                  )}
+                  {/* Inner ring: children of active (hovered/selected) parent only */}
+                  {active === i && arc.innerArcs.map((ca) => {
+                    const childDimmed = hoveredChild !== null && !(hoveredChild.parentIdx === i && hoveredChild.childIdx === ca.childIdx)
+                    const cc = childSegColors(budgetType, ca.childIdx, segments[i].children.length)
+                    const childStagger = ca.childIdx * 40
+                    const cBudgetAnim = `drawPath 400ms cubic-bezier(.22,1,.36,1) ${childStagger}ms both`
+                    const cSpentAnim = `drawPath 300ms cubic-bezier(.22,1,.36,1) ${childStagger + 120}ms both`
+
+                    return (
+                      <g key={`inner-${i}-${ca.childIdx}`}>
+                        {/* Child budget arc (track) */}
+                        <path
+                          d={describeArc(cx, cy, innerR - innerWidth / 2, ca.start, ca.end)}
+                          fill="none"
+                          strokeWidth={innerWidth}
+                          strokeLinecap="butt"
+                          pathLength={1}
+                          strokeDasharray={1}
+                          opacity={childDimmed ? 0.2 : 1}
+                          className="cursor-pointer transition-opacity duration-200"
+                          style={{
+                            stroke: cc.budget,
+                            animation: cBudgetAnim,
+                          }}
+                          onMouseEnter={() => setHoveredChild({ parentIdx: i, childIdx: ca.childIdx })}
+                          onMouseLeave={() => setHoveredChild(null)}
+                          onClick={() => onNavigate(segments[i].children[ca.childIdx].id)}
+                        />
+
+                        {/* Child spent arc (fill) */}
+                        {ca.spentEnd > ca.start && (
+                          <path
+                            d={describeArc(cx, cy, innerR - innerWidth / 2, ca.start, ca.spentEnd)}
+                            fill="none"
+                            strokeWidth={innerWidth}
+                            strokeLinecap="butt"
+                            pathLength={1}
+                            strokeDasharray={1}
+                            opacity={childDimmed ? 0.2 : 1}
+                            className="cursor-pointer transition-opacity duration-200"
+                            style={{
+                              stroke: cc.spent,
+                              animation: cSpentAnim,
+                            }}
+                            onMouseEnter={() => setHoveredChild({ parentIdx: i, childIdx: ca.childIdx })}
+                            onMouseLeave={() => setHoveredChild(null)}
+                            onClick={() => onNavigate(segments[i].children[ca.childIdx].id)}
+                          />
+                        )}
+
+                        {/* Child overspend glow */}
+                        {ca.isOver && (
+                          <path
+                            d={describeArc(cx, cy, innerR - innerWidth / 2, ca.start, ca.end)}
+                            fill="none"
+                            stroke="#ef4444"
+                            strokeWidth={innerWidth + 4}
+                            strokeLinecap="butt"
+                            opacity={childDimmed ? 0.06 : 0.25}
+                            className="pointer-events-none"
+                          />
+                        )}
+                      </g>
+                    )
+                  })}
                 </g>
               )
             })}
@@ -410,57 +460,39 @@ export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) 
           </svg>
         </div>
 
-        {/* Legend + details */}
-        <div className="space-y-2">
-          {/* Ring legend */}
-          <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--ink-3)]">
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-6 rounded-sm bg-zinc-300" />
-              Budget
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-6 rounded-sm bg-zinc-600" />
-              Besteed
-            </span>
-          </div>
-
+        {/* Legend */}
+        <div className="mt-4 space-y-1">
           {segments.map((seg, i) => {
-            const c = groupColor(seg.colorIdx)
             const pct = seg.limit > 0 ? Math.round((seg.spent / seg.limit) * 100) : 0
             const isOver = seg.spent > seg.limit && seg.limit > 0
-            const isActive = active === i
-            const isSelected = selectedIdx === i
+            const isExpanded = selectedIdx === i
 
             return (
               <div key={seg.id}>
                 <button
-                  className={`flex w-full items-center gap-3 rounded-[var(--r-lg)] border px-3 py-2.5 text-left transition-all ${
-                    isActive ? 'ring-2 ring-kern-400' : ''
-                  }`}
+                  className="flex w-full items-center gap-2 rounded-[var(--r)] border px-2.5 py-1.5 text-left transition-all"
                   style={{
-                    borderColor: isActive ? c.border : '#e4e4e7',
-                    backgroundColor: isActive ? c.bg : 'white',
+                    borderColor: isExpanded ? c.border : 'var(--border-ed)',
+                    backgroundColor: isExpanded ? c.bg : 'var(--paper)',
+                    boxShadow: isExpanded ? `0 0 0 2px ${c.border}` : undefined,
                   }}
-                  onMouseEnter={() => setHoveredIdx(i)}
+                  onMouseEnter={() => { setHoveredIdx(i); setHoveredChild(null) }}
                   onMouseLeave={() => setHoveredIdx(null)}
                   onClick={() => {
                     setSelectedIdx(selectedIdx === i ? null : i)
-                    setHoveredChildIdx(null)
+                    setHoveredChild(null)
                   }}
                 >
-                  {/* Color swatch: budget (light) + spent (dark) */}
                   <div className="flex items-center gap-0.5">
-                    <span className="block h-5 w-2.5 rounded-l-sm" style={{ backgroundColor: c.spent }} />
-                    <span className="block h-5 w-2.5 rounded-r-sm" style={{ backgroundColor: c.budget }} />
+                    <span className="block h-4 w-2 rounded-l-sm" style={{ backgroundColor: c.spent }} />
+                    <span className="block h-4 w-2 rounded-r-sm" style={{ backgroundColor: c.budget }} />
                   </div>
-
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: c.bg }}>
-                    <BudgetIcon name={seg.icon} className="h-4 w-4" />
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: c.bg }}>
+                    <BudgetIcon name={seg.icon} className="h-3.5 w-3.5" />
                   </div>
-
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-[var(--ink)]">{seg.name}</p>
-                    <p className="text-xs text-[var(--ink-3)]">
+                    <p className="truncate text-xs font-medium text-[var(--ink)]">{seg.name}</p>
+                    <p className="font-mono text-[10px] text-[var(--ink-3)]">
                       <span className={isOver ? 'font-semibold text-red-600' : ''}>
                         {formatCurrency(seg.spent)}
                       </span>
@@ -468,47 +500,43 @@ export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) 
                       {formatCurrency(seg.limit)}
                     </p>
                   </div>
-
-                  <span className={`shrink-0 text-xs font-bold ${isOver ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
+                  <span className={`shrink-0 font-mono text-[10px] font-bold ${isOver ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
                     {pct}%
                   </span>
                 </button>
 
-                {/* Subcategories when selected */}
-                {isSelected && seg.children.length > 0 && (
-                  <div className="ml-5 mt-1 mb-1 space-y-0.5">
+                {/* Expanded children */}
+                {isExpanded && seg.children.length > 0 && (
+                  <div className="ml-4 mt-0.5 space-y-0.5">
                     {seg.children.map((child, ci) => {
                       const childPct = child.limit > 0 ? Math.round((child.spent / child.limit) * 100) : 0
                       const childOver = child.spent > child.limit && child.limit > 0
-                      const cc = childColor(c.h, ci, seg.children.length)
-                      const isChildHovered = hoveredChildIdx === ci
+                      const cc = childTypeColors(budgetType, ci, seg.children.length)
 
                       return (
                         <button
                           key={child.id}
-                          className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left transition-colors ${
-                            isChildHovered ? 'bg-zinc-100' : 'hover:bg-[var(--subtle)]'
-                          }`}
-                          onMouseEnter={() => setHoveredChildIdx(ci)}
-                          onMouseLeave={() => setHoveredChildIdx(null)}
+                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1 text-left transition-colors hover:bg-[var(--subtle)]"
+                          onMouseEnter={() => setHoveredChild({ parentIdx: i, childIdx: ci })}
+                          onMouseLeave={() => setHoveredChild(null)}
                           onClick={(e) => { e.stopPropagation(); onNavigate(child.id) }}
                         >
                           <div className="flex items-center gap-0.5">
                             <span className="block h-3 w-1.5 rounded-l-sm" style={{ backgroundColor: cc.spent }} />
                             <span className="block h-3 w-1.5 rounded-r-sm" style={{ backgroundColor: cc.budget }} />
                           </div>
-                          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded" style={{ backgroundColor: c.bg }}>
-                            <BudgetIcon name={child.icon} className="h-3 w-3" />
+                          <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded" style={{ backgroundColor: c.bg }}>
+                            <BudgetIcon name={child.icon} className="h-2.5 w-2.5" />
                           </div>
-                          <span className="min-w-0 flex-1 truncate text-xs text-[var(--ink-2)]">{child.name}</span>
-                          <span className="text-xs text-[var(--ink-3)]">
+                          <span className="min-w-0 flex-1 truncate text-[10px] text-[var(--ink-2)]">{child.name}</span>
+                          <span className="font-mono text-[10px] text-[var(--ink-3)]">
                             <span className={childOver ? 'font-semibold text-red-600' : ''}>
                               {formatCurrency(child.spent)}
                             </span>
                             {' / '}
                             {formatCurrency(child.limit)}
                           </span>
-                          <span className={`w-8 text-right text-xs font-medium ${childOver ? 'text-red-600' : 'text-[var(--ink-3)]'}`}>
+                          <span className={`w-7 text-right font-mono text-[10px] font-medium ${childOver ? 'text-red-600' : 'text-[var(--ink-3)]'}`}>
                             {childPct}%
                           </span>
                         </button>
@@ -521,6 +549,44 @@ export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) 
           })}
         </div>
       </div>
+    </div>
+  )
+}
+
+/* ── BudgetDonut (orchestrator) ──────────────────────────────── */
+
+export function BudgetDonut({ groups, spending, onNavigate }: BudgetDonutProps) {
+  const segments = useMemo(() => buildSegments(groups, spending), [groups, spending])
+
+  // Group by budgetType, filter types with budget > 0
+  const typeGroups = useMemo(() => {
+    const map = new Map<BudgetType, Segment[]>()
+    for (const seg of segments) {
+      const existing = map.get(seg.budgetType) || []
+      existing.push(seg)
+      map.set(seg.budgetType, existing)
+    }
+    const order: BudgetType[] = ['income', 'expense', 'savings', 'debt']
+    return order
+      .filter((type) => {
+        const segs = map.get(type)
+        return segs && segs.reduce((s, seg) => s + seg.limit, 0) > 0
+      })
+      .map((type) => ({ type, segments: map.get(type)! }))
+  }, [segments])
+
+  if (typeGroups.length === 0) return null
+
+  return (
+    <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+      {typeGroups.map(({ type, segments: typeSegs }) => (
+        <TypeDonut
+          key={type}
+          budgetType={type}
+          segments={typeSegs}
+          onNavigate={onNavigate}
+        />
+      ))}
     </div>
   )
 }

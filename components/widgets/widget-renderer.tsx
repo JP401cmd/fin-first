@@ -27,7 +27,7 @@ import { VrijheidsMijlpalenWidget } from './vrijheidsmijlpalen-widget'
 import { BacktestingScoreWidget } from './backtesting-score-widget'
 import { getWidgetDef, WIDGET_HREFS } from '@/lib/widget-catalog'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import type { FireProjection, FireRange } from '@/lib/horizon-data'
+import type { FireProjection, FireRange, FireCountdown } from '@/lib/horizon-data'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 
 // ── DashboardData bundle ──────────────────────────────────────
@@ -107,6 +107,8 @@ export interface DashboardData {
   backtestNamedPaths: { label: string; success: boolean }[] | null
   // Box 3: pre-computed belasting from full calculateBox3() (null if no assets)
   box3Belasting: number | null
+  // Simulatie-afgeleide countdown (null als simulatie niet beschikbaar)
+  simFireCountdown: FireCountdown | null
   // FIRE end strategy
   fireEndStrategy: FireEndStrategy
   fireEndAge: number

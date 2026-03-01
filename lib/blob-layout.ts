@@ -16,6 +16,71 @@ export function seededRandom(seed: number) {
   }
 }
 
+// ── FBM (Fractional Brownian Motion) noise ──────────────────
+
+/** 32-entry value-noise lookup table seeded from PRNG */
+function buildNoiseTable(seed: number): number[] {
+  const rng = seededRandom(seed)
+  const table: number[] = []
+  for (let i = 0; i < 32; i++) table.push(rng() * 2 - 1)
+  return table
+}
+
+/** Smooth value-noise with cosine interpolation, wrapping at 32 */
+function valueNoise(t: number, table: number[]): number {
+  const len = table.length
+  const idx = ((t % len) + len) % len
+  const i0 = Math.floor(idx)
+  const i1 = (i0 + 1) % len
+  const frac = idx - i0
+  const smooth = (1 - Math.cos(frac * Math.PI)) * 0.5
+  return table[i0] * (1 - smooth) + table[i1] * smooth
+}
+
+/** Fractional Brownian Motion: layered noise at increasing frequencies */
+function fbmNoise(
+  t: number,
+  seed: number,
+  octaves: number,
+  persistence: number,
+): number {
+  const table = buildNoiseTable(seed)
+  let value = 0
+  let amplitude = 1
+  let frequency = 1
+  let maxAmp = 0
+  for (let o = 0; o < octaves; o++) {
+    value += valueNoise(t * frequency, table) * amplitude
+    maxAmp += amplitude
+    amplitude *= persistence
+    frequency *= 2
+  }
+  return value / maxAmp
+}
+
+/**
+ * FBM with a pre-built table — avoids rebuilding per sample point.
+ * This is the correct way to sample continuous noise along a contour.
+ */
+function fbmNoiseWithTable(
+  t: number,
+  table: number[],
+  octaves: number,
+  persistence: number,
+): number {
+  let value = 0
+  let amplitude = 1
+  let frequency = 1
+  let maxAmp = 0
+  for (let o = 0; o < octaves; o++) {
+    value += valueNoise(t * frequency, table) * amplitude
+    maxAmp += amplitude
+    amplitude *= persistence
+    frequency *= 2
+  }
+  return value / maxAmp
+}
+
 // ── Color palette ────────────────────────────────────────────
 
 export interface GroupColors {
@@ -23,12 +88,20 @@ export interface GroupColors {
   sat: number
   /** Very light background wash (95% L) */
   wash: string
+  /** Ultra-light watercolor fade (97% L) */
+  washFade: string
   /** Lobe fill (90% L) */
   lobe: string
+  /** Mid-light lobe tone (86% L) */
+  lobeMid: string
   /** Light cell membrane (82% L) */
   light: string
+  /** Cytoplasm ring (75% L) */
+  cytoplasm: string
   /** Mid tone for strokes/accents (60% L) */
   mid: string
+  /** Deep mid tone (50% L) */
+  deepMid: string
   /** Dark center fill (35% L) */
   dark: string
   /** Deep nucleus color (25% L) */
@@ -57,9 +130,13 @@ export function getGroupColors(slugOrName: string, index: number): GroupColors {
     hue,
     sat,
     wash: hsl(hue, sat, 95),
+    washFade: hsl(hue, sat, 97),
     lobe: hsl(hue, sat, 90),
+    lobeMid: hsl(hue, sat, 86),
     light: hsl(hue, sat, 82),
+    cytoplasm: hsl(hue, sat, 75),
     mid: hsl(hue, sat - 5, 60),
+    deepMid: hsl(hue, sat, 50),
     dark: hsl(hue, sat, 35),
     nucleus: hsl(hue, sat + 5, 25),
   }
@@ -67,8 +144,8 @@ export function getGroupColors(slugOrName: string, index: number): GroupColors {
 
 // ── Cell radius ──────────────────────────────────────────────
 
-const MIN_RADIUS = 18
-const MAX_RADIUS = 65
+const MIN_RADIUS = 16
+const MAX_RADIUS = 72
 
 export function cellRadius(limit: number, allLimits: number[]): number {
   if (allLimits.length === 0) return MIN_RADIUS
@@ -106,6 +183,8 @@ export interface CellLayout {
   blobPath: string
   /** Inner membrane path (slightly smaller) */
   innerPath: string
+  /** Cytoplasm ring (between inner membrane and nucleus) */
+  cytoplasmPath: string
   /** Nucleus path (spending-fill region) */
   nucleusPath: string
   /** Small organelle dots */
@@ -150,15 +229,15 @@ function positionLobes(
   const cx = width / 2
   const cy = height / 2
 
-  // Start on a tight ellipse — just enough to fit, then separate
-  const rx = width * 0.18
-  const ry = height * 0.16
+  // Start on a tight ellipse — lobes should touch/overlap
+  const rx = width * 0.21
+  const ry = height * 0.18
 
   const positions: LobePosition[] = []
   for (let i = 0; i < groupCount; i++) {
     const angle = (i / groupCount) * Math.PI * 2 - Math.PI / 2
-    const jitterX = (rng() - 0.5) * 12
-    const jitterY = (rng() - 0.5) * 12
+    const jitterX = (rng() - 0.5) * 28
+    const jitterY = (rng() - 0.5) * 28
     positions.push({
       cx: cx + Math.cos(angle) * rx + jitterX,
       cy: cy + Math.sin(angle) * ry + jitterY,
@@ -166,11 +245,10 @@ function positionLobes(
     })
   }
 
-  // Force-separate: push lobes apart so boundaries don't overlap,
-  // but keep them close (gap = 10–18px between lobe edges)
-  const targetGap = 14
+  // Allow slight overlap between lobes (negative gap)
+  const targetGap = -8
   const separationIters = 60
-  const centerGravity = 0.02
+  const centerGravity = 0.03
 
   for (let iter = 0; iter < separationIters; iter++) {
     for (let i = 0; i < positions.length; i++) {
@@ -227,7 +305,7 @@ function packCells(
         const dx = cells[j].x - cells[i].x
         const dy = cells[j].y - cells[i].y
         const dist = Math.sqrt(dx * dx + dy * dy) || 0.1
-        const minDist = cells[i].radius + cells[j].radius + 6
+        const minDist = cells[i].radius + cells[j].radius + 2
         if (dist < minDist) {
           const overlap = (minDist - dist) / 2
           const nx = dx / dist
@@ -262,8 +340,9 @@ function packCells(
 // ── Generate organic blob path ───────────────────────────────
 
 /**
- * Creates an irregular blob outline around a center point with given radius.
- * `bumpiness` controls how jagged; `samples` controls smoothness.
+ * Creates an irregular amoeba-like blob outline around a center point.
+ * Uses a single noise table per shape for smooth, continuous contours,
+ * plus asymmetric elliptical stretch for true amoeba silhouettes.
  */
 export function generateCellBlob(
   cx: number,
@@ -273,16 +352,36 @@ export function generateCellBlob(
   seed: number,
   samples = 32,
 ): string {
-  const rng = seededRandom(seed)
+  const octaves = radius > 35 ? 4 : 3
+  // One noise table per shape — smooth, continuous traversal
+  const noiseTable = buildNoiseTable(seed)
   const contour: { x: number; y: number }[] = []
+
+  // Asymmetric amoeba stretch: random elongation axis + ratio
+  const stretchRng = seededRandom(seed + 999)
+  const stretchAngle = stretchRng() * Math.PI      // axis of elongation
+  const stretchRatio = 1.12 + stretchRng() * 0.25  // 1.12–1.37x elongation
+  // Secondary lobe: a bulge in a random direction
+  const lobeAngle = stretchRng() * Math.PI * 2
+  const lobeStrength = 0.06 + stretchRng() * 0.10  // 6–16% radius bulge
+  const lobeWidth = 1.2 + stretchRng() * 1.0       // angular width of the lobe
 
   for (let i = 0; i < samples; i++) {
     const angle = (i / samples) * Math.PI * 2
-    // Low-frequency sinusoidal noise for smooth, rounded wobble
-    const noise1 = Math.sin(angle * 2 + seed * 0.7) * 0.5
-    const noise2 = Math.cos(angle * 3 + seed * 1.3) * 0.3
-    const noise3 = (rng() - 0.5) * 0.15
-    const r = radius * (1 + bumpiness * (noise1 + noise2 + noise3))
+    // Continuous noise along the contour (wraps at 32)
+    const noiseT = (i / samples) * 32
+    const noise = fbmNoiseWithTable(noiseT, noiseTable, octaves, 0.45)
+
+    // Elliptical deformation: stretch along stretchAngle
+    const angleDelta = angle - stretchAngle
+    const ellipseFactor = 1 + (stretchRatio - 1) * Math.cos(angleDelta) ** 2
+
+    // Secondary lobe bulge
+    let lobeDiff = Math.abs(angle - lobeAngle)
+    if (lobeDiff > Math.PI) lobeDiff = Math.PI * 2 - lobeDiff
+    const lobeFactor = 1 + lobeStrength * Math.max(0, 1 - lobeDiff / lobeWidth)
+
+    const r = radius * ellipseFactor * lobeFactor * (1 + bumpiness * noise)
 
     contour.push({
       x: cx + Math.cos(angle) * r,
@@ -310,40 +409,48 @@ function generateBlobPath(
   cenX /= points.length
   cenY /= points.length
 
-  const samples = 64
+  const samples = 96
   const contour: { x: number; y: number }[] = []
+  // Single noise table for smooth, continuous boundary wobble
+  const noiseTable = buildNoiseTable(seed + 31)
 
   for (let i = 0; i < samples; i++) {
     const angle = (i / samples) * Math.PI * 2
     let maxDist = 0
 
+    // Wider angle window for smoother boundary detection
     for (const p of points) {
       const dx = p.x - cenX
       const dy = p.y - cenY
       const pAngle = Math.atan2(dy, dx)
       let angleDiff = Math.abs(pAngle - angle)
       if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff
-      if (angleDiff < Math.PI / (samples * 0.4)) {
+      if (angleDiff < Math.PI / (samples * 0.35)) {
         const dist = Math.sqrt(dx * dx + dy * dy) + p.radius
         if (dist > maxDist) maxDist = dist
       }
     }
 
     if (maxDist === 0) {
-      let avgDist = 0
+      // Smooth fallback: weighted average based on angle proximity
+      let weightedDist = 0
+      let totalWeight = 0
       for (const p of points) {
         const dx = p.x - cenX
         const dy = p.y - cenY
-        avgDist += Math.sqrt(dx * dx + dy * dy) + p.radius
+        const pAngle = Math.atan2(dy, dx)
+        let angleDiff = Math.abs(pAngle - angle)
+        if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff
+        const weight = 1 / (angleDiff + 0.1)
+        weightedDist += (Math.sqrt(dx * dx + dy * dy) + p.radius) * weight
+        totalWeight += weight
       }
-      avgDist /= points.length
-      maxDist = avgDist
+      maxDist = totalWeight > 0 ? weightedDist / totalWeight : 100
     }
 
-    // Low-frequency noise only — smooth, flowing curves
-    const noise =
-      wobble * Math.sin(angle * 2 + seed) * Math.cos(angle * 1.7 + seed * 1.3) +
-      wobble * 0.3 * Math.sin(angle * 3.5 + seed * 0.8)
+    // Continuous FBM noise from single table
+    const noiseT = (i / samples) * 32
+    const noise = fbmNoiseWithTable(noiseT, noiseTable, 3, 0.4) * wobble * 2
     const r = maxDist + padding + noise
 
     contour.push({
@@ -355,10 +462,15 @@ function generateBlobPath(
   return catmullRomToBezier(contour)
 }
 
+/**
+ * Catmull-Rom to cubic Bezier conversion.
+ * Higher tension (1/4.5 vs 1/6) = rounder, more bubbly organic curves.
+ */
 function catmullRomToBezier(points: { x: number; y: number }[]): string {
   const n = points.length
   if (n < 2) return ''
 
+  const tension = 1 / 4.5 // higher = rounder curves (default Catmull-Rom is 1/6)
   const parts: string[] = []
   parts.push(`M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`)
 
@@ -368,10 +480,10 @@ function catmullRomToBezier(points: { x: number; y: number }[]): string {
     const p2 = points[(i + 1) % n]
     const p3 = points[(i + 2) % n]
 
-    const cp1x = p1.x + (p2.x - p0.x) / 6
-    const cp1y = p1.y + (p2.y - p0.y) / 6
-    const cp2x = p2.x - (p3.x - p1.x) / 6
-    const cp2y = p2.y - (p3.y - p1.y) / 6
+    const cp1x = p1.x + (p2.x - p0.x) * tension
+    const cp1y = p1.y + (p2.y - p0.y) * tension
+    const cp2x = p2.x - (p3.x - p1.x) * tension
+    const cp2y = p2.y - (p3.y - p1.y) * tension
 
     parts.push(
       `C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`,
@@ -533,14 +645,17 @@ export function computeBlobLayout(
       const y = packData[idx].y
       const cellSeed = seed + gi * 100 + idx * 13
 
-      // Outer blob (smooth organic membrane)
-      const blobPath = generateCellBlob(x, y, r, 0.04, cellSeed, 32)
-      // Inner membrane (slightly smaller, subtle wobble)
-      const innerPath = generateCellBlob(x, y, r * 0.85, 0.03, cellSeed + 7, 28)
+      // Outer blob (organic amoeba membrane) — high bumpiness + more samples for large cells
+      const outerSamples = r > 40 ? 48 : 36
+      const blobPath = generateCellBlob(x, y, r, 0.18, cellSeed, outerSamples)
+      // Inner membrane (organic wobble)
+      const innerPath = generateCellBlob(x, y, r * 0.85, 0.10, cellSeed + 7, 28)
+      // Cytoplasm ring (between inner membrane and nucleus)
+      const cytoplasmPath = generateCellBlob(x, y, r * 0.75, 0.06, cellSeed + 19, 24)
       // Nucleus (spending fill — scaled by pctUsed)
       const nucleusR = r * 0.7 * Math.min(pctUsed, 1.15)
       const nucleusPath = nucleusR > 3
-        ? generateCellBlob(x, y, nucleusR, 0.04, cellSeed + 13, 24)
+        ? generateCellBlob(x, y, nucleusR, 0.14, cellSeed + 13, 24)
         : ''
 
       // Organelle dots
@@ -562,6 +677,7 @@ export function computeBlobLayout(
         colorIndex: gi,
         blobPath,
         innerPath,
+        cytoplasmPath,
         nucleusPath,
         organelles,
       }
@@ -569,7 +685,7 @@ export function computeBlobLayout(
 
     // Lobe boundary
     const lobePoints = cells.map((c) => ({ x: c.x, y: c.y, radius: c.radius }))
-    const boundaryPath = generateBlobPath(lobePoints, 18, 2, seed + gi * 7)
+    const boundaryPath = generateBlobPath(lobePoints, 24, 6, seed + gi * 7)
 
     // Background dots
     const bgDots = generateBgDots(
@@ -598,7 +714,7 @@ export function computeBlobLayout(
     })
   }
 
-  const membranePath = generateBlobPath(allCellsForMembrane, 30, 2.5, seed + 99)
+  const membranePath = generateBlobPath(allCellsForMembrane, 30, 6, seed + 99)
 
   return { lobes, membranePath, viewBox: { width, height } }
 }

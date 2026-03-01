@@ -11,10 +11,11 @@ interface Props {
 }
 
 export function FirePrognoseWidget({ size, data, href }: Props) {
-  const { fireProjResult, freedomPct, fireAgeFractional } = data
+  const { fireProjResult, freedomPct, fireAgeFractional, simFireCountdown } = data
+  const cd = simFireCountdown ?? fireProjResult
 
-  const isReached = fireProjResult.fireDate === 'Bereikt!'
-  const isNotFeasible = fireProjResult.fireDate === 'Niet haalbaar'
+  const isReached = cd.fireDate === 'Bereikt!'
+  const isNotFeasible = cd.fireDate === 'Niet haalbaar'
 
   return (
     <WidgetShell module="horizon" size={size} kicker="FIRE Prognose" href={href}>
@@ -34,7 +35,7 @@ export function FirePrognoseWidget({ size, data, href }: Props) {
             <>
               <p className="text-xs text-[var(--ink-3)] mb-0.5">Countdown naar vrijheid</p>
               <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
-                {fireProjResult.countdownYears}j {fireProjResult.countdownMonths}m
+                {cd.countdownYears}j {cd.countdownMonths}m
               </p>
               {fireAgeFractional != null ? (
                 <p className="mt-0.5 text-xs text-[var(--ink-3)]">
@@ -42,7 +43,7 @@ export function FirePrognoseWidget({ size, data, href }: Props) {
                 </p>
               ) : (
                 <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-                  Verwacht: {fireProjResult.fireDate}
+                  Verwacht: {cd.fireDate}
                 </p>
               )}
             </>

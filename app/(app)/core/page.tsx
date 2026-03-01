@@ -9,7 +9,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { shouldAlert } from '@/lib/budget-alerts'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
-import { NL_SWR, DEFAULT_RETURN, NL_INFLATIE, ageAtDate, type LifeEvent } from '@/lib/horizon-data'
+import { ageAtDate, type LifeEvent } from '@/lib/horizon-data'
+import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { runSimulation, lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { parseFireStrategy } from '@/lib/fire-strategy'
 import type { Budget } from '@/lib/budget-data'
@@ -29,7 +30,7 @@ import { NetWorthProjectionChart } from '@/components/app/net-worth-projection-c
 import { computeNetWorthProjection, type NetWorthProjectionResult } from '@/lib/net-worth-projection'
 import { SpendingInsightsSection, type SpendingInsight } from '@/components/app/spending-insight-card'
 import { SnapshotComparisonView } from '@/components/app/snapshot-comparison-view'
-import { buildSegments, groupColor, childColor } from '@/components/app/budget-donut'
+import { buildSegments, typeColors, childTypeColors } from '@/components/app/budget-donut'
 import type { BudgetWithChildren } from '@/lib/budget-data'
 import { FullScreenModal } from '@/components/app/full-screen-modal'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -50,7 +51,8 @@ const DynDebtsPage = dynamic(() => import('@/app/(app)/core/debts/page'), {
 
 export default function CorePage() {
   const router = useRouter()
-  const fireSwr = NL_SWR
+  const [fireParams, setFireParams] = useState<FireParams>(resolveFireParams({}))
+  const fireSwr = fireParams.effectiveSwr
   const [data, setData] = useState<CoreData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -170,7 +172,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           .gte('date', twelveMonthsAgo)
           .order('date', { ascending: true })
           .limit(1),
-        supabase.from('profiles').select('retirement_expense_method, retirement_expense_custom_amount').single(),
+        supabase.from('profiles').select('retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate').single(),
       ])
 
       if (txResult.error) throw txResult.error
@@ -262,6 +264,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         profileResult.data?.retirement_expense_custom_amount,
       )
       setRetirementMethodUsed(activeRetirementMethod)
+      setFireParams(resolveFireParams(profileResult.data ?? {}))
 
       // Total assets (weighted by net_worth_inclusion_pct)
       const totalAssets = assetsResult.data.reduce((s, a) =>
@@ -538,7 +541,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
     async function runCoreSimulation() {
       const sb = createClient()
       const [profileResult, lifeEventsResult, assetsContribResult] = await Promise.all([
-        sb.from('profiles').select('date_of_birth, fire_end_strategy, fire_end_age, fire_legacy_amount').single(),
+        sb.from('profiles').select('date_of_birth, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate').single(),
         sb.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         sb.from('assets').select('monthly_contribution').eq('is_active', true),
       ])
@@ -551,7 +554,8 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       const annualSavings = monthlyContributions * 12
       const cashflows = lifeEventsToCashflows((lifeEventsResult.data ?? []) as LifeEvent[])
       const fireStrategy = parseFireStrategy(profileResult.data)
-      const simResult = runSimulation(currentAge, fireStrategy.endAge, data.netWorth, yearlyExp, annualSavings, DEFAULT_RETURN, 'nl_box3', NL_INFLATIE, cashflows, fireStrategy)
+      const simFireParams = resolveFireParams(profileResult.data ?? {})
+      const simResult = runSimulation(currentAge, fireStrategy.endAge, data.netWorth, yearlyExp, annualSavings, simFireParams.grossReturn, 'nl_box3', simFireParams.inflationRate, cashflows, fireStrategy)
       if (simResult.requiredFirePortfolio > 0) setCoreSimTarget(simResult.requiredFirePortfolio)
     }
     runCoreSimulation()
@@ -644,7 +648,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">vrijheid bereikt</span>
           </div>
 
-          <button type="button" onClick={() => setShowFireReceipt(true)} className="mb-4 sm:mb-6 w-full text-left transition-opacity hover:opacity-80">
+          <button type="button" onClick={() => setShowFireReceipt(true)} className="mb-4 sm:mb-6 w-full text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px rounded-[var(--r)] focus-visible:ring-2 focus-visible:ring-kern-300 focus-visible:outline-none">
             <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-kern-600 via-kern-400 to-kern-300 transition-all duration-1000"
@@ -663,7 +667,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
               <button
                 type="button"
                 onClick={() => setShowNetWorthReceipt(true)}
-                className="w-full cursor-pointer text-left transition-opacity hover:opacity-80"
+                className="w-full cursor-pointer text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px rounded-[var(--r)] focus-visible:ring-2 focus-visible:ring-kern-300 focus-visible:outline-none"
               >
                 <p className="label-editorial text-[var(--ink-3)]">Netto vermogen</p>
                 <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]">{formatCurrency(data.netWorth)}</p>
@@ -682,7 +686,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             <button
               type="button"
               onClick={() => setShowBudgetModal(true)}
-              className="cursor-pointer text-left transition-opacity hover:opacity-80"
+              className="cursor-pointer text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px rounded-[var(--r)] focus-visible:ring-2 focus-visible:ring-kern-300 focus-visible:outline-none"
               data-testid="hero-deze-maand"
             >
               <p className="label-editorial text-[var(--ink-3)]">Deze maand</p>
@@ -734,7 +738,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                   <button
                     type="button"
                     onClick={() => setShowFreeDaysReceipt(true)}
-                    className="flex items-center gap-1.5 text-left transition-all hover:opacity-70"
+                    className="flex items-center gap-1.5 text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px rounded-[var(--r)] focus-visible:ring-2 focus-visible:ring-kern-300 focus-visible:outline-none"
                   >
                     <p className="font-mono text-2xl font-bold text-[var(--ink)]">{data.freeDaysPerYear}</p>
                     <span className="text-sm text-[var(--ink-3)]">vrije dagen/jaar</span>
@@ -2332,7 +2336,7 @@ function BudgetLegendOverview({
       </div>
 
       {segments.map((seg) => {
-        const c = groupColor(seg.colorIdx)
+        const c = typeColors(seg.budgetType)
         const pct = seg.limit > 0 ? Math.round((seg.spent / seg.limit) * 100) : 0
         const isOver = seg.spent > seg.limit && seg.limit > 0
         const isExpanded = expandedGroupId === seg.id
@@ -2340,12 +2344,11 @@ function BudgetLegendOverview({
         return (
           <div key={seg.id}>
             <button
-              className={`flex w-full items-center gap-3 rounded-[var(--r-lg)] border px-3 py-2.5 text-left transition-all ${
-                isExpanded ? 'ring-2 ring-kern-400' : ''
-              }`}
+              className="flex w-full items-center gap-3 rounded-[var(--r-lg)] border px-3 py-2.5 text-left transition-all"
               style={{
-                borderColor: isExpanded ? c.border : '#e4e4e7',
-                backgroundColor: isExpanded ? c.bg : 'white',
+                borderColor: isExpanded ? c.border : 'var(--border-ed)',
+                backgroundColor: isExpanded ? c.bg : 'var(--paper)',
+                boxShadow: isExpanded ? `0 0 0 2px ${c.border}` : undefined,
               }}
               onClick={() => onToggleGroup(seg.id)}
             >
@@ -2381,7 +2384,7 @@ function BudgetLegendOverview({
                 {seg.children.map((child, ci) => {
                   const childPct = child.limit > 0 ? Math.round((child.spent / child.limit) * 100) : 0
                   const childOver = child.spent > child.limit && child.limit > 0
-                  const cc = childColor(c.h, ci, seg.children.length)
+                  const cc = childTypeColors(seg.budgetType, ci, seg.children.length)
 
                   return (
                     <button

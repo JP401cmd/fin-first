@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
 
-export default function WidgetsPage() {
+export default function ParametersPage() {
   redirect('/identity/instellingen')
 }

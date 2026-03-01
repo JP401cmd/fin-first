@@ -45,12 +45,14 @@ export function VrijheidsvoortgangWidget({ size, data, href }: Props) {
         </p>
 
         <p className="mt-1.5 font-serif italic text-[11px] text-[var(--ink-3)]">
-          {fireProjResult.fireDate === 'Bereikt!'
-            ? 'Volledige vrijheid bereikt!'
-            : fireProjResult.fireDate === 'Niet haalbaar'
-              ? 'Verhoog spaarcapaciteit'
-              : `Vrijheid: ${fireProjResult.fireDate}`
-          }
+          {(() => {
+            const cd = data.simFireCountdown ?? fireProjResult
+            return cd.fireDate === 'Bereikt!'
+              ? 'Volledige vrijheid bereikt!'
+              : cd.fireDate === 'Niet haalbaar'
+                ? 'Verhoog spaarcapaciteit'
+                : `Vrijheid: ${cd.fireDate}`
+          })()}
         </p>
       </div>
     </WidgetShell>

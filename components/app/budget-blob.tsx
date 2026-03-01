@@ -27,6 +27,15 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
   const [activeGroups, setActiveGroups] = useState<Set<number>>(new Set())
   const [showOverspendOnly, setShowOverspendOnly] = useState(false)
+  const [reducedMotion, setReducedMotion] = useState(false)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    setReducedMotion(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   useEffect(() => {
     const el = containerRef.current
@@ -130,10 +139,10 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
           className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all ${
             showOverspendOnly
               ? 'border-red-300 bg-red-50 text-red-700'
-              : 'border-[var(--border-md)] text-[var(--ink-3)] hover:border-zinc-400'
+              : 'border-[var(--border-md)] text-[var(--ink-3)] hover:border-[var(--border-md)]'
           }`}
         >
-          <span className={`inline-block h-2.5 w-2.5 rounded-full ${showOverspendOnly ? 'bg-red-500' : 'bg-zinc-400'}`} />
+          <span className={`inline-block h-2.5 w-2.5 rounded-full ${showOverspendOnly ? 'bg-red-500' : 'bg-[var(--ink-4)]'}`} />
           Alleen overschrijdingen
         </button>
       </div>
@@ -144,28 +153,31 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
           viewBox={`0 0 ${vbWidth} ${vbHeight}`}
           className="h-auto w-full"
           preserveAspectRatio="xMidYMid meet"
-          style={{ animation: hasEntered ? 'fadeInFill 500ms ease-out both' : 'none', opacity: hasEntered ? undefined : 0 }}
+          style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 0.3s ease-out' }}
         >
           <defs>
-            {/* Lobe radial gradients — watercolor wash effect */}
+            {/* Lobe radial gradients — watercolor wash with off-center origin */}
             {layout.lobes.map((lobe) => {
               const c = groupColorsList[lobe.colorIndex]
               return (
                 <radialGradient
                   key={`lobe-grad-${lobe.id}`}
                   id={`${dp}lobe-${lobe.id}`}
-                  cx="50%"
-                  cy="50%"
-                  r="55%"
+                  cx="45%"
+                  cy="40%"
+                  r="58%"
                 >
-                  <stop offset="0%" stopColor={c.lobe} stopOpacity="0.85" />
-                  <stop offset="60%" stopColor={c.wash} stopOpacity="0.5" />
-                  <stop offset="100%" stopColor={c.wash} stopOpacity="0.1" />
+                  <stop offset="0%" stopColor={c.lobe} stopOpacity="0.95" />
+                  <stop offset="20%" stopColor={c.lobeMid} stopOpacity="0.8" />
+                  <stop offset="40%" stopColor={c.wash} stopOpacity="0.65" />
+                  <stop offset="60%" stopColor={c.wash} stopOpacity="0.45" />
+                  <stop offset="80%" stopColor={c.washFade} stopOpacity="0.25" />
+                  <stop offset="100%" stopColor={c.washFade} stopOpacity="0.05" />
                 </radialGradient>
               )
             })}
 
-            {/* Per-cell nucleus gradient */}
+            {/* Per-cell nucleus gradient — deep, off-center */}
             {layout.lobes.flatMap((lobe) =>
               lobe.cells.map((cell) => {
                 const c = groupColorsList[cell.colorIndex]
@@ -173,13 +185,16 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
                   <radialGradient
                     key={cell.id}
                     id={`${dp}nuc-${cell.id}`}
-                    cx="50%"
-                    cy="50%"
-                    r="50%"
+                    cx="45%"
+                    cy="42%"
+                    r="55%"
                   >
-                    <stop offset="0%" stopColor={c.nucleus} stopOpacity="0.9" />
-                    <stop offset="55%" stopColor={c.dark} stopOpacity="0.7" />
-                    <stop offset="100%" stopColor={c.mid} stopOpacity="0.4" />
+                    <stop offset="0%" stopColor={c.nucleus} stopOpacity="0.95" />
+                    <stop offset="25%" stopColor={c.dark} stopOpacity="0.85" />
+                    <stop offset="45%" stopColor={c.deepMid} stopOpacity="0.7" />
+                    <stop offset="65%" stopColor={c.mid} stopOpacity="0.55" />
+                    <stop offset="85%" stopColor={c.light} stopOpacity="0.35" />
+                    <stop offset="100%" stopColor={c.light} stopOpacity="0.15" />
                   </radialGradient>
                 )
               }),
@@ -211,11 +226,46 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
             <filter id={`${dp}soft`} x="-10%" y="-10%" width="120%" height="120%">
               <feGaussianBlur in="SourceGraphic" stdDeviation="3" />
             </filter>
+
+            {/* Watercolor texture — fractal displacement (stronger for organic feel) */}
+            <filter id={`${dp}watercolor`} x="-8%" y="-8%" width="116%" height="116%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="4" seed="2" result="noise" />
+              <feDisplacementMap in="SourceGraphic" in2="noise" scale="14" xChannelSelector="R" yChannelSelector="G" />
+            </filter>
+
+            {/* Soft lobe edge — blurred stroke effect */}
+            <filter id={`${dp}soft-edge`} x="-15%" y="-15%" width="130%" height="130%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" />
+            </filter>
+
+            {/* Cell watercolor — subtle displacement on cell fills */}
+            <filter id={`${dp}cell-wc`} x="-5%" y="-5%" width="110%" height="110%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="3" seed="5" result="noise" />
+              <feDisplacementMap in="SourceGraphic" in2="noise" scale="4" xChannelSelector="R" yChannelSelector="G" />
+            </filter>
+
+            {/* Cell inner glow */}
+            <filter id={`${dp}cell-glow`} x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur" />
+              <feFlood floodColor="#ffffff" floodOpacity="0.6" result="white" />
+              <feComposite in="white" in2="blur" operator="in" result="glow" />
+              <feMerge>
+                <feMergeNode in="glow" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
           </defs>
 
-          {/* ── Layer 1: Outer membrane with soft shadow ── */}
+          {/* ── Layer 1: Outer membrane (4-layer biological rendering) ── */}
           {layout.membranePath && (
-            <>
+            <g
+              className="organism-membrane"
+              style={{
+                transformOrigin: `${vbWidth / 2}px ${vbHeight / 2}px`,
+                animation: hasEntered && !reducedMotion ? 'membrane-breathe 6s ease-in-out infinite' : 'none',
+              }}
+            >
+              {/* Outer glow (blurred shadow) */}
               <path
                 d={layout.membranePath}
                 fill="#f5f5f4"
@@ -223,15 +273,31 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
                 filter={`url(#${dp}soft)`}
                 opacity="0.5"
               />
+              {/* Semi-transparent fill */}
               <path
                 d={layout.membranePath}
-                fill="white"
-                fillOpacity="0.85"
-                stroke="#a8a29e"
-                strokeWidth="1.2"
-                strokeOpacity="0.4"
+                fill="#faf9f6"
+                fillOpacity="0.7"
+                stroke="none"
               />
-            </>
+              {/* Soft edge stroke (blurred) */}
+              <path
+                d={layout.membranePath}
+                fill="none"
+                stroke="#a8a29e"
+                strokeWidth="2"
+                strokeOpacity="0.25"
+                filter={`url(#${dp}soft-edge)`}
+              />
+              {/* Inner highlight */}
+              <path
+                d={layout.membranePath}
+                fill="none"
+                stroke="#ffffff"
+                strokeWidth="0.5"
+                strokeOpacity="0.5"
+              />
+            </g>
           )}
 
           {/* ── Layer 2: Lobe backgrounds (watercolor gradient) ── */}
@@ -252,15 +318,33 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
                   fill={`url(#${dp}lobe-${lobe.id})`}
                   filter={lobeIsOver && lobeVisible ? `url(#${dp}lobe-glow)` : undefined}
                 />
-                {/* Stroke — red when over budget, subtle otherwise */}
+                {/* Secondary watercolor layer — pigment pooling simulation */}
                 <path
                   d={lobe.boundaryPath}
-                  fill="none"
-                  stroke={lobeIsOver ? '#ef4444' : c.mid}
-                  strokeWidth={lobeIsOver ? 2.5 : 1}
-                  strokeOpacity={lobeIsOver ? 0.7 : 0.3}
-                  strokeDasharray={lobeIsOver ? '8 4' : 'none'}
+                  fill={`url(#${dp}lobe-${lobe.id})`}
+                  opacity="0.4"
+                  filter={`url(#${dp}watercolor)`}
                 />
+                {/* Soft blurred edge (normal) or red dashed stroke (overspend) */}
+                {lobeIsOver ? (
+                  <path
+                    d={lobe.boundaryPath}
+                    fill="none"
+                    stroke="#ef4444"
+                    strokeWidth={2.5}
+                    strokeOpacity={0.7}
+                    strokeDasharray="8 4"
+                  />
+                ) : (
+                  <path
+                    d={lobe.boundaryPath}
+                    fill="none"
+                    stroke={c.light}
+                    strokeWidth={6}
+                    strokeOpacity={0.25}
+                    filter={`url(#${dp}soft-edge)`}
+                  />
+                )}
                 {/* Background organelle dots */}
                 {lobe.bgDots.map((dot, di) => (
                   <circle
@@ -282,7 +366,7 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
                       fontSize="9"
                       fill={lobeIsOver ? '#dc2626' : c.dark}
                       fontWeight="700"
-                      fontFamily="system-ui, sans-serif"
+                      fontFamily="Inter, sans-serif"
                     >
                       {lobe.name}
                     </text>
@@ -293,7 +377,7 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
                       fontSize="7.5"
                       fill={lobeIsOver ? '#dc2626' : c.mid}
                       fontWeight="500"
-                      fontFamily="system-ui, sans-serif"
+                      fontFamily="'DM Mono', monospace"
                     >
                       {formatCurrency(lobeSpent)} / {formatCurrency(lobeLimit)} ({lobeLimit > 0 ? Math.round((lobeSpent / lobeLimit) * 100) : 0}%)
                     </text>
@@ -303,67 +387,123 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
             )
           })}
 
+          {/* ── Layer 2b: Inter-lobe blending — color bleeding where lobes overlap ── */}
+          {layout.lobes.map((lobe) => {
+            const lobeVisible = activeGroups.size === 0 || activeGroups.has(lobe.colorIndex)
+            if (!lobeVisible) return null
+            const c = groupColorsList[lobe.colorIndex]
+            return (
+              <path
+                key={`blend-${lobe.id}`}
+                d={lobe.boundaryPath}
+                fill={c.wash}
+                fillOpacity="0.25"
+                stroke="none"
+                filter={`url(#${dp}watercolor)`}
+                style={{ mixBlendMode: 'multiply' }}
+              />
+            )
+          })}
+
           {/* ── Layer 3: Cells — biological look ── */}
-          {layout.lobes.map((lobe) =>
-            lobe.cells.map((cell) => {
+          {layout.lobes.map((lobe, gi) =>
+            lobe.cells.map((cell, idx) => {
               const visible = isCellVisible(cell)
               const isOver = cell.pctUsed > 1
               const c = groupColorsList[cell.colorIndex]
               const isHovered = hoveredCell?.id === cell.id
               const showLabel = cell.radius >= 28
+              const entranceDelay = gi * 100 + idx * 60
+              const breatheDuration = 3 + (idx % 3) * 0.4
 
               return (
                 <g
                   key={cell.id}
                   opacity={visible ? 1 : 0.12}
-                  className="cursor-pointer"
-                  style={{ transition: 'opacity 0.3s' }}
+                  className="organism-cell cursor-pointer"
+                  style={{
+                    transformOrigin: `${cell.x}px ${cell.y}px`,
+                    animation: hasEntered && !reducedMotion
+                      ? `cell-grow-in 0.5s cubic-bezier(0.22,1,0.36,1) ${entranceDelay}ms both, cell-breathe ${breatheDuration}s ease-in-out ${entranceDelay + 500}ms infinite`
+                      : hasEntered ? 'none' : undefined,
+                    opacity: hasEntered ? undefined : 0,
+                    transition: 'opacity 0.3s',
+                  }}
                   onMouseEnter={() => setHoveredCell(cell)}
                   onMouseLeave={() => setHoveredCell(null)}
                   onClick={() => onNavigate(cell.id)}
                   filter={isOver && visible ? `url(#${dp}glow)` : undefined}
                 >
-                  {/* Outer blob membrane — light fill */}
+                  {/* Outer blob membrane — soft glow, no hard stroke in normal state */}
                   <path
                     d={cell.blobPath}
                     fill={c.wash}
-                    stroke={isHovered ? c.dark : c.mid}
-                    strokeWidth={isHovered ? 2 : 0.8}
-                    strokeOpacity={isHovered ? 0.8 : 0.4}
+                    stroke={isOver ? '#ef4444' : 'none'}
+                    strokeWidth={isOver ? 1.5 : 0}
+                    strokeDasharray={isOver ? '6 3' : 'none'}
+                    filter={!isOver ? `url(#${dp}cell-glow)` : undefined}
                   />
+                  {/* Hover ring — only on hover */}
+                  {isHovered && (
+                    <path
+                      d={cell.blobPath}
+                      fill="none"
+                      stroke={c.dark}
+                      strokeWidth={2}
+                      strokeOpacity={0.6}
+                    />
+                  )}
 
-                  {/* Inner membrane ring */}
+                  {/* Inner membrane ring — with subtle watercolor texture */}
                   <path
                     d={cell.innerPath}
                     fill={c.light}
                     fillOpacity="0.5"
                     stroke={c.mid}
                     strokeWidth="0.5"
-                    strokeOpacity="0.25"
+                    strokeOpacity="0.15"
+                    filter={`url(#${dp}cell-wc)`}
                   />
 
-                  {/* Nucleus (spending fill) */}
+                  {/* Cytoplasm ring (between inner membrane and nucleus) */}
+                  <path
+                    d={cell.cytoplasmPath}
+                    fill={c.cytoplasm}
+                    fillOpacity="0.35"
+                  />
+
+                  {/* Nucleus (spending fill) — pulses when nearly full */}
                   {cell.nucleusPath && (
                     <path
+                      className="organism-nucleus"
                       d={cell.nucleusPath}
                       fill={`url(#${dp}nuc-${cell.id})`}
+                      style={cell.pctUsed > 0.85 && !reducedMotion
+                        ? { animation: 'nucleus-pulse 2s ease-in-out infinite' }
+                        : undefined
+                      }
                     />
                   )}
 
-                  {/* Organelle dots inside cell */}
+                  {/* Organelle dots — variable opacity by size, subtle drift */}
                   {cell.organelles.map((o, oi) => (
                     <circle
                       key={oi}
+                      className="organism-organelle"
                       cx={o.x}
                       cy={o.y}
                       r={o.r}
                       fill={c.mid}
-                      opacity={0.25}
+                      opacity={0.2 + (o.r / 6) * 0.35}
+                      style={!reducedMotion
+                        ? { animation: `organelle-drift ${4 + oi * 0.7}s ease-in-out infinite` }
+                        : undefined
+                      }
                     />
                   ))}
 
-                  {/* Yellow accent dots (like in reference) */}
-                  {cell.pctUsed > 0.8 && cell.radius > 25 && (
+                  {/* Golden accent dots — always shown as organelles (radius > 25) */}
+                  {cell.radius > 25 && (
                     <AccentDots cx={cell.x} cy={cell.y} radius={cell.radius} seed={cell.colorIndex * 17 + 3} />
                   )}
 
@@ -393,7 +533,7 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
                       fontSize={cell.radius >= 45 ? 9 : 7}
                       fill={cell.pctUsed > 0.6 ? '#ffffff' : c.dark}
                       fontWeight="600"
-                      fontFamily="system-ui, sans-serif"
+                      fontFamily="Inter, sans-serif"
                       style={{ pointerEvents: 'none' }}
                     >
                       {truncateLabel(cell.name, cell.radius)}
@@ -408,7 +548,7 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
                       textAnchor="middle"
                       fontSize={cell.radius >= 45 ? 8 : 6.5}
                       fill={cell.pctUsed > 0.6 ? 'rgba(255,255,255,0.75)' : c.mid}
-                      fontFamily="system-ui, sans-serif"
+                      fontFamily="'DM Mono', monospace"
                       style={{ pointerEvents: 'none' }}
                     >
                       {Math.round(cell.pctUsed * 100)}%
@@ -419,17 +559,7 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
             }),
           )}
 
-          {/* ── Layer 4: Hover ring ── */}
-          {hoveredCell && hoveredCell.blobPath && (
-            <path
-              d={hoveredCell.blobPath}
-              fill="none"
-              stroke={groupColorsList[hoveredCell.colorIndex]?.dark ?? '#666'}
-              strokeWidth="2"
-              strokeDasharray="6 3"
-              style={{ pointerEvents: 'none' }}
-            />
-          )}
+          {/* Hover ring is now rendered inline per cell */}
         </svg>
 
         {/* Tooltip */}
@@ -536,7 +666,7 @@ function Tooltip({
           </span>
         </div>
         {/* Mini bar */}
-        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
           <div
             className={`h-full rounded-full ${isOver ? 'bg-red-500' : 'bg-current'}`}
             style={{

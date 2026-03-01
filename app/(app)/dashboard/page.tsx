@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeFireProjection, computeFireRange, runBacktest, ageAtDate, NL_SWR, NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF, type HorizonInput, type LifeEvent, DEFAULT_RETURN } from '@/lib/horizon-data'
+import { computeFireProjection, computeFireRange, runBacktest, ageAtDate, deriveCountdown, NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF, type HorizonInput, type LifeEvent, type FireCountdown } from '@/lib/horizon-data'
+import { resolveFireParams } from '@/lib/fire-params'
 import { runSimulation, lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { parseFireStrategy, type FireEndStrategy } from '@/lib/fire-strategy'
 import { computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
@@ -39,7 +40,7 @@ export default async function DashboardPage() {
     supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('id, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
     supabase.from('debts').select('id, current_balance, debt_type, net_worth_inclusion_pct, is_tax_deductible, linked_asset_id').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount').single(),
+    supabase.from('profiles').select('date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate').single(),
     supabase.from('budgets').select('id, default_limit, interval').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
     supabase.from('actions')
       .select('id, title, status, freedom_days_impact, priority_score, due_date, source, completed_at')
@@ -154,7 +155,8 @@ export default async function DashboardPage() {
     }
   }
 
-  const fireSwr = NL_SWR
+  const fireParams = resolveFireParams(profileResult.data ?? {})
+  const fireSwr = fireParams.effectiveSwr
 
   const yearlyRetirementExpenses = computeRetirementExpenses(
     profileResult.data?.retirement_expense_method as RetirementExpenseMethod,
@@ -173,15 +175,16 @@ export default async function DashboardPage() {
     monthlyContributions, yearlyMustExpenses: yearlyRetirementExpenses,
     dateOfBirth: profileResult.data?.date_of_birth ?? null,
   }
-  const fireProjResult = computeFireProjection(horizonInput, DEFAULT_RETURN, fireSwr)
+  const fireProjResult = computeFireProjection(horizonInput, fireParams.grossReturn, fireSwr)
 
   // Horizon extra: scenario range (optimistic / expected / pessimistic)
-  const fireRange = computeFireRange(horizonInput, fireSwr)
+  const fireRange = computeFireRange(horizonInput, fireSwr, undefined, fireParams.grossReturn)
 
   // Horizon extra: sim rows for vermogenspad chart
   const dob = profileResult.data?.date_of_birth ?? null
   let simRows: { age: number; endPortfolio: number; phase: string }[] | null = null
   let simRequiredPortfolio: number | null = null
+  let simFireAgeFractional: number | null = null
   const fireStrategy = parseFireStrategy(profileResult.data ?? {})
   if (dob && netWorth > 0) {
     try {
@@ -193,19 +196,27 @@ export default async function DashboardPage() {
         netWorth,
         yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses : monthlyExpenses * 12,
         monthlyContributions * 12,
-        DEFAULT_RETURN,
+        fireParams.grossReturn,
         'nl_box3',
-        0.02,
+        fireParams.inflationRate,
         simCashflows,
         fireStrategy,
       )
       simRows = simResult.rows.map(r => ({ age: r.age, endPortfolio: r.endPortfolio, phase: r.phase }))
       simRequiredPortfolio = simResult.requiredFirePortfolio > 0 ? simResult.requiredFirePortfolio : null
+      simFireAgeFractional = simResult.fireAgeFractional
     } catch {
       simRows = null
       simRequiredPortfolio = null
+      simFireAgeFractional = null
     }
   }
+
+  // Countdown afgeleid uit simulatie-engine (consistent met fireAgeFractional)
+  const simCurrentAge = dob ? ageAtDate(dob) : null
+  const simFireCountdown: FireCountdown | null = simFireAgeFractional != null && simCurrentAge != null
+    ? deriveCountdown(simFireAgeFractional, simCurrentAge)
+    : null
 
   // Horizon extra: backtesting success rate + named crash paths
   let backtestSuccessRate: number | null = null
@@ -363,6 +374,7 @@ export default async function DashboardPage() {
     backtestSuccessRate,
     backtestNamedPaths,
     box3Belasting,
+    simFireCountdown,
     fireEndStrategy: fireStrategy.strategy,
     fireEndAge: fireStrategy.endAge,
   }
@@ -524,12 +536,14 @@ export default async function DashboardPage() {
                   <Compass className="h-3.5 w-3.5" /> Countdown naar vrijheid
                 </div>
                 <p className="text-sm font-semibold text-[var(--ink)]" data-testid="horizon-preview-value">
-                  {fireProjResult.fireDate === 'Bereikt!'
-                    ? <span className="text-horizon-600">Bereikt!</span>
-                    : fireProjResult.countdownDays > 0
-                      ? <>Countdown: <span className="text-horizon-600 font-mono">{fireProjResult.countdownYears} jaar, {fireProjResult.countdownMonths} maanden</span></>
-                      : <span className="text-[var(--ink-4)]">-</span>
-                  }
+                  {(() => {
+                    const cd = simFireCountdown ?? fireProjResult
+                    return cd.fireDate === 'Bereikt!'
+                      ? <span className="text-horizon-600">Bereikt!</span>
+                      : cd.countdownDays > 0
+                        ? <>Countdown: <span className="text-horizon-600 font-mono">{cd.countdownYears} jaar, {cd.countdownMonths} maanden</span></>
+                        : <span className="text-[var(--ink-4)]">-</span>
+                  })()}
                 </p>
               </div>
             </div>

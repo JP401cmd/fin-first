@@ -37,10 +37,12 @@ interface HorizonFireSimInput {
   horizonInput: HorizonInput | null
   lifeEvents: LifeEvent[]
   fireStrategy?: FireStrategyConfig
+  grossReturn?: number   // default: DEFAULT_RETURN
+  inflation?: number     // default: INFLATION
 }
 
 export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFireSimResult {
-  const { horizonInput, lifeEvents, fireStrategy } = params ?? {}
+  const { horizonInput, lifeEvents, fireStrategy, grossReturn: grossReturnParam, inflation: inflationParam } = params ?? {}
 
   // Synchrone berekening via useMemo — geen async nodig want data is al geladen
   const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
@@ -64,7 +66,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
 
     // returnModel: altijd nl_box3 (Box 3-logica via fire-simulation engine)
     const returnModel: ReturnModel = 'nl_box3'
-    const grossReturn = DEFAULT_RETURN
+    const grossReturn = grossReturnParam ?? DEFAULT_RETURN
 
     // Strategy config — determines endAge and convergence target
     const strategyForSim = fireStrategy ?? DEFAULT_FIRE_STRATEGY
@@ -81,13 +83,13 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
       annualSavings,
       grossReturn,
       returnModel,
-      INFLATION,
+      inflationParam ?? INFLATION,
       cashflows,
       strategyForSim,
     )
 
     return { result, cashflows }
-  }, [horizonInput, lifeEvents, fireStrategy])
+  }, [horizonInput, lifeEvents, fireStrategy, grossReturnParam, inflationParam])
 
   // Snapshot persistentie — debounced upsert naar net_worth_snapshots
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)

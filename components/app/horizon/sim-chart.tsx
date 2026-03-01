@@ -5,6 +5,25 @@ import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { SimRow, SimCashflow } from '@/lib/fire-simulation'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 
+// ── Types ───────────────────────────────────────────────────────────────────
+
+export type ScenarioOverlay = {
+  name: string
+  label: string
+  color: string
+  points: [number, number][]  // [age, netWorth]
+}
+
+export type MonteCarloOverlay = {
+  /** Percentile bands indexed by year offset (0 = current age) */
+  p10: number[]
+  p25: number[]
+  p50: number[]
+  p75: number[]
+  p90: number[]
+  startAge: number
+}
+
 // ── SimChart ────────────────────────────────────────────────────────────────
 
 export function SimChart({
@@ -19,6 +38,8 @@ export function SimChart({
   strategy,
   targetEndPortfolio,
   baselineRows,
+  scenarioOverlays,
+  monteCarloOverlay,
 }: {
   rows: SimRow[]
   fireAge: number | null
@@ -32,6 +53,8 @@ export function SimChart({
   targetEndPortfolio?: number
   /** Optional baseline rows for ghost-line overlay (what-if mode) */
   baselineRows?: SimRow[]
+  scenarioOverlays?: ScenarioOverlay[]
+  monteCarloOverlay?: MonteCarloOverlay
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
 
@@ -77,9 +100,18 @@ export function SimChart({
   const baselineMax = baselinePts.length > 0
     ? Math.max(...baselinePts.map(([, v]) => v))
     : 0
+  const overlayMax = scenarioOverlays?.length
+    ? Math.max(...scenarioOverlays.flatMap(o => o.points.map(([, v]) => v)))
+    : 0
+  const mcMax = monteCarloOverlay
+    ? Math.max(...monteCarloOverlay.p75.filter((_, i) => {
+        const age = monteCarloOverlay.startAge + i
+        return age >= currentAge && age <= endAge
+      }))
+    : 0
   const rawMax = allPts.length > 0
-    ? Math.max(...allPts.map(([, v]) => v), fireTarget ?? 0, baselineMax)
-    : 1
+    ? Math.max(...allPts.map(([, v]) => v), fireTarget ?? 0, baselineMax, overlayMax, mcMax)
+    : Math.max(1, overlayMax, mcMax)
   const maxVal = Math.max(rawMax, 1) * 1.08
 
   const xScale = (age: number) =>
@@ -166,6 +198,41 @@ export function SimChart({
   }
 
   const yFireDot = fireFractionalPt !== null ? PAD.top + yScale(Math.max(fireFractionalPt[1], 0)) : null
+
+  // Pre-compute Monte Carlo band SVG paths
+  const mcPaths = monteCarloOverlay ? (() => {
+    const mc = monteCarloOverlay
+    function bandPath(upper: number[], lower: number[]): string {
+      const fwd: string[] = []
+      const bwd: string[] = []
+      for (let i = 0; i < upper.length; i++) {
+        const age = mc.startAge + i
+        if (age < minAge || age > maxAge) continue
+        const x = PAD.left + xScale(age)
+        fwd.push(`${x.toFixed(1)},${(PAD.top + yScale(Math.max(upper[i], 0))).toFixed(1)}`)
+        bwd.unshift(`${x.toFixed(1)},${(PAD.top + yScale(Math.max(lower[i], 0))).toFixed(1)}`)
+      }
+      if (fwd.length < 2) return ''
+      return `M ${fwd[0]} ${fwd.slice(1).map(p => `L ${p}`).join(' ')} L ${bwd.join(' L ')} Z`
+    }
+    function linePath(values: number[]): string {
+      let first = true
+      return values.map((val, i) => {
+        const age = mc.startAge + i
+        if (age < minAge || age > maxAge) return null
+        const x = PAD.left + xScale(age)
+        const y = PAD.top + yScale(Math.max(val, 0))
+        const cmd = first ? 'M' : 'L'
+        first = false
+        return `${cmd} ${x.toFixed(1)} ${y.toFixed(1)}`
+      }).filter(Boolean).join(' ')
+    }
+    return {
+      outer: bandPath(mc.p90, mc.p10),
+      inner: bandPath(mc.p75, mc.p25),
+      median: linePath(mc.p50),
+    }
+  })() : null
 
   // One-time cashflow markers (only for |amount| > 5000)
   const oneTimeMarkers = cashflows
@@ -288,6 +355,41 @@ export function SimChart({
           />
         )}
 
+        {/* Monte Carlo percentile bands (furthest back layer) */}
+        {mcPaths && (
+          <g style={{
+            opacity: hasEntered ? 1 : 0,
+            transition: hasEntered ? 'opacity 0.6s ease 0.2s' : 'none',
+          }}>
+            {mcPaths.outer && <path d={mcPaths.outer} fill="var(--hor-t, #8a6e42)" opacity={0.07} />}
+            {mcPaths.inner && <path d={mcPaths.inner} fill="var(--hor-t, #8a6e42)" opacity={0.1} />}
+            {mcPaths.median && (
+              <path d={mcPaths.median} fill="none"
+                stroke="var(--hor-t, #8a6e42)" strokeWidth={1} strokeDasharray="4 3" opacity={0.4} />
+            )}
+          </g>
+        )}
+
+        {/* Scenario overlay paths (behind main line) */}
+        {scenarioOverlays?.map((overlay, i) =>
+          overlay.points.length > 1 && (
+            <path
+              key={overlay.name}
+              d={pointsToPath(overlay.points)}
+              fill="none"
+              stroke={overlay.color}
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={0.45}
+              pathLength={1}
+              strokeDasharray="1"
+              strokeDashoffset={hasEntered ? 0 : 1}
+              style={{ transition: hasEntered ? `stroke-dashoffset 1s cubic-bezier(.22,1,.36,1) ${0.3 + i * 0.1}s` : 'none' }}
+            />
+          )
+        )}
+
         {/* Accumulation path — horizon goud */}
         {accPts.length > 1 && (
           <path
@@ -406,4 +508,45 @@ export function SimChart({
       </svg>
     </div>
   )
+}
+
+// ── Scenario variant builder ────────────────────────────────────────────────
+
+/** Return-rate offsets for pessimistic/optimistic variants (percentage points) */
+export const SCENARIO_VARIANTS = [
+  { name: 'pessimist', label: 'Voorzichtig', color: '#9e6b50', delta: -0.02 },
+  { name: 'optimist', label: 'Optimistisch', color: '#5b8c5a', delta: +0.02 },
+] as const
+
+/**
+ * Build scenario overlay paths by replaying the main simulation's cash pattern
+ * (savings, withdrawals, life-event cashflows) with variant return rates.
+ * This keeps the same FIRE-age transition and withdrawal timing — only growth differs.
+ */
+export function buildScenarioVariants(
+  rows: SimRow[],
+  baseReturn: number,
+): ScenarioOverlay[] {
+  if (rows.length === 0) return []
+
+  return SCENARIO_VARIANTS.map(({ name, label, color, delta }) => {
+    const variantReturn = baseReturn + delta
+    let portfolio = rows[0].startPortfolio
+    const points: [number, number][] = [[rows[0].age, portfolio]]
+
+    for (const row of rows) {
+      // Same net cash pattern as main sim (savings/withdrawal + life events)
+      const netCash = row.savings - row.withdrawal + row.cashflowNet
+      // Growth at variant return rate, scaled proportionally to portfolio
+      const growth = row.startPortfolio > 0
+        ? (portfolio / row.startPortfolio) * row.growth * (variantReturn / baseReturn)
+        : 0
+
+      portfolio = portfolio + netCash + growth
+      points.push([row.age + 1, Math.max(portfolio, 0)])
+      if (portfolio <= 0) break
+    }
+
+    return { name, label, color, points }
+  })
 }

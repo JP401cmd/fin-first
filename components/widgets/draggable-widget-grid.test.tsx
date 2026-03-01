@@ -70,6 +70,7 @@ const mockData: DashboardData = {
   backtestSuccessRate: null,
   backtestNamedPaths: null,
   box3Belasting: null,
+  simFireCountdown: null,
   fireEndStrategy: 'deplete',
   fireEndAge: 90,
 }

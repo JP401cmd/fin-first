@@ -1,7 +1,9 @@
 import { WidgetShell } from './widget-shell'
+import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import type { DashboardData } from './widget-renderer'
+import { Landmark } from 'lucide-react'
 
 const ASSET_COLORS: Record<string, string> = {
   savings:     '#3b82f6',
@@ -35,6 +37,14 @@ interface Props {
 
 export function AssetsWidget({ size, data, href }: Props) {
   const { totalAssets, monthlyContributions, monthlyExpenses, assetsByType, totalPurchaseValue } = data
+
+  if (totalAssets === 0 && assetsByType.length === 0) {
+    return (
+      <WidgetShell module="kern" size={size} kicker="Vermogen" href={href}>
+        <WidgetEmpty icon={Landmark} message="Voeg je eerste bezitting toe om je vermogensverdeling te zien." />
+      </WidgetShell>
+    )
+  }
 
   const dailyExp = monthlyExpenses / 30
   const ft = dailyExp > 0 && totalAssets > 0 ? calculateFreedomTime(totalAssets, dailyExp) : null

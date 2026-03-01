@@ -2,10 +2,12 @@
 
 import { useMemo } from 'react'
 import { WidgetShell } from './widget-shell'
+import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { formatCurrency, formatFreedomTimeString, calculateFreedomTime } from '@/lib/format'
 import type { DashboardData } from './widget-renderer'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { Wallet } from 'lucide-react'
 
 interface Props {
   size: WidgetSize
@@ -17,6 +19,10 @@ const SVG_W = 200
 
 export function NettoVermogenWidget({ size, data, href }: Props) {
   const { netWorth, monthlyExpenses, monthlyIncome, monthlyContributions, netWorthHistory } = data
+
+  // Empty state: no assets or income data at all
+  const isEmpty = netWorth === 0 && monthlyIncome === 0 && netWorthHistory.length === 0
+
   const dailyExp = monthlyExpenses / 30
   const freedomTime = dailyExp > 0 ? calculateFreedomTime(Math.abs(netWorth), dailyExp) : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
@@ -95,6 +101,14 @@ export function NettoVermogenWidget({ size, data, href }: Props) {
 
   // Show axis labels only for full-size widgets (half-size is too compact)
   const showAxisLabels = size === 'full' && sparkline !== null
+
+  if (isEmpty) {
+    return (
+      <WidgetShell module="kern" size={size} kicker="Netto Vermogen" href={href}>
+        <WidgetEmpty icon={Wallet} message="Voeg vermogen of bankrekeningen toe om je netto vermogen te zien." />
+      </WidgetShell>
+    )
+  }
 
   return (
     <WidgetShell module="kern" size={size} kicker="Netto Vermogen" href={href}>

@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bell } from 'lucide-react'
+import { Bell, Lock } from 'lucide-react'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
@@ -32,9 +32,29 @@ const hoverClasses: Record<string, string> = {
 export function AppHeader({ email, role }: { email: string; role?: string }) {
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   const { needsActivation } = useFeatureAccess()
   const { unreadCount, openModal } = useNotifications()
+
+  // Close dropdown on click outside or Escape
+  useEffect(() => {
+    if (!menuOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [menuOpen])
 
   // Always show all nav items in desktop nav for discoverability
   const navItems = allNavItems
@@ -63,7 +83,10 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
                         : `text-[var(--ink-3)] border-transparent ${hoverClasses[item.color]}`
                   }`}
                 >
-                  {item.label}
+                  <span className="flex items-center gap-1">
+                    {item.label}
+                    {isLocked && <Lock className="h-2.5 w-2.5 opacity-50" />}
+                  </span>
                 </Link>
               )
             })}
@@ -91,7 +114,7 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
           </button>
 
           {/* Profile dropdown */}
-          <div className="relative">
+          <div className="relative" ref={menuRef}>
             <button
               onClick={() => setMenuOpen(!menuOpen)}
               className="flex items-center gap-2 rounded-full bg-[var(--subtle)] px-3 py-1.5 text-sm text-[var(--ink-2)] hover:bg-[var(--border-ed)]"
@@ -104,7 +127,7 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
               </span>
             </button>
             {menuOpen && (
-              <div className="absolute right-0 mt-2 w-40 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] py-1 shadow-[var(--s2)]">
+              <div className="absolute right-0 mt-2 w-48 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] py-1 shadow-[var(--s2)]">
                 {role === 'superadmin' && (
                   <Link
                     href="/beheer"
@@ -121,6 +144,14 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
                 >
                   Identiteit
                 </Link>
+                <Link
+                  href="/rapportages"
+                  className="block px-4 py-2 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Rapportages
+                </Link>
+                <div className="my-1 border-t border-[var(--border-ed)]" />
                 <Link
                   href="/logout"
                   className="block px-4 py-2 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)]"

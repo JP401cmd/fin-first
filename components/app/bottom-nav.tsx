@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Wallet, Zap, Compass } from 'lucide-react'
+import { Wallet, Zap, Compass, Lock } from 'lucide-react'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 
 const tabs = [
@@ -42,14 +42,15 @@ export function BottomNav() {
               key={tab.href}
               href={tab.href}
               className={`tap-highlight relative flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium uppercase tracking-[0.06em] transition-colors ${
-                isActive ? activeColors[tab.color] : isLocked ? 'text-[var(--ink-4)]' : 'text-[var(--ink-4)]'
+                isActive ? activeColors[tab.color] : isLocked ? 'text-[var(--ink-4)] opacity-70' : 'text-[var(--ink-3)]'
               }`}
             >
-              {isActive && (
-                <span className={`absolute top-1.5 h-4 w-12 rounded-full ${pillColors[tab.color]} opacity-40`} />
-              )}
+              <span className={`absolute top-1.5 h-4 w-12 rounded-full transition-opacity duration-200 ${pillColors[tab.color]} ${isActive ? 'opacity-40' : 'opacity-0'}`} />
               <Icon className="relative h-5 w-5" />
-              <span className="relative">{tab.label}</span>
+              <span className="relative flex items-center gap-0.5">
+                {tab.label}
+                {isLocked && <Lock className="h-2.5 w-2.5 opacity-50" />}
+              </span>
             </Link>
           )
         })}

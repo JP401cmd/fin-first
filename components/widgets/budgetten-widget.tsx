@@ -1,10 +1,11 @@
 'use client'
 
 import { WidgetShell } from './widget-shell'
+import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { formatCurrency } from '@/lib/format'
+import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import type { DashboardData } from './widget-renderer'
-import { TrendingUp, ShoppingCart, PiggyBank, CreditCard } from 'lucide-react'
+import { TrendingUp, ShoppingCart, PiggyBank, CreditCard, LayoutGrid } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
@@ -144,8 +145,18 @@ function BudgetRow({ config, limit, spent, hasEntered }: BudgetRowProps) {
 
 export function BudgettenWidget({ size, data, href }: Props) {
   const isFullSize       = size === 'full'
-  const { budgetTotals } = data
+  const { budgetTotals, monthlyExpenses } = data
   const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 600 })
+
+  const hasAnyBudget = BUDGET_TYPE_CONFIGS.some(c => budgetTotals[c.key].limit > 0)
+
+  if (!hasAnyBudget) {
+    return (
+      <WidgetShell module="kern" size={size} kicker="Budgetten" href={href}>
+        <WidgetEmpty icon={LayoutGrid} message="Maak je eerste budget aan om je bestedingen te volgen." />
+      </WidgetShell>
+    )
+  }
 
   const nettoBalans =
     budgetTotals.income.spent
@@ -154,6 +165,12 @@ export function BudgettenWidget({ size, data, href }: Props) {
     - budgetTotals.debt.spent
 
   const isNettoPositief = nettoBalans >= 0
+
+  const dailyExp = monthlyExpenses / 30
+  const freedomTime = dailyExp > 0 && Math.abs(nettoBalans) > 0
+    ? calculateFreedomTime(Math.abs(nettoBalans), dailyExp)
+    : null
+  const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
 
   return (
     <WidgetShell module="kern" size={size} kicker="Budgetten" href={href}>
@@ -187,9 +204,16 @@ export function BudgettenWidget({ size, data, href }: Props) {
                 Inkomen min alle uitgaven
               </p>
             </div>
-            <p className={`font-mono tabular-nums text-xl font-semibold ${isNettoPositief ? 'text-emerald-700' : 'text-red-600'}`}>
-              {isNettoPositief ? '+' : ''}{formatCurrency(nettoBalans)}
-            </p>
+            <div className="text-right">
+              <p className={`font-mono tabular-nums text-xl font-semibold ${isNettoPositief ? 'text-emerald-700' : 'text-red-600'}`}>
+                {isNettoPositief ? '+' : ''}{formatCurrency(nettoBalans)}
+              </p>
+              {freedomStr && (
+                <p className="font-serif italic text-[11px] text-[var(--ink-3)]">
+                  {isNettoPositief ? `+${freedomStr} vrijheid` : `${freedomStr} achter`}
+                </p>
+              )}
+            </div>
           </div>
         </>
       )}

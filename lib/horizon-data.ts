@@ -545,6 +545,39 @@ export function computeFireProjection(
   }
 }
 
+// ── Countdown derived from simulation ────────────────────────
+
+export interface FireCountdown {
+  countdownYears: number
+  countdownMonths: number
+  countdownDays: number
+  fireDate: string
+}
+
+/**
+ * Derive countdown values from the simulation engine's fireAgeFractional.
+ * This ensures consistency between the displayed FIRE age and the countdown.
+ */
+export function deriveCountdown(
+  fireAgeFractional: number | null,
+  currentAge: number | null,
+): FireCountdown {
+  if (fireAgeFractional == null || currentAge == null) {
+    return { countdownYears: 0, countdownMonths: 0, countdownDays: 0, fireDate: 'Niet haalbaar' }
+  }
+  const yearsToFire = fireAgeFractional - currentAge
+  if (yearsToFire <= 0) {
+    return { countdownYears: 0, countdownMonths: 0, countdownDays: 0, fireDate: 'Bereikt!' }
+  }
+  const countdownYears = Math.floor(yearsToFire)
+  const countdownMonths = Math.round((yearsToFire - countdownYears) * 12)
+  const countdownDays = Math.round(yearsToFire * 365.25)
+  const fd = new Date()
+  fd.setMonth(fd.getMonth() + Math.round(yearsToFire * 12))
+  const fireDate = fd.toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' })
+  return { countdownYears, countdownMonths, countdownDays, fireDate }
+}
+
 /**
  * Compute optimistic / expected / pessimistic FIRE projections.
  */
@@ -552,11 +585,12 @@ export function computeFireRange(
   input: HorizonInput,
   swrOverride?: number,
   inflationOverride?: number,
+  baseReturn: number = DEFAULT_RETURN,
 ): FireRange {
   return {
-    optimistic: computeFireProjection(input, 0.09, swrOverride, inflationOverride),
-    expected: computeFireProjection(input, 0.07, swrOverride, inflationOverride),
-    pessimistic: computeFireProjection(input, 0.04, swrOverride, inflationOverride),
+    optimistic: computeFireProjection(input, Math.min(0.20, baseReturn + 0.02), swrOverride, inflationOverride),
+    expected: computeFireProjection(input, baseReturn, swrOverride, inflationOverride),
+    pessimistic: computeFireProjection(input, Math.max(0.01, baseReturn - 0.03), swrOverride, inflationOverride),
   }
 }
 

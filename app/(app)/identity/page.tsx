@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { computeSovereigntyLevel, PHASES, levelToPhaseId } from '@/lib/feature-phases'
-import { NL_SWR } from '@/lib/horizon-data'
-import { ChevronRight, User, Trophy, Share2, Settings, FileText } from 'lucide-react'
+import { NL_SWR, ageAtDate } from '@/lib/horizon-data'
+import { ChevronRight } from 'lucide-react'
 import {
   temporalLevels,
   chronologyPhases,
@@ -23,6 +23,7 @@ export default function IdentityPage() {
 
   // Profile state (minimal for overview)
   const [fullName, setFullName] = useState('')
+  const [dateOfBirth, setDateOfBirth] = useState<string | null>(null)
   const [householdType, setHouseholdType] = useState('solo')
   const [temporalBalance, setTemporalBalance] = useState(3)
 
@@ -34,8 +35,6 @@ export default function IdentityPage() {
   const [expandedPhase, setExpandedPhase] = useState<string | null>(null)
   const featuresPerPhase = getFeaturesPerPhase()
 
-  // Preview card data
-  const [activeNotifCount, setActiveNotifCount] = useState(0)
 
   // Demo user state
   const [isDemoUser, setIsDemoUser] = useState(false)
@@ -54,7 +53,7 @@ export default function IdentityPage() {
       // Profile data
       const { data: profile } = await supabase
         .from('profiles')
-        .select('full_name, household_type, temporal_balance, is_demo_user')
+        .select('full_name, household_type, temporal_balance, is_demo_user, date_of_birth')
         .eq('id', user.id)
         .single()
 
@@ -63,6 +62,7 @@ export default function IdentityPage() {
         setHouseholdType(profile.household_type ?? 'solo')
         setTemporalBalance(profile.temporal_balance ?? 3)
         setIsDemoUser(profile.is_demo_user ?? false)
+        setDateOfBirth(profile.date_of_birth ?? null)
       }
 
       // Financial data for sovereignty level
@@ -70,11 +70,10 @@ export default function IdentityPage() {
       threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
       const dateStr = threeMonthsAgo.toISOString().split('T')[0]
 
-      const [assetsRes, debtsRes, txRes, notifRes] = await Promise.all([
+      const [assetsRes, debtsRes, txRes] = await Promise.all([
         supabase.from('assets').select('current_value').eq('is_active', true),
         supabase.from('debts').select('current_balance, debt_type').eq('is_active', true),
         supabase.from('transactions').select('amount, is_income').gte('date', dateStr),
-        supabase.from('app_settings').select('value').eq('key', `notifications_preferences_${user.id}`).maybeSingle(),
       ])
 
       const totalAssets = (assetsRes.data ?? []).reduce((s, a) => s + Number(a.current_value), 0)
@@ -98,19 +97,6 @@ export default function IdentityPage() {
 
       setSovereigntyLevel(computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPct, hasConsumerDebt))
       setFinancialData({ netWorth, monthsCovered, freedomPct, hasConsumerDebt })
-
-      // Notification prefs count
-      if (notifRes.data?.value) {
-        try {
-          const parsed = JSON.parse(notifRes.data.value)
-          const active = Object.values(parsed).filter(v => v !== false).length
-          setActiveNotifCount(active)
-        } catch {
-          setActiveNotifCount(7)
-        }
-      } else {
-        setActiveNotifCount(7)
-      }
 
       setLoading(false)
     }
@@ -146,6 +132,19 @@ export default function IdentityPage() {
   }
 
   const householdLabel = householdType === 'solo' ? 'Solo' : householdType === 'samen' ? 'Samen' : 'Gezin'
+  const age = dateOfBirth ? ageAtDate(dateOfBirth) : null
+  const initials = fullName
+    ? fullName.split(' ').map(p => p[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()
+    : '?'
+
+  // Sovereignty level label
+  const levelLabel = sovereigntyLevel <= 0
+    ? 'Herstel'
+    : sovereigntyLevel <= 2
+    ? `Niveau ${sovereigntyLevel}: Stabiliteit`
+    : sovereigntyLevel <= 4
+    ? `Niveau ${sovereigntyLevel}: Momentum`
+    : `Niveau ${sovereigntyLevel}: Meesterschap`
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
@@ -229,83 +228,26 @@ export default function IdentityPage() {
         <p className="mb-4 text-sm text-red-600">{switchError}</p>
       )}
 
-      {/* ── Preview-kaarten ──────────────────────────────────────── */}
-      <div className="mb-5 sm:mb-8 grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2">
-        <Link href="/identity/profiel" className="group card-editorial p-4 sm:p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
-                <User className="h-4 w-4 text-wil-600" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--ink)]">Profiel</h3>
-                <p className="text-xs text-[var(--ink-3)]">{fullName || 'Geen naam'} &middot; {householdLabel}</p>
-              </div>
+      {/* ── Profielsamenvatting strip ─────────────────────────────── */}
+      <Link href="/identity/profiel" className="group mb-5 sm:mb-8 block card-editorial p-4 transition-all hover:border-wil-300 hover:shadow-sm">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            {/* Avatar initiaal cirkel */}
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--ink)] text-sm font-semibold text-[var(--paper)]">
+              {initials}
             </div>
-            <ChevronRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />
-          </div>
-        </Link>
-
-        <Link href="/identity/voortgang" className="group card-editorial p-4 sm:p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
-                <Trophy className="h-4 w-4 text-wil-600" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--ink)]">Voortgang</h3>
-                <p className="text-xs text-[var(--ink-3)]">Bekijk je voortgang</p>
-              </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[var(--ink)]">
+                {fullName || 'Geen naam'}
+                {age !== null && <span className="ml-1.5 font-normal text-[var(--ink-3)]">&middot; {age} jaar</span>}
+                <span className="ml-1.5 font-normal text-[var(--ink-3)]">&middot; {householdLabel}</span>
+              </p>
+              <p className="mt-0.5 text-xs text-[var(--ink-3)]">{levelLabel}</p>
             </div>
-            <ChevronRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />
           </div>
-        </Link>
-
-        <Link href="/identity/delen" className="group card-editorial p-4 sm:p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
-                <Share2 className="h-4 w-4 text-wil-600" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--ink)]">Delen</h3>
-                <p className="text-xs text-[var(--ink-3)]">Vrijheidskaart & Jaaroverzicht</p>
-              </div>
-            </div>
-            <ChevronRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />
-          </div>
-        </Link>
-
-        <Link href="/identity/instellingen" className="group card-editorial p-4 sm:p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-wil-50">
-                <Settings className="h-4 w-4 text-wil-600" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--ink)]">Instellingen</h3>
-                <p className="text-xs text-[var(--ink-3)]">{activeNotifCount} van 7 notificaties actief</p>
-              </div>
-            </div>
-            <ChevronRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />
-          </div>
-        </Link>
-
-        <Link href="/rapportages" className="group card-editorial p-4 sm:p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-kern-50">
-                <FileText className="h-4 w-4 text-kern-600" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--ink)]">Rapportages</h3>
-                <p className="text-xs text-[var(--ink-3)]">Financieel Archief</p>
-              </div>
-            </div>
-            <ChevronRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
-          </div>
-        </Link>
-      </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />
+        </div>
+      </Link>
 
       {/* ── The Temporal Balance ──────────────────────────────────── */}
       <section className="mb-5 sm:mb-8 card-editorial p-4 sm:p-8">

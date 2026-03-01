@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback, type ReactNode } from 'react'
+import { useEffect, useCallback, useRef, useId, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 
 type BottomSheetProps = {
@@ -11,6 +11,10 @@ type BottomSheetProps = {
 }
 
 export function BottomSheet({ open, onClose, title, children }: BottomSheetProps) {
+  const sheetRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<Element | null>(null)
+  const titleId = useId()
+
   // Lock body scroll when open
   useEffect(() => {
     if (open) {
@@ -19,11 +23,50 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
     }
   }, [open])
 
-  // Close on Escape key
+  // Capture trigger element + focus trap + return focus on close
+  useEffect(() => {
+    if (open) {
+      // Remember which element opened the sheet so we can return focus
+      triggerRef.current = document.activeElement
+
+      // Focus first interactive element inside the sheet (close button or first focusable)
+      const timer = requestAnimationFrame(() => {
+        if (!sheetRef.current) return
+        const focusable = sheetRef.current.querySelector<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+        focusable?.focus()
+      })
+      return () => cancelAnimationFrame(timer)
+    } else {
+      // Return focus to trigger element
+      if (triggerRef.current && triggerRef.current instanceof HTMLElement) {
+        triggerRef.current.focus()
+      }
+      triggerRef.current = null
+    }
+  }, [open])
+
+  // Focus trap: keep Tab cycling inside the sheet
   useEffect(() => {
     if (!open) return
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') { onClose(); return }
+      if (e.key !== 'Tab' || !sheetRef.current) return
+
+      const focusableEls = sheetRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      )
+      if (focusableEls.length === 0) return
+
+      const first = focusableEls[0]
+      const last = focusableEls[focusableEls.length - 1]
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus() }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus() }
+      }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
@@ -41,7 +84,13 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
       style={{ right: 'var(--chat-sidebar-width, 0px)' }}
       onClick={handleBackdrop}
     >
-      <div className="w-full max-h-[92vh] overflow-y-auto bg-[var(--paper)] rounded-t-[var(--r-lg)] shadow-[var(--s2)] md:mx-4 md:max-w-lg md:rounded-[var(--r-lg)] safe-bottom animate-sheet-enter">
+      <div
+        ref={sheetRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
+        className="w-full max-h-[92vh] overflow-y-auto bg-[var(--paper)] rounded-t-[var(--r-lg)] shadow-[var(--s2)] md:mx-4 md:max-w-lg md:rounded-[var(--r-lg)] safe-bottom animate-sheet-enter"
+      >
         {/* Drag handle — mobile only */}
         <div className="flex justify-center pt-3 md:hidden">
           <div className="h-1 w-10 rounded-full bg-[var(--border-md)]" />
@@ -50,9 +99,10 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
         {/* Header */}
         {title && (
           <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-5 py-4">
-            <h3 className="font-semibold text-[var(--ink)]">{title}</h3>
+            <h3 id={titleId} className="font-semibold text-[var(--ink)]">{title}</h3>
             <button
               onClick={onClose}
+              aria-label="Sluiten"
               className="touch-target rounded-md text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
             >
               <X className="h-5 w-5" />

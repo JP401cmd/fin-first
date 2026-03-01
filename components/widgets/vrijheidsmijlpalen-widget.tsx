@@ -24,12 +24,13 @@ function yearsToDate(years: number): string {
 }
 
 export function VrijheidsMijlpalenWidget({ size, data, href }: Props) {
-  const { freedomPct, fireTarget, netWorth, fireProjResult, simRequiredPortfolio } = data
+  const { freedomPct, fireTarget, netWorth, fireProjResult, simRequiredPortfolio, simFireCountdown } = data
   const effectiveFire = simRequiredPortfolio ?? fireTarget
   const effectivePct = effectiveFire > 0 ? Math.min((netWorth / effectiveFire) * 100, 100) : freedomPct
 
   // Monthly savings approximation using countdown
-  const countdownYears = fireProjResult.countdownYears + fireProjResult.countdownMonths / 12
+  const cd = simFireCountdown ?? fireProjResult
+  const countdownYears = cd.countdownYears + cd.countdownMonths / 12
   const monthlySavingsApprox = countdownYears > 0 && effectiveFire > 0
     ? (effectiveFire - netWorth) / (countdownYears * 12)
     : 0

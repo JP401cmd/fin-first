@@ -11,7 +11,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { getDefaultBudgets, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
 import { BudgetIcon, formatCurrency, getTypeColors, iconMap, iconOptions, type BudgetType } from '@/components/app/budget-shared'
-import { buildSegments, groupColor, childColor } from '@/components/app/budget-donut'
+import { buildSegments, typeColors, childTypeColors } from '@/components/app/budget-donut'
 import { type BudgetRollover, formatPeriod, getCarriedAmount, getPreviousPeriod, computeRollover } from '@/lib/budget-rollover'
 import { BudgetTree } from '@/components/app/budget-tree'
 import { BudgetDonut } from '@/components/app/budget-donut'
@@ -743,10 +743,10 @@ export default function BudgetsPage() {
             <p className="text-xs text-[var(--ink-3)]">{formatCurrency(totalExpenseSpent)} besteed</p>
           </div>
           <div>
-            <p className="text-xs font-medium text-blue-600 uppercase">Sparen</p>
+            <p className="text-xs font-medium text-wil-600 uppercase">Sparen</p>
             <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalSavingsBudget)}</p>
             <p className="text-xs text-[var(--ink-3)]">{formatCurrency(totalSavingsActual)} gespaard</p>
-            <p className="text-[10px] text-blue-500/70">vrijheid opbouwen</p>
+            <p className="text-[10px] text-wil-500/70">vrijheid opbouwen</p>
           </div>
           <div>
             <p className="text-xs font-medium text-red-600 uppercase">Schulden</p>
@@ -943,7 +943,7 @@ export default function BudgetsPage() {
           )}
           {savingsBudgets.length > 0 && (
             <div className="mt-4 sm:mt-8">
-              <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Sparen <span className="ml-1 font-normal normal-case tracking-normal text-blue-400/70">— vrijheid opbouwen</span></h3>
+              <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Sparen <span className="ml-1 font-normal normal-case tracking-normal text-wil-400/70">— vrijheid opbouwen</span></h3>
               <BudgetTree
                 groups={savingsBudgets}
                 spending={spending}
@@ -1315,7 +1315,7 @@ function BudgetLegend({
       </div>
 
       {segments.map((seg) => {
-        const c = groupColor(seg.colorIdx)
+        const c = typeColors(seg.budgetType)
         const pct = seg.limit > 0 ? Math.round((seg.spent / seg.limit) * 100) : 0
         const isOver = seg.spent > seg.limit && seg.limit > 0
         const isExpanded = expandedGroupId === seg.id
@@ -1323,12 +1323,11 @@ function BudgetLegend({
         return (
           <div key={seg.id}>
             <button
-              className={`flex w-full items-center gap-3 rounded-[var(--r-lg)] border px-3 py-2.5 text-left transition-all ${
-                isExpanded ? 'ring-2 ring-kern-400' : ''
-              }`}
+              className="flex w-full items-center gap-3 rounded-[var(--r-lg)] border px-3 py-2.5 text-left transition-all"
               style={{
-                borderColor: isExpanded ? c.border : '#e4e4e7',
-                backgroundColor: isExpanded ? c.bg : 'white',
+                borderColor: isExpanded ? c.border : 'var(--border-ed)',
+                backgroundColor: isExpanded ? c.bg : 'var(--paper)',
+                boxShadow: isExpanded ? `0 0 0 2px ${c.border}` : undefined,
               }}
               onClick={() => onToggleGroup(seg.id)}
             >
@@ -1364,7 +1363,7 @@ function BudgetLegend({
                 {seg.children.map((child, ci) => {
                   const childPct = child.limit > 0 ? Math.round((child.spent / child.limit) * 100) : 0
                   const childOver = child.spent > child.limit && child.limit > 0
-                  const cc = childColor(c.h, ci, seg.children.length)
+                  const cc = childTypeColors(seg.budgetType, ci, seg.children.length)
 
                   return (
                     <button
