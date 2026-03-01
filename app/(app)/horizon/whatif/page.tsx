@@ -25,6 +25,7 @@ import { WhatIfHeader } from '@/components/app/horizon/whatif-header'
 import { WhatIfSliders, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
 import { WhatIfEventsPanel, type WhatIfEvent } from '@/components/app/horizon/whatif-events'
 import { WhatIfActions } from '@/components/app/horizon/whatif-actions'
+import { WhatIfPresets } from '@/components/app/horizon/whatif-presets'
 import { Loader2, AlertTriangle, Hourglass, TrendingUp } from 'lucide-react'
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -508,8 +509,17 @@ export default function WhatIfPage() {
           </section>
         )}
 
-        {/* ── Sliders ───────────────────────────────────────── */}
+        {/* ── Presets ───────────────────────────────────────── */}
         <div className="animate-whatif-enter mt-4" style={{ animationDelay: '300ms' }}>
+          <WhatIfPresets
+            baseline={baseline}
+            overrides={overrides}
+            onChange={setOverrides}
+          />
+        </div>
+
+        {/* ── Sliders ───────────────────────────────────────── */}
+        <div className="animate-whatif-enter mt-4" style={{ animationDelay: '400ms' }}>
           <WhatIfSliders
             overrides={overrides}
             baseline={baseline}
@@ -518,7 +528,7 @@ export default function WhatIfPage() {
         </div>
 
         {/* ── Life Events ─────────────────────────────────── */}
-        <div className="animate-whatif-enter mt-4" style={{ animationDelay: '400ms' }}>
+        <div className="animate-whatif-enter mt-4" style={{ animationDelay: '500ms' }}>
           <WhatIfEventsPanel
             events={events}
             onToggleEvent={handleToggleEvent}
@@ -530,7 +540,7 @@ export default function WhatIfPage() {
         </div>
 
         {/* ── Scenario Actions ────────────────────────────────── */}
-        <div className="animate-whatif-enter mt-4" style={{ animationDelay: '500ms' }}>
+        <div className="animate-whatif-enter mt-4" style={{ animationDelay: '600ms' }}>
           <WhatIfActions
             overrides={overrides}
             baseline={baseline}
