@@ -162,18 +162,8 @@ export default function WhatIfPage() {
   const whatIfInput = useMemo<HorizonInput | null>(() => {
     if (!input || !overrides || !baseline) return null
 
-    // Apply income change
-    const incomeRatio = baseline.monthlyIncome > 0
-      ? overrides.monthlyIncome / baseline.monthlyIncome
-      : 1
-
-    // Work days affect income proportionally (e.g., 4/5 = 80%)
-    const workDaysFactor = overrides.workDaysPerWeek / baseline.workDaysPerWeek
-
-    const effectiveIncome = overrides.monthlyIncome * (workDaysFactor / (overrides.workDaysPerWeek === baseline.workDaysPerWeek ? 1 : 1))
-    const adjustedIncome = baseline.workDaysPerWeek !== overrides.workDaysPerWeek
-      ? input.monthlyIncome * (overrides.workDaysPerWeek / baseline.workDaysPerWeek) * incomeRatio
-      : overrides.monthlyIncome
+    // Apply income from slider, adjusted proportionally by work days (5 = full-time)
+    const adjustedIncome = overrides.monthlyIncome * (overrides.workDaysPerWeek / 5)
 
     // Apply savings rate to derive expenses
     const adjustedExpenses = adjustedIncome * (1 - overrides.savingsRate / 100)
@@ -313,8 +303,8 @@ export default function WhatIfPage() {
                   FIRE leeftijd
                 </span>
               </div>
-              <p className="mt-1 font-display text-xl tabular-nums text-[var(--ink)]">
-                {whatIfFireAge !== null ? whatIfFireAge.toFixed(1) : '—'}
+              <p className="mt-1 font-mono text-base tabular-nums text-[var(--ink)]">
+                {whatIfFireAge !== null ? formatFireAge(whatIfFireAge) : '—'}
               </p>
               {fireAgeDelta !== null && Math.abs(fireAgeDelta) > 0.1 && (
                 <p className={`mt-0.5 font-mono text-[11px] ${fireAgeDelta < 0 ? 'text-horizon-700' : 'text-kern-700'}`}>
@@ -372,8 +362,8 @@ export default function WhatIfPage() {
             className="animate-whatif-enter mt-6 card-editorial overflow-hidden"
             style={{ animationDelay: '200ms' }}
           >
-            {/* 4px wil-accent top border */}
-            <div className="h-1 bg-wil-500" />
+            {/* 6px horizon-accent top border */}
+            <div className="h-1.5 bg-horizon-500" />
 
             <div className="p-4 sm:p-6">
               {!simResult.fireReachable && (
@@ -445,36 +435,6 @@ export default function WhatIfPage() {
             baseline={baseline}
             onChange={setOverrides}
           />
-        </div>
-
-        {/* ── Placeholder: Chat + Acties (Fase 2 & 3) ───────── */}
-        <div className="animate-whatif-enter mt-4 grid gap-4 md:grid-cols-5" style={{ animationDelay: '400ms' }}>
-          {/* Chat placeholder */}
-          <div className="card-editorial md:col-span-3 p-6">
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-wil-50">
-                <span className="font-display text-lg text-wil-600">W</span>
-              </div>
-              <p className="mt-3 font-serif text-sm italic text-[var(--ink-3)]">
-                Binnenkort: chat met Will over je toekomstdromen.
-              </p>
-              <p className="mt-1 font-sans text-[11px] text-[var(--ink-4)]">
-                Will vertaalt je wensen naar levensgebeurtenissen op de grafiek.
-              </p>
-            </div>
-          </div>
-
-          {/* Acties placeholder */}
-          <div className="card-editorial md:col-span-2 p-6">
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-wil-600">
-                Acties
-              </p>
-              <p className="mt-2 font-serif text-sm italic text-[var(--ink-3)]">
-                Binnenkort: concrete stappen om je scenario werkelijkheid te maken.
-              </p>
-            </div>
-          </div>
         </div>
 
         {/* ── Footer ────────────────────────────────────────── */}

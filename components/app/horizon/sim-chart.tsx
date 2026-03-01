@@ -280,9 +280,11 @@ export function SimChart({
             strokeWidth={1.5}
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeDasharray="6 4"
-            opacity={hasEntered ? 0.5 : 0}
-            style={{ transition: hasEntered ? 'opacity 0.6s ease-out 0.3s' : 'none' }}
+            pathLength={1}
+            strokeDasharray="1"
+            strokeDashoffset={hasEntered ? 0 : 1}
+            opacity={0.45}
+            style={{ transition: hasEntered ? 'stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1)' : 'none' }}
           />
         )}
 

@@ -9,7 +9,7 @@ export function WhatIfHeader() {
       {/* Back link */}
       <Link
         href="/horizon"
-        className="inline-flex items-center gap-1 font-serif text-sm italic text-wil-600 transition-colors hover:text-wil-700"
+        className="inline-flex items-center gap-1 font-sans text-sm text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)]"
       >
         <ChevronLeft className="h-4 w-4" />
         De Horizon
@@ -22,6 +22,11 @@ export function WhatIfHeader() {
           Wat als...
         </span>
       </div>
+
+      {/* Heading */}
+      <h1 className="mt-1 font-display text-[28px] font-bold leading-tight tracking-tight text-[var(--ink)] sm:text-[36px]">
+        Jouw toekomst, jouw keuze
+      </h1>
 
       {/* Subtitle */}
       <p className="mt-1 font-serif text-[13px] italic text-[var(--ink-3)]">

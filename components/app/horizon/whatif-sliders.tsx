@@ -151,7 +151,7 @@ export function WhatIfSliders({ overrides, baseline, onChange }: WhatIfSlidersPr
             max={5}
             step={1}
             formatValue={v => `${v} dagen`}
-            formatDelta={v => `${v > 0 ? '+' : ''}${v} dag${Math.abs(v) !== 1 ? 'en' : ''}`}
+            formatDelta={v => `${v} dag${Math.abs(v) !== 1 ? 'en' : ''}`}
             onChange={v => set('workDaysPerWeek', v)}
             minLabel="1 dag"
             maxLabel="5 dagen"
@@ -165,7 +165,7 @@ export function WhatIfSliders({ overrides, baseline, onChange }: WhatIfSlidersPr
             max={80}
             step={1}
             formatValue={v => `${Math.round(v)}%`}
-            formatDelta={v => `${v > 0 ? '+' : ''}${Math.round(v)}%`}
+            formatDelta={v => `${Math.round(v)}%`}
             onChange={v => set('savingsRate', v)}
             minLabel="0%"
             maxLabel="80%"
@@ -179,7 +179,7 @@ export function WhatIfSliders({ overrides, baseline, onChange }: WhatIfSlidersPr
             max={12}
             step={0.5}
             formatValue={v => `${v.toFixed(1)}%`}
-            formatDelta={v => `${v > 0 ? '+' : ''}${v.toFixed(1)}%`}
+            formatDelta={v => `${v.toFixed(1)}%`}
             onChange={v => set('expectedReturn', v)}
             minLabel="2%"
             maxLabel="12%"
