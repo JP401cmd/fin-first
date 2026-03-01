@@ -5,10 +5,11 @@ import { formatCurrency } from '@/lib/format'
 import type { WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
+import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import {
   Zap, ChevronDown, ChevronUp, MessageCircle, ArrowRight,
-  TrendingUp, PiggyBank, Briefcase, DollarSign, BarChart3,
+  TrendingUp, PiggyBank, Briefcase, BarChart3,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -194,6 +195,8 @@ export function WhatIfActions({
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
+          aria-expanded={expanded}
+          aria-controls="whatif-actions-content"
           className="flex w-full items-center justify-between px-4 py-3 text-left"
         >
           <div className="flex items-center gap-2">
@@ -215,7 +218,7 @@ export function WhatIfActions({
         </button>
 
         {expanded && (
-          <div className="px-4 pb-4">
+          <div id="whatif-actions-content" className="px-4 pb-4">
             {/* Scenario summary link */}
             <button
               type="button"
@@ -267,7 +270,7 @@ export function WhatIfActions({
             <button
               type="button"
               onClick={() => openWithMessage(buildWillMessage())}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-[var(--r)] bg-wil-600 px-4 py-2.5 font-sans text-sm font-medium text-white transition-colors hover:bg-wil-700"
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-[var(--r)] bg-wil-600 px-4 py-3 font-sans text-sm font-medium text-white transition-colors hover:bg-wil-700"
             >
               <MessageCircle className="h-4 w-4" />
               Bespreek met Will
@@ -407,6 +410,13 @@ function ScenarioSummaryKassabon({
         </div>
       </div>
 
+      {/* FreedomTimeBadge for savings delta */}
+      {(whatIfAnnualSavings - baselineAnnualSavings) > 100 && (
+        <div className="my-2 flex justify-center">
+          <FreedomTimeBadge amount={whatIfAnnualSavings - baselineAnnualSavings} />
+        </div>
+      )}
+
       {/* FIRE impact total */}
       <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
         <span className="text-[var(--ink)]">FIRE-leeftijd effect</span>
@@ -449,7 +459,7 @@ function ScenarioSummaryKassabon({
 
       {/* Formule */}
       <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-        <p><strong className="font-semibold text-[var(--ink-3)]">Formule:</strong> Effectief inkomen = maandinkomen × (werkdagen / 5). Jaarlijks sparen = (inkomen − uitgaven) × 12.</p>
+        <p><strong className="font-semibold text-[var(--ink-3)]">Formule:</strong> Effectief inkomen = maandinkomen × (werkdagen / 5). Jaarlijks sparen = (inkomen − uitgaven) × 12 + extra inleg × 12.</p>
       </div>
 
       {/* Footer */}
