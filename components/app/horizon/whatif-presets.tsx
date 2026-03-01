@@ -137,8 +137,9 @@ export function WhatIfPresets({
             <button
               key={preset.id}
               type="button"
+              aria-pressed={effectiveActive === preset.id}
               onClick={() => handlePresetClick(preset)}
-              className={`group flex shrink-0 flex-col rounded-[var(--r)] border px-3 py-2.5 text-left transition-all ${
+              className={`group flex shrink-0 min-h-[44px] flex-col rounded-[var(--r)] border px-3 py-2.5 text-left transition-all ${
                 isActive
                   ? 'border-wil-400 bg-wil-50 shadow-sm'
                   : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-wil-300 hover:shadow-sm'
