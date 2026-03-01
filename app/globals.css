@@ -743,3 +743,19 @@ body {
     content: none !important;
   }
 }
+
+/* ── What-If dimension shift effect ──────────────────────── */
+@keyframes whatif-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.whatif-dimension {
+  background-color: #f5f3ed;
+  background-image: radial-gradient(ellipse at 50% 0%, rgba(61,48,72,0.04), transparent 70%);
+  animation: whatif-enter 400ms ease-out both;
+}
+
+.animate-whatif-enter {
+  animation: whatif-enter 400ms ease-out both;
+}

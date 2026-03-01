@@ -18,6 +18,7 @@ export function SimChart({
   forModal,
   strategy,
   targetEndPortfolio,
+  baselineRows,
 }: {
   rows: SimRow[]
   fireAge: number | null
@@ -29,6 +30,8 @@ export function SimChart({
   forModal?: boolean
   strategy?: FireEndStrategy
   targetEndPortfolio?: number
+  /** Optional baseline rows for ghost-line overlay (what-if mode) */
+  baselineRows?: SimRow[]
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
 
@@ -62,8 +65,20 @@ export function SimChart({
     }
   }
 
+  // Build baseline ghost-line points (what-if mode)
+  const baselinePts: [number, number][] = []
+  if (baselineRows && baselineRows.length > 0) {
+    baselinePts.push([baselineRows[0].age, baselineRows[0].startPortfolio])
+    for (const r of baselineRows) {
+      baselinePts.push([r.age + 1, r.endPortfolio])
+    }
+  }
+
+  const baselineMax = baselinePts.length > 0
+    ? Math.max(...baselinePts.map(([, v]) => v))
+    : 0
   const rawMax = allPts.length > 0
-    ? Math.max(...allPts.map(([, v]) => v), fireTarget ?? 0)
+    ? Math.max(...allPts.map(([, v]) => v), fireTarget ?? 0, baselineMax)
     : 1
   const maxVal = Math.max(rawMax, 1) * 1.08
 
@@ -254,6 +269,21 @@ export function SimChart({
         {xFire !== null && fireAgeFractional !== null && fireAgeFractional > minAge && fireAgeFractional < maxAge && (
           <line x1={xFire} x2={xFire} y1={PAD.top} y2={PAD.top + innerH}
             stroke={COLOR_OPBOUW} strokeWidth={1.5} strokeDasharray="4 2" opacity={0.85} />
+        )}
+
+        {/* Baseline ghost-line (what-if mode) */}
+        {baselinePts.length > 1 && (
+          <path
+            d={pointsToPath(baselinePts)}
+            fill="none"
+            stroke="var(--ink-4, #bbb8b0)"
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray="6 4"
+            opacity={hasEntered ? 0.5 : 0}
+            style={{ transition: hasEntered ? 'opacity 0.6s ease-out 0.3s' : 'none' }}
+          />
         )}
 
         {/* Accumulation path — horizon goud */}
