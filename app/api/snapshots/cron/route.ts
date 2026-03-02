@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { computeFireProjection, computeResilienceScore, type HorizonInput } from '@/lib/horizon-data'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
+import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
 
 const SWR = 0.04
 
@@ -99,12 +100,12 @@ export async function GET(request: Request) {
       const [assetsResult, debtsResult, expensesResult, incomeResult, budgetsResult] = await Promise.all([
         supabase
           .from('assets')
-          .select('current_value, monthly_contribution')
+          .select('id, name, asset_type, current_value, monthly_contribution, net_worth_inclusion_pct')
           .eq('user_id', userId)
           .eq('is_active', true),
         supabase
           .from('debts')
-          .select('current_balance, debt_type')
+          .select('id, name, debt_type, current_balance, net_worth_inclusion_pct')
           .eq('user_id', userId)
           .eq('is_active', true),
         supabase
@@ -211,6 +212,9 @@ export async function GET(request: Request) {
           continue
         }
       }
+
+      // Capture per-entity balance snapshots (fire-and-forget)
+      captureBalanceSnapshots(supabase, userId, today, assets, debts).catch(() => {})
 
       results.push({ userId, created: true })
     } catch (err) {

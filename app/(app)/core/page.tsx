@@ -14,7 +14,7 @@ import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { runSimulation, lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { parseFireStrategy } from '@/lib/fire-strategy'
 import type { Budget } from '@/lib/budget-data'
-import type { NetWorthSnapshot } from '@/lib/net-worth-data'
+import type { NetWorthSnapshot, EntityBalanceHistory } from '@/lib/net-worth-data'
 import {
   TrendingUp, Wallet, ShoppingCart,
   PiggyBank, Building2, ArrowRight, Info, Camera, Download, ChevronDown, Receipt, Flag,
@@ -30,6 +30,7 @@ import { NetWorthProjectionChart } from '@/components/app/net-worth-projection-c
 import { computeNetWorthProjection, type NetWorthProjectionResult } from '@/lib/net-worth-projection'
 import { SpendingInsightsSection, type SpendingInsight } from '@/components/app/spending-insight-card'
 import { SnapshotComparisonView } from '@/components/app/snapshot-comparison-view'
+import { BalanceHistoryChart } from '@/components/app/balance-history-chart'
 import { buildSegments, typeColors, childTypeColors } from '@/components/app/budget-donut'
 import type { BudgetWithChildren } from '@/lib/budget-data'
 import { FullScreenModal } from '@/components/app/full-screen-modal'
@@ -110,6 +111,8 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
     yearlyRetirementExpenses?: number
   } | null>(null)
   const [retirementMethodUsed, setRetirementMethodUsed] = useState<RetirementExpenseMethod>('essential_budgets')
+  // Balance history (per-entity snapshots)
+  const [balanceHistory, setBalanceHistory] = useState<EntityBalanceHistory[]>([])
 
   const loadData = useCallback(async () => {
     try {
@@ -579,6 +582,15 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
     }
   }, [rawFinancials, fireSwr])
 
+  // Load balance history (per-entity snapshots) — non-blocking secondary fetch
+  useEffect(() => {
+    if (!data) return
+    fetch('/api/snapshots/balances')
+      .then(r => r.ok ? r.json() : null)
+      .then(json => { if (json?.entities) setBalanceHistory(json.entities) })
+      .catch(() => {})
+  }, [data])
+
   if (loading || !data) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
@@ -1035,6 +1047,13 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
               </p>
             )}
           </section>
+
+          {/* Vermogensopbouw (per-entity balance history) */}
+          {balanceHistory.length > 0 && (
+            <section>
+              <BalanceHistoryChart entities={balanceHistory} />
+            </section>
+          )}
 
           {/* Vergelijking snapshots */}
           {snapshots.length >= 2 && (

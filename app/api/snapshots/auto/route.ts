@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { computeFireProjection, computeResilienceScore, type HorizonInput } from '@/lib/horizon-data'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
+import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
 
 const SWR = 0.04
 
@@ -52,12 +53,12 @@ export async function GET() {
   const [assetsResult, debtsResult, expensesResult, incomeResult, profileResult, budgetsResult] = await Promise.all([
     supabase
       .from('assets')
-      .select('current_value, monthly_contribution, net_worth_inclusion_pct')
+      .select('id, name, asset_type, current_value, monthly_contribution, net_worth_inclusion_pct')
       .eq('user_id', user.id)
       .eq('is_active', true),
     supabase
       .from('debts')
-      .select('current_balance, debt_type, net_worth_inclusion_pct')
+      .select('id, name, debt_type, current_balance, net_worth_inclusion_pct')
       .eq('user_id', user.id)
       .eq('is_active', true),
     supabase
@@ -181,6 +182,9 @@ export async function GET() {
   } else {
     snapshot = fullSnapshot
   }
+
+  // Capture per-entity balance snapshots (fire-and-forget, non-critical)
+  captureBalanceSnapshots(supabase, user.id, today, assets, debts).catch(() => {})
 
   // Sync last_known_phase to profiles (fire-and-forget — layout also handles this on page load,
   // but cron-triggered snapshots would otherwise leave profiles stale)
