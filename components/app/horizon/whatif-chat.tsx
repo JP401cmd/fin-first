@@ -8,6 +8,7 @@ import { LIFE_EVENT_CATALOG } from '@/lib/horizon-data'
 import { EVENT_ICONS } from '@/components/app/horizon/log-timeline'
 import { formatCurrency } from '@/lib/format'
 import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
+import { renderMarkdown, findToolInvocation, TOOL_LOADING_STATES, TOOL_OUTPUT_STATES, type MessagePart } from '@/components/app/chat/markdown-helpers'
 import {
   Send, Loader2, Check, Calendar,
 } from 'lucide-react'
@@ -25,90 +26,8 @@ type SuggestLifeEventResult = {
   explanation: string
 }
 
-type MessagePart =
-  | { type: 'text'; text: string }
-  | { type: string; [key: string]: unknown }
-
 interface WhatIfChatProps {
   onAddEvent: (event: WhatIfEvent) => void
-  currentAge: number | null
-}
-
-// ── Markdown helpers (subset from chat-panel) ───────────────────────────────
-
-function renderMarkdown(text: string) {
-  const lines = text.split('\n')
-  const elements: React.ReactNode[] = []
-  let listItems: { content: string; ordered: boolean }[] = []
-
-  const flushList = () => {
-    if (listItems.length === 0) return
-    const isOrdered = listItems[0].ordered
-    const Tag = isOrdered ? 'ol' : 'ul'
-    const listClass = isOrdered ? 'my-1 ml-4 list-decimal space-y-0.5' : 'my-1 ml-4 list-disc space-y-0.5'
-    elements.push(
-      <Tag key={`list-${elements.length}`} className={listClass}>
-        {listItems.map((item, i) => (
-          <li key={i}>{renderInline(item.content)}</li>
-        ))}
-      </Tag>
-    )
-    listItems = []
-  }
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-
-    if (/^---+$/.test(line.trim())) { flushList(); continue }
-
-    const headerMatch = line.match(/^#{1,3}\s+(.+)/)
-    if (headerMatch) {
-      flushList()
-      elements.push(
-        <p key={`h-${i}`} className="mb-1 mt-2 font-semibold first:mt-0">
-          {renderInline(headerMatch[1])}
-        </p>
-      )
-      continue
-    }
-
-    const ulMatch = line.match(/^\s*[-*]\s+(.+)/)
-    if (ulMatch) { listItems.push({ content: ulMatch[1], ordered: false }); continue }
-
-    const olMatch = line.match(/^\s*\d+\.\s+(.+)/)
-    if (olMatch) { listItems.push({ content: olMatch[1], ordered: true }); continue }
-
-    flushList()
-
-    if (line.trim() === '') {
-      elements.push(<br key={`br-${i}`} />)
-    } else {
-      elements.push(
-        <p key={`p-${i}`} className="mb-1 last:mb-0">
-          {renderInline(line)}
-        </p>
-      )
-    }
-  }
-
-  flushList()
-  return elements
-}
-
-function renderInline(text: string): React.ReactNode[] {
-  const parts: React.ReactNode[] = []
-  const regex = /\*\*(.+?)\*\*/g
-  let lastIndex = 0
-  let match: RegExpExecArray | null
-
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index))
-    parts.push(<strong key={match.index}>{match[1]}</strong>)
-    lastIndex = match.index + match[0].length
-  }
-
-  if (lastIndex < text.length) parts.push(text.slice(lastIndex))
-  return parts.length > 0 ? parts : [text]
 }
 
 // ── Life Event Suggestion Card ──────────────────────────────────────────────
@@ -175,15 +94,12 @@ function LifeEventSuggestionCard({
 
 // ── WhatIfChat ──────────────────────────────────────────────────────────────
 
-export function WhatIfChat({ onAddEvent, currentAge }: WhatIfChatProps) {
+export function WhatIfChat({ onAddEvent }: WhatIfChatProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [input, setInput] = useState('')
   const [addedEvents, setAddedEvents] = useState<Set<string>>(new Set())
   const [userHasScrolled, setUserHasScrolled] = useState(false)
-
-  // Suppress unused var — currentAge is available for future use in prompts
-  void currentAge
 
   const transport = useMemo(
     () => new DefaultChatTransport({ api: '/api/ai/chat', body: { domain: 'wil', context: 'whatif' } }),
@@ -209,7 +125,10 @@ export function WhatIfChat({ onAddEvent, currentAge }: WhatIfChatProps) {
     const el = scrollAreaRef.current
     if (!el) return
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40
-    setUserHasScrolled(!atBottom)
+    setUserHasScrolled(prev => {
+      const next = !atBottom
+      return prev === next ? prev : next
+    })
   }, [])
 
   // Reset userHasScrolled when user sends a message
@@ -260,31 +179,6 @@ export function WhatIfChat({ onAddEvent, currentAge }: WhatIfChatProps) {
     setAddedEvents(prev => new Set(prev).add(toolCallId))
   }, [addedEvents, onAddEvent])
 
-  // Find suggestLifeEvent tool invocation in message parts
-  function findSuggestLifeEvent(part: Record<string, unknown>): {
-    toolCallId: string
-    state: string
-    output?: unknown
-  } | null {
-    if (part.type === 'dynamic-tool' && part.toolName === 'suggestLifeEvent') {
-      return { toolCallId: part.toolCallId as string, state: part.state as string, output: part.output }
-    }
-    if (part.type === 'tool-suggestLifeEvent') {
-      return { toolCallId: part.toolCallId as string, state: part.state as string, output: part.output }
-    }
-    if (part.type === 'tool-invocation') {
-      const p = part as Record<string, unknown>
-      if (p.toolName === 'suggestLifeEvent') {
-        return { toolCallId: (p.toolInvocationId ?? p.toolCallId) as string, state: p.state as string, output: p.result ?? p.output }
-      }
-      const inv = p.toolInvocation as Record<string, unknown> | undefined
-      if (inv?.toolName === 'suggestLifeEvent') {
-        return { toolCallId: (inv.toolCallId ?? inv.toolInvocationId) as string, state: inv.state as string, output: inv.result ?? inv.output }
-      }
-    }
-    return null
-  }
-
   function renderAssistantMessage(parts: MessagePart[]) {
     const elements: React.ReactNode[] = []
 
@@ -299,10 +193,10 @@ export function WhatIfChat({ onAddEvent, currentAge }: WhatIfChatProps) {
         )
       }
 
-      const lifeEvent = findSuggestLifeEvent(part)
+      const lifeEvent = findToolInvocation(part, 'suggestLifeEvent')
       if (lifeEvent) {
-        const isLoading = ['input-streaming', 'input-available', 'call', 'partial-call'].includes(lifeEvent.state)
-        const hasOutput = ['output-available', 'result'].includes(lifeEvent.state) && lifeEvent.output
+        const isLoading = TOOL_LOADING_STATES.includes(lifeEvent.state)
+        const hasOutput = TOOL_OUTPUT_STATES.includes(lifeEvent.state) && lifeEvent.output
 
         if (isLoading) {
           elements.push(
@@ -381,7 +275,7 @@ export function WhatIfChat({ onAddEvent, currentAge }: WhatIfChatProps) {
 
           const hasContent =
             parts.some((p) => p.type === 'text' && 'text' in p && p.text) ||
-            parts.some((p) => findSuggestLifeEvent(p as Record<string, unknown>) !== null)
+            parts.some((p) => findToolInvocation(p as Record<string, unknown>, 'suggestLifeEvent') !== null)
 
           if (!hasContent) return null
 

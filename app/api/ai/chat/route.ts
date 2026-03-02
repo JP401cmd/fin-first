@@ -1,7 +1,7 @@
 import { streamText, convertToModelMessages, createUIMessageStreamResponse, stepCountIs, type UIMessage } from 'ai'
 import { createClient } from '@/lib/supabase/server'
 import { getModel, AIConfigError } from '@/lib/ai/config'
-import { buildSystemPrompt, type AIDomain } from '@/lib/ai/dna'
+import { buildSystemPrompt, type AIDomain, type ChatContext } from '@/lib/ai/dna'
 import { buildContext } from '@/lib/ai/context/builder'
 import { getTools } from '@/lib/ai/tools'
 import { WHATIF_PROMPT } from '@/lib/ai/dna/wil'
@@ -20,7 +20,7 @@ export async function POST(req: Request) {
   const { messages, domain = 'wil', context: chatContext } = await req.json() as {
     messages: UIMessage[]
     domain?: AIDomain
-    context?: string
+    context?: ChatContext
   }
 
   const validDomains: AIDomain[] = ['kern', 'wil', 'horizon']
@@ -40,19 +40,22 @@ export async function POST(req: Request) {
   let systemPrompt: string
   let financialContext: string
   try {
-    systemPrompt = await buildSystemPrompt(safeDomain, supabase)
-    financialContext = await buildContext(supabase)
+    if (chatContext === 'whatif') {
+      // What-if mode uses a dedicated prompt — skip the DB-backed prompt builder
+      systemPrompt = WHATIF_PROMPT
+      financialContext = await buildContext(supabase)
+    } else {
+      ;[systemPrompt, financialContext] = await Promise.all([
+        buildSystemPrompt(safeDomain, supabase),
+        buildContext(supabase),
+      ])
+    }
   } catch (err) {
     console.error('[AI Chat] Context build failed:', err)
     return Response.json(
       { error: 'Kon financiele context niet laden. Probeer het opnieuw.' },
       { status: 500 },
     )
-  }
-
-  // Replace entire system prompt in whatif mode — different personality
-  if (chatContext === 'whatif') {
-    systemPrompt = WHATIF_PROMPT
   }
 
   const tools = getTools(safeDomain, supabase, chatContext)

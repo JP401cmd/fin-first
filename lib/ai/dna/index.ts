@@ -5,7 +5,7 @@ import { KERN_PROMPT } from './kern'
 import { WIL_PROMPT } from './wil'
 import { HORIZON_PROMPT } from './horizon'
 
-export { type AIDomain, type DomainPersonality } from './types'
+export { type AIDomain, type ChatContext, type DomainPersonality } from './types'
 export { KERN_PERSONALITY } from './kern'
 export { WIL_PERSONALITY } from './wil'
 export { HORIZON_PERSONALITY } from './horizon'

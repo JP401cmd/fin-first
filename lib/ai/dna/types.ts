@@ -1,4 +1,5 @@
 export type AIDomain = 'kern' | 'wil' | 'horizon'
+export type ChatContext = 'whatif'
 
 export type DomainPersonality = {
   domain: AIDomain

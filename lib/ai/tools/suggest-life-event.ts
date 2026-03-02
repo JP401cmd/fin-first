@@ -23,16 +23,5 @@ export const suggestLifeEventTool = tool({
     duration_months: z.number().describe('Duur in maanden (0 = eenmalig)'),
     explanation: z.string().describe('Korte toelichting over de financiële impact'),
   }),
-  execute: async (args) => {
-    return {
-      event_type: args.event_type,
-      name: args.name,
-      target_age: args.target_age,
-      one_time_cost: args.one_time_cost,
-      monthly_cost_change: args.monthly_cost_change,
-      monthly_income_change: args.monthly_income_change,
-      duration_months: args.duration_months,
-      explanation: args.explanation,
-    }
-  },
+  execute: async (args) => ({ ...args }),
 })
