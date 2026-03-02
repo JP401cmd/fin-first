@@ -211,7 +211,11 @@ export function WhatIfSliders({ overrides, baseline, onChange }: WhatIfSlidersPr
         />
 
         {/* Reset button */}
-        {JSON.stringify(overrides) !== JSON.stringify(baseline) && (
+        {(overrides.monthlyIncome !== baseline.monthlyIncome
+          || overrides.workDaysPerWeek !== baseline.workDaysPerWeek
+          || overrides.savingsRate !== baseline.savingsRate
+          || overrides.expectedReturn !== baseline.expectedReturn
+          || overrides.extraContribution !== baseline.extraContribution) && (
           <button
             type="button"
             onClick={() => onChange(baseline)}

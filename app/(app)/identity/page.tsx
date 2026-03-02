@@ -135,14 +135,15 @@ export default function IdentityPage() {
       }
 
       // Financial data for sovereignty level
-      const threeMonthsAgo = new Date()
-      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
-      const dateStr = threeMonthsAgo.toISOString().split('T')[0]
+      // Use previous 3 full months (excl. current month) for stable calculation
+      const nowD = new Date()
+      const currentMonthStart = new Date(Date.UTC(nowD.getFullYear(), nowD.getMonth(), 1)).toISOString().split('T')[0]
+      const prev3MonthStart = new Date(Date.UTC(nowD.getFullYear(), nowD.getMonth() - 3, 1)).toISOString().split('T')[0]
 
       const [assetsRes, debtsRes, txRes] = await Promise.all([
         supabase.from('assets').select('current_value').eq('is_active', true),
         supabase.from('debts').select('current_balance, debt_type').eq('is_active', true),
-        supabase.from('transactions').select('amount, is_income').gte('date', dateStr),
+        supabase.from('transactions').select('amount, is_income').gte('date', prev3MonthStart).lt('date', currentMonthStart),
       ])
 
       const totalAssets = (assetsRes.data ?? []).reduce((s, a) => s + Number(a.current_value), 0)
