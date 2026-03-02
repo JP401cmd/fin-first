@@ -2000,8 +2000,19 @@ export default function HorizonPage() {
       {effectiveInput && (
         <>
           <ProjectionsModal input={effectiveInput} open={activeModal === 'projections'} onClose={() => setActiveModal(null)} />
-          <ScenariosModal input={effectiveInput} debts={debts} open={activeModal === 'scenarios'} onClose={() => setActiveModal(null)} simRows={simResult?.rows} simFireTarget={simResult?.requiredFirePortfolio} grossReturn={fireParams.grossReturn} />
-          <SimulationsModal input={effectiveInput} open={activeModal === 'simulations'} onClose={() => setActiveModal(null)} />
+          <ScenariosModal input={effectiveInput} debts={debts} open={activeModal === 'scenarios'} onClose={() => setActiveModal(null)} />
+          <SimulationsModal
+            input={effectiveInput}
+            open={activeModal === 'simulations'}
+            onClose={() => setActiveModal(null)}
+            precomputedMc={mcData}
+            authoritativeFireTarget={effectiveFireTarget}
+            defaultProjYears={
+              simResult && currentAge != null
+                ? Math.max(simResult.displayEndAge - currentAge, 10)
+                : undefined
+            }
+          />
           <WithdrawalModal input={effectiveInput} open={activeModal === 'withdrawal'} onClose={() => setActiveModal(null)} />
           <BacktestingModal input={effectiveInput} swr={fireSwr} open={activeModal === 'backtesting'} onClose={() => setActiveModal(null)} />
         </>

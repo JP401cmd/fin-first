@@ -14,20 +14,48 @@ type Props = {
   input: HorizonInput
   open: boolean
   onClose: () => void
+  /** Pre-computed MC data from the chart overlay (reused to avoid discrepancies) */
+  precomputedMc?: MonteCarloResult | null
+  /** Authoritative FIRE target from the deterministic simulation engine */
+  authoritativeFireTarget?: number
+  /** Default projection years derived from simResult.displayEndAge - currentAge */
+  defaultProjYears?: number
 }
 
-export function SimulationsModal({ input, open, onClose }: Props) {
+export function SimulationsModal({
+  input, open, onClose,
+  precomputedMc, authoritativeFireTarget, defaultProjYears,
+}: Props) {
   const [mc, setMc] = useState<MonteCarloResult | null>(null)
   const [computing, setComputing] = useState(false)
   const [hoveredYear, setHoveredYear] = useState<number | null>(null)
   const [selectedMetric, setSelectedMetric] = useState<'fire_prob' | 'p50' | 'p10' | null>(null)
   const [simCount, setSimCount] = useState(1000)
-  const [projYears, setProjYears] = useState(40)
+  const [projYears, setProjYears] = useState(defaultProjYears ?? 40)
   const [showSettings, setShowSettings] = useState(false)
+  const [hasCustomSettings, setHasCustomSettings] = useState(false)
+
+  // Sync projYears with prop when user hasn't overridden
+  useEffect(() => {
+    if (!hasCustomSettings && defaultProjYears != null) {
+      setProjYears(defaultProjYears)
+    }
+  }, [defaultProjYears, hasCustomSettings])
+
+  // Reset custom flag when modal closes
+  useEffect(() => {
+    if (!open) setHasCustomSettings(false)
+  }, [open])
 
   useEffect(() => {
     if (!open) return
     if (mc) return // already computed
+
+    // Reuse pre-computed data from chart if available and settings unchanged
+    if (precomputedMc && !hasCustomSettings) {
+      setMc(precomputedMc)
+      return
+    }
 
     setComputing(true)
     setTimeout(() => {
@@ -35,12 +63,12 @@ export function SimulationsModal({ input, open, onClose }: Props) {
       setMc(result)
       setComputing(false)
     }, 50)
-  }, [open, input, mc, simCount, projYears])
+  }, [open, input, mc, simCount, projYears, precomputedMc, hasCustomSettings])
 
-  // Reset mc when input or settings change
+  // Reset mc when input, settings, or pre-computed data changes
   useEffect(() => {
     setMc(null)
-  }, [input, simCount, projYears])
+  }, [input, simCount, projYears, precomputedMc])
 
   const currentAge = input.dateOfBirth ? ageAtDate(input.dateOfBirth) : null
 
@@ -74,9 +102,11 @@ export function SimulationsModal({ input, open, onClose }: Props) {
     )
   }
 
-  const fireTarget = input.yearlyMustExpenses > 0
-    ? input.yearlyMustExpenses / NL_SWR
-    : (input.monthlyExpenses * 12) / NL_SWR
+  const fireTarget = authoritativeFireTarget != null && authoritativeFireTarget > 0
+    ? authoritativeFireTarget
+    : (input.yearlyMustExpenses > 0
+      ? input.yearlyMustExpenses / NL_SWR
+      : (input.monthlyExpenses * 12) / NL_SWR)
 
   return (
     <BottomSheet open={true} onClose={onClose} title="Monte Carlo Simulaties">
@@ -97,7 +127,7 @@ export function SimulationsModal({ input, open, onClose }: Props) {
                   <label className="text-xs font-medium text-[var(--ink-3)]">Simulaties: {simCount.toLocaleString('nl-NL')}</label>
                   <input
                     type="range" min={100} max={5000} step={100} value={simCount}
-                    onChange={e => setSimCount(Number(e.target.value))}
+                    onChange={e => { setSimCount(Number(e.target.value)); setHasCustomSettings(true) }}
                     className="mt-1 w-full accent-horizon-600"
                   />
                   <div className="flex justify-between text-[10px] text-[var(--ink-3)]">
@@ -108,7 +138,7 @@ export function SimulationsModal({ input, open, onClose }: Props) {
                   <label className="text-xs font-medium text-[var(--ink-3)]">Projectiehorizon: {projYears} jaar</label>
                   <input
                     type="range" min={10} max={60} step={5} value={projYears}
-                    onChange={e => setProjYears(Number(e.target.value))}
+                    onChange={e => { setProjYears(Number(e.target.value)); setHasCustomSettings(true) }}
                     className="mt-1 w-full accent-horizon-600"
                   />
                   <div className="flex justify-between text-[10px] text-[var(--ink-3)]">
@@ -167,6 +197,7 @@ export function SimulationsModal({ input, open, onClose }: Props) {
               fireTarget={fireTarget}
               currentAge={currentAge}
               onClose={() => setSelectedMetric(null)}
+              isAuthoritativeTarget={authoritativeFireTarget != null && authoritativeFireTarget > 0}
             />
           )}
 
@@ -415,12 +446,14 @@ function SimulationDetailModal({
   fireTarget,
   currentAge,
   onClose,
+  isAuthoritativeTarget,
 }: {
   metric: 'fire_prob' | 'p50' | 'p10'
   mc: MonteCarloResult
   fireTarget: number
   currentAge: number | null
   onClose: () => void
+  isAuthoritativeTarget?: boolean
 }) {
   const titles = {
     fire_prob: 'FIRE-kans',
@@ -449,8 +482,12 @@ function SimulationDetailModal({
                 </p>
               </div>
               <div className="rounded-lg bg-[var(--subtle)] p-4 text-sm text-[var(--ink-2)]">
-                <p>De FIRE-kans is het percentage simulaties waarin je doelvermogen van {formatCurrency(fireTarget)} wordt bereikt binnen 40 jaar.</p>
-                <p className="mt-2">Dit doelvermogen is gebaseerd op de NL-aangepaste opnamerate ({(NL_SWR * 100).toFixed(2)}%): je pensioenuitgaven gedeeld door {NL_SWR.toFixed(4)}.</p>
+                <p>De FIRE-kans is het percentage simulaties waarin je doelvermogen van {formatCurrency(fireTarget)} wordt bereikt binnen {mc.years} jaar.</p>
+                {isAuthoritativeTarget ? (
+                  <p className="mt-2">Dit doelvermogen komt uit de simulatie-engine die rekening houdt met kasstromen, pensioen en Box 3-belastingen.</p>
+                ) : (
+                  <p className="mt-2">Dit doelvermogen is gebaseerd op de NL-aangepaste opnamerate ({(NL_SWR * 100).toFixed(2)}%): je pensioenuitgaven gedeeld door {NL_SWR.toFixed(4)}.</p>
+                )}
               </div>
             </>
           )}
