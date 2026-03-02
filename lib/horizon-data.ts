@@ -404,10 +404,19 @@ export function ageAtDate(dob: string, date: Date = new Date()): number {
 }
 
 export function formatFireAge(age: number | null): string {
-  if (age === null) return '-'
+  if (age === null) return '—'
   const years = Math.floor(age)
   const months = Math.round((age - years) * 12)
   return months > 0 ? `${years} jaar en ${months} mnd` : `${years} jaar`
+}
+
+export function formatFireAgeShort(age: number | null): string {
+  if (age === null) return '—'
+  return `${Math.floor(age)} jaar`
+}
+
+export function formatFireAgeDelta(delta: number): string {
+  return `${delta < 0 ? '' : '+'}${delta.toFixed(1)} jaar`
 }
 
 export function formatCountdown(days: number): string {

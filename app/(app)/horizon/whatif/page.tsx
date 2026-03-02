@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/format'
 import {
@@ -8,6 +8,9 @@ import {
   ageAtDate,
   DEFAULT_RETURN,
   INFLATION,
+  formatFireAge,
+  formatFireAgeShort,
+  formatFireAgeDelta,
 } from '@/lib/horizon-data'
 import {
   runSimulation,
@@ -28,20 +31,6 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import { Loader2, AlertTriangle, ArrowRight, ChevronRight } from 'lucide-react'
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatFireAge(age: number | null): string {
-  if (age === null) return '—'
-  const years = Math.floor(age)
-  const months = Math.round((age - years) * 12)
-  return months > 0 ? `${years} jaar en ${months} mnd` : `${years} jaar`
-}
-
-function formatFireAgeShort(age: number | null): string {
-  if (age === null) return '—'
-  return `${Math.floor(age)} jaar`
-}
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
@@ -352,50 +341,59 @@ export default function WhatIfPage() {
     return `${overrides.monthlyIncome}-${overrides.workDaysPerWeek}-${overrides.savingsRate}-${overrides.expectedReturn}-${overrides.extraContribution}-${activeEvents.length}`
   }, [overrides, activeEvents.length])
 
-  // ── Build scenario context for Will's global chat ──────────
+  // ── Build scenario context for Will's global chat (debounced) ──
+  const autoOpenTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
   useEffect(() => {
     if (!overrides || !baseline || !input) {
       setAutoOpenMessage(null)
       return () => setAutoOpenMessage(null)
     }
 
-    const scenarioEvents = events.filter(e => !e.whatIfDisabled)
-    const eventsDesc = scenarioEvents.length > 0
-      ? scenarioEvents.map(e => {
-          const parts = [e.name]
-          if (e.target_age) parts.push(`leeftijd ${e.target_age}`)
-          if (Number(e.one_time_cost) > 0) parts.push(formatCurrency(Number(e.one_time_cost)) + ' eenmalig')
-          if (Number(e.monthly_cost_change) !== 0) parts.push(formatCurrency(Number(e.monthly_cost_change)) + '/mnd')
-          return parts.join(', ')
-        }).join('; ')
-      : 'geen'
+    // Debounce: only update context after 500ms of slider inactivity
+    if (autoOpenTimerRef.current) clearTimeout(autoOpenTimerRef.current)
+    autoOpenTimerRef.current = setTimeout(() => {
+      const scenarioEvents = events.filter(e => !e.whatIfDisabled)
+      const eventsDesc = scenarioEvents.length > 0
+        ? scenarioEvents.map(e => {
+            const parts = [e.name]
+            if (e.target_age) parts.push(`leeftijd ${e.target_age}`)
+            if (Number(e.one_time_cost) > 0) parts.push(formatCurrency(Number(e.one_time_cost)) + ' eenmalig')
+            if (Number(e.monthly_cost_change) !== 0) parts.push(formatCurrency(Number(e.monthly_cost_change)) + '/mnd')
+            return parts.join(', ')
+          }).join('; ')
+        : 'geen'
 
-    const lines = [
-      'Ik zit op de Wat-Als scenario pagina. Hier is mijn scenario:',
-      '',
-      `Werkelijkheid: FIRE op ${baselineFireAge !== null ? Math.floor(baselineFireAge) + ' jaar' : 'onbekend'}, ` +
-        `${formatCurrency(baselineAnnualSavings)}/jr sparen, ` +
-        `inkomen ${formatCurrency(baseline.monthlyIncome)}/mnd`,
-      '',
-      `Mijn wat-als scenario: inkomen ${formatCurrency(overrides.monthlyIncome)}/mnd, ` +
-        `${overrides.workDaysPerWeek} werkdagen/week, ` +
-        `spaarquote ${Math.round(overrides.savingsRate)}%, ` +
-        `rendement ${overrides.expectedReturn.toFixed(1)}%` +
-        (overrides.extraContribution > 0 ? `, extra inleg ${formatCurrency(overrides.extraContribution)}/mnd` : ''),
-      '',
-      `Resultaat: FIRE op ${whatIfFireAge !== null ? Math.floor(whatIfFireAge) + ' jaar' : 'onbereikbaar'}` +
-        (fireAgeDelta !== null && Math.abs(fireAgeDelta) > 0.1
-          ? ` (${fireAgeDelta < 0 ? '' : '+'}${fireAgeDelta.toFixed(1)} jaar verschil)`
-          : '') +
-        `, ${formatCurrency(whatIfAnnualSavings)}/jr sparen`,
-      '',
-      `Levensgebeurtenissen in scenario: ${eventsDesc}`,
-      '',
-      'Help me met concrete acties die ik nu kan nemen om dit scenario werkelijkheid te maken.',
-    ]
+      const lines = [
+        'Ik zit op de Wat-Als scenario pagina. Hier is mijn scenario:',
+        '',
+        `Werkelijkheid: FIRE op ${baselineFireAge !== null ? Math.floor(baselineFireAge) + ' jaar' : 'onbekend'}, ` +
+          `${formatCurrency(baselineAnnualSavings)}/jr sparen, ` +
+          `inkomen ${formatCurrency(baseline.monthlyIncome)}/mnd`,
+        '',
+        `Mijn wat-als scenario: inkomen ${formatCurrency(overrides.monthlyIncome)}/mnd, ` +
+          `${overrides.workDaysPerWeek} werkdagen/week, ` +
+          `spaarquote ${Math.round(overrides.savingsRate)}%, ` +
+          `rendement ${overrides.expectedReturn.toFixed(1)}%` +
+          (overrides.extraContribution > 0 ? `, extra inleg ${formatCurrency(overrides.extraContribution)}/mnd` : ''),
+        '',
+        `Resultaat: FIRE op ${whatIfFireAge !== null ? Math.floor(whatIfFireAge) + ' jaar' : 'onbereikbaar'}` +
+          (fireAgeDelta !== null && Math.abs(fireAgeDelta) > 0.1
+            ? ` (${formatFireAgeDelta(fireAgeDelta)} verschil)`
+            : '') +
+          `, ${formatCurrency(whatIfAnnualSavings)}/jr sparen`,
+        '',
+        `Levensgebeurtenissen in scenario: ${eventsDesc}`,
+        '',
+        'Help me met concrete acties die ik nu kan nemen om dit scenario werkelijkheid te maken.',
+      ]
 
-    setAutoOpenMessage(lines.join('\n'))
-    return () => setAutoOpenMessage(null)
+      setAutoOpenMessage(lines.join('\n'))
+    }, 500)
+
+    return () => {
+      if (autoOpenTimerRef.current) clearTimeout(autoOpenTimerRef.current)
+      setAutoOpenMessage(null)
+    }
   }, [
     setAutoOpenMessage, overrides, baseline, input, events,
     baselineFireAge, whatIfFireAge, fireAgeDelta,
@@ -460,7 +458,7 @@ export default function WhatIfPage() {
             <span className={`rounded-full px-2.5 py-1 font-mono text-sm font-semibold ${
               fireAgeDelta < 0 ? 'bg-horizon-50 text-horizon-700' : 'bg-kern-50 text-kern-700'
             }`}>
-              {fireAgeDelta < 0 ? '' : '+'}{fireAgeDelta.toFixed(1)} jaar
+              {formatFireAgeDelta(fireAgeDelta)}
             </span>
           )}
           <ChevronRight className="h-4 w-4 text-[var(--ink-4)]" />
@@ -605,7 +603,6 @@ export default function WhatIfPage() {
             {/* Chat */}
             <WhatIfChat
               onAddEvent={handleAddEvent}
-              currentAge={currentAge}
             />
 
             {/* Footer */}
@@ -660,7 +657,7 @@ export default function WhatIfPage() {
                     baseValue={formatFireAge(baselineFireAge)}
                     whatIfValue={formatFireAge(whatIfFireAge)}
                     delta={fireAgeDelta !== null && Math.abs(fireAgeDelta) > 0.1
-                      ? `${fireAgeDelta < 0 ? '' : '+'}${fireAgeDelta.toFixed(1)} jaar`
+                      ? formatFireAgeDelta(fireAgeDelta)
                       : null}
                     isPositive={fireAgeDelta !== null ? fireAgeDelta < 0 : null}
                   />
