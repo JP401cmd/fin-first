@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { useDreamTransition } from '@/components/app/horizon/dream-transition-context'
 import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
 import { FfinAvatar } from '@/components/app/avatars'
 import { createClient } from '@/lib/supabase/client'
@@ -60,6 +60,7 @@ type SnapshotForTrend = {
 }
 
 export default function HorizonPage() {
+  const { triggerDream, phase } = useDreamTransition()
   const [fireParams, setFireParams] = useState<FireParams>(resolveFireParams({}))
   const fireSwr = fireParams.effectiveSwr
   const [input, setInput] = useState<HorizonInput | null>(null)
@@ -773,14 +774,16 @@ export default function HorizonPage() {
                 {STRATEGY_LABELS[simResult.strategy].name} &middot; Simulatie tot leeftijd {simResult.displayEndAge} &middot; Klik Details voor jaar-op-jaar tabel
               </p>
 
-              {/* What-If entrypoint */}
-              <Link
-                href="/horizon/whatif"
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-[var(--r)] border border-dashed border-wil-300 bg-wil-50/30 px-4 py-3 font-serif text-sm italic text-wil-700 transition-all hover:border-wil-400 hover:bg-wil-50 hover:shadow-sm"
+              {/* What-If entrypoint — dream gate portal */}
+              <button
+                type="button"
+                onClick={() => triggerDream('/horizon/whatif')}
+                disabled={phase !== 'idle'}
+                className={`mt-4 flex w-full items-center justify-center gap-2 rounded-[var(--r)] border border-dashed border-wil-300 bg-wil-50/30 px-4 py-3 font-serif text-sm italic text-wil-700 transition-all hover:border-wil-400 hover:bg-wil-50/60 hover:shadow-[0_0_20px_rgba(196,160,107,0.15)] ${phase !== 'idle' ? 'dream-cta-active' : ''}`}
               >
                 <Sparkles className="h-4 w-4" />
-                Wat als...? Speel met je toekomst →
-              </Link>
+                Wat als...? Speel met je toekomst &rarr;
+              </button>
             </>
           )}
         </div>

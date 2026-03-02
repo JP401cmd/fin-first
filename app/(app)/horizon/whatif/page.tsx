@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/format'
 import {
@@ -35,6 +36,17 @@ import { Loader2, AlertTriangle, ArrowRight, ChevronRight } from 'lucide-react'
 // ── Page ────────────────────────────────────────────────────────────────────
 
 export default function WhatIfPage() {
+  // ── Dream gate detection ──────────────────────────────────
+  const searchParams = useSearchParams()
+  const viaDreamgate = useRef(searchParams.get('via') === 'dreamgate')
+
+  // Clean up the ?via=dreamgate query param after mount
+  useEffect(() => {
+    if (viaDreamgate.current) {
+      window.history.replaceState(null, '', '/horizon/whatif')
+    }
+  }, [])
+
   // ── Base data state ──────────────────────────────────────
   const [input, setInput] = useState<HorizonInput | null>(null)
   const [events, setEvents] = useState<WhatIfEvent[]>([])
@@ -400,10 +412,15 @@ export default function WhatIfPage() {
     baselineAnnualSavings, whatIfAnnualSavings,
   ])
 
+  // Class for the dimension wrapper — skip own veil when arriving via dream gate
+  const dimensionClass = viaDreamgate.current
+    ? 'whatif-dimension whatif-dimension--no-veil min-h-screen'
+    : 'whatif-dimension min-h-screen'
+
   // ── Loading state ────────────────────────────────────────
   if (loading) {
     return (
-      <div className="whatif-dimension min-h-screen">
+      <div className={dimensionClass}>
         <div className="whatif-world mx-auto max-w-5xl px-4 py-8 sm:px-6 md:px-8">
           <WhatIfHeader />
           <div className="mt-12 flex flex-col items-center justify-center gap-3 py-20">
@@ -417,7 +434,7 @@ export default function WhatIfPage() {
 
   if (error || !input || !overrides || !baseline) {
     return (
-      <div className="whatif-dimension min-h-screen">
+      <div className={dimensionClass}>
         <div className="whatif-world mx-auto max-w-5xl px-4 py-8 sm:px-6 md:px-8">
           <WhatIfHeader />
           <div className="mt-12 flex flex-col items-center gap-3 py-20">
@@ -536,7 +553,7 @@ export default function WhatIfPage() {
   )
 
   return (
-    <div className="whatif-dimension min-h-screen">
+    <div className={dimensionClass}>
       <div className="whatif-world mx-auto max-w-5xl px-4 py-6 sm:px-6 md:px-8">
 
         {/* ── Header ────────────────────────────────────────── */}

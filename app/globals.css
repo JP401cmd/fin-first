@@ -842,3 +842,88 @@ body {
   .whatif-dimension::before { animation: none; opacity: 0; }
   .whatif-world { animation: none; opacity: 1; }
 }
+
+/* ── Dream gate transition (Horizon → Wat-Als) ──────────── */
+
+/*
+ * Layout-level orchestrated transition:
+ *   1. DISSOLVE — horizon content blurs + drifts + fades (0→400ms)
+ *   2. THRESHOLD — golden veil holds, route swap (400→1200ms)
+ *   3. REVEAL — veil parts, new world materialises (1200→2400ms)
+ */
+
+/* Phase 1: horizon content dissolves */
+@keyframes dream-dissolve {
+  0%   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  100% { opacity: 0; transform: translateY(8px) scale(0.99); filter: blur(4px); }
+}
+.dream-dissolve {
+  animation: dream-dissolve 400ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+
+/* Golden veil — full immersion overlay (z-50 covers header) */
+.dream-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse at 50% 40%,
+      rgba(196, 160, 107, 0.92),
+      rgba(196, 160, 107, 0.7) 35%,
+      rgba(196, 160, 107, 0.4) 65%,
+      rgba(180, 150, 100, 0.15)
+    );
+}
+
+/* Veil entrance — snaps on quickly */
+@keyframes dream-veil-in {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+.dream-veil--dissolve {
+  animation: dream-veil-in 400ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* Veil holds at full opacity during threshold */
+.dream-veil--threshold {
+  opacity: 1;
+}
+
+/* Veil parts — slow, dreamy fade-out */
+@keyframes dream-veil-out {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+.dream-veil--reveal {
+  animation: dream-veil-out 1200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* CTA button glow pulse on activation */
+@keyframes dream-cta-glow {
+  0%   { box-shadow: 0 0 0 0 rgba(196, 160, 107, 0.4); }
+  50%  { box-shadow: 0 0 24px 8px rgba(196, 160, 107, 0.2); }
+  100% { box-shadow: 0 0 40px 16px rgba(196, 160, 107, 0); opacity: 0.5; }
+}
+.dream-cta-active {
+  animation: dream-cta-glow 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Override: when arriving via dreamgate, skip the page's own veil */
+.whatif-dimension--no-veil::before {
+  animation: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+.whatif-dimension--no-veil .whatif-world {
+  animation: whatif-world-in 800ms cubic-bezier(0.16, 1, 0.3, 1) 600ms both;
+}
+
+/* Reduced motion for dream gate */
+@media (prefers-reduced-motion: reduce) {
+  .dream-dissolve { animation: none; opacity: 0; }
+  .dream-veil { display: none; }
+  .dream-cta-active { animation: none; }
+}
