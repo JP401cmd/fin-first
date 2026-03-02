@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeFireProjection, computeFireRange, runBacktest, ageAtDate, deriveCountdown, NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF, type HorizonInput, type LifeEvent, type FireCountdown } from '@/lib/horizon-data'
+import { computeFireProjection, computeFireRange, runBacktest, ageAtDate, deriveCountdown, NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF, NL_SWR, type HorizonInput, type LifeEvent, type FireCountdown } from '@/lib/horizon-data'
 import { resolveFireParams } from '@/lib/fire-params'
 import { runSimulation, lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { parseFireStrategy, type FireEndStrategy } from '@/lib/fire-strategy'
@@ -30,12 +30,14 @@ export default async function DashboardPage() {
   const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0]
   const monthEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1)).toISOString().split('T')[0]
   const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
+  // Previous 3 full months (excl. current month) for stable sovereignty calculation
+  const prev3MonthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 3, 1)).toISOString().split('T')[0]
   const [
     txResult, assetsResult, debtsResult, profileResult,
     essentialBudgetsResult, actionsResult, eventsResult,
     allBudgetsResult, recsResult, childBudgetsResult,
     goalsResult, recurringResult, netWorthSnapshotsResult,
-    income12Result, earliestIncomeResult,
+    income12Result, earliestIncomeResult, sovereigntyTxResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('id, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
@@ -54,6 +56,7 @@ export default async function DashboardPage() {
     supabase.from('net_worth_snapshots').select('snapshot_date, net_worth, fire_age').gte('snapshot_date', twelveMonthsAgo).order('snapshot_date', { ascending: true }).limit(12),
     supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
     supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
+    supabase.from('transactions').select('amount').lt('amount', 0).gte('date', prev3MonthStart).lt('date', monthStart),
   ])
 
   // Core calculations
@@ -297,11 +300,17 @@ export default async function DashboardPage() {
   const activated = profileResult.data?.last_known_phase !== null
 
   // Sovereignty level calculation for Jouw Pad widget
+  // Uses stable 3-month average expenses (excl. current month) + NL_SWR, matching identity page
+  const consumerDebtTypes = ['personal_loan', 'credit_card', 'revolving_credit', 'payment_plan', 'car_loan']
   const hasConsumerDebt = (debtsResult.data ?? []).some(d => {
     const dt = (d as { debt_type?: string }).debt_type
-    return dt === 'credit_card' || dt === 'personal_loan' || dt === 'consumer'
+    return dt != null && consumerDebtTypes.includes(dt) && Number(d.current_balance) > 0
   })
-  const sovereigntyLevel = computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPct, hasConsumerDebt)
+  const sovMonthlyExp = (sovereigntyTxResult.data ?? []).reduce((s, t) => s + Math.abs(Number(t.amount)), 0) / 3
+  const sovYearlyExp = sovMonthlyExp * 12
+  const sovFireTarget = sovYearlyExp > 0 ? sovYearlyExp / NL_SWR : 0
+  const sovFreedomPct = sovFireTarget > 0 ? (netWorth / sovFireTarget) * 100 : 0
+  const sovereigntyLevel = computeSovereigntyLevel(netWorth, sovMonthlyExp, sovFreedomPct, hasConsumerDebt)
   const currentPhaseId = levelToPhaseId(sovereigntyLevel)
 
   // Freedom milestone forecast for Jouw Pad widget
