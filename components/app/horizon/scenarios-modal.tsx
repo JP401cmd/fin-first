@@ -7,23 +7,31 @@ import { formatCurrency } from '@/components/app/budget-shared'
 import { X, ArrowDown, ArrowUp, TrendingDown } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
-  computeScenarios, computeResilienceScore,
-  MARKET_WEATHER, NL_SWR, type MarketWeather, type HorizonInput,
+  computeResilienceScore,
+  MARKET_WEATHER, type MarketWeather, type HorizonInput,
   type ScenarioPath, type ResilienceScore,
 } from '@/lib/horizon-data'
 import {
   simulatePayoff, payoffSummary,
   type Debt, type PayoffStrategy, type StrategyMonth,
 } from '@/lib/debt-data'
+import type { SimRow } from '@/lib/fire-simulation'
+import { buildScenarioPathsFromSim, SCENARIO_VARIANTS } from '@/components/app/horizon/sim-chart'
 
 type Props = {
   input: HorizonInput
   debts?: Debt[]
   open: boolean
   onClose: () => void
+  /** Main simulation rows — used to derive scenario paths consistent with chart */
+  simRows?: SimRow[]
+  /** FIRE target from simulation engine (requiredFirePortfolio) */
+  simFireTarget?: number
+  /** Gross annual return from fire params */
+  grossReturn?: number
 }
 
-export function ScenariosModal({ input, debts = [], open, onClose }: Props) {
+export function ScenariosModal({ input, debts = [], open, onClose, simRows, simFireTarget, grossReturn }: Props) {
   const [scenarios, setScenarios] = useState<ScenarioPath[]>([])
   const [resilience, setResilience] = useState<ResilienceScore | null>(null)
   const [weather, setWeather] = useState<MarketWeather>('normal')
@@ -32,18 +40,21 @@ export function ScenariosModal({ input, debts = [], open, onClose }: Props) {
 
   useEffect(() => {
     if (!open) return
-    setScenarios(computeScenarios(input, 40, weather))
+    if (simRows && simRows.length > 0 && grossReturn !== undefined && simFireTarget !== undefined) {
+      // Use weather to adjust base return when non-normal weather is selected
+      const effectiveReturn = weather === 'normal' ? grossReturn : MARKET_WEATHER[weather].return
+      setScenarios(buildScenarioPathsFromSim(simRows, effectiveReturn, simFireTarget))
+    }
     setResilience(computeResilienceScore(input))
-  }, [input, weather, open])
+  }, [input, weather, open, simRows, simFireTarget, grossReturn])
 
   if (!open) return null
 
-  const drifter = scenarios.find(s => s.name === 'drifter')
+  const pessimist = scenarios.find(s => s.name === 'pessimist')
   const current = scenarios.find(s => s.name === 'current')
-  const optimizer = scenarios.find(s => s.name === 'optimizer')
-  const fireTarget = input.yearlyMustExpenses > 0
-    ? input.yearlyMustExpenses / NL_SWR
-    : (input.monthlyExpenses * 12) / NL_SWR
+  const optimist = scenarios.find(s => s.name === 'optimist')
+  const fireTarget = simFireTarget ?? 0
+  const baseReturn = weather === 'normal' ? (grossReturn ?? 0) : MARKET_WEATHER[weather].return
 
   return (
     <BottomSheet open={true} onClose={onClose} title="Toekomstpaden">
@@ -55,38 +66,38 @@ export function ScenariosModal({ input, debts = [], open, onClose }: Props) {
 
           {/* Scenario cards */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {drifter && (
+            {pessimist && (
               <ScenarioCard
-                title="Drifter"
-                subtitle="Lifestyle creep, dalende discipline"
+                title="Voorzichtig"
+                subtitle={`${((baseReturn + SCENARIO_VARIANTS[0].delta) * 100).toFixed(1)}% rendement`}
                 color="red"
-                fireAge={drifter.fireAge}
-                description="Uitgaven stijgen 3%/jaar, spaarquote daalt. FIRE verdwijnt uit zicht."
-                onClick={() => setSelectedScenario(drifter)}
+                fireAge={pessimist.fireAge}
+                description="Lager rendement dan verwacht, maar dezelfde inleg en kasstromen."
+                onClick={() => setSelectedScenario(pessimist)}
               />
             )}
             {current && (
               <ScenarioCard
                 title="Huidige Koers"
-                subtitle="Doorgaan zoals nu"
+                subtitle={`${(baseReturn * 100).toFixed(1)}% rendement`}
                 color="purple"
                 fireAge={current.fireAge}
-                description="Je huidige spaar- en beleggingspatroon constant doorgezet."
+                description="Je huidige situatie inclusief alle kasstromen en levensgebeurtenissen."
                 onClick={() => setSelectedScenario(current)}
               />
             )}
-            {optimizer && (
+            {optimist && (
               <ScenarioCard
-                title="Optimizer"
-                subtitle="Bewust optimaliseren"
+                title="Optimistisch"
+                subtitle={`${((baseReturn + SCENARIO_VARIANTS[1].delta) * 100).toFixed(1)}% rendement`}
                 color="green"
-                fireAge={optimizer.fireAge}
+                fireAge={optimist.fireAge}
                 description={
-                  current?.fireAge && optimizer.fireAge
-                    ? `${Math.round(current.fireAge - optimizer.fireAge)} jaar eerder FIRE door bewuste keuzes.`
-                    : 'Uitgaven -10%, bijdragen +20%. Maximale groei.'
+                  current?.fireAge && optimist.fireAge
+                    ? `${Math.round(current.fireAge - optimist.fireAge)} jaar eerder FIRE bij hoger rendement.`
+                    : 'Hoger rendement dan verwacht, dezelfde inleg en kasstromen.'
                 }
-                onClick={() => setSelectedScenario(optimizer)}
+                onClick={() => setSelectedScenario(optimist)}
               />
             )}
           </div>
@@ -203,9 +214,9 @@ function ScenarioDetailModal({
 }) {
   const { ref: yearBarsRef, hasEntered: yearBarsEntered } = useInViewAnimation({ threshold: 0.1, duration: 500 })
   const colorMap: Record<string, { border: string; text: string; bg: string }> = {
-    drifter: { border: 'border-red-200', text: 'text-red-600', bg: 'bg-red-50' },
+    pessimist: { border: 'border-red-200', text: 'text-red-600', bg: 'bg-red-50' },
     current: { border: 'border-horizon-200', text: 'text-horizon-600', bg: 'bg-horizon-50' },
-    optimizer: { border: 'border-emerald-200', text: 'text-emerald-600', bg: 'bg-emerald-50' },
+    optimist: { border: 'border-emerald-200', text: 'text-emerald-600', bg: 'bg-emerald-50' },
   }
   const c = colorMap[scenario.name] ?? colorMap.current
 
@@ -230,7 +241,7 @@ function ScenarioDetailModal({
           <p className="mt-1 text-sm text-[var(--ink-3)]">
             {scenario.fireAge !== null
               ? `FIRE bereikt na ${scenario.fireMonth ? Math.round(scenario.fireMonth / 12) : '?'} jaar`
-              : 'FIRE-doelvermogen wordt niet bereikt in 40 jaar'}
+              : `FIRE-doelvermogen wordt niet bereikt binnen de simulatiehorizon`}
           </p>
           <p className="mt-2 text-xs text-[var(--ink-3)]">
             Benodigd doelvermogen: {formatCurrency(fireTarget)}
@@ -253,7 +264,7 @@ function ScenarioDetailModal({
                       className="h-full rounded-full"
                       style={{
                         width: yearBarsEntered ? `${Math.min(pctOfFire, 100)}%` : '0%',
-                        backgroundColor: scenario.name === 'drifter' ? '#f87171' : scenario.name === 'optimizer' ? '#34d399' : '#a78bfa',
+                        backgroundColor: scenario.name === 'pessimist' ? '#9e6b50' : scenario.name === 'optimist' ? '#5b8c5a' : '#8B5CB8',
                         transition: yearBarsEntered
                           ? `width 500ms cubic-bezier(.22,1,.36,1) ${i * 60}ms`
                           : 'none',
@@ -273,13 +284,13 @@ function ScenarioDetailModal({
         <div className="border-t border-[var(--border-ed)] px-6 py-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-lg bg-[var(--subtle)] p-3">
-              <p className="text-xs text-[var(--ink-3)]">Eindvermogen (40j)</p>
+              <p className="text-xs text-[var(--ink-3)]">Eindvermogen</p>
               <p className="mt-0.5 text-sm font-bold text-[var(--ink)]">
                 {scenario.months.length > 0 ? formatCurrency(scenario.months[scenario.months.length - 1].netWorth) : '-'}
               </p>
             </div>
             <div className="rounded-lg bg-[var(--subtle)] p-3">
-              <p className="text-xs text-[var(--ink-3)]">Passief inkomen (40j)</p>
+              <p className="text-xs text-[var(--ink-3)]">Passief inkomen</p>
               <p className="mt-0.5 text-sm font-bold text-[var(--ink)]">
                 {scenario.months.length > 0 ? formatCurrency(scenario.months[scenario.months.length - 1].passiveIncome * 12) + '/jr' : '-'}
               </p>
@@ -318,9 +329,10 @@ function DivergingPathsChart({ scenarios, fireTarget }: { scenarios: ScenarioPat
   const H = 260
   const PAD = 50
 
+  // Sample every 2nd entry (annual data = ~every 2 years) for smoother chart
   const sampled = scenarios.map(s => ({
     ...s,
-    months: s.months.filter((_, i) => i % 24 === 0 || i === s.months.length - 1),
+    months: s.months.filter((_, i) => i % 2 === 0 || i === s.months.length - 1),
   }))
 
   const allValues = sampled.flatMap(s => s.months.map(m => m.netWorth))
@@ -340,7 +352,7 @@ function DivergingPathsChart({ scenarios, fireTarget }: { scenarios: ScenarioPat
   const fireY = y(fireTarget)
   const fireInRange = fireY > PAD && fireY < H - PAD
 
-  const colors: Record<string, string> = { drifter: '#ef4444', current: '#8B5CB8', optimizer: '#10b981' }
+  const colors: Record<string, string> = { pessimist: '#9e6b50', current: '#8B5CB8', optimist: '#5b8c5a' }
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 280 }}>

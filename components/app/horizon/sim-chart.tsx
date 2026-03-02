@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { SimRow, SimCashflow } from '@/lib/fire-simulation'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
+import { NL_SWR, type ScenarioPath, type ProjectionMonth } from '@/lib/horizon-data'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -570,4 +571,101 @@ export function buildScenarioVariants(
 
     return { name, label, color, points }
   })
+}
+
+// ── Simulation-derived scenario paths (for detail modal) ───────────────────
+
+/**
+ * Build 3 ScenarioPath objects from the main simulation for the detail modal:
+ * Voorzichtig (-2%), Huidige Koers (baseline), Optimistisch (+2%).
+ * All paths share the same cashflow pattern — only return rate differs.
+ * Returns ScenarioPath[] so the existing DivergingPathsChart and
+ * ScenarioDetailModal work without changes.
+ */
+export function buildScenarioPathsFromSim(
+  rows: SimRow[],
+  baseReturn: number,
+  fireTarget: number,
+): ScenarioPath[] {
+  if (rows.length === 0) return []
+
+  const startAge = rows[0].age
+  const now = new Date()
+
+  function rowsToMonths(pts: { age: number; netWorth: number; contributions: number; growth: number }[]): ProjectionMonth[] {
+    return pts.map(pt => {
+      const yearOffset = pt.age - startAge
+      const month = yearOffset * 12
+      const date = new Date(now)
+      date.setMonth(date.getMonth() + month)
+      return {
+        month,
+        date: date.toISOString().split('T')[0],
+        netWorth: Math.round(pt.netWorth),
+        passiveIncome: Math.round((pt.netWorth * NL_SWR) / 12),
+        age: pt.age,
+        contributions: Math.round(pt.contributions),
+        growth: Math.round(pt.growth),
+      }
+    })
+  }
+
+  // Baseline path from main simulation rows
+  const baselinePts: { age: number; netWorth: number; contributions: number; growth: number }[] = [
+    { age: startAge, netWorth: rows[0].startPortfolio, contributions: 0, growth: 0 },
+  ]
+  let baselineFireAge: number | null = null
+  let baselineFireMonth: number | null = null
+  for (const row of rows) {
+    baselinePts.push({ age: row.age + 1, netWorth: row.endPortfolio, contributions: row.savings, growth: row.growth })
+    if (baselineFireAge === null && row.endPortfolio >= fireTarget && fireTarget > 0) {
+      baselineFireAge = row.age + 1
+      baselineFireMonth = (row.age + 1 - startAge) * 12
+    }
+  }
+
+  // Variant paths (same logic as buildScenarioVariants, with FIRE detection + richer output)
+  function buildVariant(name: string, label: string, color: string, delta: number): ScenarioPath {
+    const variantReturn = baseReturn + delta
+    let portfolio = rows[0].startPortfolio
+    const pts: { age: number; netWorth: number; contributions: number; growth: number }[] = [
+      { age: startAge, netWorth: portfolio, contributions: 0, growth: 0 },
+    ]
+    let varFireAge: number | null = null
+    let varFireMonth: number | null = null
+
+    for (const row of rows) {
+      const netCash = row.savings - row.withdrawal + row.cashflowNet
+      const growth = (row.startPortfolio > 0 && baseReturn !== 0)
+        ? (portfolio / row.startPortfolio) * row.growth * (variantReturn / baseReturn)
+        : portfolio * delta
+
+      portfolio = portfolio + netCash + growth
+      const clamped = Math.max(portfolio, 0)
+      pts.push({ age: row.age + 1, netWorth: clamped, contributions: row.savings, growth: Math.round(growth) })
+
+      if (varFireAge === null && clamped >= fireTarget && fireTarget > 0) {
+        varFireAge = row.age + 1
+        varFireMonth = (row.age + 1 - startAge) * 12
+      }
+
+      if (portfolio <= 0) break
+    }
+
+    return { name, label, color, months: rowsToMonths(pts), fireAge: varFireAge, fireMonth: varFireMonth }
+  }
+
+  const pessimist = buildVariant('pessimist', 'Voorzichtig', '#9e6b50', -0.02)
+  const optimist = buildVariant('optimist', 'Optimistisch', '#5b8c5a', +0.02)
+
+  const baseline: ScenarioPath = {
+    name: 'current',
+    label: 'Huidige Koers',
+    color: '#8B5CB8',
+    months: rowsToMonths(baselinePts),
+    fireAge: baselineFireAge,
+    fireMonth: baselineFireMonth,
+  }
+
+  return [pessimist, baseline, optimist]
 }
