@@ -457,7 +457,7 @@ function generateIrregularTransactions(
 // ══════════════════════════════════════════════════════════════
 
 const rooseTransactions: PersonaTransactionTemplate[] = [
-  ...generateMonthlyTransactions(12, [
+  ...generateMonthlyTransactions(15, [
     // Inkomen
     { day: 25, amount: 2800, description: 'Salaris', counterparty_name: 'Logistiek Centrum BV', counterparty_iban: 'NL91ABNA0417164300', budgetSlug: S.SALARIS_UITKERING, is_income: true },
     // Vaste lasten (no jitter)
@@ -479,15 +479,15 @@ const rooseTransactions: PersonaTransactionTemplate[] = [
     { day: 7, amount: -13.99, description: 'Disney+', counterparty_name: 'Disney+', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
     { day: 18, amount: -75, description: 'Kleding', counterparty_name: 'Zalando', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false, jitterPct: 0.30 },
     // Huishouden
-    { day: 8, amount: -25, description: 'Kruidvat', counterparty_name: 'Kruidvat', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false },
-    { day: 22, amount: -30, description: 'Action', counterparty_name: 'Action', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false },
+    { day: 8, amount: -25, description: 'Kruidvat', counterparty_name: 'Kruidvat', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false, jitterPct: 0.20 },
+    { day: 22, amount: -30, description: 'Action', counterparty_name: 'Action', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false, jitterPct: 0.25 },
     // Medisch
     { day: 14, amount: -15, description: 'Apotheek', counterparty_name: 'Apotheek Rotterdam', counterparty_iban: null, budgetSlug: S.MEDISCHE_KOSTEN, is_income: false, jitterPct: 0.40 },
     // Schulden aflossing (minimum)
     { day: 28, amount: -75, description: 'Minimum betaling creditcard', counterparty_name: 'ICS Visa', counterparty_iban: 'NL20INGB0001234568', budgetSlug: S.SCHULDEN_AFLOSSINGEN, is_income: false },
     { day: 1, amount: -200, description: 'Aflossing persoonlijke lening', counterparty_name: 'Santander', counterparty_iban: 'NL86INGB0002445500', budgetSlug: S.SCHULDEN_AFLOSSINGEN, is_income: false },
   ]),
-  ...generateGroceryTransactions(12, 95, 25), // High grocery spending
+  ...generateGroceryTransactions(15, 95, 25), // High grocery spending
   // Irregular/seasonal transactions
   ...generateIrregularTransactions([
     { monthsAgo: 2, day: 18, amount: -289, description: 'Kerstinkopen Bijenkorf', counterparty_name: 'De Bijenkorf', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
@@ -500,10 +500,13 @@ const rooseTransactions: PersonaTransactionTemplate[] = [
     { monthsAgo: 9, day: 20, amount: -79, description: 'Spotify Wrapped merchandise', counterparty_name: 'Spotify', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
     { monthsAgo: 1, day: 8, amount: -55, description: 'Nieuwjaarsborrel kroeg', counterparty_name: 'Cafe De Unie', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false },
     { monthsAgo: 7, day: 25, amount: -129, description: 'Zomerkleding H&M', counterparty_name: 'H&M', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
-    { monthsAgo: 10, day: 14, amount: -45, description: 'Valentijnsdag diner', counterparty_name: 'Restaurant De Hoek', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false },
     { monthsAgo: 11, day: 5, amount: -35, description: 'Paracetamol + medicijnen', counterparty_name: 'Etos', counterparty_iban: null, budgetSlug: S.MEDISCHE_KOSTEN, is_income: false },
     { monthsAgo: 3, day: 28, amount: -68, description: 'Sinterklaas cadeaus', counterparty_name: 'Bol.com', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
     { monthsAgo: 8, day: 18, amount: -42, description: 'Parkeerboete Rotterdam', counterparty_name: 'Gemeente Rotterdam', counterparty_iban: null, budgetSlug: S.AUTO_ONDERHOUD, is_income: false },
+    // Uitgebreide periode (jan–mrt 2025)
+    { monthsAgo: 12, day: 15, amount: -55, description: 'Lente-opruiming kleding Primark', counterparty_name: 'Primark', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
+    { monthsAgo: 13, day: 14, amount: -45, description: 'Valentijnsdag diner', counterparty_name: 'Restaurant De Hoek', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false },
+    { monthsAgo: 14, day: 8, amount: -129, description: 'Nieuwjaarsuitverkoop Mediamarkt', counterparty_name: 'Mediamarkt', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
   ]),
 ]
 
@@ -514,12 +517,12 @@ const roosData: PersonaData = {
     description: 'Na een scheiding en jarenlang onbewust consumeren zit Roos diep in de schulden. Uitgaven overstijgen zijn inkomen.',
     color: 'red',
     avatarColor: '#EF4444',
-    netWorth: -22300,
+    netWorth: -15000,
     income: 2800,
     expenses: 3200,
     backgroundStory: 'Na haar scheiding in 2024 raakte Roos het financieel overzicht kwijt. Jarenlang emotioneel kopen en nu twee schulden — een creditcard op 14% rente en een persoonlijke lening — vreten aan haar maandelijks inkomen als logistiek medewerker. Elke maand loopt ze €400 tekort.',
     challenges: ['Uitgaven overstijgen inkomen met €400/mnd', 'Creditcard schuld van €4.800 op 14% rente', 'Geen noodfonds aanwezig'],
-    currentSituation: 'Diep in de rode cijfers — netto vermogen -€22.300 met twee actieve schulden.',
+    currentSituation: 'Diep in de rode cijfers — netto vermogen -€15.000 met drie actieve schulden.',
     firstGoal: 'Noodfonds aanleggen en uit de schulden komen',
     sovereignty: 'recovery',
   },
@@ -624,6 +627,8 @@ const roosData: PersonaData = {
     },
   ],
   net_worth_snapshots: [
+    { monthsAgo: 14, total_assets: 4400, total_debts: 10800, net_worth: -6400 },
+    { monthsAgo: 13, total_assets: 4300, total_debts: 11500, net_worth: -7200 },
     { monthsAgo: 12, total_assets: 4200, total_debts: 12200, net_worth: -8000 },
     { monthsAgo: 11, total_assets: 4100, total_debts: 13300, net_worth: -9200 },
     { monthsAgo: 10, total_assets: 4050, total_debts: 14600, net_worth: -10550 },
@@ -636,7 +641,7 @@ const roosData: PersonaData = {
     { monthsAgo: 3, total_assets: 3600, total_debts: 20800, net_worth: -17200 },
     { monthsAgo: 2, total_assets: 3550, total_debts: 21000, net_worth: -17450 },
     { monthsAgo: 1, total_assets: 3500, total_debts: 21800, net_worth: -18300 },
-    { monthsAgo: 0, total_assets: 3500, total_debts: 18500, net_worth: -22300 },
+    { monthsAgo: 0, total_assets: 3500, total_debts: 18500, net_worth: -15000 },
   ],
 }
 
@@ -645,7 +650,7 @@ const roosData: PersonaData = {
 // ══════════════════════════════════════════════════════════════
 
 const daanTransactions: PersonaTransactionTemplate[] = [
-  ...generateMonthlyTransactions(12, [
+  ...generateMonthlyTransactions(15, [
     // Inkomen
     { day: 25, amount: 3400, description: 'Salaris', counterparty_name: 'TechFlow BV', counterparty_iban: 'NL91ABNA0417164300', budgetSlug: S.SALARIS_UITKERING, is_income: true },
     // Vaste lasten
@@ -659,13 +664,13 @@ const daanTransactions: PersonaTransactionTemplate[] = [
     { day: 15, amount: -29.90, description: 'Basic-Fit', counterparty_name: 'Basic-Fit', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
     { day: 10, amount: -35, description: 'Uit eten met vrienden', counterparty_name: 'Cafe De Buren', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false, jitterPct: 0.25 },
     // Huishouden
-    { day: 15, amount: -20, description: 'Kruidvat', counterparty_name: 'Kruidvat', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false },
+    { day: 15, amount: -20, description: 'Kruidvat', counterparty_name: 'Kruidvat', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false, jitterPct: 0.20 },
     // Sparen (bewust)
     { day: 1, amount: -500, description: 'Sparen noodfonds', counterparty_name: 'Spaarrekening', counterparty_iban: 'NL11RABO0100000002', budgetSlug: S.SPAREN_NOODBUFFER, is_income: false },
     { day: 1, amount: -200, description: 'Meesman indexbeleggen', counterparty_name: 'Meesman', counterparty_iban: 'NL15RABO0300000003', budgetSlug: S.INVESTEREN_FIRE, is_income: false },
     { day: 1, amount: -100, description: 'Aflossing studielening DUO', counterparty_name: 'DUO', counterparty_iban: 'NL86INGB0002445588', budgetSlug: S.SCHULDEN_AFLOSSINGEN, is_income: false },
   ]),
-  ...generateGroceryTransactions(12, 55, 15), // Low grocery spending
+  ...generateGroceryTransactions(15, 55, 15), // Low grocery spending
   // Irregular/seasonal transactions
   ...generateIrregularTransactions([
     { monthsAgo: 1, day: 15, amount: 1700, description: 'Bonus Q4 TechFlow', counterparty_name: 'TechFlow BV', counterparty_iban: 'NL91ABNA0417164300', budgetSlug: S.OVERIGE_INKOMSTEN, is_income: true },
@@ -680,6 +685,10 @@ const daanTransactions: PersonaTransactionTemplate[] = [
     { monthsAgo: 3, day: 28, amount: -29, description: 'Sinterklaas cadeautjes', counterparty_name: 'Bol.com', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
     { monthsAgo: 11, day: 10, amount: -15, description: 'Boek: Rich Dad Poor Dad', counterparty_name: 'Bol.com', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
     { monthsAgo: 8, day: 22, amount: -42, description: 'Verjaardag vriend restaurant', counterparty_name: 'Restaurant Happyhappyjoyjoy', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false },
+    // Uitgebreide periode (jan–mrt 2025)
+    { monthsAgo: 12, day: 20, amount: -18.95, description: 'Boek: The Psychology of Money', counterparty_name: 'Bol.com', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
+    { monthsAgo: 13, day: 14, amount: -35, description: 'Valentijnsdag cadeau vriendin', counterparty_name: 'Rituals', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
+    { monthsAgo: 14, day: 1, amount: -15, description: 'Nieuwjaarsduik donatie', counterparty_name: 'Rode Kruis', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
   ]),
 ]
 
@@ -778,6 +787,8 @@ const daanData: PersonaData = {
     },
   ],
   net_worth_snapshots: [
+    { monthsAgo: 14, total_assets: 1000, total_debts: 14000, net_worth: -13000 },
+    { monthsAgo: 13, total_assets: 1700, total_debts: 14000, net_worth: -12300 },
     { monthsAgo: 12, total_assets: 2400, total_debts: 13900, net_worth: -11500 },
     { monthsAgo: 11, total_assets: 3100, total_debts: 14000, net_worth: -10900 },
     { monthsAgo: 10, total_assets: 3800, total_debts: 14000, net_worth: -10200 },
@@ -793,6 +804,8 @@ const daanData: PersonaData = {
     { monthsAgo: 0, total_assets: 11600, total_debts: 13900, net_worth: -2300 },
   ],
   valuations: [
+    { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 14, value: 400 },
+    { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 12, value: 1200 },
     { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 8, value: 2200 },
     { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 6, value: 2900 },
     { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 4, value: 3800 },
@@ -824,11 +837,11 @@ const daanData: PersonaData = {
 // ══════════════════════════════════════════════════════════════
 
 const lisaTransactions: PersonaTransactionTemplate[] = [
-  ...generateMonthlyTransactions(12, [
+  ...generateMonthlyTransactions(15, [
     // Inkomen
     { day: 25, amount: 4200, description: 'Salaris', counterparty_name: 'ProjectHuis BV', counterparty_iban: 'NL91ABNA0417164300', budgetSlug: S.SALARIS_UITKERING, is_income: true },
     { day: 5, amount: 400, description: 'Kinderbijslag', counterparty_name: 'SVB', counterparty_iban: 'NL86INGB0002445588', budgetSlug: S.TOESLAGEN_KINDERBIJSLAG, is_income: true },
-    { day: 20, amount: 600, description: 'Freelance opdracht', counterparty_name: 'Diverse opdrachtgevers', counterparty_iban: null, budgetSlug: S.OVERIGE_INKOMSTEN, is_income: true, accountIndex: 2 },
+    { day: 20, amount: 600, description: 'Freelance opdracht', counterparty_name: 'Diverse opdrachtgevers', counterparty_iban: null, budgetSlug: S.OVERIGE_INKOMSTEN, is_income: true, accountIndex: 2, jitterPct: 0.30 },
     // Vaste lasten (gezamenlijke rekening = 0)
     { day: 1, amount: -1100, description: 'Hypotheek', counterparty_name: 'Rabobank Hypotheken', counterparty_iban: 'NL39RABO0300065264', budgetSlug: S.HUUR_HYPOTHEEK, is_income: false },
     { day: 1, amount: -180, description: 'Energie', counterparty_name: 'Vattenfall', counterparty_iban: 'NL20INGB0001234567', budgetSlug: S.GAS_WATER_LICHT, is_income: false, jitterPct: 0.15 },
@@ -849,30 +862,34 @@ const lisaTransactions: PersonaTransactionTemplate[] = [
     { day: 15, amount: -34.90, description: 'Basic-Fit duo', counterparty_name: 'Basic-Fit', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
     { day: 18, amount: -45, description: 'Kleding kinderen', counterparty_name: 'H&M', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false, jitterPct: 0.30 },
     // Huishouden
-    { day: 8, amount: -35, description: 'Kruidvat', counterparty_name: 'Kruidvat', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false },
-    { day: 20, amount: -25, description: 'Action', counterparty_name: 'Action', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false },
+    { day: 8, amount: -35, description: 'Kruidvat', counterparty_name: 'Kruidvat', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false, jitterPct: 0.20 },
+    { day: 20, amount: -25, description: 'Action', counterparty_name: 'Action', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false, jitterPct: 0.25 },
     // Sparen & beleggen
     { day: 1, amount: -200, description: 'Spaarrekening gezin', counterparty_name: 'Spaarrekening', counterparty_iban: 'NL11RABO0100000002', budgetSlug: S.SPAREN_NOODBUFFER, is_income: false },
     { day: 1, amount: -400, description: 'Meesman gezamenlijk', counterparty_name: 'Meesman', counterparty_iban: 'NL15RABO0300000003', budgetSlug: S.INVESTEREN_FIRE, is_income: false },
     { day: 1, amount: -50, description: 'Extra aflossing hypotheek', counterparty_name: 'Rabobank', counterparty_iban: 'NL02ABNA0450884701', budgetSlug: S.EXTRA_AFLOSSING_HYPOTHEEK, is_income: false },
   ]),
-  ...generateGroceryTransactions(12, 120, 30), // Family grocery spending
+  ...generateGroceryTransactions(15, 120, 30), // Family grocery spending
   // Irregular/seasonal transactions
   ...generateIrregularTransactions([
-    { monthsAgo: 2, day: 5, amount: -320, description: 'Sinterklaas cadeaus kinderen', counterparty_name: 'Intertoys', counterparty_iban: null, budgetSlug: S.KINDEREN_SCHOOL, is_income: false },
-    { monthsAgo: 2, day: 18, amount: -185, description: 'Kerstinkopen gezin', counterparty_name: 'Bol.com', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
+    { monthsAgo: 3, day: 5, amount: -320, description: 'Sinterklaas cadeaus kinderen', counterparty_name: 'Intertoys', counterparty_iban: null, budgetSlug: S.KINDEREN_SCHOOL, is_income: false },
+    { monthsAgo: 3, day: 18, amount: -185, description: 'Kerstinkopen gezin', counterparty_name: 'Bol.com', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
     { monthsAgo: 4, day: 10, amount: -45, description: 'Schoolreis oudste kind', counterparty_name: 'Basisschool De Ster', counterparty_iban: null, budgetSlug: S.KINDEREN_SCHOOL, is_income: false },
     { monthsAgo: 9, day: 15, amount: -285, description: 'APK auto + kleine reparatie', counterparty_name: 'Autogarage Jansen', counterparty_iban: null, budgetSlug: S.AUTO_ONDERHOUD, is_income: false },
-    { monthsAgo: 5, day: 1, amount: -1450, description: 'Zomervakantie Frankrijk huisje', counterparty_name: 'Booking.com', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
-    { monthsAgo: 5, day: 8, amount: -380, description: 'Zomervakantie Frankrijk benzine + tolwegen', counterparty_name: 'Shell Frankrijk', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
-    { monthsAgo: 5, day: 12, amount: -290, description: 'Zomervakantie Frankrijk restaurants', counterparty_name: 'iDEAL betaling buitenland', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
-    { monthsAgo: 8, day: 25, amount: -165, description: 'Schoolspullen nieuw schooljaar', counterparty_name: 'Bruna', counterparty_iban: null, budgetSlug: S.KINDEREN_SCHOOL, is_income: false },
+    { monthsAgo: 8, day: 1, amount: -1450, description: 'Zomervakantie Frankrijk huisje', counterparty_name: 'Booking.com', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
+    { monthsAgo: 8, day: 8, amount: -380, description: 'Zomervakantie Frankrijk benzine + tolwegen', counterparty_name: 'Shell Frankrijk', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
+    { monthsAgo: 8, day: 12, amount: -290, description: 'Zomervakantie Frankrijk restaurants', counterparty_name: 'iDEAL betaling buitenland', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
+    { monthsAgo: 7, day: 25, amount: -165, description: 'Schoolspullen nieuw schooljaar', counterparty_name: 'Bruna', counterparty_iban: null, budgetSlug: S.KINDEREN_SCHOOL, is_income: false },
     { monthsAgo: 10, day: 20, amount: -89, description: 'Tandarts kinderen controle', counterparty_name: 'Tandarts Utrecht', counterparty_iban: null, budgetSlug: S.MEDISCHE_KOSTEN, is_income: false },
     { monthsAgo: 7, day: 14, amount: -55, description: 'Zwemles kinderen kwartaal', counterparty_name: 'Zwembad De Krommerijn', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
     { monthsAgo: 1, day: 5, amount: -78, description: 'Nieuwjaarsbrunch restaurant', counterparty_name: 'Restaurant De Buren', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false },
-    { monthsAgo: 3, day: 20, amount: 850, description: 'Freelance factuur extra project', counterparty_name: 'Klant B.V.', counterparty_iban: null, budgetSlug: S.OVERIGE_INKOMSTEN, is_income: true, accountIndex: 2 },
+    { monthsAgo: 5, day: 20, amount: 850, description: 'Freelance factuur extra project', counterparty_name: 'Klant B.V.', counterparty_iban: null, budgetSlug: S.OVERIGE_INKOMSTEN, is_income: true, accountIndex: 2 },
     { monthsAgo: 6, day: 28, amount: -120, description: 'Kinderkleding wintercollectie', counterparty_name: 'Zeeman', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
     { monthsAgo: 11, day: 12, amount: -145, description: 'Verjaardagsfeestje kind', counterparty_name: 'Speeltuin De Ballebak', counterparty_iban: null, budgetSlug: S.KINDEREN_SCHOOL, is_income: false },
+    // Uitgebreide periode (jan–mrt 2025)
+    { monthsAgo: 12, day: 22, amount: -95, description: 'Voorjaarskleding kinderen', counterparty_name: 'H&M', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
+    { monthsAgo: 13, day: 14, amount: -65, description: 'Valentijnsdag diner met partner', counterparty_name: 'Restaurant De Buren', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false },
+    { monthsAgo: 14, day: 10, amount: -75, description: 'Schoolboeken 2e semester', counterparty_name: 'Bruna', counterparty_iban: null, budgetSlug: S.KINDEREN_SCHOOL, is_income: false },
   ]),
 ]
 
@@ -990,6 +1007,8 @@ const lisaData: PersonaData = {
     },
   ],
   net_worth_snapshots: [
+    { monthsAgo: 14, total_assets: 415000, total_debts: 350000, net_worth: 65000 },
+    { monthsAgo: 13, total_assets: 417500, total_debts: 350000, net_worth: 67500 },
     { monthsAgo: 12, total_assets: 420000, total_debts: 350000, net_worth: 70000 },
     { monthsAgo: 11, total_assets: 422500, total_debts: 350000, net_worth: 72500 },
     { monthsAgo: 10, total_assets: 425000, total_debts: 350000, net_worth: 75000 },
@@ -1005,6 +1024,7 @@ const lisaData: PersonaData = {
     { monthsAgo: 0, total_assets: 450000, total_debts: 350000, net_worth: 100000 },
   ],
   valuations: [
+    { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 14, value: 31500 },
     { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 12, value: 33600 },
     { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 10, value: 35200 },
     { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 8, value: 36800 },
@@ -1012,6 +1032,7 @@ const lisaData: PersonaData = {
     { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 4, value: 39800 },
     { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 2, value: 41000 },
     { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 0, value: 42000 },
+    { assetName: 'Woning Utrecht', entity_type: 'asset', monthsAgo: 14, value: 360000 },
     { assetName: 'Woning Utrecht', entity_type: 'asset', monthsAgo: 12, value: 365000 },
     { assetName: 'Woning Utrecht', entity_type: 'asset', monthsAgo: 6, value: 375000 },
     { assetName: 'Woning Utrecht', entity_type: 'asset', monthsAgo: 0, value: 385000 },
@@ -1023,10 +1044,10 @@ const lisaData: PersonaData = {
 // ══════════════════════════════════════════════════════════════
 
 const willemTransactions: PersonaTransactionTemplate[] = [
-  ...generateMonthlyTransactions(12, [
+  ...generateMonthlyTransactions(15, [
     // Inkomen
     { day: 25, amount: 5500, description: 'Salaris', counterparty_name: 'Consultancy Partners BV', counterparty_iban: 'NL91ABNA0417164300', budgetSlug: S.SALARIS_UITKERING, is_income: true },
-    { day: 5, amount: 500, description: 'Dividenduitkering', counterparty_name: 'DEGIRO', counterparty_iban: 'NL86INGB0002445588', budgetSlug: S.OVERIGE_INKOMSTEN, is_income: true },
+    { day: 5, amount: 500, description: 'Dividenduitkering', counterparty_name: 'DEGIRO', counterparty_iban: 'NL86INGB0002445588', budgetSlug: S.OVERIGE_INKOMSTEN, is_income: true, jitterPct: 0.15 },
     { day: 10, amount: 500, description: 'Huurinkomsten garage', counterparty_name: 'Huurder J. Smit', counterparty_iban: null, budgetSlug: S.OVERIGE_INKOMSTEN, is_income: true },
     // Vaste lasten (hypotheek afbetaald!)
     { day: 1, amount: -120, description: 'Energie', counterparty_name: 'Eneco', counterparty_iban: 'NL20INGB0001234567', budgetSlug: S.GAS_WATER_LICHT, is_income: false, jitterPct: 0.15 },
@@ -1041,12 +1062,12 @@ const willemTransactions: PersonaTransactionTemplate[] = [
     { day: 7, amount: -15.99, description: 'Netflix', counterparty_name: 'Netflix', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
     { day: 15, amount: -49.90, description: 'Golfclub contributie', counterparty_name: 'Golfclub Wassenaar', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
     // Huishouden (gezamenlijke rekening)
-    { day: 10, amount: -40, description: 'Etos', counterparty_name: 'Etos', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false, accountIndex: 2 },
+    { day: 10, amount: -40, description: 'Etos', counterparty_name: 'Etos', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false, accountIndex: 2, jitterPct: 0.20 },
     // Sparen & beleggen (agressief)
     { day: 1, amount: -500, description: 'Overboeking spaarrekening', counterparty_name: 'Spaarrekening', counterparty_iban: 'NL11RABO0100000002', budgetSlug: S.SPAREN_NOODBUFFER, is_income: false },
     { day: 1, amount: -2500, description: 'DEGIRO maandelijkse inleg', counterparty_name: 'DEGIRO', counterparty_iban: 'NL15RABO0300000003', budgetSlug: S.INVESTEREN_FIRE, is_income: false },
   ]),
-  ...generateGroceryTransactions(12, 85, 20), // Moderate grocery spending
+  ...generateGroceryTransactions(15, 85, 20), // Moderate grocery spending
   // Irregular/seasonal transactions
   ...generateIrregularTransactions([
     { monthsAgo: 2, day: 24, amount: -350, description: 'Kerstdiner restaurant De Librije', counterparty_name: 'Restaurant De Librije', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false },
@@ -1059,10 +1080,14 @@ const willemTransactions: PersonaTransactionTemplate[] = [
     { monthsAgo: 1, day: 14, amount: -185, description: 'Valentijnsdag diner + cadeau', counterparty_name: 'Restaurant Basiliek', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false },
     { monthsAgo: 8, day: 20, amount: -95, description: 'Nieuw golfshirt + handschoenen', counterparty_name: 'Golfshop Wassenaar', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
     { monthsAgo: 10, day: 5, amount: -155, description: 'Tandarts + gebitsreiniging', counterparty_name: 'Tandarts Wassenaar', counterparty_iban: null, budgetSlug: S.MEDISCHE_KOSTEN, is_income: false },
-    { monthsAgo: 5, day: 18, amount: -65, description: 'Vaderdag cadeau van partner', counterparty_name: 'Bol.com', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false, accountIndex: 2 },
+    { monthsAgo: 9, day: 18, amount: -65, description: 'Vaderdag cadeau van partner', counterparty_name: 'Bol.com', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false, accountIndex: 2 },
     { monthsAgo: 7, day: 25, amount: -42, description: 'Zomerborrel golfclub', counterparty_name: 'Golfclub Wassenaar', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false },
     { monthsAgo: 11, day: 10, amount: -125, description: 'Nieuwe hardloopschoenen', counterparty_name: 'Runners World', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
     { monthsAgo: 1, day: 3, amount: -88, description: 'Nieuwjaarsbrunch hotel', counterparty_name: 'Hotel Des Indes', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false },
+    // Uitgebreide periode (jan–mrt 2025)
+    { monthsAgo: 12, day: 20, amount: -145, description: 'Voorjaarsonderhoud tuin', counterparty_name: 'Tuincentrum Wassenaar', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false },
+    { monthsAgo: 13, day: 14, amount: -195, description: 'Valentijnsdag diner + cadeau', counterparty_name: 'Restaurant Basiliek', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false },
+    { monthsAgo: 14, day: 5, amount: -78, description: 'Nieuwjaarsreceptie golfclub', counterparty_name: 'Golfclub Wassenaar', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false },
   ]),
 ]
 
@@ -1166,6 +1191,8 @@ const willemData: PersonaData = {
     },
   ],
   net_worth_snapshots: [
+    { monthsAgo: 14, total_assets: 1355000, total_debts: 0, net_worth: 885000 },
+    { monthsAgo: 13, total_assets: 1362000, total_debts: 0, net_worth: 902000 },
     { monthsAgo: 12, total_assets: 1370000, total_debts: 0, net_worth: 920000 },
     { monthsAgo: 11, total_assets: 1378000, total_debts: 0, net_worth: 938000 },
     { monthsAgo: 10, total_assets: 1385000, total_debts: 0, net_worth: 955000 },
@@ -1181,6 +1208,7 @@ const willemData: PersonaData = {
     { monthsAgo: 0, total_assets: 1457000, total_debts: 0, net_worth: 1135000 },
   ],
   valuations: [
+    { assetName: 'DEGIRO beleggingsportefeuille', entity_type: 'asset', monthsAgo: 14, value: 340000 },
     { assetName: 'DEGIRO beleggingsportefeuille', entity_type: 'asset', monthsAgo: 12, value: 350000 },
     { assetName: 'DEGIRO beleggingsportefeuille', entity_type: 'asset', monthsAgo: 10, value: 365000 },
     { assetName: 'DEGIRO beleggingsportefeuille', entity_type: 'asset', monthsAgo: 8, value: 378000 },
@@ -1188,6 +1216,7 @@ const willemData: PersonaData = {
     { assetName: 'DEGIRO beleggingsportefeuille', entity_type: 'asset', monthsAgo: 4, value: 402000 },
     { assetName: 'DEGIRO beleggingsportefeuille', entity_type: 'asset', monthsAgo: 2, value: 412000 },
     { assetName: 'DEGIRO beleggingsportefeuille', entity_type: 'asset', monthsAgo: 0, value: 420000 },
+    { assetName: 'Woning Wassenaar', entity_type: 'asset', monthsAgo: 14, value: 615000 },
     { assetName: 'Woning Wassenaar', entity_type: 'asset', monthsAgo: 12, value: 620000 },
     { assetName: 'Woning Wassenaar', entity_type: 'asset', monthsAgo: 6, value: 635000 },
     { assetName: 'Woning Wassenaar', entity_type: 'asset', monthsAgo: 0, value: 650000 },
