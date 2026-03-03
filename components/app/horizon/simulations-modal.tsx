@@ -7,11 +7,11 @@ import { X, ChevronDown, ChevronUp } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
   runMonteCarlo, ageAtDate, NL_SWR,
-  type HorizonInput, type MonteCarloResult,
+  type FinancialInput, type MonteCarloResult,
 } from '@/lib/horizon-data'
 
 type Props = {
-  input: HorizonInput
+  input: FinancialInput
   open: boolean
   onClose: () => void
   /** Pre-computed MC data from the chart overlay (reused to avoid discrepancies) */

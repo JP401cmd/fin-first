@@ -39,17 +39,17 @@
 ---
 
 ### RF-003: Unificeer input-interfaces
-- **Status:** `[ ]`
+- **Status:** `[x]` — afgerond
 - **Ernst:** Hoog
-- **Betrokken bestanden:** `lib/mock-data.ts`, `lib/horizon-data.ts`
-- **Beschrijving:** `CoreData` mengt inputs en outputs; `HorizonInput` bevat alleen inputs. Maak een helder onderscheid.
+- **Betrokken bestanden:** `lib/core-metrics.ts` (voorheen `lib/mock-data.ts`), `lib/horizon-data.ts`
+- **Beschrijving:** `CoreData` mengde inputs en outputs; `HorizonInput` bevatte alleen inputs. Nu unified als `FinancialInput` (rauwe data) en `FinancialMetrics` (berekende waarden).
 - **Stappen:**
-  1. [ ] Definieer `FinancialInput` interface (rauwe data uit DB: totalAssets, totalDebts, monthlyIncome, etc.)
-  2. [ ] Definieer `FinancialMetrics` interface (berekende waarden: fireTarget, freedomPercentage, etc.)
-  3. [ ] Refactor `computeCoreData()` om `FinancialInput` als parameter en `FinancialMetrics` als return te gebruiken
-  4. [ ] Refactor `computeFireProjection()` om dezelfde `FinancialInput` te accepteren
-  5. [ ] Update alle pagina's die deze functies aanroepen
-  6. [ ] Verwijder `CoreData` en `HorizonInput` interfaces
+  1. [x] Definieer `FinancialInput` interface (rauwe data uit DB: totalAssets, totalDebts, monthlyIncome, etc.)
+  2. [x] Definieer `FinancialMetrics` interface (berekende waarden: fireTarget, freedomPercentage, etc.)
+  3. [x] Refactor `computeCoreData()` om `FinancialInput` als parameter en `FinancialMetrics` als return te gebruiken
+  4. [x] Refactor `computeFireProjection()` om dezelfde `FinancialInput` te accepteren
+  5. [x] Update alle pagina's die deze functies aanroepen (28 bestanden)
+  6. [x] Verwijder `CoreData` en `HorizonInput` interfaces; verwijder `lib/mock-data.ts`
 - **Audit-referentie:** Inconsistenties #9, #10
 
 ---
@@ -122,7 +122,7 @@
 |----|------|-------|--------|
 | RF-001 | Consolideer FIRE-berekeningen | Hoog | `[ ]` |
 | RF-002 | Standaardiseer SWR-gebruik | Hoog | `[ ]` |
-| RF-003 | Unificeer input-interfaces | Hoog | `[ ]` |
+| RF-003 | Unificeer input-interfaces | Hoog | `[x]` |
 | RF-004 | DB→Frontend type mapper | Medium | `[ ]` |
 | RF-005 | Standaardiseer variabelnamen | Medium | `[ ]` |
 | RF-006 | Verwijder duplicate format-functies | Medium | `[ ]` |

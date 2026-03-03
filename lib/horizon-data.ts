@@ -13,7 +13,10 @@ import {
   computeSavingsRate,
 } from './core-metrics'
 import { MSCI_REAL_RETURNS, NAMED_PERIODS } from './msci-data'
+import type { FinancialInput } from './core-metrics'
 import type { CamelCaseKeys } from './db-mapper'
+
+export type { FinancialInput } from './core-metrics'
 
 // ── Constants (canonical source: lib/constants.ts) ──────────────
 // Re-exported for backward compatibility — many files import from here.
@@ -46,16 +49,6 @@ export function getSwrForMethod(_method: FireMethod): number {
 
 // ── Types ────────────────────────────────────────────────────
 
-export interface HorizonInput {
-  totalAssets: number
-  totalDebts: number
-  monthlyIncome: number
-  monthlyExpenses: number
-  monthlyContributions: number // sum of asset monthly_contributions
-  yearlyMustExpenses: number
-  dateOfBirth: string | null // ISO date
-  expectedReturn?: number // annual decimal, default 0.07
-}
 
 export interface FutureCashflow {
   id: string
@@ -492,7 +485,7 @@ class SeededRandom {
  * Compute FIRE projection from financial inputs.
  */
 export function computeFireProjection(
-  input: HorizonInput,
+  input: FinancialInput,
   annualReturn: number = DEFAULT_RETURN,
   swrOverride?: number,
   inflationOverride?: number,
@@ -605,7 +598,7 @@ export function deriveCountdown(
  * Compute optimistic / expected / pessimistic FIRE projections.
  */
 export function computeFireRange(
-  input: HorizonInput,
+  input: FinancialInput,
   swrOverride?: number,
   inflationOverride?: number,
   baseReturn: number = DEFAULT_RETURN,
@@ -622,7 +615,7 @@ export function computeFireRange(
  * Optionally accepts future cashflows (AOW, pension, part-time) to include age-based income adjustments.
  */
 export function projectForward(
-  input: HorizonInput,
+  input: FinancialInput,
   months: number,
   annualReturn: number = DEFAULT_RETURN,
   swrOverride?: number,
@@ -687,7 +680,7 @@ export function projectForward(
  * Optionally accepts a market weather key to adjust return rates.
  */
 export function computeScenarios(
-  input: HorizonInput,
+  input: FinancialInput,
   maxYears: number = 40,
   weather: MarketWeather = 'normal',
 ): ScenarioPath[] {
@@ -765,7 +758,7 @@ export function computeScenarios(
  * Optionally accepts future cashflows (AOW, pension, part-time) to adjust yearly savings.
  */
 export function runMonteCarlo(
-  input: HorizonInput,
+  input: FinancialInput,
   sims: number = 1000,
   years: number = 40,
   swrOverride?: number,
@@ -1010,7 +1003,7 @@ export function computeWithdrawal(
  * Compute the FIRE delay caused by a single life event.
  */
 export function computeLifeEventImpact(
-  input: HorizonInput,
+  input: FinancialInput,
   event: LifeEvent,
 ): LifeEventImpact {
   const baseProjection = computeFireProjection(input)
@@ -1021,7 +1014,7 @@ export function computeLifeEventImpact(
     (Number(event.monthly_cost_change) * Number(event.duration_months))
   const totalIncomeChange = Number(event.monthly_income_change) * Number(event.duration_months)
 
-  const adjustedInput: HorizonInput = {
+  const adjustedInput: FinancialInput = {
     ...input,
     totalAssets: input.totalAssets - Number(event.one_time_cost),
     monthlyExpenses: input.monthlyExpenses + Number(event.monthly_cost_change),
@@ -1048,7 +1041,7 @@ export function computeLifeEventImpact(
 /**
  * Compute resilience score (0-100).
  */
-export function computeResilienceScore(input: HorizonInput): ResilienceScore {
+export function computeResilienceScore(input: FinancialInput): ResilienceScore {
   const { totalAssets, totalDebts, monthlyIncome, monthlyExpenses } = input
   const netWorth = totalAssets - totalDebts
   const monthlySavings = monthlyIncome - monthlyExpenses
@@ -1118,7 +1111,7 @@ export interface BacktestResult {
  * Simulates all available start years and returns success rates and statistics.
  */
 export function runBacktest(
-  input: HorizonInput,
+  input: FinancialInput,
   years: number = 30,
   swrOverride?: number,
 ): BacktestResult {

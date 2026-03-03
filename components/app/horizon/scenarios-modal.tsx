@@ -8,7 +8,7 @@ import { X, ArrowDown, ArrowUp, TrendingDown } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
   computeResilienceScore,
-  MARKET_WEATHER, type MarketWeather, type HorizonInput,
+  MARKET_WEATHER, type MarketWeather, type FinancialInput,
   type ScenarioPath, type ResilienceScore,
 } from '@/lib/horizon-data'
 import {
@@ -19,7 +19,7 @@ import type { SimRow } from '@/lib/fire-simulation'
 import { buildScenarioPathsFromSim, SCENARIO_VARIANTS } from '@/components/app/horizon/sim-chart'
 
 type Props = {
-  input: HorizonInput
+  input: FinancialInput
   debts?: Debt[]
   open: boolean
   onClose: () => void

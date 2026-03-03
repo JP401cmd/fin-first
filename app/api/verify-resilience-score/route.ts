@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { computeResilienceScore, type HorizonInput } from '@/lib/horizon-data'
+import { computeResilienceScore, type FinancialInput } from '@/lib/horizon-data'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 
@@ -55,7 +55,7 @@ export async function GET() {
   })
 
   // Test 3: computeResilienceScore produces valid 0-100 score
-  const testInput: HorizonInput = {
+  const testInput: FinancialInput = {
     totalAssets: 150000,
     totalDebts: 25000,
     monthlyIncome: 4500,
@@ -152,12 +152,12 @@ export async function GET() {
   })
 
   // Test 9: computeResilienceScore handles edge cases
-  const zeroInput: HorizonInput = {
+  const zeroInput: FinancialInput = {
     totalAssets: 0, totalDebts: 0, monthlyIncome: 0, monthlyExpenses: 0,
     monthlyContributions: 0, yearlyMustExpenses: 0, dateOfBirth: null,
   }
   const zeroResilience = computeResilienceScore(zeroInput)
-  const highInput: HorizonInput = {
+  const highInput: FinancialInput = {
     totalAssets: 1000000, totalDebts: 0, monthlyIncome: 10000, monthlyExpenses: 2000,
     monthlyContributions: 5000, yearlyMustExpenses: 12000, dateOfBirth: '1985-06-15',
   }

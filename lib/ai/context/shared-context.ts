@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { computeCoreData } from '@/lib/mock-data'
+import { computeCoreData, type FinancialInput } from '@/lib/core-metrics'
 import { resolveFireParams } from '@/lib/fire-params'
 import { section, formatCurrency, formatFreedomTime, formatPercentage } from './formatter'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
@@ -105,7 +105,11 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
   }
 
   const fireParams = resolveFireParams(profile ?? {})
-  const core = computeCoreData(monthlyIncome, monthlyExpenses, totalAssets, totalDebts, undefined, yearlyRetirementExpenses, fireParams.effectiveSwr)
+  const coreInput: FinancialInput = {
+    totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
+    yearlyMustExpenses: yearlyRetirementExpenses, monthlyContributions: 0, dateOfBirth: null,
+  }
+  const core = computeCoreData(coreInput, fireParams.effectiveSwr)
 
   const lines = [
     `Netto vermogen: ${formatCurrency(core.netWorth)}`,
@@ -113,7 +117,7 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     `Vrijheids-%: ${formatPercentage(core.freedomPercentage)}`,
     `FIRE-doel: ${formatCurrency(core.fireTarget)}`,
     `Verwachte FIRE-datum: ${core.expectedFireDate || 'onbekend'}`,
-    `Maandinkomen: ${formatCurrency(core.monthlyIncome)} | Maanduitgaven: ${formatCurrency(core.monthlyExpenses)}`,
+    `Maandinkomen: ${formatCurrency(monthlyIncome)} | Maanduitgaven: ${formatCurrency(monthlyExpenses)}`,
     monthlyMustExpenses > 0 ? `Must-uitgaven (essentieel): ${formatCurrency(monthlyMustExpenses)}/mnd` : null,
     monthlyRetirementExpenses > 0 ? `Jaarlijkse uitgave na retirement: ${formatCurrency(monthlyRetirementExpenses)}/mnd (methode: ${profile?.retirement_expense_method ?? 'essential_budgets'}) — basis voor FIRE & vrijheidsdagen` : null,
     `Spaarquote: ${formatPercentage(core.savingsRate)}`,

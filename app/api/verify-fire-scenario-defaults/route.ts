@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeFireProjection, NL_SWR, type HorizonInput } from '@/lib/horizon-data'
+import { computeFireProjection, NL_SWR, type FinancialInput } from '@/lib/horizon-data'
 import { NextResponse } from 'next/server'
 
 /**
@@ -59,7 +59,7 @@ export async function GET() {
 
     const dob = profileResult.data?.[0]?.date_of_birth ?? null
 
-    const horizonInput: HorizonInput = {
+    const horizonInput: FinancialInput = {
       totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
       monthlyContributions, yearlyMustExpenses, dateOfBirth: dob,
     }
@@ -119,7 +119,7 @@ export async function GET() {
 
     // ── Test 6: User can modify income parameter ──
     // Test the override mechanism by computing with a different income
-    const overriddenInput: HorizonInput = { ...horizonInput, monthlyIncome: monthlyIncome + 1000 }
+    const overriddenInput: FinancialInput = { ...horizonInput, monthlyIncome: monthlyIncome + 1000 }
     const overriddenFire = computeFireProjection(overriddenInput)
     const modifyWorks = overriddenFire.savingsRate !== fireResult.savingsRate || monthlyIncome === 0
 

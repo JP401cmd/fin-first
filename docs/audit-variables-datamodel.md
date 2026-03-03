@@ -684,10 +684,10 @@ De app gebruikt **33+ Supabase-tabellen** verdeeld over 8 domeinen. Oorspronkeli
 
 ### 2.2 Kerngetallen
 
-#### `computeCoreData()` — `lib/mock-data.ts:40`
+#### `computeCoreData()` — `lib/core-metrics.ts`
 **Doel:** Centrale dashboard-berekening: vrijheidstijd, FIRE-target, spaarquote, KPI's.
-**Inputs:** `monthlyIncome`, `monthlyExpenses`, `totalAssets`, `totalDebts`, `last12MonthsIncome?`, `yearlyMustExpenses?`, `swrOverride?`
-**Output:** `CoreData` (16 velden)
+**Inputs:** `FinancialInput` (unified interface), `swrOverride?`
+**Output:** `FinancialMetrics` (15 velden — input-velden niet meer in output)
 **Formules:**
 - `netWorth = totalAssets - totalDebts`
 - `fireTarget = effectiveYearlyExpenses / swr` (swr = 0.04)
@@ -855,10 +855,10 @@ De app gebruikt **33+ Supabase-tabellen** verdeeld over 8 domeinen. Oorspronkeli
 
 | # | Interface | Bestand | Karakter |
 |---|-----------|---------|----------|
-| 9 | `CoreData` | `mock-data.ts:11` | Input + output (vrijheidstijd, FIRE, KPI's) |
-| 10 | `HorizonInput` | `horizon-data.ts:36` | Alleen input (totalAssets, monthlyIncome, etc.) |
+| 9 | ~~`CoreData`~~ → `FinancialInput` + `FinancialMetrics` | `core-metrics.ts` | **Opgelost (RF-003):** Input en output gescheiden |
+| 10 | ~~`HorizonInput`~~ → `FinancialInput` | `core-metrics.ts` (re-exported via `horizon-data.ts`) | **Opgelost (RF-003):** Unified input interface |
 
-**Probleem:** Dezelfde financiële basisgegevens worden via twee verschillende interfaces verwerkt. `CoreData` mengt input en output, wat hergebruik bemoeilijkt.
+**~~Probleem:~~** ~~Dezelfde financiële basisgegevens worden via twee verschillende interfaces verwerkt. `CoreData` mengt input en output, wat hergebruik bemoeilijkt.~~ **Opgelost:** `FinancialInput` is de unified input interface; `FinancialMetrics` bevat alleen berekende waarden.
 
 ### 3.4 MEDIUM — Naamgeving
 

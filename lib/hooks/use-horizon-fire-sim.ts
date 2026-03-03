@@ -3,7 +3,7 @@
 /**
  * useHorizonFireSim — koppelt app-data aan de runSimulation engine.
  *
- * Ontvangt al-geladen data (HorizonInput + lifeEvents) van horizon/page.tsx
+ * Ontvangt al-geladen data (FinancialInput + lifeEvents) van horizon/page.tsx
  * zodat er geen dubbele fetches zijn. Berekent SimResult en schrijft het resultaat weg
  * naar net_worth_snapshots.
  */
@@ -14,7 +14,7 @@ import {
   ageAtDate,
   DEFAULT_RETURN,
   INFLATION,
-  type HorizonInput,
+  type FinancialInput,
   type LifeEvent,
 } from '@/lib/horizon-data'
 import {
@@ -34,7 +34,7 @@ export interface HorizonFireSimResult {
 }
 
 interface HorizonFireSimInput {
-  horizonInput: HorizonInput | null
+  horizonInput: FinancialInput | null
   lifeEvents: LifeEvent[]
   fireStrategy?: FireStrategyConfig
   grossReturn?: number   // default: DEFAULT_RETURN
@@ -54,7 +54,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     const currentAge = dateOfBirth ? ageAtDate(dateOfBirth) : null
     if (currentAge === null) return null
 
-    // currentPortfolio = assets − debts (al gewogen met inclusion pct in HorizonInput)
+    // currentPortfolio = assets − debts (al gewogen met inclusion pct in FinancialInput)
     const currentPortfolio = Math.max(0, totalAssets - totalDebts)
 
     // yearlyExpenses = al berekend via computeRetirementExpenses in de pagina

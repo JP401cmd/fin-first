@@ -7,7 +7,7 @@ import {
   computeFireProjection, computeFireRange, projectForward,
   formatFireAge,
   CASHFLOW_CATALOG,
-  type HorizonInput, type FireProjection, type FireRange, type ProjectionMonth,
+  type FinancialInput, type FireProjection, type FireRange, type ProjectionMonth,
   type FutureCashflow,
 } from '@/lib/horizon-data'
 import { X, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
@@ -15,7 +15,7 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import { FeatureGate } from '@/components/app/feature-gate'
 
 type Props = {
-  input: HorizonInput
+  input: FinancialInput
   open: boolean
   onClose: () => void
 }
@@ -49,12 +49,12 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
     if (!open) return
 
     const incomeMultiplier = workDays / 5
-    const adjusted: HorizonInput = {
+    const adjusted: FinancialInput = {
       ...input,
       monthlyIncome: input.monthlyIncome * incomeMultiplier,
       monthlyExpenses: input.monthlyExpenses,
     }
-    const effectiveInput: HorizonInput = {
+    const effectiveInput: FinancialInput = {
       ...adjusted,
       monthlyIncome: adjusted.monthlyIncome + extraMonthly,
     }
@@ -105,14 +105,14 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
     const s = swr / 100
     const inf = inflation / 100
     const incomeMultiplier = workDays / 5
-    const effectiveInput: HorizonInput = {
+    const effectiveInput: FinancialInput = {
       ...input,
       monthlyIncome: input.monthlyIncome * incomeMultiplier + extraMonthly,
     }
     const baseCountdown = computeFireProjection(effectiveInput, r, s, inf).countdownDays
     const withCf = computeFireProjection(effectiveInput, r, s, inf)
     // Approximate: monthly cashflow adds to savings
-    const cfInput: HorizonInput = {
+    const cfInput: FinancialInput = {
       ...effectiveInput,
       monthlyIncome: effectiveInput.monthlyIncome + cf.monthlyAmount,
     }
@@ -412,11 +412,11 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
 function ThreeLineChart({
   input, returnRate, extraMonthly, workDays, fireTarget, swr, cashflows,
 }: {
-  input: HorizonInput; returnRate: number; extraMonthly: number; workDays: number; fireTarget: number; swr: number; cashflows?: FutureCashflow[]
+  input: FinancialInput; returnRate: number; extraMonthly: number; workDays: number; fireTarget: number; swr: number; cashflows?: FutureCashflow[]
 }) {
   const { hasEntered: animated } = useModalAnimation({ delay: 100, duration: 800 })
   const incomeMultiplier = workDays / 5
-  const adjusted: HorizonInput = {
+  const adjusted: FinancialInput = {
     ...input,
     monthlyIncome: input.monthlyIncome * incomeMultiplier + extraMonthly,
   }

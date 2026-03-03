@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeFireProjection, NL_SWR, type HorizonInput } from '@/lib/horizon-data'
+import { computeFireProjection, NL_SWR, type FinancialInput } from '@/lib/horizon-data'
 import { computeNetWorthProjection } from '@/lib/net-worth-projection'
 import { buildCategorySpending, patternsToInsights, detectSeasonalPatterns, detectTrends, detectAnomalies } from '@/lib/spending-patterns'
 import { generateText } from 'ai'
@@ -475,7 +475,7 @@ export async function GET(request: Request) {
     const avgMonthlyExpenses = monthsWithData.length > 0 ? totalExpenses / monthsWithData.length : 0
 
     try {
-      const horizonInput: HorizonInput = {
+      const horizonInput: FinancialInput = {
         totalAssets,
         totalDebts,
         monthlyIncome: monthsWithData.length > 0 ? totalIncome / monthsWithData.length : 0,

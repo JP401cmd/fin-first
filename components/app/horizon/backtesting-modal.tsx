@@ -7,13 +7,13 @@ import { formatCurrency } from '@/components/app/budget-shared'
 import {
   runBacktest,
   formatFireAge,
-  type HorizonInput,
+  type FinancialInput,
   type BacktestPath,
 } from '@/lib/horizon-data'
 import { NAMED_PERIODS } from '@/lib/msci-data'
 
 type Props = {
-  input: HorizonInput
+  input: FinancialInput
   swr: number   // user-selected SWR: 0.04 (classic) or NL_SWR (~0.02883)
   open: boolean
   onClose: () => void

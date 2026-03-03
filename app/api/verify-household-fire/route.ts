@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { computeFireProjection, computeFireRange, NL_SWR, type HorizonInput } from '@/lib/horizon-data'
+import { computeFireProjection, computeFireRange, NL_SWR, type FinancialInput } from '@/lib/horizon-data'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -101,7 +101,7 @@ export async function GET() {
   // --- Step 3: Compute shared FIRE target based on combined data ---
   try {
     // Test with sample combined data
-    const combinedInput: HorizonInput = {
+    const combinedInput: FinancialInput = {
       totalAssets: 200000,
       totalDebts: 30000,
       monthlyIncome: 8000, // Two incomes combined
@@ -154,7 +154,7 @@ export async function GET() {
   // --- Step 4: Compute individual FIRE targets per partner ---
   try {
     // Test with individual partner data
-    const partner1Input: HorizonInput = {
+    const partner1Input: FinancialInput = {
       totalAssets: 120000,
       totalDebts: 15000,
       monthlyIncome: 5000,
@@ -164,7 +164,7 @@ export async function GET() {
       dateOfBirth: '1985-06-15',
     }
 
-    const partner2Input: HorizonInput = {
+    const partner2Input: FinancialInput = {
       totalAssets: 80000,
       totalDebts: 15000,
       monthlyIncome: 3000,
@@ -210,7 +210,7 @@ export async function GET() {
       name: 'API returns individual FIRE projections per partner',
       passed: returnsPartners,
       details: returnsPartners
-        ? 'API maps over each partner, creates individual HorizonInput, and computes FIRE projection'
+        ? 'API maps over each partner, creates individual FinancialInput, and computes FIRE projection'
         : 'Missing per-partner projection logic',
     })
   } catch (err) {

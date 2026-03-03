@@ -6,7 +6,6 @@
 
 import type { Asset, AssetType } from './asset-data'
 import type { Debt } from './debt-data'
-import { formatCurrency, calculateFreedomTime } from './format'
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -276,9 +275,9 @@ export function calculateBox3(input: Box3Input): Box3Result {
   const tax = box3Income * params.tarief
 
   // Freedom metric
-  const vrijheidsdagen = Math.round(
-    calculateFreedomTime(belasting, input.dailyExpenses).totalDays,
-  )
+  const freedomDays = input.dailyExpenses > 0
+    ? Math.round(tax / input.dailyExpenses)
+    : 0
 
   return {
     year: input.year,
@@ -354,9 +353,9 @@ export function generateBox3Optimizations(
       tips.push({
         id: 'shift-to-savings',
         title: 'Verschuif naar spaargeld',
-        description: `Door ${formatCurrency(shiftAmount)} van beleggingen naar spaargeld te verschuiven betaal je minder Box 3 belasting (lager forfait).`,
-        besparing,
-        vrijheidsdagen: input.dailyExpenses > 0 ? Math.round(besparing / input.dailyExpenses) : 0,
+        description: `Door ${formatEur(shiftAmount)} van beleggingen naar spaargeld te verschuiven betaal je minder Box 3 belasting (lager forfait).`,
+        savings,
+        freedomDays: input.dailyExpenses > 0 ? Math.round(savings / input.dailyExpenses) : 0,
       })
     }
   }
@@ -369,9 +368,9 @@ export function generateBox3Optimizations(
       tips.push({
         id: 'fiscaal-partner',
         title: 'Fiscaal partnerschap',
-        description: `Met een fiscaal partner verdubbelt je heffingsvrij vermogen naar ${formatCurrency(result.params.heffingsvrijPartner)}.`,
-        besparing,
-        vrijheidsdagen: input.dailyExpenses > 0 ? Math.round(besparing / input.dailyExpenses) : 0,
+        description: `Met een fiscaal partner verdubbelt je heffingsvrij vermogen naar ${formatEur(result.params.heffingsvrijPartner)}.`,
+        savings,
+        freedomDays: input.dailyExpenses > 0 ? Math.round(savings / input.dailyExpenses) : 0,
       })
     }
   }
@@ -381,9 +380,9 @@ export function generateBox3Optimizations(
     tips.push({
       id: 'schulden-timing',
       title: 'Schulden boven drempel',
-      description: `Je Box 3 schulden (${formatCurrency(result.totaalBox3Schulden)}) vallen onder de drempel van ${formatCurrency(result.schuldendrempel)}. Ze tellen daarom niet mee als aftrek.`,
-      besparing: 0,
-      vrijheidsdagen: 0,
+      description: `Je Box 3 schulden (${formatEur(result.totaalBox3Schulden)}) vallen onder de drempel van ${formatEur(result.schuldendrempel)}. Ze tellen daarom niet mee als aftrek.`,
+      savings: 0,
+      freedomDays: 0,
     })
   }
 
@@ -393,9 +392,9 @@ export function generateBox3Optimizations(
     tips.push({
       id: 'groene-beleggingen',
       title: 'Groene beleggingen',
-      description: `Groene beleggingen (ASN Groenprojectenfonds e.d.) zijn tot ${formatCurrency(groenVrijstelling)} vrijgesteld van Box 3. Check of je beleggingen hiervoor in aanmerking komen.`,
-      besparing: 0,
-      vrijheidsdagen: 0,
+      description: `Groene beleggingen (ASN Groenprojectenfonds e.d.) zijn tot ${formatEur(groenVrijstelling)} vrijgesteld van Box 3. Check of je beleggingen hiervoor in aanmerking komen.`,
+      savings: 0,
+      freedomDays: 0,
     })
   }
 
@@ -523,3 +522,13 @@ export function estimateBox3TaxDrag(result: Box3Result): number {
   return result.tax / totalBox3
 }
 
+// ── Helpers ──────────────────────────────────────────────────
+
+function formatEur(n: number): string {
+  return new Intl.NumberFormat('nl-NL', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(n)
+}

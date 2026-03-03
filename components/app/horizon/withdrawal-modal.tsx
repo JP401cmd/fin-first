@@ -7,7 +7,7 @@ import {
   computeWithdrawal, computeFireProjection, ageAtDate,
   NL_AOW_AGE, NL_AOW_MONTHLY,
   DEFAULT_GUARDRAILS, DEFAULT_BUCKET,
-  type HorizonInput, type WithdrawalStrategy, type WithdrawalResult, type WithdrawalYear,
+  type FinancialInput, type WithdrawalStrategy, type WithdrawalResult, type WithdrawalYear,
   type GuardrailsConfig, type BucketConfig,
 } from '@/lib/horizon-data'
 import { DEFAULT_RETURN } from '@/lib/constants'
@@ -34,7 +34,7 @@ const STRATEGY_INFO: Record<WithdrawalStrategy, { label: string; description: st
 }
 
 type Props = {
-  input: HorizonInput
+  input: FinancialInput
   open: boolean
   onClose: () => void
 }

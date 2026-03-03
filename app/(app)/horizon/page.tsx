@@ -13,7 +13,7 @@ import {
   computeLifeEventImpact, ageAtDate, deriveCountdown,
   runMonteCarlo,
   LIFE_EVENT_CATALOG,
-  type HorizonInput, type FireProjection, type FireRange,
+  type FinancialInput, type FireProjection, type FireRange,
   type ProjectionMonth, type ResilienceScore,
   type LifeEvent, type LifeEventImpact,
   type MonteCarloResult,
@@ -63,7 +63,7 @@ export default function HorizonPage() {
   const { triggerDream, phase } = useDreamTransition()
   const [fireParams, setFireParams] = useState<FireParams>(resolveFireParams({}))
   const fireSwr = fireParams.effectiveSwr
-  const [input, setInput] = useState<HorizonInput | null>(null)
+  const [input, setInput] = useState<FinancialInput | null>(null)
   const [fire, setFire] = useState<FireProjection | null>(null)
   const [range, setRange] = useState<FireRange | null>(null)
   const [projection, setProjection] = useState<ProjectionMonth[]>([])
@@ -230,7 +230,7 @@ export default function HorizonPage() {
       }
       setMonthlyDividendIncome(dividendMonthly)
 
-      const horizonInput: HorizonInput = {
+      const horizonInput: FinancialInput = {
         totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
         monthlyContributions, yearlyMustExpenses: yearlyRetirementExpenses, dateOfBirth: dob,
       }
@@ -268,7 +268,7 @@ export default function HorizonPage() {
   useEffect(() => { loadData() }, [loadData])
 
   // Compute effective input: base data from DB, with optional income override
-  const effectiveInput: HorizonInput | null = input
+  const effectiveInput: FinancialInput | null = input
     ? incomeOverride !== null
       ? { ...input, monthlyIncome: incomeOverride }
       : input
@@ -2469,7 +2469,7 @@ function FireAgeTrendChart({ snapshots }: { snapshots: SnapshotForTrend[] }) {
 // ── Cumulative FIRE impact calculation ────────────────────────
 
 function computeCumulativeImpacts(
-  baseInput: HorizonInput,
+  baseInput: FinancialInput,
   events: LifeEvent[],
 ): LifeEventImpact[] {
   const sorted = [...events].sort((a, b) => (a.target_age ?? 999) - (b.target_age ?? 999))

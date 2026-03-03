@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeFireProjection, projectForward, NL_SWR, type HorizonInput } from '@/lib/horizon-data'
+import { computeFireProjection, projectForward, NL_SWR, type FinancialInput } from '@/lib/horizon-data'
 import { NextResponse } from 'next/server'
 
 /**
@@ -61,7 +61,7 @@ export async function GET() {
         : `Query errors: ${queryErrors.join('; ')}`,
     })
 
-    // ── Test 3: HorizonInput computed from real aggregated DB data ──
+    // ── Test 3: FinancialInput computed from real aggregated DB data ──
     let monthlyIncome = 0
     let monthlyExpenses = 0
     for (const tx of txResult.data ?? []) {
@@ -88,13 +88,13 @@ export async function GET() {
 
     const dob = profileResult.data?.[0]?.date_of_birth ?? null
 
-    const horizonInput: HorizonInput = {
+    const horizonInput: FinancialInput = {
       totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
       monthlyContributions, yearlyMustExpenses, dateOfBirth: dob,
     }
 
     results.push({
-      test: '3. HorizonInput computed from real aggregated DB data',
+      test: '3. FinancialInput computed from real aggregated DB data',
       passed: true,
       details: `monthlyIncome=${monthlyIncome.toFixed(2)}, monthlyExpenses=${monthlyExpenses.toFixed(2)}, totalAssets=${totalAssets.toFixed(2)}, totalDebts=${totalDebts.toFixed(2)}, monthlyContributions=${monthlyContributions.toFixed(2)}, yearlyMustExpenses=${yearlyMustExpenses.toFixed(2)}, dateOfBirth=${dob ?? 'null'}`,
       data: horizonInput,

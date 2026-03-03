@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
-import { computeFireProjection, NL_SWR, type HorizonInput } from '@/lib/horizon-data'
+import { computeFireProjection, NL_SWR, type FinancialInput } from '@/lib/horizon-data'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { formatCurrency } from '@/lib/format'
 
@@ -56,7 +56,7 @@ export async function GET() {
 
     // Test 3: Dashboard computes zero net worth when no data exists
     // Simulate empty database state: 0 assets, 0 debts, 0 transactions
-    const zeroInput: HorizonInput = {
+    const zeroInput: FinancialInput = {
       totalAssets: 0,
       totalDebts: 0,
       monthlyIncome: 0,

@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { computeFireProjection, computeResilienceScore, NL_SWR, type HorizonInput } from '@/lib/horizon-data'
+import { computeFireProjection, computeResilienceScore, type FinancialInput } from '@/lib/horizon-data'
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
@@ -162,7 +162,7 @@ export async function GET(request: Request) {
         ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0)
         : 0
 
-      const horizonInput: HorizonInput = {
+      const horizonInput: FinancialInput = {
         totalAssets,
         totalDebts,
         monthlyIncome,

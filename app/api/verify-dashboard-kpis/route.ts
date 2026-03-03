@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeFireProjection, NL_SWR, type HorizonInput } from '@/lib/horizon-data'
+import { computeFireProjection, NL_SWR, type FinancialInput } from '@/lib/horizon-data'
 import { NextResponse } from 'next/server'
 
 /**
@@ -153,7 +153,7 @@ export async function GET() {
 
     // ── Test 5: De Horizon metrics from real query results ──
     const profileData = profileResult.data?.[0] ?? null
-    const horizonInput: HorizonInput = {
+    const horizonInput: FinancialInput = {
       totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
       monthlyContributions, yearlyMustExpenses,
       dateOfBirth: profileData?.date_of_birth ?? null,
