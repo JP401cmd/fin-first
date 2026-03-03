@@ -5,6 +5,7 @@ import { computeFireProjection, computeResilienceScore, NL_SWR, type HorizonInpu
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
+import { SWR } from '@/lib/constants'
 
 /**
  * GET /api/snapshots
