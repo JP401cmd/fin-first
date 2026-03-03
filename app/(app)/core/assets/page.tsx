@@ -3,11 +3,10 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import {
-  Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2, BarChart3, ChevronDown, ChevronUp, Briefcase, AlertCircle, Wallet,
+  Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2, BarChart3, ChevronDown, ChevronUp, Briefcase, AlertCircle,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AccountFormModal, type Account as BankAccount } from '@/components/app/account-form-modal'
 import { createClient } from '@/lib/supabase/client'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
@@ -37,18 +36,17 @@ export default function AssetsPage() {
   const router = useRouter()
   const [assets, setAssets] = useState<Asset[]>([])
   const [mortgages, setMortgages] = useState<Mortgage[]>([])
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
+  const [linkedBankAccounts, setLinkedBankAccounts] = useState<Map<string, { id: string; linked_asset_id: string }>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [newAssetType, setNewAssetType] = useState<AssetType | null>(null)
   const [editAsset, setEditAsset] = useState<Asset | null>(null)
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
   const [modalStep, setModalStep] = useState<'detail' | 'edit' | 'revalue'>('detail')
   const [projectionYears, setProjectionYears] = useState(10)
   const [valuations, setValuations] = useState<Record<string, Valuation[]>>({})
   const [dailyExpenses, setDailyExpenses] = useState(0)
-  const [showAccountForm, setShowAccountForm] = useState(false)
-  const [editBankAccount, setEditBankAccount] = useState<BankAccount | null>(null)
   const seedingRef = useRef(false)
   const { perspective } = usePerspective()
 
@@ -84,23 +82,14 @@ export default function AssetsPage() {
 
       setAssets(data as Asset[])
 
-      // Load linked mortgages + daily expenses for freedom-time
+      // Load linked mortgages + daily expenses for freedom-time + bank account links
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const now = new Date()
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
         const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
 
-        let bankAccountsQuery = supabase
-          .from('bank_accounts')
-          .select('*')
-          .eq('is_active', true)
-          .order('sort_order', { ascending: true })
-        if (perspective === 'personal') {
-          bankAccountsQuery = bankAccountsQuery.eq('ownership', 'personal')
-        }
-
-        const [mortgageResult, txResult, bankAccountsResult] = await Promise.all([
+        const [mortgageResult, txResult, bankLinksResult] = await Promise.all([
           supabase
             .from('debts')
             .select('id, name, current_balance, linked_asset_id')
@@ -112,11 +101,33 @@ export default function AssetsPage() {
             .select('amount')
             .gte('date', monthStart)
             .lt('date', monthEnd),
-          bankAccountsQuery,
+          supabase
+            .from('bank_accounts')
+            .select('id, linked_asset_id, balance')
+            .not('linked_asset_id', 'is', null)
+            .eq('is_active', true),
         ])
 
         if (mortgageResult.data) setMortgages(mortgageResult.data as Mortgage[])
-        if (bankAccountsResult.data) setBankAccounts(bankAccountsResult.data as BankAccount[])
+
+        // Build linked bank account map (asset_id → bank_account)
+        const linksMap = new Map<string, { id: string; linked_asset_id: string }>(
+          (bankLinksResult.data ?? []).map((ba: { id: string; linked_asset_id: string; balance: number }) => [ba.linked_asset_id, ba])
+        )
+        setLinkedBankAccounts(linksMap)
+
+        // Sync cash asset values with bank_account balances (bank_account is more up-to-date)
+        if (bankLinksResult.data && bankLinksResult.data.length > 0) {
+          const balanceMap = new Map(
+            bankLinksResult.data.map((ba: { id: string; linked_asset_id: string; balance: number }) => [ba.linked_asset_id, Number(ba.balance)])
+          )
+          setAssets(prev => prev.map(a => {
+            if (a.asset_type === 'cash' && balanceMap.has(a.id)) {
+              return { ...a, current_value: balanceMap.get(a.id)! }
+            }
+            return a
+          }))
+        }
 
         // Calculate daily expenses from current month transactions
         const monthlyExpenses = (txResult.data ?? []).reduce((sum, t) => {
@@ -203,8 +214,7 @@ export default function AssetsPage() {
   }, [loadAssets, loadAllValuations])
 
   const activeAssets = assets.filter((a) => a.is_active)
-  const totalCash = bankAccounts.reduce((s, a) => s + Number(a.balance), 0)
-  const totalValue = activeAssets.reduce((s, a) => s + Number(a.current_value), 0) + totalCash
+  const totalValue = activeAssets.reduce((s, a) => s + Number(a.current_value), 0)
   const totalPurchase = activeAssets.reduce((s, a) => s + Number(a.purchase_value), 0)
   const totalMonthlyContrib = activeAssets.reduce((s, a) => s + Number(a.monthly_contribution), 0)
 
@@ -247,6 +257,17 @@ export default function AssetsPage() {
     setModalStep('detail')
   }
 
+  function handleAssetClick(asset: Asset) {
+    if (asset.asset_type === 'cash') {
+      const linkedBA = linkedBankAccounts.get(asset.id)
+      if (linkedBA) {
+        router.push(`/core/assets/cash/${linkedBA.id}`)
+        return
+      }
+    }
+    openAssetModal(asset)
+  }
+
   if (loading) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
@@ -278,7 +299,7 @@ export default function AssetsPage() {
           <div>
             <h1 className="text-xl font-bold text-[var(--ink)]">Bezittingen</h1>
             <p className="mt-1 text-sm text-[var(--ink-3)]">
-              {activeAssets.length} actieve bezitting{activeAssets.length !== 1 ? 'en' : ''} — opgeslagen vrijheid
+              {activeAssets.length} bezitting{activeAssets.length !== 1 ? 'en' : ''} — opgeslagen vrijheid
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -352,16 +373,8 @@ export default function AssetsPage() {
         <section className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
           <h2 className="text-sm font-semibold text-[var(--ink-2)]">Verdeling</h2>
           <div className="mt-4 flex items-center gap-6">
-            <AllocationPie byType={byType} total={totalValue} dailyExpenses={dailyExpenses} cashTotal={totalCash} />
+            <AllocationPie byType={byType} total={totalValue} dailyExpenses={dailyExpenses} />
             <div className="flex-1 space-y-2">
-              {totalCash > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: CASH_COLOR }} />
-                  <span className="flex-1 text-xs text-[var(--ink-2)]">Cash</span>
-                  <span className="text-xs font-medium text-[var(--ink)]">{totalValue > 0 ? ((totalCash / totalValue) * 100).toFixed(0) : 0}%</span>
-                  <span className="text-xs text-[var(--ink-3)]">{formatCurrency(totalCash)}</span>
-                </div>
-              )}
               {(Object.keys(ASSET_TYPE_LABELS) as AssetType[]).map((type) => {
                 const data = byType[type]
                 if (!data || data.total === 0) return null
@@ -427,136 +440,114 @@ export default function AssetsPage() {
         </section>
       </div>
 
-      {/* Cash accounts */}
-      {bankAccounts.length > 0 && (
-        <section className="mt-3 sm:mt-6 space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Wallet className="h-4 w-4 text-emerald-600" />
-              <h2 className="text-sm font-semibold text-[var(--ink-2)]">Cash rekeningen</h2>
-              <span className="text-xs text-[var(--ink-3)]">{formatCurrency(totalCash)}</span>
-            </div>
-            <button
-              onClick={() => { setEditBankAccount(null); setShowAccountForm(true) }}
-              className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Rekening toevoegen
-            </button>
-          </div>
-          {bankAccounts.map((acct) => {
-            const balance = Number(acct.balance)
-            return (
-              <div
-                key={acct.id}
-                className="flex cursor-pointer items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 transition-colors hover:border-emerald-200 hover:bg-emerald-50/30"
-                onClick={() => router.push(`/core/assets/cash/${acct.id}`)}
-              >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)]" style={{ backgroundColor: CASH_COLOR + '15' }}>
-                  <Wallet className="h-4 w-4 text-emerald-600" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-[var(--ink)]">{acct.name}</p>
-                  <p className="truncate text-xs text-[var(--ink-3)]">
-                    {acct.account_type === 'checking' ? 'Betaalrekening' : acct.account_type === 'savings' ? 'Spaarrekening' : acct.account_type === 'joint' ? 'En/of-rekening' : acct.account_type === 'business' ? 'Zakelijke rekening' : 'Overig'}
-                    {acct.iban ? ` \u2022 ${acct.iban}` : ''}
-                    {acct.bank_name ? ` \u2022 ${acct.bank_name}` : ''}
-                  </p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-sm font-semibold text-[var(--ink)]">{formatCurrency(balance)}</p>
-                  {dailyExpenses > 0 && balance > 0 && (
-                    <p className="text-[10px] text-emerald-500/70" data-testid="cash-card-freedom">
-                      {formatFreedomTimeString(calculateFreedomTime(balance, dailyExpenses), 'short', true)} vrijheid
-                    </p>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </section>
-      )}
-
-      {/* No accounts yet — show add button */}
-      {bankAccounts.length === 0 && (
-        <section className="mt-3 sm:mt-6">
-          <button
-            onClick={() => { setEditBankAccount(null); setShowAccountForm(true) }}
-            className="flex w-full items-center justify-center gap-2 rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] px-4 py-4 text-sm font-medium text-[var(--ink-2)] transition-colors hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
-          >
-            <Wallet className="h-4 w-4" />
-            Cash rekening toevoegen
-          </button>
-        </section>
-      )}
-
-      {/* Asset list */}
-      <section className="mt-3 sm:mt-6 space-y-2">
-        {assets.length === 0 && bankAccounts.length === 0 && (
+      {/* Grouped asset list */}
+      <section className="mt-3 sm:mt-6 space-y-1">
+        {activeAssets.length === 0 && (
           <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-8 text-center">
             <TrendingUp className="mx-auto h-8 w-8 text-kern-400" />
-            <p className="mt-2 text-sm font-medium text-[var(--ink-2)]">Geen assets geregistreerd</p>
+            <p className="mt-2 text-sm font-medium text-[var(--ink-2)]">Geen bezittingen geregistreerd</p>
             <p className="mt-1 text-xs text-[var(--ink-3)]">Voeg een asset toe om je vermogen te volgen.</p>
           </div>
         )}
-        {assets.map((asset) => {
-          const value = Number(asset.current_value)
-          const purchase = Number(asset.purchase_value)
-          const returnPct = purchase > 0 ? ((value - purchase) / purchase) * 100 : 0
-          const icon = ASSET_TYPE_ICONS[asset.asset_type] ?? 'Briefcase'
-          const color = ASSET_TYPE_COLORS[asset.asset_type]
+        {(Object.keys(ASSET_TYPE_LABELS) as AssetType[]).map((type) => {
+          const group = byType[type]
+          if (!group || group.assets.length === 0) return null
+          const groupColor = ASSET_TYPE_COLORS[type]
+          const groupIcon = ASSET_TYPE_ICONS[type]
+          const isCash = type === 'cash'
 
           return (
-            <div
-              key={asset.id}
-              className="flex cursor-pointer items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 transition-colors hover:border-kern-200 hover:bg-kern-50/30"
-              onClick={() => openAssetModal(asset)}
-            >
-              <div
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)]"
-                style={{ backgroundColor: color + '15' }}
-              >
-                <BudgetIcon name={icon} className="h-4 w-4" />
+            <div key={type}>
+              {/* Group header */}
+              <div className="flex items-center gap-2 pt-4 pb-1.5">
+                <span style={{ color: groupColor }}><BudgetIcon name={groupIcon} className="h-4 w-4" /></span>
+                <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                  {ASSET_TYPE_LABELS[type]}
+                </h3>
+                <span className="text-xs tabular-nums text-[var(--ink-3)]">
+                  {formatCurrency(group.total)}
+                </span>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-[var(--ink)] flex items-center gap-1.5">
-                  {asset.name}
-                  <OwnershipBadge ownership={asset.ownership ?? 'personal'} />
-                </p>
-                <p className="truncate text-xs text-[var(--ink-3)]">
-                  {ASSET_TYPE_LABELS[asset.asset_type]}
-                  {asset.subtype && ASSET_SUBTYPE_LABELS[asset.asset_type]?.[asset.subtype]
-                    ? ` \u2022 ${ASSET_SUBTYPE_LABELS[asset.asset_type]![asset.subtype]}`
-                    : ''}
-                  {asset.institution ? ` \u2022 ${asset.institution}` : ''}
-                </p>
-                {(asset.net_worth_inclusion_pct ?? 100) < 100 && (
-                  <span className="mt-0.5 inline-block rounded bg-kern-50 border border-kern-200 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-kern-600">
-                    {asset.net_worth_inclusion_pct}% meegeteld
-                  </span>
-                )}
-              </div>
-              {/* Mini sparkline for asset card */}
-              {(() => {
-                const assetVals = valuations[asset.id]
-                if (assetVals && assetVals.length >= 2) {
-                  const sorted = [...assetVals].sort((a, b) => a.valuation_date.localeCompare(b.valuation_date))
-                  return <MiniSparkline valuations={sorted} className="hidden sm:block" />
-                }
-                return null
-              })()}
-              <div className="shrink-0 text-right">
-                <p className="text-sm font-semibold text-[var(--ink)]">{formatCurrency(value)}</p>
-                {dailyExpenses > 0 && value > 0 && (
-                  <p className="text-[10px] text-kern-500/70" data-testid="asset-card-freedom">
-                    {formatFreedomTimeString(calculateFreedomTime(value, dailyExpenses), 'short', true)} vrijheid
-                  </p>
-                )}
-                {purchase > 0 && (
-                  <p className={`text-xs font-medium ${returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}%
-                  </p>
-                )}
+
+              {/* Asset cards */}
+              <div className="space-y-2">
+                {group.assets.map((asset) => {
+                  const value = Number(asset.current_value)
+                  const purchase = Number(asset.purchase_value)
+                  const returnPct = purchase > 0 ? ((value - purchase) / purchase) * 100 : 0
+                  const icon = ASSET_TYPE_ICONS[asset.asset_type] ?? 'Briefcase'
+                  const color = ASSET_TYPE_COLORS[asset.asset_type]
+                  const hasBudget = isCash && linkedBankAccounts.has(asset.id)
+
+                  return (
+                    <div
+                      key={asset.id}
+                      className={`flex cursor-pointer items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 transition-colors ${
+                        isCash ? 'hover:border-emerald-200 hover:bg-emerald-50/30' : 'hover:border-kern-200 hover:bg-kern-50/30'
+                      }`}
+                      onClick={() => handleAssetClick(asset)}
+                    >
+                      <div
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)]"
+                        style={{ backgroundColor: color + '15' }}
+                      >
+                        <span style={{ color }}><BudgetIcon name={icon} className="h-4 w-4" /></span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-[var(--ink)] flex items-center gap-1.5">
+                          {asset.name}
+                          <OwnershipBadge ownership={asset.ownership ?? 'personal'} />
+                          {hasBudget && (
+                            <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700 border border-emerald-200">
+                              <BarChart3 className="h-2.5 w-2.5" /> Transacties
+                            </span>
+                          )}
+                        </p>
+                        <p className="truncate text-xs text-[var(--ink-3)]">
+                          {isCash
+                            ? [
+                                asset.subtype && ASSET_SUBTYPE_LABELS.cash?.[asset.subtype],
+                                asset.account_number,
+                                asset.institution,
+                              ].filter(Boolean).join(' \u2022 ') || 'Bankrekening'
+                            : [
+                                ASSET_TYPE_LABELS[asset.asset_type],
+                                asset.subtype && ASSET_SUBTYPE_LABELS[asset.asset_type]?.[asset.subtype],
+                                asset.institution,
+                              ].filter(Boolean).join(' \u2022 ')
+                          }
+                        </p>
+                        {(asset.net_worth_inclusion_pct ?? 100) < 100 && (
+                          <span className="mt-0.5 inline-block rounded bg-kern-50 border border-kern-200 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-kern-600">
+                            {asset.net_worth_inclusion_pct}% meegeteld
+                          </span>
+                        )}
+                      </div>
+                      {/* Mini sparkline for non-cash asset cards */}
+                      {!isCash && (() => {
+                        const assetVals = valuations[asset.id]
+                        if (assetVals && assetVals.length >= 2) {
+                          const sorted = [...assetVals].sort((a, b) => a.valuation_date.localeCompare(b.valuation_date))
+                          return <MiniSparkline valuations={sorted} className="hidden sm:block" />
+                        }
+                        return null
+                      })()}
+                      <div className="shrink-0 text-right">
+                        <p className="text-sm font-semibold text-[var(--ink)]">{formatCurrency(value)}</p>
+                        {dailyExpenses > 0 && value > 0 && (
+                          <p className={`text-[10px] ${isCash ? 'text-emerald-500/70' : 'text-kern-500/70'}`} data-testid="asset-card-freedom">
+                            {formatFreedomTimeString(calculateFreedomTime(value, dailyExpenses), 'short', true)} vrijheid
+                          </p>
+                        )}
+                        {!isCash && purchase > 0 && (
+                          <p className={`text-xs font-medium ${returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}%
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )
@@ -581,6 +572,7 @@ export default function AssetsPage() {
       {selectedAsset && modalStep === 'edit' && (
         <AssetForm
           asset={selectedAsset}
+          linkedBankAccounts={linkedBankAccounts}
           onClose={() => setModalStep('detail')}
           onSaved={() => {
             setModalStep('detail')
@@ -620,61 +612,15 @@ export default function AssetsPage() {
       {showForm && (
         <AssetForm
           asset={editAsset ?? undefined}
-          onClose={() => { setShowForm(false); setEditAsset(null) }}
+          defaultType={newAssetType ?? undefined}
+          linkedBankAccounts={linkedBankAccounts}
+          onClose={() => { setShowForm(false); setEditAsset(null); setNewAssetType(null) }}
           onSaved={() => {
             setShowForm(false)
             setEditAsset(null)
+            setNewAssetType(null)
             loadAssets()
           }}
-        />
-      )}
-
-      {/* Bank account form modal */}
-      {showAccountForm && (
-        <AccountFormModal
-          account={editBankAccount}
-          canDelete={bankAccounts.length > 1 && !!editBankAccount}
-          onSave={async (formData) => {
-            const supabase = createClient()
-            if (editBankAccount) {
-              await supabase
-                .from('bank_accounts')
-                .update({
-                  name: formData.name,
-                  iban: formData.iban || null,
-                  bank_name: formData.bank_name || null,
-                  account_type: formData.account_type,
-                  balance: formData.balance,
-                })
-                .eq('id', editBankAccount.id)
-            } else {
-              const { data: { user } } = await supabase.auth.getUser()
-              if (!user) return
-              const maxSort = bankAccounts.reduce((m, a) => Math.max(m, a.sort_order), 0)
-              await supabase
-                .from('bank_accounts')
-                .insert({
-                  user_id: user.id,
-                  name: formData.name,
-                  iban: formData.iban || null,
-                  bank_name: formData.bank_name || null,
-                  account_type: formData.account_type,
-                  balance: formData.balance,
-                  sort_order: maxSort + 1,
-                })
-            }
-            setShowAccountForm(false)
-            setEditBankAccount(null)
-            loadAssets()
-          }}
-          onDelete={async (id) => {
-            const supabase = createClient()
-            await supabase.from('bank_accounts').update({ is_active: false }).eq('id', id)
-            setShowAccountForm(false)
-            setEditBankAccount(null)
-            loadAssets()
-          }}
-          onClose={() => { setShowAccountForm(false); setEditBankAccount(null) }}
         />
       )}
     </div>
@@ -1689,18 +1635,14 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
 
 // ── Allocation pie chart (SVG donut) ─────────────────────────
 
-const CASH_COLOR = '#22c55e'
-
 function AllocationPie({
   byType,
   total,
   dailyExpenses,
-  cashTotal = 0,
 }: {
   byType: Record<AssetType, { assets: Asset[]; total: number }>
   total: number
   dailyExpenses: number
-  cashTotal?: number
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 700 })
   const size = 120
@@ -1710,9 +1652,6 @@ function AllocationPie({
   const strokeWidth = 22
 
   const segments: { type: string; pct: number; color: string }[] = []
-  if (cashTotal > 0 && total > 0) {
-    segments.push({ type: 'cash', pct: cashTotal / total, color: CASH_COLOR })
-  }
   for (const type of Object.keys(ASSET_TYPE_LABELS) as AssetType[]) {
     const pct = total > 0 ? byType[type].total / total : 0
     if (pct > 0) segments.push({ type, pct, color: ASSET_TYPE_COLORS[type] })
@@ -1841,10 +1780,14 @@ function ProjectionChart({
 
 function AssetForm({
   asset,
+  defaultType,
+  linkedBankAccounts,
   onClose,
   onSaved,
 }: {
   asset?: Asset
+  defaultType?: AssetType
+  linkedBankAccounts: Map<string, { id: string; linked_asset_id: string }>
   onClose: () => void
   onSaved: () => void
 }) {
@@ -1853,7 +1796,9 @@ function AssetForm({
   const [holdingsCount, setHoldingsCount] = useState(0)
 
   const [name, setName] = useState(asset?.name ?? '')
-  const [assetType, setAssetType] = useState<AssetType>(asset?.asset_type ?? 'savings')
+  const [assetType, setAssetType] = useState<AssetType>(asset?.asset_type ?? defaultType ?? 'savings')
+  const [hasBudgetTracking, setHasBudgetTracking] = useState(asset?.has_budget_tracking ?? false)
+  const [iban, setIban] = useState(asset?.account_number ?? '')
   const [currentValue, setCurrentValue] = useState(String(asset?.current_value ?? ''))
   const [purchaseValue, setPurchaseValue] = useState(String(asset?.purchase_value ?? ''))
 
@@ -1988,22 +1933,25 @@ function AssetForm({
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
+    const isCashType = assetType === 'cash'
+
     const row = {
       user_id: user.id,
       name,
       asset_type: assetType,
       current_value: Number(currentValue) || 0,
-      purchase_value: Number(purchaseValue) || 0,
-      purchase_date: purchaseDate || null,
-      expected_return: Number(expectedReturn) || 0,
-      monthly_contribution: Number(monthlyContribution) || 0,
+      purchase_value: isCashType ? Number(currentValue) || 0 : Number(purchaseValue) || 0,
+      purchase_date: isCashType ? null : purchaseDate || null,
+      expected_return: isCashType ? 0 : Number(expectedReturn) || 0,
+      monthly_contribution: isCashType ? 0 : Number(monthlyContribution) || 0,
       institution: institution || null,
+      account_number: isCashType ? (iban || null) : null,
       notes: notes || null,
       // Type-specific fields
       subtype: subtype || null,
       risk_profile: riskProfile || null,
       tax_benefit: visibleFields.includes('tax_benefit') ? taxBenefit : null,
-      is_liquid: visibleFields.includes('is_liquid') ? isLiquid : null,
+      is_liquid: isCashType ? true : (visibleFields.includes('is_liquid') ? isLiquid : null),
       lock_end_date: lockEndDate || null,
       ticker_symbol: tickerSymbol || null,
       rental_income: rentalIncome ? Number(rentalIncome) : null,
@@ -2017,10 +1965,15 @@ function AssetForm({
       household_id: ownership === 'shared' ? householdId : null,
       // Net worth inclusion
       net_worth_inclusion_pct: netWorthInclusionPct,
+      // Budget tracking
+      has_budget_tracking: isCashType ? hasBudgetTracking : false,
     }
+
+    let assetId: string | undefined
 
     if (isEdit && asset) {
       await supabase.from('assets').update(row).eq('id', asset.id)
+      assetId = asset.id
 
       // Auto-track valuation when current_value changes
       const newValue = Number(currentValue) || 0
@@ -2036,7 +1989,39 @@ function AssetForm({
         }, { onConflict: 'entity_id,valuation_date' })
       }
     } else {
-      await supabase.from('assets').insert(row)
+      const { data: inserted } = await supabase.from('assets').insert(row).select('id').single()
+      assetId = inserted?.id
+    }
+
+    // Create or sync linked bank_account for cash with budget tracking
+    if (isCashType && hasBudgetTracking && assetId) {
+      const { data: existingBA } = await supabase
+        .from('bank_accounts')
+        .select('id')
+        .eq('linked_asset_id', assetId)
+        .maybeSingle()
+
+      if (!existingBA) {
+        await supabase.from('bank_accounts').insert({
+          user_id: user.id,
+          name,
+          iban: iban || null,
+          bank_name: institution || null,
+          account_type: subtype || 'checking',
+          balance: Number(currentValue) || 0,
+          linked_asset_id: assetId,
+          ownership,
+          household_id: ownership === 'shared' ? householdId : null,
+        })
+      } else {
+        await supabase.from('bank_accounts').update({
+          name,
+          iban: iban || null,
+          bank_name: institution || null,
+          account_type: subtype || 'checking',
+          balance: Number(currentValue) || 0,
+        }).eq('id', existingBA.id)
+      }
     }
 
     setSaving(false)
@@ -2117,83 +2102,141 @@ function AssetForm({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          {/* Cash-specific: IBAN + Bank name */}
+          {assetType === 'cash' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">IBAN</label>
+                <input
+                  value={iban}
+                  onChange={(e) => setIban(e.target.value.toUpperCase())}
+                  className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm uppercase"
+                  placeholder="NL12 INGB 0001 2345 67"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Bank</label>
+                <input
+                  value={institution}
+                  onChange={(e) => setInstitution(e.target.value)}
+                  className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                  placeholder="ING, ABN AMRO, Rabobank..."
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Value fields */}
+          {assetType === 'cash' ? (
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
-                {assetType === 'eigen_huis' ? 'Marktwaarde' : 'Huidige waarde'}
-              </label>
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Huidig saldo</label>
               <input
                 type="number"
                 value={currentValue}
-                onChange={(e) => !hasActiveHoldings && setCurrentValue(e.target.value)}
-                readOnly={hasActiveHoldings}
-                className={`w-full rounded-[var(--r)] border px-3 py-2 text-sm ${
-                  hasActiveHoldings
-                    ? 'border-[var(--border-ed)] bg-[var(--subtle)] text-[var(--ink-3)] cursor-not-allowed'
-                    : 'border-[var(--border-ed)]'
-                }`}
-                title={hasActiveHoldings ? 'Waarde wordt automatisch berekend uit holdings' : undefined}
-              />
-              {hasActiveHoldings && (
-                <p className="mt-1 text-[10px] text-kern-600">Automatisch gesynchroniseerd vanuit holdings</p>
-              )}
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
-                {assetType === 'eigen_huis' ? 'Aankoopprijs' : 'Aankoopwaarde'}
-              </label>
-              <input
-                type="number"
-                value={purchaseValue}
-                onChange={(e) => setPurchaseValue(e.target.value)}
+                onChange={(e) => setCurrentValue(e.target.value)}
                 className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                placeholder="0"
               />
             </div>
-          </div>
-
-          <div className={`grid ${assetType === 'eigen_huis' ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Rendement (% p.j.)</label>
-              <input
-                type="number"
-                step="0.1"
-                value={expectedReturn}
-                onChange={(e) => setExpectedReturn(e.target.value)}
-                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
-              />
-            </div>
-            {assetType !== 'eigen_huis' && (
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Inleg p/m</label>
-                <input
-                  type="number"
-                  value={monthlyContribution}
-                  onChange={(e) => setMonthlyContribution(e.target.value)}
-                  className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
-                />
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+                    {assetType === 'eigen_huis' ? 'Marktwaarde' : 'Huidige waarde'}
+                  </label>
+                  <input
+                    type="number"
+                    value={currentValue}
+                    onChange={(e) => !hasActiveHoldings && setCurrentValue(e.target.value)}
+                    readOnly={hasActiveHoldings}
+                    className={`w-full rounded-[var(--r)] border px-3 py-2 text-sm ${
+                      hasActiveHoldings
+                        ? 'border-[var(--border-ed)] bg-[var(--subtle)] text-[var(--ink-3)] cursor-not-allowed'
+                        : 'border-[var(--border-ed)]'
+                    }`}
+                    title={hasActiveHoldings ? 'Waarde wordt automatisch berekend uit holdings' : undefined}
+                  />
+                  {hasActiveHoldings && (
+                    <p className="mt-1 text-[10px] text-kern-600">Automatisch gesynchroniseerd vanuit holdings</p>
+                  )}
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+                    {assetType === 'eigen_huis' ? 'Aankoopprijs' : 'Aankoopwaarde'}
+                  </label>
+                  <input
+                    type="number"
+                    value={purchaseValue}
+                    onChange={(e) => setPurchaseValue(e.target.value)}
+                    className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                  />
+                </div>
               </div>
-            )}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Aankoopdatum</label>
-              <input
-                type="date"
-                value={purchaseDate}
-                onChange={(e) => setPurchaseDate(e.target.value)}
-                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
 
-          {assetType !== 'eigen_huis' && (
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Instelling</label>
+              <div className={`grid ${assetType === 'eigen_huis' ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Rendement (% p.j.)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={expectedReturn}
+                    onChange={(e) => setExpectedReturn(e.target.value)}
+                    className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                  />
+                </div>
+                {assetType !== 'eigen_huis' && (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Inleg p/m</label>
+                    <input
+                      type="number"
+                      value={monthlyContribution}
+                      onChange={(e) => setMonthlyContribution(e.target.value)}
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Aankoopdatum</label>
+                  <input
+                    type="date"
+                    value={purchaseDate}
+                    onChange={(e) => setPurchaseDate(e.target.value)}
+                    className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              {assetType !== 'eigen_huis' && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Instelling</label>
+                  <input
+                    value={institution}
+                    onChange={(e) => setInstitution(e.target.value)}
+                    className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                    placeholder="ABN AMRO, DEGIRO, ABP..."
+                  />
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Budget tracking toggle (cash only) */}
+          {assetType === 'cash' && (
+            <label className="flex items-start gap-3 rounded-[var(--r)] border border-emerald-200 bg-emerald-50/30 p-3 cursor-pointer">
               <input
-                value={institution}
-                onChange={(e) => setInstitution(e.target.value)}
-                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
-                placeholder="ABN AMRO, DEGIRO, ABP..."
+                type="checkbox"
+                checked={hasBudgetTracking}
+                onChange={(e) => setHasBudgetTracking(e.target.checked)}
+                className="mt-0.5 rounded border-[var(--border-md)]"
               />
-            </div>
+              <div>
+                <span className="text-sm font-medium text-[var(--ink)]">Budgetten & transacties</span>
+                <p className="text-xs text-[var(--ink-3)]">
+                  Schakel in om transacties te importeren, budgetcategorieën te koppelen, en cashflow te voorspellen.
+                </p>
+              </div>
+            </label>
           )}
 
           {/* Type-specific fields */}

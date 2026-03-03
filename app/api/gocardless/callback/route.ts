@@ -92,17 +92,41 @@ export async function GET(req: Request) {
       }
 
       if (!bankAccountId) {
-        // Create a new bank account
+        // Create a linked asset record first (cash-as-asset)
+        const accountName = iban ? `${reqRow.institution_name} ${iban.slice(-4)}` : reqRow.institution_name
+        const { data: newAsset } = await supabase
+          .from('assets')
+          .insert({
+            user_id: user.id,
+            name: accountName,
+            asset_type: 'cash',
+            current_value: 0,
+            purchase_value: 0,
+            expected_return: 0,
+            monthly_contribution: 0,
+            institution: reqRow.institution_name,
+            account_number: iban,
+            is_liquid: true,
+            subtype: 'checking',
+            has_budget_tracking: true,
+            ownership: 'personal',
+            net_worth_inclusion_pct: 100,
+          })
+          .select('id')
+          .single()
+
+        // Create the bank account linked to the asset
         const { data: newAccount } = await supabase
           .from('bank_accounts')
           .insert({
             user_id: user.id,
-            name: iban ? `${reqRow.institution_name} ${iban.slice(-4)}` : reqRow.institution_name,
+            name: accountName,
             iban,
             bank_name: reqRow.institution_name,
             account_type: 'checking',
             balance: 0,
             sort_order: 0,
+            linked_asset_id: newAsset?.id ?? null,
           })
           .select('id')
           .single()
