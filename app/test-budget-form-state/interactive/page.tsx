@@ -41,6 +41,7 @@ const mockParentBudgets: Budget[] = [
     goal_amount: null,
     goal_date: null,
     goal_frequency: null,
+    is_favorite: false,
   },
 ]
 
@@ -71,6 +72,7 @@ const mockEditBudget: Budget = {
   goal_amount: null,
   goal_date: null,
   goal_frequency: null,
+  is_favorite: false,
 }
 
 export default function InteractiveTestPage() {

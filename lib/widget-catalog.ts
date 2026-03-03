@@ -1,7 +1,7 @@
 // ── Widget Catalog ────────────────────────────────────────────
 // Static definition of all 20 dashboard widgets.
 
-export type WidgetSize = 'half' | 'full'
+export type WidgetSize = 'quarter' | 'half' | 'full'
 export type WidgetModule = 'kern' | 'wil' | 'horizon' | 'cross'
 
 export interface WidgetDef {
@@ -309,13 +309,13 @@ export const WIDGET_HREFS: Record<string, string> = {
   abonnementen:             '/will?modal=subscriptions',
   jouw_pad:                 '/identity',
   veerkracht_score:         '/horizon',
-  belasting_box3:           '/core/belasting',
+  belasting_box3:           '/core/debts',
   terugkerende_transacties: '/core/cash',
   nibud_benchmark:          '/core',
   vrijheidsscenarios:       '/horizon?modal=scenarios',
   sim_vermogenspad:         '/horizon?modal=simulations',
   passief_inkomen:          '/horizon',
-  box3_drag:                '/core/belasting',
+  box3_drag:                '/core/debts',
   vrijheidsmijlpalen:       '/horizon',
   backtesting_score:        '/horizon?modal=backtesting',
 }
@@ -325,7 +325,8 @@ export function getWidgetDef(id: string): WidgetDef | undefined {
   return WIDGET_CATALOG.find(w => w.id === id)
 }
 
-/** Merge saved prefs with catalog defaults (adds new widgets, removes stale ones) */
+/** Merge saved prefs with catalog defaults (adds new widgets, removes stale ones).
+ *  Preserves dynamic widget prefs (e.g. budget_fav:*) from saved data. */
 export function mergeWidgetPrefs(saved: WidgetPrefs | null): WidgetPrefs {
   if (!saved?.widgets) return DEFAULT_WIDGET_PREFS
 
@@ -336,6 +337,11 @@ export function mergeWidgetPrefs(saved: WidgetPrefs | null): WidgetPrefs {
     // New widget not in saved prefs — add with disabled default
     return { id: def.id, enabled: false, size: def.defaultSize, order: 100 + i }
   })
+
+  // Preserve dynamic widget prefs (budget_fav:*) from saved data
+  for (const w of saved.widgets) {
+    if (w.id.startsWith('budget_fav:')) merged.push(w)
+  }
 
   return { widgets: merged }
 }

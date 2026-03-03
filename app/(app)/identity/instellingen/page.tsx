@@ -134,7 +134,7 @@ function SortableWidgetRow({ def, pref, locked, module, onToggle, onSizeChange }
               className="rounded border border-[var(--border-ed)] bg-[var(--subtle)] px-2 py-1 text-xs text-[var(--ink-2)] disabled:opacity-50"
             >
               {allowedSizes.map(s => (
-                <option key={s} value={s}>{s === 'half' ? 'Half' : 'Volledig'}</option>
+                <option key={s} value={s}>{s === 'quarter' ? 'Kwart' : s === 'half' ? 'Half' : 'Volledig'}</option>
               ))}
             </select>
           )}
@@ -215,8 +215,8 @@ export default function InstellingenPage() {
 
   // ─ Section A: Notificaties ─
   const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>({
-    budget: true, streak: true, sync: true,
-    recommendation: true, insight: true, badge: true, levelup: true,
+    budget: true, sync: true,
+    recommendation: true, insight: true, levelup: true,
   })
   const [notifLoading, setNotifLoading] = useState(true)
   const [notifSaving, setNotifSaving] = useState(false)
@@ -616,7 +616,7 @@ export default function InstellingenPage() {
             <h2 className="label-editorial text-[var(--ink-2)]">Notificaties</h2>
             {!notifOpen && (
               <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-                {Object.values(notifPrefs).filter(v => v !== false).length} van {NOTIFICATION_TYPES.length} actief
+                {NOTIFICATION_TYPES.filter(n => notifPrefs[n.type] !== false).length} van {NOTIFICATION_TYPES.length} actief
               </p>
             )}
           </div>

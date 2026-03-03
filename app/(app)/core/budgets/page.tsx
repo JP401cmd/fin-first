@@ -2,10 +2,9 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import dynamic from 'next/dynamic'
 import {
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, X, Pencil, Save, Trash2,
-  GitFork, Fingerprint, Workflow, CircleDot, AlertTriangle, CheckCircle2,
+  GitFork, CircleDot, AlertTriangle, CheckCircle2, Heart,
   TrendingUp, AlertCircle, BarChart3, EyeOff, MessageCircle,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -29,24 +28,6 @@ import { TransactionForm } from '@/components/app/transaction-form'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 
-// Spinner shown while lazy viz chunks load
-function VizSkeleton() {
-  return (
-    <div className="flex h-64 items-center justify-center rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)]">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-300 border-t-kern-500" />
-    </div>
-  )
-}
-
-// Lazy-load less-common visualizations to keep initial bundle small
-const BudgetBlob = dynamic(
-  () => import('@/components/app/budget-blob').then(m => ({ default: m.BudgetBlob })),
-  { loading: () => <VizSkeleton /> }
-)
-const BudgetSankey = dynamic(
-  () => import('@/components/app/budget-sankey').then(m => ({ default: m.BudgetSankey })),
-  { loading: () => <VizSkeleton /> }
-)
 
 type Goal = {
   id: string
@@ -75,10 +56,10 @@ export default function BudgetsPage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null)
   const [modalStep, setModalStep] = useState<'detail' | 'edit'>('detail')
-  const [viewMode, setViewMode] = useState<'tree' | 'blob' | 'sankey' | 'donut'>(() => {
+  const [viewMode, setViewMode] = useState<'tree' | 'donut'>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('budgets-view-mode')
-      if (stored === 'tree' || stored === 'blob' || stored === 'sankey' || stored === 'donut') return stored
+      if (stored === 'tree' || stored === 'donut') return stored
     }
     return 'tree'
   })
@@ -90,7 +71,6 @@ export default function BudgetsPage() {
   const [transactions, setTransactions] = useState<{ id?: string; account_id?: string; budget_id: string; amount: number; date: string; description: string; counterparty_name: string | null; is_split_row?: boolean }[]>([])
   const [rollovers, setRollovers] = useState<BudgetRollover[]>([])
   const [budgetAmounts, setBudgetAmounts] = useState<{ id: string; budget_id: string; effective_from: string; amount: number }[]>([])
-  const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null)
   const [showAllocationModal, setShowAllocationModal] = useState(false)
   const [goals, setGoals] = useState<Goal[]>([])
   const [budgetRolloverHistory, setBudgetRolloverHistory] = useState<BudgetRollover[]>([])
@@ -456,7 +436,7 @@ export default function BudgetsPage() {
     setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))
   }
 
-  function toggleViewMode(mode: 'tree' | 'blob' | 'sankey' | 'donut') {
+  function toggleViewMode(mode: 'tree' | 'donut') {
     setViewMode(mode)
     localStorage.setItem('budgets-view-mode', mode)
   }
@@ -856,28 +836,6 @@ export default function BudgetsPage() {
             Boom
           </button>
           <button
-            onClick={() => toggleViewMode('blob')}
-            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              viewMode === 'blob'
-                ? 'bg-zinc-900 text-white'
-                : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-            }`}
-          >
-            <Fingerprint className="h-3.5 w-3.5" />
-            Organisme
-          </button>
-          <button
-            onClick={() => toggleViewMode('sankey')}
-            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              viewMode === 'sankey'
-                ? 'bg-zinc-900 text-white'
-                : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-            }`}
-          >
-            <Workflow className="h-3.5 w-3.5" />
-            Stroom
-          </button>
-          <button
             onClick={() => toggleViewMode('donut')}
             className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               viewMode === 'donut'
@@ -989,31 +947,6 @@ export default function BudgetsPage() {
               )}
             </div>
           )}
-        </>
-      ) : viewMode === 'blob' ? (
-        <BudgetBlob
-          groups={[...incomeBudgets, ...expenseBudgets, ...savingsBudgets, ...debtBudgets]}
-          spending={spending}
-          onNavigate={(id) => openBudgetModal(id)}
-        />
-      ) : viewMode === 'sankey' ? (
-        <>
-          <BudgetSankey
-            groups={[...incomeBudgets, ...expenseBudgets, ...savingsBudgets, ...debtBudgets]}
-            spending={spending}
-            getEffectiveLimit={getEffectiveLimit}
-            getParentEffectiveLimit={getParentEffectiveLimit}
-            getSpent={getSpent}
-            getParentSpent={getParentSpent}
-            onNavigate={(id) => openBudgetModal(id)}
-          />
-          <BudgetLegend
-            groups={[...incomeBudgets, ...expenseBudgets, ...savingsBudgets, ...debtBudgets]}
-            spending={spending}
-            expandedGroupId={expandedGroupId}
-            onToggleGroup={(id) => setExpandedGroupId(expandedGroupId === id ? null : id)}
-            onNavigate={(id) => openBudgetModal(id)}
-          />
         </>
       ) : (
         <BudgetDonut
@@ -1284,122 +1217,6 @@ function BudgetAllocationModal({
 
 // ── Budget legend (donut-style, under Sankey) ────────────────
 
-function BudgetLegend({
-  groups,
-  spending,
-  expandedGroupId,
-  onToggleGroup,
-  onNavigate,
-}: {
-  groups: BudgetWithChildren[]
-  spending: Record<string, number>
-  expandedGroupId: string | null
-  onToggleGroup: (id: string) => void
-  onNavigate: (id: string) => void
-}) {
-  const segments = buildSegments(groups, spending)
-  if (segments.length === 0) return null
-
-  return (
-    <div className="mt-4 space-y-2">
-      {/* Header swatches */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs text-[var(--ink-3)]">
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-6 rounded-sm bg-zinc-600" />
-          Besteed
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-6 rounded-sm bg-zinc-300" />
-          Budget
-        </span>
-      </div>
-
-      {segments.map((seg) => {
-        const c = typeColors(seg.budgetType)
-        const pct = seg.limit > 0 ? Math.round((seg.spent / seg.limit) * 100) : 0
-        const isOver = seg.spent > seg.limit && seg.limit > 0
-        const isExpanded = expandedGroupId === seg.id
-
-        return (
-          <div key={seg.id}>
-            <button
-              className="flex w-full items-center gap-3 rounded-[var(--r-lg)] border px-3 py-2.5 text-left transition-all"
-              style={{
-                borderColor: isExpanded ? c.border : 'var(--border-ed)',
-                backgroundColor: isExpanded ? c.bg : 'var(--paper)',
-                boxShadow: isExpanded ? `0 0 0 2px ${c.border}` : undefined,
-              }}
-              onClick={() => onToggleGroup(seg.id)}
-            >
-              {/* Color swatch: spent (dark) + budget (light) */}
-              <div className="flex items-center gap-0.5">
-                <span className="block h-5 w-2.5 rounded-l-sm" style={{ backgroundColor: c.spent }} />
-                <span className="block h-5 w-2.5 rounded-r-sm" style={{ backgroundColor: c.budget }} />
-              </div>
-
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: c.bg }}>
-                <BudgetIcon name={seg.icon} className="h-4 w-4" />
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-[var(--ink)]">{seg.name}</p>
-                <p className="text-xs text-[var(--ink-3)]">
-                  <span className={isOver ? 'font-semibold text-red-600' : ''}>
-                    {formatCurrency(seg.spent)}
-                  </span>
-                  {' / '}
-                  {formatCurrency(seg.limit)}
-                </p>
-              </div>
-
-              <span className={`shrink-0 text-xs font-bold ${isOver ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
-                {pct}%
-              </span>
-            </button>
-
-            {/* Subcategories when expanded */}
-            {isExpanded && seg.children.length > 0 && (
-              <div className="ml-5 mt-1 mb-1 space-y-0.5">
-                {seg.children.map((child, ci) => {
-                  const childPct = child.limit > 0 ? Math.round((child.spent / child.limit) * 100) : 0
-                  const childOver = child.spent > child.limit && child.limit > 0
-                  const cc = childTypeColors(seg.budgetType, ci, seg.children.length)
-
-                  return (
-                    <button
-                      key={child.id}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left transition-colors hover:bg-[var(--subtle)]"
-                      onClick={() => onNavigate(child.id)}
-                    >
-                      <div className="flex items-center gap-0.5">
-                        <span className="block h-3 w-1.5 rounded-l-sm" style={{ backgroundColor: cc.spent }} />
-                        <span className="block h-3 w-1.5 rounded-r-sm" style={{ backgroundColor: cc.budget }} />
-                      </div>
-                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded" style={{ backgroundColor: c.bg }}>
-                        <BudgetIcon name={child.icon} className="h-3 w-3" />
-                      </div>
-                      <span className="min-w-0 flex-1 truncate text-xs text-[var(--ink-2)]">{child.name}</span>
-                      <span className="text-xs text-[var(--ink-3)]">
-                        <span className={childOver ? 'font-semibold text-red-600' : ''}>
-                          {formatCurrency(child.spent)}
-                        </span>
-                        {' / '}
-                        {formatCurrency(child.limit)}
-                      </span>
-                      <span className={`w-8 text-right text-xs font-medium ${childOver ? 'text-red-600' : 'text-[var(--ink-3)]'}`}>
-                        {childPct}%
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
 
 // ── Budget detail modal ──────────────────────────────────────
 
@@ -2756,6 +2573,7 @@ function BudgetEditModal({
     { id: string; name: string; target_value: number; target_date: string | null }[]
   >([])
   const [showCreateGoal, setShowCreateGoal] = useState(false)
+  const [isFavorite, setIsFavorite] = useState(budget.is_favorite ?? false)
 
   // Track dirty state
   const isDirty = useMemo(() => {
@@ -2777,9 +2595,10 @@ function BudgetEditModal({
       goalType !== (budget.goal_type ?? '') ||
       goalAmount !== (budget.goal_amount ? String(budget.goal_amount) : '') ||
       goalDate !== (budget.goal_date ?? '') ||
-      goalFrequency !== (budget.goal_frequency ?? '')
+      goalFrequency !== (budget.goal_frequency ?? '') ||
+      isFavorite !== (budget.is_favorite ?? false)
     )
-  }, [name, icon, description, defaultLimit, budgetType, interval, rolloverType, limitType, alertThreshold, maxSingleAmount, isEssential, priorityScore, isInflationIndexed, ownership, goalType, goalAmount, goalDate, goalFrequency, budget])
+  }, [name, icon, description, defaultLimit, budgetType, interval, rolloverType, limitType, alertThreshold, maxSingleAmount, isEssential, priorityScore, isInflationIndexed, ownership, goalType, goalAmount, goalDate, goalFrequency, isFavorite, budget])
 
   // beforeunload warning for page refresh
   useEffect(() => {
@@ -2898,6 +2717,7 @@ function BudgetEditModal({
         goal_amount: parseFloat(goalAmount) || null,
         goal_date: goalDate || null,
         goal_frequency: goalFrequency || null,
+        is_favorite: isFavorite,
         updated_at: new Date().toISOString(),
       })
       .eq('id', budget.id)
@@ -2969,9 +2789,19 @@ function BudgetEditModal({
       >
         <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-6 py-4">
           <h2 className="text-lg font-semibold text-[var(--ink)]">Budget bewerken</h2>
-          <button onClick={handleClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={() => setIsFavorite(!isFavorite)}
+              className={`rounded-lg p-1.5 transition-colors ${
+                isFavorite ? 'text-red-500 hover:text-red-600' : 'text-[var(--ink-4)] hover:text-[var(--ink-3)]'
+              }`}
+              title={isFavorite ? 'Verwijder uit favorieten' : 'Markeer als favoriet'}
+            >
+              <Heart className={`h-5 w-5 ${isFavorite ? 'fill-current' : ''}`} />
+            </button>
+            <button onClick={handleClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         <div className="space-y-4 px-6 py-4">

@@ -73,6 +73,7 @@ const mockData: DashboardData = {
   simFireCountdown: null,
   fireEndStrategy: 'deplete',
   fireEndAge: 90,
+  favoriteBudgets: [],
 }
 
 const makePrefs = (ids: string[], sizes: ('half' | 'full')[] = []): WidgetPref[] =>

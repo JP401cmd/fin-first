@@ -25,6 +25,7 @@ import { PassiefInkomenWidget } from './passief-inkomen-widget'
 import { Box3DragWidget } from './box3-drag-widget'
 import { VrijheidsMijlpalenWidget } from './vrijheidsmijlpalen-widget'
 import { BacktestingScoreWidget } from './backtesting-score-widget'
+import { BudgetFavWidget } from './budget-fav-widget'
 import { getWidgetDef, WIDGET_HREFS } from '@/lib/widget-catalog'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { FireProjection, FireRange, FireCountdown } from '@/lib/horizon-data'
@@ -112,6 +113,15 @@ export interface DashboardData {
   // FIRE end strategy
   fireEndStrategy: FireEndStrategy
   fireEndAge: number
+  // Favorite budgets for dynamic quarter-widgets
+  favoriteBudgets: {
+    id: string
+    name: string
+    icon: string
+    budgetType: 'income' | 'expense' | 'savings' | 'debt' | 'archive'
+    limit: number
+    spent: number
+  }[]
 }
 
 // ── Gating: widget id → min sovereignty level ─────────────────
@@ -140,6 +150,14 @@ interface WidgetRendererProps {
 }
 
 export function WidgetRenderer({ id, size, data }: WidgetRendererProps) {
+  // Handle dynamic favorite budget widgets
+  if (id.startsWith('budget_fav:')) {
+    const budgetId = id.slice('budget_fav:'.length)
+    const fav = data.favoriteBudgets.find(b => b.id === budgetId)
+    if (!fav) return null
+    return <BudgetFavWidget size={size} budget={fav} />
+  }
+
   const def = getWidgetDef(id)
   if (!def) return null
 

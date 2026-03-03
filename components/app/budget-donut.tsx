@@ -34,7 +34,7 @@ function segmentColors(type: BudgetType, idx: number, total: number) {
   const t = total > 1 ? idx / (total - 1) : 0.5
   const ct = cssType(type)
   return {
-    budget: `var(--color-${ct}-${snapToShade(200 + t * 200)})`,
+    budget: `color-mix(in srgb, var(--color-${ct}-${snapToShade(200 + t * 200)}) 35%, transparent)`,
     spent: `var(--color-${ct}-${snapToShade(500 + t * 200)})`,
   }
 }
@@ -44,7 +44,7 @@ function childSegColors(type: BudgetType, idx: number, total: number) {
   const t = total > 1 ? idx / (total - 1) : 0.5
   const ct = cssType(type)
   return {
-    budget: `var(--color-${ct}-${snapToShade(100 + t * 200)})`,
+    budget: `color-mix(in srgb, var(--color-${ct}-${snapToShade(100 + t * 200)}) 30%, transparent)`,
     spent: `var(--color-${ct}-${snapToShade(400 + t * 200)})`,
   }
 }

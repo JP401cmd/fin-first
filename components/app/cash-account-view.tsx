@@ -663,10 +663,10 @@ export function CashAccountView({
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
-      {/* Back link */}
+      {/* Back button */}
       <Link
         href={backHref}
-        className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)]"
+        className="mb-4 inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--paper)] px-3 py-1.5 text-sm font-medium text-[var(--ink-2)] shadow-[var(--s0)] transition-all hover:shadow-[var(--s1)] hover:text-[var(--ink)]"
       >
         <ArrowLeft className="h-4 w-4" />
         {backLabel}

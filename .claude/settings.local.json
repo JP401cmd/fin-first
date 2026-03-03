@@ -97,7 +97,8 @@
       "Bash(git log:*)",
       "Bash(npx jest:*)",
       "Bash(git stash:*)",
-      "Bash(npx vitest:*)"
+      "Bash(npx vitest:*)",
+      "Bash(rm:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

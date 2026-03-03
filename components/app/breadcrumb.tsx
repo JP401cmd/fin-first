@@ -73,6 +73,11 @@ export function Breadcrumb({
   // They only have 1 segment which would be redundant with the header
   if (segments.length <= 1) return null
 
+  // Don't show breadcrumbs for detail pages with dynamic segments (UUIDs)
+  // These pages have their own back navigation
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (pathname.split('/').some((s) => UUID_RE.test(s))) return null
+
   return (
     <nav
       aria-label="Breadcrumb navigatie"

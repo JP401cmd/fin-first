@@ -22,7 +22,6 @@ export const coreNav: ModuleNavConfig = {
     { label: 'Budgetten', href: '/core/budgets' },
     { label: 'Schulden', href: '/core/debts' },
     { label: 'Assets', href: '/core/assets' },
-    { label: 'Belasting', href: '/core/belasting', featureId: 'box3_belasting' },
   ],
 }
 

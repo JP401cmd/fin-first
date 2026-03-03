@@ -55,7 +55,11 @@ function SortableWidgetItem({ pref, data, isEditMode, isDragging }: SortableWidg
     <div
       ref={setNodeRef}
       style={style}
-      className={pref.size === 'full' ? 'sm:col-span-2' : ''}
+      className={
+        pref.size === 'full' ? 'sm:col-span-2 lg:col-span-4 row-span-2'
+        : pref.size === 'half' ? 'lg:col-span-2 row-span-2'
+        : ''
+      }
       data-testid={`widget-item-${pref.id}`}
     >
       <div className="relative">
@@ -84,10 +88,12 @@ function GhostCard({ pref }: { pref: WidgetPref }) {
   return (
     <div
       className={`opacity-90 scale-[1.02] rotate-[0.8deg] shadow-[var(--s2)] cursor-grabbing ${
-        pref.size === 'full' ? 'sm:col-span-2' : ''
+        pref.size === 'full' ? 'sm:col-span-2 lg:col-span-4 row-span-2'
+        : pref.size === 'half' ? 'lg:col-span-2 row-span-2'
+        : ''
       }`}
     >
-      <div className="rounded-[var(--r-lg)] border border-[var(--border-md)] bg-[var(--paper)] min-h-[180px]" />
+      <div className="rounded-[var(--r-lg)] border border-[var(--border-md)] bg-[var(--paper)] h-full" />
     </div>
   )
 }
@@ -292,7 +298,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data }: DraggableW
         }}
       >
         <SortableContext items={ids} strategy={rectSortingStrategy} disabled={!isEditMode}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 auto-rows-[160px] gap-4">
             {activeWidgets.map(pref => (
               <SortableWidgetItem
                 key={pref.id}

@@ -14,14 +14,14 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
     }
 
-    // Validate widget ids against catalog
+    // Validate widget ids against catalog + dynamic budget_fav: prefix
     const validIds = new Set(WIDGET_CATALOG.map(w => w.id))
     const sanitized: WidgetPref[] = body.widgets
-      .filter(w => validIds.has(w.id))
+      .filter(w => validIds.has(w.id) || w.id.startsWith('budget_fav:'))
       .map(w => ({
         id: w.id,
         enabled: Boolean(w.enabled),
-        size: w.size === 'full' ? 'full' : 'half',
+        size: w.size === 'full' ? 'full' : w.size === 'quarter' ? 'quarter' : 'half',
         order: Number(w.order) || 0,
       }))
 

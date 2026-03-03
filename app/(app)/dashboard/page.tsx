@@ -10,22 +10,17 @@ import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { FhinAvatar, FinnAvatar, FfinAvatar } from '@/components/app/avatars'
-import { JouwPadWidget } from '@/components/app/jouw-pad-widget'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
-import { computeFreedomMilestones } from '@/lib/freedom-milestones'
 import Link from 'next/link'
 import {
   ArrowRight, Zap, Compass, TrendingUp, Settings2, Info,
 } from 'lucide-react'
-import { mergeWidgetPrefs } from '@/lib/widget-catalog'
+import { mergeWidgetPrefs, type WidgetPref, type WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData, TopAction, TopGoal } from '@/components/widgets/widget-renderer'
 import { DraggableWidgetGrid } from '@/components/widgets/draggable-widget-grid'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  const displayName = user?.email?.split('@')[0] ?? 'daar'
-
   // Parallel data fetches for all module previews
   const now = new Date()
   const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0]
@@ -39,7 +34,7 @@ export default async function DashboardPage() {
     allBudgetsResult, recsResult, childBudgetsResult,
     goalsResult, recurringResult, netWorthSnapshotsResult,
     income12Result, earliestIncomeResult, sovereigntyTxResult,
-    bankAccountsResult,
+    bankAccountsResult, favBudgetsResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('id, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
@@ -60,6 +55,7 @@ export default async function DashboardPage() {
     supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
     supabase.from('transactions').select('amount').lt('amount', 0).gte('date', prev3MonthStart).lt('date', monthStart),
     supabase.from('bank_accounts').select('id, balance').eq('is_active', true).is('linked_asset_id', null),
+    supabase.from('budgets').select('id, name, icon, budget_type, default_limit, interval, parent_id, is_favorite').eq('is_favorite', true),
   ])
 
   // Core calculations
@@ -149,6 +145,48 @@ export default async function DashboardPage() {
     savings: { limit: budgetLimits.savings, spent: budgetSpent.savings },
     debt:    { limit: budgetLimits.debt,    spent: budgetSpent.debt },
   }
+
+  // Favorite budgets: compute limit + spent for each
+  const favBudgetsRaw = (favBudgetsResult.data ?? []) as { id: string; name: string; icon: string; budget_type: string; default_limit: number; interval: string; parent_id: string | null; is_favorite: boolean }[]
+  const txData = txResult.data ?? []
+  const favoriteBudgets = favBudgetsRaw.map(fb => {
+    // Determine effective limit
+    let limit: number
+    if (fb.parent_id === null) {
+      // Parent: sum children limits (or own if no children)
+      const children = allChildren.filter(c => c.parent_id === fb.id)
+      limit = children.length > 0
+        ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
+        : Number(fb.default_limit)
+    } else {
+      limit = Number(fb.default_limit)
+    }
+    // Normalize to monthly
+    if (fb.interval === 'quarterly') limit = limit / 3
+    else if (fb.interval === 'yearly') limit = limit / 12
+
+    // Determine spent: sum transaction amounts for this budget + its children
+    const relevantIds = new Set<string>([fb.id])
+    if (fb.parent_id === null) {
+      for (const c of allChildren) {
+        if (c.parent_id === fb.id) relevantIds.add(c.id)
+      }
+    }
+    let spent = 0
+    for (const tx of txData) {
+      const bid = (tx as { budget_id?: string | null }).budget_id
+      if (bid && relevantIds.has(bid)) spent += Math.abs(Number(tx.amount))
+    }
+
+    return {
+      id: fb.id,
+      name: fb.name,
+      icon: fb.icon,
+      budgetType: fb.budget_type as 'income' | 'expense' | 'savings' | 'debt' | 'archive',
+      limit,
+      spent,
+    }
+  })
 
   const last12Income = income12Result.data?.reduce((s, t) => s + Number(t.amount), 0) ?? 0
   let extrapolatedIncome = last12Income
@@ -319,14 +357,29 @@ export default async function DashboardPage() {
   const sovereigntyLevel = computeSovereigntyLevel(netWorth, sovMonthlyExp, sovFreedomPct, hasConsumerDebt)
   const currentPhaseId = levelToPhaseId(sovereigntyLevel)
 
-  // Freedom milestone forecast for Jouw Pad widget
-  const monthlySavings = monthlyIncome - monthlyExpenses
-  const milestoneResult = computeFreedomMilestones(netWorth, monthlyExpenses, monthlySavings, undefined, undefined, undefined, yearlyMustExpenses)
-
   // Widget prefs
   const rawWidgetPrefs = profileResult.data?.widget_prefs as { widgets: { id: string; enabled: boolean; size: 'half' | 'full'; order: number }[] } | null
   const widgetPrefs = mergeWidgetPrefs(rawWidgetPrefs)
-  const activeWidgets = widgetPrefs.widgets
+
+  // Inject dynamic favorite budget widget prefs (merge with saved positions)
+  const savedFavIds = new Set(widgetPrefs.widgets.filter(w => w.id.startsWith('budget_fav:')).map(w => w.id))
+  const currentFavIds = new Set(favoriteBudgets.map(b => `budget_fav:${b.id}`))
+  // Add new favorites that aren't in saved prefs yet (insert at top)
+  const lowestOrder = Math.min(0, ...widgetPrefs.widgets.map(w => w.order))
+  const newFavPrefs: WidgetPref[] = favoriteBudgets
+    .filter(b => !savedFavIds.has(`budget_fav:${b.id}`))
+    .map((b, i) => ({
+      id: `budget_fav:${b.id}`,
+      enabled: true,
+      size: 'quarter' as WidgetSize,
+      order: lowestOrder - 100 + i,
+    }))
+  // Combine: catalog widgets + saved fav prefs (only if still favorited) + new fav prefs
+  const allWidgetPrefs = [
+    ...widgetPrefs.widgets.filter(w => !w.id.startsWith('budget_fav:') || currentFavIds.has(w.id)),
+    ...newFavPrefs,
+  ]
+  const activeWidgets = allWidgetPrefs
     .filter(w => w.enabled)
     .sort((a, b) => a.order - b.order)
 
@@ -392,30 +445,11 @@ export default async function DashboardPage() {
     simFireCountdown,
     fireEndStrategy: fireStrategy.strategy,
     fireEndAge: fireStrategy.endAge,
+    favoriteBudgets,
   }
-
-  // Dateline
-  const dateStr = now.toLocaleDateString('nl-NL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
-      {/* Dateline row */}
-      <div className="flex items-center justify-between border-b border-[var(--border-ed)] pb-3 mb-6">
-        <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.11em' }} className="text-[var(--ink-3)]">{dateStr}</span>
-        <span className="font-serif italic text-[13px] text-[var(--ink-3)] hidden sm:inline">Vrijheids Dashboard</span>
-      </div>
-
-      {/* Header */}
-      <div className="mb-5 sm:mb-8">
-        <p className="label-editorial text-[var(--ink-3)] mb-1">Jouw vrijheids dashboard</p>
-        <h1 className="font-display text-[32px] font-bold text-[var(--ink)]" style={{ letterSpacing: '-0.03em' }}>
-          Welkom terug, <em className="not-italic font-display italic text-kern-600">{displayName}</em>
-        </h1>
-        <p className="mt-1 font-serif italic text-[13px] text-[var(--ink-3)]">
-          TriFinity helpt je bewust omgaan met je opgeslagen levensenergie.
-        </p>
-      </div>
-
       {/* Three module cards */}
       <div className="grid gap-4 sm:gap-6 md:grid-cols-3">
         {/* De Kern */}
@@ -595,25 +629,12 @@ export default async function DashboardPage() {
         ) : (
           <DraggableWidgetGrid
             initialPrefs={activeWidgets}
-            allPrefs={widgetPrefs.widgets}
+            allPrefs={allWidgetPrefs}
             data={dashboardData}
           />
         )}
       </section>
 
-      {/* Jouw Pad widget (always shown below widgets, legacy) */}
-      <section className="mt-6" data-testid="jouw-pad-section">
-        <JouwPadWidget
-          level={sovereigntyLevel}
-          phase={currentPhaseId}
-          freedomPct={freedomPct}
-          netWorth={netWorth}
-          monthsCovered={monthlyExpenses > 0 ? netWorth / monthlyExpenses : 0}
-          hasConsumerDebt={hasConsumerDebt}
-          milestones={milestoneResult.milestones}
-          nextMilestoneMessage={milestoneResult.nextMilestone?.message ?? null}
-        />
-      </section>
     </div>
   )
 }

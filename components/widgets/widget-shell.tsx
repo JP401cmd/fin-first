@@ -24,10 +24,12 @@ const MODULE_KICKER: Record<WidgetModule, string> = {
   cross:   'text-[var(--ink-3)]',
 }
 
-// ── Min heights ───────────────────────────────────────────────
+// ── Fixed heights (quarter×2 + gap = half = full) ────────────
+// 160×2 + 16(gap) = 336
 const SIZE_HEIGHT: Record<WidgetSize, string> = {
-  half: 'min-h-[180px]',
-  full: 'min-h-[360px]',
+  quarter: 'h-[160px]',
+  half:    'h-[336px]',
+  full:    'h-[336px]',
 }
 
 // ── WidgetShell ───────────────────────────────────────────────
@@ -40,21 +42,49 @@ interface WidgetShellProps {
   onClick?: () => void
   children: React.ReactNode
   className?: string
+  /** Render kicker as rotated vertical label on the left side */
+  kickerPosition?: 'top' | 'left'
 }
 
-export function WidgetShell({ module, size, kicker, href, onClick, children, className = '' }: WidgetShellProps) {
+export function WidgetShell({ module, size, kicker, href, onClick, children, className = '', kickerPosition = 'top' }: WidgetShellProps) {
   const accent = MODULE_ACCENT[module]
   const hoverBorder = MODULE_HOVER_BORDER[module]
   const kickerColor = MODULE_KICKER[module]
-  const minH = SIZE_HEIGHT[size]
+  const h = SIZE_HEIGHT[size]
   const isInteractive = !!(href ?? onClick)
 
-  const baseClasses = `group relative overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] transition-all ${minH} ${className}`
+  const baseClasses = `group relative overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] transition-all ${h} ${className}`
   const interactiveClasses = isInteractive
     ? `cursor-pointer text-left w-full ${hoverBorder} hover:shadow-[var(--s1)] hover:-translate-y-px`
     : ''
 
-  const content = (
+  const content = kickerPosition === 'left' ? (
+    <>
+      {/* 3px top accent bar */}
+      <div className={`h-[3px] w-full ${accent}`} />
+
+      <div className="flex h-[calc(100%-3px)]">
+        {/* Vertical kicker on the left */}
+        <div className="flex shrink-0 items-center justify-center border-r border-[var(--border-ed)] px-1.5">
+          <p className={`label-editorial ${kickerColor} [writing-mode:vertical-rl] rotate-180`}>
+            {kicker}
+          </p>
+        </div>
+
+        {/* Content area */}
+        <div className="flex-1 flex flex-col p-3 min-w-0">
+          <div className="flex-1 min-w-0">
+            {children}
+          </div>
+          {isInteractive && (
+            <div className="mt-1 flex justify-end">
+              <ArrowRight className="h-3.5 w-3.5 text-[var(--ink-4)] opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  ) : (
     <>
       {/* 3px top accent bar */}
       <div className={`h-[3px] w-full ${accent}`} />

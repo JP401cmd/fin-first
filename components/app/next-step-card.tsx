@@ -355,7 +355,7 @@ export function computeKernNextStep(data: {
     key: 'check_tax',
     title: 'Bekijk je belastingpositie',
     description: 'Bereken je Box 3 vermogensbelasting en ontdek optimalisatiemogelijkheden.',
-    href: '/core/belasting',
+    href: '/core/debts',
     icon: 'receipt',
     moduleColor: 'amber',
   }
@@ -485,7 +485,7 @@ export function computeAllKernSteps(data: {
     key: 'check_tax',
     title: 'Bekijk je belastingpositie',
     description: 'Bereken je Box 3 vermogensbelasting en ontdek optimalisatiemogelijkheden.',
-    href: '/core/belasting',
+    href: '/core/debts',
     icon: 'receipt',
     moduleColor: 'amber',
   })

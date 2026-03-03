@@ -44,6 +44,271 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'fin_prod_0.79',
+    date: '2026-03-03',
+    title: 'Vermogensbalans, cash-as-asset, balance snapshots & grote refactoring',
+    sections: [
+      {
+        module: 'Rapportages — Vermogensbalans',
+        color: 'amber',
+        items: [
+          {
+            title: 'Persoonlijke balans rapportage',
+            description:
+              'Nieuwe rapportagepagina /rapportages/balans met een volwaardige vermogensbalans in scontrovorm (twee-kolom layout). Activa links (vaste activa, vlottende activa, liquide middelen), passiva rechts (eigen vermogen, lang en kort vreemd vermogen). Balansequilibrium is altijd in evenwicht.',
+          },
+          {
+            title: 'Kengetallen en ratio\'s',
+            description:
+              'Solvabiliteitsratio, schuldgraad en liquiditeitsratio (current ratio) worden automatisch berekend en getoond met visuele balken en tooltip-formules. Sub-groepering per asset/debt type binnen elke categorie.',
+          },
+          {
+            title: 'Kassabon-stijl met vrijheidstijd',
+            description:
+              'Netto vermogen toont het vrijheidstijd-equivalent volgens de TriFinity-filosofie. De balans volgt het editorial design language met scontrovorm layout.',
+          },
+        ],
+      },
+      {
+        module: 'De Kern — Cash-as-Asset',
+        color: 'amber',
+        items: [
+          {
+            title: 'Bankrekeningen als assets',
+            description:
+              'Bankrekeningen zijn nu volledig geintegreerd in het assetsysteem. Cash verschijnt als eigen categorie op /core/assets met type-specifieke subtypes (betaal, spaar, gezamenlijk, zakelijk), iconen en kleuren. /core/cash verwijst door naar /core/assets.',
+          },
+          {
+            title: 'Diepe database-integratie',
+            description:
+              'Nieuwe linked_asset_id FK op bank_accounts en has_budget_tracking op assets. Bestaande bankrekeningen worden automatisch gemigreerd naar cash asset records. Netto-vermogensberekening voorkomt dubbeltelling van gelinkte rekeningen.',
+          },
+          {
+            title: 'GoCardless sync uitgebreid',
+            description:
+              'Saldo-synchronisatie via GoCardless werkt nu het gelinkte asset bij. Callback maakt automatisch een asset + bank_account aan bij nieuwe koppelingen.',
+          },
+        ],
+      },
+      {
+        module: 'Platform — Balance Snapshots',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Per-entiteit balanshistorie',
+            description:
+              'Nieuwe balance_snapshots tabel met RLS en indexen voor het bijhouden van individuele asset- en schuldbalansen per maandelijks snapshot-punt. Maakt composition-over-time analyse mogelijk (welke rekeningen groeien/krimpen).',
+          },
+          {
+            title: 'Snapshot API\'s uitgebreid',
+            description:
+              'POST, auto- en cron-snapshot routes vangen nu per-entiteit balansen op via captureBalanceSnapshots(). Nieuwe /api/snapshots/balances endpoint en BalanceHistoryChart component voor visualisatie.',
+          },
+        ],
+      },
+      {
+        module: 'Platform — Refactoring',
+        color: 'zinc',
+        items: [
+          {
+            title: 'FIRE-berekeningen geconsolideerd (RF-001)',
+            description:
+              'fireTarget, freedomPercentage, freedomTime, savingsRate en effectiveExpenses geextraheerd naar lib/core-metrics.ts als pure functies. 19 unit tests. Elimineert subtiele inconsistenties tussen pagina\'s.',
+          },
+          {
+            title: 'SWR-gebruik gestandaardiseerd (RF-002)',
+            description:
+              'Alle hardcoded SWR = 0.04 vervangen door NL Box 3-gecorrigeerde SWR (2,88%). resolveFireParams() is nu de enige bron voor SWR-resolutie in de hele codebase.',
+          },
+          {
+            title: 'FinancialInput/FinancialMetrics scheiding (RF-003)',
+            description:
+              'CoreData/HorizonInput vervangen door een helder onderscheid: FinancialInput (ruwe DB-data) vs FinancialMetrics (berekende waarden). 28 bestanden bijgewerkt. lib/mock-data.ts verwijderd.',
+          },
+          {
+            title: 'Variabelenamen gestandaardiseerd (RF-005)',
+            description:
+              'Naamgevingsconventie: Engels voor alle code-identifiers, Nederlands alleen voor UI-strings en officiele Box 3-termen. 22 bestanden bijgewerkt (vrijheidsdagen → freedomDays, belasting → tax, etc.).',
+          },
+          {
+            title: 'Gedupliceerde functies verwijderd (RF-006)',
+            description:
+              'Lokale formatEur() vervangen door de canonieke formatCurrency(). Inline vrijheidstijd-berekeningen vervangen door calculateFreedomTime() voor consistente edge-case afhandeling.',
+          },
+          {
+            title: 'Financiele constanten gecentraliseerd (RF-007)',
+            description:
+              'Nieuwe lib/constants.ts als single source of truth voor SWR, rendement, inflatie, Box 3-parameters en AOW-waarden. Dubbele definities uit 10+ bestanden verwijderd.',
+          },
+          {
+            title: 'DB→Frontend type mapper',
+            description:
+              'Nieuwe lib/db-mapper.ts voor automatische snake_case naar camelCase conversie van database-types naar frontend-types.',
+          },
+        ],
+      },
+      {
+        module: 'De Horizon — Droomtransitie',
+        color: 'purple',
+        items: [
+          {
+            title: 'Droomachtige paginaovergang',
+            description:
+              'Naadloze, droomachtige transitie tussen /horizon en /horizon/whatif via een persistent gouden sluier-overlay. Drie fasen: content dissolve (400ms), gouden drempel (800ms) en onthulling (1200ms). prefers-reduced-motion support.',
+          },
+        ],
+      },
+      {
+        module: 'De Kern — UX-verbeteringen',
+        color: 'amber',
+        items: [
+          {
+            title: 'Bestedingstrend stippellijn',
+            description:
+              'De budget-sparkline toont nu de huidige (onvolledige) maand als stippellijn, zodat je direct ziet dat het een voorlopig bedrag is.',
+          },
+          {
+            title: 'Inklapbare voorspelling in budget modal',
+            description:
+              'De "voorspelling volgende maand" sectie in de budget detail modal is nu inklapbaar, zodat de focus op de huidige maand ligt.',
+          },
+        ],
+      },
+      {
+        module: 'Platform — Overig',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Vercel Speed Insights',
+            description:
+              'Web Vitals monitoring via @vercel/speed-insights voor real-time performance-inzichten in productie.',
+          },
+          {
+            title: 'Sovereignty level alignment',
+            description:
+              'Fix: sovereignty level berekening is nu consistent tussen /dashboard en /identity pagina.',
+          },
+          {
+            title: 'Monte Carlo & toekomstpaden fixes',
+            description:
+              'Monte Carlo detail modal data komt nu overeen met de chart overlay. Toekomstpaden details zijn consistent gemaakt met de grafiekdata.',
+          },
+          {
+            title: 'Testdata uitgebreid naar 15 maanden',
+            description:
+              'Persona testdata (Lisa, Daan) uitgebreid naar 15 maanden transactiehistorie met seizoenscorrecties en realistische fluctuaties. Holdings data toegevoegd voor Lisa.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: 'fin_prod_0.78',
+    date: '2026-03-01',
+    title: 'What-If Net Worth Planner, droomscenario chat & identity restructure',
+    sections: [
+      {
+        module: 'De Horizon — What-If Planner',
+        color: 'purple',
+        items: [
+          {
+            title: 'What-If Net Worth Planner',
+            description:
+              'Volledig nieuwe pagina /horizon/whatif met interactieve sliders voor leeftijd, rendement, spaarquote en uitgaven. Real-time SimChart visualisatie toont het effect van aanpassingen op je vermogenspad en FIRE-leeftijd.',
+          },
+          {
+            title: 'Levensgebeurtenissen integratie',
+            description:
+              'Voeg levensgebeurtenissen toe aan je What-If scenario (huis kopen, kinderen, carrierewisseling, erfenis). Elk event verschijnt als marker op de tijdlijn en beinvloedt de simulatie.',
+          },
+          {
+            title: 'Scenario-acties en samenvatting',
+            description:
+              'Actieknoppen voor scenario-management: opslaan, vergelijken, resetten. Samenvatting toont delta-impact op FIRE-leeftijd en eindvermogen ten opzichte van je basisscenario.',
+          },
+          {
+            title: 'Scenario presets',
+            description:
+              'Voorgedefinieerde scenario\'s als snelstartpunt: "Agressief sparen", "Sabbatical nemen", "Deeltijd werken", "Huis kopen". Een klik laadt alle sliders en events in.',
+          },
+          {
+            title: 'Droomscenario AI-chat',
+            description:
+              'De Wil-persoonlijkheid helpt je dromen vertalen naar concrete levensgebeurtenissen via de nieuwe suggestLifeEvent tool. Beschrijf je droom ("ik wil een jaar door Azie reizen") en de AI stelt een passend event voor dat direct in je scenario wordt geladen.',
+          },
+          {
+            title: 'FIRE-age delta-annotatie',
+            description:
+              'SimChart toont nu een delta-annotatie die het verschil in FIRE-leeftijd toont ten opzichte van je basisscenario (bijv. "+2,3 jaar" of "-1,8 jaar").',
+          },
+        ],
+      },
+      {
+        module: 'Identiteit — Restructure',
+        color: 'rose',
+        items: [
+          {
+            title: 'Instellingen hub',
+            description:
+              'Nieuwe geconsolideerde instellingenpagina /identity/instellingen met vijf secties: Notificaties, Widgets, FIRE-parameters, Weergave en Gegevens. Widgets- en parameters-pagina\'s verwijzen door naar deze hub.',
+          },
+          {
+            title: 'FIRE berekeningsparameters',
+            description:
+              'Verwacht rendement en inflatiepercentage zijn nu instelbaar via de instellingenpagina. resolveFireParams() verwerkt de waarden en wired ze door naar /core, /dashboard, /horizon en de use-horizon-fire-sim hook.',
+          },
+          {
+            title: 'Profiel vereenvoudigd',
+            description:
+              'De profielpagina bevat nu alleen persoonlijke informatie en huishoudsamenstelling. FIRE- en kleurinstellingen zijn verplaatst naar /identity/instellingen.',
+          },
+          {
+            title: '"Zo werkt TriFinity" gids',
+            description:
+              'Nieuwe gebruikersinstructies op de identity overzichtspagina die uitleggen hoe TriFinity werkt, wat de drie modules zijn en hoe de filosofie "Geld is opgeslagen tijd" wordt toegepast.',
+          },
+        ],
+      },
+      {
+        module: 'De Kern — Budget UX',
+        color: 'amber',
+        items: [
+          {
+            title: 'Budget blob v2',
+            description:
+              'Vernieuwde watercolor-rendering met multi-layer effecten. Biologische animaties (cell-breathe, nucleus-pulse, membrane-breathe, organelle-drift) geven budgetten een organisch, levend gevoel. prefers-reduced-motion support.',
+          },
+          {
+            title: 'Budget donut semantische kleuren',
+            description:
+              'De budget donut gebruikt nu semantische typeColors en childTypeColors in plaats van index-gebaseerde kleurtoewijzing, waardoor categorieën consistent dezelfde kleur behouden.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'FIRE simulatie-fixes',
+            description:
+              'Eenmalige levensgebeurtenissen geven nu het bedrag direct door (niet /12). deriveCountdown() voor consistente FIRE-countdown vanuit fireAgeFractional. computeFireRange gebruikt het gebruikersrendement voor scenario-offsets.',
+          },
+          {
+            title: 'AI chat-context voor scenario\'s',
+            description:
+              'De globale chat FAB ontvangt nu scenario-context van de What-If pagina, zodat de AI-persoonlijkheden op de hoogte zijn van je actieve scenario bij het geven van advies.',
+          },
+          {
+            title: 'TypeScript 5.9.3 vastgezet',
+            description:
+              'TypeScript versie vastgezet op 5.9.3 in package.json om consistentie tussen ontwikkelomgevingen te garanderen.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: 'fin_prod_0.77',
     date: '2026-02-27',
     title: 'Simulatie-engine, 6 nieuwe horizon-widgets & AOW/pensioen',

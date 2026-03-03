@@ -3,6 +3,12 @@
 -- Date: 2026-03-03
 -- =============================================
 
+-- 0. Fix CHECK constraint to include 'cash' type
+ALTER TABLE assets DROP CONSTRAINT IF EXISTS assets_asset_type_check;
+ALTER TABLE assets ADD CONSTRAINT assets_asset_type_check
+  CHECK (asset_type = ANY (ARRAY['cash','savings','investment','retirement',
+    'eigen_huis','real_estate','crypto','vehicle','physical','other']));
+
 -- 1. Add linked_asset_id FK to bank_accounts (UNIQUE = max 1 bank_account per asset)
 ALTER TABLE bank_accounts
   ADD COLUMN IF NOT EXISTS linked_asset_id UUID UNIQUE REFERENCES assets(id) ON DELETE SET NULL;

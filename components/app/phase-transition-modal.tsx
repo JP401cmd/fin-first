@@ -16,7 +16,7 @@ type Props = {
 const FEATURE_PAGE_MAP: Record<string, string> = {
   // Kern features → /core
   nibud_benchmark: '/core/budgets',
-  box3_belasting: '/core/belasting',
+  box3_belasting: '/core/debts',
   budget_optimalisatie: '/core/budgets',
   schulden_aflosplan: '/core/debts',
   asset_allocatie: '/core/assets',

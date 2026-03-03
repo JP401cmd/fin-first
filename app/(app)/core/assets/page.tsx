@@ -310,6 +310,13 @@ export default function AssetsPage() {
               <BarChart3 className="h-4 w-4" />
               Holdings
             </Link>
+            <Link
+              href="/core/assets/revalue"
+              className="inline-flex items-center gap-2 rounded-[var(--r)] border border-kern-200 px-4 py-2 text-sm font-medium text-kern-700 hover:bg-kern-50"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Herwaarderen
+            </Link>
             <button
               onClick={() => { setEditAsset(null); setShowForm(true) }}
               className="inline-flex items-center gap-2 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"

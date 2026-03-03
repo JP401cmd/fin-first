@@ -19,7 +19,7 @@ const DISCOVER_ITEMS: DiscoverItem[] = [
   // Kern
   { id: 'vermogensverloop',      label: 'Vermogensverloop',       description: 'Net worth snapshots en grafiek', href: '/core', teaser: 'Wist je dat je je vermogen over tijd kunt volgen?',              module: 'kern' },
   { id: 'snapshot_vergelijking', label: 'Snapshot Vergelijking',  description: 'Vergelijk twee periodes',       href: '/core', teaser: 'Wist je dat je snapshots naast elkaar kunt vergelijken?',       module: 'kern' },
-  { id: 'box3_belasting',       label: 'Box 3 Belasting',        description: 'Vermogensbelasting berekening',  href: '/core/belasting', teaser: 'Wist je dat je je Box 3 belasting kunt berekenen?',   module: 'kern' },
+  { id: 'box3_belasting',       label: 'Box 3 Belasting',        description: 'Vermogensbelasting berekening',  href: '/core/debts', teaser: 'Wist je dat je je Box 3 belasting kunt berekenen?',   module: 'kern' },
   { id: 'cashflow_sankey',      label: 'Cashflow Diagram',       description: 'Sankey inkomen-flow visualisatie', href: '/core/budgets', teaser: 'Wist je dat je je geldstromen visueel kunt volgen?',  module: 'kern' },
   { id: 'data_export',          label: 'Data Export',             description: 'CSV export van al je data',      href: '/core', teaser: 'Wist je dat je al je data kunt exporteren als CSV?',          module: 'kern' },
   // Wil
