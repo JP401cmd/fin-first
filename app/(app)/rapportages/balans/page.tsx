@@ -4,49 +4,60 @@ import { useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Printer } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
-import { ASSET_TYPE_LABELS } from '@/lib/asset-data'
-import { DEBT_TYPE_LABELS } from '@/lib/debt-data'
 import type { BalansData, BalansCategory } from '@/app/api/report/balans/route'
 import { eurToFreedomTime } from '@/components/app/freedom-time-label'
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-const TYPE_LABELS: Record<string, string> = { ...ASSET_TYPE_LABELS, ...DEBT_TYPE_LABELS }
-function typeLabel(type: string): string {
-  return TYPE_LABELS[type] || type
-}
-
 // ── Sub-components ───────────────────────────────────────────────────────────
 
+/** Renders a balance category with sub-groups organized by type */
 function BalansCategoryBlock({ category, sign }: { category: BalansCategory; sign?: 'negative' }) {
   if (category.items.length === 0) return null
   const neg = sign === 'negative'
+  const hasSubGroups = category.subGroups.length > 1
 
   return (
-    <div className="mb-3">
-      <p className="mb-1.5 font-inter text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+    <div className="mb-4">
+      {/* Category header */}
+      <p className="mb-2 font-inter text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
         {category.label}
       </p>
-      <div className="space-y-0.5">
-        {category.items.map(item => (
-          <div key={item.id} className="flex justify-between gap-2 py-px">
-            <span className="truncate font-source-serif text-[13px] text-[var(--ink-2)]">
-              {item.name}
-              {item.inclusionPct < 100 && (
-                <span className="ml-1 font-inter text-[10px] text-[var(--ink-4)]">({item.inclusionPct}%)</span>
+
+      {hasSubGroups ? (
+        // Multiple sub-groups: show type headers
+        <div className="space-y-2">
+          {category.subGroups.map(group => (
+            <div key={group.label}>
+              <p className="mb-0.5 font-inter text-[10px] font-semibold text-[var(--ink-3)]">
+                {group.label}
+              </p>
+              <div className="space-y-px pl-2 border-l-2 border-[var(--border-ed)]">
+                {group.items.map(item => (
+                  <BalansItemRow key={item.id} item={item} neg={neg} />
+                ))}
+              </div>
+              {group.items.length > 1 && (
+                <div className="mt-0.5 flex justify-between pl-2 text-[var(--ink-3)]">
+                  <span className="font-inter text-[10px] italic">Subtotaal {group.label.toLowerCase()}</span>
+                  <span className={`font-dm-mono text-[10px] tabular-nums ${neg ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
+                    {formatCurrency(group.subtotal)}
+                  </span>
+                </div>
               )}
-              {item.interestRate != null && item.interestRate > 0 && (
-                <span className="ml-1 font-dm-mono text-[10px] text-[var(--ink-4)]">{item.interestRate}%</span>
-              )}
-            </span>
-            <span className={`shrink-0 font-dm-mono text-[13px] tabular-nums ${neg ? 'text-red-700' : 'text-[var(--ink)]'}`}>
-              {formatCurrency(item.value)}
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="mt-1 flex justify-between border-t border-dashed border-[var(--border-ed)] pt-1">
-        <span className="font-inter text-[11px] font-medium text-[var(--ink-2)]">Subtotaal</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        // Single group or flat list: no sub-headers needed
+        <div className="space-y-px">
+          {category.items.map(item => (
+            <BalansItemRow key={item.id} item={item} neg={neg} />
+          ))}
+        </div>
+      )}
+
+      {/* Category subtotal */}
+      <div className="mt-1.5 flex justify-between border-t border-dashed border-[var(--border-ed)] pt-1">
+        <span className="font-inter text-[11px] font-medium text-[var(--ink-2)]">{category.label}</span>
         <span className={`font-dm-mono text-[12px] font-medium tabular-nums ${neg ? 'text-red-700' : 'text-[var(--ink)]'}`}>
           {formatCurrency(category.subtotal)}
         </span>
@@ -55,11 +66,30 @@ function BalansCategoryBlock({ category, sign }: { category: BalansCategory; sig
   )
 }
 
-function KengetalRow({ label, value, suffix, variant }: {
+function BalansItemRow({ item, neg }: { item: { id: string; name: string; value: number; inclusionPct: number; interestRate?: number }; neg: boolean }) {
+  return (
+    <div className="flex justify-between gap-2 py-px">
+      <span className="truncate font-source-serif text-[13px] text-[var(--ink-2)]">
+        {item.name}
+        {item.inclusionPct < 100 && (
+          <span className="ml-1 font-inter text-[10px] text-[var(--ink-4)]">({item.inclusionPct}%)</span>
+        )}
+        {item.interestRate != null && item.interestRate > 0 && (
+          <span className="ml-1 font-dm-mono text-[10px] text-[var(--ink-4)]">{item.interestRate}%</span>
+        )}
+      </span>
+      <span className={`shrink-0 font-dm-mono text-[13px] tabular-nums ${neg ? 'text-red-700' : 'text-[var(--ink)]'}`}>
+        {formatCurrency(item.value)}
+      </span>
+    </div>
+  )
+}
+
+function KengetalRow({ label, value, variant, tooltip }: {
   label: string
   value: string
-  suffix?: string
   variant?: 'positive' | 'negative' | 'neutral'
+  tooltip?: string
 }) {
   const colorClass = variant === 'positive' ? 'text-kern-600'
     : variant === 'negative' ? 'text-red-600'
@@ -67,9 +97,12 @@ function KengetalRow({ label, value, suffix, variant }: {
 
   return (
     <div className="flex justify-between py-0.5">
-      <span className="font-inter text-[11px] text-[var(--ink-2)]">{label}</span>
+      <span className="font-inter text-[11px] text-[var(--ink-2)]">
+        {label}
+        {tooltip && <span className="ml-1 text-[9px] text-[var(--ink-4)]" title={tooltip}>ⓘ</span>}
+      </span>
       <span className={`font-dm-mono text-[12px] tabular-nums ${colorClass}`}>
-        {value}{suffix && <span className="ml-0.5 text-[10px] text-[var(--ink-4)]">{suffix}</span>}
+        {value}
       </span>
     </div>
   )
@@ -145,26 +178,14 @@ export default function BalansPage() {
     ? eurToFreedomTime(data.eigenVermogen, data.dailyExpenseRate)
     : null
 
-  // Determine solvability health
   const solvVariant: 'positive' | 'negative' | 'neutral' =
     data.solvabiliteitsratio == null ? 'neutral'
     : data.solvabiliteitsratio >= 40 ? 'positive'
     : data.solvabiliteitsratio < 0 ? 'negative'
     : 'neutral'
 
-  // Count all items
-  const totalAssetItems = data.vasteActiva.items.length + data.vlottendeActiva.items.length
+  const totalAssetItems = data.vasteActiva.items.length + data.vlottendeActiva.items.length + data.liquideMiddelen.items.length
   const totalDebtItems = data.langVreemdVermogen.items.length + data.kortVreemdVermogen.items.length
-
-  // Gather unique asset types for the footnote
-  const usedAssetTypes = [...new Set([
-    ...data.vasteActiva.items.map(i => i.type),
-    ...data.vlottendeActiva.items.map(i => i.type),
-  ])]
-  const usedDebtTypes = [...new Set([
-    ...data.langVreemdVermogen.items.map(i => i.type),
-    ...data.kortVreemdVermogen.items.map(i => i.type),
-  ])]
 
   return (
     <div className="mx-auto max-w-[900px] px-4 py-6 md:px-8">
@@ -242,13 +263,16 @@ export default function BalansPage() {
           {/* ── LEFT: ACTIVA ── */}
           <div className="border-r-0 md:border-r border-[var(--border-ed)] px-5 py-4">
 
-            {/* Vaste activa */}
+            {/* I. Vaste activa */}
             <BalansCategoryBlock category={data.vasteActiva} />
 
-            {/* Vlottende activa */}
+            {/* II. Vlottende activa */}
             <BalansCategoryBlock category={data.vlottendeActiva} />
 
-            {/* Total Activa */}
+            {/* III. Liquide middelen (bank accounts) */}
+            <BalansCategoryBlock category={data.liquideMiddelen} />
+
+            {/* ═══ TOTAAL ACTIVA ═══ */}
             <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2">
               <span className="font-inter text-sm font-bold text-[var(--ink)]">Totaal activa</span>
               <span className="font-dm-mono text-sm font-bold tabular-nums text-[var(--ink)]">
@@ -260,9 +284,9 @@ export default function BalansPage() {
           {/* ── RIGHT: PASSIVA ── */}
           <div className="border-t md:border-t-0 border-[var(--border-ed)] px-5 py-4">
 
-            {/* Eigen vermogen */}
-            <div className="mb-3">
-              <p className="mb-1.5 font-inter text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+            {/* I. Eigen vermogen */}
+            <div className="mb-4">
+              <p className="mb-2 font-inter text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
                 Eigen vermogen
               </p>
               <div className="flex justify-between py-px">
@@ -273,21 +297,24 @@ export default function BalansPage() {
                   {formatCurrency(data.eigenVermogen)}
                 </span>
               </div>
-              <div className="mt-1 flex justify-between border-t border-dashed border-[var(--border-ed)] pt-1">
-                <span className="font-inter text-[11px] font-medium text-[var(--ink-2)]">Subtotaal</span>
+              <p className="mt-0.5 font-inter text-[10px] italic text-[var(--ink-4)]">
+                Activa {formatCurrency(data.totalActiva)} − schulden {formatCurrency(data.totalSchulden)}
+              </p>
+              <div className="mt-1.5 flex justify-between border-t border-dashed border-[var(--border-ed)] pt-1">
+                <span className="font-inter text-[11px] font-medium text-[var(--ink-2)]">Eigen vermogen</span>
                 <span className={`font-dm-mono text-[12px] font-medium tabular-nums ${data.eigenVermogen >= 0 ? 'text-kern-700' : 'text-red-700'}`}>
                   {formatCurrency(data.eigenVermogen)}
                 </span>
               </div>
             </div>
 
-            {/* Lang vreemd vermogen */}
+            {/* II. Lang vreemd vermogen */}
             <BalansCategoryBlock category={data.langVreemdVermogen} sign="negative" />
 
-            {/* Kort vreemd vermogen */}
+            {/* III. Kort vreemd vermogen */}
             <BalansCategoryBlock category={data.kortVreemdVermogen} sign="negative" />
 
-            {/* Total Passiva */}
+            {/* ═══ TOTAAL PASSIVA ═══ */}
             <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2">
               <span className="font-inter text-sm font-bold text-[var(--ink)]">Totaal passiva</span>
               <span className="font-dm-mono text-sm font-bold tabular-nums text-[var(--ink)]">
@@ -301,7 +328,7 @@ export default function BalansPage() {
         <div className="border-t border-[var(--border-ed)] bg-[var(--subtle)]/30 px-5 py-2 text-center">
           <span className="font-inter text-[10px] text-[var(--ink-4)]">
             Activa {formatCurrency(data.totalActiva)} = Passiva {formatCurrency(data.totalPassiva)}
-            {data.totalActiva === data.totalPassiva ? ' ✓ in evenwicht' : ''}
+            {data.totalActiva === data.totalPassiva ? ' — in evenwicht' : ''}
           </span>
         </div>
       </div>
@@ -321,40 +348,55 @@ export default function BalansPage() {
 
         <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
           Deze kengetallen geven inzicht in je financiële weerbaarheid.
-          Een hogere solvabiliteit betekent meer onafhankelijkheid van schulden.
+          Hoe hoger de solvabiliteit en liquiditeit, hoe sterker je positie.
         </div>
 
-        {/* Eigen vermogen */}
+        {/* Vermogenspositie */}
+        <p className="mb-1 mt-2 font-sans text-[9px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">Vermogenspositie</p>
         <KengetalRow
           label="Eigen vermogen"
           value={formatCurrency(data.eigenVermogen)}
           variant={data.eigenVermogen >= 0 ? 'positive' : 'negative'}
         />
-
-        {/* Total schulden */}
         <KengetalRow
           label="Totaal schulden"
           value={formatCurrency(data.totalSchulden)}
           variant={data.totalSchulden > 0 ? 'negative' : 'neutral'}
         />
+        <KengetalRow
+          label="Balanstotaal"
+          value={formatCurrency(data.totalActiva)}
+        />
 
         <div className="my-2 border-b border-dashed border-[var(--border-ed)]" />
 
-        {/* Solvabiliteitsratio */}
+        {/* Ratio's */}
+        <p className="mb-1 font-sans text-[9px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">{"Ratio's"}</p>
+
         {data.solvabiliteitsratio != null && (
           <KengetalRow
             label="Solvabiliteitsratio"
             value={`${data.solvabiliteitsratio.toFixed(1)}%`}
             variant={solvVariant}
+            tooltip="Eigen vermogen / Totaal activa"
           />
         )}
 
-        {/* Schuldgraad */}
         {data.schuldgraad != null && (
           <KengetalRow
-            label="Schuldgraad (debt-to-equity)"
-            value={data.schuldgraad.toFixed(2)}
+            label="Schuldgraad"
+            value={`${data.schuldgraad.toFixed(2)}×`}
             variant={data.schuldgraad > 2 ? 'negative' : data.schuldgraad <= 1 ? 'positive' : 'neutral'}
+            tooltip="Schulden / Eigen vermogen"
+          />
+        )}
+
+        {data.liquiditeitsratio != null && (
+          <KengetalRow
+            label="Liquiditeitsratio (current ratio)"
+            value={`${data.liquiditeitsratio.toFixed(2)}×`}
+            variant={data.liquiditeitsratio >= 2 ? 'positive' : data.liquiditeitsratio >= 1 ? 'neutral' : 'negative'}
+            tooltip="(Vlottende activa + liquide middelen) / Kort vreemd vermogen"
           />
         )}
 
@@ -382,13 +424,13 @@ export default function BalansPage() {
 
         {/* Formules */}
         <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-          <p><strong className="font-semibold text-[var(--ink-3)]">Eigen vermogen</strong> = Totaal activa − Totaal schulden</p>
-          <p className="mt-0.5"><strong className="font-semibold text-[var(--ink-3)]">Solvabiliteitsratio</strong> = Eigen vermogen ÷ Totaal activa × 100%</p>
+          <p><strong className="font-semibold text-[var(--ink-3)]">Solvabiliteit</strong> = Eigen vermogen ÷ Totaal activa × 100%</p>
           <p className="mt-0.5"><strong className="font-semibold text-[var(--ink-3)]">Schuldgraad</strong> = Totaal schulden ÷ Eigen vermogen</p>
+          <p className="mt-0.5"><strong className="font-semibold text-[var(--ink-3)]">Liquiditeit</strong> = (Vlottende activa + Liquide middelen) ÷ Kort vreemd vermogen</p>
         </div>
 
         <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">
-          Berekend op basis van {totalAssetItems} activa en {totalDebtItems} passiva in TriFinity
+          Berekend op basis van {totalAssetItems} activa en {totalDebtItems} schulden in TriFinity
         </p>
       </div>
 
@@ -412,77 +454,6 @@ export default function BalansPage() {
             Je eigen vermogen van {formatCurrency(data.eigenVermogen)} vertegenwoordigt {freedom.formattedDagen} aan financiële vrijheid,
             gebaseerd op je dagelijkse uitgaven van {formatCurrency(Math.round(data.dailyExpenseRate))}/dag.
           </p>
-        </div>
-      )}
-
-      {/* ════════════════════════════════════════════════════════════════════════
-          SAMENSTELLING — Asset/debt type breakdown
-         ════════════════════════════════════════════════════════════════════════ */}
-      {(usedAssetTypes.length > 0 || usedDebtTypes.length > 0) && (
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
-          {/* Asset composition */}
-          {usedAssetTypes.length > 0 && (
-            <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 shadow-[var(--s0)]">
-              <p className="mb-3 font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-                Samenstelling activa
-              </p>
-              <div className="space-y-1.5">
-                {usedAssetTypes.map(type => {
-                  const items = [
-                    ...data.vasteActiva.items.filter(i => i.type === type),
-                    ...data.vlottendeActiva.items.filter(i => i.type === type),
-                  ]
-                  const total = items.reduce((s, i) => s + i.value, 0)
-                  const pct = data.totalActiva > 0 ? (total / data.totalActiva) * 100 : 0
-                  return (
-                    <div key={type}>
-                      <div className="flex items-center justify-between">
-                        <span className="font-inter text-xs text-[var(--ink-2)]">{typeLabel(type)}</span>
-                        <span className="font-dm-mono text-xs tabular-nums text-[var(--ink-3)]">
-                          {pct.toFixed(0)}% · {formatCurrency(total)}
-                        </span>
-                      </div>
-                      <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-[var(--border-ed)]">
-                        <div className="h-full rounded-full bg-kern-400" style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Debt composition */}
-          {usedDebtTypes.length > 0 && (
-            <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 shadow-[var(--s0)]">
-              <p className="mb-3 font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-                Samenstelling schulden
-              </p>
-              <div className="space-y-1.5">
-                {usedDebtTypes.map(type => {
-                  const items = [
-                    ...data.langVreemdVermogen.items.filter(i => i.type === type),
-                    ...data.kortVreemdVermogen.items.filter(i => i.type === type),
-                  ]
-                  const total = items.reduce((s, i) => s + i.value, 0)
-                  const pct = data.totalSchulden > 0 ? (total / data.totalSchulden) * 100 : 0
-                  return (
-                    <div key={type}>
-                      <div className="flex items-center justify-between">
-                        <span className="font-inter text-xs text-[var(--ink-2)]">{typeLabel(type)}</span>
-                        <span className="font-dm-mono text-xs tabular-nums text-[var(--ink-3)]">
-                          {pct.toFixed(0)}% · {formatCurrency(total)}
-                        </span>
-                      </div>
-                      <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-[var(--border-ed)]">
-                        <div className="h-full rounded-full bg-red-400" style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
         </div>
       )}
 

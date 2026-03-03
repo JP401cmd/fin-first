@@ -5,16 +5,23 @@ import { createClient } from '@/lib/supabase/server'
 export interface BalansItem {
   id: string
   name: string
-  type: string          // asset_type or debt_type
+  type: string          // asset_type, debt_type, or bank account_type
   value: number         // weighted value (after inclusion %)
   rawValue: number      // original value before weighting
   inclusionPct: number
   interestRate?: number // only for debts
 }
 
+export interface BalansSubGroup {
+  label: string
+  items: BalansItem[]
+  subtotal: number
+}
+
 export interface BalansCategory {
   label: string
   items: BalansItem[]
+  subGroups: BalansSubGroup[]
   subtotal: number
 }
 
@@ -24,19 +31,21 @@ export interface BalansData {
   displayName: string | null
 
   // ── ACTIVA (left side) ──
-  vasteActiva: BalansCategory    // Fixed assets: woning, voertuig, fysieke bezittingen
-  vlottendeActiva: BalansCategory // Current assets: spaargeld, beleggingen, crypto, pensioen
+  vasteActiva: BalansCategory       // Fixed assets: woning, voertuig, fysieke bezittingen
+  vlottendeActiva: BalansCategory   // Current assets: spaargeld, beleggingen, crypto, pensioen
+  liquideMiddelen: BalansCategory   // Cash & bank accounts: betaal- en spaarrekeningen
   totalActiva: number
 
   // ── PASSIVA (right side) ──
-  eigenVermogen: number           // Net worth = activa - schulden
-  langVreemdVermogen: BalansCategory  // Long-term: hypotheek, studielening, persoonlijke lening, autolening
-  kortVreemdVermogen: BalansCategory  // Short-term: creditcard, doorlopend krediet, afbetalingsregeling
-  totalPassiva: number            // = eigenVermogen + lang + kort (equals totalActiva)
+  eigenVermogen: number              // Net worth = activa - schulden
+  langVreemdVermogen: BalansCategory // Long-term: hypotheek, studielening, persoonlijke lening
+  kortVreemdVermogen: BalansCategory // Short-term: creditcard, doorlopend krediet
+  totalPassiva: number               // = eigenVermogen + lang + kort (equals totalActiva)
 
   // ── Kengetallen ──
   solvabiliteitsratio: number | null  // eigenVermogen / totalActiva × 100
-  schuldgraad: number | null          // totalSchulden / eigenVermogen (debt-to-equity)
+  schuldgraad: number | null          // totalSchulden / eigenVermogen
+  liquiditeitsratio: number | null    // vlottendeActiva+liquide / kortVreemdVermogen
   totalSchulden: number
 
   // ── Vrijheid ──
@@ -53,6 +62,51 @@ const VASTE_ACTIVA_TYPES = new Set(['eigen_huis', 'real_estate', 'vehicle', 'phy
 const LANG_VREEMD_TYPES = new Set(['mortgage', 'personal_loan', 'student_loan', 'car_loan'])
 // Everything else → kort vreemd vermogen (<1 year)
 
+// Dutch labels for asset types
+const ASSET_TYPE_LABELS: Record<string, string> = {
+  savings: 'Spaargeld',
+  investment: 'Beleggingen',
+  retirement: 'Pensioen',
+  eigen_huis: 'Eigen woning',
+  real_estate: 'Vastgoed (belegging)',
+  crypto: 'Crypto',
+  vehicle: 'Voertuig',
+  physical: 'Fysieke bezittingen',
+  other: 'Overig',
+}
+
+const DEBT_TYPE_LABELS: Record<string, string> = {
+  mortgage: 'Hypotheek',
+  personal_loan: 'Persoonlijke lening',
+  student_loan: 'Studielening',
+  car_loan: 'Autolening',
+  credit_card: 'Creditcard',
+  revolving_credit: 'Doorlopend krediet',
+  payment_plan: 'Afbetalingsregeling',
+  other: 'Overig',
+}
+
+const BANK_ACCOUNT_LABELS: Record<string, string> = {
+  checking: 'Betaalrekening',
+  savings: 'Spaarrekening',
+  joint: 'En/of-rekening',
+  business: 'Zakelijke rekening',
+  other: 'Overige rekening',
+}
+
+function buildSubGroups(items: BalansItem[], labelMap: Record<string, string>): BalansSubGroup[] {
+  const groups: Record<string, BalansItem[]> = {}
+  for (const item of items) {
+    if (!groups[item.type]) groups[item.type] = []
+    groups[item.type].push(item)
+  }
+  return Object.entries(groups).map(([type, groupItems]) => ({
+    label: labelMap[type] || type,
+    items: groupItems,
+    subtotal: groupItems.reduce((s, i) => s + i.value, 0),
+  }))
+}
+
 export async function GET(request: Request) {
   try {
     const supabase = await createClient()
@@ -65,8 +119,8 @@ export async function GET(request: Request) {
     const url = new URL(request.url)
     const date = url.searchParams.get('date') || new Date().toISOString().split('T')[0]
 
-    // Fetch all active assets, debts, profile and expense data in parallel
-    const [assetsResult, debtsResult, profileResult, expenseResult] = await Promise.allSettled([
+    // Fetch all active assets, debts, bank accounts, profile and expense data
+    const [assetsResult, debtsResult, bankResult, profileResult, expenseResult] = await Promise.allSettled([
       supabase
         .from('assets')
         .select('id, name, asset_type, current_value, is_active, net_worth_inclusion_pct')
@@ -74,6 +128,10 @@ export async function GET(request: Request) {
       supabase
         .from('debts')
         .select('id, name, debt_type, current_balance, interest_rate, is_active, net_worth_inclusion_pct')
+        .eq('is_active', true),
+      supabase
+        .from('bank_accounts')
+        .select('id, name, account_type, balance, is_active')
         .eq('is_active', true),
       supabase
         .from('profiles')
@@ -89,10 +147,12 @@ export async function GET(request: Request) {
 
     type AssetRow = { id: string; name: string; asset_type: string; current_value: number; is_active: boolean; net_worth_inclusion_pct: number }
     type DebtRow = { id: string; name: string; debt_type: string; current_balance: number; interest_rate: number; is_active: boolean; net_worth_inclusion_pct: number }
+    type BankRow = { id: string; name: string; account_type: string; balance: number; is_active: boolean }
     type TxRow = { amount: number; date: string }
 
     const assetsRaw = (assetsResult.status === 'fulfilled' ? assetsResult.value.data ?? [] : []) as AssetRow[]
     const debtsRaw = (debtsResult.status === 'fulfilled' ? debtsResult.value.data ?? [] : []) as DebtRow[]
+    const banksRaw = (bankResult.status === 'fulfilled' ? bankResult.value.data ?? [] : []) as BankRow[]
     const profile = profileResult.status === 'fulfilled' ? profileResult.value.data : null
     const expenses = (expenseResult.status === 'fulfilled' ? expenseResult.value.data ?? [] : []) as TxRow[]
 
@@ -122,16 +182,36 @@ export async function GET(request: Request) {
     const vasteActiva: BalansCategory = {
       label: 'Vaste activa',
       items: vasteItems,
+      subGroups: buildSubGroups(vasteItems, ASSET_TYPE_LABELS),
       subtotal: vasteItems.reduce((s, i) => s + i.value, 0),
     }
 
     const vlottendeActiva: BalansCategory = {
       label: 'Vlottende activa',
       items: vlottendeItems,
+      subGroups: buildSubGroups(vlottendeItems, ASSET_TYPE_LABELS),
       subtotal: vlottendeItems.reduce((s, i) => s + i.value, 0),
     }
 
-    const totalActiva = vasteActiva.subtotal + vlottendeActiva.subtotal
+    // ── Bank accounts as liquide middelen ────────────────────────────────────
+
+    const liquideItems: BalansItem[] = banksRaw.map(b => ({
+      id: b.id,
+      name: b.name,
+      type: b.account_type,
+      rawValue: Math.round(Number(b.balance)),
+      value: Math.round(Number(b.balance)),
+      inclusionPct: 100,
+    }))
+
+    const liquideMiddelen: BalansCategory = {
+      label: 'Liquide middelen',
+      items: liquideItems,
+      subGroups: buildSubGroups(liquideItems, BANK_ACCOUNT_LABELS),
+      subtotal: liquideItems.reduce((s, i) => s + i.value, 0),
+    }
+
+    const totalActiva = vasteActiva.subtotal + vlottendeActiva.subtotal + liquideMiddelen.subtotal
 
     // ── Classify debts ───────────────────────────────────────────────────────
 
@@ -160,12 +240,14 @@ export async function GET(request: Request) {
     const langVreemdVermogen: BalansCategory = {
       label: 'Lang vreemd vermogen',
       items: langItems,
+      subGroups: buildSubGroups(langItems, DEBT_TYPE_LABELS),
       subtotal: langItems.reduce((s, i) => s + i.value, 0),
     }
 
     const kortVreemdVermogen: BalansCategory = {
       label: 'Kort vreemd vermogen',
       items: kortItems,
+      subGroups: buildSubGroups(kortItems, DEBT_TYPE_LABELS),
       subtotal: kortItems.reduce((s, i) => s + i.value, 0),
     }
 
@@ -181,6 +263,12 @@ export async function GET(request: Request) {
 
     const schuldgraad = eigenVermogen > 0
       ? Math.round((totalSchulden / eigenVermogen) * 100) / 100
+      : null
+
+    // Current ratio: (vlottende activa + liquide middelen) / kort vreemd vermogen
+    const currentAssets = vlottendeActiva.subtotal + liquideMiddelen.subtotal
+    const liquiditeitsratio = kortVreemdVermogen.subtotal > 0
+      ? Math.round((currentAssets / kortVreemdVermogen.subtotal) * 100) / 100
       : null
 
     // ── Daily expense rate ───────────────────────────────────────────────────
@@ -208,6 +296,7 @@ export async function GET(request: Request) {
       displayName: profile?.full_name || null,
       vasteActiva,
       vlottendeActiva,
+      liquideMiddelen,
       totalActiva,
       eigenVermogen,
       langVreemdVermogen,
@@ -215,6 +304,7 @@ export async function GET(request: Request) {
       totalPassiva,
       solvabiliteitsratio,
       schuldgraad,
+      liquiditeitsratio,
       totalSchulden,
       dailyExpenseRate: Math.round(dailyExpenseRate * 100) / 100,
     }
