@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeFireProjection, type HorizonInput } from '@/lib/horizon-data'
+import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
 
 export async function GET(request: Request) {
   try {
@@ -81,7 +81,7 @@ export async function GET(request: Request) {
     const freedomPct = fireTarget > 0 ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0) : 0
 
     // FIRE projection
-    const horizonInput: HorizonInput = {
+    const horizonInput: FinancialInput = {
       totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
       monthlyContributions, yearlyMustExpenses,
       dateOfBirth: profileData?.date_of_birth ?? null,

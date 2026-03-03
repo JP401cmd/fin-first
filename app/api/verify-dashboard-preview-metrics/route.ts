@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
-import { computeFireProjection, type HorizonInput } from '@/lib/horizon-data'
+import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -155,7 +155,7 @@ export async function GET() {
   const growthDaysStr = formatFreedomTimeString(growthDays, 'long')
   const formattedGrowth = formatCurrency(monthlyGrowth)
 
-  const horizonInput: HorizonInput = {
+  const horizonInput: FinancialInput = {
     totalAssets: 250000,
     totalDebts: 20000,
     monthlyIncome: 5000,

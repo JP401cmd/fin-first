@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeFireProjection, type HorizonInput } from '@/lib/horizon-data'
+import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
 
 export interface YearInReviewData {
   year: number

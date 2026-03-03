@@ -1,6 +1,8 @@
 /**
- * Core dashboard data calculation.
- * Computes freedom metrics from real financial data.
+ * Core financial types and dashboard metric calculations.
+ *
+ * FinancialInput  — raw data from the database (assets, debts, income, expenses, etc.)
+ * FinancialMetrics — computed values derived from FinancialInput (FIRE target, freedom %, etc.)
  *
  * SWR (Safe Withdrawal Rate): 4%
  * FIRE target = yearly expenses / 0.04
@@ -8,7 +10,28 @@
  * Freedom time = net worth / yearly expenses
  */
 
-export type CoreData = {
+// ── Input: raw financial data from DB ────────────────────────
+
+export interface FinancialInput {
+  // Shared (used by both core metrics and horizon projections)
+  totalAssets: number
+  totalDebts: number
+  monthlyIncome: number
+  monthlyExpenses: number
+  yearlyMustExpenses: number
+
+  // Horizon-specific
+  monthlyContributions: number       // sum of asset monthly_contributions
+  dateOfBirth: string | null         // ISO date or null
+  expectedReturn?: number            // annual decimal, default 0.07
+
+  // Core-specific
+  last12MonthsIncome?: number        // actual 12-month income (more accurate than monthly×12)
+}
+
+// ── Output: computed metrics ─────────────────────────────────
+
+export type FinancialMetrics = {
   // Freedom timeline
   freedomPercentage: number
   freedomYears: number
@@ -19,33 +42,25 @@ export type CoreData = {
   yearsToFire: number
   monthsToFire: number
 
-  // KPI's
+  // KPIs
   daysWonPerMonth: number
   savingsRate: number
   freeDaysPerYear: number
   autonomyScore: string
 
-  // Kerngetallen
+  // Derived/annualized values
   estimatedYearlyIncome: number
   yearlyMustExpenses: number
   yearlyExpenses: number
-  monthlyIncome: number
-  monthlyExpenses: number
-  totalAssets: number
-  totalDebts: number
 }
 
 const SWR = 0.04
 
 export function computeCoreData(
-  monthlyIncome: number,
-  monthlyExpenses: number,
-  totalAssets: number,
-  totalDebts: number,
-  last12MonthsIncome?: number,
-  yearlyMustExpenses?: number,
+  input: FinancialInput,
   swrOverride?: number,
-): CoreData {
+): FinancialMetrics {
+  const { monthlyIncome, monthlyExpenses, totalAssets, totalDebts, last12MonthsIncome, yearlyMustExpenses } = input
   const swr = swrOverride ?? SWR
   const yearlyIncome = monthlyIncome * 12
   const yearlyExpenses = monthlyExpenses * 12
@@ -124,9 +139,5 @@ export function computeCoreData(
     estimatedYearlyIncome: last12MonthsIncome ?? yearlyIncome,
     yearlyMustExpenses: yearlyMustExpenses ?? 0,
     yearlyExpenses,
-    monthlyIncome,
-    monthlyExpenses,
-    totalAssets,
-    totalDebts,
   }
 }

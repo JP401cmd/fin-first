@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { FhinAvatar } from '@/components/app/avatars'
-import { computeCoreData, type CoreData } from '@/lib/mock-data'
+import { computeCoreData, type FinancialInput, type FinancialMetrics } from '@/lib/core-metrics'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, BudgetIcon } from '@/components/app/budget-shared'
 import Link from 'next/link'
@@ -54,7 +54,7 @@ export default function CorePage() {
   const router = useRouter()
   const [fireParams, setFireParams] = useState<FireParams>(resolveFireParams({}))
   const fireSwr = fireParams.effectiveSwr
-  const [data, setData] = useState<CoreData | null>(null)
+  const [data, setData] = useState<FinancialMetrics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [alertBudgets, setAlertBudgets] = useState<{ budget: Budget; spent: number; limit: number }[]>([])
@@ -566,13 +566,17 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
 
   useEffect(() => {
     if (!rawFinancials) return
-    const coreData = computeCoreData(
-      rawFinancials.monthlyIncome, rawFinancials.monthlyExpenses,
-      rawFinancials.totalAssets, rawFinancials.totalDebts,
-      rawFinancials.extrapolatedIncome,
-      rawFinancials.yearlyRetirementExpenses ?? rawFinancials.yearlyMustExpenses,
-      fireSwr,
-    )
+    const coreInput: FinancialInput = {
+      totalAssets: rawFinancials.totalAssets,
+      totalDebts: rawFinancials.totalDebts,
+      monthlyIncome: rawFinancials.monthlyIncome,
+      monthlyExpenses: rawFinancials.monthlyExpenses,
+      yearlyMustExpenses: rawFinancials.yearlyRetirementExpenses ?? rawFinancials.yearlyMustExpenses,
+      monthlyContributions: 0,
+      dateOfBirth: null,
+      last12MonthsIncome: rawFinancials.extrapolatedIncome,
+    }
+    const coreData = computeCoreData(coreInput, fireSwr)
     setData(coreData)
     const netWorth = rawFinancials.totalAssets - rawFinancials.totalDebts
     const monthlySavings = rawFinancials.monthlyIncome - rawFinancials.monthlyExpenses
@@ -624,8 +628,8 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
     await supabase.from('net_worth_snapshots').upsert({
       user_id: user.id,
       snapshot_date: today,
-      total_assets: data.totalAssets,
-      total_debts: data.totalDebts,
+      total_assets: rawFinancials?.totalAssets ?? 0,
+      total_debts: rawFinancials?.totalDebts ?? 0,
       net_worth: data.netWorth,
     }, { onConflict: 'user_id,snapshot_date' })
 
@@ -777,13 +781,13 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             onClick={() => setActiveModal('cash')}
             icon={<Wallet className="h-5 w-5 text-kern-600" />}
             title="Cash"
-            metric={formatCurrency(data.monthlyIncome - data.monthlyExpenses)}
-            metricColor={data.monthlyIncome >= data.monthlyExpenses ? 'text-emerald-600' : 'text-red-600'}
-            status={data.monthlyIncome >= data.monthlyExpenses ? 'healthy' : 'attention'}
-            statusLabel={data.monthlyIncome >= data.monthlyExpenses ? 'Gezond' : 'Aandacht nodig'}
+            metric={formatCurrency(rawFinancials!.monthlyIncome - rawFinancials!.monthlyExpenses)}
+            metricColor={rawFinancials!.monthlyIncome >= rawFinancials!.monthlyExpenses ? 'text-emerald-600' : 'text-red-600'}
+            status={rawFinancials!.monthlyIncome >= rawFinancials!.monthlyExpenses ? 'healthy' : 'attention'}
+            statusLabel={rawFinancials!.monthlyIncome >= rawFinancials!.monthlyExpenses ? 'Gezond' : 'Aandacht nodig'}
             details={[
-              { label: 'Inkomen', value: formatCurrency(data.monthlyIncome), color: 'text-emerald-600' },
-              { label: 'Uitgaven', value: formatCurrency(data.monthlyExpenses), color: 'text-[var(--ink-2)]' },
+              { label: 'Inkomen', value: formatCurrency(rawFinancials!.monthlyIncome), color: 'text-emerald-600' },
+              { label: 'Uitgaven', value: formatCurrency(rawFinancials!.monthlyExpenses), color: 'text-[var(--ink-2)]' },
             ]}
             cta="Bekijk transacties"
             testId="mission-cash"
@@ -800,7 +804,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             status={overBudgetCount === 0 ? 'healthy' : 'attention'}
             statusLabel={overBudgetCount === 0 ? 'Alles op schema' : `${overBudgetCount} overschreden`}
             details={[
-              { label: 'Uitgaven', value: formatCurrency(data.monthlyExpenses), color: 'text-[var(--ink-2)]' },
+              { label: 'Uitgaven', value: formatCurrency(rawFinancials!.monthlyExpenses), color: 'text-[var(--ink-2)]' },
               { label: 'Budgetten', value: `${budgetCount} actief`, color: 'text-[var(--ink-3)]' },
             ]}
             cta="Beheer budgetten"
@@ -813,7 +817,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             onClick={() => setActiveModal('assets')}
             icon={<PiggyBank className="h-5 w-5 text-emerald-600" />}
             title="Assets"
-            metric={formatCurrency(data.totalAssets)}
+            metric={formatCurrency(rawFinancials!.totalAssets)}
             metricColor="text-emerald-600"
             status="healthy"
             statusLabel={
@@ -822,7 +826,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             }
             growthDirection={assetGrowthDirection}
             details={[
-              { label: 'Totaal', value: formatCurrency(data.totalAssets), color: 'text-emerald-600' },
+              { label: 'Totaal', value: formatCurrency(rawFinancials!.totalAssets), color: 'text-emerald-600' },
               { label: 'Richting', value: assetGrowthDirection === 'up' ? '↑ Omhoog' : assetGrowthDirection === 'down' ? '↓ Omlaag' : '→ Stabiel', color: assetGrowthDirection === 'up' ? 'text-emerald-600' : assetGrowthDirection === 'down' ? 'text-red-500' : 'text-[var(--ink-3)]' },
             ]}
             cta="Bekijk portfolio"
@@ -835,13 +839,13 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             onClick={() => setActiveModal('debts')}
             icon={<Building2 className="h-5 w-5 text-red-500" />}
             title="Schulden"
-            metric={data.totalDebts > 0 ? formatCurrency(data.totalDebts) : 'Schuldvrij'}
-            metricColor={data.totalDebts > 0 ? 'text-red-600' : 'text-emerald-600'}
-            status={data.totalDebts === 0 ? 'healthy' : debtProgress && debtProgress.progressPct > 50 ? 'healthy' : 'attention'}
-            statusLabel={data.totalDebts === 0 ? 'Schuldvrij!' : debtProgress ? `${debtProgress.progressPct.toFixed(0)}% afgelost` : 'Vrijheid terugkopen'}
+            metric={rawFinancials!.totalDebts > 0 ? formatCurrency(rawFinancials!.totalDebts) : 'Schuldvrij'}
+            metricColor={rawFinancials!.totalDebts > 0 ? 'text-red-600' : 'text-emerald-600'}
+            status={rawFinancials!.totalDebts === 0 ? 'healthy' : debtProgress && debtProgress.progressPct > 50 ? 'healthy' : 'attention'}
+            statusLabel={rawFinancials!.totalDebts === 0 ? 'Schuldvrij!' : debtProgress ? `${debtProgress.progressPct.toFixed(0)}% afgelost` : 'Vrijheid terugkopen'}
             debtProgress={debtProgress ?? undefined}
             details={[
-              { label: 'Openstaand', value: formatCurrency(data.totalDebts), color: 'text-red-600' },
+              { label: 'Openstaand', value: formatCurrency(rawFinancials!.totalDebts), color: 'text-red-600' },
               { label: 'Afgelost', value: debtProgress ? `${debtProgress.progressPct.toFixed(0)}%` : '—', color: debtProgress && debtProgress.progressPct > 0 ? 'text-emerald-600' : 'text-[var(--ink-3)]' },
             ]}
             cta="Beheer schulden"
@@ -899,10 +903,10 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         <section className="mt-6">
           <NextStepSection
             steps={computeAllKernSteps({
-              totalAssets: data.totalAssets,
-              totalDebts: data.totalDebts,
-              monthlyIncome: data.monthlyIncome,
-              monthlyExpenses: data.monthlyExpenses,
+              totalAssets: rawFinancials!.totalAssets,
+              totalDebts: rawFinancials!.totalDebts,
+              monthlyIncome: rawFinancials!.monthlyIncome,
+              monthlyExpenses: rawFinancials!.monthlyExpenses,
               budgetCount,
               snapshotCount: snapshots.length,
               hasTransactions,
@@ -1274,12 +1278,12 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                       ? 'Jaarlijkse uitgave (eigen bedrag)'
                       : 'Jaarlijkse uitgave (geschat jaarinkomen)'}
                   </span>
-                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(data.yearlyMustExpenses > 0 ? data.yearlyMustExpenses : data.monthlyExpenses * 12)}</span>
+                  <span className="tabular-nums text-[var(--ink)]">{formatCurrency(data.yearlyMustExpenses > 0 ? data.yearlyMustExpenses : rawFinancials!.monthlyExpenses * 12)}</span>
                 </div>
                 {data.yearlyMustExpenses <= 0 && (
                   <div className="flex justify-between py-0.5">
                     <span className="text-[var(--ink-2)]">× 12 maanden</span>
-                    <span className="tabular-nums text-[var(--ink)]">{formatCurrency(data.monthlyExpenses * 12)}</span>
+                    <span className="tabular-nums text-[var(--ink)]">{formatCurrency(rawFinancials!.monthlyExpenses * 12)}</span>
                   </div>
                 )}
                 {!coreSimTarget && (

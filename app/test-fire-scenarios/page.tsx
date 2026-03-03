@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { formatCurrency } from '@/components/app/budget-shared'
 import {
   computeFireProjection, computeFireRange, computeScenarios, projectForward,
-  type HorizonInput, type FireProjection, type FireRange, type ScenarioPath,
+  type FinancialInput, type FireProjection, type FireRange, type ScenarioPath,
   type MarketWeather,
 } from '@/lib/horizon-data'
 import {
@@ -25,7 +25,7 @@ import { ProjectionsModal } from '@/components/app/horizon/projections-modal'
  */
 
 // Test fixture data — deterministic inputs for FIRE calculations
-const FIXTURE_INPUT: HorizonInput = {
+const FIXTURE_INPUT: FinancialInput = {
   totalAssets: 180000,
   totalDebts: 45000,
   monthlyIncome: 5200,

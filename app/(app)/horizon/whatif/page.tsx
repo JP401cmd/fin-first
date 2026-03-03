@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/format'
 import {
-  type HorizonInput,
+  type FinancialInput,
   ageAtDate,
   DEFAULT_RETURN,
   INFLATION,
@@ -48,7 +48,7 @@ export default function WhatIfPage() {
   }, [])
 
   // ── Base data state ──────────────────────────────────────
-  const [input, setInput] = useState<HorizonInput | null>(null)
+  const [input, setInput] = useState<FinancialInput | null>(null)
   const [events, setEvents] = useState<WhatIfEvent[]>([])
   const [fireStrategy, setFireStrategy] = useState<FireStrategyConfig | undefined>(undefined)
   const [loading, setLoading] = useState(true)
@@ -129,7 +129,7 @@ export default function WhatIfPage() {
 
       setFireStrategy(parseFireStrategy(profileResult.data ?? {}))
 
-      const horizonInput: HorizonInput = {
+      const horizonInput: FinancialInput = {
         totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
         monthlyContributions, yearlyMustExpenses: yearlyRetirementExpenses, dateOfBirth: dob,
       }
@@ -195,8 +195,8 @@ export default function WhatIfPage() {
     }
   }, [input])
 
-  // ── Compute what-if HorizonInput from overrides ──────────
-  const whatIfInput = useMemo<HorizonInput | null>(() => {
+  // ── Compute what-if FinancialInput from overrides ──────────
+  const whatIfInput = useMemo<FinancialInput | null>(() => {
     if (!input || !overrides || !baseline) return null
 
     // Apply income from slider, adjusted proportionally by work days (5 = full-time)

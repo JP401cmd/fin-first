@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeCoreData } from '@/lib/mock-data'
+import { computeCoreData, type FinancialInput } from '@/lib/core-metrics'
 
 /**
  * GET /api/verify-freedom-time-labels
@@ -146,7 +146,11 @@ export async function GET() {
       const totalAssets = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.current_value), 0)
       const totalDebts = (debtsResult.data ?? []).reduce((s, d) => s + Number(d.current_balance), 0)
 
-      const coreData = computeCoreData(monthlyIncome, monthlyExpenses, totalAssets, totalDebts)
+      const coreInput: FinancialInput = {
+        totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
+        yearlyMustExpenses: 0, monthlyContributions: 0, dateOfBirth: null,
+      }
+      const coreData = computeCoreData(coreInput)
       const coreDailyExpense = coreData.yearlyExpenses / 365
 
       results.push({

@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
-import { computeFireProjection, computeResilienceScore, type HorizonInput } from '@/lib/horizon-data'
+import { computeFireProjection, computeResilienceScore, type FinancialInput } from '@/lib/horizon-data'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
 
@@ -121,7 +121,7 @@ export async function GET() {
 
   // Compute FIRE projection
   const dateOfBirth = profileResult.data?.date_of_birth ?? null
-  const horizonInput: HorizonInput = {
+  const horizonInput: FinancialInput = {
     totalAssets,
     totalDebts,
     monthlyIncome,

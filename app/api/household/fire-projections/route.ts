@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { computeFireProjection, computeFireRange, type HorizonInput, type FireProjection, type FireRange } from '@/lib/horizon-data'
+import { computeFireProjection, computeFireRange, type FinancialInput, type FireProjection, type FireRange } from '@/lib/horizon-data'
 
 /**
  * GET /api/household/fire-projections
@@ -35,7 +35,7 @@ interface HouseholdFireResponse {
   householdName: string
   // Combined household projection
   combined: {
-    input: HorizonInput
+    input: FinancialInput
     projection: FireProjection
     range: FireRange
   }
@@ -45,7 +45,7 @@ interface HouseholdFireResponse {
     fullName: string | null
     isCurrentUser: boolean
     financials: PartnerFinancials
-    input: HorizonInput
+    input: FinancialInput
     projection: FireProjection
     range: FireRange
   }>
@@ -317,7 +317,7 @@ export async function GET() {
     : null
 
   // Compute combined household FIRE projection
-  const combinedInput: HorizonInput = {
+  const combinedInput: FinancialInput = {
     totalAssets: combinedTotalAssets,
     totalDebts: combinedTotalDebts,
     monthlyIncome: combinedMonthlyIncome,
@@ -332,7 +332,7 @@ export async function GET() {
 
   // Compute individual partner projections
   const partnersProjections = partnersData.map(partner => {
-    const partnerInput: HorizonInput = {
+    const partnerInput: FinancialInput = {
       totalAssets: partner.totalAssets,
       totalDebts: partner.totalDebts,
       monthlyIncome: partner.monthlyIncome,

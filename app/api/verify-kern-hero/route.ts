@@ -26,9 +26,9 @@ export async function GET() {
       'utf-8'
     )
 
-    // Read the mock-data (computeCoreData) source
+    // Read the core-metrics (computeCoreData) source
     const mockData = readFileSync(
-      join(process.cwd(), 'lib', 'mock-data.ts'),
+      join(process.cwd(), 'lib', 'core-metrics.ts'),
       'utf-8'
     )
 
