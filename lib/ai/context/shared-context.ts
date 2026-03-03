@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { computeCoreData, type FinancialInput } from '@/lib/core-metrics'
+import { resolveFireParams } from '@/lib/fire-params'
 import { section, formatCurrency, formatFreedomTime, formatPercentage } from './formatter'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 
@@ -36,7 +37,7 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
       if (!user) return { data: null }
       return supabase
         .from('profiles')
-        .select('full_name, temporal_balance, household_type, date_of_birth, retirement_expense_method, retirement_expense_custom_amount')
+        .select('full_name, temporal_balance, household_type, date_of_birth, retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate')
         .eq('id', user.id)
         .single()
     }),
@@ -103,11 +104,12 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     identitySection = section('GEBRUIKERSPROFIEL', identityLines.join('\n')) + '\n'
   }
 
+  const fireParams = resolveFireParams(profile ?? {})
   const coreInput: FinancialInput = {
     totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
     yearlyMustExpenses: yearlyRetirementExpenses, monthlyContributions: 0, dateOfBirth: null,
   }
-  const core = computeCoreData(coreInput)
+  const core = computeCoreData(coreInput, fireParams.effectiveSwr)
 
   const lines = [
     `Netto vermogen: ${formatCurrency(core.netWorth)}`,

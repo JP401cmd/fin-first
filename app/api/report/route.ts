@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
+import { computeFireProjection, NL_SWR, type FinancialInput } from '@/lib/horizon-data'
 import { computeNetWorthProjection } from '@/lib/net-worth-projection'
 import { buildCategorySpending, patternsToInsights, detectSeasonalPatterns, detectTrends, detectAnomalies } from '@/lib/spending-patterns'
 import { generateText } from 'ai'
@@ -270,7 +270,7 @@ export async function GET(request: Request) {
         const limit = Number(b.default_limit) || 0
         return s + (b.interval === 'yearly' ? limit : limit * 12)
       }, 0)
-    const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / 0.04 : 0
+    const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / NL_SWR : 0
 
     // Total assets & debts (weighted by net_worth_inclusion_pct)
     const totalAssets = assets.reduce((sum, a) => sum + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)

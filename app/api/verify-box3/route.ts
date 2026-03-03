@@ -134,7 +134,7 @@ export async function GET(request: Request) {
 
     // Verify calculation matches
     const calculationMatches = result
-      ? Math.abs(result.belasting - belasting) < 0.01
+      ? Math.abs(result.tax - belasting) < 0.01
       : assets.length === 0
 
     return NextResponse.json({
@@ -153,8 +153,8 @@ export async function GET(request: Request) {
         totaalBeleggingen: result.totaalBeleggingen,
         totaalUitgesloten: result.totaalUitgesloten,
         totaalBox3Schulden: result.totaalBox3Schulden,
-        belasting: result.belasting,
-        vrijheidsdagen: result.vrijheidsdagen,
+        tax: result.tax,
+        freedomDays: result.freedomDays,
       } : null,
       manualCalculation,
       calculationMatches,

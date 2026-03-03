@@ -34,7 +34,7 @@ export async function GET() {
   })
 
   // Test 3: Hero uses formatWithFreedom for freedom time display
-  const heroUsesFormatWithFreedom = source.includes('formatWithFreedom(result.belasting, dailyExpenses')
+  const heroUsesFormatWithFreedom = source.includes('formatWithFreedom(result.tax, dailyExpenses')
   results.push({
     name: 'Hero uses formatWithFreedom() for tax amount',
     pass: heroUsesFormatWithFreedom,
@@ -52,7 +52,7 @@ export async function GET() {
 
   // Test 5: KPI "Vrijheidsdagen" card shows freedom-time equivalent
   const kpiVrijheidsdagenTime = source.includes('data-testid="kpi-vrijheidsdagen-time"')
-    && source.includes('formatWithFreedom(result.belasting, dailyExpenses')
+    && source.includes('formatWithFreedom(result.tax, dailyExpenses')
   results.push({
     name: 'Vrijheidsdagen KPI shows freedom-time equivalent',
     pass: kpiVrijheidsdagenTime,
@@ -69,7 +69,7 @@ export async function GET() {
   })
 
   // Test 7: Optimization tips use formatWithFreedom for savings
-  const optimizationFreedom = source.includes('formatWithFreedom(tip.besparing, dailyExpenses)')
+  const optimizationFreedom = source.includes('formatWithFreedom(tip.savings, dailyExpenses)')
   results.push({
     name: 'Optimization savings use formatWithFreedom()',
     pass: optimizationFreedom,

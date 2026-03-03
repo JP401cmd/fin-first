@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
+import { computeFireProjection, NL_SWR, type FinancialInput } from '@/lib/horizon-data'
 
 export interface YearInReviewData {
   year: number
@@ -257,7 +257,7 @@ export async function GET(request: Request) {
       ? totalExpenses / monthsWithData.length
       : 0
     const yearlyExpenses = avgMonthlyExpenses * 12
-    const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / 0.04 : 0
+    const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / NL_SWR : 0
 
     if (firstSnapshot && fireTarget > 0) {
       const startNw = Number(firstSnapshot.net_worth)

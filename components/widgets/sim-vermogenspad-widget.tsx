@@ -34,8 +34,8 @@ export function SimVermogenspadWidget({ size, data, href }: Props) {
   const toX = (age: number) => pad + ((age - minAge) / ageSpan) * (W - pad * 2)
   const toY = (val: number) => H - pad - (Math.max(val, 0) / maxVal) * (H - pad * 2)
 
-  const opbouwRows = simRows.filter(r => r.phase === 'opbouw')
-  const pensioenRows = simRows.filter(r => r.phase === 'pensioen')
+  const accumulationRows = simRows.filter(r => r.phase === 'accumulation')
+  const retirementRows = simRows.filter(r => r.phase === 'retirement')
 
   const buildPath = (rows: typeof simRows) => {
     if (rows.length === 0) return ''
@@ -67,9 +67,9 @@ export function SimVermogenspadWidget({ size, data, href }: Props) {
           ))}
 
           {/* Opbouw pad (horizon-kleur) */}
-          {opbouwRows.length > 1 && (
+          {accumulationRows.length > 1 && (
             <path
-              d={buildPath(opbouwRows)}
+              d={buildPath(accumulationRows)}
               fill="none"
               stroke="var(--horizon-500, #c4a06b)"
               strokeWidth="1.8"
@@ -87,9 +87,9 @@ export function SimVermogenspadWidget({ size, data, href }: Props) {
           )}
 
           {/* Pensioen pad (gedempte kleur) */}
-          {pensioenRows.length > 1 && (
+          {retirementRows.length > 1 && (
             <path
-              d={buildPath(pensioenRows)}
+              d={buildPath(retirementRows)}
               fill="none"
               stroke="var(--ink-4)"
               strokeWidth="1.2"
@@ -117,7 +117,7 @@ export function SimVermogenspadWidget({ size, data, href }: Props) {
               />
               <circle
                 cx={fireX}
-                cy={toY(opbouwRows.at(-1)?.endPortfolio ?? 0)}
+                cy={toY(accumulationRows.at(-1)?.endPortfolio ?? 0)}
                 r="3"
                 fill="var(--horizon-600, #a07840)"
                 style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 300ms ease 650ms' }}

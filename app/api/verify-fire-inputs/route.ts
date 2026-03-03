@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeFireProjection, projectForward, type FinancialInput } from '@/lib/horizon-data'
+import { computeFireProjection, projectForward, NL_SWR, type FinancialInput } from '@/lib/horizon-data'
 import { NextResponse } from 'next/server'
 
 /**
@@ -129,14 +129,14 @@ export async function GET() {
       details: `${projectionData.length} months of projection data. First: netWorth=${projectionData[0]?.netWorth?.toFixed(2) ?? 'N/A'}, Last: netWorth=${projectionData[projectionData.length - 1]?.netWorth?.toFixed(2) ?? 'N/A'}`,
     })
 
-    // ── Test 6: FIRE target uses 4% SWR rule with real expenses ──
-    const expectedTarget = (monthlyExpenses * 12) / 0.04
+    // ── Test 6: FIRE target uses NL SWR (≈2.88%) with real expenses ──
+    const expectedTarget = (monthlyExpenses * 12) / NL_SWR
     const targetMatches = Math.abs(fireResult.fireTarget - expectedTarget) < 0.01
 
     results.push({
-      test: '6. FIRE target computed from real monthly expenses using 4% SWR',
+      test: '6. FIRE target computed from real monthly expenses using NL SWR',
       passed: targetMatches,
-      details: `Expected = (${monthlyExpenses.toFixed(2)} x 12) / 0.04 = ${expectedTarget.toFixed(2)}. Actual = ${fireResult.fireTarget.toFixed(2)}. Match: ${targetMatches}`,
+      details: `Expected = (${monthlyExpenses.toFixed(2)} x 12) / ${(NL_SWR * 100).toFixed(2)}% = ${expectedTarget.toFixed(2)}. Actual = ${fireResult.fireTarget.toFixed(2)}. Match: ${targetMatches}`,
     })
 
     // ── Test 7: Net worth = totalAssets - totalDebts from real data ──
