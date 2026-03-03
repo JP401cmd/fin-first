@@ -1457,7 +1457,7 @@ function BudgetDetailModal({
   const [showRolloverOverride, setShowRolloverOverride] = useState(false)
   const [overrideAmount, setOverrideAmount] = useState('')
   const [overrideSaving, setOverrideSaving] = useState(false)
-  const [showVarianceDetail, setShowVarianceDetail] = useState(false)
+  const [showForecastExpanded, setShowForecastExpanded] = useState(false)
   const [showForecastModal, setShowForecastModal] = useState(false)
   type FullTx = { id: string; account_id: string; budget_id: string | null; date: string; amount: number; description: string; counterparty_name: string | null; counterparty_iban: string | null; is_income: boolean; notes: string | null; category_source: string; is_split?: boolean }
   const [txToEdit, setTxToEdit] = useState<FullTx | null>(null)
@@ -2370,82 +2370,87 @@ function BudgetDetailModal({
                 <p className="text-xs font-semibold text-[var(--ink-3)] uppercase">Voorspelling volgende maand</p>
               </div>
 
-              {/* Predicted amount */}
-              <div className="rounded-[var(--r-lg)] border border-[var(--border-md)] bg-[var(--subtle)]/50 p-4" data-testid="budget-forecast-card">
-                <div className="flex items-start justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setShowForecastModal(true)}
-                    className="text-left transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kern-300 rounded"
-                    title="Bekijk de berekening"
-                  >
+              {/* Compact forecast card — collapsed: bedrag + badge, expanded: alle details */}
+              <div className="rounded-[var(--r-lg)] border border-[var(--border-md)] bg-[var(--subtle)]/50" data-testid="budget-forecast-card">
+                {/* Collapsed row — altijd zichtbaar */}
+                <button
+                  type="button"
+                  onClick={() => setShowForecastExpanded(v => !v)}
+                  className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-[var(--subtle)]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kern-300 rounded-[var(--r-lg)]"
+                  aria-expanded={showForecastExpanded}
+                  aria-label="Voorspellingsdetails tonen"
+                >
+                  <div>
                     <p className="text-xs text-[var(--ink-3)] font-medium">Verwachte uitgaven</p>
-                    <p className="text-2xl font-bold text-[var(--ink)] mt-0.5" data-testid="budget-forecast-amount">
+                    <p className="text-lg font-bold text-[var(--ink)] mt-0.5" data-testid="budget-forecast-amount">
                       {formatCurrency(forecast.predicted)}
                     </p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <SpendingConfidenceBadge data={varianceData} />
+                    {showForecastExpanded
+                      ? <ChevronUp className="h-3.5 w-3.5 text-[var(--ink-3)]" />
+                      : <ChevronDown className="h-3.5 w-3.5 text-[var(--ink-3)]" />
+                    }
+                  </div>
+                </button>
+
+                {/* Expanded details — uitklapbaar */}
+                {showForecastExpanded && (
+                  <div className="border-t border-dashed border-[var(--border-ed)] px-4 pb-4" style={{ animation: 'fadeUp 0.25s ease-out both' }}>
+                    {/* Freedom time equivalent */}
                     {hasFreedomData && forecast.predicted >= 100 && (
-                      <p className="font-serif text-sm italic text-[var(--ink-3)] mt-0.5">
+                      <p className="font-serif text-sm italic text-[var(--ink-3)] mt-3">
                         ≈ {eurToFreedomTime(forecast.predicted, dailyExpenseRate).formattedDagen}
                       </p>
                     )}
-                    <p className="text-[10px] text-kern-500 mt-1">Hoe berekend? →</p>
-                  </button>
 
-                  {/* Spending variance confidence badge with signal bars — klikbaar voor details */}
-                  <button
-                    type="button"
-                    onClick={() => setShowVarianceDetail(v => !v)}
-                    className="flex items-center gap-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-md)]"
-                    aria-expanded={showVarianceDetail}
-                    aria-label="Betrouwbaarheid details tonen"
-                  >
-                    <SpendingConfidenceBadge data={varianceData} />
-                    {showVarianceDetail
-                      ? <ChevronUp className="h-3 w-3 text-[var(--ink-3)]" />
-                      : <ChevronDown className="h-3 w-3 text-[var(--ink-3)]" />
-                    }
-                  </button>
-                </div>
+                    {/* Contextual message */}
+                    <p className="text-xs text-[var(--ink-3)] mt-3" data-testid="budget-forecast-message">
+                      {forecast.message}
+                    </p>
 
-                {/* Contextual message */}
-                <p className="text-xs text-[var(--ink-3)] mt-2" data-testid="budget-forecast-message">
-                  {forecast.message}
-                </p>
-
-                {/* Confidence detail */}
-                <div className="mt-2 flex items-center gap-3 text-[10px] text-[var(--ink-3)]">
-                  <span>Gebaseerd op {forecast.monthsUsed} maanden</span>
-                  <span>•</span>
-                  <span>{forecast.confidencePercent}% betrouwbaarheid</span>
-                </div>
-
-                {/* Budget limit comparison bar */}
-                {limit > 0 && (
-                  <div className="mt-3">
-                    <div className="flex items-center justify-between text-[10px] text-[var(--ink-3)] mb-1">
-                      <span>Voorspeld vs limiet</span>
-                      <span>{Math.round((forecast.predicted / limit) * 100)}%</span>
+                    {/* Confidence detail */}
+                    <div className="mt-2 flex items-center gap-3 text-[10px] text-[var(--ink-3)]">
+                      <span>Gebaseerd op {forecast.monthsUsed} maanden</span>
+                      <span>•</span>
+                      <span>{forecast.confidencePercent}% betrouwbaarheid</span>
                     </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          forecast.exceedsLimit ? 'bg-red-500' : forecast.predicted / limit > 0.8 ? 'bg-kern-400' : 'bg-[var(--border-md)]'
-                        }`}
-                        style={{ width: `${Math.min((forecast.predicted / limit) * 100, 100)}%` }}
-                      />
-                    </div>
+
+                    {/* Budget limit comparison bar */}
+                    {limit > 0 && (
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between text-[10px] text-[var(--ink-3)] mb-1">
+                          <span>Voorspeld vs limiet</span>
+                          <span>{Math.round((forecast.predicted / limit) * 100)}%</span>
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              forecast.exceedsLimit ? 'bg-red-500' : forecast.predicted / limit > 0.8 ? 'bg-kern-400' : 'bg-[var(--border-md)]'
+                            }`}
+                            style={{ width: `${Math.min((forecast.predicted / limit) * 100, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Spending variance detail panel */}
+                    <SpendingVarianceDetailPanel data={varianceData} className="mt-3" />
+
+                    {/* Hoe berekend link */}
+                    <button
+                      type="button"
+                      onClick={() => setShowForecastModal(true)}
+                      className="mt-3 text-[10px] text-kern-500 transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kern-300 rounded"
+                    >
+                      Hoe berekend? →
+                    </button>
                   </div>
                 )}
               </div>
 
-              {/* Spending variance detail panel — conditioneel achter badge-klik */}
-              {showVarianceDetail && (
-                <div style={{ animation: 'fadeUp 0.25s ease-out both' }}>
-                  <SpendingVarianceDetailPanel data={varianceData} className="mt-3" />
-                </div>
-              )}
-
-              {/* Alert when predicted exceeds limit */}
+              {/* Alert when predicted exceeds limit — altijd zichtbaar */}
               {forecast.exceedsLimit && forecast.alertMessage && (
                 <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3" data-testid="budget-forecast-alert">
                   <AlertCircle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />

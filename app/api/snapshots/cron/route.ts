@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { computeFireProjection, computeResilienceScore, type HorizonInput } from '@/lib/horizon-data'
+import { computeFireProjection, computeResilienceScore, NL_SWR, type HorizonInput } from '@/lib/horizon-data'
+import { resolveFireParams } from '@/lib/fire-params'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
 import { SWR } from '@/lib/constants'
@@ -69,7 +70,7 @@ export async function GET(request: Request) {
   // Get all users with completed onboarding
   const { data: profiles, error: profilesError } = await supabase
     .from('profiles')
-    .select('id, date_of_birth')
+    .select('id, date_of_birth, expected_return, inflation_rate')
     .eq('onboarding_completed', true)
 
   if (profilesError) {
@@ -154,7 +155,9 @@ export async function GET(request: Request) {
         return s + (b.interval === 'yearly' ? limit : limit * 12)
       }, 0)
 
-      const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / SWR : 0
+      const fireParams = resolveFireParams(profile)
+      const fireSwr = fireParams.effectiveSwr
+      const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / fireSwr : 0
       const freedomPercentage = fireTarget > 0
         ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0)
         : 0
@@ -168,7 +171,7 @@ export async function GET(request: Request) {
         yearlyMustExpenses,
         dateOfBirth: profile.date_of_birth,
       }
-      const fireProjection = computeFireProjection(horizonInput)
+      const fireProjection = computeFireProjection(horizonInput, fireParams.grossReturn, fireSwr)
 
       const consumerDebtTypes = ['personal_loan', 'credit_card', 'revolving_credit', 'payment_plan', 'car_loan']
       const hasConsumerDebt = debts.some(d => consumerDebtTypes.includes(d.debt_type) && Number(d.current_balance) > 0)

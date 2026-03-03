@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { computeEffectiveExpenses, computeFireTarget, computeFreedomPercentage } from '@/lib/core-metrics'
 import { computeFireProjection, computeFireRange, runBacktest, ageAtDate, deriveCountdown, NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF, NL_SWR, type HorizonInput, type LifeEvent, type FireCountdown } from '@/lib/horizon-data'
 import { resolveFireParams } from '@/lib/fire-params'
 import { runSimulation, lifeEventsToCashflows } from '@/lib/fire-simulation'
@@ -169,8 +170,8 @@ export default async function DashboardPage() {
   )
 
   const yearlyExpenses = monthlyExpenses * 12
-  const fireTarget = yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses / fireSwr : (yearlyExpenses > 0 ? yearlyExpenses / fireSwr : 0)
-  const freedomPct = fireTarget > 0 ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0) : 0
+  const fireTarget = computeFireTarget(computeEffectiveExpenses(yearlyRetirementExpenses, yearlyExpenses), fireSwr)
+  const freedomPct = computeFreedomPercentage(netWorth, fireTarget)
 
   // FIRE projection
   const horizonInput: HorizonInput = {
@@ -235,8 +236,8 @@ export default async function DashboardPage() {
     }
   }
 
-  // Box 3 belasting — zelfde berekening als /core/belasting (default: 2025, geen partner)
-  let box3Belasting: number | null = null
+  // Box 3 tax — same calculation as /core/belasting (default: 2025, no partner)
+  let box3Tax: number | null = null
   const rawAssets = assetsResult.data ?? []
   const rawDebts = debtsResult.data ?? []
   if (rawAssets.length > 0) {
@@ -249,9 +250,9 @@ export default async function DashboardPage() {
         dailyExpenses: dailyExp,
         year: 2025,
       })
-      box3Belasting = box3Result.belasting
+      box3Tax = box3Result.tax
     } catch {
-      box3Belasting = null
+      box3Tax = null
     }
   }
 
@@ -382,7 +383,7 @@ export default async function DashboardPage() {
     simRequiredPortfolio,
     backtestSuccessRate,
     backtestNamedPaths,
-    box3Belasting,
+    box3Tax,
     simFireCountdown,
     fireEndStrategy: fireStrategy.strategy,
     fireEndAge: fireStrategy.endAge,

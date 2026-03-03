@@ -148,12 +148,12 @@ export function Box3Calculation({ result }: { result: Box3Result }) {
               value={pct(result.effectiefRendement)}
               tooltip={BOX3_TOOLTIPS.effectiefTarief}
             />
-            <Step label="Box 3 inkomen" value={formatCurrency(result.box3Inkomen)} />
+            <Step label="Box 3 inkomen" value={formatCurrency(result.box3Income)} />
             <Step label={`Tarief (${pct(result.params.tarief)})`} value="" />
             <div className="my-2 border-t border-dashed border-kern-200" />
             <Step
               label="Te betalen Box 3 belasting"
-              value={formatCurrency(result.belasting)}
+              value={formatCurrency(result.tax)}
               highlight
             />
           </div>

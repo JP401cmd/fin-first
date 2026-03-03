@@ -119,13 +119,13 @@ export async function GET() {
   try {
     const pagePath = join(process.cwd(), 'app', '(app)', 'core', 'belasting', 'page.tsx')
     const content = readFileSync(pagePath, 'utf-8')
-    const showsBelasting = content.includes('result.belasting')
-    const showsVrijheidsdagen = content.includes('result.vrijheidsdagen')
+    const showsTax = content.includes('result.tax')
+    const showsFredomDays = content.includes('result.freedomDays')
     const showsEffectiefTarief = content.includes('effectiefTariefPct')
     results.push({
-      name: 'Belasting page displays tax data (belasting, vrijheidsdagen, tarief)',
-      pass: showsBelasting && showsVrijheidsdagen && showsEffectiefTarief,
-      details: `belasting: ${showsBelasting}, vrijheidsdagen: ${showsVrijheidsdagen}, tarief: ${showsEffectiefTarief}`,
+      name: 'Belasting page displays tax data (tax, freedomDays, tarief)',
+      pass: showsTax && showsFredomDays && showsEffectiefTarief,
+      details: `tax: ${showsTax}, freedomDays: ${showsFredomDays}, tarief: ${showsEffectiefTarief}`,
     })
   } catch (e) {
     results.push({ name: 'Belasting page displays tax data', pass: false, details: String(e) })

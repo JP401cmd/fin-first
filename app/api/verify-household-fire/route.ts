@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { computeFireProjection, computeFireRange, type HorizonInput } from '@/lib/horizon-data'
+import { computeFireProjection, computeFireRange, NL_SWR, type HorizonInput } from '@/lib/horizon-data'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -119,12 +119,12 @@ export async function GET() {
       name: 'Shared FIRE target computed from combined data',
       passed: hasFireTarget,
       details: hasFireTarget
-        ? `Shared FIRE target: ${Math.round(combinedProjection.fireTarget)} (based on combined yearly expenses / 4% SWR)`
+        ? `Shared FIRE target: ${Math.round(combinedProjection.fireTarget)} (based on combined yearly expenses / NL SWR)`
         : 'FIRE target not computed',
     })
 
-    // Verify FIRE target is based on combined expenses (5000*12/0.04 = 1,500,000)
-    const expectedTarget = (5000 * 12) / 0.04
+    // Verify FIRE target is based on combined expenses
+    const expectedTarget = (5000 * 12) / NL_SWR
     const targetCorrect = Math.abs(combinedProjection.fireTarget - expectedTarget) < 1
     results.push({
       step: 3,
