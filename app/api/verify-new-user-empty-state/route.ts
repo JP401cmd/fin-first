@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
-import { computeFireProjection, type HorizonInput } from '@/lib/horizon-data'
+import { computeFireProjection, NL_SWR, type HorizonInput } from '@/lib/horizon-data'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { formatCurrency } from '@/lib/format'
 
@@ -67,7 +67,7 @@ export async function GET() {
     }
     const netWorth = 0 - 0 // totalAssets - totalDebts
     const yearlyExpenses = 0 * 12
-    const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / 0.04 : 0
+    const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / NL_SWR : 0
     const freedomPct = fireTarget > 0 ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0) : 0
     results.push({
       test: 'Zero data produces €0 net worth and 0% freedom (no NaN)',

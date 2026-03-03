@@ -2,10 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { computeFireProjection, computeResilienceScore, type HorizonInput } from '@/lib/horizon-data'
+import { resolveFireParams } from '@/lib/fire-params'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
-
-const SWR = 0.04
+import { SWR } from '@/lib/constants'
 
 /**
  * GET /api/snapshots/auto
@@ -77,7 +77,7 @@ export async function GET() {
       .lt('date', monthEnd),
     supabase
       .from('profiles')
-      .select('date_of_birth')
+      .select('date_of_birth, expected_return, inflation_rate')
       .eq('id', user.id)
       .single(),
     supabase
@@ -114,7 +114,9 @@ export async function GET() {
     return s + (b.interval === 'yearly' ? limit : limit * 12)
   }, 0)
 
-  const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / SWR : 0
+  const fireParams = resolveFireParams(profileResult.data ?? {})
+  const fireSwr = fireParams.effectiveSwr
+  const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / fireSwr : 0
   const freedomPercentage = fireTarget > 0
     ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0)
     : 0
@@ -130,7 +132,7 @@ export async function GET() {
     yearlyMustExpenses,
     dateOfBirth,
   }
-  const fireProjection = computeFireProjection(horizonInput)
+  const fireProjection = computeFireProjection(horizonInput, fireParams.grossReturn, fireSwr)
 
   // Compute sovereignty level
   const consumerDebtTypes = ['personal_loan', 'credit_card', 'revolving_credit', 'payment_plan', 'car_loan']

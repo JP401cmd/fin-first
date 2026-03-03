@@ -153,11 +153,11 @@ export async function GET(request: Request) {
       const synInput: Box3Input = { assets: synAssets, debts: [], hasPartner: false, dailyExpenses: 100, year: 2025 }
       const synResult = calculateBox3(synInput)
       const expectedTax = (100_000 - params2025.heffingsvrijSingle) * params2025.forfaitSpaargeld * params2025.tarief
-      const taxMatch = Math.abs(synResult.belasting - expectedTax) < 0.01
+      const taxMatch = Math.abs(synResult.tax - expectedTax) < 0.01
       tests.push({
         name: 'Savings-only €100k yields correct tax (2025)',
         pass: taxMatch && synResult.totaalSpaargeld === 100_000 && synResult.totaalBeleggingen === 0,
-        detail: `Tax: €${synResult.belasting.toFixed(2)} (expected: €${expectedTax.toFixed(2)}), spaargeld: €${synResult.totaalSpaargeld}, beleggingen: €${synResult.totaalBeleggingen}`,
+        detail: `Tax: €${synResult.tax.toFixed(2)} (expected: €${expectedTax.toFixed(2)}), spaargeld: €${synResult.totaalSpaargeld}, beleggingen: €${synResult.totaalBeleggingen}`,
       })
     }
 
@@ -180,11 +180,11 @@ export async function GET(request: Request) {
       const grondslagSparen = grondslag - params2025.heffingsvrijSingle
       const inkomen = grondslagSparen * effectief
       const expectedTax = inkomen * params2025.tarief
-      const taxMatch = Math.abs(synResult.belasting - expectedTax) < 0.01
+      const taxMatch = Math.abs(synResult.tax - expectedTax) < 0.01
       tests.push({
         name: 'Mixed portfolio (€30k savings + €80k investments) correct tax',
         pass: taxMatch && synResult.totaalSpaargeld === 30_000 && synResult.totaalBeleggingen === 80_000,
-        detail: `Tax: €${synResult.belasting.toFixed(2)} (expected: €${expectedTax.toFixed(2)}). Savings: €${synResult.totaalSpaargeld}, Investments: €${synResult.totaalBeleggingen}`,
+        detail: `Tax: €${synResult.tax.toFixed(2)} (expected: €${expectedTax.toFixed(2)}). Savings: €${synResult.totaalSpaargeld}, Investments: €${synResult.totaalBeleggingen}`,
       })
     }
 
@@ -199,8 +199,8 @@ export async function GET(request: Request) {
       // huis excluded → only €50k spaargeld. Below heffingsvrij → tax = 0
       tests.push({
         name: 'Eigen huis (€340k) excluded from Box 3 calculation',
-        pass: synResult.totaalUitgesloten === 340_000 && synResult.totaalSpaargeld === 50_000 && synResult.belasting === 0,
-        detail: `Uitgesloten: €${synResult.totaalUitgesloten}, Spaargeld: €${synResult.totaalSpaargeld}, Tax: €${synResult.belasting.toFixed(2)} (expected: €0 because below heffingsvrij)`,
+        pass: synResult.totaalUitgesloten === 340_000 && synResult.totaalSpaargeld === 50_000 && synResult.tax === 0,
+        detail: `Uitgesloten: €${synResult.totaalUitgesloten}, Spaargeld: €${synResult.totaalSpaargeld}, Tax: €${synResult.tax.toFixed(2)} (expected: €0 because below heffingsvrij)`,
       })
     }
 
@@ -217,12 +217,12 @@ export async function GET(request: Request) {
       // Verify: shifting reduces tax because forfait spaargeld (1.37%) < forfait beleggingen (5.88%)
       const shiftAmount = Math.min(synResult.totaalBeleggingen, 50_000)
       const shifted = calculateBox3WithShift(synInput, shiftAmount)
-      const expectedBesparing = synResult.belasting - shifted.belasting
+      const expectedBesparing = synResult.tax - shifted.tax
       tests.push({
         name: 'Shift-to-savings optimization reduces tax (beleggingen→spaargeld)',
-        pass: !!shiftTip && shiftTip.besparing > 0 && Math.abs(shiftTip.besparing - expectedBesparing) < 0.01,
+        pass: !!shiftTip && shiftTip.savings > 0 && Math.abs(shiftTip.savings - expectedBesparing) < 0.01,
         detail: shiftTip
-          ? `Shift €${shiftAmount} from beleggingen to spaargeld → saves €${shiftTip.besparing.toFixed(2)} (verified: €${expectedBesparing.toFixed(2)})`
+          ? `Shift €${shiftAmount} from beleggingen to spaargeld → saves €${shiftTip.savings.toFixed(2)} (verified: €${expectedBesparing.toFixed(2)})`
           : 'FAIL: shift-to-savings tip not generated',
       })
     }
@@ -238,13 +238,13 @@ export async function GET(request: Request) {
       const synOptimizations = generateBox3Optimizations(synResult, synInput)
       const partnerTip = synOptimizations.find(t => t.id === 'fiscaal-partner')
       const partnerResult = calculateBox3({ ...synInput, hasPartner: true })
-      const expectedBesparing = synResult.belasting - partnerResult.belasting
+      const expectedBesparing = synResult.tax - partnerResult.tax
       tests.push({
         name: 'Partner optimization doubles heffingsvrij and reduces tax',
-        pass: !!partnerTip && partnerTip.besparing > 0 && Math.abs(partnerTip.besparing - expectedBesparing) < 0.01,
+        pass: !!partnerTip && partnerTip.savings > 0 && Math.abs(partnerTip.savings - expectedBesparing) < 0.01,
         detail: partnerTip
-          ? `Single: €${synResult.belasting.toFixed(2)}, Partner: €${partnerResult.belasting.toFixed(2)}, Saves: €${partnerTip.besparing.toFixed(2)} (heffingsvrij: €${params2025.heffingsvrijSingle} → €${params2025.heffingsvrijPartner})`
-          : `FAIL: partner tip not generated (tax was €${synResult.belasting.toFixed(2)})`,
+          ? `Single: €${synResult.tax.toFixed(2)}, Partner: €${partnerResult.tax.toFixed(2)}, Saves: €${partnerTip.savings.toFixed(2)} (heffingsvrij: €${params2025.heffingsvrijSingle} → €${params2025.heffingsvrijPartner})`
+          : `FAIL: partner tip not generated (tax was €${synResult.tax.toFixed(2)})`,
       })
     }
 
@@ -260,17 +260,17 @@ export async function GET(request: Request) {
       const synOptimizations = generateBox3Optimizations(synResult, synInput)
 
       // Verify all tips with besparing > 0 have correct vrijheidsdagen
-      const tipsWithSavings = synOptimizations.filter(t => t.besparing > 0)
+      const tipsWithSavings = synOptimizations.filter(t => t.savings > 0)
       const allCorrect = tipsWithSavings.every(t => {
-        const expected = Math.round(t.besparing / synDailyExpenses)
-        return t.vrijheidsdagen === expected
+        const expected = Math.round(t.savings / synDailyExpenses)
+        return t.freedomDays === expected
       })
       // Also verify the main result has correct vrijheidsdagen
-      const mainDaysCorrect = synResult.vrijheidsdagen === Math.round(synResult.belasting / synDailyExpenses)
+      const mainDaysCorrect = synResult.freedomDays === Math.round(synResult.tax / synDailyExpenses)
       tests.push({
         name: 'Freedom days = besparing / daily expenses (correctly calculated)',
         pass: allCorrect && mainDaysCorrect,
-        detail: `Main: ${synResult.vrijheidsdagen} days (€${synResult.belasting.toFixed(2)} / €${synDailyExpenses}/day = ${Math.round(synResult.belasting / synDailyExpenses)}). Tips: ${tipsWithSavings.map(t => `"${t.title}": ${t.vrijheidsdagen} days (€${t.besparing.toFixed(2)} / €${synDailyExpenses} = ${Math.round(t.besparing / synDailyExpenses)})`).join('; ')}`,
+        detail: `Main: ${synResult.freedomDays} days (€${synResult.tax.toFixed(2)} / €${synDailyExpenses}/day = ${Math.round(synResult.tax / synDailyExpenses)}). Tips: ${tipsWithSavings.map(t => `"${t.title}": ${t.freedomDays} days (€${t.savings.toFixed(2)} / €${synDailyExpenses} = ${Math.round(t.savings / synDailyExpenses)})`).join('; ')}`,
       })
     }
 
@@ -287,8 +287,8 @@ export async function GET(request: Request) {
       // 2025 vs 2026 should differ (different forfaits and heffingsvrij)
       tests.push({
         name: 'Year toggle (2025 vs 2026) changes tax amount',
-        pass: r2025.belasting !== r2026.belasting,
-        detail: `2025: €${r2025.belasting.toFixed(2)} (forfaitS=${params2025.forfaitSpaargeld}, forfaitB=${params2025.forfaitBeleggingen}, heffingsvrij=€${params2025.heffingsvrijSingle}), 2026: €${r2026.belasting.toFixed(2)} (forfaitS=${params2026.forfaitSpaargeld}, forfaitB=${params2026.forfaitBeleggingen}, heffingsvrij=€${params2026.heffingsvrijSingle})`,
+        pass: r2025.tax !== r2026.tax,
+        detail: `2025: €${r2025.tax.toFixed(2)} (forfaitS=${params2025.forfaitSpaargeld}, forfaitB=${params2025.forfaitBeleggingen}, heffingsvrij=€${params2025.heffingsvrijSingle}), 2026: €${r2026.tax.toFixed(2)} (forfaitS=${params2026.forfaitSpaargeld}, forfaitB=${params2026.forfaitBeleggingen}, heffingsvrij=€${params2026.heffingsvrijSingle})`,
       })
     }
 
@@ -303,8 +303,8 @@ export async function GET(request: Request) {
       // €50k is below heffingsvrij (€57,684) so tax=0. €200k should have significant tax.
       tests.push({
         name: 'Changing asset value changes tax (€50k vs €200k investments)',
-        pass: r50k.belasting === 0 && r200k.belasting > 0 && r200k.belasting > r50k.belasting,
-        detail: `€50k: tax=€${r50k.belasting.toFixed(2)} (below heffingsvrij), €200k: tax=€${r200k.belasting.toFixed(2)} (above heffingsvrij). Difference: €${(r200k.belasting - r50k.belasting).toFixed(2)}`,
+        pass: r50k.tax === 0 && r200k.tax > 0 && r200k.tax > r50k.tax,
+        detail: `€50k: tax=€${r50k.tax.toFixed(2)} (below heffingsvrij), €200k: tax=€${r200k.tax.toFixed(2)} (above heffingsvrij). Difference: €${(r200k.tax - r50k.tax).toFixed(2)}`,
       })
     }
 
@@ -341,8 +341,8 @@ export async function GET(request: Request) {
         dbAssetCount: assets.length,
         dbDebtCount: debts.length,
         dailyExpenses: dailyExpenses.toFixed(2),
-        belasting: result?.belasting.toFixed(2) ?? 'N/A (no user data)',
-        vrijheidsdagen: result?.vrijheidsdagen ?? 0,
+        belasting: result?.tax.toFixed(2) ?? 'N/A (no user data)',
+        vrijheidsdagen: result?.freedomDays ?? 0,
         optimizationCount: result ? generateBox3Optimizations(result, input).length : 0,
       },
     })

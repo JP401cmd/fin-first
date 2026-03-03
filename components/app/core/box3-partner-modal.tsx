@@ -48,7 +48,7 @@ export function Box3PartnerModal({
     if (totalSch > 0) setP1Pct(prev => ({ ...prev, schulden: Math.round((optimal.partner1Schulden / totalSch) * 100) }))
   }
 
-  const besparingVsSingle = result.belasting - manualSplit.totalTax
+  const besparingVsSingle = result.tax - manualSplit.totalTax
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 transition-[right] duration-300" style={{ right: 'var(--chat-sidebar-width, 0px)' }} onClick={onClose}>
@@ -79,10 +79,10 @@ export function Box3PartnerModal({
             Optimale verdeling toepassen
           </button>
 
-          {optimal.besparingVsGelijk > 0 && (
+          {optimal.savingsVsEqual > 0 && (
             <div className="mb-5 rounded-lg bg-emerald-50 p-3 text-center">
               <p className="text-xs text-emerald-600">
-                Optimale verdeling bespaart {formatCurrency(optimal.besparingVsGelijk)} ten opzichte van 50/50
+                Optimale verdeling bespaart {formatCurrency(optimal.savingsVsEqual)} ten opzichte van 50/50
               </p>
             </div>
           )}

@@ -82,8 +82,8 @@ function ShiftTab({ input, result }: { input: Box3Input; result: Box3Result }) {
     return calculateBox3WithShift(input, shiftAmount)
   }, [input, result, shiftAmount])
 
-  const delta = result.belasting - shifted.belasting
-  const deltaVrijheid = result.vrijheidsdagen - shifted.vrijheidsdagen
+  const delta = result.tax - shifted.tax
+  const deltaVrijheid = result.freedomDays - shifted.freedomDays
 
   return (
     <div>
@@ -116,7 +116,7 @@ function ShiftTab({ input, result }: { input: Box3Input; result: Box3Result }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
           <p className="text-[10px] font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">Huidige situatie</p>
-          <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(result.belasting)}</p>
+          <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(result.tax)}</p>
           <p className="text-xs text-[var(--ink-3)]">Box 3 belasting</p>
           <div className="mt-2 text-xs text-[var(--ink-3)]">
             <p>Spaargeld: {formatCurrency(result.totaalSpaargeld)}</p>
@@ -125,7 +125,7 @@ function ShiftTab({ input, result }: { input: Box3Input; result: Box3Result }) {
         </div>
         <div className={`rounded-[var(--r-lg)] border p-4 ${delta > 0 ? 'border-emerald-200 bg-emerald-50' : 'border-[var(--border-ed)] bg-[var(--subtle)]'}`}>
           <p className="text-[10px] font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">Na verschuiving</p>
-          <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(shifted.belasting)}</p>
+          <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(shifted.tax)}</p>
           <p className="text-xs text-[var(--ink-3)]">Box 3 belasting</p>
           <div className="mt-2 text-xs text-[var(--ink-3)]">
             <p>Spaargeld: {formatCurrency(shifted.totaalSpaargeld)}</p>
@@ -155,7 +155,7 @@ function CompareTab({ input, result }: { input: Box3Input; result: Box3Result })
     [input, otherYear],
   )
 
-  const delta = result.belasting - otherResult.belasting
+  const delta = result.tax - otherResult.tax
   const params1 = result.params
   const params2 = BOX3_PARAMS[otherYear]
 
@@ -168,7 +168,7 @@ function CompareTab({ input, result }: { input: Box3Input; result: Box3Result })
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-[var(--r-lg)] border border-kern-200 bg-kern-50 p-4">
           <p className="text-xs font-semibold text-kern-700">{result.year}</p>
-          <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(result.belasting)}</p>
+          <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(result.tax)}</p>
           <div className="mt-3 space-y-1 text-xs text-[var(--ink-3)]">
             <p>Forfait spaargeld: {(params1.forfaitSpaargeld * 100).toFixed(2)}%</p>
             <p>Forfait beleggingen: {(params1.forfaitBeleggingen * 100).toFixed(2)}%</p>
@@ -177,7 +177,7 @@ function CompareTab({ input, result }: { input: Box3Input; result: Box3Result })
         </div>
         <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
           <p className="text-xs font-semibold text-[var(--ink-2)]">{otherYear}</p>
-          <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(otherResult.belasting)}</p>
+          <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(otherResult.tax)}</p>
           <div className="mt-3 space-y-1 text-xs text-[var(--ink-3)]">
             <p>Forfait spaargeld: {(params2.forfaitSpaargeld * 100).toFixed(2)}%</p>
             <p>Forfait beleggingen: {(params2.forfaitBeleggingen * 100).toFixed(2)}%</p>

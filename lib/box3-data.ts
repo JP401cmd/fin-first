@@ -44,6 +44,14 @@ export interface Box3Input {
   year: TaxYear
 }
 
+/**
+ * Box 3 calculation result.
+ *
+ * Naming convention: Dutch Box 3 tax-specific terms (forfaitairSpaargeld,
+ * heffingsvrijVermogen, rendementsgrondslag, schuldendrempel, etc.) retain
+ * Dutch naming as official legal terminology. Generic financial terms use
+ * English (tax, savings, freedomDays, box3Income).
+ */
 export interface Box3Result {
   year: TaxYear
   hasPartner: boolean
@@ -60,7 +68,7 @@ export interface Box3Result {
   totaalBox3Schulden: number
   totaalUitgeslotenSchulden: number
 
-  // Calculation steps
+  // Calculation steps (Dutch tax terms — see naming convention above)
   schuldendrempel: number
   aftrekbareSchulden: number
   forfaitairSpaargeld: number
@@ -71,11 +79,11 @@ export interface Box3Result {
   heffingsvrijVermogen: number
   grondslagSparen: number
   effectiefRendement: number
-  box3Inkomen: number
-  belasting: number
+  box3Income: number
+  tax: number
 
   // Freedom metric
-  vrijheidsdagen: number
+  freedomDays: number
   dailyExpenses: number
 }
 
@@ -83,8 +91,8 @@ export interface Box3Optimization {
   id: string
   title: string
   description: string
-  besparing: number
-  vrijheidsdagen: number
+  savings: number
+  freedomDays: number
 }
 
 export interface PartnerAllocation {
@@ -94,8 +102,8 @@ export interface PartnerAllocation {
   partner2Spaargeld: number
   partner2Beleggingen: number
   partner2Schulden: number
-  totalBelasting: number
-  besparingVsGelijk: number
+  totalTax: number
+  savingsVsEqual: number
 }
 
 // ── Constants ────────────────────────────────────────────────
@@ -260,15 +268,15 @@ export function calculateBox3(input: Box3Input): Box3Result {
     ? voordeelUitSparen / rendementsgrondslag
     : 0
 
-  // Step 14: Box 3 inkomen
-  const box3Inkomen = grondslagSparen * effectiefRendement
+  // Step 14: Box 3 income
+  const box3Income = grondslagSparen * effectiefRendement
 
-  // Step 15: Belasting
-  const belasting = box3Inkomen * params.tarief
+  // Step 15: Tax
+  const tax = box3Income * params.tarief
 
   // Freedom metric
-  const vrijheidsdagen = input.dailyExpenses > 0
-    ? Math.round(belasting / input.dailyExpenses)
+  const freedomDays = input.dailyExpenses > 0
+    ? Math.round(tax / input.dailyExpenses)
     : 0
 
   return {
@@ -292,9 +300,9 @@ export function calculateBox3(input: Box3Input): Box3Result {
     heffingsvrijVermogen,
     grondslagSparen,
     effectiefRendement,
-    box3Inkomen,
-    belasting,
-    vrijheidsdagen,
+    box3Income,
+    tax,
+    freedomDays,
     dailyExpenses: input.dailyExpenses,
   }
 }
@@ -337,32 +345,32 @@ export function generateBox3Optimizations(
   const tips: Box3Optimization[] = []
 
   // Tip 1: Shift from beleggingen to spaargeld (if beleggingen are significant)
-  if (result.totaalBeleggingen > 10_000 && result.belasting > 0) {
+  if (result.totaalBeleggingen > 10_000 && result.tax > 0) {
     const shiftAmount = Math.min(result.totaalBeleggingen, 50_000)
     const shifted = calculateBox3WithShift(input, shiftAmount)
-    const besparing = result.belasting - shifted.belasting
-    if (besparing > 10) {
+    const savings = result.tax - shifted.tax
+    if (savings > 10) {
       tips.push({
         id: 'shift-to-savings',
         title: 'Verschuif naar spaargeld',
         description: `Door ${formatEur(shiftAmount)} van beleggingen naar spaargeld te verschuiven betaal je minder Box 3 belasting (lager forfait).`,
-        besparing,
-        vrijheidsdagen: input.dailyExpenses > 0 ? Math.round(besparing / input.dailyExpenses) : 0,
+        savings,
+        freedomDays: input.dailyExpenses > 0 ? Math.round(savings / input.dailyExpenses) : 0,
       })
     }
   }
 
   // Tip 2: Partner allocation (if no partner yet)
-  if (!input.hasPartner && result.belasting > 0) {
+  if (!input.hasPartner && result.tax > 0) {
     const partnerResult = calculateBox3({ ...input, hasPartner: true })
-    const besparing = result.belasting - partnerResult.belasting
-    if (besparing > 10) {
+    const savings = result.tax - partnerResult.tax
+    if (savings > 10) {
       tips.push({
         id: 'fiscaal-partner',
         title: 'Fiscaal partnerschap',
         description: `Met een fiscaal partner verdubbelt je heffingsvrij vermogen naar ${formatEur(result.params.heffingsvrijPartner)}.`,
-        besparing,
-        vrijheidsdagen: input.dailyExpenses > 0 ? Math.round(besparing / input.dailyExpenses) : 0,
+        savings,
+        freedomDays: input.dailyExpenses > 0 ? Math.round(savings / input.dailyExpenses) : 0,
       })
     }
   }
@@ -373,31 +381,31 @@ export function generateBox3Optimizations(
       id: 'schulden-timing',
       title: 'Schulden boven drempel',
       description: `Je Box 3 schulden (${formatEur(result.totaalBox3Schulden)}) vallen onder de drempel van ${formatEur(result.schuldendrempel)}. Ze tellen daarom niet mee als aftrek.`,
-      besparing: 0,
-      vrijheidsdagen: 0,
+      savings: 0,
+      freedomDays: 0,
     })
   }
 
   // Tip 4: Groene beleggingen
-  if (result.totaalBeleggingen > 20_000 && result.belasting > 0) {
+  if (result.totaalBeleggingen > 20_000 && result.tax > 0) {
     const groenVrijstelling = input.hasPartner ? 145_014 : 72_507
     tips.push({
       id: 'groene-beleggingen',
       title: 'Groene beleggingen',
       description: `Groene beleggingen (ASN Groenprojectenfonds e.d.) zijn tot ${formatEur(groenVrijstelling)} vrijgesteld van Box 3. Check of je beleggingen hiervoor in aanmerking komen.`,
-      besparing: 0,
-      vrijheidsdagen: 0,
+      savings: 0,
+      freedomDays: 0,
     })
   }
 
   // Tip 5: Peildatum planning
-  if (result.belasting > 100) {
+  if (result.tax > 100) {
     tips.push({
       id: 'peildatum-planning',
       title: 'Peildatum planning',
       description: 'Je Box 3 vermogen wordt gemeten op 1 januari. Grote aankopen net voor die datum verlagen tijdelijk je vermogen.',
-      besparing: 0,
-      vrijheidsdagen: 0,
+      savings: 0,
+      freedomDays: 0,
     })
   }
 
@@ -447,8 +455,8 @@ export function optimizePartnerAllocation(
     partner2Spaargeld: totalS / 2,
     partner2Beleggingen: totalB / 2,
     partner2Schulden: totalSch / 2,
-    totalBelasting: equalTax,
-    besparingVsGelijk: 0,
+    totalTax: equalTax,
+    savingsVsEqual: 0,
   }
 
   for (let pctS = 0; pctS <= 100; pctS += 5) {
@@ -474,8 +482,8 @@ export function optimizePartnerAllocation(
             partner2Spaargeld: Math.round(p2s),
             partner2Beleggingen: Math.round(p2b),
             partner2Schulden: Math.round(p2sch),
-            totalBelasting: Math.round(tax),
-            besparingVsGelijk: Math.round(equalTax - tax),
+            totalTax: Math.round(tax),
+            savingsVsEqual: Math.round(equalTax - tax),
           }
         }
       }
@@ -511,7 +519,7 @@ export function calculatePartnerSplit(
 export function estimateBox3TaxDrag(result: Box3Result): number {
   const totalBox3 = result.totaalSpaargeld + result.totaalBeleggingen
   if (totalBox3 <= 0) return 0
-  return result.belasting / totalBox3
+  return result.tax / totalBox3
 }
 
 // ── Helpers ──────────────────────────────────────────────────
