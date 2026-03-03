@@ -13,6 +13,7 @@ import {
   computeSavingsRate,
 } from './core-metrics'
 import { MSCI_REAL_RETURNS, NAMED_PERIODS } from './msci-data'
+import type { CamelCaseKeys } from './db-mapper'
 
 // ── Constants (canonical source: lib/constants.ts) ──────────────
 // Re-exported for backward compatibility — many files import from here.
@@ -191,6 +192,9 @@ export interface LifeEvent {
   sort_order: number
   is_indexed: boolean
 }
+
+/** LifeEvent with camelCase keys (frontend representation). */
+export type LifeEventFe = CamelCaseKeys<LifeEvent>
 
 export interface LifeEventImpact {
   event: LifeEvent

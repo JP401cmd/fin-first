@@ -5,7 +5,9 @@ import { computeFireProjection, computeResilienceScore, NL_SWR, type HorizonInpu
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
-import { SWR } from '@/lib/constants'
+import { mapDbRows } from '@/lib/db-mapper'
+
+const SWR = 0.04
 
 /**
  * GET /api/snapshots
@@ -139,19 +141,24 @@ export async function POST() {
     return NextResponse.json({ error: debtsResult.error.message }, { status: 500 })
   }
 
-  const assets = assetsResult.data ?? []
-  const debts = debtsResult.data ?? []
+  // Keep raw rows for captureBalanceSnapshots (expects snake_case)
+  const rawAssets = assetsResult.data ?? []
+  const rawDebts = debtsResult.data ?? []
+
+  // Map DB rows to camelCase for local processing
+  const assets = mapDbRows(rawAssets)
+  const debts = mapDbRows(rawDebts)
   const expenses = expensesResult.data ?? []
   const income = incomeResult.data ?? []
 
-  const totalAssets = assets.reduce((s, a) => s + Number(a.current_value), 0)
-  const totalDebts = debts.reduce((s, d) => s + Number(d.current_balance), 0)
+  const totalAssets = assets.reduce((s, a) => s + Number(a.currentValue), 0)
+  const totalDebts = debts.reduce((s, d) => s + Number(d.currentBalance), 0)
   const netWorth = totalAssets - totalDebts
 
   const yearlyExpenses = Math.abs(expenses.reduce((s, t) => s + Number(t.amount), 0))
   const monthlyExpenses = yearlyExpenses / 12
   const monthlyIncome = income.reduce((s, t) => s + Number(t.amount), 0)
-  const monthlyContributions = assets.reduce((s, a) => s + Number(a.monthly_contribution || 0), 0)
+  const monthlyContributions = assets.reduce((s, a) => s + Number(a.monthlyContribution || 0), 0)
 
   // Essential budgets for yearly "must" expenses
   const yearlyMustExpenses = (budgetsResult.data ?? []).reduce((s, b) => {
@@ -181,7 +188,7 @@ export async function POST() {
 
   // Compute sovereignty level
   const consumerDebtTypes = ['personal_loan', 'credit_card', 'revolving_credit', 'payment_plan', 'car_loan']
-  const hasConsumerDebt = debts.some(d => consumerDebtTypes.includes(d.debt_type) && Number(d.current_balance) > 0)
+  const hasConsumerDebt = debts.some(d => consumerDebtTypes.includes(d.debtType) && Number(d.currentBalance) > 0)
   const sovereigntyLevel = computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPercentage, hasConsumerDebt)
 
   // Compute resilience score
@@ -236,7 +243,7 @@ export async function POST() {
   }
 
   // Capture per-entity balance snapshots (fire-and-forget, non-critical)
-  captureBalanceSnapshots(supabase, user.id, today, assets, debts).catch(() => {})
+  captureBalanceSnapshots(supabase, user.id, today, rawAssets, rawDebts).catch(() => {})
 
   // Trigger badge evaluation after snapshot creation (fire-and-forget, server-side)
   try {
