@@ -54,6 +54,20 @@ export async function POST(req: Request) {
         })
         .eq('id', gcAccount.bank_account_id)
 
+      // Sync balance to linked asset (cash-as-asset)
+      const { data: ba } = await supabase
+        .from('bank_accounts')
+        .select('linked_asset_id')
+        .eq('id', gcAccount.bank_account_id)
+        .single()
+
+      if (ba?.linked_asset_id) {
+        await supabase
+          .from('assets')
+          .update({ current_value: balance, updated_at: new Date().toISOString() })
+          .eq('id', ba.linked_asset_id)
+      }
+
       return NextResponse.json({ balance, balance_type: preferred.balanceType })
     }
 

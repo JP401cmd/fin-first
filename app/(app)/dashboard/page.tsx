@@ -59,7 +59,7 @@ export default async function DashboardPage() {
     supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
     supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
     supabase.from('transactions').select('amount').lt('amount', 0).gte('date', prev3MonthStart).lt('date', monthStart),
-    supabase.from('bank_accounts').select('id, balance').eq('is_active', true),
+    supabase.from('bank_accounts').select('id, balance').eq('is_active', true).is('linked_asset_id', null),
   ])
 
   // Core calculations
@@ -71,10 +71,11 @@ export default async function DashboardPage() {
     else monthlyExpenses += Math.abs(amt)
   }
 
+  // Cash assets already included via assets table — only add unlinked bank_accounts (legacy/transition)
   const totalAssetsOnly = (assetsResult.data ?? []).reduce((s, a) =>
     s + Number(a.current_value) * (((a as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100), 0)
-  const totalCash = (bankAccountsResult.data ?? []).reduce((s, a) => s + Number(a.balance), 0)
-  const totalAssets = totalAssetsOnly + totalCash
+  const unlinkedCash = (bankAccountsResult.data ?? []).reduce((s, a) => s + Number(a.balance), 0)
+  const totalAssets = totalAssetsOnly + unlinkedCash
   const totalDebts = (debtsResult.data ?? []).reduce((s, d) =>
     s + Number(d.current_balance) * (((d as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100), 0)
   const netWorth = totalAssets - totalDebts

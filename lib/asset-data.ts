@@ -5,6 +5,7 @@
 // ── Types ────────────────────────────────────────────────────
 
 export type AssetType =
+  | 'cash'
   | 'savings'
   | 'investment'
   | 'retirement'
@@ -18,6 +19,7 @@ export type AssetType =
 export type RiskProfile = 'laag' | 'middel' | 'hoog'
 export type RetirementProviderType = 'bedrijfspensioenfonds' | 'verzekeraar' | 'ppi'
 
+export type CashSubtype = 'checking' | 'savings_account' | 'joint' | 'business' | 'other_cash'
 export type SavingsSubtype = 'vrij_opneembaar' | 'deposito' | 'termijndeposito'
 export type InvestmentSubtype = 'etf' | 'indexfonds' | 'aandelen' | 'obligaties' | 'mixed'
 export type RetirementSubtype = 'uitkeringsregeling' | 'premieregeling' | 'lijfrente'
@@ -27,6 +29,7 @@ export type VehicleSubtype = 'auto_eigendom' | 'auto_financial_lease' | 'motor' 
 export type PhysicalSubtype = 'kunst' | 'sieraden' | 'inboedel' | 'verzameling'
 
 export type AssetSubtype =
+  | CashSubtype
   | SavingsSubtype
   | InvestmentSubtype
   | RetirementSubtype
@@ -70,9 +73,12 @@ export interface Asset {
   household_id: string | null
   // Net worth inclusion
   net_worth_inclusion_pct: number // 0–100, default 100
+  // Budget tracking (cash assets)
+  has_budget_tracking: boolean
 }
 
 export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
+  cash: 'Cash / Bankrekeningen',
   savings: 'Spaargeld',
   investment: 'Beleggingen',
   retirement: 'Pensioen',
@@ -85,6 +91,7 @@ export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
 }
 
 export const ASSET_TYPE_ICONS: Record<AssetType, string> = {
+  cash: 'Wallet',
   savings: 'PiggyBank',
   investment: 'TrendingUp',
   retirement: 'Vault',
@@ -97,6 +104,7 @@ export const ASSET_TYPE_ICONS: Record<AssetType, string> = {
 }
 
 export const ASSET_TYPE_COLORS: Record<AssetType, string> = {
+  cash: '#22c55e',
   savings: '#3b82f6',
   investment: '#10b981',
   retirement: '#8b5cf6',
@@ -110,6 +118,7 @@ export const ASSET_TYPE_COLORS: Record<AssetType, string> = {
 
 /** Typical annual return expectations per asset type (for default suggestions) */
 export const TYPICAL_RETURNS: Record<AssetType, number> = {
+  cash: 0,
   savings: 2.5,
   investment: 7,
   retirement: 6,
@@ -125,6 +134,13 @@ export const TYPICAL_RETURNS: Record<AssetType, number> = {
 
 /** Which asset types have subtypes */
 export const ASSET_SUBTYPE_LABELS: Partial<Record<AssetType, Record<string, string>>> = {
+  cash: {
+    checking: 'Betaalrekening',
+    savings_account: 'Spaarrekening',
+    joint: 'En/of-rekening',
+    business: 'Zakelijke rekening',
+    other_cash: 'Overig',
+  },
   savings: {
     vrij_opneembaar: 'Vrij opneembaar',
     deposito: 'Deposito',
@@ -187,6 +203,12 @@ export const ASSET_SUBTYPE_DEFAULTS: Record<string, Partial<{
   is_liquid: boolean
   tax_benefit: boolean
 }>> = {
+  // Cash
+  checking: { risk_profile: 'laag', is_liquid: true, expected_return: 0 },
+  savings_account: { risk_profile: 'laag', is_liquid: true, expected_return: 2.5 },
+  joint: { risk_profile: 'laag', is_liquid: true, expected_return: 0 },
+  business: { risk_profile: 'laag', is_liquid: true, expected_return: 0 },
+  other_cash: { risk_profile: 'laag', is_liquid: true, expected_return: 0 },
   // Savings
   vrij_opneembaar: { risk_profile: 'laag', is_liquid: true, expected_return: 2.5 },
   deposito: { risk_profile: 'laag', is_liquid: false, expected_return: 3.5 },
@@ -211,6 +233,7 @@ export const ASSET_SUBTYPE_DEFAULTS: Record<string, Partial<{
 
 /** Which type-specific fields to show per asset_type */
 export const ASSET_TYPE_FIELDS: Record<AssetType, string[]> = {
+  cash: ['subtype', 'is_liquid'],
   savings: ['subtype', 'is_liquid', 'lock_end_date'],
   investment: ['subtype', 'risk_profile', 'ticker_symbol'],
   retirement: ['subtype', 'risk_profile', 'tax_benefit', 'retirement_provider_type'],
@@ -293,7 +316,7 @@ export function projectPortfolio(
 
   for (let m = 0; m < months; m++) {
     const byType: Record<AssetType, number> = {
-      savings: 0, investment: 0, retirement: 0, eigen_huis: 0, real_estate: 0,
+      cash: 0, savings: 0, investment: 0, retirement: 0, eigen_huis: 0, real_estate: 0,
       crypto: 0, vehicle: 0, physical: 0, other: 0,
     }
     let total = 0

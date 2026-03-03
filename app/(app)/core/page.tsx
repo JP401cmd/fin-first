@@ -174,7 +174,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           .order('date', { ascending: true })
           .limit(1),
         supabase.from('profiles').select('retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate').single(),
-        supabase.from('bank_accounts').select('id, name, balance').eq('is_active', true),
+        supabase.from('bank_accounts').select('id, name, balance').eq('is_active', true).is('linked_asset_id', null),
       ])
 
       if (txResult.error) throw txResult.error
@@ -268,11 +268,12 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       setRetirementMethodUsed(activeRetirementMethod)
       setFireParams(resolveFireParams(profileResult.data ?? {}))
 
-      // Total assets (weighted by net_worth_inclusion_pct) + cash balances
+      // Total assets (weighted by net_worth_inclusion_pct) — cash assets already included
+      // Only add unlinked bank_accounts (legacy/transition) to avoid double-counting
       const totalAssetsOnly = assetsResult.data.reduce((s, a) =>
         s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
-      const totalCash = (bankAccountsResult.data ?? []).reduce((s, a) => s + Number(a.balance), 0)
-      const totalAssets = totalAssetsOnly + totalCash
+      const unlinkedCash = (bankAccountsResult.data ?? []).reduce((s, a) => s + Number(a.balance), 0)
+      const totalAssets = totalAssetsOnly + unlinkedCash
 
       // Total debts (weighted by net_worth_inclusion_pct)
       const totalDebts = debtsResult.data.reduce((s, d) =>

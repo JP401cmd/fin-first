@@ -28,6 +28,7 @@ const demoAssets: Asset[] = [
     woz_value: null, retirement_provider_type: null, depreciation_rate: null,
     address_postcode: null, address_house_number: null,
     ownership: 'personal', household_id: null, net_worth_inclusion_pct: 100,
+    has_budget_tracking: false,
     created_at: '2023-01-01', updated_at: '2023-01-01',
   },
   {
@@ -40,6 +41,7 @@ const demoAssets: Asset[] = [
     woz_value: null, retirement_provider_type: null, depreciation_rate: null,
     address_postcode: null, address_house_number: null,
     ownership: 'personal', household_id: null, net_worth_inclusion_pct: 100,
+    has_budget_tracking: false,
     created_at: '2021-06-01', updated_at: '2023-01-01',
   },
   {
@@ -52,6 +54,7 @@ const demoAssets: Asset[] = [
     woz_value: null, retirement_provider_type: 'ppi', depreciation_rate: null,
     address_postcode: null, address_house_number: null,
     ownership: 'personal', household_id: null, net_worth_inclusion_pct: 100,
+    has_budget_tracking: false,
     created_at: '2019-01-01', updated_at: '2023-01-01',
   },
 ]
