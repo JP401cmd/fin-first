@@ -1,35 +1,57 @@
 import { createClient } from '@/lib/supabase/server'
 
-export interface BalansAssetItem {
+// ── Types ────────────────────────────────────────────────────────────────────
+
+export interface BalansItem {
   id: string
   name: string
-  assetType: string
-  currentValue: number
+  type: string          // asset_type or debt_type
+  value: number         // weighted value (after inclusion %)
+  rawValue: number      // original value before weighting
   inclusionPct: number
-  weightedValue: number
+  interestRate?: number // only for debts
 }
 
-export interface BalansDebtItem {
-  id: string
-  name: string
-  debtType: string
-  currentBalance: number
-  interestRate: number
-  inclusionPct: number
-  weightedBalance: number
+export interface BalansCategory {
+  label: string
+  items: BalansItem[]
+  subtotal: number
 }
 
 export interface BalansData {
   date: string
   generatedAt: string
   displayName: string | null
-  assets: BalansAssetItem[]
-  debts: BalansDebtItem[]
-  totalAssets: number
-  totalDebts: number
-  netWorth: number
+
+  // ── ACTIVA (left side) ──
+  vasteActiva: BalansCategory    // Fixed assets: woning, voertuig, fysieke bezittingen
+  vlottendeActiva: BalansCategory // Current assets: spaargeld, beleggingen, crypto, pensioen
+  totalActiva: number
+
+  // ── PASSIVA (right side) ──
+  eigenVermogen: number           // Net worth = activa - schulden
+  langVreemdVermogen: BalansCategory  // Long-term: hypotheek, studielening, persoonlijke lening, autolening
+  kortVreemdVermogen: BalansCategory  // Short-term: creditcard, doorlopend krediet, afbetalingsregeling
+  totalPassiva: number            // = eigenVermogen + lang + kort (equals totalActiva)
+
+  // ── Kengetallen ──
+  solvabiliteitsratio: number | null  // eigenVermogen / totalActiva × 100
+  schuldgraad: number | null          // totalSchulden / eigenVermogen (debt-to-equity)
+  totalSchulden: number
+
+  // ── Vrijheid ──
   dailyExpenseRate: number
 }
+
+// ── Classification maps ──────────────────────────────────────────────────────
+
+// Asset types → vaste activa (illiquid, long-term)
+const VASTE_ACTIVA_TYPES = new Set(['eigen_huis', 'real_estate', 'vehicle', 'physical'])
+// Everything else → vlottende activa (liquid, convertible)
+
+// Debt types → lang vreemd vermogen (>1 year)
+const LANG_VREEMD_TYPES = new Set(['mortgage', 'personal_loan', 'student_loan', 'car_loan'])
+// Everything else → kort vreemd vermogen (<1 year)
 
 export async function GET(request: Request) {
   try {
@@ -57,7 +79,6 @@ export async function GET(request: Request) {
         .from('profiles')
         .select('full_name')
         .single(),
-      // Get daily expense rate from last 12 months of transactions
       supabase
         .from('transactions')
         .select('amount, date')
@@ -75,40 +96,95 @@ export async function GET(request: Request) {
     const profile = profileResult.status === 'fulfilled' ? profileResult.value.data : null
     const expenses = (expenseResult.status === 'fulfilled' ? expenseResult.value.data ?? [] : []) as TxRow[]
 
-    // Build assets
-    const assets: BalansAssetItem[] = assetsRaw.map(a => {
+    // ── Classify assets ──────────────────────────────────────────────────────
+
+    const vasteItems: BalansItem[] = []
+    const vlottendeItems: BalansItem[] = []
+
+    for (const a of assetsRaw) {
       const val = Number(a.current_value)
       const pct = a.net_worth_inclusion_pct ?? 100
-      return {
+      const item: BalansItem = {
         id: a.id,
         name: a.name,
-        assetType: a.asset_type,
-        currentValue: Math.round(val),
+        type: a.asset_type,
+        rawValue: Math.round(val),
+        value: Math.round(val * (pct / 100)),
         inclusionPct: pct,
-        weightedValue: Math.round(val * (pct / 100)),
       }
-    })
+      if (VASTE_ACTIVA_TYPES.has(a.asset_type)) {
+        vasteItems.push(item)
+      } else {
+        vlottendeItems.push(item)
+      }
+    }
 
-    // Build debts
-    const debts: BalansDebtItem[] = debtsRaw.map(d => {
+    const vasteActiva: BalansCategory = {
+      label: 'Vaste activa',
+      items: vasteItems,
+      subtotal: vasteItems.reduce((s, i) => s + i.value, 0),
+    }
+
+    const vlottendeActiva: BalansCategory = {
+      label: 'Vlottende activa',
+      items: vlottendeItems,
+      subtotal: vlottendeItems.reduce((s, i) => s + i.value, 0),
+    }
+
+    const totalActiva = vasteActiva.subtotal + vlottendeActiva.subtotal
+
+    // ── Classify debts ───────────────────────────────────────────────────────
+
+    const langItems: BalansItem[] = []
+    const kortItems: BalansItem[] = []
+
+    for (const d of debtsRaw) {
       const bal = Number(d.current_balance)
       const pct = d.net_worth_inclusion_pct ?? 100
-      return {
+      const item: BalansItem = {
         id: d.id,
         name: d.name,
-        debtType: d.debt_type,
-        currentBalance: Math.round(bal),
-        interestRate: Number(d.interest_rate),
+        type: d.debt_type,
+        rawValue: Math.round(bal),
+        value: Math.round(bal * (pct / 100)),
         inclusionPct: pct,
-        weightedBalance: Math.round(bal * (pct / 100)),
+        interestRate: Number(d.interest_rate),
       }
-    })
+      if (LANG_VREEMD_TYPES.has(d.debt_type)) {
+        langItems.push(item)
+      } else {
+        kortItems.push(item)
+      }
+    }
 
-    const totalAssets = assets.reduce((sum, a) => sum + a.weightedValue, 0)
-    const totalDebts = debts.reduce((sum, d) => sum + d.weightedBalance, 0)
-    const netWorth = totalAssets - totalDebts
+    const langVreemdVermogen: BalansCategory = {
+      label: 'Lang vreemd vermogen',
+      items: langItems,
+      subtotal: langItems.reduce((s, i) => s + i.value, 0),
+    }
 
-    // Compute daily expense rate
+    const kortVreemdVermogen: BalansCategory = {
+      label: 'Kort vreemd vermogen',
+      items: kortItems,
+      subtotal: kortItems.reduce((s, i) => s + i.value, 0),
+    }
+
+    const totalSchulden = langVreemdVermogen.subtotal + kortVreemdVermogen.subtotal
+    const eigenVermogen = totalActiva - totalSchulden
+    const totalPassiva = eigenVermogen + totalSchulden // always equals totalActiva
+
+    // ── Kengetallen ──────────────────────────────────────────────────────────
+
+    const solvabiliteitsratio = totalActiva > 0
+      ? Math.round((eigenVermogen / totalActiva) * 10000) / 100
+      : null
+
+    const schuldgraad = eigenVermogen > 0
+      ? Math.round((totalSchulden / eigenVermogen) * 100) / 100
+      : null
+
+    // ── Daily expense rate ───────────────────────────────────────────────────
+
     let dailyExpenseRate = 0
     if (expenses.length > 0) {
       const totalExpenses = expenses.reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0)
@@ -124,15 +200,22 @@ export async function GET(request: Request) {
       dailyExpenseRate = (monthlyExpenses * 12) / 365
     }
 
+    // ── Response ─────────────────────────────────────────────────────────────
+
     const balansData: BalansData = {
       date,
       generatedAt: new Date().toISOString(),
       displayName: profile?.full_name || null,
-      assets,
-      debts,
-      totalAssets,
-      totalDebts,
-      netWorth,
+      vasteActiva,
+      vlottendeActiva,
+      totalActiva,
+      eigenVermogen,
+      langVreemdVermogen,
+      kortVreemdVermogen,
+      totalPassiva,
+      solvabiliteitsratio,
+      schuldgraad,
+      totalSchulden,
       dailyExpenseRate: Math.round(dailyExpenseRate * 100) / 100,
     }
 

@@ -1,27 +1,81 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Printer } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { formatCurrency } from '@/lib/format'
 import { ASSET_TYPE_LABELS } from '@/lib/asset-data'
 import { DEBT_TYPE_LABELS } from '@/lib/debt-data'
-import type { BalansData } from '@/app/api/report/balans/route'
+import type { BalansData, BalansCategory } from '@/app/api/report/balans/route'
 import { eurToFreedomTime } from '@/components/app/freedom-time-label'
 
-type AssetType = keyof typeof ASSET_TYPE_LABELS
-type DebtType = keyof typeof DEBT_TYPE_LABELS
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-function groupBy<T>(items: T[], keyFn: (item: T) => string): Record<string, T[]> {
-  const groups: Record<string, T[]> = {}
-  for (const item of items) {
-    const key = keyFn(item)
-    if (!groups[key]) groups[key] = []
-    groups[key].push(item)
-  }
-  return groups
+const TYPE_LABELS: Record<string, string> = { ...ASSET_TYPE_LABELS, ...DEBT_TYPE_LABELS }
+function typeLabel(type: string): string {
+  return TYPE_LABELS[type] || type
 }
+
+// ── Sub-components ───────────────────────────────────────────────────────────
+
+function BalansCategoryBlock({ category, sign }: { category: BalansCategory; sign?: 'negative' }) {
+  if (category.items.length === 0) return null
+  const neg = sign === 'negative'
+
+  return (
+    <div className="mb-3">
+      <p className="mb-1.5 font-inter text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+        {category.label}
+      </p>
+      <div className="space-y-0.5">
+        {category.items.map(item => (
+          <div key={item.id} className="flex justify-between gap-2 py-px">
+            <span className="truncate font-source-serif text-[13px] text-[var(--ink-2)]">
+              {item.name}
+              {item.inclusionPct < 100 && (
+                <span className="ml-1 font-inter text-[10px] text-[var(--ink-4)]">({item.inclusionPct}%)</span>
+              )}
+              {item.interestRate != null && item.interestRate > 0 && (
+                <span className="ml-1 font-dm-mono text-[10px] text-[var(--ink-4)]">{item.interestRate}%</span>
+              )}
+            </span>
+            <span className={`shrink-0 font-dm-mono text-[13px] tabular-nums ${neg ? 'text-red-700' : 'text-[var(--ink)]'}`}>
+              {formatCurrency(item.value)}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-1 flex justify-between border-t border-dashed border-[var(--border-ed)] pt-1">
+        <span className="font-inter text-[11px] font-medium text-[var(--ink-2)]">Subtotaal</span>
+        <span className={`font-dm-mono text-[12px] font-medium tabular-nums ${neg ? 'text-red-700' : 'text-[var(--ink)]'}`}>
+          {formatCurrency(category.subtotal)}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function KengetalRow({ label, value, suffix, variant }: {
+  label: string
+  value: string
+  suffix?: string
+  variant?: 'positive' | 'negative' | 'neutral'
+}) {
+  const colorClass = variant === 'positive' ? 'text-kern-600'
+    : variant === 'negative' ? 'text-red-600'
+    : 'text-[var(--ink)]'
+
+  return (
+    <div className="flex justify-between py-0.5">
+      <span className="font-inter text-[11px] text-[var(--ink-2)]">{label}</span>
+      <span className={`font-dm-mono text-[12px] tabular-nums ${colorClass}`}>
+        {value}{suffix && <span className="ml-0.5 text-[10px] text-[var(--ink-4)]">{suffix}</span>}
+      </span>
+    </div>
+  )
+}
+
+// ── Main page ────────────────────────────────────────────────────────────────
 
 export default function BalansPage() {
   const router = useRouter()
@@ -40,8 +94,7 @@ export default function BalansPage() {
           const err = await res.json()
           throw new Error(err.error || 'Balans laden mislukt')
         }
-        const balansData: BalansData = await res.json()
-        setData(balansData)
+        setData(await res.json())
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Balans laden mislukt')
       } finally {
@@ -88,24 +141,34 @@ export default function BalansPage() {
     minute: '2-digit',
   })
 
-  // Group assets by type
-  const assetsByType = groupBy(data.assets, a => a.assetType)
-  const assetTypeOrder = Object.keys(ASSET_TYPE_LABELS) as AssetType[]
-  const sortedAssetTypes = assetTypeOrder.filter(t => assetsByType[t]?.length)
-
-  // Group debts by type
-  const debtsByType = groupBy(data.debts, d => d.debtType)
-  const debtTypeOrder = Object.keys(DEBT_TYPE_LABELS) as DebtType[]
-  const sortedDebtTypes = debtTypeOrder.filter(t => debtsByType[t]?.length)
-
-  // Freedom time for net worth
-  const freedom = data.dailyExpenseRate > 0 && data.netWorth >= 100
-    ? eurToFreedomTime(data.netWorth, data.dailyExpenseRate)
+  const freedom = data.dailyExpenseRate > 0 && data.eigenVermogen >= 100
+    ? eurToFreedomTime(data.eigenVermogen, data.dailyExpenseRate)
     : null
 
+  // Determine solvability health
+  const solvVariant: 'positive' | 'negative' | 'neutral' =
+    data.solvabiliteitsratio == null ? 'neutral'
+    : data.solvabiliteitsratio >= 40 ? 'positive'
+    : data.solvabiliteitsratio < 0 ? 'negative'
+    : 'neutral'
+
+  // Count all items
+  const totalAssetItems = data.vasteActiva.items.length + data.vlottendeActiva.items.length
+  const totalDebtItems = data.langVreemdVermogen.items.length + data.kortVreemdVermogen.items.length
+
+  // Gather unique asset types for the footnote
+  const usedAssetTypes = [...new Set([
+    ...data.vasteActiva.items.map(i => i.type),
+    ...data.vlottendeActiva.items.map(i => i.type),
+  ])]
+  const usedDebtTypes = [...new Set([
+    ...data.langVreemdVermogen.items.map(i => i.type),
+    ...data.kortVreemdVermogen.items.map(i => i.type),
+  ])]
+
   return (
-    <div className="mx-auto max-w-[720px] px-4 py-6 md:px-8">
-      {/* Toolbar */}
+    <div className="mx-auto max-w-[900px] px-4 py-6 md:px-8">
+      {/* ── Toolbar ── */}
       <div data-print-hide className="mb-6 flex items-center justify-between">
         <button
           type="button"
@@ -125,182 +188,305 @@ export default function BalansPage() {
         </button>
       </div>
 
-      {/* Masthead */}
+      {/* ── Masthead ── */}
       <div className="border-b-2 border-[var(--ink)] pb-4 mb-8">
-        <p className="text-center font-inter text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)] mb-2">
-          Persoonlijke Balans
+        <p className="text-center font-inter text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)] mb-1">
+          Persoonlijke Vermogensbalans
         </p>
-        <h1 className="text-center font-playfair text-4xl font-bold tracking-tight text-[var(--ink)] md:text-5xl" style={{ letterSpacing: '-0.03em' }}>
+        <h1 className="text-center font-playfair text-3xl font-bold tracking-tight text-[var(--ink)] md:text-[42px] md:leading-[1.1]" style={{ letterSpacing: '-0.03em' }}>
           {displayDate}
         </h1>
         <div className="mt-3 flex items-center justify-center gap-2 text-[13px] font-source-serif italic text-[var(--ink-3)]">
           {data.displayName && <span>{data.displayName}</span>}
           {data.displayName && <span>&middot;</span>}
-          <span>Gegenereerd {generatedDate}</span>
+          <span>Peildatum {new Date(data.date).toLocaleDateString('nl-NL')}</span>
         </div>
       </div>
 
-      {/* Balance Sheet — Kassabon style */}
-      <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 font-mono text-sm">
-        {/* Header */}
+      {/* ── Dateline ── */}
+      <div className="mb-6 flex items-center justify-between border-b border-[var(--border-ed)] pb-2">
+        <span className="font-inter text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-3)]">
+          Balansstaat
+        </span>
+        <span className="font-source-serif text-[13px] italic text-[var(--ink-3)]">
+          {totalAssetItems} bezittingen · {totalDebtItems} schulden
+        </span>
+      </div>
+
+      {/* ════════════════════════════════════════════════════════════════════════
+          BALANS — Scontrovorm (twee kolommen)
+          Links: ACTIVA (Debet) — wat je bezit
+          Rechts: PASSIVA (Credit) — hoe het gefinancierd is
+         ════════════════════════════════════════════════════════════════════════ */}
+      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
+
+        {/* Column headers */}
+        <div className="grid grid-cols-1 md:grid-cols-2">
+          <div className="border-b-2 border-[var(--ink)] bg-[var(--subtle)]/40 px-5 py-2.5">
+            <p className="font-inter text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink)]">
+              Activa <span className="font-normal text-[var(--ink-3)]">(debet)</span>
+            </p>
+            <p className="mt-0.5 font-source-serif text-[11px] italic text-[var(--ink-3)]">Wat je bezit</p>
+          </div>
+          <div className="border-b-2 border-[var(--ink)] border-l-0 md:border-l border-[var(--border-ed)] bg-[var(--subtle)]/40 px-5 py-2.5">
+            <p className="font-inter text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink)]">
+              Passiva <span className="font-normal text-[var(--ink-3)]">(credit)</span>
+            </p>
+            <p className="mt-0.5 font-source-serif text-[11px] italic text-[var(--ink-3)]">Hoe het gefinancierd is</p>
+          </div>
+        </div>
+
+        {/* Balance body — two columns */}
+        <div className="grid grid-cols-1 md:grid-cols-2">
+
+          {/* ── LEFT: ACTIVA ── */}
+          <div className="border-r-0 md:border-r border-[var(--border-ed)] px-5 py-4">
+
+            {/* Vaste activa */}
+            <BalansCategoryBlock category={data.vasteActiva} />
+
+            {/* Vlottende activa */}
+            <BalansCategoryBlock category={data.vlottendeActiva} />
+
+            {/* Total Activa */}
+            <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2">
+              <span className="font-inter text-sm font-bold text-[var(--ink)]">Totaal activa</span>
+              <span className="font-dm-mono text-sm font-bold tabular-nums text-[var(--ink)]">
+                {formatCurrency(data.totalActiva)}
+              </span>
+            </div>
+          </div>
+
+          {/* ── RIGHT: PASSIVA ── */}
+          <div className="border-t md:border-t-0 border-[var(--border-ed)] px-5 py-4">
+
+            {/* Eigen vermogen */}
+            <div className="mb-3">
+              <p className="mb-1.5 font-inter text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+                Eigen vermogen
+              </p>
+              <div className="flex justify-between py-px">
+                <span className="font-source-serif text-[13px] text-[var(--ink-2)]">
+                  Netto vermogen
+                </span>
+                <span className={`font-dm-mono text-[13px] font-medium tabular-nums ${data.eigenVermogen >= 0 ? 'text-kern-700' : 'text-red-700'}`}>
+                  {formatCurrency(data.eigenVermogen)}
+                </span>
+              </div>
+              <div className="mt-1 flex justify-between border-t border-dashed border-[var(--border-ed)] pt-1">
+                <span className="font-inter text-[11px] font-medium text-[var(--ink-2)]">Subtotaal</span>
+                <span className={`font-dm-mono text-[12px] font-medium tabular-nums ${data.eigenVermogen >= 0 ? 'text-kern-700' : 'text-red-700'}`}>
+                  {formatCurrency(data.eigenVermogen)}
+                </span>
+              </div>
+            </div>
+
+            {/* Lang vreemd vermogen */}
+            <BalansCategoryBlock category={data.langVreemdVermogen} sign="negative" />
+
+            {/* Kort vreemd vermogen */}
+            <BalansCategoryBlock category={data.kortVreemdVermogen} sign="negative" />
+
+            {/* Total Passiva */}
+            <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2">
+              <span className="font-inter text-sm font-bold text-[var(--ink)]">Totaal passiva</span>
+              <span className="font-dm-mono text-sm font-bold tabular-nums text-[var(--ink)]">
+                {formatCurrency(data.totalPassiva)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Balance check bar */}
+        <div className="border-t border-[var(--border-ed)] bg-[var(--subtle)]/30 px-5 py-2 text-center">
+          <span className="font-inter text-[10px] text-[var(--ink-4)]">
+            Activa {formatCurrency(data.totalActiva)} = Passiva {formatCurrency(data.totalPassiva)}
+            {data.totalActiva === data.totalPassiva ? ' ✓ in evenwicht' : ''}
+          </span>
+        </div>
+      </div>
+
+      {/* ════════════════════════════════════════════════════════════════════════
+          KENGETALLEN — Financiële gezondheid
+         ════════════════════════════════════════════════════════════════════════ */}
+      <div className="mt-8 rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-5 font-mono text-sm">
         <div className="mb-3 text-center">
           <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
-            VERMOGENSBALANS
+            Kengetallen
           </p>
           <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">
-            Peildatum {new Date(data.date).toLocaleDateString('nl-NL')}
+            Financiële gezondheid op {new Date(data.date).toLocaleDateString('nl-NL')}
           </p>
         </div>
 
-        {/* Uitleg */}
         <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-          Je persoonlijke balans toont een momentopname van al je bezittingen en schulden.
-          Het netto vermogen is het verschil — de vrijheid die je tot nu toe hebt opgebouwd.
+          Deze kengetallen geven inzicht in je financiële weerbaarheid.
+          Een hogere solvabiliteit betekent meer onafhankelijkheid van schulden.
         </div>
 
-        {/* ── ACTIVA ── */}
-        <div className="mb-2 mt-3">
-          <p className="font-sans text-[10px] font-bold uppercase tracking-[0.08em] text-kern-600 mb-2">
-            Activa (bezittingen)
-          </p>
+        {/* Eigen vermogen */}
+        <KengetalRow
+          label="Eigen vermogen"
+          value={formatCurrency(data.eigenVermogen)}
+          variant={data.eigenVermogen >= 0 ? 'positive' : 'negative'}
+        />
 
-          {sortedAssetTypes.map(type => {
-            const items = assetsByType[type]!
-            const subtotal = items.reduce((sum, a) => sum + a.weightedValue, 0)
-            return (
-              <div key={type} className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
-                <p className="mb-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--ink-3)]">
-                  {ASSET_TYPE_LABELS[type] || type}
-                </p>
-                {items.map(a => (
-                  <div key={a.id} className="flex justify-between py-0.5">
-                    <span className="font-sans text-sm text-[var(--ink-2)]">
-                      {a.name}
-                      {a.inclusionPct < 100 && (
-                        <span className="ml-1 text-[10px] text-[var(--ink-4)]">({a.inclusionPct}%)</span>
-                      )}
-                    </span>
-                    <span className="tabular-nums text-[var(--ink)]">{formatCurrency(a.weightedValue)}</span>
-                  </div>
-                ))}
-                {items.length > 1 && (
-                  <div className="flex justify-between pt-0.5 text-[var(--ink-2)]">
-                    <span className="font-sans text-xs italic">Subtotaal</span>
-                    <span className="tabular-nums text-xs">{formatCurrency(subtotal)}</span>
-                  </div>
-                )}
+        {/* Total schulden */}
+        <KengetalRow
+          label="Totaal schulden"
+          value={formatCurrency(data.totalSchulden)}
+          variant={data.totalSchulden > 0 ? 'negative' : 'neutral'}
+        />
+
+        <div className="my-2 border-b border-dashed border-[var(--border-ed)]" />
+
+        {/* Solvabiliteitsratio */}
+        {data.solvabiliteitsratio != null && (
+          <KengetalRow
+            label="Solvabiliteitsratio"
+            value={`${data.solvabiliteitsratio.toFixed(1)}%`}
+            variant={solvVariant}
+          />
+        )}
+
+        {/* Schuldgraad */}
+        {data.schuldgraad != null && (
+          <KengetalRow
+            label="Schuldgraad (debt-to-equity)"
+            value={data.schuldgraad.toFixed(2)}
+            variant={data.schuldgraad > 2 ? 'negative' : data.schuldgraad <= 1 ? 'positive' : 'neutral'}
+          />
+        )}
+
+        {/* Solvability bar */}
+        {data.solvabiliteitsratio != null && (
+          <div className="mt-3">
+            <div className="flex items-center gap-2">
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--border-ed)]">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    data.solvabiliteitsratio >= 40 ? 'bg-kern-500' : data.solvabiliteitsratio >= 0 ? 'bg-horizon-500' : 'bg-red-500'
+                  }`}
+                  style={{ width: `${Math.max(0, Math.min(100, data.solvabiliteitsratio))}%` }}
+                />
               </div>
-            )
-          })}
-
-          {/* Total Assets */}
-          <div className="flex justify-between border-t border-[var(--ink-3)] pt-1 font-bold">
-            <span className="font-sans text-sm text-[var(--ink)]">Totaal activa</span>
-            <span className="tabular-nums text-[var(--ink)]">{formatCurrency(data.totalAssets)}</span>
-          </div>
-        </div>
-
-        {/* ── PASSIVA ── */}
-        {data.debts.length > 0 && (
-          <div className="mb-2 mt-4">
-            <p className="font-sans text-[10px] font-bold uppercase tracking-[0.08em] text-red-600 mb-2">
-              Passiva (schulden)
+              <span className="shrink-0 font-inter text-[10px] text-[var(--ink-4)]">
+                {data.solvabiliteitsratio >= 40 ? 'Gezond' : data.solvabiliteitsratio >= 25 ? 'Redelijk' : data.solvabiliteitsratio >= 0 ? 'Kwetsbaar' : 'Negatief'}
+              </span>
+            </div>
+            <p className="mt-1 font-sans text-[10px] text-[var(--ink-4)]">
+              {'< 25% kwetsbaar · 25–40% redelijk · > 40% financieel gezond'}
             </p>
-
-            {sortedDebtTypes.map(type => {
-              const items = debtsByType[type]!
-              const subtotal = items.reduce((sum, d) => sum + d.weightedBalance, 0)
-              return (
-                <div key={type} className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
-                  <p className="mb-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--ink-3)]">
-                    {DEBT_TYPE_LABELS[type] || type}
-                  </p>
-                  {items.map(d => (
-                    <div key={d.id} className="flex justify-between py-0.5">
-                      <span className="font-sans text-sm text-[var(--ink-2)]">
-                        {d.name}
-                        {d.interestRate > 0 && (
-                          <span className="ml-1 text-[10px] text-[var(--ink-4)]">{d.interestRate}%</span>
-                        )}
-                        {d.inclusionPct < 100 && (
-                          <span className="ml-1 text-[10px] text-[var(--ink-4)]">({d.inclusionPct}%)</span>
-                        )}
-                      </span>
-                      <span className="tabular-nums text-red-600">-{formatCurrency(d.weightedBalance)}</span>
-                    </div>
-                  ))}
-                  {items.length > 1 && (
-                    <div className="flex justify-between pt-0.5 text-red-500">
-                      <span className="font-sans text-xs italic">Subtotaal</span>
-                      <span className="tabular-nums text-xs">-{formatCurrency(subtotal)}</span>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-
-            {/* Total Debts */}
-            <div className="flex justify-between border-t border-[var(--ink-3)] pt-1 font-bold">
-              <span className="font-sans text-sm text-red-600">Totaal passiva</span>
-              <span className="tabular-nums text-red-600">-{formatCurrency(data.totalDebts)}</span>
-            </div>
           </div>
         )}
 
-        {/* ── NETTO VERMOGEN ── */}
-        <div className="mt-3 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
-          <span className="text-[var(--ink)]">Netto vermogen</span>
-          <span className="tabular-nums text-[var(--ink)]">{formatCurrency(data.netWorth)}</span>
-        </div>
-
-        {/* Freedom Time Badge */}
-        {freedom && (
-          <div className="mt-4 flex justify-center">
-            <div className="rounded-[var(--r)] border border-[var(--hor-m)] bg-[var(--hor-l)] px-3 py-2 text-center">
-              <p className="font-playfair text-xl font-bold text-[var(--hor-t)]">
-                {freedom.formatted}
-              </p>
-              <p className="font-sans text-[9px] font-bold uppercase tracking-[0.08em] text-[var(--hor-t)]">
-                vrijheid
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Formule */}
+        {/* Formules */}
         <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-          <p><strong className="font-semibold text-[var(--ink-3)]">Formule:</strong> Netto vermogen = Totaal activa − Totaal passiva</p>
-          {data.dailyExpenseRate > 0 && (
-            <p className="mt-1"><strong className="font-semibold text-[var(--ink-3)]">Vrijheidstijd:</strong> Netto vermogen ÷ dagelijkse uitgaven ({formatCurrency(Math.round(data.dailyExpenseRate))}/dag)</p>
-          )}
+          <p><strong className="font-semibold text-[var(--ink-3)]">Eigen vermogen</strong> = Totaal activa − Totaal schulden</p>
+          <p className="mt-0.5"><strong className="font-semibold text-[var(--ink-3)]">Solvabiliteitsratio</strong> = Eigen vermogen ÷ Totaal activa × 100%</p>
+          <p className="mt-0.5"><strong className="font-semibold text-[var(--ink-3)]">Schuldgraad</strong> = Totaal schulden ÷ Eigen vermogen</p>
         </div>
 
-        {/* Footer */}
         <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">
-          Actuele waarden uit TriFinity · Peildatum {new Date(data.date).toLocaleDateString('nl-NL')}
+          Berekend op basis van {totalAssetItems} activa en {totalDebtItems} passiva in TriFinity
         </p>
       </div>
 
-      {/* Summary cards */}
-      <div className="mt-8 grid grid-cols-3 gap-3">
-        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-center shadow-[var(--s0)]">
-          <p className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">Activa</p>
-          <p className="mt-1 font-dm-mono text-lg tabular-nums text-[var(--ink)]">{formatCurrency(data.totalAssets)}</p>
-          <p className="mt-0.5 font-inter text-[10px] text-[var(--ink-4)]">{data.assets.length} posten</p>
+      {/* ════════════════════════════════════════════════════════════════════════
+          VRIJHEIDSTIJD — TriFinity filosofie
+         ════════════════════════════════════════════════════════════════════════ */}
+      {freedom && (
+        <div className="mt-8 text-center">
+          <p className="font-inter text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)] mb-3">
+            Geld is opgeslagen tijd
+          </p>
+          <div className="inline-block rounded-[var(--r-lg)] border border-[var(--hor-m)] bg-[var(--hor-l)] px-8 py-5">
+            <p className="font-playfair text-4xl font-bold text-[var(--hor-t)]" style={{ letterSpacing: '-0.03em' }}>
+              {freedom.formatted}
+            </p>
+            <p className="mt-1 font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--hor-t)]">
+              vrijheid
+            </p>
+          </div>
+          <p className="mt-3 font-source-serif text-[13px] italic text-[var(--ink-3)]">
+            Je eigen vermogen van {formatCurrency(data.eigenVermogen)} vertegenwoordigt {freedom.formattedDagen} aan financiële vrijheid,
+            gebaseerd op je dagelijkse uitgaven van {formatCurrency(Math.round(data.dailyExpenseRate))}/dag.
+          </p>
         </div>
-        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-center shadow-[var(--s0)]">
-          <p className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">Passiva</p>
-          <p className="mt-1 font-dm-mono text-lg tabular-nums text-red-600">{data.debts.length > 0 ? `-${formatCurrency(data.totalDebts)}` : formatCurrency(0)}</p>
-          <p className="mt-0.5 font-inter text-[10px] text-[var(--ink-4)]">{data.debts.length} posten</p>
-        </div>
-        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-center shadow-[var(--s0)]">
-          <p className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">Netto</p>
-          <p className={`mt-1 font-dm-mono text-lg tabular-nums ${data.netWorth >= 0 ? 'text-kern-600' : 'text-red-600'}`}>{formatCurrency(data.netWorth)}</p>
-          {freedom && <p className="mt-0.5 font-inter text-[10px] text-[var(--hor-t)]">{freedom.formatted} vrijheid</p>}
-        </div>
-      </div>
+      )}
 
-      {/* Footer */}
+      {/* ════════════════════════════════════════════════════════════════════════
+          SAMENSTELLING — Asset/debt type breakdown
+         ════════════════════════════════════════════════════════════════════════ */}
+      {(usedAssetTypes.length > 0 || usedDebtTypes.length > 0) && (
+        <div className="mt-8 grid gap-4 md:grid-cols-2">
+          {/* Asset composition */}
+          {usedAssetTypes.length > 0 && (
+            <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 shadow-[var(--s0)]">
+              <p className="mb-3 font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                Samenstelling activa
+              </p>
+              <div className="space-y-1.5">
+                {usedAssetTypes.map(type => {
+                  const items = [
+                    ...data.vasteActiva.items.filter(i => i.type === type),
+                    ...data.vlottendeActiva.items.filter(i => i.type === type),
+                  ]
+                  const total = items.reduce((s, i) => s + i.value, 0)
+                  const pct = data.totalActiva > 0 ? (total / data.totalActiva) * 100 : 0
+                  return (
+                    <div key={type}>
+                      <div className="flex items-center justify-between">
+                        <span className="font-inter text-xs text-[var(--ink-2)]">{typeLabel(type)}</span>
+                        <span className="font-dm-mono text-xs tabular-nums text-[var(--ink-3)]">
+                          {pct.toFixed(0)}% · {formatCurrency(total)}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-[var(--border-ed)]">
+                        <div className="h-full rounded-full bg-kern-400" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Debt composition */}
+          {usedDebtTypes.length > 0 && (
+            <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 shadow-[var(--s0)]">
+              <p className="mb-3 font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                Samenstelling schulden
+              </p>
+              <div className="space-y-1.5">
+                {usedDebtTypes.map(type => {
+                  const items = [
+                    ...data.langVreemdVermogen.items.filter(i => i.type === type),
+                    ...data.kortVreemdVermogen.items.filter(i => i.type === type),
+                  ]
+                  const total = items.reduce((s, i) => s + i.value, 0)
+                  const pct = data.totalSchulden > 0 ? (total / data.totalSchulden) * 100 : 0
+                  return (
+                    <div key={type}>
+                      <div className="flex items-center justify-between">
+                        <span className="font-inter text-xs text-[var(--ink-2)]">{typeLabel(type)}</span>
+                        <span className="font-dm-mono text-xs tabular-nums text-[var(--ink-3)]">
+                          {pct.toFixed(0)}% · {formatCurrency(total)}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-[var(--border-ed)]">
+                        <div className="h-full rounded-full bg-red-400" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Footer ── */}
       <footer className="mt-10 border-t-2 border-[var(--ink)] pt-4 text-center">
         <p className="font-playfair text-lg font-bold text-[var(--ink)]">
           <span>t</span><span className="text-kern-600">f.</span>
@@ -309,7 +495,7 @@ export default function BalansPage() {
           &ldquo;Geld is opgeslagen tijd&rdquo;
         </p>
         <p className="mt-2 font-inter text-[10px] text-[var(--ink-4)]">
-          Gegenereerd door TriFinity &middot; {new Date(data.generatedAt).toLocaleDateString('nl-NL')}
+          Gegenereerd door TriFinity &middot; {generatedDate}
         </p>
       </footer>
     </div>
