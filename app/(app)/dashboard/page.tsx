@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { computeEffectiveExpenses, computeFireTarget, computeFreedomPercentage } from '@/lib/core-metrics'
 import { computeFireProjection, computeFireRange, runBacktest, ageAtDate, deriveCountdown, NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF, NL_SWR, type HorizonInput, type LifeEvent, type FireCountdown } from '@/lib/horizon-data'
 import { resolveFireParams } from '@/lib/fire-params'
 import { runSimulation, lifeEventsToCashflows } from '@/lib/fire-simulation'
@@ -169,8 +170,8 @@ export default async function DashboardPage() {
   )
 
   const yearlyExpenses = monthlyExpenses * 12
-  const fireTarget = yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses / fireSwr : (yearlyExpenses > 0 ? yearlyExpenses / fireSwr : 0)
-  const freedomPct = fireTarget > 0 ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0) : 0
+  const fireTarget = computeFireTarget(computeEffectiveExpenses(yearlyRetirementExpenses, yearlyExpenses), fireSwr)
+  const freedomPct = computeFreedomPercentage(netWorth, fireTarget)
 
   // FIRE projection
   const horizonInput: HorizonInput = {
