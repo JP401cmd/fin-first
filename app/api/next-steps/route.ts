@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { NL_SWR } from '@/lib/horizon-data'
 
 /**
  * GET /api/next-steps — Get user's next recommended steps.
@@ -146,8 +147,7 @@ export async function GET() {
       const monthlyExpenses = Math.abs(monthlyTxs.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0))
       const monthlySavings = monthlyIncome - monthlyExpenses
       const yearlyExpenses = monthlyExpenses * 12
-      const SWR = 0.04
-      const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / SWR : 0
+      const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / NL_SWR : 0
 
       // FIRE is unreachable if: target exists but savings <= 0 and haven't reached target
       // OR if it would take > 50 years (600 months) to reach

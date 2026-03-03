@@ -211,7 +211,7 @@ export default function TestAutoSnapshot() {
             { label: 'GET /api/snapshots/auto endpoint exists', detail: 'app/api/snapshots/auto/route.ts — creates snapshot if none this month', pass: true },
             { label: 'POST /api/snapshots enhanced', detail: 'Now computes fire_age, sovereignty_level, savings_rate, resilience_score', pass: true },
             { label: 'net_worth = total_assets - total_debts', detail: 'Computed from active assets and debts in database', pass: true },
-            { label: 'freedom_percentage from real expenses', detail: '(net_worth / FIRE_target) × 100, FIRE_target = yearly_expenses / 0.04', pass: true },
+            { label: 'freedom_percentage from real expenses', detail: '(net_worth / FIRE_target) × 100, FIRE_target = yearly_expenses / NL_SWR (≈2.88%)', pass: true },
             { label: 'fire_age via computeFireProjection()', detail: 'Requires date_of_birth from profiles; null if not set', pass: true },
             { label: 'sovereignty_level via computeSovereigntyLevel()', detail: 'Levels -2 to 6 based on net worth, expenses, freedom%, consumer debt', pass: true },
             { label: 'savings_rate from fire projection', detail: '(monthly_savings / monthly_income) × 100', pass: true },
