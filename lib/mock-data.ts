@@ -2,11 +2,15 @@
  * Core dashboard data calculation.
  * Computes freedom metrics from real financial data.
  *
- * SWR (Safe Withdrawal Rate): 4%
- * FIRE target = yearly expenses / 0.04
+ * SWR (Safe Withdrawal Rate): defaults to NL Box 3-corrected SWR (≈2.88%)
+ * via resolveFireParams(). Callers can override with swrOverride parameter.
+ *
+ * FIRE target = yearly expenses / SWR
  * Freedom % = net worth / FIRE target
  * Freedom time = net worth / yearly expenses
  */
+
+import { resolveFireParams } from '@/lib/fire-params'
 
 export type CoreData = {
   // Freedom timeline
@@ -40,8 +44,6 @@ export type CoreData = {
   totalDebts: number
 }
 
-const SWR = 0.04
-
 export function computeCoreData(
   monthlyIncome: number,
   monthlyExpenses: number,
@@ -51,7 +53,7 @@ export function computeCoreData(
   yearlyMustExpenses?: number,
   swrOverride?: number,
 ): CoreData {
-  const swr = swrOverride ?? SWR
+  const swr = swrOverride ?? resolveFireParams({}).effectiveSwr
   const yearlyIncome = monthlyIncome * 12
   const yearlyExpenses = monthlyExpenses * 12
   const effectiveYearlyExpenses = yearlyMustExpenses && yearlyMustExpenses > 0 ? yearlyMustExpenses : yearlyExpenses

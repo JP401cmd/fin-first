@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { computeFreedomMilestones } from '@/lib/freedom-milestones'
+import { NL_SWR } from '@/lib/horizon-data'
 
 /**
  * Verification endpoint for freedom milestone projections.
@@ -132,7 +133,7 @@ export async function GET() {
   // Test 11: Milestone target amounts are mathematically correct
   {
     const r = computeFreedomMilestones(50000, 2500, 1500)
-    const fireTarget = (2500 * 12) / 0.04 // 750,000
+    const fireTarget = (2500 * 12) / NL_SWR
     const m25target = r.milestones.find(m => m.percent === 25)?.targetNetWorth ?? 0
     const m50target = r.milestones.find(m => m.percent === 50)?.targetNetWorth ?? 0
     const m100target = r.milestones.find(m => m.percent === 100)?.targetNetWorth ?? 0

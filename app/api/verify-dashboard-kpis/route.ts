@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeFireProjection, type HorizonInput } from '@/lib/horizon-data'
+import { computeFireProjection, NL_SWR, type HorizonInput } from '@/lib/horizon-data'
 import { NextResponse } from 'next/server'
 
 /**
@@ -116,7 +116,7 @@ export async function GET() {
     }
 
     const yearlyExpenses = monthlyExpenses * 12
-    const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / 0.04 : 0
+    const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / NL_SWR : 0
     const freedomPct = fireTarget > 0 ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0) : 0
     const budgetCount = allBudgetsResult.data?.length ?? 0
 

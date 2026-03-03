@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeFireProjection, type HorizonInput } from '@/lib/horizon-data'
+import { computeFireProjection, NL_SWR, type HorizonInput } from '@/lib/horizon-data'
 import { NextResponse } from 'next/server'
 
 /**
@@ -108,13 +108,13 @@ export async function GET() {
     })
 
     // ── Test 5: FIRE target derived from real expenses ──
-    const expectedFireTarget = (monthlyExpenses * 12) / 0.04
+    const expectedFireTarget = (monthlyExpenses * 12) / NL_SWR
     const fireTargetMatches = Math.abs(fireResult.fireTarget - expectedFireTarget) < 0.01
 
     results.push({
-      test: '5. FIRE target derived from real monthly expenses (4% SWR)',
+      test: '5. FIRE target derived from real monthly expenses (NL SWR)',
       passed: fireTargetMatches,
-      details: `FIRE target = (${monthlyExpenses.toFixed(2)} × 12) / 0.04 = ${expectedFireTarget.toFixed(2)}. Actual: ${fireResult.fireTarget.toFixed(2)}. Uses real transaction expenses, not hardcoded values.`,
+      details: `FIRE target = (${monthlyExpenses.toFixed(2)} × 12) / ${(NL_SWR * 100).toFixed(2)}% = ${expectedFireTarget.toFixed(2)}. Actual: ${fireResult.fireTarget.toFixed(2)}. Uses real transaction expenses, not hardcoded values.`,
     })
 
     // ── Test 6: User can modify income parameter ──

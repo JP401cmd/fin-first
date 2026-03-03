@@ -5,6 +5,7 @@ import {
   FEATURES,
   type FeaturePhaseMatrix,
 } from '@/lib/feature-phases'
+import { NL_SWR } from '@/lib/horizon-data'
 
 export type FinancialInput = {
   assets: { current_value: number | string }[]
@@ -34,7 +35,7 @@ export function computeFeatureAccess(input: FinancialInput): FeatureAccessData {
   const monthlyExpenses = expenses / 3
 
   const yearlyExpenses = monthlyExpenses * 12
-  const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / 0.04 : 0
+  const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / NL_SWR : 0
   const freedomPct = fireTarget > 0 ? (netWorth / fireTarget) * 100 : 0
 
   const consumerDebtTypes = ['personal_loan', 'credit_card', 'revolving_credit', 'payment_plan', 'car_loan']
