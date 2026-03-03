@@ -77,13 +77,15 @@ export function BudgetSparkline({
   testId,
 }: BudgetSparklineProps) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 400, rootMargin: '0px' })
-  const { points, fillPath, linePath, trend, trendColor, hasData } = useMemo(() => {
+  const { points, historicalFillPath, projectedFillPath, historicalLinePath, projectedLinePath, trend, trendColor, hasData } = useMemo(() => {
     const values = data.map(d => d.spent)
     if (values.length < 2 || values.every(v => v === 0)) {
-      return { points: [], fillPath: '', linePath: '', trend: 'flat' as const, trendColor: '#a1a1aa', hasData: false }
+      return { points: [], historicalFillPath: '', projectedFillPath: '', historicalLinePath: '', projectedLinePath: '', trend: 'flat' as const, trendColor: '#a1a1aa', hasData: false }
     }
 
-    const trend = calculateTrend(values)
+    // Exclude current (last/incomplete) month from trend calculation
+    const historicalValues = values.slice(0, -1)
+    const trend = historicalValues.length >= 2 ? calculateTrend(historicalValues) : 'flat'
 
     // Determine color based on trend and type
     let trendColor: string
@@ -110,16 +112,26 @@ export function BudgetSparkline({
       y: padding.top + chartHeight - ((v - minVal) / range) * chartHeight,
     }))
 
-    // Build SVG path for the line
-    let linePath = `M ${pts[0].x} ${pts[0].y}`
-    for (let i = 1; i < pts.length; i++) {
-      linePath += ` L ${pts[i].x} ${pts[i].y}`
+    const n = pts.length
+    const lastHistIdx = n - 2 // second-to-last point = last complete month
+    const chartBottom = padding.top + chartHeight
+
+    // Historical line: points 0 to n-2 (completed months)
+    let historicalLinePath = `M ${pts[0].x} ${pts[0].y}`
+    for (let i = 1; i <= lastHistIdx; i++) {
+      historicalLinePath += ` L ${pts[i].x} ${pts[i].y}`
     }
 
-    // Build SVG path for the fill area
-    const fillPath = `${linePath} L ${pts[pts.length - 1].x} ${padding.top + chartHeight} L ${pts[0].x} ${padding.top + chartHeight} Z`
+    // Projected line: points n-2 to n-1 (current incomplete month)
+    const projectedLinePath = `M ${pts[lastHistIdx].x} ${pts[lastHistIdx].y} L ${pts[n - 1].x} ${pts[n - 1].y}`
 
-    return { points: pts, fillPath, linePath, trend, trendColor, hasData: true }
+    // Historical fill: area under completed months
+    const historicalFillPath = `${historicalLinePath} L ${pts[lastHistIdx].x} ${chartBottom} L ${pts[0].x} ${chartBottom} Z`
+
+    // Projected fill: area under current month segment
+    const projectedFillPath = `M ${pts[lastHistIdx].x} ${pts[lastHistIdx].y} L ${pts[n - 1].x} ${pts[n - 1].y} L ${pts[n - 1].x} ${chartBottom} L ${pts[lastHistIdx].x} ${chartBottom} Z`
+
+    return { points: pts, historicalFillPath, projectedFillPath, historicalLinePath, projectedLinePath, trend, trendColor, hasData: true }
   }, [data, width, height, isIncome])
 
   if (!hasData) {
@@ -162,10 +174,10 @@ export function BudgetSparkline({
       data-trend-color={trendColor}
     >
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-        {/* Fill area under the line */}
+        {/* Historical fill area (completed months) */}
         {showFill && (
           <path
-            d={fillPath}
+            d={historicalFillPath}
             fill={trendColor}
             style={{
               opacity:    hasEntered ? 0.12 : 0,
@@ -174,9 +186,21 @@ export function BudgetSparkline({
           />
         )}
 
-        {/* Main sparkline */}
+        {/* Projected fill area (current incomplete month — reduced opacity) */}
+        {showFill && (
+          <path
+            d={projectedFillPath}
+            fill={trendColor}
+            style={{
+              opacity:    hasEntered ? 0.06 : 0,
+              transition: hasEntered ? 'opacity 150ms ease-out 310ms' : 'none',
+            }}
+          />
+        )}
+
+        {/* Historical sparkline (solid) */}
         <path
-          d={linePath}
+          d={historicalLinePath}
           fill="none"
           stroke={trendColor}
           strokeWidth={1.5}
@@ -188,8 +212,22 @@ export function BudgetSparkline({
           style={{ animation: lineAnim }}
         />
 
-        {/* Data point dots */}
-        {showDots && points.map((pt, i) => (
+        {/* Projected sparkline (dashed — current incomplete month) */}
+        <path
+          d={projectedLinePath}
+          fill="none"
+          stroke={trendColor}
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeDasharray="3 2"
+          style={{
+            opacity:    hasEntered ? 0.7 : 0,
+            transition: hasEntered ? 'opacity 150ms ease-out 380ms' : 'none',
+          }}
+        />
+
+        {/* Data point dots (historical only) */}
+        {showDots && points.slice(0, -1).map((pt, i) => (
           <circle
             key={i}
             cx={pt.x}
@@ -201,12 +239,14 @@ export function BudgetSparkline({
           />
         ))}
 
-        {/* Endpoint dot (always shown for context) */}
+        {/* Endpoint dot — current month (hollow to indicate incomplete) */}
         <circle
           cx={points[points.length - 1].x}
           cy={points[points.length - 1].y}
           r={2}
-          fill={trendColor}
+          fill="none"
+          stroke={trendColor}
+          strokeWidth={1}
           opacity={dotOpacity}
           style={{ transition: dotTransition }}
         />
@@ -228,7 +268,9 @@ export function SparklineWithLabel({
   testId,
 }: Omit<BudgetSparklineProps, 'showDots' | 'showFill'> & { showLabel?: boolean }) {
   const values = data.map(d => d.spent)
-  const trend = values.length >= 2 ? calculateTrend(values) : 'flat'
+  // Exclude current (last/incomplete) month from trend calculation
+  const historicalValues = values.length >= 2 ? values.slice(0, -1) : values
+  const trend = historicalValues.length >= 2 ? calculateTrend(historicalValues) : 'flat'
 
   let trendLabel: string
   let labelColor: string
