@@ -10,7 +10,13 @@
  * Freedom time = net worth / yearly expenses
  */
 
-import { resolveFireParams } from '@/lib/fire-params'
+import {
+  computeEffectiveExpenses,
+  computeFireTarget,
+  computeFreedomPercentage,
+  computeFreedomTime,
+  computeSavingsRate,
+} from './core-metrics'
 
 export type CoreData = {
   // Freedom timeline
@@ -56,21 +62,15 @@ export function computeCoreData(
   const swr = swrOverride ?? resolveFireParams({}).effectiveSwr
   const yearlyIncome = monthlyIncome * 12
   const yearlyExpenses = monthlyExpenses * 12
-  const effectiveYearlyExpenses = yearlyMustExpenses && yearlyMustExpenses > 0 ? yearlyMustExpenses : yearlyExpenses
+  const effectiveYearlyExpenses = computeEffectiveExpenses(yearlyMustExpenses ?? 0, yearlyExpenses)
   const monthlySavings = monthlyIncome - monthlyExpenses
   const netWorth = totalAssets - totalDebts
 
-  // FIRE calculations
-  const fireTarget = effectiveYearlyExpenses > 0 ? effectiveYearlyExpenses / swr : 0
-  const freedomPercentage = fireTarget > 0 ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0) : 0
-
-  // Freedom time: how long could you live off net worth
-  const freedomMonthsTotal = effectiveYearlyExpenses > 0 ? (netWorth / effectiveYearlyExpenses) * 12 : 0
-  const freedomYears = Math.floor(freedomMonthsTotal / 12)
-  const freedomMonths = Math.floor(freedomMonthsTotal % 12)
-
-  // Savings rate
-  const savingsRate = monthlyIncome > 0 ? (monthlySavings / monthlyIncome) * 100 : 0
+  // FIRE calculations (shared primitives from core-metrics.ts)
+  const fireTarget = computeFireTarget(effectiveYearlyExpenses, swr)
+  const freedomPercentage = computeFreedomPercentage(netWorth, fireTarget)
+  const { years: freedomYears, months: freedomMonths } = computeFreedomTime(netWorth, effectiveYearlyExpenses)
+  const savingsRate = computeSavingsRate(monthlyIncome, monthlyExpenses)
 
   // Days won per month (how many days of expenses covered by monthly savings)
   // dailyExpense = all expenses / 365 (used for daysWonPerMonth: general savings impact)

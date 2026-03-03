@@ -5,6 +5,13 @@
  * Pure functions, no Supabase dependency.
  */
 
+import {
+  computeEffectiveExpenses,
+  computeFireTarget,
+  computeFreedomPercentage,
+  computeFreedomTime,
+  computeSavingsRate,
+} from './core-metrics'
 import { MSCI_REAL_RETURNS, NAMED_PERIODS } from './msci-data'
 
 // ── Constants ────────────────────────────────────────────────
@@ -486,17 +493,15 @@ export function computeFireProjection(
   const inflationRate = inflationOverride ?? INFLATION
   const netWorth = totalAssets - totalDebts
   const yearlyExpenses = monthlyExpenses * 12
-  const effectiveYearlyExpenses = yearlyMustExpenses > 0 ? yearlyMustExpenses : yearlyExpenses
-  const fireTarget = effectiveYearlyExpenses > 0 ? effectiveYearlyExpenses / swr : 0
-  const freedomPercentage = fireTarget > 0 ? Math.min((netWorth / fireTarget) * 100, 100) : 0
+  const effectiveYearlyExpenses = computeEffectiveExpenses(yearlyMustExpenses, yearlyExpenses)
+  const fireTarget = computeFireTarget(effectiveYearlyExpenses, swr)
+  const freedomPercentage = computeFreedomPercentage(netWorth, fireTarget)
   const monthlySavings = monthlyIncome - monthlyExpenses
-  const savingsRate = monthlyIncome > 0 ? (monthlySavings / monthlyIncome) * 100 : 0
+  const savingsRate = computeSavingsRate(monthlyIncome, monthlyExpenses)
   const monthlyPassiveIncome = (netWorth * swr) / 12
 
-  // Freedom time
-  const freedomMonthsTotal = effectiveYearlyExpenses > 0 ? (netWorth / effectiveYearlyExpenses) * 12 : 0
-  const freedomYears = Math.floor(Math.max(0, freedomMonthsTotal) / 12)
-  const freedomMonths = Math.floor(Math.max(0, freedomMonthsTotal) % 12)
+  // Freedom time (shared primitives from core-metrics.ts)
+  const { years: freedomYears, months: freedomMonths } = computeFreedomTime(netWorth, effectiveYearlyExpenses)
 
   // FIRE date calculation (inflation-adjusted real return)
   const realReturn = (1 + annualReturn) / (1 + inflationRate) - 1
