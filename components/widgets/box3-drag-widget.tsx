@@ -10,10 +10,10 @@ interface Props {
 }
 
 export function Box3DragWidget({ size, data, href }: Props) {
-  const { totalAssets, yearlyMustExpenses, box3Belasting } = data
+  const { totalAssets, yearlyMustExpenses, box3Tax } = data
 
-  // Use pre-computed Box 3 belasting (full calculateBox3 calculation)
-  const annualDrag = box3Belasting ?? 0
+  // Use pre-computed Box 3 tax (full calculateBox3 calculation)
+  const annualDrag = box3Tax ?? 0
   const dailyMustExpense = yearlyMustExpenses > 0 ? yearlyMustExpenses / 365 : 0
   const freedomDaysLost = dailyMustExpense > 0 && annualDrag > 0 ? Math.round(annualDrag / dailyMustExpense) : null
 

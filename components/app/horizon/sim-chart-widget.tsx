@@ -9,10 +9,11 @@ import { formatCurrency } from '@/lib/format'
 import { formatFireAge } from '@/lib/horizon-data'
 import type { SimResult, SimCashflow } from '@/lib/fire-simulation'
 import { type FireEndStrategy, STRATEGY_LABELS } from '@/lib/fire-strategy'
+import { DEFAULT_RETURN } from '@/lib/constants'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const GROSS_RETURN = 0.07
+const GROSS_RETURN = DEFAULT_RETURN
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -72,9 +73,9 @@ export function SimChartModal({
 
   const resolvedCurrentAge = currentAge ?? 30
   const startPortfolio = rows[0]?.startPortfolio ?? 0
-  const annualSavingsFromRows = rows.find(r => r.phase === 'opbouw')?.savings ?? 0
-  const opbouwRows = rows.filter(r => r.phase === 'opbouw')
-  const pensioenRows = rows.filter(r => r.phase === 'pensioen')
+  const annualSavingsFromRows = rows.find(r => r.phase === 'accumulation')?.savings ?? 0
+  const accumulationRows = rows.filter(r => r.phase === 'accumulation')
+  const retirementRows = rows.filter(r => r.phase === 'retirement')
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Simulatie Prognose">
@@ -301,15 +302,15 @@ export function SimChartModal({
                     let cumLifeEvent = 0
                     return rows.map((row, i) => {
                       cumLifeEvent += row.cashflowNet
-                      const isFireRow = fireAge !== null && row.age === fireAge && row.phase === 'pensioen'
-                      const isOpbouw = row.phase === 'opbouw'
+                      const isFireRow = fireAge !== null && row.age === fireAge && row.phase === 'retirement'
+                      const isAccumulation = row.phase === 'accumulation'
                       return (
                         <tr
                           key={i}
                           className={`border-b border-[var(--border-ed)] ${
                             isFireRow
                               ? 'bg-horizon-50/80 font-bold'
-                              : isOpbouw
+                              : isAccumulation
                               ? 'bg-[var(--paper)]'
                               : 'bg-kern-50/30'
                           }`}
@@ -323,8 +324,8 @@ export function SimChartModal({
                             )}
                           </td>
                           <td className="px-3 py-1.5">
-                            <span className={`font-sans text-[10px] font-medium ${isOpbouw ? 'text-horizon-700' : strategy === 'perpetual' ? 'text-horizon-700' : 'text-kern-700'}`}>
-                              {isOpbouw ? 'Opbouw' : strategy === 'perpetual' ? 'Behoud' : 'Afbouw'}
+                            <span className={`font-sans text-[10px] font-medium ${isAccumulation ? 'text-horizon-700' : strategy === 'perpetual' ? 'text-horizon-700' : 'text-kern-700'}`}>
+                              {isAccumulation ? 'Opbouw' : strategy === 'perpetual' ? 'Behoud' : 'Afbouw'}
                             </span>
                           </td>
                           <td className="px-3 py-1.5 tabular-nums text-right text-[var(--ink-2)]">
@@ -334,7 +335,7 @@ export function SimChartModal({
                             +{fmt(row.growth)}
                           </td>
                           <td className="px-3 py-1.5 tabular-nums text-right">
-                            {isOpbouw ? (
+                            {isAccumulation ? (
                               <span className="text-horizon-700">+{fmt(row.savings)}</span>
                             ) : (
                               <span className="text-kern-700">−{fmt(row.withdrawal)}</span>
@@ -389,16 +390,16 @@ export function SimChartModal({
             <div className="mt-2 grid grid-cols-3 gap-3">
               <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/60 p-2.5 text-center">
                 <p className="font-sans text-[10px] text-[var(--ink-4)]">Opbouwjaren</p>
-                <p className="font-mono text-base font-semibold text-horizon-700">{opbouwRows.length}</p>
+                <p className="font-mono text-base font-semibold text-horizon-700">{accumulationRows.length}</p>
               </div>
               <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/60 p-2.5 text-center">
                 <p className="font-sans text-[10px] text-[var(--ink-4)]">{strategy === 'perpetual' ? 'Behoudjaren' : 'Afbouwjaren'}</p>
-                <p className={`font-mono text-base font-semibold ${strategy === 'perpetual' ? 'text-horizon-700' : 'text-kern-700'}`}>{pensioenRows.length}</p>
+                <p className={`font-mono text-base font-semibold ${strategy === 'perpetual' ? 'text-horizon-700' : 'text-kern-700'}`}>{retirementRows.length}</p>
               </div>
               <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/60 p-2.5 text-center">
                 <p className="font-sans text-[10px] text-[var(--ink-4)]">Totaal AOW</p>
                 <p className="font-mono text-base font-semibold text-[var(--ink)]">
-                  {pensioenRows.filter(r => r.age >= 67).length} jaar
+                  {retirementRows.filter(r => r.age >= 67).length} jaar
                 </p>
               </div>
             </div>

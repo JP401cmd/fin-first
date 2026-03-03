@@ -1,9 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
-import { computeFireProjection, computeResilienceScore, type HorizonInput } from '@/lib/horizon-data'
+import { computeFireProjection, computeResilienceScore, NL_SWR, type HorizonInput } from '@/lib/horizon-data'
+import { resolveFireParams } from '@/lib/fire-params'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
+import { mapDbRows } from '@/lib/db-mapper'
 
 const SWR = 0.04
 
@@ -44,7 +46,7 @@ export async function GET() {
     const limit = Number(b.default_limit) || 0
     return s + (b.interval === 'yearly' ? limit : limit * 12)
   }, 0)
-  const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / SWR : 0
+  const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / NL_SWR : 0
 
   // Enrich snapshots with computed freedom_percentage
   const enriched = (snapshots ?? []).map(s => {
@@ -120,7 +122,7 @@ export async function POST() {
       .lt('date', monthEnd),
     supabase
       .from('profiles')
-      .select('date_of_birth')
+      .select('date_of_birth, expected_return, inflation_rate')
       .eq('id', user.id)
       .single(),
     supabase
@@ -139,19 +141,24 @@ export async function POST() {
     return NextResponse.json({ error: debtsResult.error.message }, { status: 500 })
   }
 
-  const assets = assetsResult.data ?? []
-  const debts = debtsResult.data ?? []
+  // Keep raw rows for captureBalanceSnapshots (expects snake_case)
+  const rawAssets = assetsResult.data ?? []
+  const rawDebts = debtsResult.data ?? []
+
+  // Map DB rows to camelCase for local processing
+  const assets = mapDbRows(rawAssets)
+  const debts = mapDbRows(rawDebts)
   const expenses = expensesResult.data ?? []
   const income = incomeResult.data ?? []
 
-  const totalAssets = assets.reduce((s, a) => s + Number(a.current_value), 0)
-  const totalDebts = debts.reduce((s, d) => s + Number(d.current_balance), 0)
+  const totalAssets = assets.reduce((s, a) => s + Number(a.currentValue), 0)
+  const totalDebts = debts.reduce((s, d) => s + Number(d.currentBalance), 0)
   const netWorth = totalAssets - totalDebts
 
   const yearlyExpenses = Math.abs(expenses.reduce((s, t) => s + Number(t.amount), 0))
   const monthlyExpenses = yearlyExpenses / 12
   const monthlyIncome = income.reduce((s, t) => s + Number(t.amount), 0)
-  const monthlyContributions = assets.reduce((s, a) => s + Number(a.monthly_contribution || 0), 0)
+  const monthlyContributions = assets.reduce((s, a) => s + Number(a.monthlyContribution || 0), 0)
 
   // Essential budgets for yearly "must" expenses
   const yearlyMustExpenses = (budgetsResult.data ?? []).reduce((s, b) => {
@@ -159,7 +166,9 @@ export async function POST() {
     return s + (b.interval === 'yearly' ? limit : limit * 12)
   }, 0)
 
-  const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / SWR : 0
+  const fireParams = resolveFireParams(profileResult.data ?? {})
+  const fireSwr = fireParams.effectiveSwr
+  const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / fireSwr : 0
   const freedomPercentage = fireTarget > 0
     ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0)
     : 0
@@ -175,11 +184,11 @@ export async function POST() {
     yearlyMustExpenses,
     dateOfBirth,
   }
-  const fireProjection = computeFireProjection(horizonInput)
+  const fireProjection = computeFireProjection(horizonInput, fireParams.grossReturn, fireSwr)
 
   // Compute sovereignty level
   const consumerDebtTypes = ['personal_loan', 'credit_card', 'revolving_credit', 'payment_plan', 'car_loan']
-  const hasConsumerDebt = debts.some(d => consumerDebtTypes.includes(d.debt_type) && Number(d.current_balance) > 0)
+  const hasConsumerDebt = debts.some(d => consumerDebtTypes.includes(d.debtType) && Number(d.currentBalance) > 0)
   const sovereigntyLevel = computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPercentage, hasConsumerDebt)
 
   // Compute resilience score
@@ -234,7 +243,7 @@ export async function POST() {
   }
 
   // Capture per-entity balance snapshots (fire-and-forget, non-critical)
-  captureBalanceSnapshots(supabase, user.id, today, assets, debts).catch(() => {})
+  captureBalanceSnapshots(supabase, user.id, today, rawAssets, rawDebts).catch(() => {})
 
   // Trigger badge evaluation after snapshot creation (fire-and-forget, server-side)
   try {
@@ -275,7 +284,7 @@ export async function POST() {
       formula: 'net_worth = total_assets - total_debts',
       freedom_percentage: Math.round(freedomPercentage * 10) / 10,
       fire_target: fireTarget,
-      swr: SWR,
+      swr: fireSwr,
       fire_age: fireProjection.fireAge,
       sovereignty_level: sovereigntyLevel,
       savings_rate: Math.round(fireProjection.savingsRate * 10) / 10,

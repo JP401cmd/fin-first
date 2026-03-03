@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation'
 import { shouldAlert } from '@/lib/budget-alerts'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { ageAtDate, type LifeEvent } from '@/lib/horizon-data'
+import { DEFAULT_RETURN, INFLATION } from '@/lib/constants'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { runSimulation, lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { parseFireStrategy } from '@/lib/fire-strategy'
@@ -295,9 +296,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         if (monthlySavings <= 0) {
           setFireUnreachable(true)
         } else {
-          const annualReturn = 0.07
-          const inflation = 0.02
-          const realReturn = (1 + annualReturn) / (1 + inflation) - 1
+          const realReturn = (1 + DEFAULT_RETURN) / (1 + INFLATION) - 1
           const monthlyReturnRate = realReturn / 12
           let projectedNW = netWorth
           let fireMonths = 0
