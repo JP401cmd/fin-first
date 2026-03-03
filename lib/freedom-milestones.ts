@@ -7,7 +7,7 @@
  * "Geld is opgeslagen tijd" — each milestone represents a step closer to full freedom.
  */
 
-import { DEFAULT_RETURN, INFLATION, SWR } from '@/lib/horizon-data'
+import { DEFAULT_RETURN, INFLATION, NL_SWR } from '@/lib/horizon-data'
 
 export interface FreedomMilestone {
   /** Milestone percentage (25, 50, 75, 100) */
@@ -50,7 +50,7 @@ const MILESTONE_PERCENTS = [25, 50, 75, 100]
  * @param monthlySavings - Monthly savings (income - expenses)
  * @param annualReturn - Expected annual return (default 7%)
  * @param inflationRate - Annual inflation rate (default 2%)
- * @param swrRate - Safe withdrawal rate (default 4%)
+ * @param swrRate - Safe withdrawal rate (default NL_SWR ≈2.88%)
  */
 export function computeFreedomMilestones(
   netWorth: number,
@@ -58,7 +58,7 @@ export function computeFreedomMilestones(
   monthlySavings: number,
   annualReturn: number = DEFAULT_RETURN,
   inflationRate: number = INFLATION,
-  swrRate: number = SWR,
+  swrRate: number = NL_SWR,
   yearlyMustExpenses: number = 0,
 ): FreedomMilestoneResult {
   const yearlyExpenses = monthlyExpenses * 12

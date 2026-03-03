@@ -2,8 +2,10 @@
  * Core dashboard data calculation.
  * Computes freedom metrics from real financial data.
  *
- * SWR (Safe Withdrawal Rate): 4%
- * FIRE target = yearly expenses / 0.04
+ * SWR (Safe Withdrawal Rate): defaults to NL Box 3-corrected SWR (≈2.88%)
+ * via resolveFireParams(). Callers can override with swrOverride parameter.
+ *
+ * FIRE target = yearly expenses / SWR
  * Freedom % = net worth / FIRE target
  * Freedom time = net worth / yearly expenses
  */
@@ -34,6 +36,11 @@ export type CoreData = {
   autonomyScore: string
 
   // Kerngetallen
+  /**
+   * Best estimate of annual income, preferring actual 12-month history.
+   * = last12MonthsIncome ?? (monthlyIncome × 12)
+   * Contrast with yearlyIncome (local var): simple extrapolation = monthlyIncome × 12.
+   */
   estimatedYearlyIncome: number
   yearlyMustExpenses: number
   yearlyExpenses: number
@@ -42,8 +49,6 @@ export type CoreData = {
   totalAssets: number
   totalDebts: number
 }
-
-const SWR = 0.04
 
 export function computeCoreData(
   monthlyIncome: number,
@@ -54,7 +59,7 @@ export function computeCoreData(
   yearlyMustExpenses?: number,
   swrOverride?: number,
 ): CoreData {
-  const swr = swrOverride ?? SWR
+  const swr = swrOverride ?? resolveFireParams({}).effectiveSwr
   const yearlyIncome = monthlyIncome * 12
   const yearlyExpenses = monthlyExpenses * 12
   const effectiveYearlyExpenses = computeEffectiveExpenses(yearlyMustExpenses ?? 0, yearlyExpenses)
@@ -68,11 +73,14 @@ export function computeCoreData(
   const savingsRate = computeSavingsRate(monthlyIncome, monthlyExpenses)
 
   // Days won per month (how many days of expenses covered by monthly savings)
+  // dailyExpense = all expenses / 365 (used for daysWonPerMonth: general savings impact)
   const dailyExpense = monthlyExpenses > 0 ? yearlyExpenses / 365 : 0
   const daysWonPerMonth = dailyExpense > 0 ? Math.round(monthlySavings / dailyExpense) : 0
 
   // Free days per year (passive income from net worth at SWR / daily must expenses)
-  // Uses must expenses (same basis as FIRE calculations), falls back to total expenses
+  // dailyMustExpense = essential expenses only / 365 (used for FIRE freedom-day calculations)
+  // Falls back to dailyExpense when no essential budget data is available.
+  // See also: DailyExpenseProvider (dailyExpenseRate) — transaction-history-based daily rate.
   const dailyMustExpense = effectiveYearlyExpenses > 0 ? effectiveYearlyExpenses / 365 : dailyExpense
   const passiveIncome = netWorth * swr
   const freeDaysPerYear = dailyMustExpense > 0 ? Math.round(passiveIncome / dailyMustExpense) : 0

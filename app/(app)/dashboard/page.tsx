@@ -236,8 +236,8 @@ export default async function DashboardPage() {
     }
   }
 
-  // Box 3 belasting — zelfde berekening als /core/belasting (default: 2025, geen partner)
-  let box3Belasting: number | null = null
+  // Box 3 tax — same calculation as /core/belasting (default: 2025, no partner)
+  let box3Tax: number | null = null
   const rawAssets = assetsResult.data ?? []
   const rawDebts = debtsResult.data ?? []
   if (rawAssets.length > 0) {
@@ -250,9 +250,9 @@ export default async function DashboardPage() {
         dailyExpenses: dailyExp,
         year: 2025,
       })
-      box3Belasting = box3Result.belasting
+      box3Tax = box3Result.tax
     } catch {
-      box3Belasting = null
+      box3Tax = null
     }
   }
 
@@ -383,7 +383,7 @@ export default async function DashboardPage() {
     simRequiredPortfolio,
     backtestSuccessRate,
     backtestNamedPaths,
-    box3Belasting,
+    box3Tax,
     simFireCountdown,
     fireEndStrategy: fireStrategy.strategy,
     fireEndAge: fireStrategy.endAge,

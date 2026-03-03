@@ -1,11 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
-import { computeFireProjection, computeResilienceScore, type HorizonInput } from '@/lib/horizon-data'
+import { computeFireProjection, computeResilienceScore, NL_SWR, type HorizonInput } from '@/lib/horizon-data'
+import { resolveFireParams } from '@/lib/fire-params'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
-
-const SWR = 0.04
 
 /**
  * GET /api/snapshots
@@ -44,7 +43,7 @@ export async function GET() {
     const limit = Number(b.default_limit) || 0
     return s + (b.interval === 'yearly' ? limit : limit * 12)
   }, 0)
-  const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / SWR : 0
+  const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / NL_SWR : 0
 
   // Enrich snapshots with computed freedom_percentage
   const enriched = (snapshots ?? []).map(s => {
@@ -120,7 +119,7 @@ export async function POST() {
       .lt('date', monthEnd),
     supabase
       .from('profiles')
-      .select('date_of_birth')
+      .select('date_of_birth, expected_return, inflation_rate')
       .eq('id', user.id)
       .single(),
     supabase
@@ -159,7 +158,9 @@ export async function POST() {
     return s + (b.interval === 'yearly' ? limit : limit * 12)
   }, 0)
 
-  const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / SWR : 0
+  const fireParams = resolveFireParams(profileResult.data ?? {})
+  const fireSwr = fireParams.effectiveSwr
+  const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / fireSwr : 0
   const freedomPercentage = fireTarget > 0
     ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0)
     : 0
@@ -175,7 +176,7 @@ export async function POST() {
     yearlyMustExpenses,
     dateOfBirth,
   }
-  const fireProjection = computeFireProjection(horizonInput)
+  const fireProjection = computeFireProjection(horizonInput, fireParams.grossReturn, fireSwr)
 
   // Compute sovereignty level
   const consumerDebtTypes = ['personal_loan', 'credit_card', 'revolving_credit', 'payment_plan', 'car_loan']
@@ -275,7 +276,7 @@ export async function POST() {
       formula: 'net_worth = total_assets - total_debts',
       freedom_percentage: Math.round(freedomPercentage * 10) / 10,
       fire_target: fireTarget,
-      swr: SWR,
+      swr: fireSwr,
       fire_age: fireProjection.fireAge,
       sovereignty_level: sovereigntyLevel,
       savings_rate: Math.round(fireProjection.savingsRate * 10) / 10,

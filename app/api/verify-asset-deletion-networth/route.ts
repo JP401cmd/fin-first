@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
+import { NL_SWR } from '@/lib/horizon-data'
 
 export const dynamic = 'force-dynamic'
 
@@ -337,7 +338,7 @@ async function runAuthenticatedTests(
 
   // Test 9: Freedom percentage also updates
   const yearlyExpenses = 30000 // typical estimate
-  const fireTarget = yearlyExpenses / 0.04
+  const fireTarget = yearlyExpenses / NL_SWR
   const freedomBefore = netWorthBefore > 0 ? (netWorthBefore / fireTarget) * 100 : 0
   const freedomAfterCreate = netWorthAfterCreate > 0 ? (netWorthAfterCreate / fireTarget) * 100 : 0
   const freedomAfterDelete = netWorthAfterDelete > 0 ? (netWorthAfterDelete / fireTarget) * 100 : 0

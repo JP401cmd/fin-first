@@ -105,8 +105,8 @@ export interface DashboardData {
   // Horizon: backtesting success rate + named crash paths
   backtestSuccessRate: number | null
   backtestNamedPaths: { label: string; success: boolean }[] | null
-  // Box 3: pre-computed belasting from full calculateBox3() (null if no assets)
-  box3Belasting: number | null
+  // Box 3: pre-computed tax from full calculateBox3() (null if no assets)
+  box3Tax: number | null
   // Simulatie-afgeleide countdown (null als simulatie niet beschikbaar)
   simFireCountdown: FireCountdown | null
   // FIRE end strategy

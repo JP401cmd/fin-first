@@ -796,8 +796,8 @@ export default function FireSimPage() {
                 {result.rows.flatMap((row, idx) => {
                   const isFireTransition = result.fireAge !== null
                     && idx > 0
-                    && result.rows[idx - 1].phase === 'opbouw'
-                    && row.phase !== 'opbouw'
+                    && result.rows[idx - 1].phase === 'accumulation'
+                    && row.phase !== 'accumulation'
                   const elements: React.ReactNode[] = []
 
                   if (isFireTransition) {
@@ -817,15 +817,15 @@ export default function FireSimPage() {
                       <td className="py-1 text-left tabular-nums text-[var(--ink-2)]">{row.age}</td>
                       <td className="py-1 text-left">
                         <span className={`font-sans text-[9px] uppercase tracking-[0.06em] ${
-                          row.phase === 'opbouw' ? 'text-green-600' : 'text-orange-500'
+                          row.phase === 'accumulation' ? 'text-green-600' : 'text-orange-500'
                         }`}>
-                          {row.phase === 'opbouw' ? 'Opbouw' : 'Pensioen'}
+                          {row.phase === 'accumulation' ? 'Opbouw' : 'Pensioen'}
                         </span>
                       </td>
                       <td className="py-1 text-right tabular-nums text-[var(--ink-3)]">{formatCurrency(row.startPortfolio)}</td>
                       <td className="py-1 text-right tabular-nums text-green-700">+{formatCurrency(row.growth)}</td>
                       <td className="py-1 text-right tabular-nums">
-                        {row.phase === 'opbouw'
+                        {row.phase === 'accumulation'
                           ? <span className="text-green-700">+{formatCurrency(row.savings)}</span>
                           : row.withdrawal > 0
                           ? <span className="text-orange-600">-{formatCurrency(row.withdrawal)}</span>
@@ -839,7 +839,7 @@ export default function FireSimPage() {
                           : <span className="text-[var(--ink-4)]">—</span>}
                       </td>
                       <td className={`py-1 text-right tabular-nums font-medium ${
-                        row.phase !== 'opbouw' && row.endPortfolio <= 1000 && row.age >= safeEndAge - 2
+                        row.phase !== 'accumulation' && row.endPortfolio <= 1000 && row.age >= safeEndAge - 2
                           ? 'text-orange-600' : 'text-[var(--ink)]'
                       }`}>
                         {formatCurrency(row.endPortfolio)}
