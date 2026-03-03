@@ -2234,11 +2234,13 @@ function BudgetDetailModal({
               )}
             </div>
             <div className="flex items-end gap-1" style={{ height: 80 }}>
-              {history.map((h) => {
+              {history.map((h, i) => {
                 const spentH = (h.spent / maxHistoryValue) * 100
                 const limitH = (h.limit / maxHistoryValue) * 100
                 const over = h.spent > h.limit && h.limit > 0
                 const isSelected = selectedHistMonth === h.month
+                const isCurrentMonth = i === history.length - 1
+                const barColor = over ? '#f87171' : colors.barHex
                 return (
                   <button
                     key={h.month}
@@ -2246,7 +2248,7 @@ function BudgetDetailModal({
                     onClick={() => selectHistMonth(h.month)}
                     className="group relative flex flex-1 flex-col items-center focus-visible:outline-none"
                     style={{ height: '100%' }}
-                    title={`${h.label}: ${formatCurrency(h.spent)}`}
+                    title={`${h.label}: ${formatCurrency(h.spent)}${isCurrentMonth ? ' (lopende maand)' : ''}`}
                   >
                     {/* Limit indicator line */}
                     {h.limit > 0 && (
@@ -2261,23 +2263,25 @@ function BudgetDetailModal({
                         className="w-full rounded-t transition-opacity"
                         style={{
                           height: `${Math.max(spentH * 0.8, 2)}px`,
-                          backgroundColor: over ? '#f87171' : colors.barHex,
-                          opacity: selectedHistMonth && !isSelected ? 0.35 : 1,
+                          backgroundColor: barColor,
+                          opacity: selectedHistMonth && !isSelected ? 0.35 : isCurrentMonth ? 0.5 : 1,
                           outline: isSelected ? `2px solid ${colors.barHex}` : undefined,
                           outlineOffset: isSelected ? '2px' : undefined,
+                          ...(isCurrentMonth ? { borderTop: `2px dashed ${barColor}` } : {}),
                         }}
                       />
                     </div>
                     {/* Month label */}
-                    <p className={`mt-1 text-[9px] transition-colors ${isSelected ? 'font-semibold text-[var(--ink-2)]' : 'text-[var(--ink-3)]'}`}>{h.label}</p>
+                    <p className={`mt-1 text-[9px] transition-colors ${isSelected ? 'font-semibold text-[var(--ink-2)]' : isCurrentMonth ? 'italic text-[var(--ink-3)]' : 'text-[var(--ink-3)]'}`}>{h.label}{isCurrentMonth ? '*' : ''}</p>
                     {/* Tooltip */}
                     <div className="pointer-events-none absolute -top-10 z-10 rounded bg-zinc-800 px-2 py-1 text-[10px] text-white opacity-0 shadow-[var(--s2)] transition-opacity group-hover:opacity-100">
-                      {formatCurrency(h.spent)} / {formatCurrency(h.limit)}
+                      {formatCurrency(h.spent)} / {formatCurrency(h.limit)}{isCurrentMonth ? ' ∗' : ''}
                     </div>
                   </button>
                 )
               })}
             </div>
+            <p className="mt-1 text-right text-[8px] italic text-[var(--ink-4)]">* lopende maand</p>
 
             {/* Uitklappanel voor geselecteerde maand */}
             {selectedHistMonth && (() => {
@@ -2338,7 +2342,8 @@ function BudgetDetailModal({
 
         {/* Budget forecast next month prediction with spending variance confidence */}
         {(() => {
-          const monthlySpending = history.map(h => h.spent)
+          // Exclude current (incomplete) month from forecast and variance calculations
+          const monthlySpending = history.slice(0, -1).map(h => h.spent)
           if (monthlySpending.length < 3) return null
           const forecast = computeBudgetForecast(monthlySpending, limit, budget.name)
           const varianceData = calculateSpendingVariance(monthlySpending, budget.name)
