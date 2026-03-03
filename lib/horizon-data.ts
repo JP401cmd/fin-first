@@ -6,6 +6,7 @@
  */
 
 import { MSCI_REAL_RETURNS, NAMED_PERIODS } from './msci-data'
+import type { CamelCaseKeys } from './db-mapper'
 
 // ── Constants ────────────────────────────────────────────────
 
@@ -179,6 +180,9 @@ export interface LifeEvent {
   sort_order: number
   is_indexed: boolean
 }
+
+/** LifeEvent with camelCase keys (frontend representation). */
+export type LifeEventFe = CamelCaseKeys<LifeEvent>
 
 export interface LifeEventImpact {
   event: LifeEvent
