@@ -24,7 +24,7 @@ import {
   Clock, Percent, CalendarDays, ShieldCheck, Target, TrendingDown, Calculator, AlertTriangle,
 } from 'lucide-react'
 import {
-  NL_DEEMED_INVESTMENT_RETURN, BOX3_TARIEF, BOX3_DRAG, NL_INFLATION, NL_SWR, NL_MULTIPLIER,
+  NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF, BOX3_DRAG, INFLATION, NL_SWR, NL_MULTIPLIER,
   CLASSIC_MULTIPLIER, DEFAULT_RETURN,
 } from '@/lib/horizon-data'
 import { FeatureGate } from '@/components/app/feature-gate'
@@ -505,7 +505,7 @@ export default function BelastingPage() {
               <span className="tabular-nums text-red-500">−{(BOX3_DRAG * 100).toFixed(2)}%</span>
             </div>
             <div className="mt-1 space-y-0.5 font-sans text-[11px] text-[var(--ink-4)]">
-              <p>Fictief rendement beleggingen: {(NL_DEEMED_INVESTMENT_RETURN * 100).toFixed(2)}%</p>
+              <p>Fictief rendement beleggingen: {(NL_FICTIEF_BELEGGINGEN * 100).toFixed(2)}%</p>
               <p>× Belastingtarief: {(BOX3_TARIEF * 100).toFixed(0)}%</p>
               <p className="text-[var(--ink-3)]">= {(BOX3_DRAG * 100).toFixed(2)}% van je totale vermogen, elk jaar</p>
               <p className="font-sans text-[11px] italic text-[var(--ink-4)]">(ook als je werkelijke rendement tegenvalt)</p>
@@ -527,7 +527,7 @@ export default function BelastingPage() {
           <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Stap 4: Inflatieverrekening</span>
-              <span className="tabular-nums text-red-500">−{(NL_INFLATION * 100).toFixed(2)}%</span>
+              <span className="tabular-nums text-red-500">−{(INFLATION * 100).toFixed(2)}%</span>
             </div>
             <p className="mt-0.5 font-sans text-[11px] text-[var(--ink-4)]">
               Langjarig NL inflatiegemiddelde — je koopkracht moet gelijk blijven
@@ -732,7 +732,7 @@ export default function BelastingPage() {
           <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Fictief rendement (gemiddeld)</span>
-              <span className="tabular-nums text-[var(--ink)]">× ca. {(NL_DEEMED_INVESTMENT_RETURN * 100).toFixed(2)}%</span>
+              <span className="tabular-nums text-[var(--ink)]">× ca. {(NL_FICTIEF_BELEGGINGEN * 100).toFixed(2)}%</span>
             </div>
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Belastingtarief Box 3</span>
@@ -924,7 +924,7 @@ export default function BelastingPage() {
                 </div>
                 <div className="flex justify-between py-0.5">
                   <span className="font-sans text-xs text-[var(--ink-3)]">Inflatie</span>
-                  <span className="tabular-nums text-xs text-red-500">−{(NL_INFLATION * 100).toFixed(2)}%</span>
+                  <span className="tabular-nums text-xs text-red-500">−{(INFLATION * 100).toFixed(2)}%</span>
                 </div>
               </div>
             </div>

@@ -276,8 +276,8 @@ export function calculateBox3(input: Box3Input): Box3Result {
   const tax = box3Income * params.tarief
 
   // Freedom metric
-  const vrijheidsdagen = Math.round(
-    calculateFreedomTime(belasting, input.dailyExpenses).totalDays,
+  const freedomDays = Math.round(
+    calculateFreedomTime(tax, input.dailyExpenses).totalDays,
   )
 
   return {
@@ -355,8 +355,8 @@ export function generateBox3Optimizations(
         id: 'shift-to-savings',
         title: 'Verschuif naar spaargeld',
         description: `Door ${formatCurrency(shiftAmount)} van beleggingen naar spaargeld te verschuiven betaal je minder Box 3 belasting (lager forfait).`,
-        besparing,
-        vrijheidsdagen: input.dailyExpenses > 0 ? Math.round(besparing / input.dailyExpenses) : 0,
+        savings,
+        freedomDays: input.dailyExpenses > 0 ? Math.round(savings / input.dailyExpenses) : 0,
       })
     }
   }
@@ -370,8 +370,8 @@ export function generateBox3Optimizations(
         id: 'fiscaal-partner',
         title: 'Fiscaal partnerschap',
         description: `Met een fiscaal partner verdubbelt je heffingsvrij vermogen naar ${formatCurrency(result.params.heffingsvrijPartner)}.`,
-        besparing,
-        vrijheidsdagen: input.dailyExpenses > 0 ? Math.round(besparing / input.dailyExpenses) : 0,
+        savings,
+        freedomDays: input.dailyExpenses > 0 ? Math.round(savings / input.dailyExpenses) : 0,
       })
     }
   }
@@ -382,8 +382,8 @@ export function generateBox3Optimizations(
       id: 'schulden-timing',
       title: 'Schulden boven drempel',
       description: `Je Box 3 schulden (${formatCurrency(result.totaalBox3Schulden)}) vallen onder de drempel van ${formatCurrency(result.schuldendrempel)}. Ze tellen daarom niet mee als aftrek.`,
-      besparing: 0,
-      vrijheidsdagen: 0,
+      savings: 0,
+      freedomDays: 0,
     })
   }
 
@@ -394,8 +394,8 @@ export function generateBox3Optimizations(
       id: 'groene-beleggingen',
       title: 'Groene beleggingen',
       description: `Groene beleggingen (ASN Groenprojectenfonds e.d.) zijn tot ${formatCurrency(groenVrijstelling)} vrijgesteld van Box 3. Check of je beleggingen hiervoor in aanmerking komen.`,
-      besparing: 0,
-      vrijheidsdagen: 0,
+      savings: 0,
+      freedomDays: 0,
     })
   }
 
