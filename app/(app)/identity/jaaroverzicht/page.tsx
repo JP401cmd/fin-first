@@ -18,6 +18,7 @@ import {
   PiggyBank,
   BarChart3,
 } from 'lucide-react'
+import { formatCurrency } from '@/lib/format'
 import Link from 'next/link'
 import { ShareDialog, type ShareContent } from '@/components/app/share-dialog'
 
@@ -74,15 +75,6 @@ interface YearInReviewData {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
-function formatEur(value: number): string {
-  return new Intl.NumberFormat('nl-NL', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value)
-}
-
 function formatPct(value: number): string {
   return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`
 }
@@ -197,7 +189,7 @@ function renderYearInReviewToCanvas(data: YearInReviewData): HTMLCanvasElement {
   drawStat(pad + cw + 16, y, 'Acties voltooid', String(data.actionsCompleted), AMBER)
   y += ch + 12
 
-  const nwText = data.netWorthGrowth != null ? formatEur(data.netWorthGrowth) : 'N/B'
+  const nwText = data.netWorthGrowth != null ? formatCurrency(data.netWorthGrowth) : 'N/B'
   drawStat(pad, y, 'Vermogensgroei', nwText, data.netWorthGrowth && data.netWorthGrowth >= 0 ? EMERALD : '#f87171')
   drawStat(pad + cw + 16, y, 'Spaarquote', data.savingsRate != null ? `${data.savingsRate}%` : 'N/B', PURPLE)
   y += ch + 12
@@ -253,7 +245,7 @@ function renderYearInReviewToCanvas(data: YearInReviewData): HTMLCanvasElement {
       ctx.fillStyle = EMERALD
       ctx.fillText(`🏆 ${data.bestMonth.label}`, pad + 16, y + 14)
       ctx.font = 'bold 22px system-ui, sans-serif'
-      ctx.fillText(formatEur(data.bestMonth.savings), pad + 16, y + 34)
+      ctx.fillText(formatCurrency(data.bestMonth.savings), pad + 16, y + 34)
     }
 
     if (data.worstMonth) {
@@ -264,7 +256,7 @@ function renderYearInReviewToCanvas(data: YearInReviewData): HTMLCanvasElement {
       ctx.fillStyle = '#f87171'
       ctx.fillText(`📉 ${data.worstMonth.label}`, pad + cw + 32, y + 14)
       ctx.font = 'bold 22px system-ui, sans-serif'
-      ctx.fillText(formatEur(data.worstMonth.savings), pad + cw + 32, y + 34)
+      ctx.fillText(formatCurrency(data.worstMonth.savings), pad + cw + 32, y + 34)
     }
 
     y += 72
@@ -482,13 +474,13 @@ export default function JaaroverzichtPage() {
                 <div className="rounded-xl bg-zinc-800/50 p-4">
                   <p className="text-xs text-zinc-500 uppercase">Begin {data.year}</p>
                   <p className="mt-1 text-xl font-bold" data-testid="nw-start">
-                    {data.netWorthStart != null ? formatEur(data.netWorthStart) : 'N/B'}
+                    {data.netWorthStart != null ? formatCurrency(data.netWorthStart) : 'N/B'}
                   </p>
                 </div>
                 <div className="rounded-xl bg-zinc-800/50 p-4">
                   <p className="text-xs text-zinc-500 uppercase">Eind {data.year}</p>
                   <p className="mt-1 text-xl font-bold" data-testid="nw-end">
-                    {data.netWorthEnd != null ? formatEur(data.netWorthEnd) : 'N/B'}
+                    {data.netWorthEnd != null ? formatCurrency(data.netWorthEnd) : 'N/B'}
                   </p>
                 </div>
               </div>
@@ -501,7 +493,7 @@ export default function JaaroverzichtPage() {
                     <ArrowDown className="h-5 w-5 text-red-400" />
                   )}
                   <span className={`text-2xl font-bold ${data.netWorthGrowth >= 0 ? 'text-emerald-400' : 'text-red-400'}`} data-testid="nw-growth">
-                    {formatEur(data.netWorthGrowth)}
+                    {formatCurrency(data.netWorthGrowth)}
                   </span>
                   {data.netWorthGrowthPct != null && (
                     <span className={`text-sm ${data.netWorthGrowthPct >= 0 ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
@@ -567,7 +559,7 @@ export default function JaaroverzichtPage() {
                   {data.bestMonth ? (
                     <>
                       <p className="text-sm font-medium text-zinc-200" data-testid="best-month-name">{data.bestMonth.label}</p>
-                      <p className="text-xl font-bold text-emerald-400" data-testid="best-month-value">{formatEur(data.bestMonth.savings)}</p>
+                      <p className="text-xl font-bold text-emerald-400" data-testid="best-month-value">{formatCurrency(data.bestMonth.savings)}</p>
                       <p className="text-[10px] text-zinc-500">gespaard</p>
                     </>
                   ) : (
@@ -584,7 +576,7 @@ export default function JaaroverzichtPage() {
                   {data.worstMonth ? (
                     <>
                       <p className="text-sm font-medium text-zinc-200" data-testid="worst-month-name">{data.worstMonth.label}</p>
-                      <p className="text-xl font-bold text-red-400" data-testid="worst-month-value">{formatEur(data.worstMonth.savings)}</p>
+                      <p className="text-xl font-bold text-red-400" data-testid="worst-month-value">{formatCurrency(data.worstMonth.savings)}</p>
                       <p className="text-[10px] text-zinc-500">gespaard</p>
                     </>
                   ) : (
@@ -607,7 +599,7 @@ export default function JaaroverzichtPage() {
                             m.savings >= 0 ? 'bg-emerald-400/60' : 'bg-red-400/60'
                           } ${m.income === 0 && m.expenses === 0 ? 'bg-zinc-700/30' : ''}`}
                           style={{ height: `${h}%` }}
-                          title={`${m.label}: ${formatEur(m.savings)}`}
+                          title={`${m.label}: ${formatCurrency(m.savings)}`}
                         />
                         <span className="text-[9px] text-zinc-500">
                           {m.label.substring(0, 3).toLowerCase()}
@@ -622,16 +614,16 @@ export default function JaaroverzichtPage() {
               <div className="mt-4 grid grid-cols-3 gap-2 text-center">
                 <div className="rounded-lg bg-zinc-800/40 p-2">
                   <p className="text-[10px] text-zinc-500 uppercase">Inkomen</p>
-                  <p className="text-sm font-semibold text-zinc-200" data-testid="total-income">{formatEur(data.totalIncome)}</p>
+                  <p className="text-sm font-semibold text-zinc-200" data-testid="total-income">{formatCurrency(data.totalIncome)}</p>
                 </div>
                 <div className="rounded-lg bg-zinc-800/40 p-2">
                   <p className="text-[10px] text-zinc-500 uppercase">Uitgaven</p>
-                  <p className="text-sm font-semibold text-zinc-200" data-testid="total-expenses">{formatEur(data.totalExpenses)}</p>
+                  <p className="text-sm font-semibold text-zinc-200" data-testid="total-expenses">{formatCurrency(data.totalExpenses)}</p>
                 </div>
                 <div className="rounded-lg bg-zinc-800/40 p-2">
                   <p className="text-[10px] text-zinc-500 uppercase">Gespaard</p>
                   <p className={`text-sm font-semibold ${data.totalSaved >= 0 ? 'text-emerald-400' : 'text-red-400'}`} data-testid="total-saved">
-                    {formatEur(data.totalSaved)}
+                    {formatCurrency(data.totalSaved)}
                   </p>
                 </div>
               </div>
