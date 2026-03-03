@@ -11,6 +11,14 @@
  */
 
 import { SWR, DEFAULT_RETURN } from '@/lib/constants'
+import {
+  computeEffectiveExpenses,
+  computeFireTarget,
+  computeFreedomPercentage,
+  computeFreedomTime,
+  computeSavingsRate,
+} from '@/lib/core-metrics'
+import { resolveFireParams } from '@/lib/fire-params'
 
 export type CoreData = {
   // Freedom timeline
