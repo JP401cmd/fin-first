@@ -8,6 +8,8 @@
  * Freedom time = net worth / yearly expenses
  */
 
+import { SWR, DEFAULT_RETURN } from '@/lib/constants'
+
 export type CoreData = {
   // Freedom timeline
   freedomPercentage: number
@@ -35,7 +37,6 @@ export type CoreData = {
   totalDebts: number
 }
 
-const SWR = 0.04
 
 export function computeCoreData(
   monthlyIncome: number,
@@ -80,8 +81,7 @@ export function computeCoreData(
   let monthsToFire = 0
   let expectedFireDate = ''
   if (monthlySavings > 0 && fireTarget > netWorth) {
-    // Simple compound growth: assume 7% annual return on investments
-    const annualReturn = 0.07
+    const annualReturn = DEFAULT_RETURN
     const monthlyReturn = annualReturn / 12
     let projected = netWorth
     let months = 0

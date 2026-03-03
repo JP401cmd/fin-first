@@ -3,8 +3,7 @@ import { NextResponse } from 'next/server'
 import { computeFireProjection, computeResilienceScore, type HorizonInput } from '@/lib/horizon-data'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
-
-const SWR = 0.04
+import { SWR } from '@/lib/constants'
 
 /**
  * GET /api/snapshots/cron

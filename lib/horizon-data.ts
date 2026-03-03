@@ -7,23 +7,28 @@
 
 import { MSCI_REAL_RETURNS, NAMED_PERIODS } from './msci-data'
 
-// ── Constants ────────────────────────────────────────────────
-
-export const SWR = 0.04
-export const DEFAULT_RETURN = 0.07
-export const DEFAULT_VOLATILITY = 0.15
-export const NL_AOW_AGE = 67
-export const NL_AOW_MONTHLY = 1380 // alleenstaand, bruto 2025
-export const INFLATION = 0.02
-
-// NL-FIRE constanten (Box 3, 2025)
-export const NL_FICTIEF_BELEGGINGEN = 0.0588   // 5.88% — forfaitair rendement beleggingen 2025
-export const BOX3_TARIEF = 0.36                 // 36% — belastingtarief Box 3
-export const BOX3_DRAG = NL_FICTIEF_BELEGGINGEN * BOX3_TARIEF // ≈ 2.117%
-export const NL_INFLATIE = 0.02                 // 2.00% — langjarig NL inflatiegemiddelde
-export const NL_SWR = DEFAULT_RETURN - BOX3_DRAG - NL_INFLATIE // ≈ 0.02883
-export const NL_MULTIPLIER = 1 / NL_SWR        // ≈ 34.7×
-export const CLASSIC_MULTIPLIER = 1 / SWR      // = 25×
+// ── Constants (canonical source: lib/constants.ts) ──────────────
+// Re-exported for backward compatibility — many files import from here.
+export {
+  SWR,
+  DEFAULT_RETURN,
+  DEFAULT_VOLATILITY,
+  NL_AOW_AGE,
+  NL_AOW_MONTHLY,
+  INFLATION,
+  NL_FICTIEF_BELEGGINGEN,
+  BOX3_TARIEF,
+  BOX3_DRAG,
+  NL_INFLATIE,
+  NL_SWR,
+  NL_MULTIPLIER,
+  CLASSIC_MULTIPLIER,
+} from './constants'
+import {
+  SWR, DEFAULT_RETURN, DEFAULT_VOLATILITY,
+  NL_AOW_AGE, NL_AOW_MONTHLY, INFLATION,
+  NL_SWR,
+} from './constants'
 
 export type FireMethod = 'nl'
 

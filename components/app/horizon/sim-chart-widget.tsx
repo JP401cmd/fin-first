@@ -9,10 +9,11 @@ import { formatCurrency } from '@/lib/format'
 import { formatFireAge } from '@/lib/horizon-data'
 import type { SimResult, SimCashflow } from '@/lib/fire-simulation'
 import { type FireEndStrategy, STRATEGY_LABELS } from '@/lib/fire-strategy'
+import { DEFAULT_RETURN } from '@/lib/constants'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const GROSS_RETURN = 0.07
+const GROSS_RETURN = DEFAULT_RETURN
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

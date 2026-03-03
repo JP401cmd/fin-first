@@ -4,8 +4,7 @@ import { headers } from 'next/headers'
 import { computeFireProjection, computeResilienceScore, type HorizonInput } from '@/lib/horizon-data'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
-
-const SWR = 0.04
+import { SWR } from '@/lib/constants'
 
 /**
  * GET /api/snapshots/auto
