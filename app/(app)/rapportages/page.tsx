@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { ReportConfig } from '@/lib/report-data'
-import { FileText, Trash2, Eye, Sparkles, CheckCircle2 } from 'lucide-react'
+import { FileText, Trash2, Eye, Sparkles, CheckCircle2, Scale } from 'lucide-react'
 
 type PeriodType = 'month' | 'quarter' | 'year'
 
@@ -88,6 +88,7 @@ export default function RapportagesPage() {
   const [generating, setGenerating] = useState(false)
   const [configsLoading, setConfigsLoading] = useState(true)
   const [useAi, setUseAi] = useState(false)
+  const [balansDate, setBalansDate] = useState(new Date().toISOString().split('T')[0])
 
   // Set default selection when period type changes
   useEffect(() => {
@@ -314,6 +315,36 @@ export default function RapportagesPage() {
               Genereer rapport
             </>
           )}
+        </button>
+      </div>
+
+      {/* Persoonlijke Balans */}
+      <div className="mt-6 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-[var(--s0)]">
+        <p className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)] mb-1">
+          Persoonlijke Balans
+        </p>
+        <p className="font-source-serif text-[12px] italic leading-snug text-[var(--ink-2)] mb-4">
+          Momentopname van al je bezittingen en schulden — je financiële staat op één datum.
+        </p>
+
+        <div className="mb-4">
+          <label className="mb-1.5 block font-inter text-xs text-[var(--ink-2)]">Peildatum</label>
+          <input
+            type="date"
+            value={balansDate}
+            onChange={(e) => setBalansDate(e.target.value)}
+            max={new Date().toISOString().split('T')[0]}
+            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-inter text-sm text-[var(--ink)] outline-none transition-colors focus:border-kern-400"
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => router.push(`/rapportages/balans?date=${balansDate}`)}
+          className="flex w-full items-center justify-center gap-2 rounded-[var(--r)] bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)]"
+        >
+          <Scale className="h-4 w-4" />
+          Genereer balans
         </button>
       </div>
 
