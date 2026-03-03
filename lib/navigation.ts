@@ -20,7 +20,6 @@ export const coreNav: ModuleNavConfig = {
   items: [
     { label: 'Overzicht', href: '/core' },
     { label: 'Budgetten', href: '/core/budgets' },
-    { label: 'Cash', href: '/core/cash' },
     { label: 'Schulden', href: '/core/debts' },
     { label: 'Assets', href: '/core/assets' },
     { label: 'Belasting', href: '/core/belasting', featureId: 'box3_belasting' },

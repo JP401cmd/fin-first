@@ -38,6 +38,7 @@ export default async function DashboardPage() {
     allBudgetsResult, recsResult, childBudgetsResult,
     goalsResult, recurringResult, netWorthSnapshotsResult,
     income12Result, earliestIncomeResult, sovereigntyTxResult,
+    bankAccountsResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('id, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
@@ -57,6 +58,7 @@ export default async function DashboardPage() {
     supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
     supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
     supabase.from('transactions').select('amount').lt('amount', 0).gte('date', prev3MonthStart).lt('date', monthStart),
+    supabase.from('bank_accounts').select('id, balance').eq('is_active', true),
   ])
 
   // Core calculations
@@ -68,8 +70,10 @@ export default async function DashboardPage() {
     else monthlyExpenses += Math.abs(amt)
   }
 
-  const totalAssets = (assetsResult.data ?? []).reduce((s, a) =>
+  const totalAssetsOnly = (assetsResult.data ?? []).reduce((s, a) =>
     s + Number(a.current_value) * (((a as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100), 0)
+  const totalCash = (bankAccountsResult.data ?? []).reduce((s, a) => s + Number(a.balance), 0)
+  const totalAssets = totalAssetsOnly + totalCash
   const totalDebts = (debtsResult.data ?? []).reduce((s, d) =>
     s + Number(d.current_balance) * (((d as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100), 0)
   const netWorth = totalAssets - totalDebts

@@ -3,9 +3,11 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import {
-  Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2, BarChart3, ChevronDown, ChevronUp, Briefcase, AlertCircle,
+  Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2, BarChart3, ChevronDown, ChevronUp, Briefcase, AlertCircle, Wallet,
 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { AccountFormModal, type Account as BankAccount } from '@/components/app/account-form-modal'
 import { createClient } from '@/lib/supabase/client'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
@@ -32,8 +34,10 @@ import {
 type Mortgage = { id: string; name: string; current_balance: number; linked_asset_id: string | null }
 
 export default function AssetsPage() {
+  const router = useRouter()
   const [assets, setAssets] = useState<Asset[]>([])
   const [mortgages, setMortgages] = useState<Mortgage[]>([])
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -43,6 +47,8 @@ export default function AssetsPage() {
   const [projectionYears, setProjectionYears] = useState(10)
   const [valuations, setValuations] = useState<Record<string, Valuation[]>>({})
   const [dailyExpenses, setDailyExpenses] = useState(0)
+  const [showAccountForm, setShowAccountForm] = useState(false)
+  const [editBankAccount, setEditBankAccount] = useState<BankAccount | null>(null)
   const seedingRef = useRef(false)
   const { perspective } = usePerspective()
 
@@ -85,7 +91,16 @@ export default function AssetsPage() {
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
         const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
 
-        const [mortgageResult, txResult] = await Promise.all([
+        let bankAccountsQuery = supabase
+          .from('bank_accounts')
+          .select('*')
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true })
+        if (perspective === 'personal') {
+          bankAccountsQuery = bankAccountsQuery.eq('ownership', 'personal')
+        }
+
+        const [mortgageResult, txResult, bankAccountsResult] = await Promise.all([
           supabase
             .from('debts')
             .select('id, name, current_balance, linked_asset_id')
@@ -97,9 +112,11 @@ export default function AssetsPage() {
             .select('amount')
             .gte('date', monthStart)
             .lt('date', monthEnd),
+          bankAccountsQuery,
         ])
 
         if (mortgageResult.data) setMortgages(mortgageResult.data as Mortgage[])
+        if (bankAccountsResult.data) setBankAccounts(bankAccountsResult.data as BankAccount[])
 
         // Calculate daily expenses from current month transactions
         const monthlyExpenses = (txResult.data ?? []).reduce((sum, t) => {
@@ -186,7 +203,8 @@ export default function AssetsPage() {
   }, [loadAssets, loadAllValuations])
 
   const activeAssets = assets.filter((a) => a.is_active)
-  const totalValue = activeAssets.reduce((s, a) => s + Number(a.current_value), 0)
+  const totalCash = bankAccounts.reduce((s, a) => s + Number(a.balance), 0)
+  const totalValue = activeAssets.reduce((s, a) => s + Number(a.current_value), 0) + totalCash
   const totalPurchase = activeAssets.reduce((s, a) => s + Number(a.purchase_value), 0)
   const totalMonthlyContrib = activeAssets.reduce((s, a) => s + Number(a.monthly_contribution), 0)
 
@@ -334,8 +352,16 @@ export default function AssetsPage() {
         <section className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
           <h2 className="text-sm font-semibold text-[var(--ink-2)]">Verdeling</h2>
           <div className="mt-4 flex items-center gap-6">
-            <AllocationPie byType={byType} total={totalValue} dailyExpenses={dailyExpenses} />
+            <AllocationPie byType={byType} total={totalValue} dailyExpenses={dailyExpenses} cashTotal={totalCash} />
             <div className="flex-1 space-y-2">
+              {totalCash > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: CASH_COLOR }} />
+                  <span className="flex-1 text-xs text-[var(--ink-2)]">Cash</span>
+                  <span className="text-xs font-medium text-[var(--ink)]">{totalValue > 0 ? ((totalCash / totalValue) * 100).toFixed(0) : 0}%</span>
+                  <span className="text-xs text-[var(--ink-3)]">{formatCurrency(totalCash)}</span>
+                </div>
+              )}
               {(Object.keys(ASSET_TYPE_LABELS) as AssetType[]).map((type) => {
                 const data = byType[type]
                 if (!data || data.total === 0) return null
@@ -401,9 +427,72 @@ export default function AssetsPage() {
         </section>
       </div>
 
+      {/* Cash accounts */}
+      {bankAccounts.length > 0 && (
+        <section className="mt-3 sm:mt-6 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Wallet className="h-4 w-4 text-emerald-600" />
+              <h2 className="text-sm font-semibold text-[var(--ink-2)]">Cash rekeningen</h2>
+              <span className="text-xs text-[var(--ink-3)]">{formatCurrency(totalCash)}</span>
+            </div>
+            <button
+              onClick={() => { setEditBankAccount(null); setShowAccountForm(true) }}
+              className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Rekening toevoegen
+            </button>
+          </div>
+          {bankAccounts.map((acct) => {
+            const balance = Number(acct.balance)
+            return (
+              <div
+                key={acct.id}
+                className="flex cursor-pointer items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 transition-colors hover:border-emerald-200 hover:bg-emerald-50/30"
+                onClick={() => router.push(`/core/assets/cash/${acct.id}`)}
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)]" style={{ backgroundColor: CASH_COLOR + '15' }}>
+                  <Wallet className="h-4 w-4 text-emerald-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-[var(--ink)]">{acct.name}</p>
+                  <p className="truncate text-xs text-[var(--ink-3)]">
+                    {acct.account_type === 'checking' ? 'Betaalrekening' : acct.account_type === 'savings' ? 'Spaarrekening' : acct.account_type === 'joint' ? 'En/of-rekening' : acct.account_type === 'business' ? 'Zakelijke rekening' : 'Overig'}
+                    {acct.iban ? ` \u2022 ${acct.iban}` : ''}
+                    {acct.bank_name ? ` \u2022 ${acct.bank_name}` : ''}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-sm font-semibold text-[var(--ink)]">{formatCurrency(balance)}</p>
+                  {dailyExpenses > 0 && balance > 0 && (
+                    <p className="text-[10px] text-emerald-500/70" data-testid="cash-card-freedom">
+                      {formatFreedomTimeString(calculateFreedomTime(balance, dailyExpenses), 'short', true)} vrijheid
+                    </p>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </section>
+      )}
+
+      {/* No accounts yet — show add button */}
+      {bankAccounts.length === 0 && (
+        <section className="mt-3 sm:mt-6">
+          <button
+            onClick={() => { setEditBankAccount(null); setShowAccountForm(true) }}
+            className="flex w-full items-center justify-center gap-2 rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] px-4 py-4 text-sm font-medium text-[var(--ink-2)] transition-colors hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+          >
+            <Wallet className="h-4 w-4" />
+            Cash rekening toevoegen
+          </button>
+        </section>
+      )}
+
       {/* Asset list */}
       <section className="mt-3 sm:mt-6 space-y-2">
-        {assets.length === 0 && (
+        {assets.length === 0 && bankAccounts.length === 0 && (
           <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-8 text-center">
             <TrendingUp className="mx-auto h-8 w-8 text-kern-400" />
             <p className="mt-2 text-sm font-medium text-[var(--ink-2)]">Geen assets geregistreerd</p>
@@ -537,6 +626,55 @@ export default function AssetsPage() {
             setEditAsset(null)
             loadAssets()
           }}
+        />
+      )}
+
+      {/* Bank account form modal */}
+      {showAccountForm && (
+        <AccountFormModal
+          account={editBankAccount}
+          canDelete={bankAccounts.length > 1 && !!editBankAccount}
+          onSave={async (formData) => {
+            const supabase = createClient()
+            if (editBankAccount) {
+              await supabase
+                .from('bank_accounts')
+                .update({
+                  name: formData.name,
+                  iban: formData.iban || null,
+                  bank_name: formData.bank_name || null,
+                  account_type: formData.account_type,
+                  balance: formData.balance,
+                })
+                .eq('id', editBankAccount.id)
+            } else {
+              const { data: { user } } = await supabase.auth.getUser()
+              if (!user) return
+              const maxSort = bankAccounts.reduce((m, a) => Math.max(m, a.sort_order), 0)
+              await supabase
+                .from('bank_accounts')
+                .insert({
+                  user_id: user.id,
+                  name: formData.name,
+                  iban: formData.iban || null,
+                  bank_name: formData.bank_name || null,
+                  account_type: formData.account_type,
+                  balance: formData.balance,
+                  sort_order: maxSort + 1,
+                })
+            }
+            setShowAccountForm(false)
+            setEditBankAccount(null)
+            loadAssets()
+          }}
+          onDelete={async (id) => {
+            const supabase = createClient()
+            await supabase.from('bank_accounts').update({ is_active: false }).eq('id', id)
+            setShowAccountForm(false)
+            setEditBankAccount(null)
+            loadAssets()
+          }}
+          onClose={() => { setShowAccountForm(false); setEditBankAccount(null) }}
         />
       )}
     </div>
@@ -1551,14 +1689,18 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
 
 // ── Allocation pie chart (SVG donut) ─────────────────────────
 
+const CASH_COLOR = '#22c55e'
+
 function AllocationPie({
   byType,
   total,
   dailyExpenses,
+  cashTotal = 0,
 }: {
   byType: Record<AssetType, { assets: Asset[]; total: number }>
   total: number
   dailyExpenses: number
+  cashTotal?: number
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 700 })
   const size = 120
@@ -1567,7 +1709,10 @@ function AllocationPie({
   const r = 45
   const strokeWidth = 22
 
-  const segments: { type: AssetType; pct: number; color: string }[] = []
+  const segments: { type: string; pct: number; color: string }[] = []
+  if (cashTotal > 0 && total > 0) {
+    segments.push({ type: 'cash', pct: cashTotal / total, color: CASH_COLOR })
+  }
   for (const type of Object.keys(ASSET_TYPE_LABELS) as AssetType[]) {
     const pct = total > 0 ? byType[type].total / total : 0
     if (pct > 0) segments.push({ type, pct, color: ASSET_TYPE_COLORS[type] })
