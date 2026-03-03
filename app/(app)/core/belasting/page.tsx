@@ -24,7 +24,7 @@ import {
   Clock, Percent, CalendarDays, ShieldCheck, Target, TrendingDown, Calculator, AlertTriangle,
 } from 'lucide-react'
 import {
-  NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF, BOX3_DRAG, NL_INFLATIE, NL_SWR, NL_MULTIPLIER,
+  NL_DEEMED_INVESTMENT_RETURN, BOX3_TARIEF, BOX3_DRAG, NL_INFLATION, NL_SWR, NL_MULTIPLIER,
   CLASSIC_MULTIPLIER, DEFAULT_RETURN,
 } from '@/lib/horizon-data'
 import { FeatureGate } from '@/components/app/feature-gate'
@@ -177,7 +177,7 @@ export default function BelastingPage() {
   }
 
   const effectiefTariefPct = (result.totaalSpaargeld + result.totaalBeleggingen) > 0
-    ? (result.belasting / (result.totaalSpaargeld + result.totaalBeleggingen)) * 100
+    ? (result.tax / (result.totaalSpaargeld + result.totaalBeleggingen)) * 100
     : 0
   const heffingsvrijBenut = result.heffingsvrijVermogen > 0
     ? Math.min(100, (Math.min(result.rendementsgrondslag, result.heffingsvrijVermogen) / result.heffingsvrijVermogen) * 100)
@@ -237,7 +237,7 @@ export default function BelastingPage() {
 
           <div className="mb-3">
             <span className="font-display text-[36px] font-bold tracking-tight text-[var(--ink)] sm:text-[44px] md:text-[52px]" data-testid="belasting-hero-amount">
-              {formatCurrency(result.belasting)}
+              {formatCurrency(result.tax)}
             </span>
           </div>
 
@@ -245,17 +245,17 @@ export default function BelastingPage() {
             <p className="font-serif italic text-lg text-[var(--ink-3)]" data-testid="belasting-hero-freedom-days">
               Box 3 kost je{' '}
               <span className="font-semibold not-italic text-[var(--ink-2)]">
-                {result.vrijheidsdagen} vrijheidsdagen
+                {result.freedomDays} vrijheidsdagen
               </span>
             </p>
             <KpiTooltip text={BOX3_TOOLTIPS.box3} />
           </div>
-          {result.belasting >= 100 && (
+          {result.tax >= 100 && (
             <p className="mb-6 text-sm text-[var(--ink-3)]" data-testid="belasting-hero-freedom-time">
-              {formatWithFreedom(result.belasting, dailyExpenses, { includeCurrency: false })} verloren aan belasting
+              {formatWithFreedom(result.tax, dailyExpenses, { includeCurrency: false })} verloren aan belasting
             </p>
           )}
-          {result.belasting < 100 && <div className="mb-6" />}
+          {result.tax < 100 && <div className="mb-6" />}
 
           <div className="flex items-center gap-2 text-xs text-[var(--ink-3)]">
             <CalendarDays className="h-3.5 w-3.5" />
@@ -280,8 +280,8 @@ export default function BelastingPage() {
             <KpiTooltip text="De totale Box 3 belasting die je verschuldigd bent, berekend op basis van je vermogen op de peildatum." />
           </div>
           <p className="text-sm font-medium text-[var(--ink-3)]">Totale Belasting</p>
-          <p className="mt-1 font-mono text-3xl font-bold tabular-nums text-[var(--ink)]">{formatCurrency(result.belasting)}</p>
-          <FreedomTimeBadge amount={result.belasting} className="mt-2" />
+          <p className="mt-1 font-mono text-3xl font-bold tabular-nums text-[var(--ink)]">{formatCurrency(result.tax)}</p>
+          <FreedomTimeBadge amount={result.tax} className="mt-2" />
         </button>
 
         <button
@@ -299,7 +299,7 @@ export default function BelastingPage() {
           <p className="text-sm font-medium text-[var(--ink-3)]">Effectief Tarief</p>
           <p className="mt-1 font-mono text-3xl font-bold tabular-nums text-[var(--ink)]">{effectiefTariefPct.toFixed(2)}%</p>
           <p className="mt-1 text-xs text-[var(--ink-3)]" data-testid="kpi-tarief-freedom">
-            {formatCurrency(result.belasting)} belasting
+            {formatCurrency(result.tax)} belasting
           </p>
         </button>
 
@@ -316,10 +316,10 @@ export default function BelastingPage() {
             <KpiTooltip text="Hoeveel vrijheidsdagen je verliest aan Box 3 belasting. Berekening: belasting / dagelijkse uitgaven." />
           </div>
           <p className="text-sm font-medium text-[var(--ink-3)]">Vrijheidsdagen verloren</p>
-          <p className="mt-1 font-mono text-3xl font-bold tabular-nums text-[var(--ink)]">-{result.vrijheidsdagen}</p>
-          {result.belasting >= 100 && (
+          <p className="mt-1 font-mono text-3xl font-bold tabular-nums text-[var(--ink)]">-{result.freedomDays}</p>
+          {result.tax >= 100 && (
             <p className="mt-1 text-xs text-[var(--ink-3)]" data-testid="kpi-vrijheidsdagen-time">
-              {formatWithFreedom(result.belasting, dailyExpenses, { includeCurrency: false })}
+              {formatWithFreedom(result.tax, dailyExpenses, { includeCurrency: false })}
             </p>
           )}
         </button>
@@ -441,14 +441,14 @@ export default function BelastingPage() {
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-[var(--ink)]">{tip.title}</p>
                     <p className="mt-1 text-xs text-[var(--ink-3)]">{tip.description}</p>
-                    {tip.besparing > 0 && (
+                    {tip.savings > 0 && (
                       <div className="mt-2 flex flex-wrap items-center gap-2" data-testid={`optimization-${tip.id}-savings`}>
                         <span className="rounded-full border border-kern-100 bg-kern-50 px-2 py-0.5 text-[10px] font-medium text-kern-700">
-                          Besparing: {tip.besparing >= 100 ? formatWithFreedom(tip.besparing, dailyExpenses) : formatCurrency(tip.besparing)}
+                          Besparing: {tip.savings >= 100 ? formatWithFreedom(tip.savings, dailyExpenses) : formatCurrency(tip.savings)}
                         </span>
-                        {tip.vrijheidsdagen > 0 && (
+                        {tip.freedomDays > 0 && (
                           <span className="rounded-full border border-kern-100 bg-kern-50 px-2 py-0.5 text-[10px] font-medium text-kern-700" data-testid={`optimization-${tip.id}-freedom`}>
-                            +{tip.vrijheidsdagen} vrijheidsdagen teruggewonnen
+                            +{tip.freedomDays} vrijheidsdagen teruggewonnen
                           </span>
                         )}
                       </div>
@@ -505,7 +505,7 @@ export default function BelastingPage() {
               <span className="tabular-nums text-red-500">−{(BOX3_DRAG * 100).toFixed(2)}%</span>
             </div>
             <div className="mt-1 space-y-0.5 font-sans text-[11px] text-[var(--ink-4)]">
-              <p>Fictief rendement beleggingen: {(NL_FICTIEF_BELEGGINGEN * 100).toFixed(2)}%</p>
+              <p>Fictief rendement beleggingen: {(NL_DEEMED_INVESTMENT_RETURN * 100).toFixed(2)}%</p>
               <p>× Belastingtarief: {(BOX3_TARIEF * 100).toFixed(0)}%</p>
               <p className="text-[var(--ink-3)]">= {(BOX3_DRAG * 100).toFixed(2)}% van je totale vermogen, elk jaar</p>
               <p className="font-sans text-[11px] italic text-[var(--ink-4)]">(ook als je werkelijke rendement tegenvalt)</p>
@@ -527,7 +527,7 @@ export default function BelastingPage() {
           <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Stap 4: Inflatieverrekening</span>
-              <span className="tabular-nums text-red-500">−{(NL_INFLATIE * 100).toFixed(2)}%</span>
+              <span className="tabular-nums text-red-500">−{(NL_INFLATION * 100).toFixed(2)}%</span>
             </div>
             <p className="mt-0.5 font-sans text-[11px] text-[var(--ink-4)]">
               Langjarig NL inflatiegemiddelde — je koopkracht moet gelijk blijven
@@ -732,7 +732,7 @@ export default function BelastingPage() {
           <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Fictief rendement (gemiddeld)</span>
-              <span className="tabular-nums text-[var(--ink)]">× ca. {(NL_FICTIEF_BELEGGINGEN * 100).toFixed(2)}%</span>
+              <span className="tabular-nums text-[var(--ink)]">× ca. {(NL_DEEMED_INVESTMENT_RETURN * 100).toFixed(2)}%</span>
             </div>
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Belastingtarief Box 3</span>
@@ -741,9 +741,9 @@ export default function BelastingPage() {
           </div>
           <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
             <span className="text-[var(--ink)]">Totale belasting</span>
-            <span className="tabular-nums text-[var(--ink)]">{formatCurrency(result.belasting)}</span>
+            <span className="tabular-nums text-[var(--ink)]">{formatCurrency(result.tax)}</span>
           </div>
-          <FreedomTimeBadge amount={result.belasting} className="mx-auto mt-3 block" />
+          <FreedomTimeBadge amount={result.tax} className="mx-auto mt-3 block" />
           <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">
             Bron: berekend op basis van je assets en schulden · Belastingdienst.nl tarieven {year}
           </p>
@@ -781,7 +781,7 @@ export default function BelastingPage() {
             </div>
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Belasting betaald</span>
-              <span className="tabular-nums text-[var(--ink)]">{formatCurrency(result.belasting)}</span>
+              <span className="tabular-nums text-[var(--ink)]">{formatCurrency(result.tax)}</span>
             </div>
           </div>
           <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
@@ -814,7 +814,7 @@ export default function BelastingPage() {
           <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Totale belasting</span>
-              <span className="tabular-nums text-[var(--ink)]">{formatCurrency(result.belasting)}</span>
+              <span className="tabular-nums text-[var(--ink)]">{formatCurrency(result.tax)}</span>
             </div>
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Dagelijkse uitgaven</span>
@@ -823,7 +823,7 @@ export default function BelastingPage() {
           </div>
           <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
             <span className="text-[var(--ink)]">Vrijheidsdagen verloren</span>
-            <span className="tabular-nums text-[var(--ink)]">{result.vrijheidsdagen} dagen</span>
+            <span className="tabular-nums text-[var(--ink)]">{result.freedomDays} dagen</span>
           </div>
           <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
             <p><strong className="font-semibold text-[var(--ink-3)]">Formule:</strong> belasting ÷ dagelijkse uitgaven = verloren vrijheidsdagen</p>
@@ -924,7 +924,7 @@ export default function BelastingPage() {
                 </div>
                 <div className="flex justify-between py-0.5">
                   <span className="font-sans text-xs text-[var(--ink-3)]">Inflatie</span>
-                  <span className="tabular-nums text-xs text-red-500">−{(NL_INFLATIE * 100).toFixed(2)}%</span>
+                  <span className="tabular-nums text-xs text-red-500">−{(NL_INFLATION * 100).toFixed(2)}%</span>
                 </div>
               </div>
             </div>

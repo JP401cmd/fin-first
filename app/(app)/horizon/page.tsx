@@ -1752,7 +1752,7 @@ export default function HorizonPage() {
               const yearlyIncomeAtAow = incomeCfAtAow.reduce((s, cf) => s + cf.amount * 12, 0)
 
               // Pensioen-fase rijen uit de simulatie
-              const pensionRows = simResult.rows.filter(r => r.phase === 'pensioen')
+              const pensionRows = simResult.rows.filter(r => r.phase === 'retirement')
               const firstPensionRow = pensionRows.length > 0 ? pensionRows[0] : null
               const rowAtAow = pensionRows.find(r => r.age === aowAge) ?? null
 
