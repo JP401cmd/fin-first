@@ -17,11 +17,11 @@ export const NL_AOW_MONTHLY = 1380 // alleenstaand, bruto 2025
 export const INFLATION = 0.02
 
 // NL-FIRE constanten (Box 3, 2025)
-export const NL_FICTIEF_BELEGGINGEN = 0.0588   // 5.88% — forfaitair rendement beleggingen 2025
+export const NL_DEEMED_INVESTMENT_RETURN = 0.0588   // 5.88% — forfaitair rendement beleggingen 2025
 export const BOX3_TARIEF = 0.36                 // 36% — belastingtarief Box 3
-export const BOX3_DRAG = NL_FICTIEF_BELEGGINGEN * BOX3_TARIEF // ≈ 2.117%
-export const NL_INFLATIE = 0.02                 // 2.00% — langjarig NL inflatiegemiddelde
-export const NL_SWR = DEFAULT_RETURN - BOX3_DRAG - NL_INFLATIE // ≈ 0.02883
+export const BOX3_DRAG = NL_DEEMED_INVESTMENT_RETURN * BOX3_TARIEF // ≈ 2.117%
+export const NL_INFLATION = 0.02                 // 2.00% — langjarig NL inflatiegemiddelde
+export const NL_SWR = DEFAULT_RETURN - BOX3_DRAG - NL_INFLATION // ≈ 0.02883
 export const NL_MULTIPLIER = 1 / NL_SWR        // ≈ 34.7×
 export const CLASSIC_MULTIPLIER = 1 / SWR      // = 25×
 

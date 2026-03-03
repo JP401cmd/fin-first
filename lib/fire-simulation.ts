@@ -25,7 +25,7 @@ export interface SimCashflow {
 
 export interface SimRow {
   age: number
-  phase: 'opbouw' | 'pensioen'
+  phase: 'accumulation' | 'retirement'
   startPortfolio: number
   growth: number
   savings: number
@@ -165,7 +165,7 @@ export function runSimulation(
       if (generateRows) {
         rows.push({
           age,
-          phase: 'pensioen',
+          phase: 'retirement',
           startPortfolio: Math.round(startPf),
           growth: Math.round(growth),
           savings: 0,
@@ -253,7 +253,7 @@ export function runSimulation(
 
     accRows.push({
       age,
-      phase: 'opbouw',
+      phase: 'accumulation',
       startPortfolio: Math.round(portfolio),
       growth: Math.round(growth),
       savings: Math.round(annualSavings),

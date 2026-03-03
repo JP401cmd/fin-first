@@ -340,15 +340,15 @@ export default function TestBox3Verification() {
             </div>
             <div>
               <span className="text-zinc-500">Box 3 Inkomen:</span>
-              <span className="ml-2 font-mono font-bold">{formatEur(originalResult.box3Inkomen)}</span>
+              <span className="ml-2 font-mono font-bold">{formatEur(originalResult.box3Income)}</span>
             </div>
             <div className="col-span-2 mt-2 rounded-lg bg-amber-50 p-4">
               <span className="text-lg font-bold text-amber-800">
-                Totale Belasting: <span data-testid="belasting-result">{formatEur(originalResult.belasting)}</span>
+                Totale Belasting: <span data-testid="belasting-result">{formatEur(originalResult.tax)}</span>
               </span>
-              {originalResult.vrijheidsdagen > 0 && (
+              {originalResult.freedomDays > 0 && (
                 <span className="ml-4 text-sm text-amber-600">
-                  ({originalResult.vrijheidsdagen} vrijheidsdagen)
+                  ({originalResult.freedomDays} vrijheidsdagen)
                 </span>
               )}
             </div>
@@ -386,8 +386,8 @@ export default function TestBox3Verification() {
                 { label: 'Rendementsgrondslag', calc: originalResult.rendementsgrondslag, manual: manualCalc.rendementsgrondslag },
                 { label: 'Heffingsvrij Vermogen', calc: originalResult.heffingsvrijVermogen, manual: manualCalc.heffingsvrijVermogen },
                 { label: 'Grondslag Sparen', calc: originalResult.grondslagSparen, manual: manualCalc.grondslagSparen },
-                { label: 'Box 3 Inkomen', calc: originalResult.box3Inkomen, manual: manualCalc.box3Inkomen },
-                { label: 'BELASTING', calc: originalResult.belasting, manual: manualCalc.belasting },
+                { label: 'Box 3 Inkomen', calc: originalResult.box3Income, manual: manualCalc.box3Inkomen },
+                { label: 'BELASTING', calc: originalResult.tax, manual: manualCalc.belasting },
               ].map(row => {
                 const match = Math.abs(row.calc - row.manual) < 0.01
                 return (
@@ -469,23 +469,23 @@ export default function TestBox3Verification() {
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div>
                     <span className="text-zinc-500">Original Tax:</span>
-                    <span className="ml-2 font-mono font-bold">{formatEur(originalResult.belasting)}</span>
+                    <span className="ml-2 font-mono font-bold">{formatEur(originalResult.tax)}</span>
                   </div>
                   <div>
                     <span className="text-zinc-500">Modified Tax:</span>
-                    <span className="ml-2 font-mono font-bold" data-testid="modified-belasting">{formatEur(modifiedResult.belasting)}</span>
+                    <span className="ml-2 font-mono font-bold" data-testid="modified-belasting">{formatEur(modifiedResult.tax)}</span>
                   </div>
                   <div>
                     <span className="text-zinc-500">Difference:</span>
                     <span className={`ml-2 font-mono font-bold ${
-                      modifiedResult.belasting > originalResult.belasting ? 'text-red-600' : 'text-emerald-600'
+                      modifiedResult.tax > originalResult.tax ? 'text-red-600' : 'text-emerald-600'
                     }`}>
-                      {formatEur(modifiedResult.belasting - originalResult.belasting)}
+                      {formatEur(modifiedResult.tax - originalResult.tax)}
                     </span>
                   </div>
                 </div>
                 <p className="text-xs text-amber-700">
-                  {modifiedResult.belasting !== originalResult.belasting
+                  {modifiedResult.tax !== originalResult.tax
                     ? '✓ Tax recalculated correctly with modified asset value'
                     : modifiedValue === Number(assets.find(a => a.id === modifiedAssetId)?.current_value)
                       ? '(Same value — no change expected)'
@@ -526,11 +526,11 @@ export default function TestBox3Verification() {
           </li>
           <li className={originalResult ? 'text-emerald-700' : 'text-amber-600'}>
             {originalResult ? '✓' : '⚠'} Box 3 calculation produces result: {
-              originalResult ? formatEur(originalResult.belasting) : 'No data'
+              originalResult ? formatEur(originalResult.tax) : 'No data'
             }
           </li>
-          <li className={manualCalc && originalResult && Math.abs(originalResult.belasting - manualCalc.belasting) < 0.01 ? 'text-emerald-700' : 'text-amber-600'}>
-            {manualCalc && originalResult && Math.abs(originalResult.belasting - manualCalc.belasting) < 0.01
+          <li className={manualCalc && originalResult && Math.abs(originalResult.tax - manualCalc.belasting) < 0.01 ? 'text-emerald-700' : 'text-amber-600'}>
+            {manualCalc && originalResult && Math.abs(originalResult.tax - manualCalc.belasting) < 0.01
               ? '✓ Manual calculation matches calculateBox3() result'
               : '⚠ Cannot verify calculation match (no data)'
             }
