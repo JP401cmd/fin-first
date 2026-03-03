@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation'
 import { shouldAlert } from '@/lib/budget-alerts'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { ageAtDate, type LifeEvent } from '@/lib/horizon-data'
+import { DEFAULT_RETURN, INFLATION } from '@/lib/constants'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { runSimulation, lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { parseFireStrategy } from '@/lib/fire-strategy'
@@ -37,9 +38,6 @@ import { FullScreenModal } from '@/components/app/full-screen-modal'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import dynamic from 'next/dynamic'
 
-const DynCashPage = dynamic(() => import('@/app/(app)/core/cash/page'), {
-  loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" /></div>,
-})
 const DynBudgetsPage = dynamic(() => import('@/app/(app)/core/budgets/page'), {
   loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" /></div>,
 })
@@ -125,7 +123,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
 
       // Fetch all in parallel
-      const [txResult, assetsResult, debtsResult, income12Result, essentialBudgetsResult, earliestIncomeResult, childBudgetsResult, expense12Result, earliestTxResult, profileResult] = await Promise.all([
+      const [txResult, assetsResult, debtsResult, income12Result, essentialBudgetsResult, earliestIncomeResult, childBudgetsResult, expense12Result, earliestTxResult, profileResult, bankAccountsResult] = await Promise.all([
         supabase
           .from('transactions')
           .select('amount')
@@ -176,6 +174,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           .order('date', { ascending: true })
           .limit(1),
         supabase.from('profiles').select('retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate').single(),
+        supabase.from('bank_accounts').select('id, name, balance').eq('is_active', true),
       ])
 
       if (txResult.error) throw txResult.error
@@ -269,9 +268,11 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       setRetirementMethodUsed(activeRetirementMethod)
       setFireParams(resolveFireParams(profileResult.data ?? {}))
 
-      // Total assets (weighted by net_worth_inclusion_pct)
-      const totalAssets = assetsResult.data.reduce((s, a) =>
+      // Total assets (weighted by net_worth_inclusion_pct) + cash balances
+      const totalAssetsOnly = assetsResult.data.reduce((s, a) =>
         s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
+      const totalCash = (bankAccountsResult.data ?? []).reduce((s, a) => s + Number(a.balance), 0)
+      const totalAssets = totalAssetsOnly + totalCash
 
       // Total debts (weighted by net_worth_inclusion_pct)
       const totalDebts = debtsResult.data.reduce((s, d) =>
@@ -295,9 +296,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         if (monthlySavings <= 0) {
           setFireUnreachable(true)
         } else {
-          const annualReturn = 0.07
-          const inflation = 0.02
-          const realReturn = (1 + annualReturn) / (1 + inflation) - 1
+          const realReturn = (1 + DEFAULT_RETURN) / (1 + INFLATION) - 1
           const monthlyReturnRate = realReturn / 12
           let projectedNW = netWorth
           let fireMonths = 0
@@ -777,7 +776,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {/* Cash Card */}
           <MissionControlCard
-            href="/core/cash"
+            href="/core/assets"
             onClick={() => setActiveModal('cash')}
             icon={<Wallet className="h-5 w-5 text-kern-600" />}
             title="Cash"
@@ -984,10 +983,10 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       <FullScreenModal
         open={activeModal === 'cash'}
         onClose={() => setActiveModal(null)}
-        title="Cash"
-        href="/core/cash"
+        title="Assets"
+        href="/core/assets"
       >
-        <DynCashPage />
+        <DynAssetsPage />
       </FullScreenModal>
       <FullScreenModal
         open={activeModal === 'budgets'}

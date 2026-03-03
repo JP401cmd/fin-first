@@ -5,28 +5,41 @@
  * Pure functions, no Supabase dependency.
  */
 
+import {
+  computeEffectiveExpenses,
+  computeFireTarget,
+  computeFreedomPercentage,
+  computeFreedomTime,
+  computeSavingsRate,
+} from './core-metrics'
 import { MSCI_REAL_RETURNS, NAMED_PERIODS } from './msci-data'
 import type { FinancialInput } from './core-metrics'
+import type { CamelCaseKeys } from './db-mapper'
 
 export type { FinancialInput } from './core-metrics'
 
-// ── Constants ────────────────────────────────────────────────
-
-export const CLASSIC_SWR = 0.04
-export const DEFAULT_RETURN = 0.07
-export const DEFAULT_VOLATILITY = 0.15
-export const NL_AOW_AGE = 67
-export const NL_AOW_MONTHLY = 1380 // alleenstaand, bruto 2025
-export const INFLATION = 0.02
-
-// NL-FIRE constanten (Box 3, 2025)
-export const NL_DEEMED_INVESTMENT_RETURN = 0.0588   // 5.88% — forfaitair rendement beleggingen 2025
-export const BOX3_TARIEF = 0.36                 // 36% — belastingtarief Box 3
-export const BOX3_DRAG = NL_DEEMED_INVESTMENT_RETURN * BOX3_TARIEF // ≈ 2.117%
-export const NL_INFLATION = 0.02                 // 2.00% — langjarig NL inflatiegemiddelde
-export const NL_SWR = DEFAULT_RETURN - BOX3_DRAG - NL_INFLATION // ≈ 0.02883
-export const NL_MULTIPLIER = 1 / NL_SWR        // ≈ 34.7×
-export const CLASSIC_MULTIPLIER = 1 / CLASSIC_SWR // = 25×
+// ── Constants (canonical source: lib/constants.ts) ──────────────
+// Re-exported for backward compatibility — many files import from here.
+export {
+  SWR,
+  DEFAULT_RETURN,
+  DEFAULT_VOLATILITY,
+  NL_AOW_AGE,
+  NL_AOW_MONTHLY,
+  INFLATION,
+  NL_FICTIEF_BELEGGINGEN,
+  BOX3_TARIEF,
+  BOX3_DRAG,
+  NL_INFLATIE,
+  NL_SWR,
+  NL_MULTIPLIER,
+  CLASSIC_MULTIPLIER,
+} from './constants'
+import {
+  SWR, DEFAULT_RETURN, DEFAULT_VOLATILITY,
+  NL_AOW_AGE, NL_AOW_MONTHLY, INFLATION,
+  NL_SWR,
+} from './constants'
 
 export type FireMethod = 'nl'
 
@@ -172,6 +185,9 @@ export interface LifeEvent {
   sort_order: number
   is_indexed: boolean
 }
+
+/** LifeEvent with camelCase keys (frontend representation). */
+export type LifeEventFe = CamelCaseKeys<LifeEvent>
 
 export interface LifeEventImpact {
   event: LifeEvent
@@ -479,17 +495,15 @@ export function computeFireProjection(
   const inflationRate = inflationOverride ?? INFLATION
   const netWorth = totalAssets - totalDebts
   const yearlyExpenses = monthlyExpenses * 12
-  const effectiveYearlyExpenses = yearlyMustExpenses > 0 ? yearlyMustExpenses : yearlyExpenses
-  const fireTarget = effectiveYearlyExpenses > 0 ? effectiveYearlyExpenses / swr : 0
-  const freedomPercentage = fireTarget > 0 ? Math.min((netWorth / fireTarget) * 100, 100) : 0
+  const effectiveYearlyExpenses = computeEffectiveExpenses(yearlyMustExpenses, yearlyExpenses)
+  const fireTarget = computeFireTarget(effectiveYearlyExpenses, swr)
+  const freedomPercentage = computeFreedomPercentage(netWorth, fireTarget)
   const monthlySavings = monthlyIncome - monthlyExpenses
-  const savingsRate = monthlyIncome > 0 ? (monthlySavings / monthlyIncome) * 100 : 0
+  const savingsRate = computeSavingsRate(monthlyIncome, monthlyExpenses)
   const monthlyPassiveIncome = (netWorth * swr) / 12
 
-  // Freedom time
-  const freedomMonthsTotal = effectiveYearlyExpenses > 0 ? (netWorth / effectiveYearlyExpenses) * 12 : 0
-  const freedomYears = Math.floor(Math.max(0, freedomMonthsTotal) / 12)
-  const freedomMonths = Math.floor(Math.max(0, freedomMonthsTotal) % 12)
+  // Freedom time (shared primitives from core-metrics.ts)
+  const { years: freedomYears, months: freedomMonths } = computeFreedomTime(netWorth, effectiveYearlyExpenses)
 
   // FIRE date calculation (inflation-adjusted real return)
   const realReturn = (1 + annualReturn) / (1 + inflationRate) - 1

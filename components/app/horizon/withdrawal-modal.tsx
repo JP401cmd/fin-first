@@ -10,6 +10,7 @@ import {
   type FinancialInput, type WithdrawalStrategy, type WithdrawalResult, type WithdrawalYear,
   type GuardrailsConfig, type BucketConfig,
 } from '@/lib/horizon-data'
+import { DEFAULT_RETURN } from '@/lib/constants'
 import { X, ChevronDown, ChevronUp, Info } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 
@@ -74,7 +75,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
 
     const currentAge = input.dateOfBirth ? ageAtDate(input.dateOfBirth) : 55
     const yearsToRetirement = Math.max(0, retirementAge - currentAge)
-    const monthlyReturn = 0.07 / 12
+    const monthlyReturn = DEFAULT_RETURN / 12
     const monthlySavings = input.monthlyIncome - input.monthlyExpenses
     let projectedPortfolio = input.totalAssets - input.totalDebts
 

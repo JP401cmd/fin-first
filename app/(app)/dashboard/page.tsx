@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeFireProjection, computeFireRange, runBacktest, ageAtDate, deriveCountdown, NL_DEEMED_INVESTMENT_RETURN, BOX3_TARIEF, NL_SWR, type FinancialInput, type LifeEvent, type FireCountdown } from '@/lib/horizon-data'
+import { computeEffectiveExpenses, computeFireTarget, computeFreedomPercentage } from '@/lib/core-metrics'
+import { computeFireProjection, computeFireRange, runBacktest, ageAtDate, deriveCountdown, NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF, NL_SWR, type FinancialInput, type LifeEvent, type FireCountdown } from '@/lib/horizon-data'
 import { resolveFireParams } from '@/lib/fire-params'
 import { runSimulation, lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { parseFireStrategy, type FireEndStrategy } from '@/lib/fire-strategy'
@@ -38,6 +39,7 @@ export default async function DashboardPage() {
     allBudgetsResult, recsResult, childBudgetsResult,
     goalsResult, recurringResult, netWorthSnapshotsResult,
     income12Result, earliestIncomeResult, sovereigntyTxResult,
+    bankAccountsResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('id, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
@@ -57,6 +59,7 @@ export default async function DashboardPage() {
     supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
     supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
     supabase.from('transactions').select('amount').lt('amount', 0).gte('date', prev3MonthStart).lt('date', monthStart),
+    supabase.from('bank_accounts').select('id, balance').eq('is_active', true),
   ])
 
   // Core calculations
@@ -68,8 +71,10 @@ export default async function DashboardPage() {
     else monthlyExpenses += Math.abs(amt)
   }
 
-  const totalAssets = (assetsResult.data ?? []).reduce((s, a) =>
+  const totalAssetsOnly = (assetsResult.data ?? []).reduce((s, a) =>
     s + Number(a.current_value) * (((a as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100), 0)
+  const totalCash = (bankAccountsResult.data ?? []).reduce((s, a) => s + Number(a.balance), 0)
+  const totalAssets = totalAssetsOnly + totalCash
   const totalDebts = (debtsResult.data ?? []).reduce((s, d) =>
     s + Number(d.current_balance) * (((d as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100), 0)
   const netWorth = totalAssets - totalDebts
@@ -169,8 +174,8 @@ export default async function DashboardPage() {
   )
 
   const yearlyExpenses = monthlyExpenses * 12
-  const fireTarget = yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses / fireSwr : (yearlyExpenses > 0 ? yearlyExpenses / fireSwr : 0)
-  const freedomPct = fireTarget > 0 ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0) : 0
+  const fireTarget = computeFireTarget(computeEffectiveExpenses(yearlyRetirementExpenses, yearlyExpenses), fireSwr)
+  const freedomPct = computeFreedomPercentage(netWorth, fireTarget)
 
   // FIRE projection
   const horizonInput: FinancialInput = {

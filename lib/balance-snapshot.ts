@@ -3,6 +3,7 @@
  * alongside the aggregate net_worth_snapshot.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { CamelCaseKeys } from './db-mapper'
 
 type AssetRow = {
   id: string
@@ -19,6 +20,12 @@ type DebtRow = {
   current_balance: number
   net_worth_inclusion_pct?: number | null
 }
+
+/** AssetRow with camelCase keys (frontend representation). */
+export type AssetRowFe = CamelCaseKeys<AssetRow>
+
+/** DebtRow with camelCase keys (frontend representation). */
+export type DebtRowFe = CamelCaseKeys<DebtRow>
 
 /**
  * Capture individual asset and debt balances for a given snapshot date.

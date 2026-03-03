@@ -11,6 +11,8 @@
  * - Horizon = long-term strategic FIRE projection (30 years)
  */
 
+import { DEFAULT_RETURN } from '@/lib/constants'
+
 export interface NetWorthProjectionPoint {
   /** Month index from now (0 = current) */
   month: number
@@ -59,7 +61,7 @@ export function computeNetWorthProjection(
   netWorth: number,
   monthlySavings: number,
   fireTarget: number,
-  annualReturn: number = 0.07,
+  annualReturn: number = DEFAULT_RETURN,
 ): NetWorthProjectionResult {
   const monthlyReturn = annualReturn / 12
   const totalMonths = 60 // 5 years

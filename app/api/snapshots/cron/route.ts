@@ -4,6 +4,7 @@ import { computeFireProjection, computeResilienceScore, type FinancialInput } fr
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
+import { SWR } from '@/lib/constants'
 
 /**
  * GET /api/snapshots/cron

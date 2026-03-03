@@ -1,18 +1,71 @@
 /**
- * Core financial types and dashboard metric calculations.
+ * Core financial types, shared FIRE calculation primitives,
+ * and dashboard metric calculations.
  *
  * FinancialInput  — raw data from the database (assets, debts, income, expenses, etc.)
  * FinancialMetrics — computed values derived from FinancialInput (FIRE target, freedom %, etc.)
  *
+ * Shared primitives (computeFireTarget, computeFreedomPercentage, etc.) are the
+ * single source of truth — used by computeCoreData(), computeFireProjection(),
+ * and dashboard inline calculations.
+ *
  * SWR (Safe Withdrawal Rate): defaults to NL Box 3-corrected SWR (≈2.88%)
  * via resolveFireParams(). Callers can override with swrOverride parameter.
- *
- * FIRE target = yearly expenses / SWR
- * Freedom % = net worth / FIRE target
- * Freedom time = net worth / yearly expenses
  */
 
+import { DEFAULT_RETURN } from '@/lib/constants'
 import { resolveFireParams } from '@/lib/fire-params'
+
+// ── Shared FIRE calculation primitives ───────────────────────
+
+/** Determine effective yearly expenses: prefer must-expenses when available. */
+export function computeEffectiveExpenses(
+  yearlyMustExpenses: number,
+  yearlyExpenses: number,
+): number {
+  return yearlyMustExpenses > 0 ? yearlyMustExpenses : yearlyExpenses
+}
+
+/** FIRE target = yearly expenses / SWR. */
+export function computeFireTarget(
+  effectiveYearlyExpenses: number,
+  swr: number,
+): number {
+  return effectiveYearlyExpenses > 0 ? effectiveYearlyExpenses / swr : 0
+}
+
+/** Freedom percentage: progress toward FIRE (0–100). */
+export function computeFreedomPercentage(
+  netWorth: number,
+  fireTarget: number,
+): number {
+  return fireTarget > 0
+    ? Math.max(0, Math.min((netWorth / fireTarget) * 100, 100))
+    : 0
+}
+
+/** Freedom time: how many years + months net worth covers expenses. */
+export function computeFreedomTime(
+  netWorth: number,
+  effectiveYearlyExpenses: number,
+): { years: number; months: number } {
+  const totalMonths =
+    effectiveYearlyExpenses > 0 ? (netWorth / effectiveYearlyExpenses) * 12 : 0
+  const clamped = Math.max(0, totalMonths)
+  return {
+    years: Math.floor(clamped / 12),
+    months: Math.floor(clamped % 12),
+  }
+}
+
+/** Savings rate as percentage of income. */
+export function computeSavingsRate(
+  monthlyIncome: number,
+  monthlyExpenses: number,
+): number {
+  if (monthlyIncome <= 0) return 0
+  return ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100
+}
 
 // ── Input: raw financial data from DB ────────────────────────
 
@@ -71,21 +124,15 @@ export function computeCoreData(
   const swr = swrOverride ?? resolveFireParams({}).effectiveSwr
   const yearlyIncome = monthlyIncome * 12
   const yearlyExpenses = monthlyExpenses * 12
-  const effectiveYearlyExpenses = yearlyMustExpenses && yearlyMustExpenses > 0 ? yearlyMustExpenses : yearlyExpenses
+  const effectiveYearlyExpenses = computeEffectiveExpenses(yearlyMustExpenses ?? 0, yearlyExpenses)
   const monthlySavings = monthlyIncome - monthlyExpenses
   const netWorth = totalAssets - totalDebts
 
-  // FIRE calculations
-  const fireTarget = effectiveYearlyExpenses > 0 ? effectiveYearlyExpenses / swr : 0
-  const freedomPercentage = fireTarget > 0 ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0) : 0
-
-  // Freedom time: how long could you live off net worth
-  const freedomMonthsTotal = effectiveYearlyExpenses > 0 ? (netWorth / effectiveYearlyExpenses) * 12 : 0
-  const freedomYears = Math.floor(freedomMonthsTotal / 12)
-  const freedomMonths = Math.floor(freedomMonthsTotal % 12)
-
-  // Savings rate
-  const savingsRate = monthlyIncome > 0 ? (monthlySavings / monthlyIncome) * 100 : 0
+  // FIRE calculations (shared primitives)
+  const fireTarget = computeFireTarget(effectiveYearlyExpenses, swr)
+  const freedomPercentage = computeFreedomPercentage(netWorth, fireTarget)
+  const { years: freedomYears, months: freedomMonths } = computeFreedomTime(netWorth, effectiveYearlyExpenses)
+  const savingsRate = computeSavingsRate(monthlyIncome, monthlyExpenses)
 
   // Days won per month (how many days of expenses covered by monthly savings)
   // dailyExpense = all expenses / 365 (used for daysWonPerMonth: general savings impact)
@@ -105,8 +152,7 @@ export function computeCoreData(
   let monthsToFire = 0
   let expectedFireDate = ''
   if (monthlySavings > 0 && fireTarget > netWorth) {
-    // Simple compound growth: assume 7% annual return on investments
-    const annualReturn = 0.07
+    const annualReturn = DEFAULT_RETURN
     const monthlyReturn = annualReturn / 12
     let projected = netWorth
     let months = 0
