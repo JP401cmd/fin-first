@@ -7,12 +7,11 @@ import type { ChecklistCardSpec } from '@/lib/briefing/types'
 
 interface Props {
   spec: ChecklistCardSpec
-  delay: number
 }
 
-export function ChecklistCard({ spec, delay }: Props) {
+export function ChecklistCard({ spec }: Props) {
   return (
-    <BriefingCard module="wil" delay={delay}>
+    <BriefingCard module="wil">
       <p className="text-sm font-semibold text-[var(--ink)] mb-2">{spec.title}</p>
       <ul className="space-y-1.5">
         {spec.items.map((item, i) => {

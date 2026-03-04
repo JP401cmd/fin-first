@@ -1,0 +1,364 @@
+// ── Briefing Directives ─────────────────────────────────────
+// Admin-configurable editorial directives for Will's briefing.
+// Temporal directives: app_settings key 'briefing_directives'
+// Functional directives: app_settings key 'briefing_functional_directives'
+
+export interface BriefingDirective {
+  id: string
+  title: string
+  instruction: string
+  priority: 'low' | 'normal' | 'high'
+  months: number[]        // [] = all months
+  dayFrom?: number        // 1-31
+  dayTo?: number          // 1-31
+  enabled: boolean
+}
+
+/** Check if a directive is active for the given month/day. */
+export function isDirectiveActive(
+  d: BriefingDirective,
+  month: number,
+  dayOfMonth: number,
+): boolean {
+  if (!d.enabled) return false
+
+  // Month filter: empty = all months
+  if (d.months.length > 0 && !d.months.includes(month)) return false
+
+  // Day range filter
+  if (d.dayFrom != null && dayOfMonth < d.dayFrom) return false
+  if (d.dayTo != null && dayOfMonth > d.dayTo) return false
+
+  return true
+}
+
+/** Filter and sort directives: high priority first. */
+export function getActiveDirectives(
+  all: BriefingDirective[],
+  month: number,
+  dayOfMonth: number,
+): BriefingDirective[] {
+  const PRIORITY_ORDER: Record<string, number> = { high: 0, normal: 1, low: 2 }
+  return all
+    .filter((d) => isDirectiveActive(d, month, dayOfMonth))
+    .sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1))
+}
+
+/** Format active directives as a prompt block for Will's system prompt. */
+export function formatDirectivesForPrompt(directives: BriefingDirective[]): string {
+  if (directives.length === 0) return ''
+
+  const lines = directives.map((d) => {
+    switch (d.priority) {
+      case 'high':
+        return `[PRIORITEIT] ${d.instruction}`
+      case 'low':
+        return `[optioneel] ${d.instruction}`
+      default:
+        return `- ${d.instruction}`
+    }
+  })
+
+  return `== REDACTIONELE RICHTLIJNEN ==\n${lines.join('\n')}`
+}
+
+// ── Functional Directives ────────────────────────────────────
+// Data-driven editorial guidance: triggered by financial conditions.
+// Will evaluates conditions against the user's data contextually.
+
+export interface FunctionalDirective {
+  id: string
+  title: string
+  metric: string            // key from DIRECTIVE_METRICS
+  condition: string         // key from metric's conditions
+  instruction: string       // editorial guidance for Will
+  priority: 'low' | 'normal' | 'high'
+  enabled: boolean
+}
+
+export interface MetricCondition {
+  id: string
+  label: string
+}
+
+export interface DirectiveMetric {
+  id: string
+  label: string
+  conditions: MetricCondition[]
+}
+
+export const DIRECTIVE_METRICS: DirectiveMetric[] = [
+  {
+    id: 'net_worth',
+    label: 'Netto vermogen',
+    conditions: [
+      { id: 'rising', label: 'Stijgend' },
+      { id: 'declining', label: 'Dalend' },
+      { id: 'stagnant', label: 'Stagnerend' },
+    ],
+  },
+  {
+    id: 'savings_rate',
+    label: 'Spaarquote',
+    conditions: [
+      { id: 'high', label: 'Hoog (>20%)' },
+      { id: 'low', label: 'Laag (<10%)' },
+      { id: 'improving', label: 'Verbeterend' },
+      { id: 'declining', label: 'Dalend' },
+    ],
+  },
+  {
+    id: 'budget',
+    label: 'Budget',
+    conditions: [
+      { id: 'on_track', label: 'Binnen limiet' },
+      { id: 'over', label: 'Overschreden' },
+      { id: 'warning', label: 'Bijna op (>75%)' },
+    ],
+  },
+  {
+    id: 'debt',
+    label: 'Schulden',
+    conditions: [
+      { id: 'decreasing', label: 'Afnemend' },
+      { id: 'increasing', label: 'Toenemend' },
+      { id: 'nearly_paid', label: 'Bijna afgelost' },
+      { id: 'none', label: 'Geen schulden' },
+    ],
+  },
+  {
+    id: 'fire',
+    label: 'FIRE voortgang',
+    conditions: [
+      { id: 'on_track', label: 'Op schema' },
+      { id: 'behind', label: 'Achterloopt' },
+      { id: 'milestone_near', label: 'Mijlpaal nabij' },
+    ],
+  },
+  {
+    id: 'spending',
+    label: 'Uitgaven',
+    conditions: [
+      { id: 'spike', label: 'Uitgavenpiek' },
+      { id: 'decreasing', label: 'Dalend' },
+      { id: 'stable', label: 'Stabiel' },
+    ],
+  },
+  {
+    id: 'emergency_fund',
+    label: 'Noodfonds',
+    conditions: [
+      { id: 'sufficient', label: 'Voldoende (≥3 maanden)' },
+      { id: 'insufficient', label: 'Onvoldoende' },
+      { id: 'reached', label: 'Doel bereikt' },
+    ],
+  },
+  {
+    id: 'income',
+    label: 'Inkomen',
+    conditions: [
+      { id: 'stable', label: 'Stabiel' },
+      { id: 'variable', label: 'Wisselend' },
+      { id: 'increased', label: 'Gestegen' },
+    ],
+  },
+]
+
+/** Resolve human-readable labels for a metric + condition combo. */
+export function resolveMetricLabels(metricId: string, conditionId: string): { metric: string; condition: string } {
+  const metric = DIRECTIVE_METRICS.find((m) => m.id === metricId)
+  const condition = metric?.conditions.find((c) => c.id === conditionId)
+  return {
+    metric: metric?.label ?? metricId,
+    condition: condition?.label ?? conditionId,
+  }
+}
+
+/** Format functional directives as a prompt block. */
+export function formatFunctionalDirectivesForPrompt(directives: FunctionalDirective[]): string {
+  const enabled = directives.filter((d) => d.enabled)
+  if (enabled.length === 0) return ''
+
+  const PRIORITY_ORDER: Record<string, number> = { high: 0, normal: 1, low: 2 }
+  const sorted = [...enabled].sort(
+    (a, b) => (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1),
+  )
+
+  const lines = sorted.map((d) => {
+    const { metric, condition } = resolveMetricLabels(d.metric, d.condition)
+    const prefix =
+      d.priority === 'high' ? '[PRIORITEIT]' :
+      d.priority === 'low' ? '[optioneel]' : '-'
+    return `${prefix} Wanneer ${metric.toLowerCase()} ${condition.toLowerCase()}: ${d.instruction}`
+  })
+
+  return `== FUNCTIONELE RICHTLIJNEN ==
+Pas de volgende richtlijnen toe wanneer je de betreffende situatie herkent in de gebruikersdata:
+${lines.join('\n')}`
+}
+
+/** Default functional directive seeds. */
+export function getDefaultFunctionalDirectives(): FunctionalDirective[] {
+  return [
+    {
+      id: crypto.randomUUID(),
+      title: 'Vermogen groeit',
+      metric: 'net_worth',
+      condition: 'rising',
+      instruction: 'Vier de vooruitgang. Toon groeitrend met sparkline. Frame als "vrijheid opbouwen".',
+      priority: 'normal',
+      enabled: true,
+    },
+    {
+      id: crypto.randomUUID(),
+      title: 'Vermogen daalt',
+      metric: 'net_worth',
+      condition: 'declining',
+      instruction: 'Wees empathisch maar constructief. Focus op herstelacties en wat wél goed gaat. Geen paniek.',
+      priority: 'high',
+      enabled: true,
+    },
+    {
+      id: crypto.randomUUID(),
+      title: 'Budget overschreden',
+      metric: 'budget',
+      condition: 'over',
+      instruction: 'Budget alert prominent tonen met showBudgetBar. Concrete bespaartips, niet veroordelend.',
+      priority: 'high',
+      enabled: true,
+    },
+    {
+      id: crypto.randomUUID(),
+      title: 'Lage spaarquote',
+      metric: 'savings_rate',
+      condition: 'low',
+      instruction: 'Benadruk kleine verbeteringen. Elke extra euro gespaard = meer vrijheidstijd. Toon progressRing.',
+      priority: 'normal',
+      enabled: true,
+    },
+    {
+      id: crypto.randomUUID(),
+      title: 'Schulden nemen af',
+      metric: 'debt',
+      condition: 'decreasing',
+      instruction: 'Vier de schuldenreductie. Frame als "vrijheid teruggewonnen". Toon voortgang met milestone.',
+      priority: 'normal',
+      enabled: true,
+    },
+    {
+      id: crypto.randomUUID(),
+      title: 'FIRE mijlpaal nabij',
+      metric: 'fire',
+      condition: 'milestone_near',
+      instruction: 'Mijlpaal prominent tonen met showMilestone. Motivatieboost, concreet hoeveel er nog nodig is.',
+      priority: 'high',
+      enabled: true,
+    },
+    {
+      id: crypto.randomUUID(),
+      title: 'Noodfonds onvoldoende',
+      metric: 'emergency_fund',
+      condition: 'insufficient',
+      instruction: 'Noodfonds opbouwen als prioriteit. Toon hoeveel maanden buffer er is, hoeveel er nog nodig is.',
+      priority: 'normal',
+      enabled: true,
+    },
+    {
+      id: crypto.randomUUID(),
+      title: 'Uitgavenpiek',
+      metric: 'spending',
+      condition: 'spike',
+      instruction: 'Waarschuw voor ongebruikelijk hoge uitgaven, maar wees niet veroordelend. Bied context en vergelijking.',
+      priority: 'normal',
+      enabled: true,
+    },
+  ]
+}
+
+// ── Temporal Directive Defaults ──────────────────────────────
+
+/** Default seed directives based on current hardcoded temporal logic. */
+export function getDefaultDirectives(): BriefingDirective[] {
+  return [
+    {
+      id: crypto.randomUUID(),
+      title: 'Belastingaangifte periode',
+      instruction: 'Belastingseizoen: belastingaangifte deadline en box3 inzicht prominent tonen. Herinner gebruiker aan aangifte.',
+      priority: 'high',
+      months: [3, 4],
+      enabled: true,
+    },
+    {
+      id: crypto.randomUUID(),
+      title: 'Jaaroverzicht & feestdagen',
+      instruction: 'December: jaaroverzicht-stijl briefing, reflectie op financieel jaar, feestdagen-budget alert.',
+      priority: 'normal',
+      months: [12],
+      enabled: true,
+    },
+    {
+      id: crypto.randomUUID(),
+      title: 'Eindejaarsuitgaven piek',
+      instruction: 'Eindejaarsperiode: waarschuw voor uitgavenpiek, cadeaus en feestdagen. Budget-bewaking extra belangrijk.',
+      priority: 'high',
+      months: [12],
+      dayFrom: 20,
+      dayTo: 31,
+      enabled: true,
+    },
+    {
+      id: crypto.randomUUID(),
+      title: 'Nieuw jaar planning',
+      instruction: 'Januari: goede voornemens, jaarplanning, schone lei. Stel financiële doelen voor het nieuwe jaar.',
+      priority: 'normal',
+      months: [1],
+      enabled: true,
+    },
+    {
+      id: crypto.randomUUID(),
+      title: 'Vakantiebudget plannen',
+      instruction: 'Vakantieseizoen nadert: help gebruiker met vakantiebudget plannen en reserveringen.',
+      priority: 'normal',
+      months: [5, 6],
+      enabled: true,
+    },
+    {
+      id: crypto.randomUUID(),
+      title: 'Schoolkosten seizoen',
+      instruction: 'Schoolkosten seizoen: denk aan schoolboeken, materialen en inschrijvingen.',
+      priority: 'low',
+      months: [8],
+      dayFrom: 15,
+      dayTo: 31,
+      enabled: true,
+    },
+    {
+      id: crypto.randomUUID(),
+      title: 'Energieafrekening periode',
+      instruction: 'Energieafrekening periode: jaarafrekening energie verwacht. Check of er een buffer is.',
+      priority: 'low',
+      months: [1, 2],
+      enabled: true,
+    },
+    {
+      id: crypto.randomUUID(),
+      title: 'Begin van de maand',
+      instruction: 'Begin van de maand: start met comparison-card (vorige vs huidige maand). Maand-terugblik, nieuw budget-overzicht.',
+      priority: 'normal',
+      months: [],
+      dayFrom: 1,
+      dayTo: 5,
+      enabled: true,
+    },
+    {
+      id: crypto.randomUUID(),
+      title: 'Einde van de maand',
+      instruction: 'Einde van de maand: budget-druk prominent, salaris countdown. Gebruik showBudgetBar en showCountdown.',
+      priority: 'normal',
+      months: [],
+      dayFrom: 23,
+      dayTo: 31,
+      enabled: true,
+    },
+  ]
+}

@@ -5,15 +5,14 @@ import type { ComparisonCardSpec } from '@/lib/briefing/types'
 
 interface Props {
   spec: ComparisonCardSpec
-  delay: number
 }
 
-export function ComparisonCard({ spec, delay }: Props) {
+export function ComparisonCard({ spec }: Props) {
   const isPositive = spec.delta.startsWith('+')
   const isNegative = spec.delta.startsWith('-')
 
   return (
-    <BriefingCard module="kern" delay={delay}>
+    <BriefingCard module="kern">
       <p className="label-editorial text-[var(--ink-3)] mb-2">{spec.label}</p>
 
       <div className="flex items-center gap-4">
@@ -32,7 +31,7 @@ export function ComparisonCard({ spec, delay }: Props) {
             {spec.delta}
           </span>
           {spec.freedomDays != null && (
-            <span className="text-[10px] text-[var(--ink-4)]">
+            <span className="text-xs text-[var(--ink-3)]">
               {Math.abs(spec.freedomDays)}d vrijheid
             </span>
           )}

@@ -42,6 +42,33 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
     '',
   ]
 
+  // Net worth delta (month-over-month)
+  if (data.netWorthDelta != null) {
+    const sign = data.netWorthDelta >= 0 ? '+' : ''
+    lines.push(`Vermogensdelta (MoM): ${sign}${formatCurrency(data.netWorthDelta)}`)
+  }
+
+  // Consecutive positive growth months
+  if (data.netWorthHistory.length >= 2) {
+    let streak = 0
+    for (let i = data.netWorthHistory.length - 1; i > 0; i--) {
+      if (data.netWorthHistory[i].value > data.netWorthHistory[i - 1].value) streak++
+      else break
+    }
+    if (streak > 0) lines.push(`Opeenvolgende maanden groei: ${streak}`)
+  }
+
+  // Previous month expenses comparison
+  if (data.prevMonthExpenses > 0) {
+    const delta = data.monthlyExpenses - data.prevMonthExpenses
+    const sign = delta >= 0 ? '+' : ''
+    lines.push(`Vorige maand uitgaven: ${formatCurrency(data.prevMonthExpenses)} (verschil: ${sign}${formatCurrency(delta)})`)
+  }
+
+  // Savings rate trend (current vs 3-month avg from sovereignty data)
+  lines.push(`Huidige spaarquote: ${savingsRate}%`)
+  lines.push('')
+
   // Budget totals
   const bt = data.budgetTotals
   lines.push('BUDGETTEN DEZE MAAND:')
@@ -54,6 +81,17 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
   const expensePct = bt.expense.limit > 0 ? (bt.expense.spent / bt.expense.limit) * 100 : 0
   if (expensePct > 90) lines.push(`⚠ Budget bijna op: ${Math.round(expensePct)}% besteed`)
   else if (expensePct > 75) lines.push(`Budget druk: ${Math.round(expensePct)}% besteed`)
+
+  // Favorite budget breakdowns
+  if (data.favoriteBudgets.length > 0) {
+    lines.push('')
+    lines.push('FAVORIETE BUDGETTEN:')
+    for (const fb of data.favoriteBudgets) {
+      const fbPct = fb.limit > 0 ? Math.round((fb.spent / fb.limit) * 100) : 0
+      const remaining = Math.max(0, fb.limit - fb.spent)
+      lines.push(`- ${fb.name}: ${formatCurrency(fb.spent)} van ${formatCurrency(fb.limit)} (${fbPct}%, rest ${formatCurrency(remaining)})`)
+    }
+  }
   lines.push('')
 
   // Actions
@@ -68,12 +106,14 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
   }
   lines.push('')
 
-  // Goals
+  // Goals with deadlines
   lines.push(`DOELEN: ${data.goals}`)
   if (data.topGoals.length > 0) {
     for (const g of data.topGoals) {
       const goalPct = g.target_value > 0 ? Math.round((g.current_value / g.target_value) * 100) : 0
-      lines.push(`- ${g.name}: ${goalPct}% (${formatCurrency(g.current_value)} / ${formatCurrency(g.target_value)})`)
+      const deadline = g.target_date ? ` deadline ${g.target_date}` : ''
+      const remaining = g.target_value - g.current_value
+      lines.push(`- ${g.name}: ${goalPct}% (${formatCurrency(g.current_value)} / ${formatCurrency(g.target_value)}, rest ${formatCurrency(remaining)}${deadline})`)
     }
   }
   lines.push('')

@@ -445,6 +445,8 @@ export default async function DashboardPage() {
     simFireCountdown,
     fireEndStrategy: fireStrategy.strategy,
     fireEndAge: fireStrategy.endAge,
+    prevMonthExpenses: 0,
+    netWorthDelta: null,
     favoriteBudgets,
   }
 

@@ -12,6 +12,8 @@ import { InsightCard } from './cards/insight-card'
 import { ChecklistCard } from './cards/checklist-card'
 import { ComparisonCard } from './cards/comparison-card'
 import { CountdownCard } from './cards/countdown-card'
+import { GoalProgressCard } from './cards/goal-progress-card'
+import { BudgetBarCard } from './cards/budget-bar-card'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 
 interface BriefingCardGridProps {
@@ -25,19 +27,20 @@ const SPAN_CLASSES: Record<number, string> = {
   4: 'col-span-full',
 }
 
-function renderCard(card: BriefingCardSpec, index: number, data: DashboardData) {
-  const delay = index * 50
+function renderCard(card: BriefingCardSpec, data: DashboardData) {
   switch (card.type) {
-    case 'metric': return <MetricCard key={index} spec={card} delay={delay} />
-    case 'action': return <ActionCard key={index} spec={card} delay={delay} />
-    case 'alert': return <AlertCard key={index} spec={card} delay={delay} />
-    case 'progressRing': return <ProgressRingCard key={index} spec={card} delay={delay} />
-    case 'sparkline': return <SparklineCard key={index} spec={card} data={data} delay={delay} />
-    case 'milestone': return <MilestoneCard key={index} spec={card} delay={delay} />
-    case 'insight': return <InsightCard key={index} spec={card} delay={delay} />
-    case 'checklist': return <ChecklistCard key={index} spec={card} delay={delay} />
-    case 'comparison': return <ComparisonCard key={index} spec={card} delay={delay} />
-    case 'countdown': return <CountdownCard key={index} spec={card} delay={delay} />
+    case 'metric': return <MetricCard spec={card} />
+    case 'action': return <ActionCard spec={card} />
+    case 'alert': return <AlertCard spec={card} />
+    case 'progressRing': return <ProgressRingCard spec={card} />
+    case 'sparkline': return <SparklineCard spec={card} data={data} />
+    case 'milestone': return <MilestoneCard spec={card} />
+    case 'insight': return <InsightCard spec={card} />
+    case 'checklist': return <ChecklistCard spec={card} />
+    case 'comparison': return <ComparisonCard spec={card} />
+    case 'countdown': return <CountdownCard spec={card} />
+    case 'goalProgress': return <GoalProgressCard spec={card} />
+    case 'budgetBar': return <BudgetBarCard spec={card} />
   }
 }
 
@@ -45,8 +48,8 @@ export function BriefingCardGrid({ cards, data }: BriefingCardGridProps) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       {cards.map((card, i) => (
-        <div key={i} className={SPAN_CLASSES[CARD_SPAN[card.type]] ?? 'col-span-1'}>
-          {renderCard(card, i, data)}
+        <div key={`${card.type}-${i}`} className={SPAN_CLASSES[CARD_SPAN[card.type]] ?? 'col-span-1'}>
+          {renderCard(card, data)}
         </div>
       ))}
     </div>

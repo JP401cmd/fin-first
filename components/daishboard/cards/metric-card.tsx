@@ -6,12 +6,11 @@ import type { MetricCardSpec } from '@/lib/briefing/types'
 
 interface Props {
   spec: MetricCardSpec
-  delay: number
 }
 
-export function MetricCard({ spec, delay }: Props) {
+export function MetricCard({ spec }: Props) {
   return (
-    <BriefingCard module={spec.module} href={spec.href} delay={delay}>
+    <BriefingCard module={spec.module} href={spec.href}>
       <p className="label-editorial text-[var(--ink-3)] mb-1">{spec.label}</p>
       <p className="text-lg font-bold font-mono tabular-nums text-[var(--ink)]">
         {spec.value}
@@ -22,9 +21,9 @@ export function MetricCard({ spec, delay }: Props) {
       {spec.delta && (
         <div className="mt-2 flex items-center gap-1 text-xs">
           {spec.delta.startsWith('+') ? (
-            <ArrowUp className="h-3 w-3 text-emerald-600" />
+            <ArrowUp className="h-4 w-4 text-emerald-600" />
           ) : spec.delta.startsWith('-') ? (
-            <ArrowDown className="h-3 w-3 text-rose-600" />
+            <ArrowDown className="h-4 w-4 text-rose-600" />
           ) : null}
           <span className="font-mono tabular-nums text-[var(--ink-2)]">{spec.delta}</span>
           {spec.deltaLabel && (

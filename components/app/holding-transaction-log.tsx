@@ -7,6 +7,7 @@ import {
   Plus, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { formatCurrency } from '@/components/app/budget-shared'
+import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 
 type TransactionWithPnL = {
   id: string
@@ -266,6 +267,7 @@ export default function HoldingTransactionLog({
                     <p className={`text-sm font-semibold ${cfg.color}`}>
                       {cfg.sign}{formatCurrency(tx.total_amount)}
                     </p>
+                    <FreedomTimeBadge amount={tx.total_amount} className="mt-0.5 justify-end text-[10px]" />
                     {tx.type === 'sell' && tx.realized_pnl !== 0 && (
                       <p className={`text-xs font-medium ${tx.realized_pnl >= 0 ? 'text-emerald-600' : 'text-red-600'}`}
                          data-testid="tx-realized-pnl"

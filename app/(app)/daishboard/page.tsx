@@ -23,6 +23,7 @@ export default async function DAIshboardPage() {
   const monthEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1)).toISOString().split('T')[0]
   const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
   const prev3MonthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 3, 1)).toISOString().split('T')[0]
+  const prevMonthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 1)).toISOString().split('T')[0]
 
   const [
     txResult, assetsResult, debtsResult, profileResult,
@@ -30,7 +31,7 @@ export default async function DAIshboardPage() {
     allBudgetsResult, recsResult, childBudgetsResult,
     goalsResult, recurringResult, netWorthSnapshotsResult,
     income12Result, earliestIncomeResult, sovereigntyTxResult,
-    bankAccountsResult, favBudgetsResult,
+    bankAccountsResult, favBudgetsResult, prevMonthTxResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('id, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
@@ -52,6 +53,7 @@ export default async function DAIshboardPage() {
     supabase.from('transactions').select('amount').lt('amount', 0).gte('date', prev3MonthStart).lt('date', monthStart),
     supabase.from('bank_accounts').select('id, balance').eq('is_active', true).is('linked_asset_id', null),
     supabase.from('budgets').select('id, name, icon, budget_type, default_limit, interval, parent_id, is_favorite').eq('is_favorite', true),
+    supabase.from('transactions').select('amount').lt('amount', 0).gte('date', prevMonthStart).lt('date', monthStart),
   ])
 
   // ── Core calculations ─────────────────────────────────────
@@ -324,6 +326,12 @@ export default async function DAIshboardPage() {
     ? Number((latestSnapshotFireAge as { fire_age?: number | null }).fire_age)
     : null
 
+  // ── Previous month expenses + net worth delta ─────────────
+  const prevMonthExpenses = (prevMonthTxResult.data ?? []).reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
+  const netWorthDelta = netWorthHistory.length >= 2
+    ? netWorthHistory[netWorthHistory.length - 1].value - netWorthHistory[netWorthHistory.length - 2].value
+    : null
+
   // ── Build DashboardData ───────────────────────────────────
   const dashboardData: DashboardData = {
     netWorth, totalAssets, totalDebts,
@@ -354,6 +362,8 @@ export default async function DAIshboardPage() {
     box3Tax, simFireCountdown,
     fireEndStrategy: fireStrategy.strategy,
     fireEndAge: fireStrategy.endAge,
+    prevMonthExpenses,
+    netWorthDelta,
     favoriteBudgets,
   }
 

@@ -41,6 +41,7 @@ import { DEFAULT_MODULE_COLORS, DEFAULT_BUDGET_COLORS, DEFAULT_PHASE_COLORS } fr
 import type { ModuleColorConfig, ModuleName, BudgetColorConfig, PhaseColorConfig } from '@/lib/color-palette'
 import { ColorPickerCard } from '@/components/app/color-picker-card'
 import { Palette, RotateCcw, Type } from 'lucide-react'
+import { useDashboardType } from '@/components/app/dashboard-type-provider'
 import { type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { type FireEndStrategy, STRATEGY_LABELS, parseFireStrategy } from '@/lib/fire-strategy'
 
@@ -223,6 +224,8 @@ export default function InstellingenPage() {
   const [notifMessage, setNotifMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   // ─ Section B: Dashboard Widgets ─
+  const { dashboardType, setDashboardType } = useDashboardType()
+  const [dashTypeSaving, setDashTypeSaving] = useState(false)
   const [prefs, setPrefs] = useState<WidgetPref[]>(DEFAULT_WIDGET_PREFS.widgets)
   const [widgetsLoading, setWidgetsLoading] = useState(true)
   const [widgetsSaving, setWidgetsSaving] = useState(false)
@@ -346,6 +349,7 @@ export default function InstellingenPage() {
         if (d.typography_theme) {
           setFontTheme(d.typography_theme as FontTheme)
         }
+
       }
 
       // Widgets + sovereignty level
@@ -428,6 +432,12 @@ export default function InstellingenPage() {
       return [...otherPrefs, ...reorderedWithOrders]
     })
   }, [])
+
+  const saveDashboardType = useCallback(async (type: 'widgets' | 'briefing') => {
+    setDashTypeSaving(true)
+    await setDashboardType(type)
+    setDashTypeSaving(false)
+  }, [setDashboardType])
 
   const saveWidgets = useCallback(async () => {
     setWidgetsSaving(true)
@@ -678,7 +688,7 @@ export default function InstellingenPage() {
         )}
       </section>
 
-      {/* ── B: Dashboard Widgets ────────────────────────────────────── */}
+      {/* ── B: Dashboard ─────────────────────────────────────────────── */}
       <section className="mb-5 sm:mb-8 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
         <button
           type="button"
@@ -686,10 +696,10 @@ export default function InstellingenPage() {
           className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
         >
           <div>
-            <h2 className="label-editorial text-[var(--ink-2)]">Dashboard Widgets</h2>
+            <h2 className="label-editorial text-[var(--ink-2)]">Dashboard</h2>
             {!widgetsOpen && (
               <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-                {prefs.filter(p => p.enabled).length} van {prefs.length} actief · sleep om te sorteren
+                {dashboardType === 'briefing' ? 'AI Briefing' : 'Widgets'} · {prefs.filter(p => p.enabled).length} van {prefs.length} widgets actief
               </p>
             )}
           </div>
@@ -698,6 +708,42 @@ export default function InstellingenPage() {
 
         {widgetsOpen && (
           <>
+            {/* Dashboard type toggle */}
+            <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 py-4">
+              <label className="text-sm font-medium text-[var(--ink-2)]">Standaard dashboard</label>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => saveDashboardType('widgets')}
+                  disabled={dashTypeSaving}
+                  className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                    dashboardType === 'widgets'
+                      ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
+                      : 'border-[var(--border-md)] text-[var(--ink-2)] hover:bg-[var(--subtle)]'
+                  }`}
+                >
+                  Widgets
+                </button>
+                <button
+                  type="button"
+                  onClick={() => saveDashboardType('briefing')}
+                  disabled={dashTypeSaving}
+                  className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                    dashboardType === 'briefing'
+                      ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
+                      : 'border-[var(--border-md)] text-[var(--ink-2)] hover:bg-[var(--subtle)]'
+                  }`}
+                >
+                  AI Briefing
+                </button>
+              </div>
+              {dashboardType === 'briefing' && (
+                <p className="mt-2 text-xs text-[var(--ink-3)]">
+                  Widget-instellingen hieronder gelden alleen voor het widgets-dashboard.
+                </p>
+              )}
+            </div>
+
             <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 py-3">
               <p className="text-sm text-[var(--ink-3)]">
                 Kies welke widgets op jouw dashboard verschijnen en in welk formaat. Sleep rijen om de volgorde aan te passen.

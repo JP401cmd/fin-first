@@ -44,6 +44,71 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'fin_prod_0.80',
+    date: '2026-03-04',
+    title: 'Streaming AI briefing, dashboard-type switcher, briefing directives & nieuwe card types',
+    sections: [
+      {
+        module: 'DAIshboard — AI Briefing',
+        color: 'purple',
+        items: [
+          {
+            title: 'Streaming briefing compositie',
+            description:
+              'De AI briefing wordt nu via Server-Sent Events (SSE) gestreamd in plaats van in één keer opgehaald. Cards verschijnen één voor één terwijl Will componeert, wat een snellere en meer interactieve ervaring geeft. De skeleton loader is vervangen door een compacte composing-indicator.',
+          },
+          {
+            title: 'Nieuwe card types: Goal Progress & Budget Bar',
+            description:
+              'Twee nieuwe briefing card types: goalProgress toont doelvoortgang met mini-balk, deadline en on-track indicator. budgetBar toont een horizontale bar per budget met status (healthy/warning/over). Beide zijn beschikbaar als AI tools.',
+          },
+          {
+            title: 'Slimmere AI-compositie',
+            description:
+              'Het briefingsysteem heeft nu fase-specifieke card emphasis, temporele guidance per maandperiode, verplichte href-navigatie op alle cards, en layout constraints (geen dubbele metrics naast elkaar, altijd eindigen met action/insight). Vorige maand-uitgaven en netto-vermogensdelta worden meegegeven voor vergelijkingen.',
+          },
+          {
+            title: 'Briefing directives',
+            description:
+              'Nieuw admin-systeem voor redactionele en functionele briefing directives. Temporele directives activeren op specifieke periodes (bijv. belastingseizoen). Functionele directives sturen altijd mee. Beheerbaar via /beheer/briefing.',
+          },
+        ],
+      },
+      {
+        module: 'Platform — Dashboard Type',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Dashboard-type switcher',
+            description:
+              'Gebruikers kunnen kiezen tussen het widgets-dashboard en het AI briefing-dashboard als standaard. Instelbaar via Instellingen > Dashboard met een toggle. De keuze wordt opgeslagen in localStorage via een nieuwe DashboardTypeProvider.',
+          },
+          {
+            title: 'Snelle dashboard-wissel in header',
+            description:
+              'Wanneer je op het dashboard bent, verschijnt een klein icoon naast de Dashboard-tab om snel te wisselen naar het andere dashboard-type (Sparkles voor AI, LayoutGrid voor widgets).',
+          },
+        ],
+      },
+      {
+        module: 'Platform — Verbeteringen',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Card animatie-vereenvoudiging',
+            description:
+              'De stagger-delay animatie op briefing cards is verwijderd. Cards animeren nu direct bij verschijning, wat beter past bij de streaming aanpak waar cards sowieso met vertraging binnenkomen.',
+          },
+          {
+            title: 'Verbeterde card styling',
+            description:
+              'Diverse kleine verbeteringen: grotere pijl-iconen bij delta\'s en acties, line-clamp op alert berichten, verbeterde milestone progress bar met cubic-bezier easing, en module-kleuring op insight en milestone cards.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: 'fin_prod_0.79',
     date: '2026-03-03',
     title: 'Vermogensbalans, cash-as-asset, balance snapshots & grote refactoring',

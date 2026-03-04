@@ -6,20 +6,19 @@ import type { MilestoneCardSpec } from '@/lib/briefing/types'
 
 interface Props {
   spec: MilestoneCardSpec
-  delay: number
 }
 
-export function MilestoneCard({ spec, delay }: Props) {
+export function MilestoneCard({ spec }: Props) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1000 })
   const pct = Math.min(Math.max(spec.percentage, 0), 100)
 
   return (
-    <BriefingCard module="horizon" delay={delay}>
+    <BriefingCard module={spec.module ?? 'horizon'}>
       <div ref={ref}>
         <div className="flex items-baseline justify-between mb-2">
           <p className="text-sm font-semibold text-[var(--ink)]">{spec.label}</p>
           {spec.freedomStr && (
-            <p className="text-xs text-horizon-600">{spec.freedomStr}</p>
+            <p className="text-xs text-[var(--ink-3)]">{spec.freedomStr}</p>
           )}
         </div>
 
@@ -31,8 +30,11 @@ export function MilestoneCard({ spec, delay }: Props) {
         {/* Progress bar */}
         <div className="h-3 w-full rounded-full bg-[var(--subtle)] overflow-hidden">
           <div
-            className="h-full rounded-full bg-horizon-500 transition-all duration-1000 ease-out"
-            style={{ width: hasEntered ? `${pct}%` : '0%' }}
+            className="h-full rounded-full bg-horizon-500 transition-all duration-[800ms]"
+            style={{
+              width: hasEntered ? `${pct}%` : '0%',
+              transitionTimingFunction: 'cubic-bezier(.22,1,.36,1)',
+            }}
           />
         </div>
 

@@ -5,7 +5,6 @@ import type { InsightCardSpec } from '@/lib/briefing/types'
 
 interface Props {
   spec: InsightCardSpec
-  delay: number
 }
 
 const EMPHASIS_STYLES: Record<string, { border: string; bg: string; label: string }> = {
@@ -15,12 +14,12 @@ const EMPHASIS_STYLES: Record<string, { border: string; bg: string; label: strin
   tip: { border: 'border-l-2 border-l-amber-400', bg: 'bg-amber-50/30', label: 'Tip' },
 }
 
-export function InsightCard({ spec, delay }: Props) {
+export function InsightCard({ spec }: Props) {
   const emphasis = spec.emphasis ?? 'observation'
   const styles = EMPHASIS_STYLES[emphasis] ?? EMPHASIS_STYLES.observation
 
   return (
-    <BriefingCard module="wil" delay={delay}>
+    <BriefingCard module={spec.module ?? 'wil'}>
       <div className={`${styles.border} ${styles.bg} ${styles.border ? 'pl-3 py-1' : ''}`}>
         {styles.label && (
           <p className="label-editorial text-[var(--ink-4)] mb-1">{styles.label}</p>

@@ -6,7 +6,6 @@ import type { ProgressRingCardSpec } from '@/lib/briefing/types'
 
 interface Props {
   spec: ProgressRingCardSpec
-  delay: number
 }
 
 const SIZE = 80
@@ -14,7 +13,7 @@ const STROKE = 8
 const RADIUS = (SIZE - STROKE) / 2
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
-export function ProgressRingCard({ spec, delay }: Props) {
+export function ProgressRingCard({ spec }: Props) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1000 })
   const offset = CIRCUMFERENCE - (Math.min(spec.percentage, 100) / 100) * CIRCUMFERENCE
 
@@ -26,7 +25,7 @@ export function ProgressRingCard({ spec, delay }: Props) {
   }
 
   return (
-    <BriefingCard module={spec.module} href={spec.href} delay={delay}>
+    <BriefingCard module={spec.module} href={spec.href}>
       <div ref={ref} className="flex items-center gap-3">
         <svg width={SIZE} height={SIZE} className="shrink-0 -rotate-90">
           {/* Track */}

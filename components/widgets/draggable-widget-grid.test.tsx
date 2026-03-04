@@ -73,6 +73,8 @@ const mockData: DashboardData = {
   simFireCountdown: null,
   fireEndStrategy: 'deplete',
   fireEndAge: 90,
+  prevMonthExpenses: 0,
+  netWorthDelta: null,
   favoriteBudgets: [],
 }
 

@@ -3,13 +3,13 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bell, Lock } from 'lucide-react'
+import { Bell, Lock, Sparkles, LayoutGrid } from 'lucide-react'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
+import { useDashboardType } from '@/components/app/dashboard-type-provider'
 
-const allNavItems = [
-  { label: 'Dashboard', href: '/dashboard', color: 'zinc', requiresActivation: false },
+const staticNavItems = [
   { label: 'De Kern', href: '/core', color: 'amber', requiresActivation: false },
   { label: 'De Wil', href: '/will', color: 'teal', requiresActivation: true },
   { label: 'De Horizon', href: '/horizon', color: 'purple', requiresActivation: true },
@@ -36,6 +36,16 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
 
   const { needsActivation } = useFeatureAccess()
   const { unreadCount, openModal } = useNotifications()
+  const { dashboardType } = useDashboardType()
+
+  const dashboardHref = dashboardType === 'briefing' ? '/daishboard' : '/dashboard'
+  const altDashboardHref = dashboardType === 'briefing' ? '/dashboard' : '/daishboard'
+  const isDashboard = pathname === '/dashboard' || pathname === '/daishboard'
+
+  const navItems = [
+    { label: 'Dashboard', href: dashboardHref, color: 'zinc' as const, requiresActivation: false },
+    ...staticNavItems,
+  ]
 
   // Close dropdown on click outside or Escape
   useEffect(() => {
@@ -56,38 +66,50 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
     }
   }, [menuOpen])
 
-  // Always show all nav items in desktop nav for discoverability
-  const navItems = allNavItems
-
   return (
     <header className="sticky top-0 z-50 border-b-2 border-[var(--ink)] bg-[var(--paper)] shadow-[var(--s0)]">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
         <div className="flex items-center gap-8">
-          <Link href="/dashboard" className="font-display text-[28px] font-bold tracking-tight text-[var(--ink)]">
+          <Link href={dashboardHref} className="font-display text-[28px] font-bold tracking-tight text-[var(--ink)]">
             <span className="lowercase">t</span>ri<span className="lowercase">f</span>inity<span className="text-kern-500">.</span>
           </Link>
 
           <nav className="hidden items-center gap-1 md:flex">
             {navItems.map((item) => {
-              const isActive = pathname.startsWith(item.href)
+              const isItemDashboard = item.label === 'Dashboard'
+              const isActive = isItemDashboard ? isDashboard : pathname.startsWith(item.href)
               const isLocked = item.requiresActivation && needsActivation
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors border-b-3 ${
-                    isActive
-                      ? `${activeClasses[item.color]}`
-                      : isLocked
-                        ? 'text-[var(--ink-4)] border-transparent hover:text-[var(--ink-3)]'
-                        : `text-[var(--ink-3)] border-transparent ${hoverClasses[item.color]}`
-                  }`}
-                >
-                  <span className="flex items-center gap-1">
-                    {item.label}
-                    {isLocked && <Lock className="h-2.5 w-2.5 opacity-50" />}
-                  </span>
-                </Link>
+                <div key={item.label} className="flex items-center">
+                  <Link
+                    href={item.href}
+                    className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors border-b-3 ${
+                      isActive
+                        ? `${activeClasses[item.color]}`
+                        : isLocked
+                          ? 'text-[var(--ink-4)] border-transparent hover:text-[var(--ink-3)]'
+                          : `text-[var(--ink-3)] border-transparent ${hoverClasses[item.color]}`
+                    }`}
+                  >
+                    <span className="flex items-center gap-1">
+                      {item.label}
+                      {isLocked && <Lock className="h-2.5 w-2.5 opacity-50" />}
+                    </span>
+                  </Link>
+                  {isItemDashboard && isDashboard && (
+                    <Link
+                      href={altDashboardHref}
+                      className="ml-0.5 rounded-md p-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink)]"
+                      title={pathname === '/daishboard' ? 'Widgets dashboard' : 'AI Briefing'}
+                    >
+                      {pathname === '/daishboard' ? (
+                        <LayoutGrid className="h-3.5 w-3.5" />
+                      ) : (
+                        <Sparkles className="h-3.5 w-3.5" />
+                      )}
+                    </Link>
+                  )}
+                </div>
               )
             })}
           </nav>

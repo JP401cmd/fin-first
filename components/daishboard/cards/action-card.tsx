@@ -16,14 +16,13 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 
 interface Props {
   spec: ActionCardSpec
-  delay: number
 }
 
-export function ActionCard({ spec, delay }: Props) {
+export function ActionCard({ spec }: Props) {
   const Icon = ICON_MAP[spec.icon] ?? Zap
 
   return (
-    <BriefingCard module={spec.module} href={spec.href} delay={delay}>
+    <BriefingCard module={spec.module} href={spec.href}>
       <div className="flex items-start gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
           <Icon className="h-4 w-4 text-[var(--ink-3)]" />

@@ -5,12 +5,11 @@ import type { CountdownCardSpec } from '@/lib/briefing/types'
 
 interface Props {
   spec: CountdownCardSpec
-  delay: number
 }
 
-export function CountdownCard({ spec, delay }: Props) {
+export function CountdownCard({ spec }: Props) {
   return (
-    <BriefingCard module={spec.module} href={spec.href} delay={delay}>
+    <BriefingCard module={spec.module} href={spec.href}>
       <p className="label-editorial text-[var(--ink-3)] mb-1">{spec.label}</p>
       <div className="flex items-baseline gap-1">
         <span className="text-2xl font-bold font-mono tabular-nums text-[var(--ink)]">

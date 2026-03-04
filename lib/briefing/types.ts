@@ -81,6 +81,7 @@ export interface MilestoneCardSpec {
   percentage: number
   label: string
   freedomStr?: string
+  module?: CardModule
 }
 
 export type InsightEmphasis = 'greeting' | 'observation' | 'celebration' | 'tip'
@@ -89,6 +90,7 @@ export interface InsightCardSpec {
   type: 'insight'
   text: string
   emphasis?: InsightEmphasis
+  module?: CardModule
 }
 
 export interface ChecklistCardSpec {
@@ -117,6 +119,29 @@ export interface CountdownCardSpec {
   href?: string
 }
 
+export interface GoalProgressCardSpec {
+  type: 'goalProgress'
+  name: string
+  percentage: number
+  current: string
+  target: string
+  targetDate?: string
+  onTrack: boolean
+  module: CardModule
+  href?: string
+}
+
+export interface BudgetBarCardSpec {
+  type: 'budgetBar'
+  name: string
+  spent: string
+  limit: string
+  percentage: number
+  remainingDays?: number
+  status: 'healthy' | 'warning' | 'over'
+  href?: string
+}
+
 // ── Union Type ──────────────────────────────────────────────
 
 export type BriefingCardSpec =
@@ -130,6 +155,30 @@ export type BriefingCardSpec =
   | ChecklistCardSpec
   | ComparisonCardSpec
   | CountdownCardSpec
+  | GoalProgressCardSpec
+  | BudgetBarCardSpec
+
+// ── SSE Event Types ─────────────────────────────────────────
+
+export interface BriefingSSECardEvent {
+  type: 'card'
+  spec: BriefingCardSpec
+}
+
+export interface BriefingSSEDoneEvent {
+  type: 'done'
+  composedAt: string
+}
+
+export interface BriefingSSEErrorEvent {
+  type: 'error'
+  message: string
+}
+
+export type BriefingSSEEvent =
+  | BriefingSSECardEvent
+  | BriefingSSEDoneEvent
+  | BriefingSSEErrorEvent
 
 // ── API Types ───────────────────────────────────────────────
 
@@ -143,7 +192,7 @@ export interface BriefingComposeRequest {
 export interface BriefingComposeResponse {
   cards: BriefingCardSpec[]
   composedAt: string
-  source: 'ai' | 'fallback'
+  source: 'ai'
 }
 
 // ── Card Grid Sizing ────────────────────────────────────────
@@ -153,6 +202,8 @@ export const CARD_SPAN: Record<BriefingCardSpec['type'], number> = {
   progressRing: 1,
   countdown: 1,
   sparkline: 1,
+  goalProgress: 1,
+  budgetBar: 1,
   action: 2,
   alert: 2,
   checklist: 2,

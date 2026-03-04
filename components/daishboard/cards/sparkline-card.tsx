@@ -9,14 +9,13 @@ import type { DashboardData } from '@/components/widgets/widget-renderer'
 interface Props {
   spec: SparklineCardSpec
   data: DashboardData
-  delay: number
 }
 
 const W = 180
 const H = 48
 const PAD = { top: 4, bottom: 4, left: 0, right: 0 }
 
-export function SparklineCard({ spec, data, delay }: Props) {
+export function SparklineCard({ spec, data }: Props) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1000 })
 
   const history = data[spec.dataKey] ?? []
@@ -50,7 +49,7 @@ export function SparklineCard({ spec, data, delay }: Props) {
   const color = MODULE_COLOR[spec.module] ?? MODULE_COLOR.cross
 
   return (
-    <BriefingCard module={spec.module} delay={delay}>
+    <BriefingCard module={spec.module}>
       <p className="label-editorial text-[var(--ink-3)] mb-1">{spec.label}</p>
       <p className="text-base font-bold font-mono tabular-nums text-[var(--ink)] mb-2">{spec.value}</p>
       <div ref={ref}>

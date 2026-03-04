@@ -17,11 +17,9 @@ interface BriefingCardProps {
   onClick?: () => void
   children: ReactNode
   className?: string
-  /** Animation delay in ms for stagger */
-  delay?: number
 }
 
-export function BriefingCard({ module = 'cross', href, onClick, children, className = '', delay = 0 }: BriefingCardProps) {
+export function BriefingCard({ module = 'cross', href, onClick, children, className = '' }: BriefingCardProps) {
   const accent = MODULE_ACCENT[module] ?? MODULE_ACCENT.cross
   const isInteractive = !!(href ?? onClick)
 
@@ -29,9 +27,7 @@ export function BriefingCard({ module = 'cross', href, onClick, children, classN
   const interactiveClasses = isInteractive
     ? 'cursor-pointer hover:shadow-[var(--s1)] hover:-translate-y-px'
     : ''
-  const animClasses = 'animate-fade-up opacity-0'
-
-  const style = { animationDelay: `${delay}ms`, animationFillMode: 'forwards' as const }
+  const animClasses = 'animate-fade-up'
 
   const content = (
     <>
@@ -44,7 +40,7 @@ export function BriefingCard({ module = 'cross', href, onClick, children, classN
 
   if (href) {
     return (
-      <Link href={href} className={`block ${baseClasses} ${interactiveClasses} ${animClasses} ${className}`} style={style}>
+      <Link href={href} className={`block ${baseClasses} ${interactiveClasses} ${animClasses} ${className}`}>
         {content}
       </Link>
     )
@@ -52,14 +48,14 @@ export function BriefingCard({ module = 'cross', href, onClick, children, classN
 
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} className={`text-left w-full ${baseClasses} ${interactiveClasses} ${animClasses} ${className}`} style={style}>
+      <button type="button" onClick={onClick} className={`text-left w-full ${baseClasses} ${interactiveClasses} ${animClasses} ${className}`}>
         {content}
       </button>
     )
   }
 
   return (
-    <div className={`${baseClasses} ${animClasses} ${className}`} style={style}>
+    <div className={`${baseClasses} ${animClasses} ${className}`}>
       {content}
     </div>
   )

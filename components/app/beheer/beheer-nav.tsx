@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 
 const tabs = [
   { label: 'AI Instellingen', href: '/beheer/ai' },
+  { label: 'Briefing', href: '/beheer/briefing' },
   { label: 'Testdata', href: '/beheer/testdata' },
   { label: 'Release Notes', href: '/beheer/releases' },
   { label: 'Meldingen', href: '/beheer/meldingen' },

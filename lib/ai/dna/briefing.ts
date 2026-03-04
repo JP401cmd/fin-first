@@ -11,7 +11,12 @@ export function buildBriefingSystemPrompt(
   temporal: TemporalContext,
   phase: string,
   level: number,
+  directivesBlock?: string,
 ): string {
+  // Phase-specific card emphasis
+  const phaseEmphasis = getPhaseEmphasis(phase)
+  const temporalGuidance = getTemporalGuidance(temporal)
+
   return `Je bent Will, de financiele redacteur van TriFinity.
 
 == OPDRACHT ==
@@ -30,23 +35,35 @@ Kies bewust: wat is nu het belangrijkst voor deze gebruiker?
 - Gebruik GEEN vrije tekst buiten de tools
 - Alle bedragen boven 100 euro moeten een vrijheidstijd-equivalent tonen
 - module parameter is altijd "kern", "wil", "horizon", of "cross"
+- BELANGRIJK: Vul ALTIJD de href parameter in bij cards die een href ondersteunen. Elke card moet klikbaar zijn naar de relevante pagina.
+
+== NAVIGATIE HREFS ==
+Gebruik deze routes als href waarden:
+- Netto vermogen, assets → "/core/assets"
+- Budgetten, uitgaven → "/core/budgets"
+- Transacties, bankzaken → "/core/cash"
+- Schulden → "/core/debts"
+- Belasting, box 3 → "/core/belasting"
+- De Kern overzicht → "/core"
+- FIRE, vrijheid, projecties → "/horizon"
+- Doelen, acties → "/will"
+- Scenario's, simulaties → "/horizon"
+- Identiteit, profiel → "/identity"
+
+== LAYOUT CONSTRAINTS ==
+- Nooit twee metric-cards direct naast elkaar (wissel af met andere types)
+- Eindig met een action of insight card (call-to-action of slotobservatie)
+- Milestone altijd in het midden van de briefing, nooit als eerste of laatste
+- Wissel 1-kolom cards (metric, progressRing, countdown, goalProgress, budgetBar) af met 2-kolom cards
 
 == TEMPOREEL BEWUSTZIJN ==
 Vandaag: ${temporal.date}, dag ${temporal.dayOfMonth} van de maand, ${temporal.dayOfWeek}.
-- Dag 1-5: maand-terugblik, nieuw budget-overzicht
-- Dag 6-22: focus op acties, voortgang, groei
-- Dag 23-31: budget-druk, salaris countdown, maandafsluiting
-- Maart-April: belastingaangifte prominent
-- December: jaaroverzicht, feestdagen-budget
-- Januari: goede voornemens, jaarplanning
+${temporalGuidance}
 ${temporal.seasonalNotes.length > 0 ? `\nActueel: ${temporal.seasonalNotes.join('; ')}` : ''}
-
+${directivesBlock ? `\n${directivesBlock}\n` : ''}
 == FASE-BEWUST ==
 Gebruikersfase: ${phase} (sovereignty level ${level})
-- Recovery (-2 tot 0): schuld-alerts, budget-basics, positief momentum, kleine winsten vieren
-- Stability (1-2): budget-optimalisatie, spaarquote verbeteren, eerste mijlpalen
-- Momentum (3-4): FIRE countdown, scenariovergelijkingen, belasting-optimalisatie, groei
-- Mastery (5-6): passief inkomen, portfolio, withdrawal strategie, legacy planning
+${phaseEmphasis}
 
 == TOON ==
 - Nederlands, informeel (je/jij)
@@ -55,6 +72,63 @@ Gebruikersfase: ${phase} (sovereignty level ${level})
 - Concreet: altijd met een getal, nooit vaag advies
 - Warm maar feitelijk — als een wijze financiele partner
 - Geen emoji's`
+}
+
+function getPhaseEmphasis(phase: string): string {
+  switch (phase) {
+    case 'recovery':
+      return `Recovery: focus op alert, action, checklist cards.
+- Benadruk schuld-alerts, budget-basics, positief momentum
+- Vier kleine winsten (elke euro minder schuld = vrijheid teruggewonnen)
+- Gebruik showBudgetBar voor dagelijkse budgetbewaking
+- Vermijd FIRE/horizon cards — die zijn nu niet relevant`
+    case 'stability':
+      return `Stability: focus op progressRing, budgetBar, comparison cards.
+- Benadruk budget-optimalisatie, spaarquote verbeteren
+- Toon eerste mijlpalen (3m buffer, 6m buffer)
+- Gebruik showGoalProgress voor spaardoelen
+- Begin FIRE-bewustzijn te introduceren`
+    case 'momentum':
+      return `Momentum: focus op sparkline, milestone, goalProgress cards.
+- Benadruk FIRE countdown, scenariovergelijkingen
+- Toon groeitrends en vermogensopbouw
+- Gebruik showComparison voor maand-op-maand vooruitgang
+- Belasting-optimalisatie tips waar relevant`
+    case 'mastery':
+    default:
+      return `Mastery: focus op comparison, sparkline, insight cards.
+- Benadruk passief inkomen, portfolio-diversificatie
+- Toon backtesting resultaten en scenario's
+- Gebruik showMilestone voor FIRE-voortgang
+- Withdrawal strategie en legacy planning`
+  }
+}
+
+function getTemporalGuidance(temporal: TemporalContext): string {
+  const lines: string[] = []
+
+  if (temporal.dayOfMonth <= 5) {
+    lines.push('- Begin van de maand: start met een comparison-card (vorige vs huidige maand)')
+    lines.push('- Maand-terugblik, nieuw budget-overzicht')
+  } else if (temporal.dayOfMonth <= 22) {
+    lines.push('- Midden van de maand: focus op acties, voortgang, groei')
+    lines.push('- Toon budgetvoortgang en doelstatus')
+  } else {
+    lines.push('- Einde van de maand: budget-druk prominent, salaris countdown')
+    lines.push('- Gebruik showBudgetBar en showCountdown voor salaris')
+  }
+
+  if (temporal.month >= 3 && temporal.month <= 4) {
+    lines.push('- Belastingseizoen: belastingaangifte deadline en box3 inzicht prominent')
+  }
+  if (temporal.month === 12) {
+    lines.push('- December: jaaroverzicht-stijl, feestdagen-budget alert')
+  }
+  if (temporal.month === 1) {
+    lines.push('- Januari: goede voornemens, jaarplanning, schone lei')
+  }
+
+  return lines.join('\n')
 }
 
 // ── Tool Definitions ────────────────────────────────────────
@@ -128,6 +202,7 @@ export const briefingTools = {
       percentage: z.number().describe('Voortgang 0-100'),
       label: z.string().describe('Mijlpaal naam, bijv. "FIRE Doel"'),
       freedomStr: z.string().optional().describe('Vrijheidstijd equivalent'),
+      module: moduleEnum.optional().describe('Kleurmodule (default: horizon)'),
     }),
   }),
 
@@ -136,6 +211,7 @@ export const briefingTools = {
     inputSchema: z.object({
       text: z.string().describe('Inzicht tekst (max 2 zinnen, concreet, met getal)'),
       emphasis: z.enum(['greeting', 'observation', 'celebration', 'tip']).optional().describe('Type nadruk'),
+      module: moduleEnum.optional().describe('Kleurmodule (default: wil)'),
     }),
   }),
 
@@ -172,6 +248,33 @@ export const briefingTools = {
       sublabel: z.string().optional().describe('Extra context'),
       module: moduleEnum.describe('Kleurmodule'),
       href: z.string().optional().describe('Link'),
+    }),
+  }),
+
+  showGoalProgress: tool({
+    description: 'Toon doelvoortgang met mini-balk, deadline en on-track indicator.',
+    inputSchema: z.object({
+      name: z.string().describe('Doelnaam, bijv. "Noodfonds"'),
+      percentage: z.number().describe('Voortgang 0-100'),
+      current: z.string().describe('Huidig bedrag, bijv. "€ 3.200"'),
+      target: z.string().describe('Doelbedrag, bijv. "€ 5.000"'),
+      targetDate: z.string().optional().describe('Deadline, bijv. "dec 2026"'),
+      onTrack: z.boolean().describe('Is het doel op schema?'),
+      module: moduleEnum.describe('Kleurmodule (gebruik "wil")'),
+      href: z.string().optional().describe('Link naar doel'),
+    }),
+  }),
+
+  showBudgetBar: tool({
+    description: 'Toon een horizontale bar voor een specifiek budget met status.',
+    inputSchema: z.object({
+      name: z.string().describe('Budgetnaam, bijv. "Boodschappen"'),
+      spent: z.string().describe('Besteed bedrag, bijv. "€ 342"'),
+      limit: z.string().describe('Budgetlimiet, bijv. "€ 500"'),
+      percentage: z.number().describe('Percentage besteed 0-100+'),
+      remainingDays: z.number().optional().describe('Resterende dagen in de maand'),
+      status: z.enum(['healthy', 'warning', 'over']).describe('Budget status: healthy (<75%), warning (75-100%), over (>100%)'),
+      href: z.string().optional().describe('Link naar budget detail'),
     }),
   }),
 }

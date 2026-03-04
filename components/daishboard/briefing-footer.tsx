@@ -4,12 +4,12 @@ import { RefreshCw } from 'lucide-react'
 
 interface Props {
   composedAt: string
-  source: 'ai' | 'fallback'
+  source: 'ai'
   onRefresh?: () => void
   refreshing?: boolean
 }
 
-export function BriefingFooter({ composedAt, source, onRefresh, refreshing }: Props) {
+export function BriefingFooter({ composedAt, onRefresh, refreshing }: Props) {
   const time = new Date(composedAt)
   const timeStr = time.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
 
@@ -18,7 +18,6 @@ export function BriefingFooter({ composedAt, source, onRefresh, refreshing }: Pr
       <div className="flex items-center justify-center gap-3">
         <p className="text-[10px] text-[var(--ink-4)] tracking-wide">
           Samengesteld door Will &middot; {timeStr}
-          {source === 'fallback' && <span className="ml-1">(standaard)</span>}
         </p>
         {onRefresh && (
           <button

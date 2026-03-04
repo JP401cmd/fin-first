@@ -18,6 +18,7 @@ import { NotificationModal } from '@/components/app/notifications/notification-p
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
 import { PHASES } from '@/lib/feature-phases'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
+import { DashboardTypeProvider } from '@/components/app/dashboard-type-provider'
 import {
   generateAllColorVars,
   DEFAULT_MODULE_COLORS,
@@ -160,18 +161,20 @@ export default async function AppLayout({
             <ChatProvider>
               <NotificationProvider>
                 <ModuleColorProvider initialConfig={moduleColors} initialBudgetConfig={budgetColors} initialPhaseConfig={phaseColors} initialFontTheme={(profile?.typography_theme as FontTheme) ?? 'editorial'}>
-                  <div className="min-h-screen bg-[var(--bg)]" data-app-root style={allVars as React.CSSProperties}>
-                    <ChatLayoutWrapper>
-                      <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
-                      <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation}>
-                        <DailyExpenseProvider>
-                          <main className="pb-20 md:pb-0">{children}</main>
-                          <BottomNav />
-                        </DailyExpenseProvider>
-                      </FeatureAccessProvider>
-                    </ChatLayoutWrapper>
-                    <ChatPanel />
-                  </div>
+                  <DashboardTypeProvider>
+                    <div className="min-h-screen bg-[var(--bg)]" data-app-root style={allVars as React.CSSProperties}>
+                      <ChatLayoutWrapper>
+                        <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
+                        <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation}>
+                          <DailyExpenseProvider>
+                            <main className="pb-20 md:pb-0">{children}</main>
+                            <BottomNav />
+                          </DailyExpenseProvider>
+                        </FeatureAccessProvider>
+                      </ChatLayoutWrapper>
+                      <ChatPanel />
+                    </div>
+                  </DashboardTypeProvider>
                 </ModuleColorProvider>
                 <NotificationModal />
               </NotificationProvider>
