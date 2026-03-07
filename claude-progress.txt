@@ -1,3 +1,46 @@
+## Session 2026-03-07 - Features #338, #345, #348
+
+### Feature #338: Condense: aanbevelingen detail meegeven - PASSING
+- Replaced simple `Voorstellen: N` line with detailed AANBEVELINGEN section
+- Top 3 recommendations with title, category, and freedom days impact
+- Handles empty list gracefully
+
+### Feature #345: Nieuw card type: showQuote - PASSING
+- Added QuoteCardSpec interface to lib/briefing/types.ts
+- Added quote to BriefingCardSpec union and CARD_SPAN (2-col)
+- Added showQuote tool to lib/ai/dna/briefing.ts with zod schema
+- Created components/daishboard/cards/quote-card.tsx with serif italic typography
+- Registered in briefing-card-grid.tsx and compose/route.ts
+
+### Feature #348: Cache-invalidatie op basis van data-hash - PASSING
+- Created hashDashboardData() that hashes key metrics (netWorth, totalAssets, totalDebts, monthlyExpenses, monthlyIncome, budgetTotals, openActions, freedomPct)
+- Extended cache with CachedBriefing interface including dataHash field
+- readCache() now compares stored hash with current hash — invalidates on mismatch
+- Cache write includes dataHash for future comparisons
+
+### Current Status
+- 3 features completed this session (#338, #345, #348)
+- All type-checks pass (only pre-existing sparkline-card.tsx error)
+- Commit: e09a980
+
+## Session 2026-03-07 - Features #352, #354
+
+### Feature #352: Staggered card animaties bij streaming - PASSING
+- briefing-card-grid.tsx: Added CSS custom property `--stagger: ${i * 80}ms` per card wrapper div
+- globals.css: Added `animation-delay: var(--stagger, 0ms)` to `.animate-fade-up` class
+- Cards now appear with 80ms staggered delay, works for both streaming and cached briefings
+- Commit: 527bec9
+
+### Feature #354: BriefingComposingIndicator verrijken met context - PASSING
+- Added FinnAvatar (Will's teal avatar) above bouncing dots
+- Added rotating status messages every 2s: "Je data analyseren", "Trends bekijken", "Prioriteiten bepalen", "Briefing samenstellen"
+- Styled with wil-600 text color, wil-50 avatar background, consistent with BriefingHeader
+- Each message fades in with animate-fade-up via key remount
+- Commit: 527bec9
+
+### Current Status
+- 333/352 features passing (94.6%)
+
 ## Session 2026-03-07 - Features #333, #334
 
 ### Feature #333: Quarter-size widget visuele consistentie - PASSING
@@ -8612,3 +8655,53 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#328, #329, #330)
 - All type-checks pass cleanly
 - Commit: 2663490
+
+## Session 2026-03-07 - Features #340, #344, #336
+
+### Feature #340: Condense maandoverzicht, streaks, notificaties, badges - PASSING
+- Added MAANDOVERZICHT section with netWorthDelta, freedomDaysWon, savingsRate, budgetScore, prevMonthComparison
+- Added STREAKS section with active streaks (login/budget/action type, count, record)
+- Added MELDINGEN section with urgent notifications (max 3, critical/warning only)
+- Added BADGES section with earned/total count, latest badge, nearest badge progress
+- All sections handle undefined/empty data gracefully
+
+### Feature #344: Nieuw card type showStreak - PASSING
+- Added StreakCardSpec interface to lib/briefing/types.ts (type, label, count, unit, description, module)
+- Added streak to BriefingCardSpec union and CARD_SPAN (1-col)
+- Added showStreak tool to lib/ai/dna/briefing.ts with zod schema
+- Created components/daishboard/cards/streak-card.tsx with Flame icon, count display, description
+- Registered in briefing-card-grid.tsx and compose/route.ts
+
+### Feature #336: Condense noodfonds data - PASSING
+- Added NOODFONDS section to condenseDashboardData with currentAmount, targetAmount, monthsCovered, status
+- Includes vrijheidstijd-equivalent for current amount
+- Handles undefined emergencyFund gracefully
+
+### Current Status
+- 3 features completed this session (#340, #344, #336)
+- Zero TypeScript errors
+
+## Session 2026-03-07 - Features #337, #342, #339
+
+### Feature #337: Condense terugkerende transacties detail - PASSING
+- Replaced simple count with TERUGKERENDE KOSTEN section in condenseDashboardData
+- Top 5 recurring transactions with name, amount/mnd, category, freedom-time
+- Total recurring amount with freedom-time impact
+- Fallback to simple count when topRecurringTransactions empty
+
+### Feature #342: Nieuw card type showRecurring - PASSING
+- RecurringCardSpec interface in types.ts with items array
+- recurring: 2 in CARD_SPAN (2-column card)
+- showRecurring tool in briefingTools with zod schema
+- RecurringCard component with per-item amounts, freedom time, totals row
+- Registered in briefing-card-grid.tsx and compose/route.ts
+
+### Feature #339: Condense life events detail - PASSING
+- Replaced simple count with LEVENSGEBEURTENISSEN section
+- Per event: name, year, impact type, estimated amount, freedom-time
+- Fallback to simple count when topLifeEvents empty
+
+### Current Status
+- 3 features completed this session (#337, #342, #339)
+- All type-checks pass cleanly (pre-existing errors from other agents only)
+- Commits: b0a814f, b178db3
