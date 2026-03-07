@@ -281,7 +281,7 @@ export default function InstellingenPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const [notifData, profileData, assetsResult, debtsResult, txResult] = await Promise.all([
+      const [notifData, profileData, assetsResult, debtsResult, txResult, briefingPrefsData] = await Promise.all([
         supabase.from('app_settings').select('value').eq('key', `notifications_preferences_${user.id}`).maybeSingle(),
         supabase.from('profiles').select(
           'widget_prefs, expected_return, inflation_rate, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, module_colors, budget_colors, phase_colors, typography_theme'
@@ -291,6 +291,7 @@ export default function InstellingenPage() {
         supabase.from('transactions').select('amount')
           .gte('date', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0])
           .lt('date', new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().split('T')[0]),
+        supabase.from('app_settings').select('value').eq('key', `briefing_preferences_${user.id}`).maybeSingle(),
       ])
 
       // Notificaties
@@ -302,8 +303,19 @@ export default function InstellingenPage() {
       }
       setNotifLoading(false)
 
-      // Briefing content preferences (localStorage)
-      setBriefingContentPrefs(readBriefingContentPrefs())
+      // Briefing content preferences (DB → localStorage fallback)
+      if (briefingPrefsData.data?.value) {
+        try {
+          const parsed = JSON.parse(briefingPrefsData.data.value) as BriefingContentPrefs
+          const merged = { showNextSteps: parsed.showNextSteps !== false, showDiscover: parsed.showDiscover !== false }
+          setBriefingContentPrefs(merged)
+          saveBriefingContentPrefs(merged) // sync to localStorage
+        } catch {
+          setBriefingContentPrefs(readBriefingContentPrefs())
+        }
+      } else {
+        setBriefingContentPrefs(readBriefingContentPrefs())
+      }
 
       // FIRE parameters
       const d = profileData.data
@@ -444,10 +456,19 @@ export default function InstellingenPage() {
     setDashTypeSaving(false)
   }, [setDashboardType])
 
-  const toggleBriefingContentPref = useCallback((key: keyof BriefingContentPrefs) => {
+  const toggleBriefingContentPref = useCallback(async (key: keyof BriefingContentPrefs) => {
     setBriefingContentPrefs(prev => {
       const updated = { ...prev, [key]: !prev[key] }
       saveBriefingContentPrefs(updated)
+      // Persist to app_settings (fire-and-forget)
+      const sb = createClient()
+      sb.auth.getUser().then(({ data: { user: u } }) => {
+        if (!u) return
+        sb.from('app_settings').upsert(
+          { key: `briefing_preferences_${u.id}`, value: JSON.stringify(updated) },
+          { onConflict: 'key' },
+        )
+      })
       return updated
     })
   }, [])
@@ -756,45 +777,47 @@ export default function InstellingenPage() {
                     Widget-instellingen hieronder gelden alleen voor het widgets-dashboard.
                   </p>
 
-                  <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3 space-y-3">
+                  <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3 sm:p-4 space-y-1">
                     <p className="text-xs font-medium text-[var(--ink-2)]">Briefing-inhoud</p>
 
-                    <label className="flex items-center justify-between gap-3 min-h-[44px] cursor-pointer">
-                      <div>
-                        <span className="text-sm text-[var(--ink)]">Volgende stappen tonen</span>
-                        <p className="text-xs text-[var(--ink-3)]">Will toont relevante volgende stappen in je DAIshboard</p>
+                    <label className="flex items-center justify-between gap-4 min-h-[44px] py-2 cursor-pointer">
+                      <div className="min-w-0">
+                        <span className="text-sm font-medium text-[var(--ink)]">Volgende stappen tonen</span>
+                        <p className="text-xs text-zinc-500">Will toont relevante volgende stappen in je DAIshboard</p>
                       </div>
                       <button
                         type="button"
                         role="switch"
                         aria-checked={briefingContentPrefs.showNextSteps}
+                        aria-label="Volgende stappen tonen"
                         onClick={() => toggleBriefingContentPref('showNextSteps')}
-                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                        className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors touch-manipulation ${
                           briefingContentPrefs.showNextSteps ? 'bg-[var(--ink)]' : 'bg-[var(--border-md)]'
                         }`}
                       >
-                        <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
-                          briefingContentPrefs.showNextSteps ? 'translate-x-6' : 'translate-x-1'
+                        <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                          briefingContentPrefs.showNextSteps ? 'translate-x-[22px]' : 'translate-x-[3px]'
                         }`} />
                       </button>
                     </label>
 
-                    <label className="flex items-center justify-between gap-3 min-h-[44px] cursor-pointer">
-                      <div>
-                        <span className="text-sm text-[var(--ink)]">Ontdek-suggesties tonen</span>
-                        <p className="text-xs text-[var(--ink-3)]">Will toont tips over features die je nog niet hebt ontdekt</p>
+                    <label className="flex items-center justify-between gap-4 min-h-[44px] py-2 cursor-pointer">
+                      <div className="min-w-0">
+                        <span className="text-sm font-medium text-[var(--ink)]">Ontdek-suggesties tonen</span>
+                        <p className="text-xs text-zinc-500">Will toont tips over features die je nog niet hebt ontdekt</p>
                       </div>
                       <button
                         type="button"
                         role="switch"
                         aria-checked={briefingContentPrefs.showDiscover}
+                        aria-label="Ontdek-suggesties tonen"
                         onClick={() => toggleBriefingContentPref('showDiscover')}
-                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                        className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors touch-manipulation ${
                           briefingContentPrefs.showDiscover ? 'bg-[var(--ink)]' : 'bg-[var(--border-md)]'
                         }`}
                       >
-                        <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
-                          briefingContentPrefs.showDiscover ? 'translate-x-6' : 'translate-x-1'
+                        <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                          briefingContentPrefs.showDiscover ? 'translate-x-[22px]' : 'translate-x-[3px]'
                         }`} />
                       </button>
                     </label>
