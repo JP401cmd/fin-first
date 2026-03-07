@@ -72,7 +72,7 @@ const GOAL_OPTIONS: CardOption<MainGoal>[] = [
   { id: 'overzicht', label: 'Financieel overzicht', description: 'Grip op mijn inkomsten en uitgaven', icon: BarChart3 },
   { id: 'schulden', label: 'Schulden afbetalen', description: 'Mijn schulden zo snel mogelijk aflossen', icon: CreditCard },
   { id: 'vermogen', label: 'Vermogen opbouwen', description: 'Sparen en investeren voor de toekomst', icon: TrendingUp },
-  { id: 'fire', label: 'FIRE bereiken', description: 'Financieel onafhankelijk worden', icon: Flame },
+  { id: 'fire', label: 'Financiële vrijheid', description: 'Niet meer hoeven werken voor geld', icon: Flame },
 ]
 
 const ACTIVITY_OPTIONS: CardOption<ActivityLevel>[] = [
@@ -84,7 +84,7 @@ const ACTIVITY_OPTIONS: CardOption<ActivityLevel>[] = [
 const MODULE_OPTIONS: CardOption<ModuleInterest>[] = [
   { id: 'kern', label: 'De Kern', description: 'Vermogen, budgetten, schulden, kas', icon: Shield },
   { id: 'wil', label: 'De Wil', description: 'Acties, doelen, aanbevelingen', icon: Zap },
-  { id: 'horizon', label: 'De Horizon', description: 'FIRE, simulaties, scenario\'s', icon: Telescope },
+  { id: 'horizon', label: 'De Horizon', description: 'Vrijheidsprojecties, simulaties, scenario\'s', icon: Telescope },
 ]
 
 const AI_OPTIONS: CardOption<'ja' | 'nee'>[] = [
@@ -96,17 +96,17 @@ const DASHBOARD_OPTIONS: CardOption<DashboardCategory>[] = [
   { id: 'vermogen', label: 'Vermogen', description: 'Netto vermogen en bezittingen', icon: PiggyBank },
   { id: 'budgetten', label: 'Budgetten', description: 'Budgetten en uitgaven', icon: Wallet },
   { id: 'doelen', label: 'Doelen', description: 'Financiele doelen en voortgang', icon: Target },
-  { id: 'fire', label: 'FIRE', description: 'FIRE-prognose en scenario\'s', icon: Flame },
+  { id: 'fire', label: 'Vrijheidsprognose', description: 'Wanneer bereik je financiële vrijheid?', icon: Flame },
   { id: 'beleggingen', label: 'Beleggingen', description: 'Portefeuille en rendement', icon: LineChart },
   { id: 'voortgang', label: 'Voortgang', description: 'Badges, streaks en niveau', icon: Award },
 ]
 
 const SPEECH_BUBBLES: Record<number, string> = {
-  0: 'Wat is het belangrijkste doel voor jou? Zo kan ik je dashboard afstemmen op wat jij nodig hebt.',
-  1: 'Hoe vaak wil je je financien bekijken? Dit bepaalt welke meldingen en overzichten je ziet.',
-  2: 'TriFinity heeft drie modules. Kies welke je interessant vindt — je kunt dit later altijd aanpassen.',
-  3: 'Ik kan je persoonlijke inzichten geven op basis van je data. Wil je dat?',
-  4: 'Tot slot: welke onderwerpen wil je op je dashboard zien? Kies er zoveel als je wilt.',
+  0: 'Iedereen heeft een ander startpunt en een andere bestemming. Wat is het belangrijkste doel voor jou op dit moment? Zo stem ik je dashboard af op wat jij écht nodig hebt.',
+  1: 'Sommige mensen checken dagelijks hun voortgang, anderen doen het één keer per maand. Wat past bij jou? Dit bepaalt hoe vaak je updates en samenvattingen krijgt.',
+  2: 'Er zijn drie perspectieven op je financiën: je fundament, je keuzes, en je toekomst. Kies welke je het meest aanspreken — je kunt dit later altijd aanpassen.',
+  3: 'Ik kan je persoonlijke tips en patronen laten zien op basis van je gegevens. Handig als je wilt leren van je eigen financiële gedrag. Geen zorgen: je data blijft privé.',
+  4: 'Bijna klaar! Welke onderwerpen wil je op je startscherm zien? Kies er zoveel als je wilt — je kunt dit later altijd wijzigen in je instellingen.',
 }
 
 // ── Preference → Widget mapping ──────────────────────────────
@@ -378,7 +378,7 @@ export function OnboardingPreferences({
         ))}
       </div>
 
-      {/* Finn speech bubble */}
+      {/* Will speech bubble */}
       <div className="mb-6 flex items-start gap-3">
         <div className="shrink-0"><FinnAvatar size={48} /></div>
         <SpeechBubble>

@@ -167,7 +167,7 @@ export function OnboardingIdentity({
   const inputErrorClass = (field: FieldKey) =>
     showError(field)
       ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
-      : 'border-zinc-300 focus:border-zinc-500 focus:ring-zinc-500'
+      : 'border-[var(--border-ed)] focus:border-[var(--border-md)] focus:ring-[var(--border-md)]'
 
   const effectiveSwr = Math.max(0.001, data.expected_return - BOX3_DRAG - data.inflation_rate)
 
@@ -202,7 +202,7 @@ export function OnboardingIdentity({
     <div className="pb-20 sm:pb-0">
       <button
         onClick={onBack}
-        className="mb-6 flex min-h-[44px] items-center gap-1 text-sm text-zinc-500 hover:text-zinc-900 active:text-zinc-900 transition-colors"
+        className="mb-6 flex min-h-[44px] items-center gap-1 text-sm text-[var(--ink-3)] hover:text-[var(--ink)] active:text-[var(--ink)] transition-colors"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -214,13 +214,13 @@ export function OnboardingIdentity({
         <StepProgress current="profiel" />
       </div>
 
-      {/* FINN question */}
+      {/* Will question */}
       <div className="mb-6 flex items-start gap-3">
         <div className="shrink-0"><FinnAvatar size={48} /></div>
-        <SpeechBubble>Laten we beginnen met de basis. Wie ben je en wat verdien je?</SpeechBubble>
+        <SpeechBubble>Om je pad naar vrijheid te berekenen, moet ik je eerst leren kennen. Je inkomen bepaalt hoeveel vrijheidstijd je elke maand opbouwt &mdash; en je leeftijd helpt me inschatten hoeveel tijd er nog voor je ligt.</SpeechBubble>
       </div>
 
-      <div className="space-y-5 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
+      <div className="space-y-5 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
         {submitted && !isValid && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3" role="alert">
             <p className="text-sm font-medium text-red-700">
@@ -231,7 +231,7 @@ export function OnboardingIdentity({
 
         {/* Full name */}
         <div>
-          <label htmlFor="ob-name" className="mb-1.5 block text-sm font-medium text-zinc-700">
+          <label htmlFor="ob-name" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
             Volledige naam <span className="text-red-400">*</span>
           </label>
           <input
@@ -243,7 +243,7 @@ export function OnboardingIdentity({
             placeholder="Je naam"
             aria-invalid={!!showError('full_name')}
             aria-describedby={showError('full_name') ? 'ob-name-error' : undefined}
-            className={`w-full rounded-lg bg-zinc-50 px-3 py-2.5 text-base text-zinc-900 outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('full_name')}`}
+            className={`w-full rounded-lg bg-[var(--subtle)]px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('full_name')}`}
           />
           {showError('full_name') && (
             <p id="ob-name-error" className="mt-1 text-xs text-red-500" role="alert">{showError('full_name')}</p>
@@ -252,7 +252,7 @@ export function OnboardingIdentity({
 
         {/* Date of birth */}
         <div>
-          <label htmlFor="ob-dob" className="mb-1.5 block text-sm font-medium text-zinc-700">
+          <label htmlFor="ob-dob" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
             Geboortedatum <span className="text-red-400">*</span>
           </label>
           <input
@@ -263,7 +263,7 @@ export function OnboardingIdentity({
             onBlur={() => markTouched('date_of_birth')}
             aria-invalid={!!showError('date_of_birth')}
             aria-describedby={showError('date_of_birth') ? 'ob-dob-error' : undefined}
-            className={`w-full rounded-lg bg-zinc-50 px-3 py-2.5 text-base text-zinc-900 outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('date_of_birth')}`}
+            className={`w-full rounded-lg bg-[var(--subtle)]px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('date_of_birth')}`}
           />
           {showError('date_of_birth') && (
             <p id="ob-dob-error" className="mt-1 text-xs text-red-500" role="alert">{showError('date_of_birth')}</p>
@@ -272,7 +272,7 @@ export function OnboardingIdentity({
 
         {/* Household type — large clickable cards */}
         <div>
-          <span className="mb-2 block text-sm font-medium text-zinc-700">
+          <span className="mb-2 block text-sm font-medium text-[var(--ink-2)]">
             Huishouden <span className="text-red-400">*</span>
           </span>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -290,17 +290,17 @@ export function OnboardingIdentity({
                   className={`flex min-h-[56px] items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-all active:scale-[0.98] ${
                     isSelected
                       ? 'border-wil-500 bg-wil-50 shadow-sm'
-                      : 'border-zinc-200 bg-zinc-50 hover:border-zinc-300 hover:bg-zinc-100'
+                      : 'border-[var(--border-ed)] bg-[var(--subtle)] hover:border-[var(--border-md)] hover:bg-[var(--paper)]'
                   }`}
                 >
                   <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-                    isSelected ? 'bg-wil-100 text-wil-600' : 'bg-zinc-200 text-zinc-500'
+                    isSelected ? 'bg-wil-100 text-wil-600' : 'bg-[var(--border-ed)] text-[var(--ink-3)]'
                   }`}>
                     <Icon className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className={`text-sm font-semibold ${isSelected ? 'text-wil-700' : 'text-zinc-700'}`}>{label}</p>
-                    <p className={`text-xs ${isSelected ? 'text-wil-600' : 'text-zinc-500'}`}>{desc}</p>
+                    <p className={`text-sm font-semibold ${isSelected ? 'text-wil-700' : 'text-[var(--ink-2)]'}`}>{label}</p>
+                    <p className={`text-xs ${isSelected ? 'text-wil-600' : 'text-[var(--ink-3)]'}`}>{desc}</p>
                   </div>
                 </button>
               )
@@ -311,7 +311,7 @@ export function OnboardingIdentity({
         {/* Number of children (if gezin) */}
         {data.household_type === 'gezin' && (
           <div>
-            <label htmlFor="ob-children" className="mb-1.5 block text-sm font-medium text-zinc-700">Aantal kinderen</label>
+            <label htmlFor="ob-children" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">Aantal kinderen</label>
             <input
               id="ob-children"
               type="number"
@@ -322,7 +322,7 @@ export function OnboardingIdentity({
               onBlur={() => markTouched('number_of_children')}
               aria-invalid={!!showError('number_of_children')}
               aria-describedby={showError('number_of_children') ? 'ob-children-error' : undefined}
-              className={`w-full sm:w-24 min-h-[44px] rounded-lg bg-zinc-50 px-3 py-2.5 text-base text-zinc-900 outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('number_of_children')}`}
+              className={`w-full sm:w-24 min-h-[44px] rounded-lg bg-[var(--subtle)]px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('number_of_children')}`}
             />
             {showError('number_of_children') && (
               <p id="ob-children-error" className="mt-1 text-xs text-red-500" role="alert">{showError('number_of_children')}</p>
@@ -332,11 +332,11 @@ export function OnboardingIdentity({
 
         {/* Net monthly income */}
         <div>
-          <label htmlFor="ob-income" className="mb-1.5 block text-sm font-medium text-zinc-700">
+          <label htmlFor="ob-income" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
             Netto maandinkomen <span className="text-red-400">*</span>
           </label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">&euro;</span>
             <input
               id="ob-income"
               type="text"
@@ -351,13 +351,13 @@ export function OnboardingIdentity({
               autoComplete="off"
               aria-invalid={!!showError('net_monthly_income')}
               aria-describedby={showError('net_monthly_income') ? 'ob-income-error' : 'ob-income-hint'}
-              className={`w-full rounded-lg bg-zinc-50 py-2.5 pr-3 pl-7 text-base text-zinc-900 outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('net_monthly_income')}`}
+              className={`w-full rounded-lg bg-[var(--subtle)]py-2.5 pr-3 pl-7 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('net_monthly_income')}`}
             />
           </div>
           {showError('net_monthly_income') ? (
             <p id="ob-income-error" className="mt-1 text-xs text-red-500" role="alert">{showError('net_monthly_income')}</p>
           ) : (
-            <p id="ob-income-hint" className="mt-1 text-xs text-zinc-400">Huishouden netto-inkomen (samen als je samenwoont).</p>
+            <p id="ob-income-hint" className="mt-1 text-xs text-[var(--ink-4)]">Huishouden netto-inkomen (samen als je samenwoont).</p>
           )}
         </div>
       </div>
@@ -366,22 +366,22 @@ export function OnboardingIdentity({
       <div className="mt-6 mb-6 flex items-start gap-3">
         <div className="shrink-0"><FinnAvatar size={40} /></div>
         <SpeechBubble>
-          Deze instellingen bepalen hoe we je pad naar financiele vrijheid berekenen. De standaardwaarden zijn goed voor de meeste mensen.
+          Hoe wil je dat we je financiële toekomst berekenen? De standaardinstellingen werken voor de meeste mensen &mdash; je kunt dit later altijd finetunen in je instellingen.
         </SpeechBubble>
       </div>
 
-      <div className="space-y-5 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
+      <div className="space-y-5 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-zinc-800">FIRE Instellingen</h3>
-          <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-500">optioneel</span>
+          <h3 className="font-display text-sm font-semibold tracking-[-0.02em] text-[var(--ink)]">Vrijheidsberekening</h3>
+          <span className="rounded-full bg-[var(--subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink-3)]">optioneel</span>
         </div>
 
         {/* Expected return slider: 3-12%, step 0.5%, default 7% */}
         <div>
           <div className="mb-2 flex items-center gap-2">
-            <label htmlFor="ob-return" className="text-sm font-medium text-zinc-700">Verwacht rendement</label>
+            <label htmlFor="ob-return" className="text-sm font-medium text-[var(--ink-2)]">Verwacht rendement</label>
             <div className="group relative">
-              <Info className="h-3.5 w-3.5 text-zinc-400 cursor-help" />
+              <Info className="h-3.5 w-3.5 text-[var(--ink-4)] cursor-help" />
               <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 w-52 -translate-x-1/2 rounded-lg bg-zinc-800 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
                 Gemiddeld jaarlijks rendement op je beleggingen voor belasting en inflatie.
               </div>
@@ -403,7 +403,7 @@ export function OnboardingIdentity({
               {formatPct(data.expected_return)}
             </span>
           </div>
-          <div className="mt-1 flex justify-between text-[10px] text-zinc-400">
+          <div className="mt-1 flex justify-between text-[10px] text-[var(--ink-4)]">
             <span>3%</span>
             <span>12%</span>
           </div>
@@ -412,9 +412,9 @@ export function OnboardingIdentity({
         {/* Inflation slider: 0-5%, step 0.5%, default 2% */}
         <div>
           <div className="mb-2 flex items-center gap-2">
-            <label htmlFor="ob-inflation" className="text-sm font-medium text-zinc-700">Inflatie</label>
+            <label htmlFor="ob-inflation" className="text-sm font-medium text-[var(--ink-2)]">Inflatie</label>
             <div className="group relative">
-              <Info className="h-3.5 w-3.5 text-zinc-400 cursor-help" />
+              <Info className="h-3.5 w-3.5 text-[var(--ink-4)] cursor-help" />
               <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 w-52 -translate-x-1/2 rounded-lg bg-zinc-800 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
                 Verwachte jaarlijkse stijging van je levenskosten.
               </div>
@@ -432,11 +432,11 @@ export function OnboardingIdentity({
               className="slider-touch slider-touch--neutral min-w-0 flex-1"
               style={{ background: `linear-gradient(to right, #52525b ${((data.inflation_rate - 0) / (0.05 - 0)) * 100}%, #e4e4e7 ${((data.inflation_rate - 0) / (0.05 - 0)) * 100}%)` }}
             />
-            <span className="w-14 shrink-0 rounded-md bg-zinc-100 px-2 py-1 text-center font-mono text-sm font-semibold tabular-nums text-zinc-700">
+            <span className="w-14 shrink-0 rounded-md bg-[var(--subtle)] px-2 py-1 text-center font-mono text-sm font-semibold tabular-nums text-[var(--ink-2)]">
               {formatPct(data.inflation_rate)}
             </span>
           </div>
-          <div className="mt-1 flex justify-between text-[10px] text-zinc-400">
+          <div className="mt-1 flex justify-between text-[10px] text-[var(--ink-4)]">
             <span>0%</span>
             <span>5%</span>
           </div>
@@ -445,16 +445,16 @@ export function OnboardingIdentity({
         {/* Effective SWR info badge */}
         <div className="flex items-center gap-2 rounded-lg border border-wil-200 bg-wil-50/50 px-3 py-2">
           <Info className="h-4 w-4 shrink-0 text-wil-500" />
-          <p className="text-xs text-zinc-600">
-            Effectieve opnamerate:{' '}
+          <p className="text-xs text-[var(--ink-2)]">
+            Wat je vermogen netto per jaar groeit:{' '}
             <span className="font-mono font-semibold text-wil-700">{formatPct(effectiveSwr)}</span>
-            <span className="text-zinc-400"> = rendement - box3 - inflatie</span>
+            <span className="text-[var(--ink-4)]"> = rendement − belasting − inflatie</span>
           </p>
         </div>
 
         {/* Retirement expense method — 3 choice cards */}
         <div>
-          <span className="mb-2 block text-sm font-medium text-zinc-700">Pensioenuitgaven methode</span>
+          <span className="mb-2 block text-sm font-medium text-[var(--ink-2)]">Pensioenuitgaven methode</span>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {RETIREMENT_METHODS.map(({ value, label, desc }) => {
               const isSelected = data.retirement_expense_method === value
@@ -466,11 +466,11 @@ export function OnboardingIdentity({
                   className={`min-h-[56px] rounded-xl border-2 px-4 py-3 text-left transition-all active:scale-[0.98] ${
                     isSelected
                       ? 'border-wil-500 bg-wil-50 shadow-sm'
-                      : 'border-zinc-200 bg-zinc-50 hover:border-zinc-300 hover:bg-zinc-100'
+                      : 'border-[var(--border-ed)] bg-[var(--subtle)] hover:border-[var(--border-md)] hover:bg-[var(--paper)]'
                   }`}
                 >
-                  <p className={`text-sm font-semibold ${isSelected ? 'text-wil-700' : 'text-zinc-700'}`}>{label}</p>
-                  <p className={`text-xs ${isSelected ? 'text-wil-600' : 'text-zinc-500'}`}>{desc}</p>
+                  <p className={`text-sm font-semibold ${isSelected ? 'text-wil-700' : 'text-[var(--ink-2)]'}`}>{label}</p>
+                  <p className={`text-xs ${isSelected ? 'text-wil-600' : 'text-[var(--ink-3)]'}`}>{desc}</p>
                 </button>
               )
             })}
@@ -478,11 +478,11 @@ export function OnboardingIdentity({
           {/* Custom amount input when method is 'vast bedrag' */}
           {data.retirement_expense_method === 'custom_amount' && (
             <div className="mt-3">
-              <label htmlFor="ob-custom-amount" className="mb-1.5 block text-sm font-medium text-zinc-700">
+              <label htmlFor="ob-custom-amount" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                 Jaarbedrag na pensioen <span className="text-red-400">*</span>
               </label>
               <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">&euro;</span>
                 <input
                   id="ob-custom-amount"
                   type="text"
@@ -497,10 +497,10 @@ export function OnboardingIdentity({
                   autoComplete="off"
                   aria-invalid={!!showError('retirement_custom_amount')}
                   aria-describedby={showError('retirement_custom_amount') ? 'ob-custom-amount-error' : undefined}
-                  className={`w-full min-h-[44px] rounded-lg bg-zinc-50 py-2.5 pr-3 pl-8 text-base text-zinc-900 outline-none border focus:ring-1 sm:text-sm ${
+                  className={`w-full min-h-[44px] rounded-lg bg-[var(--subtle)]py-2.5 pr-3 pl-8 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${
                     showError('retirement_custom_amount')
                       ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
-                      : 'border-zinc-300 focus:border-zinc-500 focus:ring-zinc-500'
+                      : 'border-[var(--border-ed)] focus:border-[var(--border-md)] focus:ring-[var(--border-md)]'
                   }`}
                 />
               </div>
@@ -513,7 +513,7 @@ export function OnboardingIdentity({
 
         {/* FIRE end strategy — 3 choice cards */}
         <div>
-          <span className="mb-2 block text-sm font-medium text-zinc-700">FIRE eindstrategie</span>
+          <span className="mb-2 block text-sm font-medium text-[var(--ink-2)]">Vermogensstrategie op einddatum</span>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {FIRE_STRATEGIES.map(({ value, label, desc }) => {
               const isSelected = data.fire_end_strategy === value
@@ -525,11 +525,11 @@ export function OnboardingIdentity({
                   className={`min-h-[56px] rounded-xl border-2 px-4 py-3 text-left transition-all active:scale-[0.98] ${
                     isSelected
                       ? 'border-wil-500 bg-wil-50 shadow-sm'
-                      : 'border-zinc-200 bg-zinc-50 hover:border-zinc-300 hover:bg-zinc-100'
+                      : 'border-[var(--border-ed)] bg-[var(--subtle)] hover:border-[var(--border-md)] hover:bg-[var(--paper)]'
                   }`}
                 >
-                  <p className={`text-sm font-semibold ${isSelected ? 'text-wil-700' : 'text-zinc-700'}`}>{label}</p>
-                  <p className={`text-xs ${isSelected ? 'text-wil-600' : 'text-zinc-500'}`}>{desc}</p>
+                  <p className={`text-sm font-semibold ${isSelected ? 'text-wil-700' : 'text-[var(--ink-2)]'}`}>{label}</p>
+                  <p className={`text-xs ${isSelected ? 'text-wil-600' : 'text-[var(--ink-3)]'}`}>{desc}</p>
                 </button>
               )
             })}
@@ -538,11 +538,11 @@ export function OnboardingIdentity({
           {/* Legacy amount input when strategy is 'nalatenschap' */}
           {data.fire_end_strategy === 'legacy' && (
             <div className="mt-3">
-              <label htmlFor="ob-legacy-amount" className="mb-1.5 block text-sm font-medium text-zinc-700">
+              <label htmlFor="ob-legacy-amount" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                 Gewenst nalatenschap-bedrag <span className="text-red-400">*</span>
               </label>
               <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">&euro;</span>
                 <input
                   id="ob-legacy-amount"
                   type="text"
@@ -557,17 +557,17 @@ export function OnboardingIdentity({
                   autoComplete="off"
                   aria-invalid={!!showError('fire_legacy_amount')}
                   aria-describedby={showError('fire_legacy_amount') ? 'ob-legacy-amount-error' : 'ob-legacy-amount-hint'}
-                  className={`w-full min-h-[44px] rounded-lg bg-zinc-50 py-2.5 pr-3 pl-8 text-base text-zinc-900 outline-none border focus:ring-1 sm:text-sm ${
+                  className={`w-full min-h-[44px] rounded-lg bg-[var(--subtle)]py-2.5 pr-3 pl-8 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${
                     showError('fire_legacy_amount')
                       ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
-                      : 'border-zinc-300 focus:border-zinc-500 focus:ring-zinc-500'
+                      : 'border-[var(--border-ed)] focus:border-[var(--border-md)] focus:ring-[var(--border-md)]'
                   }`}
                 />
               </div>
               {showError('fire_legacy_amount') ? (
                 <p id="ob-legacy-amount-error" className="mt-1 text-xs text-red-500" role="alert">{showError('fire_legacy_amount')}</p>
               ) : (
-                <p id="ob-legacy-amount-hint" className="mt-1 text-xs text-zinc-400">Het bedrag dat je wilt nalaten aan het einde van je leven.</p>
+                <p id="ob-legacy-amount-hint" className="mt-1 text-xs text-[var(--ink-4)]">Het bedrag dat je wilt nalaten aan het einde van je leven.</p>
               )}
             </div>
           )}
@@ -575,7 +575,7 @@ export function OnboardingIdentity({
           {/* End age input when strategy is 'opteren' */}
           {data.fire_end_strategy === 'deplete' && (
             <div className="mt-3">
-              <label htmlFor="ob-end-age" className="mb-1.5 block text-sm font-medium text-zinc-700">
+              <label htmlFor="ob-end-age" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                 Eind-leeftijd <span className="text-red-400">*</span>
               </label>
               <input
@@ -590,16 +590,16 @@ export function OnboardingIdentity({
                 placeholder="90"
                 aria-invalid={!!showError('fire_end_age')}
                 aria-describedby={showError('fire_end_age') ? 'ob-end-age-error' : 'ob-end-age-hint'}
-                className={`w-full sm:w-32 min-h-[44px] rounded-lg bg-zinc-50 px-3 py-2.5 text-base text-zinc-900 outline-none border focus:ring-1 sm:text-sm ${
+                className={`w-full sm:w-32 min-h-[44px] rounded-lg bg-[var(--subtle)]px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${
                   showError('fire_end_age')
                     ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
-                    : 'border-zinc-300 focus:border-zinc-500 focus:ring-zinc-500'
+                    : 'border-[var(--border-ed)] focus:border-[var(--border-md)] focus:ring-[var(--border-md)]'
                 }`}
               />
               {showError('fire_end_age') ? (
                 <p id="ob-end-age-error" className="mt-1 text-xs text-red-500" role="alert">{showError('fire_end_age')}</p>
               ) : (
-                <p id="ob-end-age-hint" className="mt-1 text-xs text-zinc-400">Leeftijd waarop je vermogen volledig opgemaakt mag zijn.</p>
+                <p id="ob-end-age-hint" className="mt-1 text-xs text-[var(--ink-4)]">Leeftijd waarop je vermogen volledig opgemaakt mag zijn.</p>
               )}
             </div>
           )}
@@ -607,7 +607,7 @@ export function OnboardingIdentity({
       </div>
 
       {/* Sticky nav on mobile */}
-      <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-zinc-200 bg-white/95 px-4 pb-[env(safe-area-inset-bottom,8px)] pt-3 backdrop-blur-sm sm:static sm:mt-5 sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
+      <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-[var(--border-ed)] bg-[var(--paper)]/95 px-4 pb-[env(safe-area-inset-bottom,8px)] pt-3 backdrop-blur-sm sm:static sm:mt-5 sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
         <button
           onClick={handleNext}
           disabled={disableNext}
