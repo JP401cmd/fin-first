@@ -41,9 +41,9 @@ export function OnboardingSuccess({ onDashboard }: { onDashboard: () => void }) 
       </div>
 
       <span className="font-playfair text-2xl font-bold text-[var(--ink)]">t<span className="text-kern-600">f.</span></span>
-      <h2 className="mt-2 text-2xl font-bold text-zinc-900">Welkom</h2>
+      <h2 className="mt-2 font-display text-2xl font-bold tracking-[-0.02em] text-[var(--ink)]">Welkom</h2>
       <p className="mt-1 font-source-serif text-[13px] italic text-[var(--ink-3)]">&ldquo;Geld is opgeslagen tijd&rdquo;</p>
-      <p className="mt-2 text-sm text-zinc-500">Drie perspectieven, een doel</p>
+      <p className="mt-2 text-sm text-[var(--ink-3)]">Drie perspectieven, een doel</p>
 
       {/* Will introduces the modules */}
       <div className="mt-5 w-full">
@@ -63,7 +63,7 @@ export function OnboardingSuccess({ onDashboard }: { onDashboard: () => void }) 
               <card.Icon className={`h-6 w-6 ${card.textColor}`} />
             </div>
             <p className={`mt-2 text-sm font-semibold ${card.textColor}`}>{card.name}</p>
-            <p className="mt-1 text-xs leading-relaxed text-zinc-500">{card.description}</p>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--ink-3)]">{card.description}</p>
           </div>
         ))}
       </div>

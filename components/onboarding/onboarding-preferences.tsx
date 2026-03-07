@@ -410,7 +410,7 @@ export function OnboardingPreferences({
         <button
           type="button"
           onClick={handleSkipDefaults}
-          className="mb-4 w-full text-center text-sm text-[var(--ink-4)] underline underline-offset-2 transition-colors hover:text-zinc-600"
+          className="mb-4 w-full text-center text-sm text-[var(--ink-4)] underline underline-offset-2 transition-colors hover:text-[var(--ink-2)]"
         >
           Standaard instellingen gebruiken
         </button>
@@ -419,7 +419,7 @@ export function OnboardingPreferences({
       {/* Question 1: Hoofddoel */}
       {questionIndex === 0 && (
         <div className="space-y-3">
-          <h2 className="mb-4 text-lg font-bold text-[var(--ink)]">Wat is je hoofddoel?</h2>
+          <h2 className="mb-4 font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">Wat is je hoofddoel?</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {GOAL_OPTIONS.map((opt) => (
               <SelectCard
@@ -436,7 +436,7 @@ export function OnboardingPreferences({
       {/* Question 2: Activiteit */}
       {questionIndex === 1 && (
         <div className="space-y-3">
-          <h2 className="mb-4 text-lg font-bold text-[var(--ink)]">Hoe actief wil je bezig zijn?</h2>
+          <h2 className="mb-4 font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">Hoe actief wil je bezig zijn?</h2>
           <div className="grid grid-cols-1 gap-3">
             {ACTIVITY_OPTIONS.map((opt) => (
               <SelectCard
@@ -453,7 +453,7 @@ export function OnboardingPreferences({
       {/* Question 3: Modules (multi-select) */}
       {questionIndex === 2 && (
         <div className="space-y-3">
-          <h2 className="mb-4 text-lg font-bold text-[var(--ink)]">Welke modules interesseren je?</h2>
+          <h2 className="mb-4 font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">Welke modules interesseren je?</h2>
           <div className="grid grid-cols-1 gap-3">
             {MODULE_OPTIONS.map((opt) => (
               <MultiSelectCard
@@ -475,7 +475,7 @@ export function OnboardingPreferences({
       {/* Question 4: AI inzichten */}
       {questionIndex === 3 && (
         <div className="space-y-3">
-          <h2 className="mb-4 text-lg font-bold text-[var(--ink)]">Wil je AI-inzichten?</h2>
+          <h2 className="mb-4 font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">Wil je AI-inzichten?</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {AI_OPTIONS.map((opt) => (
               <SelectCard
@@ -495,7 +495,7 @@ export function OnboardingPreferences({
       {/* Question 5: Dashboard categorieën (multi-select) */}
       {questionIndex === 4 && (
         <div className="space-y-3">
-          <h2 className="mb-4 text-lg font-bold text-[var(--ink)]">Wat wil je op je dashboard?</h2>
+          <h2 className="mb-4 font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">Wat wil je op je dashboard?</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {DASHBOARD_OPTIONS.map((opt) => (
               <MultiSelectCard
@@ -518,10 +518,10 @@ export function OnboardingPreferences({
       )}
 
       {/* Sticky navigation */}
-      <div className="fixed bottom-0 left-0 right-0 z-10 flex gap-3 border-t border-zinc-200 bg-white/80 px-4 pb-[env(safe-area-inset-bottom,12px)] pt-3 backdrop-blur-sm sm:static sm:mt-6 sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
+      <div className="fixed bottom-0 left-0 right-0 z-10 flex gap-3 border-t border-[var(--border-ed)] bg-[var(--paper)]/80 px-4 pb-[env(safe-area-inset-bottom,12px)] pt-3 backdrop-blur-sm sm:static sm:mt-6 sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
         <button
           onClick={handleBack}
-          className="flex-1 min-h-[44px] rounded-lg border border-[var(--border-ed)] px-4 py-3 text-sm font-medium text-zinc-600 hover:bg-zinc-50 active:bg-zinc-100"
+          className="flex-1 min-h-[44px] rounded-lg border border-[var(--border-ed)] px-4 py-3 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] active:bg-[var(--subtle)]"
         >
           Terug
         </button>
