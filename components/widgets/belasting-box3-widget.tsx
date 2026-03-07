@@ -59,9 +59,14 @@ export function BelastingBox3Widget({ size, data, href }: Props) {
         <p className="mt-1 text-xs text-[var(--ink-3)]">
           Schatting vermogensbelasting
         </p>
+        {effectiefTarief > 0 && (
+          <p className="mt-1.5 text-[11px] text-[var(--ink-2)]">
+            Effectief tarief: <span className="font-mono tabular-nums font-medium">{effectiefTarief.toFixed(2)}%</span>
+          </p>
+        )}
         {vrijheidsdagen > 0 && (
-          <p className="mt-1.5 font-serif italic text-[12px] text-[var(--ink-3)]">
-            = {vrijheidsdagen} dagen vrijheid
+          <p className="mt-1 font-serif italic text-[12px] text-[var(--ink-3)]">
+            = {vrijheidsdagen} {vrijheidsdagen === 1 ? 'dag' : 'dagen'} vrijheid per jaar
           </p>
         )}
         <p className="mt-2 font-serif italic text-[12px] text-[var(--ink-3)]">
