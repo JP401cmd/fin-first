@@ -9690,3 +9690,38 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 3 features completed this session (#425, #426, #419)
 - Zero TypeScript errors, zero console errors
+
+## Session 2026-03-07 - Features #427, #428
+
+### Feature #427: Onboarding intro stap: editorial welkomsdesign - PASSING
+- Redesigned OnboardingIntro with premium editorial finance aesthetic
+- FinnAvatar at 140px (up from 120px), centered with breathing animation
+- font-display for "Welkom bij TriFinity" heading (text-2xl sm:text-3xl)
+- font-serif italic for philosophy tagline
+- Editorial divider (h-px w-16) between tagline and introduction text
+- Module preview cards: card-editorial class with 3px module-colored left border
+- Proper module colors: kern-400/100/700, wil-400/100/700, horizon-400/100/700
+- font-display for module names in cards
+- CTA: full-width mobile max-w-xs, bg-wil-600 rounded-xl shadow-sm
+- Duration label: label-editorial class (uppercase, small, tracking)
+- Logout link: ghost text with subtle hover
+- Generous spacing throughout (py-8 sm:py-12)
+- Removed SpeechBubbleCentered dependency (inline text instead)
+
+### Feature #428: Onboarding success stap: editorial afsluiting - PASSING
+- Redesigned OnboardingSuccess with celebratory yet refined editorial aesthetic
+- FinnAvatar at 140px with subtle pulse animation on mount
+- font-display heading "Welkom bij TriFinity!" with tracking-[-0.02em]
+- font-serif italic philosophical closing with smart quotes
+- Module cards: card-editorial with left-aligned layout, module-colored left borders
+- Shorter module descriptions (concise)
+- Will's closing speech: border-y editorial style, font-serif italic
+- Decorative tri-color line (kern-300/wil-300/horizon-300) before CTA
+- Dashboard button: rounded-xl bg-wil-600 shadow-sm with hover shadow
+- Removed SpeechBubbleCentered dependency
+- Both pages share consistent editorial design language
+
+### Current Status
+- 2 features completed this session (#427, #428)
+- Zero TypeScript errors, zero console errors
+- Commit: a598cd6
