@@ -1,3 +1,21 @@
+## Session 2026-03-07 - Feature #418
+
+### Feature #418: Briefing instellingen toggles mobiele weergave - PASSING
+- Improved briefing preference toggles in identity/instellingen for mobile-friendliness
+- Toggle size increased: h-6 w-11 → h-7 w-12 (28×48px), thumb h-4 w-4 → h-5 w-5 with shadow-sm
+- Labels: added font-medium for readability, descriptions: text-zinc-500
+- Added touch-manipulation on toggle buttons, aria-label for accessibility
+- Container: responsive padding p-3 sm:p-4, min-w-0 on text div to prevent overflow
+- Row: min-h-[44px] + py-2 ensures ≥44px touch area, gap-4 spacing
+- Verified at narrow viewport: both toggles fully visible, no horizontal scroll
+- Toggle state changes immediately with visual feedback (no delay)
+- Zero console errors on test page
+- Commit: 2d954f6
+
+### Current Status
+- 1 feature completed this session (#418)
+- 409/414 features passing (98.8%)
+
 ## Session 2026-03-07 - Features #408, #409, #410
 
 ### Feature #408: Nieuwe DIRECTIVE_METRICS voor next_steps en discover - PASSING
@@ -9474,3 +9492,72 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#412)
 - 402/414 features passing (97.1%)
+
+## Session 2026-03-07 - Feature #415
+
+### Feature #415: Visited tracking op showDiscover briefing card - PASSING
+- Updated discover-card.tsx trackVisit to use navigator.sendBeacon (reliable during navigation)
+- Added markFeatureVisitedLocal(spec.featureId) call to immediately update localStorage
+- Exported markFeatureVisitedLocal from discover-carousel.tsx (was private)
+- Fallback to fire-and-forget fetch for browsers without sendBeacon support
+- Full flow verified: card click → sendBeacon POST + localStorage update → next briefing condense excludes visited feature
+- BriefingCard renders Link component (proper <a> tag semantics) when href is provided
+- Zero TypeScript errors, zero console errors
+- Commit: 90e7554
+
+### Current Status
+- 1 feature completed this session (#415)
+- 405/414 features passing (97.8%)
+
+## Session 2026-03-07 - Features #406, #416, #414
+
+### Feature #406: Briefing card renderer voor showNextStep - PASSING
+- Enhanced next-step-card.tsx with dynamic Lucide icon from spec.icon (24 icons mapped)
+- Module-colored 3px left border (kern=amber, wil=teal, horizon=purple, cross=zinc)
+- Module-colored icon background and text color
+- "Volgende Stap" badge with module colors
+- Dismiss button with 44x44px touch target
+- CTA "Ga aan de slag" with ArrowRight icon
+- Card registered in briefing-card-grid.tsx (was already present)
+
+### Feature #416: showNextStep card mobiele weergave - PASSING
+- Responsive icon: h-5 w-5 (20px) mobile, sm:h-6 sm:w-6 (24px) desktop
+- Description: text-xs mobile, sm:text-sm desktop with leading-relaxed
+- Title: text-sm font-semibold with leading-snug
+- CTA area: min-h-[44px] on mobile, sm:min-h-0 on desktop
+- Dismiss button: active:bg state for touch feedback
+- Icon container: h-9 w-9 mobile, sm:h-10 sm:w-10 desktop
+
+### Feature #414: Dismiss functionaliteit op showNextStep briefing card - PASSING
+- POST to /api/next-steps/dismiss with spec.dismissKey on click
+- Optimistic UI: immediate fade-out (opacity 0 + scale 0.95, 200ms transition)
+- After animation: setDismissed(true) removes card from DOM
+- Error handling: on API failure, card reverts (fadingOut=false) + error toast
+- Error toast auto-clears after 3 seconds
+- aria-label="Verberg suggestie" for accessibility
+- Already-dismissed steps filtered by /api/next-steps route (next_step_completions table)
+- Test page: app/test-next-step-card/page.tsx with 4 example cards
+
+### Current Status
+- 3 features completed this session (#406, #416, #414)
+- Zero TypeScript errors
+- Commit: 252a716
+
+## Session 2026-03-07 - Feature #417
+
+### Feature #417: showDiscover card mobiele weergave - PASSING
+- Verified discover-card.tsx already had mobile-optimized layout from feature #415
+- Teaser: text-sm font-medium (readable on mobile)
+- Description: text-xs sm:text-sm (responsive)
+- Arrow CTA: right-aligned, vertically centered, 40x40 circle
+- Entire card tappable as Link (no small tap targets)
+- Module badge: text-[10px] uppercase compact
+- Dashed border with 50% opacity (subtle on mobile)
+- Created test page at /test-discover-card-mobile for visual verification
+- Tested at 375px viewport: readable, tappable, no overflow
+- Zero console errors
+- Commit: 8a5bec2
+
+### Current Status
+- 1 feature completed this session (#417)
+- 408/414 features passing (98.6%)
