@@ -71,32 +71,29 @@ export function VolgendeStapWidget({ size, data, href }: Props) {
     )
   }
 
-  // ── Half-size: 1-2 prioritized steps with description + impact + CTA link ──
+  // ── Half-size: compact 1-2 steps (fits 1-row 160px height) ──
   if (size === 'half') {
     const shown = active.slice(0, 2)
 
     return (
       <WidgetShell module="wil" size={size} kicker="Volgende Stap" href={href}>
-        <ul className="space-y-3">
+        <ul className="space-y-1.5">
           {shown.map(step => (
-            <li key={step.key} className="flex items-start gap-2">
-              <ArrowRight className="h-3.5 w-3.5 text-wil-500 shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <a href={step.href} className="text-sm font-medium text-[var(--ink)] hover:text-wil-700 transition-colors line-clamp-1">
-                  {step.title}
-                </a>
-                <p className="mt-0.5 text-xs text-[var(--ink-3)] line-clamp-1">{step.description}</p>
-                {step.impact != null && step.impact > 0 && (
-                  <p className="mt-0.5 font-serif italic text-[12px] text-emerald-600">
-                    +{step.impact} vrijheidsdagen
-                  </p>
-                )}
-              </div>
+            <li key={step.key} className="flex items-center gap-2">
+              <ArrowRight className="h-3.5 w-3.5 text-wil-500 shrink-0" />
+              <a href={step.href} className="flex-1 min-w-0 text-sm font-medium text-[var(--ink)] hover:text-wil-700 transition-colors truncate">
+                {step.title}
+              </a>
+              {step.impact != null && step.impact > 0 && (
+                <span className="shrink-0 font-mono text-xs tabular-nums text-wil-700 bg-wil-50 rounded-full px-2 py-px">
+                  +{step.impact}d
+                </span>
+              )}
             </li>
           ))}
         </ul>
         {active.length > 2 && (
-          <p className="mt-2 text-[11px] text-[var(--ink-4)]">
+          <p className="mt-1 text-[11px] text-[var(--ink-4)]">
             +{active.length - 2} andere {active.length - 2 === 1 ? 'stap' : 'stappen'}
           </p>
         )}

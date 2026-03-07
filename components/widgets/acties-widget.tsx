@@ -76,23 +76,23 @@ export function ActiesWidget({ size, data, href }: Props) {
   }
 
   if (size === 'half') {
+    const halfTop = topOpenActions.slice(0, 2)
     return (
       <WidgetShell module="wil" size={size} kicker="Acties" href={href}>
         <div ref={containerRef}>
-          {top.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-4 text-center">
+          {halfTop.length === 0 ? (
+            <div className="flex items-center justify-center py-2 text-center">
               <p className="font-sans text-sm text-[var(--ink-3)]">Geen openstaande acties</p>
-              <p className="font-serif italic text-[11px] text-[var(--ink-4)] mt-1">Alle acties zijn afgerond</p>
             </div>
           ) : (
             <div className="space-y-0">
-              {top.map((action, i) => (
+              {halfTop.map((action, i) => (
                 <ActionRow key={action.id} action={action} index={i} hasEntered={hasEntered} />
               ))}
             </div>
           )}
-          <p className="mt-2 text-xs text-[var(--ink-3)]">
-            {openActions} {openActions === 1 ? 'actie' : 'acties'} open
+          <p className="mt-1 text-[11px] text-[var(--ink-3)]">
+            {openActions} open · {completedActionsThisMonth} afgerond
           </p>
         </div>
       </WidgetShell>

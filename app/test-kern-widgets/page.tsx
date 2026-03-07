@@ -24,7 +24,11 @@ const MOCK_DATA: DashboardData = {
   openActions: 5,
   totalFreedomDaysOpen: 30,
   completedActionsThisMonth: 2,
-  topOpenActions: [],
+  topOpenActions: [
+    { id: 'a1', title: 'Overstappen energieleverancier', freedom_days_impact: 12, priority_score: 5, due_date: '2026-04-01', source: 'recommendation' },
+    { id: 'a2', title: 'Noodfonds aanvullen tot 6 maanden', freedom_days_impact: 8, priority_score: 4, due_date: null, source: 'system' },
+    { id: 'a3', title: 'Pensioencheck uitvoeren', freedom_days_impact: 5, priority_score: 3, due_date: '2026-06-15', source: 'recommendation' },
+  ],
   recentCompletedActions: [],
   recentRejectedActions: [],
   sovereigntyLevel: 3,
@@ -33,7 +37,11 @@ const MOCK_DATA: DashboardData = {
   hasConsumerDebt: false,
   recommendations: 3,
   goals: 2,
-  topGoals: [],
+  topGoals: [
+    { id: 'g1', name: 'Nieuwe auto', goal_type: 'savings', current_value: 8500, target_value: 15000, target_date: '2026-12-01', color: 'teal', icon: 'car' },
+    { id: 'g2', name: 'Vakantie Japan', goal_type: 'savings', current_value: 3200, target_value: 5000, target_date: '2026-08-01', color: 'amber', icon: 'plane' },
+    { id: 'g3', name: 'Noodfonds', goal_type: 'savings', current_value: 14000, target_value: 21000, target_date: null, color: 'emerald', icon: 'shield' },
+  ],
   recurringTransactions: 12,
   lifeEvents: 2,
   fireAgeFractional: 55.3,
@@ -87,7 +95,11 @@ const MOCK_DATA: DashboardData = {
   badgeSummary: { earned: 5, total: 20, latestBadge: null, nearestBadge: null },
   streaks: [],
   aiInsights: [],
-  nextSteps: [],
+  nextSteps: [
+    { key: 'ns1', title: 'Stel je eerste spaardoel in', description: 'Begin met een concreet doel om je motivatie te versterken', impact: 5, href: '/will/goals', dismissed: false },
+    { key: 'ns2', title: 'Controleer je vaste lasten', description: 'Bekijk of je kunt besparen op abonnementen', impact: 3, href: '/core/cash', dismissed: false },
+    { key: 'ns3', title: 'Maak een budgetplan voor deze maand', description: 'Verdeel je inkomen over categorieën', impact: null, href: '/core/budgets', dismissed: false },
+  ],
   monthSummary: { netWorthDelta: 3000, freedomDaysWon: 8, savingsRate: 30, budgetScore: 75, prevMonthComparison: 5 },
   upcomingEvents: [],
   emergencyFund: { currentAmount: 14000, targetAmount: 21000, monthsCovered: 4, targetMonths: 6, isComplete: false },
@@ -99,7 +111,11 @@ const MOCK_DATA: DashboardData = {
     { id: 'r5', name: 'Spotify', amount: 15, frequency: 'maand', category: 'abonnement' },
   ],
   totalRecurringAmount: 1235,
-  topRecommendations: [],
+  topRecommendations: [
+    { id: 'rec1', title: 'Overstappen energieleverancier', freedomDaysImpact: 12, priority: 1, category: 'besparing' },
+    { id: 'rec2', title: 'Hypotheek oversluiten check', freedomDaysImpact: 45, priority: 2, category: 'wonen' },
+    { id: 'rec3', title: 'Extra aflossing studielening', freedomDaysImpact: 8, priority: 3, category: 'schuld' },
+  ],
   topLifeEvents: [],
   budgetingActive: true,
 }
@@ -119,6 +135,13 @@ const KERN_WIDGETS = [
   'maandoverzicht',
 ]
 
+const WIL_WIDGETS = [
+  'acties',
+  'voorstellen',
+  'doelen',
+  'volgende_stap',
+]
+
 const SIZES: WidgetSize[] = ['quarter', 'half', 'full']
 
 export default function TestKernWidgetsPage() {
@@ -130,6 +153,29 @@ export default function TestKernWidgetsPage() {
       </p>
 
       {KERN_WIDGETS.map((widgetId) => (
+        <div key={widgetId} className="space-y-3">
+          <h2 className="text-lg font-semibold border-b pb-1">{widgetId}</h2>
+          <div className="grid grid-cols-2 gap-4">
+            {SIZES.map((size) => (
+              <div
+                key={size}
+                className={
+                  size === 'full' ? 'col-span-2' :
+                  size === 'half' ? 'col-span-2' :
+                  'col-span-1'
+                }
+              >
+                <p className="text-xs text-zinc-400 mb-1 font-mono">{size}</p>
+                <WidgetRenderer id={widgetId} size={size} data={MOCK_DATA} features={{}} />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {/* ── Wil-module widgets ── */}
+      <h1 className="text-2xl font-bold mt-12 pt-8 border-t-2">Wil Widget Format Test</h1>
+      {WIL_WIDGETS.map((widgetId) => (
         <div key={widgetId} className="space-y-3">
           <h2 className="text-lg font-semibold border-b pb-1">{widgetId}</h2>
           <div className="grid grid-cols-2 gap-4">

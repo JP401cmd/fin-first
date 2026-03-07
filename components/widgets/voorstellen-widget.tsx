@@ -90,34 +90,25 @@ export function VoorstellenWidget({ size, data, href }: Props) {
     )
   }
 
-  // ── Half-size: top-3 recommendations list with freedom days ────
+  // ── Half-size: top-2 recommendations list (compact for 1-row height) ────
   if (size === 'half') {
-    const top3 = (topRecommendations ?? []).slice(0, 3)
-    const totalDays = Math.round(
-      (topRecommendations ?? []).reduce((sum, r) => sum + (r.freedomDaysImpact > 0 ? r.freedomDaysImpact : 0), 0)
-    )
+    const top2 = (topRecommendations ?? []).slice(0, 2)
 
     return (
       <WidgetShell module="wil" size={size} kicker="Voorstellen" href={href}>
         <div>
-          {top3.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-4 text-center">
+          {top2.length === 0 ? (
+            <div className="flex items-center justify-center py-2 text-center">
               <p className="font-sans text-sm text-[var(--ink-3)]">Geen aanbevelingen</p>
-              <p className="font-serif italic text-[11px] text-[var(--ink-4)] mt-1">Je bent helemaal bij</p>
             </div>
           ) : (
             <div className="space-y-0">
-              {top3.map((rec, i) => (
+              {top2.map((rec, i) => (
                 <RecommendationRow key={rec.id} rec={rec} index={i} />
               ))}
             </div>
           )}
-          {totalDays > 0 && (
-            <p className="mt-2 font-mono text-xs tabular-nums text-wil-600">
-              {totalDays} dagen te winnen
-            </p>
-          )}
-          <p className="mt-1 text-xs text-[var(--ink-3)]">
+          <p className="mt-1 text-[11px] text-[var(--ink-3)]">
             {recommendations} {recommendations === 1 ? 'aanbeveling' : 'aanbevelingen'}
           </p>
         </div>

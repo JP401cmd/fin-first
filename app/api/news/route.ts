@@ -37,7 +37,7 @@ const newsItemSchema = z.object({
 export type NewsItem = z.infer<typeof newsItemSchema>
 
 const newsResponseSchema = z.object({
-  items: z.array(newsItemSchema).min(5).max(10),
+  items: z.array(newsItemSchema),
 })
 
 // ── System prompt ────────────────────────────────────────────────────
@@ -228,9 +228,12 @@ Genereer 5-10 gepersonaliseerde Nederlandse financiele nieuwsitems. Focus op nie
 
     return NextResponse.json({ items: filteredItems, cached: false })
   } catch (err) {
-    console.error('[/api/news] AI generation failed:', err)
+    const errMsg = err instanceof Error ? err.message : String(err)
+    const errStack = err instanceof Error ? err.stack : undefined
+    console.error('[/api/news] AI generation failed:', errMsg)
+    if (errStack) console.error('[/api/news] Stack:', errStack)
     return NextResponse.json(
-      { error: 'Nieuws kon niet worden gegenereerd. Probeer het later opnieuw.' },
+      { error: `Nieuws kon niet worden gegenereerd: ${errMsg}` },
       { status: 500 }
     )
   }
