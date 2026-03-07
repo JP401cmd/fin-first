@@ -20,12 +20,32 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical } from 'lucide-react'
+import { GripVertical, Maximize2 } from 'lucide-react'
 import { WidgetRenderer, type DashboardData } from './widget-renderer'
 import { reassignOrders } from '@/lib/widget-order'
-import type { WidgetPref } from '@/lib/widget-catalog'
-import { WIDGET_FEATURE_MAP } from '@/lib/widget-catalog'
+import type { WidgetPref, WidgetSize } from '@/lib/widget-catalog'
+import { WIDGET_FEATURE_MAP, getWidgetDef } from '@/lib/widget-catalog'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
+
+/** Cycle to the next allowed size for a widget */
+function nextSize(currentSize: WidgetSize, widgetId: string): WidgetSize {
+  const def = getWidgetDef(widgetId)
+  const allowed = def?.sizes ?? ['quarter', 'half', 'full']
+  const cycle: WidgetSize[] = ['quarter', 'half', 'full']
+  const available = cycle.filter(s => allowed.includes(s))
+  if (available.length <= 1) return currentSize
+  const idx = available.indexOf(currentSize)
+  return available[(idx + 1) % available.length]
+}
+
+/** Human-readable size label */
+function sizeLabel(size: WidgetSize): string {
+  switch (size) {
+    case 'quarter': return '25%'
+    case 'half': return '50%'
+    case 'full': return '100%'
+  }
+}
 
 // ── SortableWidgetItem ─────────────────────────────────────────
 
@@ -35,9 +55,10 @@ interface SortableWidgetItemProps {
   features: Record<string, boolean>
   isEditMode: boolean
   isDragging: boolean
+  onResize?: (id: string) => void
 }
 
-function SortableWidgetItem({ pref, data, features, isEditMode, isDragging }: SortableWidgetItemProps) {
+function SortableWidgetItem({ pref, data, features, isEditMode, isDragging, onResize }: SortableWidgetItemProps) {
   const {
     attributes,
     listeners,
@@ -66,18 +87,32 @@ function SortableWidgetItem({ pref, data, features, isEditMode, isDragging }: So
       data-testid={`widget-item-${pref.id}`}
     >
       <div className="relative">
-        {/* Drag handle — only visible in edit mode */}
+        {/* Edit controls — only visible in edit mode */}
         {isEditMode && (
-          <button
-            type="button"
-            {...attributes}
-            {...listeners}
-            aria-label={`Versleep ${pref.id} widget`}
-            data-testid={`drag-handle-${pref.id}`}
-            className="absolute top-2.5 right-2.5 z-10 flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-4)] shadow-[var(--s0)] transition-shadow hover:text-[var(--ink-3)] hover:shadow-[var(--s1)] cursor-grab active:cursor-grabbing"
-          >
-            <GripVertical className="h-4 w-4" />
-          </button>
+          <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1">
+            {/* Resize button */}
+            <button
+              type="button"
+              onClick={() => onResize?.(pref.id)}
+              aria-label={`Grootte wijzigen ${pref.id} widget (nu ${sizeLabel(pref.size)})`}
+              data-testid={`resize-btn-${pref.id}`}
+              title={`Grootte: ${sizeLabel(pref.size)}`}
+              className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-4)] shadow-[var(--s0)] transition-all hover:text-[var(--ink-3)] hover:shadow-[var(--s1)] active:scale-95 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
+            {/* Drag handle */}
+            <button
+              type="button"
+              {...attributes}
+              {...listeners}
+              aria-label={`Versleep ${pref.id} widget`}
+              data-testid={`drag-handle-${pref.id}`}
+              className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-4)] shadow-[var(--s0)] transition-shadow hover:text-[var(--ink-3)] hover:shadow-[var(--s1)] cursor-grab active:cursor-grabbing min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0"
+            >
+              <GripVertical className="h-4 w-4" />
+            </button>
+          </div>
         )}
         <WidgetRenderer id={pref.id} size={pref.size} data={data} features={features} />
       </div>
@@ -183,6 +218,16 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data }: DraggableW
     }
   }, [allPrefs])
 
+  const handleResize = useCallback((widgetId: string) => {
+    setActiveWidgets(prev => {
+      const updated = prev.map(w =>
+        w.id === widgetId ? { ...w, size: nextSize(w.size, w.id) } : w
+      )
+      scheduleSave(updated)
+      return updated
+    })
+  }, [scheduleSave])
+
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id as string)
   }, [])
@@ -276,8 +321,8 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data }: DraggableW
       {/* Instruction banner / error banner */}
       {isEditMode && !saveError && (
         <div className="mb-3 rounded-[var(--r-sm)] border border-dashed border-kern-200 bg-kern-50/50 px-3 py-2 text-xs text-kern-700">
-          <span className="hidden sm:inline">Sleep widgets om de volgorde te wijzigen. Klik <strong>Gereed</strong> als je klaar bent.</span>
-          <span className="sm:hidden">Houd een widget ingedrukt om te verslepen.</span>
+          <span className="hidden sm:inline">Sleep widgets om de volgorde te wijzigen. Gebruik <Maximize2 className="inline h-3 w-3 mx-0.5" /> om de grootte aan te passen. Klik <strong>Gereed</strong> als je klaar bent.</span>
+          <span className="sm:hidden">Houd een widget ingedrukt om te verslepen. Tik <Maximize2 className="inline h-3 w-3 mx-0.5" /> voor grootte.</span>
         </div>
       )}
       {saveError && (
@@ -323,6 +368,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data }: DraggableW
                 features={features}
                 isEditMode={isEditMode}
                 isDragging={pref.id === activeId}
+                onResize={handleResize}
               />
             ))}
           </div>
