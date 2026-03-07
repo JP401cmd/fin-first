@@ -173,6 +173,53 @@ export function DoelenWidget({ size, data, href }: Props) {
   const { ref: containerRef, hasEntered } = useInViewAnimation({ duration: 800 })
   const footerLabel = goals === 1 ? '1 actief doel' : `${goals} actieve doelen`
 
+  // ── Quarter-size: eerste doel compact ───────────────────────
+  if (size === 'quarter') {
+    const goal = topGoals[0] ?? null
+
+    if (!goal) {
+      return (
+        <WidgetShell module="wil" size={size} kicker="Doelen" href={href}>
+          <div className="flex flex-col items-center justify-center text-center py-3">
+            <Target className="h-6 w-6 text-wil-200 mb-1" />
+            <p className="text-[11px] text-[var(--ink-3)]">Geen doelen</p>
+          </div>
+        </WidgetShell>
+      )
+    }
+
+    const pct = goalPct(goal)
+    const overdue = isOverdue(goal)
+    const eta = etaLabel(goal)
+    const colors = getGoalColorClasses(goal.color)
+    const pctColor = overdue ? 'text-red-600' : pct >= 90 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-600' : 'text-[var(--ink)]'
+
+    return (
+      <WidgetShell module="wil" size={size} kicker="Doelen" href={href}>
+        <div ref={containerRef}>
+          <p className="text-sm text-[var(--ink)] font-medium truncate">{goal.name}</p>
+          <p className={`mt-0.5 font-mono text-lg font-semibold tabular-nums ${pctColor}`}>
+            {pct}%
+          </p>
+          <div className="mt-1 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+            <div
+              className={`h-full rounded-full ${overdue ? 'bg-red-400' : colors.bar}`}
+              style={{
+                width: hasEntered ? `${pct}%` : '0%',
+                transition: hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1)' : 'none',
+              }}
+            />
+          </div>
+          {eta && (
+            <p className={`mt-0.5 font-mono text-[10px] tabular-nums ${overdue ? 'text-red-500' : 'text-[var(--ink-4)]'}`}>
+              {overdue ? 'Verlopen — ' : ''}{eta}
+            </p>
+          )}
+        </div>
+      </WidgetShell>
+    )
+  }
+
   if (size === 'half') {
     return (
       <WidgetShell module="wil" size={size} kicker="Doelen" href={href}>
