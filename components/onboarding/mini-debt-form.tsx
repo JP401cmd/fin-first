@@ -205,6 +205,7 @@ export function MiniDebtForm({
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
                   <input
                     type="number"
+                    inputMode="decimal"
                     step={100}
                     min={0}
                     value={draft.original_amount}
@@ -221,6 +222,7 @@ export function MiniDebtForm({
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
                   <input
                     type="number"
+                    inputMode="decimal"
                     step={100}
                     min={0}
                     value={draft.current_balance}
@@ -236,6 +238,7 @@ export function MiniDebtForm({
                 <div className="relative">
                   <input
                     type="number"
+                    inputMode="decimal"
                     step={0.1}
                     min={0}
                     value={draft.interest_rate}
@@ -253,6 +256,7 @@ export function MiniDebtForm({
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
                   <input
                     type="number"
+                    inputMode="decimal"
                     step={10}
                     min={0}
                     value={draft.minimum_payment}
@@ -269,6 +273,7 @@ export function MiniDebtForm({
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
                   <input
                     type="number"
+                    inputMode="decimal"
                     step={10}
                     min={0}
                     value={draft.monthly_payment}
@@ -356,6 +361,7 @@ export function MiniDebtForm({
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
                     <input
                       type="number"
+                      inputMode="decimal"
                       step={100}
                       min={0}
                       value={draft.credit_limit}

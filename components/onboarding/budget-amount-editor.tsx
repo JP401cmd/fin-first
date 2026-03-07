@@ -92,11 +92,11 @@ export function BudgetAmountEditor({
                   {parent.children.map((child) => {
                     const val = amounts[child.slug] ?? child.default_limit
                     return (
-                      <div key={child.slug} className="flex items-center gap-3">
-                        <label className="min-w-0 flex-1 text-xs text-zinc-600 truncate" title={child.name}>
+                      <div key={child.slug} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+                        <label className="min-w-0 text-xs text-zinc-600 truncate sm:flex-1" title={child.name}>
                           {child.name}
                         </label>
-                        <div className="relative w-28 shrink-0">
+                        <div className="relative w-full sm:w-28 sm:shrink-0">
                           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-zinc-400">&euro;</span>
                           <input
                             type="number"
@@ -116,8 +116,8 @@ export function BudgetAmountEditor({
           )
         })}
 
-      {/* Running total */}
-      <div className={`rounded-xl border-2 p-4 ${isOver ? 'border-red-300 bg-red-50' : 'border-zinc-200 bg-zinc-50'}`}>
+      {/* Running total — sticky on mobile */}
+      <div className={`sticky bottom-0 z-10 rounded-xl border-2 p-4 shadow-lg sm:static sm:shadow-none ${isOver ? 'border-red-300 bg-red-50' : 'border-zinc-200 bg-zinc-50'}`}>
         <div className="flex justify-between text-sm">
           <span className="text-zinc-600">Netto inkomen</span>
           <span className="font-semibold text-zinc-800">&euro;{netIncome.toLocaleString('nl-NL')}</span>

@@ -1,24 +1,114 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { User, Users, Briefcase, Sunset } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { User, Users, Briefcase, Sunset, Hand, LayoutTemplate, SlidersHorizontal, Coins, PiggyBank, Flame } from 'lucide-react'
 import type { LucideProps } from 'lucide-react'
 import { FinnAvatar } from '@/components/app/avatars'
 import { SpeechBubble } from './speech-bubble'
 import { StepProgress } from './step-progress'
 import { BudgetAmountEditor } from './budget-amount-editor'
-import { getDefaultBudgets } from '@/lib/budget-data'
-import { BUDGET_TEMPLATES, type BudgetTemplate } from '@/lib/budget-templates'
+import { getDefaultBudgets, BUDGET_SLUGS } from '@/lib/budget-data'
+import { formatCurrency } from '@/lib/format'
 
-const TEMPLATE_ICONS: Record<string, React.ComponentType<LucideProps>> = {
-  User,
-  Users,
-  Briefcase,
-  Sunset,
+// ── Profile-based template definitions ──────────────────────
+type ProfileTemplateId = 'zuinig' | 'gebalanceerd' | 'fire'
+
+interface CategoryBreakdown {
+  label: string
+  pct: number
+  amount: number
 }
 
-type SubChoice = null | 'ai' | 'manual' | 'template'
+interface ProfileTemplate {
+  id: ProfileTemplateId
+  name: string
+  description: string
+  icon: React.ComponentType<LucideProps>
+  // Percentage allocations for main expense groups
+  vaste: number   // Vaste lasten (wonen + vervoer)
+  dagelijks: number // Dagelijkse uitgaven
+  leuk: number    // Leuke dingen & lifestyle
+  sparen: number  // Sparen & investeren
+}
 
+const PROFILE_TEMPLATES: Omit<ProfileTemplate, 'icon'>[] = [
+  { id: 'zuinig', name: 'Zuinig', description: 'Focus op lage kosten, bewust leven', vaste: 0.55, dagelijks: 0.20, leuk: 0.10, sparen: 0.15 },
+  { id: 'gebalanceerd', name: 'Gebalanceerd', description: 'Evenwicht tussen genieten en sparen', vaste: 0.45, dagelijks: 0.20, leuk: 0.15, sparen: 0.20 },
+  { id: 'fire', name: 'FIRE-gericht', description: 'Maximaal sparen voor financiele vrijheid', vaste: 0.40, dagelijks: 0.15, leuk: 0.10, sparen: 0.35 },
+]
+
+const TEMPLATE_ICONS: Record<ProfileTemplateId, React.ComponentType<LucideProps>> = {
+  zuinig: Coins,
+  gebalanceerd: PiggyBank,
+  fire: Flame,
+}
+
+function buildProfileAmounts(netIncome: number, template: Omit<ProfileTemplate, 'icon'>): Record<string, number> {
+  const S = BUDGET_SLUGS
+  const r = (pct: number) => Math.round(netIncome * pct)
+
+  // Vaste lasten: split into wonen (80%) and vervoer (20%)
+  const vasteTotal = r(template.vaste)
+  const wonenTotal = Math.round(vasteTotal * 0.80)
+  const vervoerTotal = Math.round(vasteTotal * 0.20)
+
+  // Dagelijkse uitgaven
+  const dagelijksTotal = r(template.dagelijks)
+
+  // Leuke dingen
+  const leukTotal = r(template.leuk)
+
+  // Sparen
+  const sparenTotal = r(template.sparen)
+
+  return {
+    // Inkomen
+    [S.SALARIS_UITKERING]: netIncome,
+    [S.TOESLAGEN_KINDERBIJSLAG]: 0,
+    [S.TERUGGAVE_BELASTING]: 0,
+    [S.OVERIGE_INKOMSTEN]: 0,
+    // Vaste lasten wonen
+    [S.HUUR_HYPOTHEEK]: Math.round(wonenTotal * 0.65),
+    [S.GAS_WATER_LICHT]: Math.round(wonenTotal * 0.18),
+    [S.VERZEKERINGEN_WONEN]: Math.round(wonenTotal * 0.12),
+    [S.GEMEENTELIJKE_LASTEN]: Math.round(wonenTotal * 0.05),
+    // Vervoer
+    [S.BRANDSTOF_OV]: Math.round(vervoerTotal * 0.40),
+    [S.AUTO_VASTE_LASTEN]: Math.round(vervoerTotal * 0.35),
+    [S.AUTO_ONDERHOUD]: Math.round(vervoerTotal * 0.15),
+    [S.FIETS_DEELVERVOER]: Math.round(vervoerTotal * 0.10),
+    // Dagelijkse uitgaven
+    [S.BOODSCHAPPEN]: Math.round(dagelijksTotal * 0.70),
+    [S.HUISHOUDEN_VERZORGING]: Math.round(dagelijksTotal * 0.12),
+    [S.KINDEREN_SCHOOL]: Math.round(dagelijksTotal * 0.10),
+    [S.MEDISCHE_KOSTEN]: Math.round(dagelijksTotal * 0.08),
+    // Leuke dingen
+    [S.UIT_ETEN_HORECA]: Math.round(leukTotal * 0.30),
+    [S.VRIJE_TIJD_SPORT]: Math.round(leukTotal * 0.25),
+    [S.VAKANTIE]: Math.round(leukTotal * 0.25),
+    [S.KLEDING_OVERIGE]: Math.round(leukTotal * 0.20),
+    // Sparen
+    [S.SPAREN_NOODBUFFER]: Math.round(sparenTotal * 0.35),
+    [S.INVESTEREN_FIRE]: Math.round(sparenTotal * 0.65),
+    // Schulden (default 0)
+    [S.SCHULDEN_AFLOSSINGEN]: 0,
+    [S.EXTRA_AFLOSSING_HYPOTHEEK]: 0,
+  }
+}
+
+function getBreakdown(netIncome: number, template: Omit<ProfileTemplate, 'icon'>): CategoryBreakdown[] {
+  return [
+    { label: 'Vaste lasten', pct: template.vaste, amount: Math.round(netIncome * template.vaste) },
+    { label: 'Dagelijks', pct: template.dagelijks, amount: Math.round(netIncome * template.dagelijks) },
+    { label: 'Leuk', pct: template.leuk, amount: Math.round(netIncome * template.leuk) },
+    { label: 'Sparen', pct: template.sparen, amount: Math.round(netIncome * template.sparen) },
+  ]
+}
+
+// ── Subchoice type ─────────────────────────────────────────
+type SubChoice = null | 'manual' | 'template'
+
+// ── Component ──────────────────────────────────────────────
 export function OnboardingBudgets({
   amounts,
   onChange,
@@ -27,6 +117,7 @@ export function OnboardingBudgets({
   numberOfChildren,
   onNext,
   onBack,
+  saving = false,
 }: {
   amounts: Record<string, number>
   onChange: (amounts: Record<string, number>) => void
@@ -35,12 +126,10 @@ export function OnboardingBudgets({
   numberOfChildren: number
   onNext: () => void
   onBack: () => void
+  saving?: boolean
 }) {
   const [subChoice, setSubChoice] = useState<SubChoice>(null)
-  const [aiLoading, setAiLoading] = useState(false)
-  const [aiError, setAiError] = useState<string | null>(null)
-  const [aiContext, setAiContext] = useState('')
-  const [selectedTemplate, setSelectedTemplate] = useState<BudgetTemplate | null>(null)
+  const [selectedProfileTemplate, setSelectedProfileTemplate] = useState<ProfileTemplateId | null>(null)
 
   // Initialize with defaults if empty
   const hasAmounts = Object.keys(amounts).length > 0
@@ -57,48 +146,23 @@ export function OnboardingBudgets({
     onChange(defaults)
   }, [hasAmounts, onChange])
 
-  function handleTemplateSelect(template: BudgetTemplate) {
-    setSelectedTemplate(template)
-    // Pre-fill amounts from template
-    const budgets = template.getBudgets()
-    const newAmounts: Record<string, number> = {}
-    for (const parent of budgets) {
-      if (parent.children) {
-        for (const child of parent.children) {
-          newAmounts[child.slug] = child.default_limit
-        }
-      }
-    }
-    onChange(newAmounts)
-    setSubChoice('manual') // Go to manual editor so user can review/adjust
-  }
+  // Compute breakdowns for all profile templates
+  const profileBreakdowns = useMemo(() => {
+    const income = netIncome || 2500 // Fallback if no income set
+    return PROFILE_TEMPLATES.map((t) => ({
+      ...t,
+      breakdown: getBreakdown(income, t),
+    }))
+  }, [netIncome])
 
-  async function handleAISuggest() {
-    setAiLoading(true)
-    setAiError(null)
-    try {
-      const res = await fetch('/api/onboarding/suggest-budgets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          netMonthlyIncome: netIncome,
-          householdType,
-          numberOfChildren,
-          context: aiContext.trim() || undefined,
-        }),
-      })
-      if (!res.ok) {
-        const body = await res.json()
-        throw new Error(body.error || 'AI niet beschikbaar')
-      }
-      const { amounts: suggested } = await res.json()
-      onChange(suggested)
-      setSubChoice('manual') // Switch to manual editor so user can review
-    } catch (err) {
-      setAiError(err instanceof Error ? err.message : 'AI-suggestie mislukt')
-    } finally {
-      setAiLoading(false)
-    }
+  function handleProfileTemplateSelect(templateId: ProfileTemplateId) {
+    const template = PROFILE_TEMPLATES.find((t) => t.id === templateId)
+    if (!template) return
+    const income = netIncome || 2500
+    const newAmounts = buildProfileAmounts(income, template)
+    onChange(newAmounts)
+    setSelectedProfileTemplate(templateId)
+    setSubChoice('manual') // Go to manual editor so user can review/adjust
   }
 
   return (
@@ -119,45 +183,42 @@ export function OnboardingBudgets({
 
       <div className="mb-6 flex items-start gap-3">
         <div className="shrink-0"><FinnAvatar size={48} /></div>
-        <SpeechBubble>Nu gaan we je maandelijkse budget verdelen.</SpeechBubble>
+        <SpeechBubble>Budgetteren helpt je bewust te kiezen. Maar het is niet verplicht.</SpeechBubble>
       </div>
 
-      {/* Sub-choice: AI or Manual */}
+      {/* Budget choice: skip, template, or manual */}
       {subChoice === null && (
         <div className="space-y-3">
           <button
-            onClick={() => setSubChoice('template')}
-            className="group w-full min-h-[60px] rounded-xl border-2 border-zinc-200 bg-white p-4 sm:p-5 text-left transition-all hover:border-kern-300 hover:shadow-md active:scale-[0.99] active:border-kern-400"
+            onClick={onNext}
+            disabled={saving}
+            className="group w-full min-h-[60px] rounded-xl border-2 border-zinc-200 bg-white p-4 sm:p-5 text-left transition-all hover:border-zinc-300 hover:shadow-md active:scale-[0.99]"
           >
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-kern-50 group-hover:bg-kern-100">
-                <svg className="h-5 w-5 text-kern-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
-                </svg>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-100 group-hover:bg-zinc-200">
+                <Hand className="h-5 w-5 text-zinc-500" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-zinc-900">Start met een template</h3>
+                <h3 className="text-sm font-semibold text-zinc-900">Nee, niet nu</h3>
                 <p className="mt-0.5 text-xs text-zinc-500">
-                  Kies een startpunt dat past bij jouw situatie. Je kunt daarna alles aanpassen.
+                  Default budgetten worden op de achtergrond aangemaakt
                 </p>
               </div>
             </div>
           </button>
 
           <button
-            onClick={() => setSubChoice('ai')}
-            className="group w-full min-h-[60px] rounded-xl border-2 border-zinc-200 bg-white p-4 sm:p-5 text-left transition-all hover:border-[var(--border-md)] hover:shadow-md active:scale-[0.99]"
+            onClick={() => setSubChoice('template')}
+            className="group w-full min-h-[60px] rounded-xl border-2 border-zinc-200 bg-white p-4 sm:p-5 text-left transition-all hover:border-kern-300 hover:shadow-md active:scale-[0.99] active:border-kern-400"
           >
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] group-hover:bg-[var(--border-ed)]">
-                <svg className="h-5 w-5 text-[var(--ink-3)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                </svg>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-kern-50 group-hover:bg-kern-100">
+                <LayoutTemplate className="h-5 w-5 text-kern-600" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-zinc-900">AI-suggestie</h3>
+                <h3 className="text-sm font-semibold text-zinc-900">Ja, met een template</h3>
                 <p className="mt-0.5 text-xs text-zinc-500">
-                  Laat AI je budget verdelen op basis van je profiel. Je kunt daarna alles aanpassen.
+                  Kies een profiel dat bij je past
                 </p>
               </div>
             </div>
@@ -165,18 +226,16 @@ export function OnboardingBudgets({
 
           <button
             onClick={() => setSubChoice('manual')}
-            className="group w-full min-h-[60px] rounded-xl border-2 border-zinc-200 bg-white p-4 sm:p-5 text-left transition-all hover:border-[var(--border-md)] hover:shadow-md active:scale-[0.99]"
+            className="group w-full min-h-[60px] rounded-xl border-2 border-zinc-200 bg-white p-4 sm:p-5 text-left transition-all hover:border-kern-300 hover:shadow-md active:scale-[0.99]"
           >
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] group-hover:bg-[var(--border-ed)]">
-                <svg className="h-5 w-5 text-[var(--ink-3)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-                </svg>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-kern-50 group-hover:bg-kern-100">
+                <SlidersHorizontal className="h-5 w-5 text-kern-600" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-zinc-900">Zelf invullen</h3>
+                <h3 className="text-sm font-semibold text-zinc-900">Ja, handmatig</h3>
                 <p className="mt-0.5 text-xs text-zinc-500">
-                  Stel je eigen budgetbedragen in per categorie.
+                  Stel elk budget zelf in
                 </p>
               </div>
             </div>
@@ -184,68 +243,71 @@ export function OnboardingBudgets({
         </div>
       )}
 
-      {/* AI context + generate */}
-      {subChoice === 'ai' && (
-        <div className="space-y-4 rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
-          <p className="text-sm text-zinc-600">
-            Vertel optioneel iets meer over je situatie (woonsituatie, auto, leefstijl) zodat de AI je budget beter kan inschatten.
-          </p>
-          <textarea
-            value={aiContext}
-            onChange={(e) => setAiContext(e.target.value)}
-            rows={3}
-            placeholder="Bijv: Ik huur een appartement voor €950/mnd, heb geen auto, ga graag uit eten..."
-            className="w-full resize-none rounded-lg border border-zinc-300 bg-zinc-50 px-4 py-3 text-base text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 sm:text-sm"
-          />
-          {aiError && (
-            <p className="text-sm text-red-600">{aiError}</p>
-          )}
-          <div className="flex gap-3">
-            <button
-              onClick={() => setSubChoice(null)}
-              className="flex-1 min-h-[44px] rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50 active:bg-zinc-100"
-            >
-              Terug
-            </button>
-            <button
-              onClick={handleAISuggest}
-              disabled={aiLoading}
-              className="flex-1 min-h-[44px] rounded-lg bg-horizon-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-horizon-700 active:bg-horizon-800 disabled:opacity-50"
-            >
-              {aiLoading ? 'AI denkt na...' : 'Genereer suggestie'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Template selection */}
+      {/* Profile-based template selection */}
       {subChoice === 'template' && (
         <div className="space-y-3">
           <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-            Kies een template
+            Kies een budgetprofiel
           </p>
-          {BUDGET_TEMPLATES.map((template) => {
-            const TemplateIcon = TEMPLATE_ICONS[template.icon] ?? User
+          {profileBreakdowns.map((template) => {
+            const Icon = TEMPLATE_ICONS[template.id]
             return (
-            <button
-              key={template.id}
-              onClick={() => handleTemplateSelect(template)}
-              className="group w-full min-h-[60px] rounded-xl border-2 border-zinc-200 bg-white p-4 text-left transition-all hover:border-kern-300 hover:shadow-md active:scale-[0.99]"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-kern-50 group-hover:bg-kern-100">
-                  <TemplateIcon className="h-5 w-5 text-kern-600" />
+              <button
+                key={template.id}
+                onClick={() => handleProfileTemplateSelect(template.id)}
+                className="group w-full rounded-xl border-2 border-zinc-200 bg-white p-4 text-left transition-all hover:border-kern-300 hover:shadow-md active:scale-[0.99]"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-kern-50 group-hover:bg-kern-100">
+                    <Icon className="h-5 w-5 text-kern-600" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-zinc-900">{template.name}</h3>
+                      <svg className="ml-2 h-4 w-4 shrink-0 text-zinc-400 group-hover:text-kern-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                      </svg>
+                    </div>
+                    <p className="mt-0.5 text-xs text-zinc-500">{template.description}</p>
+                    {/* Category breakdown */}
+                    <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
+                      {template.breakdown.map((cat) => (
+                        <div key={cat.label} className="flex items-center justify-between">
+                          <span className="text-[11px] text-zinc-500">{cat.label}</span>
+                          <span className="font-mono text-[11px] tabular-nums text-zinc-700">
+                            {formatCurrency(cat.amount)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Percentage bar */}
+                    <div className="mt-2.5 flex h-1.5 overflow-hidden rounded-full">
+                      {template.breakdown.map((cat, i) => {
+                        const colors = ['bg-amber-400', 'bg-teal-400', 'bg-purple-400', 'bg-emerald-500']
+                        return (
+                          <div
+                            key={cat.label}
+                            className={`${colors[i]} transition-all`}
+                            style={{ width: `${cat.pct * 100}%` }}
+                          />
+                        )
+                      })}
+                    </div>
+                    <div className="mt-1 flex gap-3">
+                      {template.breakdown.map((cat, i) => {
+                        const colors = ['text-amber-600', 'text-teal-600', 'text-purple-600', 'text-emerald-600']
+                        return (
+                          <span key={cat.label} className={`text-[9px] font-medium ${colors[i]}`}>
+                            {cat.label} {Math.round(cat.pct * 100)}%
+                          </span>
+                        )
+                      })}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-zinc-900">{template.name}</h3>
-                  <p className="text-xs text-zinc-500">{template.description}</p>
-                </div>
-                <svg className="ml-auto h-4 w-4 text-zinc-400 group-hover:text-kern-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                </svg>
-              </div>
-            </button>
-          )})}
+              </button>
+            )
+          })}
           <button
             onClick={() => setSubChoice(null)}
             className="w-full min-h-[44px] rounded-lg border border-[var(--border-md)] px-4 py-2.5 text-sm font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)] active:bg-zinc-100"
@@ -258,12 +320,10 @@ export function OnboardingBudgets({
       {/* Manual editor */}
       {subChoice === 'manual' && (
         <div className="space-y-4">
-          {selectedTemplate && (
+          {selectedProfileTemplate && (
             <div className="flex items-center gap-2 rounded-lg border border-kern-200 bg-kern-50 px-3 py-2 text-[11px] text-kern-700">
-              <svg className="h-3.5 w-3.5 shrink-0 text-kern-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
-              </svg>
-              <span>Template: <strong>{selectedTemplate.name}</strong> — Pas de bedragen aan naar jouw situatie</span>
+              <LayoutTemplate className="h-3.5 w-3.5 shrink-0 text-kern-500" />
+              <span>Template: <strong>{PROFILE_TEMPLATES.find((t) => t.id === selectedProfileTemplate)?.name}</strong> — Pas de bedragen aan naar jouw situatie</span>
             </div>
           )}
           <BudgetAmountEditor
@@ -282,9 +342,10 @@ export function OnboardingBudgets({
             </button>
             <button
               onClick={onNext}
-              className="flex-1 min-h-[44px] rounded-lg bg-kern-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-kern-700 active:bg-kern-800"
+              disabled={saving}
+              className="flex-1 min-h-[44px] rounded-lg bg-kern-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-kern-700 active:bg-kern-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Volgende
+              {saving ? 'Opslaan...' : 'Opslaan & verder'}
             </button>
           </div>
         </div>

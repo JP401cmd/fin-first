@@ -62,7 +62,7 @@ export function OnboardingExtras({
       </button>
 
       <div className="mb-6">
-        <StepProgress current="voorkeuren" />
+        <StepProgress current="startpunt" />
       </div>
 
       <div className="mb-6 flex items-start gap-3">
@@ -127,7 +127,7 @@ export function OnboardingExtras({
           data-testid="onboarding-save-next"
           className="flex-1 min-h-[44px] rounded-lg bg-wil-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-wil-700 active:bg-wil-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {saving ? 'Opslaan...' : 'Opslaan & verder'}
+          Volgende
         </button>
       </div>
     </div>

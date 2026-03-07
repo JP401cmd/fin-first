@@ -201,7 +201,7 @@ export default function OnboardingPage() {
 
       dispatch({ type: 'SET_STEP', step: 'success' })
     } catch (err) {
-      dispatch({ type: 'SET_STEP', step: 'extras' })
+      dispatch({ type: 'SET_STEP', step: 'budgets' })
     } finally {
       setSaving(false)
     }
@@ -240,20 +240,8 @@ export default function OnboardingPage() {
           <OnboardingIdentity
             data={state.identity}
             onChange={(data) => dispatch({ type: 'SET_IDENTITY', data })}
-            onNext={() => dispatch({ type: 'SET_STEP', step: 'budgets' })}
-            onBack={() => dispatch({ type: 'SET_STEP', step: 'intro' })}
-          />
-        )}
-
-        {state.step === 'budgets' && (
-          <OnboardingBudgets
-            amounts={state.budgetAmounts}
-            onChange={(amounts) => dispatch({ type: 'SET_BUDGET_AMOUNTS', amounts })}
-            netIncome={Number(state.identity.net_monthly_income) || 0}
-            householdType={state.identity.household_type}
-            numberOfChildren={state.identity.number_of_children}
             onNext={() => dispatch({ type: 'SET_STEP', step: 'extras' })}
-            onBack={() => dispatch({ type: 'SET_STEP', step: 'identity' })}
+            onBack={() => dispatch({ type: 'SET_STEP', step: 'intro' })}
           />
         )}
 
@@ -265,9 +253,21 @@ export default function OnboardingPage() {
             onBankChange={(items) => dispatch({ type: 'SET_BANK_ACCOUNTS', items })}
             onAssetChange={(items) => dispatch({ type: 'SET_ASSETS', items })}
             onDebtChange={(items) => dispatch({ type: 'SET_DEBTS', items })}
+            onNext={() => dispatch({ type: 'SET_STEP', step: 'budgets' })}
+            onSkip={() => dispatch({ type: 'SET_STEP', step: 'budgets' })}
+            onBack={() => dispatch({ type: 'SET_STEP', step: 'identity' })}
+          />
+        )}
+
+        {state.step === 'budgets' && (
+          <OnboardingBudgets
+            amounts={state.budgetAmounts}
+            onChange={(amounts) => dispatch({ type: 'SET_BUDGET_AMOUNTS', amounts })}
+            netIncome={Number(state.identity.net_monthly_income) || 0}
+            householdType={state.identity.household_type}
+            numberOfChildren={state.identity.number_of_children}
             onNext={handleSaveOwnData}
-            onSkip={handleSaveOwnData}
-            onBack={() => dispatch({ type: 'SET_STEP', step: 'budgets' })}
+            onBack={() => dispatch({ type: 'SET_STEP', step: 'extras' })}
             saving={saving}
           />
         )}

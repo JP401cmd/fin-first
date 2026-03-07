@@ -57,6 +57,7 @@ export function MiniBankForm({
               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-zinc-400">&euro;</span>
               <input
                 type="number"
+                inputMode="decimal"
                 step={0.01}
                 placeholder="Saldo"
                 value={item.balance}

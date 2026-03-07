@@ -227,6 +227,7 @@ export function MiniAssetForm({
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
                   <input
                     type="number"
+                    inputMode="decimal"
                     step={100}
                     min={0}
                     value={draft.current_value}
@@ -245,6 +246,7 @@ export function MiniAssetForm({
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
                   <input
                     type="number"
+                    inputMode="decimal"
                     step={100}
                     min={0}
                     value={draft.purchase_value}
@@ -260,6 +262,7 @@ export function MiniAssetForm({
                 <div className="relative">
                   <input
                     type="number"
+                    inputMode="decimal"
                     step={0.1}
                     value={draft.expected_return}
                     onChange={(e) => updateDraft({ expected_return: e.target.value })}
@@ -277,6 +280,7 @@ export function MiniAssetForm({
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
                     <input
                       type="number"
+                      inputMode="decimal"
                       step={10}
                       min={0}
                       value={draft.monthly_contribution}
@@ -398,6 +402,7 @@ export function MiniAssetForm({
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
                     <input
                       type="number"
+                      inputMode="decimal"
                       step={1000}
                       min={0}
                       value={draft.woz_value}
@@ -442,6 +447,7 @@ export function MiniAssetForm({
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
                     <input
                       type="number"
+                      inputMode="decimal"
                       step={50}
                       min={0}
                       value={draft.rental_income}
@@ -459,6 +465,7 @@ export function MiniAssetForm({
                   <div className="relative">
                     <input
                       type="number"
+                      inputMode="decimal"
                       step={0.5}
                       min={0}
                       value={draft.depreciation_rate}
