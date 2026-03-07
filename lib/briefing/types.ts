@@ -218,12 +218,23 @@ export interface PreviousBriefingSummary {
   keyMetrics: Record<string, string>
 }
 
+/** Long-term memory that persists across browser sessions via localStorage */
+export interface BriefingLongTermMemory {
+  lastBriefingDate: string
+  lastNetWorth: number
+  lastSavingsRate: number
+  lastFreedomPct: number
+  briefingCount: number
+  adviceHistory: string[]  // last 5 insight/tip texts, max 50 chars each
+}
+
 export interface BriefingComposeRequest {
   dataSummary: string
   temporal: TemporalContext
   phase: string
   level: number
   previousBriefing?: PreviousBriefingSummary
+  longTermMemory?: BriefingLongTermMemory
 }
 
 export interface BriefingComposeResponse {

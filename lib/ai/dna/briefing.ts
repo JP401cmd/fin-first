@@ -3,7 +3,7 @@
 
 import { z } from 'zod'
 import { tool } from 'ai'
-import type { TemporalContext, PreviousBriefingSummary } from '@/lib/briefing/types'
+import type { TemporalContext, PreviousBriefingSummary, BriefingLongTermMemory } from '@/lib/briefing/types'
 
 // ── System Prompt Builder ───────────────────────────────────
 
@@ -13,11 +13,13 @@ export function buildBriefingSystemPrompt(
   level: number,
   directivesBlock?: string,
   previousBriefing?: PreviousBriefingSummary,
+  longTermMemory?: BriefingLongTermMemory,
 ): string {
   // Phase-specific card emphasis
   const phaseEmphasis = getPhaseEmphasis(phase)
   const temporalGuidance = getTemporalGuidance(temporal)
   const previousBlock = formatPreviousBriefing(previousBriefing)
+  const longTermBlock = formatLongTermMemory(longTermMemory)
 
   return `Je bent Will, de financiele redacteur van TriFinity.
 
@@ -62,7 +64,7 @@ Gebruik deze routes als href waarden:
 Vandaag: ${temporal.date}, dag ${temporal.dayOfMonth} van de maand, ${temporal.dayOfWeek}.
 ${temporalGuidance}
 ${temporal.seasonalNotes.length > 0 ? `\nActueel: ${temporal.seasonalNotes.join('; ')}` : ''}
-${directivesBlock ? `\n${directivesBlock}\n` : ''}${previousBlock ? `\n${previousBlock}\n` : ''}
+${directivesBlock ? `\n${directivesBlock}\n` : ''}${previousBlock ? `\n${previousBlock}\n` : ''}${longTermBlock ? `\n${longTermBlock}\n` : ''}
 == FASE-BEWUST ==
 Gebruikersfase: ${phase} (sovereignty level ${level})
 ${phaseEmphasis}
@@ -115,6 +117,43 @@ function formatPreviousBriefing(prev?: PreviousBriefingSummary): string {
   }
 
   lines.push('Instructie: Refereer aan vorige observaties als er relevante veranderingen zijn. Varieer card types t.o.v. de vorige briefing.')
+
+  return lines.join('\n')
+}
+
+/** Format long-term briefing memory for prompt context */
+function formatLongTermMemory(mem?: BriefingLongTermMemory): string {
+  if (!mem) return ''
+
+  const lines: string[] = ['== LANGETERMIJN GEHEUGEN ==']
+
+  lines.push(`Aantal briefings tot nu toe: ${mem.briefingCount}`)
+
+  // When was the last briefing
+  const lastDate = new Date(mem.lastBriefingDate)
+  const now = new Date()
+  const diffDays = Math.round((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24))
+  if (diffDays === 0) {
+    lines.push('Laatste briefing: vandaag')
+  } else if (diffDays === 1) {
+    lines.push('Laatste briefing: gisteren')
+  } else {
+    lines.push(`Laatste briefing: ${diffDays} dagen geleden`)
+  }
+
+  // Financial snapshot from last briefing
+  lines.push(`Laatst bekende netto vermogen: ${mem.lastNetWorth.toLocaleString('nl-NL')} EUR`)
+  lines.push(`Laatst bekende spaarquote: ${mem.lastSavingsRate}%`)
+  lines.push(`Laatst bekende vrijheidspercentage: ${mem.lastFreedomPct}%`)
+
+  // Previous advice given
+  if (mem.adviceHistory.length > 0) {
+    lines.push('Eerder gegeven adviezen/inzichten:')
+    for (const advice of mem.adviceHistory) {
+      lines.push(`  - "${advice}"`)
+    }
+    lines.push('Instructie: Vermijd herhaling van deze inzichten tenzij er relevante updates zijn. Bouw voort op eerdere adviezen.')
+  }
 
   return lines.join('\n')
 }

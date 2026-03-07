@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
-import type { BriefingCardSpec, BriefingComposeResponse, BriefingSSEEvent, TemporalContext, PreviousBriefingSummary } from '@/lib/briefing/types'
+import type { BriefingCardSpec, BriefingComposeResponse, BriefingSSEEvent, TemporalContext, PreviousBriefingSummary, BriefingLongTermMemory, CardModule } from '@/lib/briefing/types'
 import { condenseDashboardData } from '@/lib/briefing/condense'
+import { logCardEngagement } from '@/lib/briefing/engagement'
+import { loadPreviousSnapshot, saveSnapshot, buildSnapshot, detectProgressionEvents } from '@/lib/briefing/progression'
 import { BriefingHeader } from './briefing-header'
 import { BriefingCardGrid } from './briefing-card-grid'
 import { BriefingComposingIndicator } from './briefing-skeleton'
@@ -23,6 +25,9 @@ const CACHE_KEY = 'briefing_v2'
 
 /** Key for previous briefing summary (session continuity) */
 const PREVIOUS_KEY = 'briefing_previous'
+
+/** Key for long-term briefing memory (cross-session via localStorage) */
+const LONG_TERM_KEY = 'briefing_memory'
 
 /** Extract key metrics from completed briefing cards */
 function extractKeyMetrics(cards: BriefingCardSpec[]): Record<string, string> {
@@ -60,6 +65,51 @@ function readPreviousBriefing(): PreviousBriefingSummary | null {
     return JSON.parse(raw) as PreviousBriefingSummary
   } catch { /* SSR / storage errors */ }
   return null
+}
+
+/** Read long-term briefing memory from localStorage */
+function readLongTermMemory(): BriefingLongTermMemory | null {
+  try {
+    const raw = localStorage.getItem(LONG_TERM_KEY)
+    if (!raw) return null
+    return JSON.parse(raw) as BriefingLongTermMemory
+  } catch { /* SSR / storage errors */ }
+  return null
+}
+
+/** Update long-term briefing memory in localStorage after each briefing */
+function updateLongTermMemory(
+  cards: BriefingCardSpec[],
+  composedAt: string,
+  data: DashboardData,
+): void {
+  try {
+    const existing = readLongTermMemory()
+
+    // Extract insight/tip texts (max 50 chars each)
+    const newAdvice: string[] = cards
+      .filter(c => c.type === 'insight' && (c.emphasis === 'observation' || c.emphasis === 'tip'))
+      .map(c => (c as { text: string }).text.slice(0, 50))
+
+    // Merge with existing advice history, keep last 5
+    const prevAdvice = existing?.adviceHistory ?? []
+    const mergedAdvice = [...prevAdvice, ...newAdvice].slice(-5)
+
+    // Compute savings rate from data
+    const savingsRate = data.monthlyIncome > 0
+      ? Math.round(((data.monthlyIncome - data.monthlyExpenses) / data.monthlyIncome) * 100)
+      : 0
+
+    const memory: BriefingLongTermMemory = {
+      lastBriefingDate: composedAt,
+      lastNetWorth: Math.round(data.netWorth),
+      lastSavingsRate: savingsRate,
+      lastFreedomPct: Math.round(data.freedomPct),
+      briefingCount: (existing?.briefingCount ?? 0) + 1,
+      adviceHistory: mergedAdvice,
+    }
+    localStorage.setItem(LONG_TERM_KEY, JSON.stringify(memory))
+  } catch { /* quota / SSR */ }
 }
 
 /** Compact hash of key financial metrics for cache invalidation */
@@ -151,7 +201,20 @@ export function DAIshboard({ data, temporal, userName }: Props) {
   const level = data.sovereigntyLevel
 
   const streamFromAI = useCallback((isRefresh = false) => {
-    const dataSummary = condenseDashboardData(data, temporal)
+    // Detect progression events by comparing with previous snapshot
+    const previousSnapshot = loadPreviousSnapshot()
+    const currentSnapshot = buildSnapshot(
+      data.sovereigntyLevel,
+      data.freedomPct,
+      data.hasConsumerDebt,
+      data.netWorth,
+      data.monthsCovered,
+    )
+    const progressionEvents = detectProgressionEvents(previousSnapshot, currentSnapshot)
+    // Save current snapshot for next briefing comparison
+    saveSnapshot(currentSnapshot)
+
+    const dataSummary = condenseDashboardData(data, temporal, progressionEvents)
 
     controllerRef.current?.abort()
     const controller = new AbortController()
@@ -166,11 +229,13 @@ export function DAIshboard({ data, temporal, userName }: Props) {
 
     // Read previous briefing summary for continuity
     const previousBriefing = readPreviousBriefing()
+    // Read long-term memory for cross-session context
+    const longTermMemory = readLongTermMemory()
 
     fetch('/api/briefing/compose', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dataSummary, temporal, phase, level, previousBriefing }),
+      body: JSON.stringify({ dataSummary, temporal, phase, level, previousBriefing, longTermMemory }),
       signal: controller.signal,
     })
       .then(async (res) => {
@@ -209,6 +274,8 @@ export function DAIshboard({ data, temporal, userName }: Props) {
                 } catch { /* quota */ }
                 // Save briefing summary for next-briefing continuity
                 saveBriefingSummary(streamedCards, event.composedAt)
+                // Update long-term memory in localStorage
+                updateLongTermMemory(streamedCards, event.composedAt, data)
                 break
               case 'error':
                 setError(event.message)
@@ -253,6 +320,10 @@ export function DAIshboard({ data, temporal, userName }: Props) {
     streamFromAI()
   }, [streamFromAI])
 
+  const handleCardEngage = useCallback((cardType: string, module: string | undefined) => {
+    logCardEngagement(cardType, module as CardModule | undefined)
+  }, [])
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       <BriefingHeader temporal={temporal} userName={userName} />
@@ -277,7 +348,7 @@ export function DAIshboard({ data, temporal, userName }: Props) {
               <p className="text-xs text-[var(--ink-4)] animate-pulse">Will stelt je briefing samen...</p>
             </div>
           )}
-          <BriefingCardGrid cards={cards} data={data} />
+          <BriefingCardGrid cards={cards} data={data} onCardEngage={handleCardEngage} />
           {!composing && composedAt && (
             <BriefingFooter composedAt={composedAt} source="ai" onRefresh={handleRefresh} refreshing={refreshing} />
           )}
