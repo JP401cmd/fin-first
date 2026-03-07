@@ -33,7 +33,7 @@ import { VolgendeStapWidget } from './volgende-stap-widget'
 import { MaandoverzichtWidget } from './maandoverzicht-widget'
 import { AgendaWidget } from './agenda-widget'
 import { NoodfondsWidget } from './noodfonds-widget'
-import { getWidgetDef, WIDGET_HREFS, WIDGET_CATALOG } from '@/lib/widget-catalog'
+import { getWidgetDef, WIDGET_HREFS, WIDGET_FEATURE_MAP } from '@/lib/widget-catalog'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { FireProjection, FireRange, FireCountdown } from '@/lib/horizon-data'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
@@ -259,18 +259,16 @@ export interface DashboardData {
   budgetingActive: boolean
 }
 
-// ── Gating: widget id → min sovereignty level (derived from catalog) ──
-const WIDGET_MIN_LEVEL: Record<string, number> = Object.fromEntries(
-  WIDGET_CATALOG.map(w => [w.id, w.minLevel])
-)
-
 interface WidgetRendererProps {
   id: string
   size: WidgetSize
   data: DashboardData
+  /** Feature-phase access map — keys are feature ids, values are access booleans.
+   *  Widgets listed in WIDGET_FEATURE_MAP are hidden when their feature is false. */
+  features: Record<string, boolean>
 }
 
-export function WidgetRenderer({ id, size, data }: WidgetRendererProps) {
+export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps) {
   // Handle dynamic favorite budget widgets
   if (id.startsWith('budget_fav:')) {
     const budgetId = id.slice('budget_fav:'.length)
@@ -282,10 +280,9 @@ export function WidgetRenderer({ id, size, data }: WidgetRendererProps) {
   const def = getWidgetDef(id)
   if (!def) return null
 
-  const minLevel = WIDGET_MIN_LEVEL[id] ?? -2
-  const isLocked = data.sovereigntyLevel < minLevel
-
-  if (isLocked) return null
+  // Feature-phase gating: if widget maps to a feature, check access
+  const featureId = WIDGET_FEATURE_MAP[id]
+  if (featureId && features[featureId] === false) return null
 
   const href = WIDGET_HREFS[id]
 

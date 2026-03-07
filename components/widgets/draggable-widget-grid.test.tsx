@@ -11,6 +11,11 @@ vi.mock('./widget-renderer', () => ({
   ),
 }))
 
+// Mock useFeatureAccess — all features enabled by default
+vi.mock('@/components/app/feature-access-provider', () => ({
+  useFeatureAccess: () => ({ features: {}, phase: 'mastery', level: 6, netWorth: 100000, monthlyExpenses: 2000, freedomPct: 100, needsActivation: false, newlyUnlockedFeatures: [] }),
+}))
+
 // Mock fetch for save calls
 const mockFetch = vi.fn()
 global.fetch = mockFetch

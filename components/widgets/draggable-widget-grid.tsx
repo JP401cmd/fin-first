@@ -24,17 +24,20 @@ import { GripVertical } from 'lucide-react'
 import { WidgetRenderer, type DashboardData } from './widget-renderer'
 import { reassignOrders } from '@/lib/widget-order'
 import type { WidgetPref } from '@/lib/widget-catalog'
+import { WIDGET_FEATURE_MAP } from '@/lib/widget-catalog'
+import { useFeatureAccess } from '@/components/app/feature-access-provider'
 
 // ── SortableWidgetItem ─────────────────────────────────────────
 
 interface SortableWidgetItemProps {
   pref: WidgetPref
   data: DashboardData
+  features: Record<string, boolean>
   isEditMode: boolean
   isDragging: boolean
 }
 
-function SortableWidgetItem({ pref, data, isEditMode, isDragging }: SortableWidgetItemProps) {
+function SortableWidgetItem({ pref, data, features, isEditMode, isDragging }: SortableWidgetItemProps) {
   const {
     attributes,
     listeners,
@@ -76,7 +79,7 @@ function SortableWidgetItem({ pref, data, isEditMode, isDragging }: SortableWidg
             <GripVertical className="h-4 w-4" />
           </button>
         )}
-        <WidgetRenderer id={pref.id} size={pref.size} data={data} />
+        <WidgetRenderer id={pref.id} size={pref.size} data={data} features={features} />
       </div>
     </div>
   )
@@ -108,8 +111,21 @@ interface DraggableWidgetGridProps {
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
+/** Check if a widget is accessible based on feature-phase gating */
+function isWidgetAccessible(widgetId: string, features: Record<string, boolean>): boolean {
+  const featureId = WIDGET_FEATURE_MAP[widgetId]
+  // Widgets not in WIDGET_FEATURE_MAP are always available
+  if (!featureId) return true
+  return features[featureId] !== false
+}
+
 export function DraggableWidgetGrid({ initialPrefs, allPrefs, data }: DraggableWidgetGridProps) {
-  const [activeWidgets, setActiveWidgets] = useState<WidgetPref[]>(initialPrefs)
+  const { features } = useFeatureAccess()
+
+  // Filter out widgets that are not accessible based on feature-phase gating
+  const accessibleInitialPrefs = initialPrefs.filter(p => isWidgetAccessible(p.id, features))
+
+  const [activeWidgets, setActiveWidgets] = useState<WidgetPref[]>(accessibleInitialPrefs)
   const [isEditMode, setIsEditMode] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<SaveState>('idle')
@@ -304,6 +320,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data }: DraggableW
                 key={pref.id}
                 pref={pref}
                 data={data}
+                features={features}
                 isEditMode={isEditMode}
                 isDragging={pref.id === activeId}
               />

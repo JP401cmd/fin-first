@@ -400,6 +400,31 @@ export const WIDGET_HREFS: Record<string, string> = {
   noodfonds:                '/core',
 }
 
+// ── Widget → Feature-phase mapping ───────────────────────────
+// Maps widget catalog ids to feature-phase matrix ids.
+// Single source of truth for which feature controls which widget.
+// Widgets NOT in this map are always available (no feature gating).
+
+export const WIDGET_FEATURE_MAP: Record<string, string> = {
+  assets:               'widget_assets',
+  belasting_box3:       'widget_belasting',
+  holdings:             'widget_holdings',
+  monte_carlo:          'widget_monte_carlo',
+  voorstellen:          'widget_voorstellen',
+  doelen:               'doelen_systeem',
+  fire_prognose:        'fire_projecties',
+  levensgebeurtenissen: 'levensgebeurtenissen',
+  veerkracht_score:     'veerkracht_score',
+  vrijheidsscenarios:   'widget_vrijheidsscenarios',
+  sim_vermogenspad:     'widget_sim_vermogenspad',
+  passief_inkomen:      'widget_passief_inkomen',
+  box3_drag:            'widget_box3_drag',
+  vrijheidsmijlpalen:  'widget_vrijheidsmijlpalen',
+  backtesting_score:    'widget_backtesting_score',
+  ai_inzicht:           'widget_ai_inzicht',
+  nibud_benchmark:      'nibud_benchmark',
+}
+
 /** Allowed sizes for dynamic budget_fav:* widgets */
 export const BUDGET_FAV_SIZES: WidgetSize[] = ['quarter', 'half', 'full']
 
