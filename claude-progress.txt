@@ -1,3 +1,28 @@
+## Session 2026-03-07 - Features #347, #353
+
+### Feature #347: System prompt bijwerken met nieuwe tools en richtlijnen - PASSING
+- Added CARD TYPE RICHTLIJNEN section to system prompt with showRecurring, showLifeEvent, showStreak, showQuote guidance
+- Updated getPhaseEmphasis() for all 4 phases:
+  - Recovery: showStreak + showRecurring; avoid showQuote + showLifeEvent
+  - Stability: showRecurring + showLifeEvent; avoid showQuote
+  - Momentum: showStreak + showQuote
+  - Mastery: showQuote + showLifeEvent
+- Extended LAYOUT CONSTRAINTS with placement rules for new card types
+- Updated ending rule to include quote as valid final card
+
+### Feature #353: Server-side layout validatie van card-volgorde - PASSING
+- Created lib/briefing/validate-layout.ts with validateBriefingLayout()
+- Rule 1: No two 1-col cards of same type adjacent — swap with next different card
+- Rule 2: Milestone not first or last — move to middle position
+- Rule 3: Last card must be action, insight, or quote — find and move valid ending card
+- Modified compose route to collect-then-validate-then-emit pattern (was stream-as-you-go)
+- Import and call validateBriefingLayout in app/api/briefing/compose/route.ts
+
+### Current Status
+- 2 features completed this session (#347, #353)
+- All type-checks pass cleanly
+- Changes auto-committed in 347285e
+
 ## Session 2026-03-07 - Feature #364
 
 ### Feature #364: Briefing-frequentie adaptatie: korte vs uitgebreide briefing - PASSING
