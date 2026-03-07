@@ -1,3 +1,94 @@
+## Session 2026-03-07 - Features #515, #474, #481
+
+### Feature #515: Widget grootte aanpassen direct op het dashboard in edit-mode - PASSING
+- Added Maximize2 resize button next to GripVertical drag handle in SortableWidgetItem
+- Only visible in edit mode, cycles quarter → half → full → quarter
+- nextSize() respects widget's allowed sizes from getWidgetDef()
+- sizeLabel() shows human-readable percentage (25%/50%/100%)
+- handleResize() updates state + triggers debounced save via scheduleSave()
+- Mobile: min-h-[44px] min-w-[44px] tap targets on both buttons
+- Updated instruction banner to mention resize icon
+- All 6 unit tests pass, zero TypeScript errors
+- Commit: 04a88cf
+
+### Feature #474: Gelezen/ongelezen status meldingen met visuele distinctie - PASSING
+- Already fully implemented in existing NotificationItem component
+- Unread: font-semibold text-[var(--ink)] + colored indicator dot
+- Read: font-normal text-[var(--ink-2)], no dot
+- Click calls onRead → markAsRead → PATCH /api/notifications → app_settings persistence
+- Persistent across page reload (readIds stored in Supabase app_settings)
+
+### Feature #481: 5-10 nieuwsitems per generatie - PASSING
+- Already fully implemented in /api/news/route.ts
+- Zod schema: z.array(newsItemSchema).min(5).max(10) enforces 5-10 items
+- System prompt + user prompt both instruct "5-10" items
+- All required fields validated: id, headline, summary, personalImpact, category, date
+- Sorted by relevance per system prompt instruction
+
+### Current Status
+- 3 features completed this session (#515, #474, #481)
+- Commit: 04a88cf
+
+## Session 2026-03-07 - Features #468, #483, #485
+
+### Feature #468: Hero nieuwsartikel als voorpagina-artikel - PASSING
+- Replaced expandable NewsArticleCard with dedicated HeroNewsArticle component for first item
+- Hero: text-2xl/3xl Source Serif semibold heading with -0.02em letter-spacing
+- Lead text: text-base/lg Source Serif leading-relaxed in --ink-2
+- Category badge + source context + date line
+- Visual divider (h-px) separating hero from remaining articles
+- Remaining items rendered by NewsArticle component (text-lg headings)
+
+### Feature #483: Nieuwsartikel kop, lead en bron/datum typografie - PASSING
+- All headings: font-source-serif font-semibold (hero: text-2xl/3xl, regular: text-lg)
+- Lead/summary: font-source-serif normal (hero: text-base/lg, regular: text-sm), text-[var(--ink-2)]
+- Date: font-inter text-[11px] text-[var(--ink-4)]
+- Source context: font-inter text-[11px] text-[var(--ink-4)]
+- Consistent typographic hierarchy across hero and regular articles
+
+### Feature #485: Impact voor jou blok per nieuwsartikel - PASSING
+- Created ImpactBlock component with border-l-3 border-wil-400 accent
+- Background: bg-wil-50/60 with rounded corners
+- Header: TrendingUp icon + "IMPACT VOOR JOU" in uppercase wil-700
+- Body: font-source-serif text-[13px] leading-relaxed text-wil-900
+- Always visible (not hidden behind expand toggle)
+- Applied to both hero and regular articles
+
+### Current Status
+- 3 features completed this session (#468, #483, #485)
+- Zero console errors
+- Commit: 5df152b
+- Test page: /test-news-hero for visual verification
+
+## Session 2026-03-07 - Features #511, #512, #467
+
+### Feature #511: Privacy en vertrouwen sectie op landingspagina - PASSING
+- Added privacy section to landing page between "Voor wie" and "Vrijheid" sections
+- Title: "Jouw data, jouw controle" with subtitle about privacy as foundation
+- 3 cards with Lucide icons: ShieldCheck (no PII to AI), Lock (zero-retention API), Eye (full control)
+- Consistent editorial style with existing landing page patterns
+- SectionRule separator before the section
+- Responsive grid: sm:grid-cols-3
+
+### Feature #512: Trust badges en visuele privacy-indicatoren op landingspagina - PASSING
+- Added 3 compact pill badges below the privacy cards
+- Badges: "Privacy by Design" (Fingerprint), "Zero Data Retention" (DatabaseZap), "AI Opt-out" (ToggleRight)
+- Subtle rounded-full border pills, centered, editorial style
+- Zero console errors
+
+### Feature #467: Sectie-koppen met krantsectie-stijl scheiders - PASSING
+- Created SectionHeading component with newspaper-style dividers
+- Uppercase text-[10px] font-bold tracking-[0.12em] with horizontal rules on both sides
+- Replaced tab-based layout with scrollable page showing both sections
+- Added "Meldingen" and "Financieel Nieuws" section headings
+- News fetches on mount instead of on tab switch
+- Consistent with editorial patterns (matches landing page SectionRule)
+- Zero TypeScript errors
+- Commit: 5b128b7
+
+### Current Status
+- 474/509 features passing (93.1%)
+
 ## Session 2026-03-07 - Features #504, #502, #503
 
 ### Feature #504: Unit tests voor sanitizeForAI functie - PASSING
@@ -10083,3 +10174,18 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#463, #464, #465)
 - Zero TypeScript errors
 - Commit: 6483df8
+
+## Session 2026-03-07 - Feature #514
+
+### Feature #514: Widgets tab in beheer-navigatie naar /beheer/widgets-test - PASSING
+- Added { label: 'Widgets', href: '/beheer/widgets-test' } to tabs array in beheer-nav.tsx
+- Uses default amber active styling (border-amber-500 text-amber-700)
+- widgets-test page already exists at app/(app)/beheer/widgets-test/page.tsx
+- beheer layout.tsx already includes BeheerNav, so tab renders on all beheer pages
+- Active styling: pathname === '/beheer/widgets-test' matches correctly
+- Zero TypeScript errors
+- Commit: f2ce54c
+
+### Current Status
+- 1 feature completed this session (#514)
+- 478/511 features passing (93.5%)
