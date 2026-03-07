@@ -233,7 +233,6 @@ export default function BerichtenPage() {
   const [activeTab, setActiveTab] = useState<TabId>('meldingen')
   const {
     unreadCount,
-    loading: providerLoading,
     markAsRead,
     markAllRead,
   } = useNotifications()
