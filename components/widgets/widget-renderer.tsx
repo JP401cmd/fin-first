@@ -201,7 +201,8 @@ export interface DashboardData {
   // FIRE end strategy
   fireEndStrategy: FireEndStrategy
   fireEndAge: number
-  // DAIshboard enrichment: previous month expenses + net worth delta
+  // DAIshboard enrichment: previous month income/expenses + net worth delta
+  prevMonthIncome: number
   prevMonthExpenses: number
   netWorthDelta: number | null
   // Favorite budgets for dynamic quarter-widgets

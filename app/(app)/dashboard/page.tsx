@@ -26,6 +26,8 @@ export default async function DashboardPage() {
   const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0]
   const monthEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1)).toISOString().split('T')[0]
   const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
+  // Previous month range for cashflow comparison
+  const prevMonthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 1)).toISOString().split('T')[0]
   // Previous 3 full months (excl. current month) for stable sovereignty calculation
   const prev3MonthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 3, 1)).toISOString().split('T')[0]
   const [
@@ -34,7 +36,7 @@ export default async function DashboardPage() {
     allBudgetsResult, recsResult, childBudgetsResult,
     goalsResult, recurringResult, netWorthSnapshotsResult,
     income12Result, earliestIncomeResult, sovereigntyTxResult,
-    bankAccountsResult, favBudgetsResult,
+    bankAccountsResult, favBudgetsResult, prevMonthTxResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('id, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
@@ -56,6 +58,7 @@ export default async function DashboardPage() {
     supabase.from('transactions').select('amount').lt('amount', 0).gte('date', prev3MonthStart).lt('date', monthStart),
     supabase.from('bank_accounts').select('id, balance').eq('is_active', true).is('linked_asset_id', null),
     supabase.from('budgets').select('id, name, icon, budget_type, default_limit, interval, parent_id, is_favorite').eq('is_favorite', true),
+    supabase.from('transactions').select('amount').gte('date', prevMonthStart).lt('date', monthStart),
   ])
 
   // Core calculations
@@ -65,6 +68,15 @@ export default async function DashboardPage() {
     const amt = Number(tx.amount)
     if (amt > 0) monthlyIncome += amt
     else monthlyExpenses += Math.abs(amt)
+  }
+
+  // Previous month income/expenses for cashflow comparison widget
+  let prevMonthIncome = 0
+  let prevMonthExpenses = 0
+  for (const tx of prevMonthTxResult.data ?? []) {
+    const amt = Number(tx.amount)
+    if (amt > 0) prevMonthIncome += amt
+    else prevMonthExpenses += Math.abs(amt)
   }
 
   // Cash assets already included via assets table — only add unlinked bank_accounts (legacy/transition)
@@ -502,7 +514,8 @@ export default async function DashboardPage() {
     simFireCountdown,
     fireEndStrategy: fireStrategy.strategy,
     fireEndAge: fireStrategy.endAge,
-    prevMonthExpenses: 0,
+    prevMonthIncome,
+    prevMonthExpenses,
     netWorthDelta: null,
     favoriteBudgets,
     // New widget data (defaults until widgets are implemented)

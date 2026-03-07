@@ -73,9 +73,22 @@ const mockData: DashboardData = {
   simFireCountdown: null,
   fireEndStrategy: 'deplete',
   fireEndAge: 90,
+  prevMonthIncome: 0,
   prevMonthExpenses: 0,
   netWorthDelta: null,
   favoriteBudgets: [],
+  notifications: [],
+  badgeSummary: { earned: 0, total: 0, latestBadge: null, nearestBadge: null },
+  streaks: [],
+  aiInsights: [],
+  nextSteps: [],
+  monthSummary: { netWorthDelta: 0, freedomDaysWon: 0, savingsRate: 0, budgetScore: 0, prevMonthComparison: 0 },
+  upcomingEvents: [],
+  emergencyFund: { currentAmount: 0, targetAmount: 0, monthsCovered: 0, targetMonths: 6, isComplete: false },
+  topRecurringTransactions: [],
+  totalRecurringAmount: 0,
+  topRecommendations: [],
+  topLifeEvents: [],
 }
 
 const makePrefs = (ids: string[], sizes: ('half' | 'full')[] = []): WidgetPref[] =>
