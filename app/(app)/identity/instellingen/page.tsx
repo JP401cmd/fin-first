@@ -839,7 +839,7 @@ export default function InstellingenPage() {
             ) : (
               <div className="space-y-0">
                 {MODULE_GROUPS.map(({ module, label, accentClass }) => {
-                  const widgets = WIDGET_CATALOG.filter(w => w.module === module)
+                  const widgets = WIDGET_CATALOG.filter(w => w.module === module && sovereigntyLevel >= w.minLevel)
                   if (widgets.length === 0) return null
                   const widgetIds = widgets.map(w => w.id)
                   const sortedWidgets = [...widgets].sort((a, b) => {

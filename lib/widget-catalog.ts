@@ -1,5 +1,7 @@
 // ── Widget Catalog ────────────────────────────────────────────
-// Static definition of all 20 dashboard widgets.
+// Static definition of all dashboard widgets.
+
+import { PHASES, DEFAULT_MATRIX } from '@/lib/feature-phases'
 
 export type WidgetSize = 'quarter' | 'half' | 'full'
 export type WidgetModule = 'kern' | 'wil' | 'horizon' | 'cross'
@@ -25,6 +27,39 @@ export interface WidgetPref {
 
 export interface WidgetPrefs {
   widgets: WidgetPref[]
+}
+
+// ── Derive minLevel & requiredPhase from feature-phase matrix ─
+// Single source of truth: DEFAULT_MATRIX determines when a widget unlocks.
+
+/**
+ * Find the earliest phase where a feature is enabled and return
+ * the lowest sovereignty level of that phase.
+ * Returns -2 if the feature is not in the matrix (always available).
+ */
+export function deriveMinLevel(featureId: string): number {
+  const row = DEFAULT_MATRIX[featureId]
+  if (!row) return -2
+  for (const phase of PHASES) {
+    if (row[phase.id] === true) return Math.min(...phase.levels)
+  }
+  return -2
+}
+
+/**
+ * Find the earliest phase where a feature is enabled and return its label.
+ * Returns undefined if the feature is always available (recovery or not in matrix).
+ */
+export function deriveRequiredPhase(featureId: string): string | undefined {
+  const row = DEFAULT_MATRIX[featureId]
+  if (!row) return undefined
+  for (const phase of PHASES) {
+    if (row[phase.id] === true) {
+      // Recovery = always available, no phase label needed
+      return phase.id === 'recovery' ? undefined : phase.label
+    }
+  }
+  return undefined
 }
 
 export const WIDGET_CATALOG: WidgetDef[] = [
@@ -423,6 +458,17 @@ export const WIDGET_FEATURE_MAP: Record<string, string> = {
   backtesting_score:    'widget_backtesting_score',
   ai_inzicht:           'widget_ai_inzicht',
   nibud_benchmark:      'nibud_benchmark',
+}
+
+// ── Sync minLevel & requiredPhase from matrix ────────────────
+// Override hardcoded values with derived values from DEFAULT_MATRIX
+// to prevent drift between widget-catalog and feature-phases.
+for (const widget of WIDGET_CATALOG) {
+  const featureId = WIDGET_FEATURE_MAP[widget.id]
+  if (featureId) {
+    widget.minLevel = deriveMinLevel(featureId)
+    widget.requiredPhase = deriveRequiredPhase(featureId)
+  }
 }
 
 /** Allowed sizes for dynamic budget_fav:* widgets */

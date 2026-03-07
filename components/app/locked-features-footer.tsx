@@ -13,15 +13,19 @@ const MODULE_FEATURES: Record<string, string[]> = {
     'vermogensverloop',
     'snapshot_vergelijking',
     'cashflow_sankey',
+    'cashflow_forecast',
     'data_export',
     'budget_optimalisatie',
     'asset_allocatie',
+    'vermogensprognose_kern',
+    'spending_patterns',
   ],
   wil: [
     'nibud_benchmark',
     'doelen_systeem',
     'beslissingspatronen',
     'schulden_aflosplan',
+    'widget_voorstellen',
   ],
   horizon: [
     'fire_projecties',
@@ -32,6 +36,12 @@ const MODULE_FEATURES: Record<string, string[]> = {
     'veerkracht_score',
     'vermogensprojectie_chart',
     'fire_geavanceerde_params',
+    'widget_vrijheidsscenarios',
+    'widget_sim_vermogenspad',
+    'widget_passief_inkomen',
+    'widget_box3_drag',
+    'widget_vrijheidsmijlpalen',
+    'widget_backtesting_score',
   ],
 }
 
