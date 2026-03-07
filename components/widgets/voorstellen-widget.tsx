@@ -90,17 +90,20 @@ export function VoorstellenWidget({ size, data, href }: Props) {
     )
   }
 
-  // ── Half-size: top-2 recommendations list (compact for 1-row height) ────
+  // ── Half-size: compact for 1-row 160px height ────
   if (size === 'half') {
     const top2 = (topRecommendations ?? []).slice(0, 2)
 
     return (
       <WidgetShell module="wil" size={size} kicker="Voorstellen" href={href}>
         <div>
+          <div className="flex items-center gap-3 mb-1.5">
+            <Lightbulb className="h-4 w-4 text-wil-500 shrink-0" />
+            <span className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">{recommendations}</span>
+            <span className="text-xs text-[var(--ink-3)]">{recommendations === 1 ? 'aanbeveling' : 'aanbevelingen'}</span>
+          </div>
           {top2.length === 0 ? (
-            <div className="flex items-center justify-center py-2 text-center">
-              <p className="font-sans text-sm text-[var(--ink-3)]">Geen aanbevelingen</p>
-            </div>
+            <p className="text-sm text-[var(--ink-3)]">Geen aanbevelingen</p>
           ) : (
             <div className="space-y-0">
               {top2.map((rec, i) => (
@@ -108,16 +111,13 @@ export function VoorstellenWidget({ size, data, href }: Props) {
               ))}
             </div>
           )}
-          <p className="mt-1 text-[11px] text-[var(--ink-3)]">
-            {recommendations} {recommendations === 1 ? 'aanbeveling' : 'aanbevelingen'}
-          </p>
         </div>
       </WidgetShell>
     )
   }
 
-  // ── Full-size: stats row + top-5 with category badges ────
-  const top5 = (topRecommendations ?? []).slice(0, 5)
+  // ── Full-size: stats row + top-6 with category badges (336px height) ────
+  const top5 = (topRecommendations ?? []).slice(0, 6)
   const totalDaysFull = Math.round(
     (topRecommendations ?? []).reduce((sum, r) => sum + (r.freedomDaysImpact > 0 ? r.freedomDaysImpact : 0), 0)
   )
@@ -138,7 +138,7 @@ export function VoorstellenWidget({ size, data, href }: Props) {
         </div>
 
         {/* Aanbevelingenlijst */}
-        <p className="label-editorial text-[var(--ink-3)] mt-4 mb-2">TOP VOORSTELLEN</p>
+        <p className="label-editorial text-[var(--ink-3)] mt-3 mb-1.5">TOP VOORSTELLEN</p>
 
         {top5.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">

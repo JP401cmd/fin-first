@@ -1,7 +1,7 @@
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData, NextStep } from './widget-renderer'
-import { ArrowRight, CheckCircle2, ExternalLink } from 'lucide-react'
+import { ArrowRight, CheckCircle2 } from 'lucide-react'
 
 interface Props {
   size: WidgetSize
@@ -11,23 +11,20 @@ interface Props {
 
 function StepCard({ step }: { step: NextStep }) {
   return (
-    <a
-      href={step.href}
-      className="block rounded-[var(--r)] border border-[var(--border-ed)] p-3 hover:border-wil-300 hover:bg-wil-50/30 transition-colors group"
-    >
+    <div className="rounded-[var(--r)] border border-[var(--border-ed)] p-2.5 group/step">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-medium text-[var(--ink)] group-hover:text-wil-700 line-clamp-2">
+        <p className="text-sm font-medium text-[var(--ink)] line-clamp-1">
           {step.title}
         </p>
-        <ExternalLink className="h-3.5 w-3.5 shrink-0 text-[var(--ink-4)] group-hover:text-wil-500 mt-0.5" />
+        <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[var(--ink-4)] mt-0.5" />
       </div>
-      <p className="mt-1 text-xs text-[var(--ink-3)] line-clamp-2">{step.description}</p>
+      <p className="mt-0.5 text-xs text-[var(--ink-3)] line-clamp-1">{step.description}</p>
       {step.impact != null && step.impact > 0 && (
-        <p className="mt-1.5 font-serif italic text-[12px] text-emerald-600">
+        <p className="mt-1 font-serif italic text-[11px] text-emerald-600">
           +{step.impact} vrijheidsdagen
         </p>
       )}
-    </a>
+    </div>
   )
 }
 
@@ -71,19 +68,19 @@ export function VolgendeStapWidget({ size, data, href }: Props) {
     )
   }
 
-  // ── Half-size: compact 1-2 steps (fits 1-row 160px height) ──
+  // ── Half-size: compact for 1-row 160px height ──
   if (size === 'half') {
     const shown = active.slice(0, 2)
 
     return (
       <WidgetShell module="wil" size={size} kicker="Volgende Stap" href={href}>
-        <ul className="space-y-1.5">
+        <ul className="space-y-1">
           {shown.map(step => (
-            <li key={step.key} className="flex items-center gap-2">
+            <li key={step.key} className="flex items-center gap-2 py-0.5">
               <ArrowRight className="h-3.5 w-3.5 text-wil-500 shrink-0" />
-              <a href={step.href} className="flex-1 min-w-0 text-sm font-medium text-[var(--ink)] hover:text-wil-700 transition-colors truncate">
+              <span className="flex-1 min-w-0 text-sm font-medium text-[var(--ink)] truncate">
                 {step.title}
-              </a>
+              </span>
               {step.impact != null && step.impact > 0 && (
                 <span className="shrink-0 font-mono text-xs tabular-nums text-wil-700 bg-wil-50 rounded-full px-2 py-px">
                   +{step.impact}d
@@ -93,7 +90,7 @@ export function VolgendeStapWidget({ size, data, href }: Props) {
           ))}
         </ul>
         {active.length > 2 && (
-          <p className="mt-1 text-[11px] text-[var(--ink-4)]">
+          <p className="mt-0.5 text-[11px] text-[var(--ink-4)]">
             +{active.length - 2} andere {active.length - 2 === 1 ? 'stap' : 'stappen'}
           </p>
         )}
@@ -101,8 +98,8 @@ export function VolgendeStapWidget({ size, data, href }: Props) {
     )
   }
 
-  // ── Full-size: top-3 steps as cards with description + why + impact + link ──
-  const topSteps = active.slice(0, 3)
+  // ── Full-size: top-4 steps as cards (336px height) ──
+  const topSteps = active.slice(0, 4)
 
   return (
     <WidgetShell module="wil" size={size} kicker="Volgende Stap" href={href}>
@@ -111,9 +108,9 @@ export function VolgendeStapWidget({ size, data, href }: Props) {
           <StepCard key={step.key} step={step} />
         ))}
       </div>
-      {active.length > 3 && (
-        <p className="mt-3 text-xs text-[var(--ink-4)] text-center">
-          +{active.length - 3} andere {active.length - 3 === 1 ? 'stap' : 'stappen'}
+      {active.length > topSteps.length && (
+        <p className="mt-2 text-xs text-[var(--ink-4)] text-center">
+          +{active.length - topSteps.length} andere {active.length - topSteps.length === 1 ? 'stap' : 'stappen'}
         </p>
       )}
     </WidgetShell>

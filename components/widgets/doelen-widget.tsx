@@ -220,15 +220,15 @@ export function DoelenWidget({ size, data, href }: Props) {
     )
   }
 
+  // ── Half-size: compact for 1-row 160px height ────
   if (size === 'half') {
-    // Compact: show max 2 goals with tighter spacing for 1-row height (160px)
     const halfGoals = topGoals.slice(0, 2)
     return (
       <WidgetShell module="wil" size={size} kicker="Doelen" href={href}>
         <div ref={containerRef}>
           {halfGoals.length === 0 ? (
-            <div className="flex items-center justify-center py-2 text-center">
-              <Target className="h-5 w-5 text-wil-200 mr-2" />
+            <div className="flex items-center gap-2 py-2">
+              <Target className="h-5 w-5 text-wil-200 shrink-0" />
               <p className="text-sm text-[var(--ink-3)]">Nog geen doelen</p>
             </div>
           ) : (
@@ -240,7 +240,7 @@ export function DoelenWidget({ size, data, href }: Props) {
                 return (
                   <div
                     key={goal.id}
-                    className="py-1.5 border-b border-[var(--border-ed)] last:border-0"
+                    className="py-1 border-b border-[var(--border-ed)] last:border-0"
                     style={{
                       animation: hasEntered ? `fadeUp 0.4s ease-out ${i * 60}ms both` : 'none',
                       opacity: hasEntered ? undefined : 0,
@@ -252,7 +252,7 @@ export function DoelenWidget({ size, data, href }: Props) {
                         {pct}%
                       </span>
                     </div>
-                    <div className="mt-0.5 h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+                    <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
                       <div
                         className={`h-full rounded-full ${overdue ? 'bg-red-400' : colors.bar}`}
                         style={{
@@ -267,27 +267,49 @@ export function DoelenWidget({ size, data, href }: Props) {
             </div>
           )}
           {goals > halfGoals.length && (
-            <p className="mt-1 text-[11px] text-[var(--ink-3)]">{footerLabel}</p>
+            <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">{footerLabel}</p>
           )}
         </div>
       </WidgetShell>
     )
   }
 
-  // Full size
+  // ── Full-size: summary + goal cards grid (336px height) ────
+  const completedGoals = topGoals.filter(g => goalPct(g) >= 100).length
+  const avgPct = topGoals.length > 0
+    ? Math.round(topGoals.reduce((sum, g) => sum + goalPct(g), 0) / topGoals.length)
+    : 0
+
   return (
     <WidgetShell module="wil" size={size} kicker="Doelen" href={href}>
       <div ref={containerRef}>
         {topGoals.length === 0 ? (
           <EmptyState full />
         ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {topGoals.map((goal, i) => (
-              <GoalCard key={goal.id} goal={goal} index={i} hasEntered={hasEntered} />
-            ))}
-          </div>
+          <>
+            {/* Summary row */}
+            <div className="grid grid-cols-3 divide-x divide-dashed divide-[var(--border-ed)] border border-dashed border-[var(--border-ed)] rounded-[var(--r)] p-3 mb-3">
+              <div className="flex flex-col items-center pr-3">
+                <span className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">{goals}</span>
+                <span className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] font-sans mt-0.5 text-center">DOELEN</span>
+              </div>
+              <div className="flex flex-col items-center px-3">
+                <span className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">{avgPct}%</span>
+                <span className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] font-sans mt-0.5 text-center leading-tight">GEM. VOORTGANG</span>
+              </div>
+              <div className="flex flex-col items-center pl-3">
+                <span className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">{completedGoals}</span>
+                <span className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] font-sans mt-0.5 text-center">BEHAALD</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {topGoals.map((goal, i) => (
+                <GoalCard key={goal.id} goal={goal} index={i} hasEntered={hasEntered} />
+              ))}
+            </div>
+          </>
         )}
-        <p className="mt-3 text-xs text-[var(--ink-3)]">{footerLabel}</p>
       </div>
     </WidgetShell>
   )

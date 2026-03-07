@@ -50,10 +50,10 @@ function ActionRow({ action, index, hasEntered }: { action: TopAction; index: nu
 }
 
 export function ActiesWidget({ size, data, href }: Props) {
-  const { openActions, totalFreedomDaysOpen, completedActionsThisMonth, topOpenActions } = data
+  const { openActions, totalFreedomDaysOpen, completedActionsThisMonth, topOpenActions, recentCompletedActions } = data
   const { ref: containerRef, hasEntered } = useInViewAnimation({ duration: 600 })
 
-  const top = size === 'full' ? topOpenActions.slice(0, 5) : topOpenActions.slice(0, 3)
+  const top = size === 'full' ? topOpenActions.slice(0, 6) : topOpenActions.slice(0, 3)
   const roundedDays = Math.round(totalFreedomDaysOpen)
 
   // ── Quarter-size: stacked KPIs ────
@@ -75,15 +75,23 @@ export function ActiesWidget({ size, data, href }: Props) {
     )
   }
 
+  // ── Half-size: compact for 1-row 160px height ────
   if (size === 'half') {
     const halfTop = topOpenActions.slice(0, 2)
     return (
       <WidgetShell module="wil" size={size} kicker="Acties" href={href}>
         <div ref={containerRef}>
+          <div className="flex items-center gap-3 mb-1.5">
+            <span className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">{openActions}</span>
+            <span className="text-xs text-[var(--ink-3)]">open</span>
+            {roundedDays > 0 && (
+              <span className="font-mono text-xs tabular-nums text-wil-700 bg-wil-50 rounded-full px-2 py-px">
+                +{roundedDays}d
+              </span>
+            )}
+          </div>
           {halfTop.length === 0 ? (
-            <div className="flex items-center justify-center py-2 text-center">
-              <p className="font-sans text-sm text-[var(--ink-3)]">Geen openstaande acties</p>
-            </div>
+            <p className="text-sm text-[var(--ink-3)]">Geen openstaande acties</p>
           ) : (
             <div className="space-y-0">
               {halfTop.map((action, i) => (
@@ -91,9 +99,6 @@ export function ActiesWidget({ size, data, href }: Props) {
               ))}
             </div>
           )}
-          <p className="mt-1 text-[11px] text-[var(--ink-3)]">
-            {openActions} open · {completedActionsThisMonth} afgerond
-          </p>
         </div>
       </WidgetShell>
     )
@@ -120,10 +125,10 @@ export function ActiesWidget({ size, data, href }: Props) {
         </div>
 
         {/* Actielijst */}
-        <p className="label-editorial text-[var(--ink-3)] mt-4 mb-2">TOP ACTIES</p>
+        <p className="label-editorial text-[var(--ink-3)] mt-3 mb-1.5">TOP ACTIES</p>
 
         {top.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
+          <div className="flex flex-col items-center justify-center py-6 text-center">
             <p className="font-sans text-sm text-[var(--ink-3)]">Geen openstaande acties</p>
             <p className="font-serif italic text-[11px] text-[var(--ink-4)] mt-1">Alle acties zijn afgerond</p>
           </div>
@@ -133,6 +138,22 @@ export function ActiesWidget({ size, data, href }: Props) {
               <ActionRow key={action.id} action={action} index={i} hasEntered={hasEntered} />
             ))}
           </div>
+        )}
+
+        {/* Recent completed — fills remaining vertical space in 336px */}
+        {recentCompletedActions.length > 0 && top.length > 0 && (
+          <>
+            <p className="label-editorial text-[var(--ink-3)] mt-3 mb-1.5">RECENT AFGEROND</p>
+            {recentCompletedActions.slice(0, 2).map((a) => (
+              <div key={a.id} className="flex items-center gap-2 py-1 text-[var(--ink-3)]">
+                <span className="h-2 w-2 rounded-full shrink-0 bg-emerald-400" />
+                <span className="flex-1 min-w-0 text-xs truncate line-through decoration-[var(--ink-4)]">{a.title}</span>
+                {a.freedomDaysImpact != null && a.freedomDaysImpact > 0 && (
+                  <span className="shrink-0 font-mono text-[10px] tabular-nums text-emerald-600">+{Math.round(a.freedomDaysImpact)}d</span>
+                )}
+              </div>
+            ))}
+          </>
         )}
       </div>
     </WidgetShell>
