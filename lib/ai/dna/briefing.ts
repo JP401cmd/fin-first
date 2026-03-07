@@ -65,10 +65,23 @@ showStreak: Vier positieve streaks (vermogensgroei, budget compliance, etc). Geb
   - Ideaal als boost in het midden van de briefing
   - Niet gebruiken als er geen actieve streaks in de data staan
 
+showNextStep: Toon een concrete volgende stap suggestie. Gebruik max 2x per briefing, kies de meest impactvolle stappen uit de VOLGENDE STAPPEN data.
+  - Prioriteer stappen die de meeste vrijheidstijd opleveren
+  - Gebruik de dismissKey uit de VOLGENDE STAPPEN data voor dismiss-tracking
+  - Plaats bij voorkeur na een metric of insight card als logische opvolging
+  - Ideaal als "call to action" na het tonen van een inzicht
+
 showQuote: Toon een reflectief of motiverend citaat. Gebruik max 1x per briefing.
   - Pas de toon aan op de gebruikersfase (recovery: bemoedigend, mastery: filosofisch)
   - Citaten moeten relevant zijn voor de actuele financiele situatie
   - Gebruik attribution "Will" voor eigen redactionele reflecties
+
+showDiscover: Toon een ontdek-suggestie voor een feature die de gebruiker nog niet heeft bezocht. Max 1 per briefing, alleen voor onbezochte features.
+  - Gebruik een prikkelende teaser die nieuwsgierigheid wekt
+  - Beschrijf kort wat de feature biedt en waarom het relevant is
+  - Kies features die passen bij de huidige fase van de gebruiker
+  - Gebruik featureId voor visit-tracking (bijv. "belasting", "scenarios", "simulaties")
+  - Plaats altijd near het einde van de briefing, nooit als eerste card
 
 == NAVIGATIE HREFS ==
 Gebruik ALTIJD een van deze routes. Verzin GEEN eigen routes.
@@ -102,6 +115,8 @@ Default href per card type:
 - showRecurring → "/core/cash"
 - showLifeEvent → "/horizon"
 - showStreak → contextafhankelijk (kies de route die past bij het streak-onderwerp)
+- showNextStep → volgt uit de VOLGENDE STAPPEN data (kern→"/core/*", wil→"/will", horizon→"/horizon")
+- showDiscover → de relevante pagina van de feature (bijv. "/core/belasting", "/horizon")
 
 == LAYOUT CONSTRAINTS ==
 - Nooit twee metric-cards direct naast elkaar (wissel af met andere types)
@@ -112,6 +127,8 @@ Default href per card type:
 - showQuote als mooie afsluiter van de briefing of als rustpunt halverwege
 - showStreak als positieve boost, bij voorkeur na een metric of progressRing card
 - showLifeEvent bij voorkeur na een horizon-gerelateerde card (FIRE, countdown)
+- showNextStep werkt goed na een metric of insight card als logische vervolgactie
+- showDiscover als lichte afsluiter, nooit als eerste card — plaats near het einde van de briefing
 
 == TEMPOREEL BEWUSTZIJN ==
 Vandaag: ${temporal.date}, dag ${temporal.dayOfMonth} van de maand, ${temporal.dayOfWeek}.
@@ -592,6 +609,30 @@ export const briefingTools = {
       freedomStr: z.string().optional().describe('Vrijheidstijd-impact, bijv. "5 maanden"'),
       module: moduleEnum.describe('Kleurmodule (gebruik "horizon" voor toekomst-events)'),
       href: z.string().optional().describe('Link naar detail pagina'),
+    }),
+  }),
+
+  showNextStep: tool({
+    description: 'Toon een concrete volgende stap suggestie voor de gebruiker. Visueel als actiekaart met icoon, module-kleur en klikbare link. Max 2 per briefing, kies de meest impactvolle stappen.',
+    inputSchema: z.object({
+      title: z.string().describe('Stap titel, bijv. "Importeer je eerste bankafschrift"'),
+      description: z.string().describe('Korte beschrijving (1-2 zinnen)'),
+      href: z.string().describe('Link naar de relevante pagina'),
+      module: moduleEnum.describe('Kleurmodule (kern/wil/horizon)'),
+      icon: z.string().describe('Lucide icon naam, bijv. "receipt", "piggy-bank", "target", "compass", "zap"'),
+      dismissKey: z.string().optional().describe('Unieke key voor dismiss-tracking, bijv. "import_transactions"'),
+    }),
+  }),
+
+  showDiscover: tool({
+    description: 'Toon een ontdek-suggestie voor een feature die de gebruiker nog niet heeft bezocht. Max 1 per briefing, alleen voor onbezochte features. Plaats near het einde van de briefing.',
+    inputSchema: z.object({
+      label: z.string().describe('Feature naam, bijv. "Box 3 Belastingberekening"'),
+      teaser: z.string().describe('Prikkelende teaser (1 zin), bijv. "Wist je dat je belastingdruk in vrijheidsdagen kunt zien?"'),
+      description: z.string().describe('Korte beschrijving van de feature en waarom het relevant is (1-2 zinnen)'),
+      href: z.string().describe('Link naar de feature pagina'),
+      module: moduleEnum.describe('Kleurmodule van de feature'),
+      featureId: z.string().describe('Unieke feature ID voor visit-tracking, bijv. "belasting", "scenarios", "simulaties"'),
     }),
   }),
 }

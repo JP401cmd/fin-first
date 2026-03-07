@@ -10,6 +10,8 @@ import type { ProgressionEvent } from './progression'
 import { computePersonalTrends } from './trends'
 import { detectPatterns } from './pattern-detection'
 import { getSeasonalContext } from './seasonal'
+import { computeAllKernSteps, computeAllWilSteps, computeAllHorizonSteps } from '@/components/app/next-step-card'
+import { DISCOVER_ITEMS } from '@/components/app/discover-carousel'
 
 function pct(value: number, total: number): string {
   if (total === 0) return '0'
@@ -22,7 +24,7 @@ function freedomStr(amount: number, dailyExp: number): string {
   return formatFreedomTimeString(ft, 'short')
 }
 
-export function condenseDashboardData(data: DashboardData, temporal: TemporalContext, progressionEvents?: ProgressionEvent[]): string {
+export function condenseDashboardData(data: DashboardData, temporal: TemporalContext, progressionEvents?: ProgressionEvent[], visitedFeatureIds?: Set<string>): string {
   const dailyExp = (data.monthlyExpenses ?? 0) > 0 ? (data.monthlyExpenses ?? 0) / 30 : 0
   const monthlyIncome = data.monthlyIncome ?? 0
   const monthlyExpenses = data.monthlyExpenses ?? 0
@@ -371,6 +373,53 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
       const impact = rec.freedomDaysImpact > 0 ? ` — ${rec.freedomDaysImpact} vrijheidsdagen/jaar` : ''
       lines.push(`- ${rec.title} (${rec.category})${impact}`)
     }
+  }
+  lines.push('')
+
+  // Next steps (volgende stappen) per module
+  const alertBudgetCount = (data.favoriteBudgets ?? []).filter(fb => fb.spent > fb.limit).length
+  const kernSteps = computeAllKernSteps({
+    totalAssets: data.totalAssets ?? 0,
+    totalDebts: data.totalDebts ?? 0,
+    monthlyIncome: data.monthlyIncome ?? 0,
+    monthlyExpenses: data.monthlyExpenses ?? 0,
+    budgetCount: (data.budgetTotals?.expense?.limit ?? 0) > 0 ? 1 : 0,
+    snapshotCount: (data.netWorthHistory ?? []).length,
+    hasTransactions: (data.monthlyExpenses ?? 0) > 0 || (data.monthlyIncome ?? 0) > 0,
+    alertBudgetCount,
+    hasGoals: (data.goals ?? 0) > 0,
+    fireUnreachable: data.fireProjResult?.fireAge == null,
+  })
+  const wilSteps = computeAllWilSteps({
+    pendingRecommendations: data.recommendations ?? 0,
+    openActions: data.openActions ?? 0,
+    goalCount: data.goals ?? 0,
+    hasCompletedActions: (data.completedActionsThisMonth ?? 0) > 0,
+  })
+  const horizonSteps = computeAllHorizonSteps({
+    hasFireProjection: data.fireProjResult?.fireAge != null,
+    eventCount: data.lifeEvents ?? 0,
+    freedomPct: data.freedomPct ?? 0,
+  })
+
+  lines.push(`VOLGENDE STAPPEN: ${kernSteps.length} kern, ${wilSteps.length} wil, ${horizonSteps.length} horizon`)
+  for (const step of kernSteps) {
+    lines.push(`- [kern] ${step.title}: ${step.description} (${step.href})`)
+  }
+  for (const step of wilSteps) {
+    lines.push(`- [wil] ${step.title}: ${step.description} (${step.href})`)
+  }
+  for (const step of horizonSteps) {
+    lines.push(`- [horizon] ${step.title}: ${step.description} (${step.href})`)
+  }
+  lines.push('')
+
+  // Discoverable features (ontdekbare features)
+  const visited = visitedFeatureIds ?? new Set<string>()
+  const unvisited = DISCOVER_ITEMS.filter(item => !visited.has(item.id))
+  lines.push(`ONTDEKBARE FEATURES: ${unvisited.length} van ${DISCOVER_ITEMS.length} onontdekt`)
+  for (const item of unvisited) {
+    lines.push(`- [${item.module}] ${item.label}: ${item.description} — "${item.teaser}" (${item.href})`)
   }
   lines.push('')
 

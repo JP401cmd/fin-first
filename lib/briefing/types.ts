@@ -183,6 +183,26 @@ export interface LifeEventCardSpec {
   href?: string
 }
 
+export interface NextStepCardSpec {
+  type: 'nextStep'
+  title: string
+  description: string
+  href: string
+  module: CardModule
+  icon: string
+  dismissKey?: string
+}
+
+export interface DiscoverCardSpec {
+  type: 'discover'
+  label: string
+  teaser: string
+  description: string
+  href: string
+  module: CardModule
+  featureId: string
+}
+
 // ── Union Type ──────────────────────────────────────────────
 
 export type BriefingCardSpec =
@@ -202,6 +222,8 @@ export type BriefingCardSpec =
   | StreakCardSpec
   | RecurringCardSpec
   | LifeEventCardSpec
+  | NextStepCardSpec
+  | DiscoverCardSpec
 
 // ── SSE Event Types ─────────────────────────────────────────
 
@@ -285,4 +307,6 @@ export const CARD_SPAN: Record<BriefingCardSpec['type'], number> = {
   streak: 1,
   recurring: 2,
   lifeEvent: 2,
+  nextStep: 2,
+  discover: 2,
 }

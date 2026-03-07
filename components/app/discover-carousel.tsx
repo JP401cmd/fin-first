@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 
-interface DiscoverItem {
+export interface DiscoverItem {
   id: string
   label: string
   description: string
@@ -15,7 +15,7 @@ interface DiscoverItem {
 }
 
 /** All discoverable features mapped to pages */
-const DISCOVER_ITEMS: DiscoverItem[] = [
+export const DISCOVER_ITEMS: DiscoverItem[] = [
   // Kern
   { id: 'vermogensverloop',      label: 'Vermogensverloop',       description: 'Net worth snapshots en grafiek', href: '/core', teaser: 'Wist je dat je je vermogen over tijd kunt volgen?',              module: 'kern' },
   { id: 'snapshot_vergelijking', label: 'Snapshot Vergelijking',  description: 'Vergelijk twee periodes',       href: '/core', teaser: 'Wist je dat je snapshots naast elkaar kunt vergelijken?',       module: 'kern' },
@@ -43,7 +43,7 @@ const MODULE_COLORS: Record<string, { bg: string; border: string; text: string; 
 
 const STORAGE_KEY = 'discover_visited_features'
 
-function getVisitedFeaturesLocal(): Set<string> {
+export function getVisitedFeaturesLocal(): Set<string> {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     return stored ? new Set(JSON.parse(stored)) : new Set()

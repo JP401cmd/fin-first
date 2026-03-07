@@ -4,6 +4,7 @@ import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 import type { BriefingCardSpec, BriefingComposeResponse, BriefingSSEEvent, TemporalContext, PreviousBriefingSummary, BriefingLongTermMemory, CardModule } from '@/lib/briefing/types'
 import { condenseDashboardData } from '@/lib/briefing/condense'
+import { getVisitedFeaturesLocal } from '@/components/app/discover-carousel'
 import { logCardEngagement } from '@/lib/briefing/engagement'
 import { buildUserPreferenceBlock, persistFeedback, logVisitTimestamp, readVisitTimestamps, detectBriefingFrequency } from '@/lib/briefing/user-preferences'
 import { loadPreviousSnapshot, saveSnapshot, buildSnapshot, detectProgressionEvents } from '@/lib/briefing/progression'
@@ -232,7 +233,8 @@ export function DAIshboard({ data, temporal, userName }: Props) {
       ? { previousPhase: String(phaseTransitionEvent.previousValue), currentPhase: String(phaseTransitionEvent.currentValue) }
       : undefined
 
-    const dataSummary = condenseDashboardData(data, temporal, progressionEvents)
+    const visitedFeatures = typeof window !== 'undefined' ? getVisitedFeaturesLocal() : new Set<string>()
+    const dataSummary = condenseDashboardData(data, temporal, progressionEvents, visitedFeatures)
 
     controllerRef.current?.abort()
     const controller = new AbortController()
@@ -331,7 +333,10 @@ export function DAIshboard({ data, temporal, userName }: Props) {
     if (hasFetchedRef.current) return
     hasFetchedRef.current = true
     streamFromAI()
-    return () => controllerRef.current?.abort()
+    return () => {
+      controllerRef.current?.abort()
+      hasFetchedRef.current = false
+    }
   }, [streamFromAI])
 
   const handleRefresh = useCallback(() => {

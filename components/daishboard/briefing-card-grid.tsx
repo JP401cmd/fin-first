@@ -18,6 +18,8 @@ import { QuoteCard } from './cards/quote-card'
 import { StreakCard } from './cards/streak-card'
 import { RecurringCard } from './cards/recurring-card'
 import { LifeEventCard } from './cards/life-event-card'
+import { NextStepBriefingCard } from './cards/next-step-card'
+import { DiscoverCard } from './cards/discover-card'
 import { CardFeedbackProvider, type CardFeedbackFn } from './card-feedback-context'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 
@@ -52,6 +54,8 @@ function renderCard(card: BriefingCardSpec, data: DashboardData) {
     case 'streak': return <StreakCard spec={card} />
     case 'recurring': return <RecurringCard spec={card} />
     case 'lifeEvent': return <LifeEventCard spec={card} />
+    case 'nextStep': return <NextStepBriefingCard spec={card} />
+    case 'discover': return <DiscoverCard spec={card} />
   }
 }
 
