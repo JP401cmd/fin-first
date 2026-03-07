@@ -57,7 +57,7 @@ function renderCard(card: BriefingCardSpec, data: DashboardData) {
 
 export function BriefingCardGrid({ cards, data, onCardEngage, onFeedback }: BriefingCardGridProps) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 grid-flow-dense">
       {cards.map((card, i) => {
         const module = 'module' in card ? card.module : undefined
         const rendered = renderCard(card, data)
