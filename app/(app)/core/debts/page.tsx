@@ -19,7 +19,6 @@ import {
 } from '@/lib/debt-data'
 import type { Asset } from '@/lib/asset-data'
 import { FeatureGate } from '@/components/app/feature-gate'
-import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
 import { OwnershipBadge } from '@/components/app/ownership-toggle'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
@@ -667,9 +666,6 @@ export default function DebtsPage() {
           }}
         />
       )}
-
-      {/* Locked features footer for debts sub-page */}
-      <LockedFeaturesFooter module="kern" featureIds={['schulden_aflosplan', 'box3_belasting']} />
 
       {/* New debt form */}
       {showForm && (

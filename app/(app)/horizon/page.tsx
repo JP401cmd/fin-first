@@ -40,7 +40,6 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { FeatureGate } from '@/components/app/feature-gate'
-import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
 import { HouseholdFireSection } from '@/components/app/household-fire-section'
 import { SimChartModal } from '@/components/app/horizon/sim-chart-widget'
 import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverlay, type MonteCarloOverlay } from '@/components/app/horizon/sim-chart'
@@ -1368,9 +1367,6 @@ export default function HorizonPage() {
           </div>
         </div>
       </section>
-
-      {/* === Locked Features Footer === */}
-      <LockedFeaturesFooter module="horizon" />
 
       {/* === Event Form Modal === */}
       {showForm && (

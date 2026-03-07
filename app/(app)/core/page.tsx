@@ -22,7 +22,6 @@ import {
   CheckCircle2, AlertTriangle, TrendingDown, ArrowUpRight, ArrowDownRight, Minus,
 } from 'lucide-react'
 import { FeatureGate } from '@/components/app/feature-gate'
-import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { SparklineWithLabel, type SparklineDataPoint } from '@/components/app/budget-sparkline'
 import { NetWorthProjectionChart } from '@/components/app/net-worth-projection-chart'
@@ -952,9 +951,6 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         </div>
       </section>
 
-      {/* === 8. Locked Features Footer === */}
-      <LockedFeaturesFooter module="kern" />
-
       {/* === Mission Control Modals === */}
       <FullScreenModal
         open={activeModal === 'cash'}
@@ -1090,17 +1086,19 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           )}
 
           {/* Uitgavenpatronen */}
-          {(spendingInsightsLoading || spendingInsights.length > 0 || spendingInsightsHasData) && (
-            <section>
-              <h3 className="mb-3 text-sm font-semibold text-[var(--ink-2)]">Uitgavenpatronen</h3>
-              <SpendingInsightsSection
-                insights={spendingInsights}
-                dataMonths={spendingInsightsDataMonths}
-                message={spendingInsightsMessage}
-                isLoading={spendingInsightsLoading}
-              />
-            </section>
-          )}
+          <FeatureGate featureId="spending_patterns" fallback="hidden">
+            {(spendingInsightsLoading || spendingInsights.length > 0 || spendingInsightsHasData) && (
+              <section>
+                <h3 className="mb-3 text-sm font-semibold text-[var(--ink-2)]">Uitgavenpatronen</h3>
+                <SpendingInsightsSection
+                  insights={spendingInsights}
+                  dataMonths={spendingInsightsDataMonths}
+                  message={spendingInsightsMessage}
+                  isLoading={spendingInsightsLoading}
+                />
+              </section>
+            )}
+          </FeatureGate>
 
           {budgetSparklines.length === 0 && !spendingInsightsLoading && spendingInsights.length === 0 && (
             <p className="py-8 text-center text-sm text-[var(--ink-3)]">

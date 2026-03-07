@@ -26,7 +26,6 @@ import {
 import { NibudBenchmarkSection } from '@/components/app/will/nibud-benchmark'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { CollapsibleSection } from '@/components/app/collapsible-section'
-import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
 import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-animation'
 import { FreedomDaysMonthlyTrend } from '@/components/app/will/freedom-days-monthly-trend'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -1092,9 +1091,6 @@ export default function WillPage() {
         userProfile={userProfile}
         onSavedToActionList={handleCancellationSaved}
       />
-
-      {/* === 9. Locked Features Footer === */}
-      <LockedFeaturesFooter module="wil" />
 
     </div>
     </FreedomDaysAnimationProvider>
