@@ -5,7 +5,70 @@
 import { getEngagementSummary, getModuleEngagementSummary } from './engagement'
 
 const FEEDBACK_KEY = 'briefing_feedback_history'
+const VISITS_KEY = 'briefing_visits'
+const MAX_VISITS = 30
 const MIN_DATA_POINTS = 10
+
+export type BriefingFrequency = 'daily' | 'weekly' | 'monthly' | 'rare'
+
+/**
+ * Detect how often the user visits the DAIshboard based on recent visit timestamps.
+ * - daily: median gap <= 2 days
+ * - weekly: median gap <= 9 days
+ * - monthly: median gap <= 35 days
+ * - rare: less frequent than monthly
+ */
+export function detectBriefingFrequency(lastVisits: Date[]): BriefingFrequency {
+  if (lastVisits.length < 2) return 'rare'
+
+  // Sort descending (most recent first)
+  const sorted = [...lastVisits].sort((a, b) => b.getTime() - a.getTime())
+
+  // Calculate gaps between consecutive visits in days
+  const gaps: number[] = []
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const diffMs = sorted[i].getTime() - sorted[i + 1].getTime()
+    gaps.push(diffMs / (1000 * 60 * 60 * 24))
+  }
+
+  // Median gap
+  const sortedGaps = [...gaps].sort((a, b) => a - b)
+  const mid = Math.floor(sortedGaps.length / 2)
+  const medianGap = sortedGaps.length % 2 === 0
+    ? (sortedGaps[mid - 1] + sortedGaps[mid]) / 2
+    : sortedGaps[mid]
+
+  if (medianGap <= 2) return 'daily'
+  if (medianGap <= 9) return 'weekly'
+  if (medianGap <= 35) return 'monthly'
+  return 'rare'
+}
+
+/** Log a visit timestamp to localStorage (keeps last MAX_VISITS entries) */
+export function logVisitTimestamp(): void {
+  try {
+    const raw = localStorage.getItem(VISITS_KEY)
+    const visits: string[] = raw ? JSON.parse(raw) : []
+    visits.push(new Date().toISOString())
+    // Keep last MAX_VISITS
+    while (visits.length > MAX_VISITS) {
+      visits.shift()
+    }
+    localStorage.setItem(VISITS_KEY, JSON.stringify(visits))
+  } catch { /* quota / SSR */ }
+}
+
+/** Read visit timestamps from localStorage */
+export function readVisitTimestamps(): Date[] {
+  try {
+    const raw = localStorage.getItem(VISITS_KEY)
+    if (!raw) return []
+    const timestamps: string[] = JSON.parse(raw)
+    return timestamps.map(t => new Date(t))
+  } catch {
+    return []
+  }
+}
 
 export interface FeedbackEntry {
   cardType: string

@@ -310,18 +310,26 @@ function getPhaseEmphasis(phase: string): string {
 - Benadruk schuld-alerts, budget-basics, positief momentum
 - Vier kleine winsten (elke euro minder schuld = vrijheid teruggewonnen)
 - Gebruik showBudgetBar voor dagelijkse budgetbewaking
-- Vermijd FIRE/horizon cards — die zijn nu niet relevant`
+- Gebruik showStreak om positieve streaks te vieren (bijv. "3 weken binnen budget") — motiverend in deze fase
+- Gebruik showRecurring om vaste lasten inzichtelijk te maken — bewustwording van maandelijkse drains
+- Vermijd FIRE/horizon cards — die zijn nu niet relevant
+- Vermijd showQuote en showLifeEvent — te vroeg in deze fase`
     case 'stability':
       return `Stability: focus op progressRing, budgetBar, comparison cards.
 - Benadruk budget-optimalisatie, spaarquote verbeteren
 - Toon eerste mijlpalen (3m buffer, 6m buffer)
 - Gebruik showGoalProgress voor spaardoelen
-- Begin FIRE-bewustzijn te introduceren`
+- Gebruik showRecurring voor optimalisatie van vaste lasten — toon besparingspotentieel in vrijheidstijd
+- Gebruik showLifeEvent als er actieve life events zijn — begin met financiele voorbereiding
+- Begin FIRE-bewustzijn te introduceren
+- Vermijd showQuote — focus op concrete actie`
     case 'momentum':
       return `Momentum: focus op sparkline, milestone, goalProgress cards.
 - Benadruk FIRE countdown, scenariovergelijkingen
 - Toon groeitrends en vermogensopbouw
 - Gebruik showComparison voor maand-op-maand vooruitgang
+- Gebruik showStreak om groeistreaks te vieren (bijv. "6 maanden vermogensgroei") — bevestiging van momentum
+- Gebruik showQuote als inspirerende reflectie over vrijheid en vermogensopbouw
 - Belasting-optimalisatie tips waar relevant`
     case 'mastery':
     default:
@@ -329,6 +337,8 @@ function getPhaseEmphasis(phase: string): string {
 - Benadruk passief inkomen, portfolio-diversificatie
 - Toon backtesting resultaten en scenario's
 - Gebruik showMilestone voor FIRE-voortgang
+- Gebruik showQuote als filosofische reflectie over vrijheid, legacy, en meesterschap
+- Gebruik showLifeEvent voor toekomstplanning en legacy-events
 - Withdrawal strategie en legacy planning`
   }
 }
