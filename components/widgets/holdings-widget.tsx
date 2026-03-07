@@ -58,6 +58,29 @@ export function HoldingsWidget({ size, data, href }: Props) {
     ? investmentAssets.reduce((s, a) => s + a.value * (a.expectedReturn ?? 0), 0) / totalInvestments
     : null
 
+  // ── Quarter-size: compact amount + positions + freedom time ────
+  if (size === 'quarter') {
+    return (
+      <WidgetShell module="kern" size={size} kicker="Beleggingen" href={href}>
+        <div>
+          <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
+            {formatCurrency(totalInvestments)}
+          </p>
+          <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
+            {positionCount > 0
+              ? `${positionCount} ${positionCount === 1 ? 'positie' : 'posities'}`
+              : 'Geen beleggingsactiva'}
+          </p>
+          {ftStr && (
+            <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
+              ≈ {ftStr} vrijheid
+            </p>
+          )}
+        </div>
+      </WidgetShell>
+    )
+  }
+
   return (
     <WidgetShell module="kern" size={size} kicker="Beleggingen" href={href}>
       {/* Primary value */}
@@ -78,6 +101,13 @@ export function HoldingsWidget({ size, data, href }: Props) {
       {investmentContributions > 0 && (
         <p className="font-mono text-sm text-emerald-700 tabular-nums">
           +{formatCurrency(investmentContributions)} / maand
+        </p>
+      )}
+
+      {/* Half-size: weighted return summary */}
+      {size === 'half' && weightedReturn != null && weightedReturn > 0 && (
+        <p className="mt-1 font-mono text-xs tabular-nums text-[var(--ink-3)]">
+          Verwacht rendement: {(weightedReturn * 100).toFixed(1)}% p.j.
         </p>
       )}
 
