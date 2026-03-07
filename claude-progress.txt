@@ -1,3 +1,52 @@
+## Session 2026-03-07 - Features #509, #484, #491
+
+### Feature #509: Privacy-indicator bij AI-features - PASSING
+- Created reusable AiPrivacyIndicator component (ShieldCheck icon + hover/tap tooltip)
+- Tooltip: "Deze functie gebruikt AI — je data wordt geanonimiseerd verstuurd."
+- Added to 4 locations: chat FAB, DAIshboard briefing header, berichten news section, AI-inzicht widget
+- Icon: ShieldCheck at 11-14px, text-[var(--ink-4)], subtle and non-distracting
+- Tooltip: positioned above icon, editorial paper style, auto-dismiss on outside click (mobile)
+- Indicator naturally hidden when AI is disabled (components are conditionally rendered)
+- Zero TypeScript errors
+- Commit: 3315794
+
+### Feature #484: Categorie-tag per nieuwsartikel - PASSING
+- Already fully implemented in berichten page
+- CategoryBadge component renders on both HeroNewsArticle and NewsArticle
+- 6 categories: Fiscaal (kern), Rente (blue), Woningmarkt (purple), Beleggingen (wil), Pensioen (horizon), Macro (zinc)
+- Uppercase text-[10px] font-bold with color-coded dot and border
+- No changes needed
+
+### Feature #491: Mobiel: verversknop en sectie-navigatie bereikbaar - PASSING
+- Already fully implemented
+- SectionAnchors: nav with min-h-[44px] touch targets, smooth scrollIntoView
+- Refresh button: min-h-[44px], RefreshCw icon always visible, text hidden on mobile
+- Sections: scroll-mt-4 for proper scroll offset
+- No changes needed
+
+### Current Status
+- 3 features completed this session (#509, #484, #491)
+- 499/511 features passing (97.7%)
+
+## Session 2026-03-07 - Feature #506
+
+### Feature #506: PII-detectie vangnet in AI output - PASSING
+- Created lib/ai/pii-output-filter.ts with maskPIIInOutput() and maskPIIInObject()
+- Masks Dutch IBANs (NL format), international IBANs (DE, BE, etc.), and BSN (9-digit) patterns
+- Preserves financial amounts (€1.234,56), percentages (7,5%), and other numeric data
+- Integrated into 4 AI response handlers:
+  - /api/ai/chat: TransformStream wrapping UIMessageStream
+  - /api/briefing/compose: maskPIIInObject on card specs before SSE emission
+  - /api/news: maskPIIInObject on news items before caching/returning
+  - /api/ai/recommendations: maskPIIInOutput on title/description before DB insert
+- 22 unit tests in pii-output-filter.test.ts (all passing)
+- 9/9 API integration tests at /api/test-pii-output-filter (all passing)
+- Zero TypeScript errors, zero console errors
+- Commit: c027eb8
+
+### Current Status
+- 496/511 features passing (97.1%)
+
 ## Session 2026-03-07 - Features #497, #508, #510
 
 ### Feature #497: Preview van actieve vs default nieuws-prompt - PASSING
