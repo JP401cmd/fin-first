@@ -1,3 +1,30 @@
+## Session 2026-03-07 - Features #408, #409, #410
+
+### Feature #408: Nieuwe DIRECTIVE_METRICS voor next_steps en discover - PASSING
+- Added next_steps metric: conditions 'available' and 'all_done'
+- Added discover metric: conditions 'unvisited_features' and 'all_visited'
+- extractMetricsFromSummary: parses VOLGENDE STAPPEN (sum of kern+wil+horizon) and ONTDEKBARE FEATURES counts
+- evaluateFunctionalDirective: next_steps/available (total>0), all_done (total===0), discover/unvisited (>0), all_visited (===0)
+
+### Feature #409: Default functionele richtlijnen voor next_steps en discover - PASSING
+- Added 3 default directives to getDefaultFunctionalDirectives():
+  - next_steps/available: showNextStep, max 2 per briefing (priority normal)
+  - next_steps/all_done: feliciteer, geen showNextStep (priority low)
+  - discover/unvisited_features: max 1 showDiscover (priority low)
+
+### Feature #410: Briefing instellingen toggles voor next steps en discover - PASSING
+- Added BriefingContentPrefs interface + read/save functions in lib/briefing/user-preferences.ts
+- localStorage key: 'briefing_content_prefs' with showNextSteps + showDiscover booleans (default true)
+- buildUserPreferenceBlock() now appends disable instructions when toggles are off
+- Added toggle switches in identity/instellingen Dashboard section (visible when briefing mode selected)
+- Toggles: 'Volgende stappen tonen' + 'Ontdek-suggesties tonen' with descriptions
+- Min 44px touch target, role=switch, aria-checked for accessibility
+
+### Current Status
+- 3 features completed this session (#408, #409, #410)
+- Zero TypeScript errors
+- 402/414 features passing (97.1%)
+
 ## Session 2026-03-07 - Features #405, #407, #413
 
 ### Feature #405: showDiscover briefing tool definitie - PASSING
