@@ -558,6 +558,16 @@ body {
   letter-spacing: 0.08em;
 }
 
+/* ── Newspaper column separators ──────────────────────── */
+
+/* Vertical rule between columns in a 2-col grid (desktop only) */
+@media (min-width: 640px) {
+  .news-grid-columns > :nth-child(odd) {
+    border-right: 1px solid var(--border-ed);
+    padding-right: 4px;
+  }
+}
+
 /* ── Editorial animations ──────────────────────────────── */
 @keyframes sheet-enter {
   from { transform: translateY(16px); opacity: 0; }

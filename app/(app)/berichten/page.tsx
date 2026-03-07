@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { NotificationItem } from '@/components/app/notifications/notification-item'
 import { RELEASE_NOTES, type ReleaseNote } from '@/lib/release-notes'
 import { Bell, Newspaper, ChevronRight, CheckCheck, Sparkles, TrendingUp, AlertCircle, Loader2, RefreshCw } from 'lucide-react'
+import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
 import Link from 'next/link'
 import type { Notification } from '@/app/api/notifications/route'
 import type { NewsItem } from '@/app/api/news/route'
@@ -271,6 +273,10 @@ function ImpactBlock({ impact }: { impact: string }) {
 // ── Hero news article (first item — front-page style) ───────────────
 
 function HeroNewsArticle({ item }: { item: NewsItem }) {
+  // Split summary into first letter + rest for dropcap effect
+  const firstLetter = item.summary.charAt(0)
+  const restOfSummary = item.summary.slice(1)
+
   return (
     <article className="mb-8">
       {/* Category + source context */}
@@ -291,13 +297,19 @@ function HeroNewsArticle({ item }: { item: NewsItem }) {
         {item.headline}
       </h2>
 
-      {/* Lead / summary text */}
+      {/* Lead / summary text with dropcap */}
       <p className="mt-3 font-source-serif text-base leading-relaxed text-[var(--ink-2)] sm:text-lg">
-        {item.summary}
+        <span
+          className="float-left mr-2 font-playfair text-[3.2rem] font-bold leading-[0.8] text-[var(--ink)]"
+          aria-hidden="true"
+        >
+          {firstLetter}
+        </span>
+        <span aria-label={item.summary}>{restOfSummary}</span>
       </p>
 
       {/* Date in Inter */}
-      <div className="mt-3">
+      <div className="mt-3 clear-left">
         <span className="font-inter text-[11px] text-[var(--ink-4)]">
           {formatNewsDate(item.date)}
         </span>
@@ -388,7 +400,7 @@ function NewsSkeletonLoader() {
       </div>
 
       {/* Grid article skeletons (2-column on desktop) */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+      <div className="news-grid-columns grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
         {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={i}
@@ -517,6 +529,9 @@ export default function BerichtenPage() {
   const [history, setHistory] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
 
+  // AI enabled state
+  const [aiEnabled, setAiEnabled] = useState(true)
+
   // News state
   const [newsItems, setNewsItems] = useState<NewsItem[]>([])
   const [newsLoading, setNewsLoading] = useState(false)
@@ -538,6 +553,14 @@ export default function BerichtenPage() {
 
   useEffect(() => {
     fetchExtendedHistory()
+    // Fetch AI enabled status
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase.from('profiles').select('ai_enabled').eq('id', user.id).single().then(({ data }) => {
+        if (data && data.ai_enabled === false) setAiEnabled(false)
+      })
+    })
   }, [fetchExtendedHistory])
 
   // Fetch news on-demand when Nieuws tab is first activated
@@ -604,10 +627,10 @@ export default function BerichtenPage() {
     }
   }, [])
 
-  // Fetch news on mount
+  // Fetch news on mount (only when AI is enabled)
   useEffect(() => {
-    fetchNews()
-  }, [fetchNews])
+    if (aiEnabled) fetchNews()
+  }, [fetchNews, aiEnabled])
 
   // Wrap markAsRead/markAllRead to also update local 30-day history
   const handleMarkAsRead = useCallback((id: string) => {
@@ -810,12 +833,21 @@ export default function BerichtenPage() {
       {/* ── FINANCIEEL NIEUWS sectie ──────────────────────────────── */}
       <SectionHeading label="Financieel Nieuws" />
 
+      {!aiEnabled ? (
+        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-6 py-12 text-center shadow-[var(--s0)]">
+          <p className="font-inter text-sm font-medium text-[var(--ink-2)]">AI-nieuws is uitgeschakeld</p>
+          <p className="mt-1 font-source-serif text-[13px] italic text-[var(--ink-4)]">
+            Schakel AI weer in via Instellingen &gt; Privacy &amp; AI om gepersonaliseerd nieuws te ontvangen.
+          </p>
+        </div>
+      ) : (
       <div className="space-y-6">
           {/* AI-generated personalized news */}
           <div>
             <div className="mb-3 flex items-center gap-2">
-              <span className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+              <span className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)] flex items-center gap-1.5">
                 Gepersonaliseerd nieuws
+                <AiPrivacyIndicator size={12} />
               </span>
               <div className="h-px flex-1 bg-[var(--border-ed)]" />
               {newsFetched && !newsLoading && (
@@ -860,9 +892,9 @@ export default function BerichtenPage() {
               <div>
                 {/* Hero article — front-page style, significantly larger */}
                 <HeroNewsArticle item={newsItems[0]} />
-                {/* Remaining articles — 2-column grid on desktop */}
+                {/* Remaining articles — 2-column grid on desktop with column rules */}
                 {newsItems.length > 1 && (
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+                  <div className="news-grid-columns grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
                     {newsItems.slice(1).map((item) => (
                       <NewsArticle key={item.id} item={item} />
                     ))}
@@ -896,6 +928,7 @@ export default function BerichtenPage() {
             </div>
           )}
         </div>
+      )}
 
       {/* Krant-footer */}
       <NewspaperFooter />
