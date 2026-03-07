@@ -12,7 +12,7 @@ export function ComparisonCard({ spec }: Props) {
   const isNegative = spec.delta.startsWith('-')
 
   return (
-    <BriefingCard module="kern">
+    <BriefingCard module="kern" href={spec.href}>
       <p className="label-editorial text-[var(--ink-3)] mb-2">{spec.label}</p>
 
       <div className="flex items-center gap-4">

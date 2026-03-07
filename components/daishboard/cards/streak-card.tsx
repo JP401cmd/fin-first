@@ -10,7 +10,7 @@ interface Props {
 
 export function StreakCard({ spec }: Props) {
   return (
-    <BriefingCard module={spec.module}>
+    <BriefingCard module={spec.module} href={spec.href}>
       <div className="flex items-center gap-2 mb-1">
         <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/40">
           <Flame className="h-4 w-4 text-amber-500" />

@@ -437,6 +437,7 @@ export const briefingTools = {
       value: z.string().describe('Huidige waarde'),
       dataKey: z.enum(['netWorthHistory', 'savingsHistory', 'expenseHistory']).describe('Dataset: netWorthHistory, savingsHistory, of expenseHistory'),
       module: moduleEnum.describe('Kleurmodule'),
+      href: z.string().optional().describe('Link naar detail pagina'),
     }),
   }),
 
@@ -483,6 +484,7 @@ export const briefingTools = {
       rightValue: z.string().describe('Rechter waarde'),
       delta: z.string().describe('Verschil, bijv. "+€ 500"'),
       freedomDays: z.number().optional().describe('Impact in vrijheidsdagen'),
+      href: z.string().optional().describe('Link naar detail pagina'),
     }),
   }),
 
@@ -541,6 +543,7 @@ export const briefingTools = {
       unit: z.enum(['dagen', 'weken', 'maanden']).describe('Tijdseenheid'),
       description: z.string().describe('Korte beschrijving, bijv. "Al 4 maanden op rij stijgt je vermogen"'),
       module: moduleEnum.describe('Kleurmodule'),
+      href: z.string().optional().describe('Link naar detail pagina'),
     }),
   }),
 
@@ -555,6 +558,7 @@ export const briefingTools = {
       })).describe('Top 3-5 terugkerende kosten'),
       totalAmount: z.string().describe('Totaal maandelijks bedrag, bijv. "€ 1.250"'),
       totalFreedomStr: z.string().optional().describe('Totale vrijheidstijd-impact, bijv. "12,5 dagen"'),
+      href: z.string().optional().describe('Link naar detail pagina'),
     }),
   }),
 
@@ -567,6 +571,7 @@ export const briefingTools = {
       amountType: z.enum(['eenmalig', 'maandelijks']).describe('Type bedrag: eenmalige kost of maandelijkse impact'),
       freedomStr: z.string().optional().describe('Vrijheidstijd-impact, bijv. "5 maanden"'),
       module: moduleEnum.describe('Kleurmodule (gebruik "horizon" voor toekomst-events)'),
+      href: z.string().optional().describe('Link naar detail pagina'),
     }),
   }),
 }

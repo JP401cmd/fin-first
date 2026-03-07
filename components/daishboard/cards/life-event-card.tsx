@@ -24,7 +24,7 @@ export function LifeEventCard({ spec }: Props) {
   const isImminent = spec.daysUntil <= 30
 
   return (
-    <BriefingCard module={spec.module}>
+    <BriefingCard module={spec.module} href={spec.href}>
       <div className="flex items-start gap-3">
         {/* Icon */}
         <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${

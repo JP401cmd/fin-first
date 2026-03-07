@@ -60,7 +60,7 @@ export function SparklineCard({ spec, data }: Props) {
   const color = MODULE_COLOR[spec.module] ?? MODULE_COLOR.cross
 
   return (
-    <BriefingCard module={spec.module}>
+    <BriefingCard module={spec.module} href={spec.href}>
       <p className="label-editorial text-[var(--ink-3)] mb-1">{spec.label}</p>
       <p className="text-base font-bold font-mono tabular-nums text-[var(--ink)] mb-2">{spec.value}</p>
       <div ref={ref}>

@@ -10,7 +10,7 @@ interface Props {
 
 export function RecurringCard({ spec }: Props) {
   return (
-    <BriefingCard module="kern">
+    <BriefingCard module="kern" href={spec.href}>
       <div className="flex items-center gap-2 mb-3">
         <Repeat className="h-4 w-4 text-[var(--kern-accent)]" />
         <p className="text-sm font-semibold text-[var(--ink)]">{spec.title}</p>

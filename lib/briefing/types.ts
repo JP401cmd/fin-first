@@ -74,6 +74,7 @@ export interface SparklineCardSpec {
   value: string
   dataKey: SparklineDataKey
   module: CardModule
+  href?: string
 }
 
 export interface MilestoneCardSpec {
@@ -110,6 +111,7 @@ export interface ComparisonCardSpec {
   rightValue: string
   delta: string
   freedomDays?: number
+  href?: string
 }
 
 export interface CountdownCardSpec {
@@ -158,6 +160,7 @@ export interface StreakCardSpec {
   unit: 'dagen' | 'weken' | 'maanden'
   description: string
   module: CardModule
+  href?: string
 }
 
 export interface RecurringCardSpec {
@@ -166,6 +169,7 @@ export interface RecurringCardSpec {
   items: { name: string; amount: string; freedomStr?: string }[]
   totalAmount: string
   totalFreedomStr?: string
+  href?: string
 }
 
 export interface LifeEventCardSpec {
@@ -176,6 +180,7 @@ export interface LifeEventCardSpec {
   amountType: 'eenmalig' | 'maandelijks'
   freedomStr?: string
   module: CardModule
+  href?: string
 }
 
 // ── Union Type ──────────────────────────────────────────────
