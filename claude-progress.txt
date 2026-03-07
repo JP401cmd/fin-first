@@ -1,3 +1,33 @@
+## Session 2026-03-07 - Features #272, #273, #274
+
+### Feature #272: Schulden widget quarter-size - PASSING
+### Feature #273: Schulden widget half-size verrijking - PASSING
+### Feature #274: Schulden widget full-size met breakdown - PASSING
+- Enhanced schulden-widget.tsx with three distinct size renderings:
+  - Quarter: compact red amount (-€X) with freedom time label, or green €0 Schuldenvrij!
+  - Half: enriched with schuldratio progress bar (debt/assets %), monthly repayment from budgetTotals.debt.spent
+  - Full: breakdown with schuldratio bar, monthly repayment + freedom days framing, net worth impact after repayment, motivational debt-free state with full green bar
+- All sizes use freedom time philosophy framing
+- Type-check passes cleanly
+- Commit: 1e75c25
+
+### Current Status
+- 266/331 features passing (263 before + #272, #273, #274)
+
+## Session 2026-03-07 - Feature #259
+
+### Feature #259: DashboardData uitbreiden met nieuwe velden voor verrijkte widgets - PASSING
+- Added 3 new interfaces: TopRecurringTransaction, TopRecommendation, TopLifeEvent
+- Extended DashboardData with: topRecurringTransactions, totalRecurringAmount, topRecommendations, topLifeEvents
+- Populated new fields from Supabase queries in both dashboard/page.tsx and daishboard/page.tsx
+- Updated recurring_transactions query to fetch name/amount/frequency/budget_id (was only 'id')
+- Updated recommendations query to fetch title/priority_score/recommendation_type (was only id/freedom_days_per_year/status)
+- Updated draggable-widget-grid.test.tsx mock with all new DashboardData fields
+- All 6 widget grid tests passing, type-check clean, 0 lint errors
+- Commit: 293aea7
+
+---
+
 ## Session 2026-03-07 - Features #335, #264, #265
 
 ### Feature #335: DraggableWidgetGrid quarter-size kolom spanning - PASSING
@@ -8036,3 +8066,61 @@ For Feature #51 (Transaction Import):
 - PhaseTransitionModal was already partially built; this session enhanced with animations, close/overlay dismiss, Dutch phase labels
 - The modal is rendered by FeatureAccessProvider when phaseTransition prop is set
 - Phase detection happens in server component layout.tsx on every page load
+
+## Session 2026-03-07 - Features #275, #276, #277
+
+### Feature #275: Holdings widget quarter-size - PASSING
+- Added quarter-size early return in holdings-widget.tsx
+- Shows totalInvestments as font-mono text-lg
+- Shows positionCount: 'X posities'
+- Shows freedom time label (font-serif italic text-[11px])
+- No per-type breakdown or inleg info on quarter
+- Follows same pattern as SchuldenWidget quarter
+
+### Feature #276: Holdings widget half-size weighted return - PASSING
+- Added weighted return summary line for half-size
+- Shows 'Verwacht rendement: X.X% p.j.' in font-mono text-xs
+- Only displayed when weightedReturn > 0
+- Existing amount, positions, and inleg info preserved
+
+### Feature #277: Voorstellen widget quarter-size - PASSING
+- Added quarter-size early return in voorstellen-widget.tsx
+- Shows recommendation count as font-mono text-lg
+- Shows Lightbulb icon (existing import)
+- Shows priority dot from topRecommendations[0].priority
+- Priority colors: 1=red, 2=amber, 3=emerald
+- Compact format within quarter constraints
+
+### Current Status
+- 3 features completed this session (#275, #276, #277)
+- All type-checks pass, zero errors
+- Commit: 16523c5
+
+## Session 2026-03-07 - Features #269, #270, #271
+
+### Feature #269: Cashflow Maand widget full-size met categorieen en vergelijking - PASSING
+- Full-size now shows 4 budget categories (income/expense/savings/debt) with mini progress bars
+- Each category shows amount + freedom time equivalent
+- Previous month comparison barchart: income/expenses/netto side by side (this month vs prev)
+- Added prevMonthIncome to DashboardData, computed from real Supabase transaction data
+- Added prev month transaction query to both dashboard and daishboard pages
+- Uses BUDGET_TYPE_CONFIGS color scheme from budgetten-widget
+- Widget is now 'use client' with useInViewAnimation for animated bars
+- Commit: 99e77b6
+
+### Feature #270: Budgetten widget quarter-size - PASSING
+- Quarter shows 'X/N op schema' budget health summary
+- Mini 4-segment horizontal bar: green=on track, red=over budget, grey=no data
+- No individual budget rows on quarter size
+- Commit: 03e09a7
+
+### Feature #271: Assets widget quarter-size - PASSING
+- Shows totalAssets as font-mono text-lg
+- Freedom time label below amount
+- Compact 4px stacked bar for asset allocation
+- No per-type breakdown or monthly contributions on quarter
+- Commit: 285a76c
+
+### Current Status
+- 3 features completed this session (#269, #270, #271)
+- All type-checks pass cleanly
