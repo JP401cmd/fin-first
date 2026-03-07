@@ -46,7 +46,8 @@ export async function GET() {
       // We monkey-patch temporarily to simulate
       const originalReplace = String.prototype.replace
       // eslint-disable-next-line no-extend-native
-      String.prototype.replace = function (...args: Parameters<typeof originalReplace>) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(String.prototype as any).replace = function (this: string, ...args: any[]) {
         // Only throw on the first IBAN regex replacement to simulate failure
         if (args[0] instanceof RegExp && args[0].source.includes('NL')) {
           // eslint-disable-next-line no-extend-native
