@@ -8,6 +8,9 @@ import { CARD_SPAN } from './types'
 /** Card types that are valid as the last card in a briefing */
 const VALID_ENDING_TYPES = new Set<BriefingCardSpec['type']>(['action', 'insight', 'quote'])
 
+/** Row width in columns */
+const ROW_COLS = 4
+
 /** 1-column card types (span = 1) */
 function isOneCol(type: BriefingCardSpec['type']): boolean {
   return CARD_SPAN[type] === 1
@@ -28,6 +31,9 @@ export function validateBriefingLayout(cards: BriefingCardSpec[]): BriefingCardS
 
   let result = [...cards]
 
+  // ── Rule 0: Optimize row fill — every row of 4 columns fully filled ──
+  result = optimizeRowFill(result)
+
   // ── Rule 2: Milestone not first or last — move to middle ──
   result = fixMilestonePosition(result)
 
@@ -36,6 +42,63 @@ export function validateBriefingLayout(cards: BriefingCardSpec[]): BriefingCardS
 
   // ── Rule 3: Last card must be action, insight, or quote ──
   result = fixLastCard(result)
+
+  return result
+}
+
+/**
+ * Optimize row fill: rearrange cards so every row of 4 columns is fully filled.
+ *
+ * Valid row patterns: 4 (milestone), 2+2, 1+1+2, 2+1+1, 1+1+1+1.
+ * Milestone (span=4) always gets its own row.
+ *
+ * Uses a greedy algorithm: process cards in order, building rows of exactly
+ * 4 columns. When the next card doesn't fit, search ahead for one that does.
+ * Minimises reordering by only pulling cards forward when necessary.
+ */
+export function optimizeRowFill(cards: BriefingCardSpec[]): BriefingCardSpec[] {
+  if (cards.length <= 1) return [...cards]
+
+  const remaining = [...cards]
+  const result: BriefingCardSpec[] = []
+
+  while (remaining.length > 0) {
+    let rowUsed = 0
+
+    // Fill a row up to ROW_COLS columns
+    while (rowUsed < ROW_COLS && remaining.length > 0) {
+      const space = ROW_COLS - rowUsed
+
+      // First try the next card in line (preserve order)
+      const nextSpan = CARD_SPAN[remaining[0].type]
+
+      if (nextSpan <= space) {
+        // Next card fits — take it
+        result.push(remaining.shift()!)
+        rowUsed += nextSpan
+      } else {
+        // Next card doesn't fit — search ahead for one that does
+        let found = false
+        for (let i = 1; i < remaining.length; i++) {
+          const candidateSpan = CARD_SPAN[remaining[i].type]
+          if (candidateSpan <= space) {
+            // Pull this card forward to fill the gap
+            const [card] = remaining.splice(i, 1)
+            result.push(card)
+            rowUsed += candidateSpan
+            found = true
+            break
+          }
+        }
+
+        if (!found) {
+          // No card fits the remaining space — start a new row
+          // (this means an incomplete row, but we can't avoid it)
+          break
+        }
+      }
+    }
+  }
 
   return result
 }
