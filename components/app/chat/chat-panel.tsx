@@ -10,6 +10,7 @@ import { ActionEditModal } from '@/components/app/action-edit-modal'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { renderMarkdown, findToolInvocation, TOOL_LOADING_STATES, TOOL_OUTPUT_STATES, type MessagePart } from './markdown-helpers'
 import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff } from 'lucide-react'
+import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
 
 /* ── Domain config per module ─────────────────────────────────────── */
 
@@ -328,14 +329,16 @@ export function ChatPanel() {
 
   if (!isOpen) {
     return (
-      <button
-        onClick={toggle}
-        className={`fixed bottom-[calc(var(--bottom-nav-height)+1.5rem)] z-50 flex h-14 w-14 items-center justify-center rounded-full ${config.fabBg} text-white shadow-[var(--s2)] transition-all hover:scale-105 active:scale-95 md:bottom-6`}
-        style={{ right: 'calc(1.5rem + var(--chat-sidebar-width, 0px))' }}
-        aria-label={`Open chat met ${config.name}`}
-      >
-        {config.fabAvatar(36)}
-      </button>
+      <div className="fixed bottom-[calc(var(--bottom-nav-height)+1.5rem)] z-50 md:bottom-6" style={{ right: 'calc(1.5rem + var(--chat-sidebar-width, 0px))' }}>
+        <button
+          onClick={toggle}
+          className={`flex h-14 w-14 items-center justify-center rounded-full ${config.fabBg} text-white shadow-[var(--s2)] transition-all hover:scale-105 active:scale-95`}
+          aria-label={`Open chat met ${config.name}`}
+        >
+          {config.fabAvatar(36)}
+        </button>
+        <AiPrivacyIndicator size={12} className="absolute -top-1 -right-1 rounded-full bg-[var(--paper)] p-0.5 shadow-sm" />
+      </div>
     )
   }
 

@@ -5,6 +5,7 @@ import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { Lightbulb, Sparkles } from 'lucide-react'
+import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
 
 interface Props {
   size: WidgetSize
@@ -52,8 +53,9 @@ export function AiInzichtWidget({ size, data, href }: Props) {
     return (
       <WidgetShell module="cross" size={size} kicker="AI Inzicht" href={href}>
         <div className="flex items-start gap-2">
-          <div className="shrink-0 mt-0.5">
+          <div className="shrink-0 mt-0.5 flex items-center gap-1">
             <Lightbulb className="h-3.5 w-3.5 text-amber-500" />
+            <AiPrivacyIndicator size={11} />
           </div>
           <p className="text-xs text-[var(--ink-2)] line-clamp-2 leading-relaxed flex-1">
             {latest.text}
@@ -73,7 +75,10 @@ export function AiInzichtWidget({ size, data, href }: Props) {
       <WidgetShell module="cross" size={size} kicker="AI Inzicht" href={href}>
         <div className="space-y-2.5">
           <div className="flex items-start gap-2">
-            <Lightbulb className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+            <div className="shrink-0 mt-0.5 flex items-center gap-1">
+              <Lightbulb className="h-4 w-4 text-amber-500" />
+              <AiPrivacyIndicator size={12} />
+            </div>
             <p className="text-sm text-[var(--ink-2)] leading-relaxed">
               {latest.text}
             </p>
@@ -97,6 +102,9 @@ export function AiInzichtWidget({ size, data, href }: Props) {
   return (
     <WidgetShell module="cross" size={size} kicker="AI Inzicht" href={href}>
       <div className="space-y-3">
+        <div className="flex justify-end -mt-1 -mb-1">
+          <AiPrivacyIndicator size={13} />
+        </div>
         {shown.map(insight => {
           const ic = MODULE_COLORS[insight.module] ?? { bg: 'bg-gray-50', text: 'text-gray-600', dot: 'bg-gray-400' }
           const moduleHref = MODULE_HREFS[insight.module]

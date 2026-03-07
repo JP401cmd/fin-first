@@ -341,6 +341,9 @@ function HeroNewsArticle({ item }: { item: NewsItem }) {
       {/* Impact block */}
       <ImpactBlock impact={item.personalImpact} />
 
+      {/* Discuss with Will */}
+      <DiscussWithWillButton item={item} />
+
       {/* Divider separating hero from rest */}
       <div className="mt-6 h-px bg-[var(--border-ed)]" />
     </article>
@@ -379,6 +382,9 @@ function NewsArticle({ item }: { item: NewsItem }) {
 
       {/* Impact block */}
       <ImpactBlock impact={item.personalImpact} />
+
+      {/* Discuss with Will */}
+      <DiscussWithWillButton item={item} />
     </article>
   )
 }
