@@ -1,3 +1,14 @@
+## Session 2026-03-07 - Feature #411
+
+### Feature #411: User preferences doorvoeren naar briefing system prompt - PASSING
+- Compose API (app/api/briefing/compose/route.ts) now reads `briefing_preferences_{userId}` from app_settings
+- Builds server-side `== BRIEFING VOORKEUREN ==` block with `Volgende stappen: AAN/UIT` and `Ontdek-suggesties: AAN/UIT`
+- When preferences are UIT, adds explicit instruction: "Gebruik NIET de showNextStep/showDiscover tool"
+- Server-side prefs are merged with client-sent userPreferences (server takes precedence)
+- Instellingen page already persists to app_settings (done in prior session #418)
+- Zero TypeScript errors
+- 409/414 features passing (98.8%)
+
 ## Session 2026-03-07 - Feature #418
 
 ### Feature #418: Briefing instellingen toggles mobiele weergave - PASSING
