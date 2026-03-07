@@ -1,3 +1,36 @@
+## Session 2026-03-07 - Features #516, #517, #520
+
+### Feature #516: Widget grid formaten aanpassen: half=2col/1row, full=2col/2row - PASSING
+- draggable-widget-grid.tsx SortableWidgetItem: half `sm:col-span-2` (no row-span), full `sm:col-span-2 row-span-2`
+- GhostCard: same classes updated
+- Removed lg:col-span-4 from full (was full-width on lg, now 2-col)
+- Updated test: half now expects sm:col-span-2 (not "not contains")
+- Added assertion: full has row-span-2 and no col-span-4
+- All 6 unit tests passing
+- Commit: b6f6f2a
+
+### Feature #517: Widget test pagina formaten bijwerken - PASSING
+- /beheer/widgets-test already had correct new format classes (sm:col-span-2 for half, sm:col-span-2 row-span-2 for full)
+- No changes needed
+
+### Feature #520: Horizon-module widgets content aanpassen aan nieuwe formaten - PASSING
+- widget-shell.tsx: half height changed from h-[336px] to h-[160px] (1 row instead of 2)
+- veerkracht-score half: horizontal layout (gauge 90px + factor rows side-by-side)
+- monte-carlo half: compacted, removed extra CTA paragraph
+- vrijheidsvoortgang half: delta moved inline, tighter margins
+- passief-inkomen half: % moved inline, smaller text
+- vrijheidsmijlpalen half: space-y-1 (was space-y-2), smaller icons
+- levensgebeurtenissen half: tighter gaps (1.5 vs 2), smaller dots/text
+- backtesting-score half: smaller icon/text sizes, tighter badge gaps
+- vrijheidsscenarios half: reduced margins
+- fire-prognose, sim-vermogenspad, box3-drag: already compact enough
+- All widgets compile, zero TypeScript errors in changed files
+
+### Current Status
+- 3 features completed this session (#516, #517, #520)
+- 507/517 features passing (98.1%)
+- Commit: b6f6f2a
+
 ## Session 2026-03-07 - Features #509, #484, #491
 
 ### Feature #509: Privacy-indicator bij AI-features - PASSING
@@ -10390,3 +10423,120 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#469, #490, #470)
 - Zero TypeScript errors in changed files
 - Commit: 0e8c928
+
+## Session 2026-03-07 - Features #488, #476
+
+### Feature #488: Scroll-navigatie of sectie-ankers - PASSING
+- Created SectionAnchors component with Meldingen (Bell icon) and Nieuws (Newspaper icon) buttons
+- Middot separator between buttons, aria-label="Sectie-navigatie" on nav
+- Added section id="sectie-meldingen" and id="sectie-nieuws" with scroll-mt-4 offset
+- scrollIntoView({ behavior: 'smooth', block: 'start' }) on button click
+- 44px min touch targets on mobile (sm:min-h-0 on desktop)
+- Test page at /test-section-anchors for visual verification
+- Zero console errors
+- Commit: e00f539
+
+### Feature #476: Alles gelezen markeren op berichten-pagina - PASSING
+- Already fully implemented: "Alles gelezen" button with CheckCheck icon in meldingen header
+- Button visible when unreadCount > 0
+- handleMarkAllRead updates local 30-day history + calls provider markAllRead()
+- Provider sends PATCH /api/notifications with markAllRead IDs array
+- Optimistic update: sets all read + unreadCount=0 (updates header badge)
+- No code changes needed — verified existing implementation covers all steps
+
+### Current Status
+- 2 features completed this session (#488, #476)
+- 503/511 features passing (98.4%)
+
+## Session 2026-03-07 - Features #475, #486, #487
+
+### Feature #475: Vraag Will knop per melding op berichten-pagina - PASSING
+- Already fully implemented in notification-item.tsx (lines 181-195)
+- NotificationItem shows Vraag Will button when notification.aiContext exists
+- handleAskAI calls openWithMessage(notification.aiContext) via useChatContext()
+- ChatPanel auto-sends pendingMessage when chat opens
+
+### Feature #486: Bespreek met Will knop per nieuwsartikel - PASSING
+- Added useChatContext import and MessageSquare icon to berichten/page.tsx
+- Created NewsArticleActions component with Bespreek met Will button
+- Button calls openWithMessage with headline + summary context
+- Added to both HeroNewsArticle and NewsArticle components
+- Styled with wil module colors (wil-50/wil-200/wil-700)
+
+### Feature #487: Nieuwsartikelen markeerbaar als gelezen - PASSING
+- Created /api/news/read endpoint (GET/POST) using app_settings table
+- Key: news_read:{userId}, stores up to 200 article IDs
+- Auth-gated: both endpoints check user authentication
+- Read state fetched on mount, persisted optimistically via POST
+- Visual indicators: green dot for unread, opacity-70 for read articles
+- Gelezen button (CheckCheck icon) for explicit marking
+- Auto-marks as read when clicking Bespreek met Will
+- Zero TypeScript errors
+- Commit: 5745bb6
+
+### Current Status
+- 3 features completed this session (#475, #486, #487)
+- 502/511 features passing (98.2%)
+
+## Session 2026-03-07 - Features #522, #523, #524
+
+### Feature #522: Berichten pagina: meldingen sectie standaard ingeklapt - PASSING
+- Added meldingenExpanded state (default false)
+- Replaced static header with collapsible button: ChevronRight/ChevronDown + Bell icon + "Meldingen" label
+- Shows notification count ("— X berichten") and unread badge (rounded pill with count)
+- Content only renders when meldingenExpanded is true
+- "Alles gelezen" button moved inside expanded content
+- Imported ChevronDown icon from lucide-react
+
+### Feature #523: Berichten pagina: nieuws als hoofdcontent - PASSING
+- Swapped section order: Nieuws now renders first (directly after masthead), Meldingen below
+- SectionAnchors updated: Nieuws button first, Meldingen second
+- Cross-link to Will's Briefing moved between nieuws and meldingen sections
+- Hero article is the first content element users see
+
+### Feature #524: Berichten pagina: release notes verwijderd - PASSING
+- Removed RELEASE_NOTES and ReleaseNote type imports from berichten/page.tsx
+- Removed ReleaseNoteCard component (60+ lines)
+- Removed MODULE_DOT color mapping (only used by ReleaseNoteCard)
+- Removed release notes rendering section from JSX
+- Updated hasNoNieuws to not reference RELEASE_NOTES
+- /beheer/releases page remains intact and functional
+- Commit: 8d9d79c
+
+### Current Status
+- 3 features completed this session (#522, #523, #524)
+- Zero TypeScript errors in changed files
+- 517/520 features passing (99.4%)
+
+## Session 2026-03-07 - Features #519, #521
+
+### Feature #519: Wil-module widgets content aanpassen aan nieuwe formaten - PASSING
+- acties half: compact header (count + freedom days badge) + 2 action rows
+- acties full: 6 items (was 5) + "RECENT AFGEROND" section showing completed actions
+- voorstellen half: icon + count inline + 2 recommendation rows
+- voorstellen full: 6 items (was 5), tighter spacing
+- doelen half: tighter spacing (py-1, h-[3px] bars), footer closer
+- doelen full: added 3-column summary grid (DOELEN, GEM. VOORTGANG, BEHAALD) + goal cards
+- volgende-stap half: tighter spacing, changed <a> to <span> to fix nested <a> hydration error
+- volgende-stap full: 4 step cards (was 3), compact card design (line-clamp-1)
+- Fixed ExternalLink unused import removal
+- Test page enriched with more mock data (6 actions, 6 recommendations, 4 goals, 5 next steps)
+- Commit: df7cd23
+
+### Feature #521: Cross-module widgets content aanpassen aan nieuwe formaten - PASSING
+- meldingen half: 3 items (was 5), tighter spacing (space-y-1.5)
+- meldingen full: fixed nested <a> (changed to <span>)
+- badges half: compact inline layout with count header, progress bar, latest badge inline, near badge inline
+- streaks half: gap-0.5 (was gap-1), removed record line to save space
+- ai-inzicht half: added line-clamp-3, tighter spacing (space-y-1.5)
+- ai-inzicht full: fixed nested <a> (changed to <span>)
+- jouw-pad: added explicit half variant with compact header + level + phase bar (no criteria/next level)
+- agenda half: 3 items (was 5), single-line layout with date inline
+- Test page enriched with notifications, badges, streaks, AI insights, upcoming events mock data
+- Commit: 17fb176
+
+### Current Status
+- 2 features completed this session (#519, #521)
+- Zero TypeScript errors
+- Zero console errors
+- 520/520 features passing (100%)

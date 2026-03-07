@@ -44,6 +44,181 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'fin_prod_0.81',
+    date: '2026-03-07',
+    title:
+      'Privacy & AI veiligheid, Berichten-pagina, widget grid redesign & onboarding editorial',
+    sections: [
+      {
+        module: 'Berichten — Nieuwspagina',
+        color: 'blue',
+        items: [
+          {
+            title: 'Berichten-pagina met nieuwsoverzicht',
+            description:
+              'Nieuwe /berichten pagina met redactioneel newspaper-design, masthead en sectie-navigatie. AI-gegenereerd financieel nieuws gepersonaliseerd op basis van je financiële situatie.',
+          },
+          {
+            title: 'Hero-artikel en typografie',
+            description:
+              'Het belangrijkste nieuwsartikel wordt prominent getoond met hero-layout, dropcap, kolom-separators en impact-blocks.',
+          },
+          {
+            title: 'Twee-koloms nieuwsgrid',
+            description:
+              'Nieuws wordt in een krant-achtig twee-koloms grid getoond op desktop, met single-column op mobiel.',
+          },
+          {
+            title: 'On-demand nieuwsgeneratie',
+            description:
+              'Nieuws wordt on-demand gegenereerd met 7-dagen cache. Via de refresh-knop kun je nieuw nieuws opvragen.',
+          },
+          {
+            title: 'Collapsible meldingen',
+            description:
+              'Meldingen zijn nu inklapbaar bovenaan de pagina, zodat nieuws de hoofdcontent is.',
+          },
+          {
+            title: 'Bespreek met Will',
+            description:
+              'Elk nieuwsartikel heeft een "Bespreek met Will" knop om het artikel te bespreken met de AI-coach. Gelezen artikelen worden bijgehouden.',
+          },
+          {
+            title: 'Scroll-navigatie',
+            description:
+              'Sectie-ankers maken het mogelijk om snel tussen nieuwscategorieën te navigeren.',
+          },
+          {
+            title: 'Foutafhandeling en lege staat',
+            description:
+              'Verbeterde error UI met retry-knop en een editorial empty state wanneer er geen nieuws beschikbaar is.',
+          },
+        ],
+      },
+      {
+        module: 'Platform — Privacy & AI Veiligheid',
+        color: 'zinc',
+        items: [
+          {
+            title: 'AI privacy-filter (sanitizeForAI)',
+            description:
+              'Nieuwe utility die persoonlijke gegevens automatisch anonimiseert voordat ze naar AI-providers worden gestuurd. Geïntegreerd in alle AI endpoints met unit tests.',
+          },
+          {
+            title: 'PII output filter',
+            description:
+              'AI-antwoorden worden automatisch gefilterd op IBAN- en BSN-nummers, zodat deze nooit in de interface verschijnen.',
+          },
+          {
+            title: 'AI opt-out en privacy-instellingen',
+            description:
+              'Nieuwe privacy-sectie in instellingen met AI opt-out toggle, standaard prompt preview, en een privacy statement modal.',
+          },
+          {
+            title: 'AiPrivacyIndicator',
+            description:
+              'Nieuw ShieldCheck-icoon met tooltip bij alle AI-aangedreven features, zodat je altijd ziet dat privacy-bescherming actief is.',
+          },
+          {
+            title: 'Fail-safe sanitization',
+            description:
+              'Wanneer de anonimisatie faalt, worden AI-calls geblokkeerd in plaats van onbeschermde data te versturen.',
+          },
+          {
+            title: 'Graceful fallback zonder AI',
+            description:
+              '/berichten werkt correct zonder geconfigureerde AI-provider, met duidelijke feedback.',
+          },
+        ],
+      },
+      {
+        module: 'DAIshboard — Widget Grid',
+        color: 'purple',
+        items: [
+          {
+            title: 'Nieuw grid formaat',
+            description:
+              'Widgets hebben een nieuw formaat-systeem: half-size widgets tonen in 2 kolommen / 1 rij, full-size in 2 kolommen / 2 rijen. Dit geeft een compacter en overzichtelijker dashboard.',
+          },
+          {
+            title: 'Kern-widgets aangepast',
+            description:
+              'Alle kern-module widgets zijn aangepast voor de nieuwe grid formaten.',
+          },
+          {
+            title: 'Widget resize in edit-mode',
+            description:
+              'In dashboard edit-mode kun je nu widgets verkleinen of vergroten met een resize-knop.',
+          },
+        ],
+      },
+      {
+        module: 'Platform — Meldingen',
+        color: 'zinc',
+        items: [
+          {
+            title: '30-dagen meldingenhistorie',
+            description:
+              'Meldingen tonen nu tot 30 dagen historie met dag-groepering en verbeterde mobile touch targets.',
+          },
+          {
+            title: 'Cross-links',
+            description:
+              'Meldingen-widget linkt door naar /berichten, en de notification-modal bevat directe links naar relevante pagina\u0027s.',
+          },
+        ],
+      },
+      {
+        module: 'Identiteit — Onboarding',
+        color: 'blue',
+        items: [
+          {
+            title: 'Editorial redesign',
+            description:
+              'Onboarding intro- en success-stappen hebben een volledig nieuw editorial design met verbeterde whitespace en hiërarchie.',
+          },
+          {
+            title: 'Monochroom design',
+            description:
+              'Kleurrijke gradiënten zijn vervangen door een strak monochroom ontwerp dat aansluit bij het editorial design language.',
+          },
+        ],
+      },
+      {
+        module: 'Platform — Feature Gating',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Standaard verborgen features',
+            description:
+              'FeatureGate toont vergrendelde features nu standaard niet meer (was: locked card). Dit geeft een schonere interface.',
+          },
+          {
+            title: 'Widget-specifieke feature gates',
+            description:
+              'Widgets worden nu per feature-fase gegated, zodat alleen beschikbare widgets zichtbaar zijn in de selector en op het dashboard.',
+          },
+        ],
+      },
+      {
+        module: 'Beheer',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Widgets tab',
+            description:
+              'Nieuw tabblad in beheer met link naar /beheer/widgets-test.',
+          },
+          {
+            title: 'Nieuws beheer',
+            description:
+              'Nieuw tabblad in beheer voor het beheren van nieuws system prompts.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: 'fin_prod_0.80',
     date: '2026-03-04',
     title: 'Streaming AI briefing, dashboard-type switcher, briefing directives & nieuwe card types',
