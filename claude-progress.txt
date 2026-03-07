@@ -1,3 +1,21 @@
+## Session 2026-03-07 - Feature #391
+
+### Feature #391: Onboarding netwerk- en save-fouten met retry - PASSING
+- Replaced separate 'error' step with sticky error banner (fixed top, z-50, red bg)
+- Error banner shows Dutch error messages with "Opnieuw proberen" retry + dismiss (X)
+- Added AbortController with 10s timeout → specific Dutch timeout message
+- On error: returns to 'preferences' step, all useReducer state preserved (no data loss)
+- Network error detection: TypeError "Failed to fetch" → specific Dutch message
+- Idempotency check already existed in API (lines 96-106 of save-own-data/route.ts)
+- Mobile-friendly: fixed positioning ensures banner always visible
+- Test page: /test-onboarding-error-handling with 4 error scenarios
+- Zero console errors, zero TypeScript errors
+- Commit: c763d62
+
+### Current Status
+- 1 feature completed this session (#391)
+- 387/388 features passing (99.7%)
+
 ## Session 2026-03-07 - Features #384, #385, #386
 
 ### Feature #384: Onboarding voorkeuren - 'Wat vind jij belangrijk?' - PASSING
@@ -9249,3 +9267,41 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#387)
 - 387/388 features passing (99.7%)
+
+## Session 2026-03-07 - Features #393, #394
+
+### Feature #393: Onboarding: fix retirement_custom_amount kolom-mismatch - PASSING
+- Fixed column name in save-own-data API: retirement_custom_amount -> retirement_expense_custom_amount
+- The API input field stays retirement_custom_amount (from form), but now maps to correct DB column
+- All other pages (identity/instellingen, horizon, dashboard, core) already used the correct column name
+- Zero TypeScript errors in changed file
+
+### Feature #394: Onboarding: fix React Hooks violation - dismissError na conditional return - PASSING
+- Moved dismissError useCallback from after if(loading) conditional return to before it
+- This fixes Rules of Hooks violation (hooks must not be called conditionally)
+- All other hooks in the component were already correctly placed above conditional returns
+- Zero TypeScript errors in changed file
+
+### Current Status
+- 2 features completed this session (#393, #394)
+- Commit: 0d65977
+- 390/397 features passing (98.2%)
+
+## Session 2026-03-07 - Feature #396
+
+### Feature #396: Onboarding: stap-transitie animatie tussen schermen - PASSING
+- Added CSS keyframes in globals.css: step-slide-from-right (translateX 20px→0) and step-slide-from-left (translateX -20px→0)
+- CSS classes: .step-enter-forward and .step-enter-back with 250ms ease-out animation
+- prefers-reduced-motion: animation: none for both classes
+- Added Direction type and STEP_ORDER array to onboarding page
+- Reducer SET_STEP case now computes direction by comparing old/new step indices
+- StepTransition wrapper component with CSS animation class based on direction
+- key={state.step} on StepTransition forces remount = instant old step removal + fresh animation
+- Fixed pre-existing TS errors: added fire_legacy_amount and fire_end_age to initialState and test page
+- Test page at /test-onboarding-transition for isolated visual verification
+- Zero console errors, zero TypeScript errors (in onboarding files)
+
+### Current Status
+- 1 feature completed this session (#396)
+- Commit: 53cee67
+- 389/397 features passing (97.9%)
