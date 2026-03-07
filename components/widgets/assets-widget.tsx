@@ -50,6 +50,37 @@ export function AssetsWidget({ size, data, href }: Props) {
   const ft = dailyExp > 0 && totalAssets > 0 ? calculateFreedomTime(totalAssets, dailyExp) : null
   const ftStr = ft ? formatFreedomTimeString(ft, 'short') : null
 
+  // ── Quarter-size: compact total + freedom time + stacked bar ──
+  if (size === 'quarter') {
+    return (
+      <WidgetShell module="kern" size={size} kicker="Vermogen" href={href}>
+        <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
+          {formatCurrency(totalAssets)}
+        </p>
+        {ftStr && (
+          <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
+            {ftStr} vrijheid
+          </p>
+        )}
+        {/* Compact stacked bar */}
+        {assetsByType.length > 0 && totalAssets > 0 && (
+          <div className="mt-2 h-[4px] w-full flex overflow-hidden rounded-full bg-[var(--border-ed)]">
+            {assetsByType.map(a => (
+              <div
+                key={a.type}
+                style={{
+                  width: `${(a.value / totalAssets) * 100}%`,
+                  backgroundColor: ASSET_COLORS[a.type] ?? '#71717a',
+                }}
+                title={`${ASSET_LABELS[a.type] ?? a.type}: ${formatCurrency(a.value)}`}
+              />
+            ))}
+          </div>
+        )}
+      </WidgetShell>
+    )
+  }
+
   const unrealizedGain = totalPurchaseValue > 0 ? totalAssets - totalPurchaseValue : null
   const unrealizedPct  = unrealizedGain != null && totalPurchaseValue > 0
     ? (unrealizedGain / totalPurchaseValue) * 100
