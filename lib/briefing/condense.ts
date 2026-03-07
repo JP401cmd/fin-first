@@ -8,6 +8,8 @@ import { levelToPhaseId } from '@/lib/feature-phases'
 import type { TemporalContext } from './types'
 import type { ProgressionEvent } from './progression'
 import { computePersonalTrends } from './trends'
+import { detectPatterns } from './pattern-detection'
+import { getSeasonalContext } from './seasonal'
 
 function pct(value: number, total: number): string {
   if (total === 0) return '0'
@@ -174,14 +176,48 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
   }
   lines.push('')
 
-  // Goals with deadlines
+  // Goals with deadlines + coaching context
   lines.push(`DOELEN: ${data.goals}`)
   if (data.topGoals.length > 0) {
+    const now = new Date()
     for (const g of data.topGoals) {
       const goalPct = g.target_value > 0 ? Math.round((g.current_value / g.target_value) * 100) : 0
-      const deadline = g.target_date ? ` deadline ${g.target_date}` : ''
       const remaining = g.target_value - g.current_value
+      const deadline = g.target_date ? ` deadline ${g.target_date}` : ''
       lines.push(`- ${g.name}: ${goalPct}% (${formatCurrency(g.current_value)} / ${formatCurrency(g.target_value)}, rest ${formatCurrency(remaining)}${deadline})`)
+
+      // Coaching: on-track analysis when there's a target date
+      if (g.target_date && g.target_value > 0) {
+        const targetDate = new Date(g.target_date)
+        const totalDays = Math.max(1, (targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+        const daysLeft = Math.max(0, Math.ceil(totalDays))
+        const monthsLeft = Math.max(0.1, daysLeft / 30)
+
+        // Expected progress: linear interpolation based on time elapsed
+        // If we don't know start date, use simple remaining/time approach
+        const expectedPct = daysLeft <= 0 ? 100 : Math.min(100, 100 - (daysLeft / Math.max(1, totalDays)) * 100)
+        const onTrack = goalPct >= expectedPct || daysLeft <= 0
+
+        if (daysLeft <= 0) {
+          // Past deadline
+          if (goalPct >= 100) {
+            lines.push(`  [BEREIKT] Doel behaald!`)
+          } else {
+            const extra = remaining
+            lines.push(`  [ACHTERLOOPT] Deadline verstreken, nog ${formatCurrency(extra)} nodig`)
+          }
+        } else if (goalPct >= 100) {
+          lines.push(`  [BEREIKT] Doel behaald, ${daysLeft} dagen voor deadline`)
+        } else if (onTrack) {
+          const monthlyNeeded = remaining / monthsLeft
+          lines.push(`  [OP SCHEMA] Nog ${formatCurrency(Math.ceil(monthlyNeeded))}/mnd nodig, ${daysLeft}d tot deadline`)
+        } else {
+          const monthlyNeeded = remaining / monthsLeft
+          lines.push(`  [ACHTERLOOPT] Niet op schema, ${formatCurrency(Math.ceil(monthlyNeeded))}/mnd nodig om op tijd te zijn`)
+        }
+      } else if (goalPct >= 100) {
+        lines.push(`  [BEREIKT] Doel behaald!`)
+      }
     }
   }
   lines.push('')
@@ -299,6 +335,17 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
   lines.push(`- Opeenvolgende groeimaanden: ${trends.consecutiveGrowthMonths}`)
   lines.push(`- Budget discipline: ${trends.budgetDisciplineScore}%`)
   lines.push('')
+
+  // Pattern alerts
+  const patterns = detectPatterns(data)
+  if (patterns.length > 0) {
+    lines.push('GEDETECTEERDE PATRONEN:')
+    for (const p of patterns) {
+      const severityIcon = p.severity === 'warning' ? '⚠' : 'ℹ'
+      lines.push(`- ${severityIcon} [${p.type}] ${p.message} (module: ${p.relatedModule})`)
+    }
+    lines.push('')
+  }
 
   return lines.join('\n')
 }

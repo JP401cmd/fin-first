@@ -14,6 +14,7 @@ export function buildBriefingSystemPrompt(
   directivesBlock?: string,
   previousBriefing?: PreviousBriefingSummary,
   longTermMemory?: BriefingLongTermMemory,
+  userPreferences?: string,
 ): string {
   // Phase-specific card emphasis
   const phaseEmphasis = getPhaseEmphasis(phase)
@@ -64,10 +65,17 @@ Gebruik deze routes als href waarden:
 Vandaag: ${temporal.date}, dag ${temporal.dayOfMonth} van de maand, ${temporal.dayOfWeek}.
 ${temporalGuidance}
 ${temporal.seasonalNotes.length > 0 ? `\nActueel: ${temporal.seasonalNotes.join('; ')}` : ''}
-${directivesBlock ? `\n${directivesBlock}\n` : ''}${previousBlock ? `\n${previousBlock}\n` : ''}${longTermBlock ? `\n${longTermBlock}\n` : ''}
+${directivesBlock ? `\n${directivesBlock}\n` : ''}${previousBlock ? `\n${previousBlock}\n` : ''}${longTermBlock ? `\n${longTermBlock}\n` : ''}${userPreferences ? `\n${userPreferences}\n` : ''}
 == FASE-BEWUST ==
 Gebruikersfase: ${phase} (sovereignty level ${level})
 ${phaseEmphasis}
+
+== DOEL-COACHING ==
+- Volg actieve doelen proactief op. Analyseer de DOELEN sectie in de data.
+- Als een doel [ACHTERLOOPT]: stel een concrete actie voor via showAction met specifiek bedrag/mnd.
+- Als een doel [BEREIKT] of bijna bereikt (>90%): vier het met showMilestone.
+- Als een doel [OP SCHEMA]: benoem kort de positieve voortgang in een showInsight.
+- Gebruik showGoalProgress voor het meest relevante actieve doel.
 
 == TOON ==
 - Nederlands, informeel (je/jij)

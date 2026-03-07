@@ -17,11 +17,14 @@ import { BudgetBarCard } from './cards/budget-bar-card'
 import { QuoteCard } from './cards/quote-card'
 import { StreakCard } from './cards/streak-card'
 import { RecurringCard } from './cards/recurring-card'
+import { CardFeedbackProvider, type CardFeedbackFn } from './card-feedback-context'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 
 interface BriefingCardGridProps {
   cards: BriefingCardSpec[]
   data: DashboardData
+  onCardEngage?: (cardType: string, module: string | undefined) => void
+  onFeedback?: CardFeedbackFn
 }
 
 const SPAN_CLASSES: Record<number, string> = {
@@ -50,18 +53,26 @@ function renderCard(card: BriefingCardSpec, data: DashboardData) {
   }
 }
 
-export function BriefingCardGrid({ cards, data }: BriefingCardGridProps) {
+export function BriefingCardGrid({ cards, data, onCardEngage, onFeedback }: BriefingCardGridProps) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-      {cards.map((card, i) => (
-        <div
-          key={`${card.type}-${i}`}
-          className={SPAN_CLASSES[CARD_SPAN[card.type]] ?? 'col-span-1'}
-          style={{ '--stagger': `${i * 80}ms` } as React.CSSProperties}
-        >
-          {renderCard(card, data)}
-        </div>
-      ))}
+      {cards.map((card, i) => {
+        const module = 'module' in card ? card.module : undefined
+        const rendered = renderCard(card, data)
+        const wrapped = onFeedback
+          ? <CardFeedbackProvider index={i} cardType={card.type} handler={onFeedback}>{rendered}</CardFeedbackProvider>
+          : rendered
+        return (
+          <div
+            key={`${card.type}-${i}`}
+            className={SPAN_CLASSES[CARD_SPAN[card.type]] ?? 'col-span-1'}
+            style={{ '--stagger': `${i * 80}ms` } as React.CSSProperties}
+            onClick={onCardEngage ? () => onCardEngage(card.type, module) : undefined}
+          >
+            {wrapped}
+          </div>
+        )
+      })}
     </div>
   )
 }

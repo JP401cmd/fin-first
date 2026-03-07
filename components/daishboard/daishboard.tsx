@@ -5,6 +5,7 @@ import type { DashboardData } from '@/components/widgets/widget-renderer'
 import type { BriefingCardSpec, BriefingComposeResponse, BriefingSSEEvent, TemporalContext, PreviousBriefingSummary, BriefingLongTermMemory, CardModule } from '@/lib/briefing/types'
 import { condenseDashboardData } from '@/lib/briefing/condense'
 import { logCardEngagement } from '@/lib/briefing/engagement'
+import { buildUserPreferenceBlock, persistFeedback } from '@/lib/briefing/user-preferences'
 import { loadPreviousSnapshot, saveSnapshot, buildSnapshot, detectProgressionEvents } from '@/lib/briefing/progression'
 import { BriefingHeader } from './briefing-header'
 import { BriefingCardGrid } from './briefing-card-grid'
@@ -231,11 +232,13 @@ export function DAIshboard({ data, temporal, userName }: Props) {
     const previousBriefing = readPreviousBriefing()
     // Read long-term memory for cross-session context
     const longTermMemory = readLongTermMemory()
+    // Build user preference block from engagement + feedback data
+    const userPreferences = buildUserPreferenceBlock()
 
     fetch('/api/briefing/compose', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dataSummary, temporal, phase, level, previousBriefing, longTermMemory }),
+      body: JSON.stringify({ dataSummary, temporal, phase, level, previousBriefing, longTermMemory, userPreferences }),
       signal: controller.signal,
     })
       .then(async (res) => {
@@ -324,6 +327,20 @@ export function DAIshboard({ data, temporal, userName }: Props) {
     logCardEngagement(cardType, module as CardModule | undefined)
   }, [])
 
+  /** Key for per-session card feedback storage */
+  const FEEDBACK_KEY = 'briefing_feedback'
+
+  const handleFeedback = useCallback((cardIndex: number, cardType: string, positive: boolean) => {
+    try {
+      const raw = sessionStorage.getItem(FEEDBACK_KEY)
+      const existing = raw ? (JSON.parse(raw) as { cardIndex: number; cardType: string; positive: boolean; timestamp: string }[]) : []
+      existing.push({ cardIndex, cardType, positive, timestamp: new Date().toISOString() })
+      sessionStorage.setItem(FEEDBACK_KEY, JSON.stringify(existing))
+    } catch { /* quota / SSR */ }
+    // Also persist to localStorage for long-term preference building
+    persistFeedback(cardType, positive)
+  }, [])
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       <BriefingHeader temporal={temporal} userName={userName} />
@@ -348,7 +365,7 @@ export function DAIshboard({ data, temporal, userName }: Props) {
               <p className="text-xs text-[var(--ink-4)] animate-pulse">Will stelt je briefing samen...</p>
             </div>
           )}
-          <BriefingCardGrid cards={cards} data={data} onCardEngage={handleCardEngage} />
+          <BriefingCardGrid cards={cards} data={data} onCardEngage={handleCardEngage} onFeedback={handleFeedback} />
           {!composing && composedAt && (
             <BriefingFooter composedAt={composedAt} source="ai" onRefresh={handleRefresh} refreshing={refreshing} />
           )}
