@@ -3,8 +3,19 @@
 import { useMemo } from 'react'
 import { BriefingCard } from '../briefing-card'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import type { SparklineCardSpec } from '@/lib/briefing/types'
+import type { SparklineCardSpec, SparklineDataKey } from '@/lib/briefing/types'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
+
+type HistoryEntry = { month: string; value: number }
+
+function getHistoryData(data: DashboardData, dataKey: SparklineDataKey): HistoryEntry[] {
+  switch (dataKey) {
+    case 'netWorthHistory': return data.netWorthHistory ?? []
+    case 'savingsHistory': return data.savingsHistory ?? []
+    case 'expenseHistory': return data.expenseHistory ?? []
+    default: return []
+  }
+}
 
 interface Props {
   spec: SparklineCardSpec
@@ -18,7 +29,7 @@ const PAD = { top: 4, bottom: 4, left: 0, right: 0 }
 export function SparklineCard({ spec, data }: Props) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1000 })
 
-  const history = data[spec.dataKey] ?? []
+  const history = getHistoryData(data, spec.dataKey)
 
   const pathData = useMemo(() => {
     if (history.length < 2) return null

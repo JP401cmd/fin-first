@@ -61,6 +61,8 @@ const mockData: DashboardData = {
   recurringTransactions: 5,
   lifeEvents: 0,
   netWorthHistory: [],
+  savingsHistory: [],
+  expenseHistory: [],
   assetsByType: [],
   totalPurchaseValue: 0,
   fireAgeFractional: null,

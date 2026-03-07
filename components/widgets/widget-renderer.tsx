@@ -190,6 +190,10 @@ export interface DashboardData {
   fireAgeFractional: number | null
   // Historical net worth (up to 12 monthly snapshots, ascending)
   netWorthHistory: { month: string; value: number }[]
+  // Historical savings rate % per month (up to 12 monthly snapshots, ascending)
+  savingsHistory: { month: string; value: number }[]
+  // Historical monthly expenses (up to 12 monthly snapshots, ascending)
+  expenseHistory: { month: string; value: number }[]
   // Asset breakdown per type
   assetsByType: { type: string; value: number; purchaseValue: number; expectedReturn: number }[]
   totalPurchaseValue: number

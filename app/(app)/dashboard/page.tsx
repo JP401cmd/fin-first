@@ -38,6 +38,7 @@ export default async function DashboardPage() {
     income12Result, earliestIncomeResult, sovereigntyTxResult,
     bankAccountsResult, favBudgetsResult, prevMonthTxResult,
     badgesResult, userBadgesResult, userStreaksResult, nextStepCompletionsResult,
+    expenseTx12Result,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('id, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
@@ -53,7 +54,7 @@ export default async function DashboardPage() {
     supabase.from('budgets').select('id, parent_id, default_limit').not('parent_id', 'is', null),
     supabase.from('goals').select('id, name, goal_type, current_value, target_value, target_date, color, icon').eq('is_completed', false).order('sort_order', { ascending: true }),
     supabase.from('recurring_transactions').select('id, name, amount, frequency, budget_id').eq('is_active', true),
-    supabase.from('net_worth_snapshots').select('snapshot_date, net_worth, fire_age').gte('snapshot_date', twelveMonthsAgo).order('snapshot_date', { ascending: true }).limit(12),
+    supabase.from('net_worth_snapshots').select('snapshot_date, net_worth, fire_age, savings_rate').gte('snapshot_date', twelveMonthsAgo).order('snapshot_date', { ascending: true }).limit(12),
     supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
     supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
     supabase.from('transactions').select('amount').lt('amount', 0).gte('date', prev3MonthStart).lt('date', monthStart),
@@ -64,6 +65,7 @@ export default async function DashboardPage() {
     supabase.from('user_badges').select('id, badge_id, earned_at'),
     supabase.from('user_streaks').select('id, streak_type, current_count, longest_count, last_activity_date'),
     supabase.from('next_step_completions').select('step_key, dismissed'),
+    supabase.from('transactions').select('amount, date').lt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
   ])
 
   // Core calculations
@@ -406,6 +408,24 @@ export default async function DashboardPage() {
     month: s.snapshot_date as string,
     value: Number(s.net_worth),
   }))
+  // Savings rate history from snapshots (percentage per month)
+  const savingsHistory = snapshotRows
+    .filter(s => (s as { savings_rate?: number | null }).savings_rate != null)
+    .map(s => ({
+      month: s.snapshot_date as string,
+      value: Number((s as { savings_rate?: number | null }).savings_rate),
+    }))
+
+  // Expense history: aggregate negative transactions per month (absolute values)
+  const expenseByMonth = new Map<string, number>()
+  for (const tx of (expenseTx12Result.data ?? []) as { amount: number; date: string }[]) {
+    const month = (tx.date as string).slice(0, 7) // "YYYY-MM"
+    expenseByMonth.set(month, (expenseByMonth.get(month) ?? 0) + Math.abs(Number(tx.amount)))
+  }
+  const expenseHistory = Array.from(expenseByMonth.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, value]) => ({ month, value }))
+
   // Meest recente fire_age uit snapshot (gezet door useHorizonFireSim bij bezoek /horizon)
   const latestSnapshotFireAge = snapshotRows
     .filter(s => (s as { fire_age?: number | null }).fire_age != null)
@@ -785,6 +805,8 @@ export default async function DashboardPage() {
     recurringTransactions: (recurringResult.data ?? []).length,
     lifeEvents: (eventsResult.data ?? []).length,
     netWorthHistory,
+    savingsHistory,
+    expenseHistory,
     assetsByType,
     totalPurchaseValue,
     fireRange,
