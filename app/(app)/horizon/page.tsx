@@ -40,9 +40,7 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { FeatureGate } from '@/components/app/feature-gate'
-import { DiscoverCarousel } from '@/components/app/discover-carousel'
 import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
-import { NextStepSection, computeAllHorizonSteps } from '@/components/app/next-step-card'
 import { HouseholdFireSection } from '@/components/app/household-fire-section'
 import { SimChartModal } from '@/components/app/horizon/sim-chart-widget'
 import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverlay, type MonteCarloOverlay } from '@/components/app/horizon/sim-chart'
@@ -802,17 +800,6 @@ export default function HorizonPage() {
         />
       )}
 
-      {/* === 3. Next Step Card === */}
-      <section className="mt-6">
-        <NextStepSection
-          steps={computeAllHorizonSteps({
-            hasFireProjection: fire.fireAge !== null,
-            eventCount: events.length,
-            freedomPct: effectiveFreedomPct,
-          })}
-          moduleColor="purple"
-        />
-      </section>
 
       {/* === 5. Household FIRE Projections === */}
       <HouseholdFireSection />
@@ -1384,9 +1371,6 @@ export default function HorizonPage() {
 
       {/* === Locked Features Footer === */}
       <LockedFeaturesFooter module="horizon" />
-
-      {/* === Discover Carousel === */}
-      <DiscoverCarousel module="horizon" />
 
       {/* === Event Form Modal === */}
       {showForm && (

@@ -22,9 +22,7 @@ import {
   CheckCircle2, AlertTriangle, TrendingDown, ArrowUpRight, ArrowDownRight, Minus,
 } from 'lucide-react'
 import { FeatureGate } from '@/components/app/feature-gate'
-import { DiscoverCarousel } from '@/components/app/discover-carousel'
 import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
-import { NextStepSection, computeAllKernSteps } from '@/components/app/next-step-card'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { SparklineWithLabel, type SparklineDataPoint } from '@/components/app/budget-sparkline'
 import { NetWorthProjectionChart } from '@/components/app/net-worth-projection-chart'
@@ -898,26 +896,6 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         </section>
       )}
 
-      {/* === 1b. Next Step Card === */}
-      {data && (
-        <section className="mt-6">
-          <NextStepSection
-            steps={computeAllKernSteps({
-              totalAssets: rawFinancials!.totalAssets,
-              totalDebts: rawFinancials!.totalDebts,
-              monthlyIncome: rawFinancials!.monthlyIncome,
-              monthlyExpenses: rawFinancials!.monthlyExpenses,
-              budgetCount,
-              snapshotCount: snapshots.length,
-              hasTransactions,
-              alertBudgetCount: alertBudgets.length,
-              hasGoals,
-              fireUnreachable,
-            })}
-            moduleColor="amber"
-          />
-        </section>
-      )}
 
       {/* === 7. Financiële Kerngetallen (Deep Dive) === */}
       <section className="mt-5 sm:mt-8">
@@ -976,9 +954,6 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
 
       {/* === 8. Locked Features Footer === */}
       <LockedFeaturesFooter module="kern" />
-
-      {/* === 9. Discover Carousel === */}
-      <DiscoverCarousel module="kern" />
 
       {/* === Mission Control Modals === */}
       <FullScreenModal

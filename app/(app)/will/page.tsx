@@ -26,9 +26,7 @@ import {
 import { NibudBenchmarkSection } from '@/components/app/will/nibud-benchmark'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { CollapsibleSection } from '@/components/app/collapsible-section'
-import { DiscoverCarousel } from '@/components/app/discover-carousel'
 import { LockedFeaturesFooter } from '@/components/app/locked-features-footer'
-import { NextStepSection, computeAllWilSteps } from '@/components/app/next-step-card'
 import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-animation'
 import { FreedomDaysMonthlyTrend } from '@/components/app/will/freedom-days-monthly-trend'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -498,18 +496,6 @@ export default function WillPage() {
         </div>
       </section>
 
-      {/* === 1b. Next Step Card === */}
-      <section className="mt-6">
-        <NextStepSection
-          steps={computeAllWilSteps({
-            pendingRecommendations: allPendingRecs.length,
-            openActions: openActions.length,
-            goalCount: totalGoalCount,
-            hasCompletedActions: completedActions.length > 0,
-          })}
-          moduleColor="teal"
-        />
-      </section>
 
       {/* === 2. KPI Stat Cards (White cards, subtle borders) === */}
       <section data-testid="wil-kpi-grid" className="mt-4 sm:mt-8 grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -1110,8 +1096,6 @@ export default function WillPage() {
       {/* === 9. Locked Features Footer === */}
       <LockedFeaturesFooter module="wil" />
 
-      {/* === 10. Discover Carousel === */}
-      <DiscoverCarousel module="wil" />
     </div>
     </FreedomDaysAnimationProvider>
   )
