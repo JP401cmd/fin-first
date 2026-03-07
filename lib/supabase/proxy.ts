@@ -393,6 +393,7 @@ export async function updateSession(request: NextRequest) {
     '/test-sanitize-failsafe',
     '/api/test-sanitize-failsafe',
     '/api/verify-news-error-handling',
+    '/api/verify-no-ai-fallback',
   ]
 
   // Protected route prefixes that require authentication
