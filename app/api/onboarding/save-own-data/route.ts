@@ -64,6 +64,15 @@ const bodySchema = z.object({
     credit_limit: z.number().optional(),
     draagkrachtmeting_date: z.string().optional(),
   })).optional(),
+  widgetPrefs: z.object({
+    widgets: z.array(z.object({
+      id: z.string(),
+      enabled: z.boolean(),
+      size: z.enum(['quarter', 'half', 'full']),
+      order: z.number(),
+    })),
+  }).optional(),
+  budgetteringMode: z.enum(['none', 'template', 'manual']).optional(),
 })
 
 export async function POST(req: Request) {
@@ -81,7 +90,7 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Ongeldige invoer', details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { identity, budgetAmounts, bankAccounts, assets, debts } = parsed.data
+  const { identity, budgetAmounts, bankAccounts, assets, debts, widgetPrefs } = parsed.data
 
   try {
     // Idempotency check: if onboarding is already completed, skip all inserts
@@ -114,6 +123,7 @@ export async function POST(req: Request) {
     if (identity.retirement_expense_method) profileData.retirement_expense_method = identity.retirement_expense_method
     if (identity.retirement_custom_amount != null) profileData.retirement_custom_amount = identity.retirement_custom_amount
     if (identity.fire_end_strategy) profileData.fire_end_strategy = identity.fire_end_strategy
+    if (widgetPrefs) profileData.widget_prefs = widgetPrefs
 
     const { error: profileErr } = await supabase
       .from('profiles')

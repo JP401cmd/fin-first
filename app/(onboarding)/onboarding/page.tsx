@@ -1,18 +1,30 @@
 'use client'
 
-import { useState, useEffect, useReducer } from 'react'
+import { useState, useEffect, useReducer, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { FinnAvatar } from '@/components/app/avatars'
 import type { IdentityData } from '@/components/onboarding/onboarding-identity'
 import type { BankAccountEntry } from '@/components/onboarding/mini-bank-form'
 import type { AssetEntry } from '@/components/onboarding/mini-asset-form'
 import type { DebtEntry } from '@/components/onboarding/mini-debt-form'
+import type { PreferencesData } from '@/components/onboarding/onboarding-preferences'
 
 import { OnboardingIntro } from '@/components/onboarding/onboarding-intro'
 import { OnboardingIdentity } from '@/components/onboarding/onboarding-identity'
 import { OnboardingBudgets } from '@/components/onboarding/onboarding-budgets'
 import { OnboardingExtras } from '@/components/onboarding/onboarding-extras'
+import { OnboardingPreferences, INITIAL_PREFERENCES, buildWidgetPrefsFromPreferences } from '@/components/onboarding/onboarding-preferences'
 import { OnboardingSuccess } from '@/components/onboarding/onboarding-success'
+
+// ── Saving progress messages ─────────────────────────────────
+const SAVING_MESSAGES = [
+  'Profiel wordt opgeslagen...',
+  'Budgetten worden aangemaakt...',
+  'Bezittingen en schulden verwerken...',
+  'Dashboard wordt geconfigureerd...',
+  'Bijna klaar...',
+]
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -21,7 +33,9 @@ type Step =
   | 'identity'
   | 'budgets'
   | 'extras'
+  | 'preferences'
   | 'saving'
+  | 'error'
   | 'success'
 
 interface State {
@@ -31,6 +45,7 @@ interface State {
   bankAccounts: BankAccountEntry[]
   assets: AssetEntry[]
   debts: DebtEntry[]
+  preferences: PreferencesData
 }
 
 type Action =
@@ -40,6 +55,7 @@ type Action =
   | { type: 'SET_BANK_ACCOUNTS'; items: BankAccountEntry[] }
   | { type: 'SET_ASSETS'; items: AssetEntry[] }
   | { type: 'SET_DEBTS'; items: DebtEntry[] }
+  | { type: 'SET_PREFERENCES'; data: PreferencesData }
 
 const initialState: State = {
   step: 'intro',
@@ -59,6 +75,7 @@ const initialState: State = {
   bankAccounts: [],
   assets: [],
   debts: [],
+  preferences: INITIAL_PREFERENCES,
 }
 
 function reducer(state: State, action: Action): State {
@@ -75,6 +92,8 @@ function reducer(state: State, action: Action): State {
       return { ...state, assets: action.items }
     case 'SET_DEBTS':
       return { ...state, debts: action.items }
+    case 'SET_PREFERENCES':
+      return { ...state, preferences: action.data }
     default:
       return state
   }
@@ -88,6 +107,9 @@ export default function OnboardingPage() {
   const [state, dispatch] = useReducer(reducer, initialState)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [saveProgress, setSaveProgress] = useState(0)
+  const [saveMessageIdx, setSaveMessageIdx] = useState(0)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   // Check if already onboarded
   useEffect(() => {
@@ -115,14 +137,41 @@ export default function OnboardingPage() {
 
   // ── Handlers ─────────────────────────────────────────────────
 
-  async function handleSaveOwnData() {
+  // Animate progress bar and rotating messages during save
+  useEffect(() => {
+    if (state.step !== 'saving') return
+    // Progress bar animation: ramp from 0 to 90% over ~3s
+    const progressTimer = setInterval(() => {
+      setSaveProgress((prev) => {
+        if (prev >= 90) { clearInterval(progressTimer); return 90 }
+        return prev + 3
+      })
+    }, 100)
+    // Rotate messages every 800ms
+    const messageTimer = setInterval(() => {
+      setSaveMessageIdx((prev) => (prev + 1) % SAVING_MESSAGES.length)
+    }, 800)
+    return () => { clearInterval(progressTimer); clearInterval(messageTimer) }
+  }, [state.step])
+
+  const handleSaveOwnData = useCallback(async () => {
     // Prevent double-submit: if already saving, ignore subsequent calls
     if (saving) return
     setSaving(true)
+    setSaveProgress(0)
+    setSaveMessageIdx(0)
+    setSaveError(null)
     dispatch({ type: 'SET_STEP', step: 'saving' })
 
     try {
-      const { identity, budgetAmounts, bankAccounts, assets, debts } = state
+      const { identity, budgetAmounts, bankAccounts, assets, debts, preferences } = state
+
+      // Build widget prefs from user preferences
+      const widgetPrefs = buildWidgetPrefsFromPreferences(preferences)
+
+      // Determine budgettering mode
+      const hasBudgetAmounts = Object.values(budgetAmounts).some((v) => v > 0)
+      const budgetteringMode = hasBudgetAmounts ? 'manual' : 'none'
 
       const body: Record<string, unknown> = {
         identity: {
@@ -131,6 +180,8 @@ export default function OnboardingPage() {
           retirement_custom_amount: identity.retirement_custom_amount ? Number(identity.retirement_custom_amount) : undefined,
         },
         budgetAmounts,
+        widgetPrefs,
+        budgetteringMode,
       }
 
       // Only send non-empty optional arrays
@@ -199,13 +250,19 @@ export default function OnboardingPage() {
         throw new Error(data.error || 'Opslaan mislukt')
       }
 
+      // Complete the progress bar
+      setSaveProgress(100)
+      await new Promise((r) => setTimeout(r, 400))
+
       dispatch({ type: 'SET_STEP', step: 'success' })
     } catch (err) {
-      dispatch({ type: 'SET_STEP', step: 'budgets' })
+      const message = err instanceof Error ? err.message : 'Onbekende fout bij opslaan'
+      setSaveError(message)
+      dispatch({ type: 'SET_STEP', step: 'error' })
     } finally {
       setSaving(false)
     }
-  }
+  }, [saving, state])
 
   // ── Render ───────────────────────────────────────────────────
 
@@ -217,7 +274,7 @@ export default function OnboardingPage() {
     )
   }
 
-  const showHeader = !['intro', 'success', 'saving'].includes(state.step)
+  const showHeader = !['intro', 'success', 'saving', 'error'].includes(state.step)
 
   return (
     <div className="flex min-h-screen flex-col items-center px-4 py-8 sm:justify-center sm:px-6 sm:py-12">
@@ -266,16 +323,69 @@ export default function OnboardingPage() {
             netIncome={Number(state.identity.net_monthly_income) || 0}
             householdType={state.identity.household_type}
             numberOfChildren={state.identity.number_of_children}
-            onNext={handleSaveOwnData}
+            onNext={() => dispatch({ type: 'SET_STEP', step: 'preferences' })}
             onBack={() => dispatch({ type: 'SET_STEP', step: 'extras' })}
+          />
+        )}
+
+        {state.step === 'preferences' && (
+          <OnboardingPreferences
+            data={state.preferences}
+            onChange={(data) => dispatch({ type: 'SET_PREFERENCES', data })}
+            onNext={handleSaveOwnData}
+            onBack={() => dispatch({ type: 'SET_STEP', step: 'budgets' })}
             saving={saving}
           />
         )}
 
         {state.step === 'saving' && (
-          <div className="rounded-2xl border border-zinc-200 bg-white p-8 text-center">
-            <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-teal-600" />
-            <p className="text-sm text-zinc-600">Je gegevens worden opgeslagen...</p>
+          <div className="flex min-h-[60vh] flex-col items-center justify-center sm:min-h-0">
+            <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-8 text-center">
+              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center">
+                <div className="animate-pulse">
+                  <FinnAvatar size={64} />
+                </div>
+              </div>
+              <p className="mb-4 text-sm font-medium text-zinc-700 transition-opacity duration-300">
+                {SAVING_MESSAGES[saveMessageIdx]}
+              </p>
+              {/* Progress bar */}
+              <div className="mx-auto h-2 w-full overflow-hidden rounded-full bg-zinc-100">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-400 via-teal-400 to-purple-500 transition-all duration-300 ease-out"
+                  style={{ width: `${saveProgress}%` }}
+                />
+              </div>
+              <p className="mt-2 font-mono text-xs tabular-nums text-zinc-400">{saveProgress}%</p>
+            </div>
+          </div>
+        )}
+
+        {state.step === 'error' && (
+          <div className="flex min-h-[60vh] flex-col items-center justify-center sm:min-h-0">
+            <div className="w-full max-w-sm rounded-2xl border border-red-200 bg-white p-8 text-center">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
+                <svg className="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                </svg>
+              </div>
+              <h3 className="mb-2 text-base font-semibold text-zinc-900">Er ging iets mis</h3>
+              <p className="mb-5 text-sm text-zinc-500">{saveError}</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => dispatch({ type: 'SET_STEP', step: 'preferences' })}
+                  className="flex-1 min-h-[44px] rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+                >
+                  Terug
+                </button>
+                <button
+                  onClick={handleSaveOwnData}
+                  className="flex-1 min-h-[44px] rounded-lg bg-wil-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-wil-700"
+                >
+                  Opnieuw proberen
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

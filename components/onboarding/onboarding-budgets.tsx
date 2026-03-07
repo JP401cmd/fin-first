@@ -126,7 +126,7 @@ export function OnboardingBudgets({
   numberOfChildren: number
   onNext: () => void
   onBack: () => void
-  saving?: boolean
+  saving?: boolean // kept for backwards compat but no longer used from preferences flow
 }) {
   const [subChoice, setSubChoice] = useState<SubChoice>(null)
   const [selectedProfileTemplate, setSelectedProfileTemplate] = useState<ProfileTemplateId | null>(null)
