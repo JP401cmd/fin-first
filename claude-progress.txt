@@ -1,3 +1,36 @@
+## Session 2026-03-07 - Features #513, #498, #500
+
+### Feature #513: Fail-safe: blokkeer AI-call als sanitize faalt - PASSING
+- Changed all 3 AI endpoints (chat, briefing/compose, news) from non-fatal to fail-safe
+- Previously: sanitize failure → proceed with unsanitized data (PII leak risk)
+- Now: sanitize failure → return 503 with user-friendly message, block AI call
+- Message: "De AI-assistent is tijdelijk niet beschikbaar vanwege een beveiligingscontrole"
+- Error logged with console.error for debugging
+- Test page at /test-sanitize-failsafe (4/4 tests passing)
+- Commit: 1a113da
+
+### Feature #498: Foutmelding bij mislukte nieuwsgeneratie met retry - PASSING
+- Enhanced error state on /berichten news section
+- AlertCircle icon in circular background, two-line message layout
+- Heading: "Nieuws kon niet worden geladen" + detailed error below
+- "Opnieuw proberen" button with RefreshCw icon, prominent button styling
+- min-h-[44px] touch target, active:scale-[0.98] press feedback
+- Retry resets newsFetched and newsError, triggers fresh API call via useEffect
+- Verified 8/8 tests via /api/verify-news-error-handling
+- Commit: 2957cc5
+
+### Feature #500: Graceful fallback zonder AI-provider: toon alleen meldingen - PASSING
+- Meldingen section uses /api/notifications (no AI dependency) — works independently
+- Nieuws section catches API errors and shows "Nieuws kon niet worden geladen"
+- AIConfigError (invalid key) returns 422 with descriptive message from /api/news
+- Retry/refresh mechanism allows recovery after AI key is restored
+- Verified 8/8 tests via /api/verify-no-ai-fallback
+- Commit: d56c8ae
+
+### Current Status
+- 3 features completed this session (#513, #498, #500)
+- Zero TypeScript errors, zero console errors
+
 ## Session 2026-03-07 - Features #515, #474, #481
 
 ### Feature #515: Widget grootte aanpassen direct op het dashboard in edit-mode - PASSING
@@ -10189,3 +10222,66 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#514)
 - 478/511 features passing (93.5%)
+
+## Session 2026-03-07 - Features #478, #479, #480
+
+### Feature #478: Nieuws on-demand generatie bij paginabezoek - PASSING
+- News fetched on-demand when visiting /berichten page (fetchNews on mount)
+- Client-side localStorage cache (NEWS_LOCAL_CACHE_KEY) with 6-hour TTL
+- Server-side app_settings cache with getCachedNews/setCachedNews helpers
+- NewsSkeletonLoader with animated placeholders plus spinner
+- NewsArticleCard with category badge (CATEGORY_CONFIG), headline, summary, personal impact block
+- newsFetched flag prevents re-generation on quick refresh
+- API returns items and cached boolean to indicate cache hit or miss
+
+### Feature #479: Nieuwscache van 7 dagen in database - PASSING
+- Server-side CACHE_TTL_HOURS changed from 6 to 7x24 (168 hours equals 7 days)
+- Cache stored in app_settings table with key news_cache:userId
+- CachedNews interface with items array and generatedAt timestamp
+- Cache validated by computing age in hours vs TTL
+- Client-side cache remains at 6 hours (short-term for fast re-visits)
+
+### Feature #480: Handmatige verversknop voor nieuws - PASSING
+- RefreshCw icon button added to Gepersonaliseerd nieuws section header
+- refreshNews clears localStorage, resets state, fetches with refresh=1 param
+- API GET handler accepts refresh=1 to bypass server-side cache
+- Button only visible when news is loaded and not loading
+- Button disabled during loading, 44px touch target on mobile
+- Ververs label hidden on mobile, shown on desktop
+
+### Current Status
+- 3 features completed this session (478, 479, 480)
+- Zero TypeScript errors
+- Commit: 369b116
+
+## Session 2026-03-07 - Features #471, #493, #482
+
+### Feature #471: Krant-footer met redactionele afsluiting - PASSING
+- Added NewspaperFooter component to berichten/page.tsx
+- Double rule (h-px + h-[2px]) matching masthead style
+- Editorial closing quote in italic Source Serif: "Geld is opgeslagen tijd — elke euro vertegenwoordigt een stukje levenstijd."
+- Link to /daishboard: "Naar Will's Briefing →" with hover state
+- Responsive layout: stacked on mobile, side-by-side on desktop (sm:flex-row)
+- Footer added to both empty state and main content render paths
+- Test page at /test-berichten-footer for visual verification
+
+### Feature #493: Link naar DAIshboard vanuit berichten-pagina - PASSING
+- Already had prominent cross-link card at top of page (from #462/#465)
+- NewspaperFooter adds editorial-style link at bottom (from #471)
+- Three /daishboard links total: footer, empty state card, main content card
+- Link navigation verified via playwright click
+
+### Feature #482: Loading skeleton in editorial krant-stijl - PASSING
+- Replaced old generic list skeleton with newspaper-layout skeleton
+- Hero article skeleton: category tag placeholder, large headline blocks, summary lines, date, impact block
+- 4 grid card skeletons in 2-column layout (sm:grid-cols-2)
+- All blocks use animate-pulse
+- Loading indicator (Loader2 spinner) with italic Source Serif text at bottom
+- Skeleton replaced inline spinner in main render loading condition
+- Test page updated to show skeleton
+- Zero console errors
+
+### Current Status
+- 3 features completed this session (#471, #493, #482)
+- Zero TypeScript errors, zero console errors
+- Changes committed in 369b116 (parallel agent commit)
