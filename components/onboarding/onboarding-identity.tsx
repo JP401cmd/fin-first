@@ -23,9 +23,11 @@ export interface IdentityData {
   retirement_expense_method: RetirementExpenseMethod
   retirement_custom_amount: string
   fire_end_strategy: FireEndStrategy
+  fire_legacy_amount: string
+  fire_end_age: number
 }
 
-type FieldKey = 'full_name' | 'date_of_birth' | 'net_monthly_income' | 'number_of_children' | 'retirement_custom_amount'
+type FieldKey = 'full_name' | 'date_of_birth' | 'net_monthly_income' | 'number_of_children' | 'retirement_custom_amount' | 'fire_legacy_amount' | 'fire_end_age'
 
 /** Field ID mapping for scroll-to-error */
 const FIELD_IDS: Record<FieldKey, string> = {
@@ -34,6 +36,8 @@ const FIELD_IDS: Record<FieldKey, string> = {
   net_monthly_income: 'ob-income',
   number_of_children: 'ob-children',
   retirement_custom_amount: 'ob-custom-amount',
+  fire_legacy_amount: 'ob-legacy-amount',
+  fire_end_age: 'ob-end-age',
 }
 
 function getFieldErrors(data: IdentityData): Partial<Record<FieldKey, string>> {
@@ -100,6 +104,27 @@ function getFieldErrors(data: IdentityData): Partial<Record<FieldKey, string>> {
     }
   }
 
+  // Legacy amount: required if strategy is legacy
+  if (data.fire_end_strategy === 'legacy') {
+    const amt = Number(data.fire_legacy_amount)
+    if (!data.fire_legacy_amount) {
+      errors.fire_legacy_amount = 'Voer een gewenst nalatenschap-bedrag in'
+    } else if (isNaN(amt) || amt <= 0) {
+      errors.fire_legacy_amount = 'Bedrag moet hoger dan \u20AC0 zijn'
+    } else if (amt > 100000000) {
+      errors.fire_legacy_amount = 'Voer een realistisch bedrag in'
+    }
+  }
+
+  // End age: required if strategy is deplete, 60-120
+  if (data.fire_end_strategy === 'deplete') {
+    if (data.fire_end_age < 60) {
+      errors.fire_end_age = 'Eind-leeftijd moet minimaal 60 zijn'
+    } else if (data.fire_end_age > 120) {
+      errors.fire_end_age = 'Eind-leeftijd moet maximaal 120 zijn'
+    }
+  }
+
   return errors
 }
 
@@ -150,7 +175,7 @@ export function OnboardingIdentity({
   const disableNext = submitted && !isValid
 
   const scrollToFirstError = useCallback(() => {
-    const fieldOrder: FieldKey[] = ['full_name', 'date_of_birth', 'number_of_children', 'net_monthly_income', 'retirement_custom_amount']
+    const fieldOrder: FieldKey[] = ['full_name', 'date_of_birth', 'number_of_children', 'net_monthly_income', 'retirement_custom_amount', 'fire_legacy_amount', 'fire_end_age']
     for (const field of fieldOrder) {
       if (errors[field]) {
         const el = document.getElementById(FIELD_IDS[field])
@@ -509,6 +534,75 @@ export function OnboardingIdentity({
               )
             })}
           </div>
+
+          {/* Legacy amount input when strategy is 'nalatenschap' */}
+          {data.fire_end_strategy === 'legacy' && (
+            <div className="mt-3">
+              <label htmlFor="ob-legacy-amount" className="mb-1.5 block text-sm font-medium text-zinc-700">
+                Gewenst nalatenschap-bedrag <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
+                <input
+                  id="ob-legacy-amount"
+                  type="text"
+                  inputMode="decimal"
+                  value={data.fire_legacy_amount}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9.,]/g, '')
+                    onChange({ ...data, fire_legacy_amount: val })
+                  }}
+                  onBlur={() => markTouched('fire_legacy_amount')}
+                  placeholder="bv. 100000"
+                  autoComplete="off"
+                  aria-invalid={!!showError('fire_legacy_amount')}
+                  aria-describedby={showError('fire_legacy_amount') ? 'ob-legacy-amount-error' : 'ob-legacy-amount-hint'}
+                  className={`w-full min-h-[44px] rounded-lg bg-zinc-50 py-2.5 pr-3 pl-8 text-base text-zinc-900 outline-none border focus:ring-1 sm:text-sm ${
+                    showError('fire_legacy_amount')
+                      ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
+                      : 'border-zinc-300 focus:border-zinc-500 focus:ring-zinc-500'
+                  }`}
+                />
+              </div>
+              {showError('fire_legacy_amount') ? (
+                <p id="ob-legacy-amount-error" className="mt-1 text-xs text-red-500" role="alert">{showError('fire_legacy_amount')}</p>
+              ) : (
+                <p id="ob-legacy-amount-hint" className="mt-1 text-xs text-zinc-400">Het bedrag dat je wilt nalaten aan het einde van je leven.</p>
+              )}
+            </div>
+          )}
+
+          {/* End age input when strategy is 'opteren' */}
+          {data.fire_end_strategy === 'deplete' && (
+            <div className="mt-3">
+              <label htmlFor="ob-end-age" className="mb-1.5 block text-sm font-medium text-zinc-700">
+                Eind-leeftijd <span className="text-red-400">*</span>
+              </label>
+              <input
+                id="ob-end-age"
+                type="number"
+                inputMode="numeric"
+                min={60}
+                max={120}
+                value={data.fire_end_age}
+                onChange={(e) => onChange({ ...data, fire_end_age: Math.max(0, Number(e.target.value)) })}
+                onBlur={() => markTouched('fire_end_age')}
+                placeholder="90"
+                aria-invalid={!!showError('fire_end_age')}
+                aria-describedby={showError('fire_end_age') ? 'ob-end-age-error' : 'ob-end-age-hint'}
+                className={`w-full sm:w-32 min-h-[44px] rounded-lg bg-zinc-50 px-3 py-2.5 text-base text-zinc-900 outline-none border focus:ring-1 sm:text-sm ${
+                  showError('fire_end_age')
+                    ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
+                    : 'border-zinc-300 focus:border-zinc-500 focus:ring-zinc-500'
+                }`}
+              />
+              {showError('fire_end_age') ? (
+                <p id="ob-end-age-error" className="mt-1 text-xs text-red-500" role="alert">{showError('fire_end_age')}</p>
+              ) : (
+                <p id="ob-end-age-hint" className="mt-1 text-xs text-zinc-400">Leeftijd waarop je vermogen volledig opgemaakt mag zijn.</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

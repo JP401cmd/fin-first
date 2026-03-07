@@ -1,7 +1,7 @@
 import { FinnAvatar, FhinAvatar, FfinAvatar } from '@/components/app/avatars'
 import { SpeechBubbleCentered } from './speech-bubble'
 
-export function OnboardingIntro({ onNext }: { onNext: () => void }) {
+export function OnboardingIntro({ onNext, onLogout }: { onNext: () => void; onLogout?: () => void }) {
   return (
     <div className="flex flex-col items-center text-center">
       <div className="mb-6">
@@ -49,6 +49,15 @@ export function OnboardingIntro({ onNext }: { onNext: () => void }) {
         Aan de slag
       </button>
       <p className="mt-3 text-xs text-zinc-400">Dit duurt nog geen 2 minuten</p>
+
+      {onLogout && (
+        <button
+          onClick={onLogout}
+          className="mt-6 text-xs text-zinc-400 transition-colors hover:text-zinc-600"
+        >
+          Uitloggen
+        </button>
+      )}
     </div>
   )
 }
