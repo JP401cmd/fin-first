@@ -85,13 +85,14 @@ export async function POST(request: Request) {
       })
     }
 
-    // Load editorial directives from app_settings
+    // Load editorial directives + briefing preferences from app_settings
     let directivesBlock = ''
+    let serverUserPreferences = userPreferences ?? ''
     try {
       const { data: settingsRows } = await supabase
         .from('app_settings')
         .select('key, value')
-        .in('key', ['briefing_directives', 'briefing_functional_directives'])
+        .in('key', ['briefing_directives', 'briefing_functional_directives', `briefing_preferences_${user.id}`])
 
       const settingsMap = Object.fromEntries(
         (settingsRows ?? []).map((r) => [r.key, r.value]),
@@ -114,12 +115,36 @@ export async function POST(request: Request) {
       }
 
       directivesBlock = blocks.join('\n\n')
+
+      // Read user-specific briefing preferences (next steps / discover toggles)
+      const briefingPrefsKey = `briefing_preferences_${user.id}`
+      if (settingsMap[briefingPrefsKey]) {
+        try {
+          const prefs = JSON.parse(settingsMap[briefingPrefsKey]) as { showNextSteps?: boolean; showDiscover?: boolean }
+          const prefLines: string[] = []
+          const showNextSteps = prefs.showNextSteps !== false // default true
+          const showDiscover = prefs.showDiscover !== false   // default true
+          prefLines.push(`Volgende stappen: ${showNextSteps ? 'AAN' : 'UIT'}`)
+          prefLines.push(`Ontdek-suggesties: ${showDiscover ? 'AAN' : 'UIT'}`)
+          if (!showNextSteps) {
+            prefLines.push('Gebruik NIET de showNextStep tool. De gebruiker heeft volgende stappen uitgeschakeld.')
+          }
+          if (!showDiscover) {
+            prefLines.push('Gebruik NIET de showDiscover tool. De gebruiker heeft ontdek-suggesties uitgeschakeld.')
+          }
+          const serverPrefBlock = `== BRIEFING VOORKEUREN ==\n${prefLines.join('\n')}`
+          // Merge: server-side prefs take precedence, append client prefs if present
+          serverUserPreferences = serverUserPreferences
+            ? `${serverPrefBlock}\n\n${serverUserPreferences}`
+            : serverPrefBlock
+        } catch { /* invalid JSON — skip */ }
+      }
     } catch {
       // Silent fallback — hardcoded temporal logic still works
     }
 
     const model = await getModel(supabase)
-    const systemPrompt = buildBriefingSystemPrompt(temporal, phase, level, directivesBlock, previousBriefing, longTermMemory, userPreferences, phaseTransition, briefingFrequency)
+    const systemPrompt = buildBriefingSystemPrompt(temporal, phase, level, directivesBlock, previousBriefing, longTermMemory, serverUserPreferences || undefined, phaseTransition, briefingFrequency)
 
     // Create a ReadableStream that emits SSE events as tool calls complete
     const encoder = new TextEncoder()
