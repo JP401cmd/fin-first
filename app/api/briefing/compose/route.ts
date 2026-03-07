@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json() as BriefingComposeRequest
-    const { dataSummary, temporal, phase, level } = body
+    const { dataSummary, temporal, phase, level, previousBriefing } = body
 
     if (!dataSummary || !temporal) {
       return new Response(JSON.stringify({ error: 'Missing dataSummary or temporal' }), {
@@ -111,7 +111,7 @@ export async function POST(request: Request) {
     }
 
     const model = await getModel(supabase)
-    const systemPrompt = buildBriefingSystemPrompt(temporal, phase, level, directivesBlock)
+    const systemPrompt = buildBriefingSystemPrompt(temporal, phase, level, directivesBlock, previousBriefing)
 
     // Create a ReadableStream that emits SSE events as tool calls complete
     const encoder = new TextEncoder()

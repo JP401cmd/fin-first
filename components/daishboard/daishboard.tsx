@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
-import type { BriefingCardSpec, BriefingComposeResponse, BriefingSSEEvent, TemporalContext } from '@/lib/briefing/types'
+import type { BriefingCardSpec, BriefingComposeResponse, BriefingSSEEvent, TemporalContext, PreviousBriefingSummary } from '@/lib/briefing/types'
 import { condenseDashboardData } from '@/lib/briefing/condense'
 import { BriefingHeader } from './briefing-header'
 import { BriefingCardGrid } from './briefing-card-grid'
@@ -20,6 +20,47 @@ const CACHE_TTL_MS = 2 * 60 * 60 * 1000
 
 /** Stable cache key */
 const CACHE_KEY = 'briefing_v2'
+
+/** Key for previous briefing summary (session continuity) */
+const PREVIOUS_KEY = 'briefing_previous'
+
+/** Extract key metrics from completed briefing cards */
+function extractKeyMetrics(cards: BriefingCardSpec[]): Record<string, string> {
+  const metrics: Record<string, string> = {}
+  for (const card of cards) {
+    if (card.type === 'metric') {
+      metrics[card.label] = card.value
+      if (card.delta) metrics[`${card.label}_delta`] = card.delta
+    } else if (card.type === 'progressRing') {
+      metrics[card.label] = card.value
+    } else if (card.type === 'milestone') {
+      metrics[card.label] = `${card.percentage}%`
+    }
+  }
+  return metrics
+}
+
+/** Save a summary of the completed briefing for next-session continuity */
+function saveBriefingSummary(cards: BriefingCardSpec[], composedAt: string): void {
+  try {
+    const summary: PreviousBriefingSummary = {
+      composedAt,
+      cardTypes: cards.map(c => c.type),
+      keyMetrics: extractKeyMetrics(cards),
+    }
+    sessionStorage.setItem(PREVIOUS_KEY, JSON.stringify(summary))
+  } catch { /* quota / SSR */ }
+}
+
+/** Read previous briefing summary (if any) */
+function readPreviousBriefing(): PreviousBriefingSummary | null {
+  try {
+    const raw = sessionStorage.getItem(PREVIOUS_KEY)
+    if (!raw) return null
+    return JSON.parse(raw) as PreviousBriefingSummary
+  } catch { /* SSR / storage errors */ }
+  return null
+}
 
 /** Compact hash of key financial metrics for cache invalidation */
 function hashDashboardData(data: DashboardData): string {
@@ -123,10 +164,13 @@ export function DAIshboard({ data, temporal, userName }: Props) {
     }
     setComposing(true)
 
+    // Read previous briefing summary for continuity
+    const previousBriefing = readPreviousBriefing()
+
     fetch('/api/briefing/compose', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dataSummary, temporal, phase, level }),
+      body: JSON.stringify({ dataSummary, temporal, phase, level, previousBriefing }),
       signal: controller.signal,
     })
       .then(async (res) => {
@@ -163,6 +207,8 @@ export function DAIshboard({ data, temporal, userName }: Props) {
                   }
                   sessionStorage.setItem(CACHE_KEY, JSON.stringify(cacheData))
                 } catch { /* quota */ }
+                // Save briefing summary for next-briefing continuity
+                saveBriefingSummary(streamedCards, event.composedAt)
                 break
               case 'error':
                 setError(event.message)

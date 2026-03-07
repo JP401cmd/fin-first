@@ -3,7 +3,7 @@
 
 import { z } from 'zod'
 import { tool } from 'ai'
-import type { TemporalContext } from '@/lib/briefing/types'
+import type { TemporalContext, PreviousBriefingSummary } from '@/lib/briefing/types'
 
 // ── System Prompt Builder ───────────────────────────────────
 
@@ -12,10 +12,12 @@ export function buildBriefingSystemPrompt(
   phase: string,
   level: number,
   directivesBlock?: string,
+  previousBriefing?: PreviousBriefingSummary,
 ): string {
   // Phase-specific card emphasis
   const phaseEmphasis = getPhaseEmphasis(phase)
   const temporalGuidance = getTemporalGuidance(temporal)
+  const previousBlock = formatPreviousBriefing(previousBriefing)
 
   return `Je bent Will, de financiele redacteur van TriFinity.
 
@@ -60,7 +62,7 @@ Gebruik deze routes als href waarden:
 Vandaag: ${temporal.date}, dag ${temporal.dayOfMonth} van de maand, ${temporal.dayOfWeek}.
 ${temporalGuidance}
 ${temporal.seasonalNotes.length > 0 ? `\nActueel: ${temporal.seasonalNotes.join('; ')}` : ''}
-${directivesBlock ? `\n${directivesBlock}\n` : ''}
+${directivesBlock ? `\n${directivesBlock}\n` : ''}${previousBlock ? `\n${previousBlock}\n` : ''}
 == FASE-BEWUST ==
 Gebruikersfase: ${phase} (sovereignty level ${level})
 ${phaseEmphasis}
@@ -72,6 +74,49 @@ ${phaseEmphasis}
 - Concreet: altijd met een getal, nooit vaag advies
 - Warm maar feitelijk — als een wijze financiele partner
 - Geen emoji's`
+}
+
+/** Format previous briefing summary for prompt context */
+function formatPreviousBriefing(prev?: PreviousBriefingSummary): string {
+  if (!prev) return ''
+
+  const lines: string[] = ['== VORIGE BRIEFING ==']
+
+  // When was the last briefing
+  const composedDate = new Date(prev.composedAt)
+  const now = new Date()
+  const diffMs = now.getTime() - composedDate.getTime()
+  const diffHours = Math.round(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffHours < 24) {
+    lines.push(`Vorige briefing: ${diffHours} uur geleden`)
+  } else {
+    lines.push(`Vorige briefing: ${diffDays} dag${diffDays > 1 ? 'en' : ''} geleden`)
+  }
+
+  // Card types used previously
+  const typeCounts: Record<string, number> = {}
+  for (const t of prev.cardTypes) {
+    typeCounts[t] = (typeCounts[t] || 0) + 1
+  }
+  const typesSummary = Object.entries(typeCounts)
+    .map(([t, c]) => `${t}(${c})`)
+    .join(', ')
+  lines.push(`Gebruikte cards: ${typesSummary}`)
+
+  // Key metrics from previous briefing
+  const metricEntries = Object.entries(prev.keyMetrics)
+  if (metricEntries.length > 0) {
+    lines.push('Eerder getoonde metrics:')
+    for (const [label, value] of metricEntries.slice(0, 8)) {
+      lines.push(`  - ${label}: ${value}`)
+    }
+  }
+
+  lines.push('Instructie: Refereer aan vorige observaties als er relevante veranderingen zijn. Varieer card types t.o.v. de vorige briefing.')
+
+  return lines.join('\n')
 }
 
 function getPhaseEmphasis(phase: string): string {
