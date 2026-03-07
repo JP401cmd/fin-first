@@ -169,7 +169,7 @@ export function OnboardingBudgets({
     <div className="pb-20 sm:pb-0">
       <button
         onClick={onBack}
-        className="mb-6 flex min-h-[44px] items-center gap-1 text-sm text-[var(--ink-3)] hover:text-[var(--ink)] active:text-[var(--ink)] transition-colors"
+        className="mb-6 flex min-h-[44px] items-center gap-1 text-sm text-[var(--ink-3)] hover:text-[var(--ink)] active:text-[var(--ink)] transition-colors duration-150"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -312,7 +312,7 @@ export function OnboardingBudgets({
           })}
           <button
             onClick={() => setSubChoice(null)}
-            className="w-full min-h-[44px] rounded-lg border border-[var(--border-md)] px-4 py-2.5 text-sm font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)] active:bg-[var(--subtle)]"
+            className="w-full min-h-[44px] rounded-xl border border-[var(--border-md)] px-4 py-2.5 text-sm font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)] active:bg-[var(--subtle)] transition-colors duration-150"
           >
             Terug
           </button>
@@ -335,17 +335,17 @@ export function OnboardingBudgets({
           />
 
           {/* Sticky nav on mobile */}
-          <div className="fixed bottom-0 left-0 right-0 z-10 flex gap-3 border-t border-[var(--border-ed)] bg-[var(--paper)]/80 px-4 pb-[env(safe-area-inset-bottom,12px)] pt-3 backdrop-blur-sm sm:static sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
+          <div className="fixed bottom-0 left-0 right-0 z-10 flex gap-3 border-t border-[var(--border-ed)] bg-[var(--paper)]/95 px-4 pb-[env(safe-area-inset-bottom,12px)] pt-3 backdrop-blur-sm sm:static sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
             <button
               onClick={() => setSubChoice(null)}
-              className="flex-1 min-h-[44px] rounded-lg border border-[var(--border-ed)] px-4 py-3 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] active:bg-[var(--subtle)]"
+              className="flex-1 min-h-[44px] rounded-xl border border-[var(--border-ed)] px-4 py-3 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] active:bg-[var(--subtle)] transition-colors duration-150"
             >
               Terug
             </button>
             <button
               onClick={onNext}
               disabled={saving}
-              className="flex-1 min-h-[44px] rounded-lg bg-kern-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-kern-700 active:bg-kern-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex-1 min-h-[44px] rounded-xl bg-kern-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-kern-700 active:bg-kern-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving ? 'Opslaan...' : 'Opslaan & verder'}
             </button>

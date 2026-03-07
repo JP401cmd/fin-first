@@ -24,7 +24,7 @@ export function MiniBankForm({
   return (
     <div className="space-y-3">
       {items.map((item, i) => (
-        <div key={i} className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-3 space-y-2">
+        <div key={i} className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] p-3 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-[var(--ink-3)]">Rekening {i + 1}</span>
             <button onClick={() => remove(i)} className="text-xs text-red-500 hover:text-red-700">Verwijder</button>
@@ -70,7 +70,7 @@ export function MiniBankForm({
       ))}
       <button
         onClick={add}
-        className="flex w-full min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-dashed border-[var(--border-ed)] py-2 text-xs font-medium text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)] active:bg-[var(--subtle)]"
+        className="flex w-full min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--border-ed)] py-2 text-xs font-medium text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)] active:bg-[var(--subtle)]"
       >
         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />

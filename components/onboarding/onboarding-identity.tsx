@@ -164,7 +164,7 @@ export function OnboardingIdentity({
   const inputErrorClass = (field: FieldKey) =>
     showError(field)
       ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
-      : 'border-[var(--border-ed)] focus:border-[var(--border-md)] focus:ring-[var(--border-md)]'
+      : 'border-[var(--border-ed)] focus:border-wil-500 focus:ring-wil-500'
 
   // After first submit, disable button while errors exist
   const disableNext = submitted && !isValid
@@ -197,7 +197,7 @@ export function OnboardingIdentity({
     <div className="pb-20 sm:pb-0">
       <button
         onClick={onBack}
-        className="mb-6 flex min-h-[44px] items-center gap-1 text-sm text-[var(--ink-3)] hover:text-[var(--ink)] active:text-[var(--ink)] transition-colors"
+        className="mb-6 flex min-h-[44px] items-center gap-1 text-sm text-[var(--ink-3)] hover:text-[var(--ink)] active:text-[var(--ink)] transition-colors duration-150"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -217,9 +217,9 @@ export function OnboardingIdentity({
         <SpeechBubble>Om je pad naar vrijheid te berekenen, moet ik je eerst leren kennen. Je inkomen bepaalt hoeveel vrijheidstijd je elke maand opbouwt &mdash; en je leeftijd helpt me inschatten hoeveel tijd er nog voor je ligt.</SpeechBubble>
       </div>
 
-      <div className="space-y-6 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-5 sm:p-6">
+      <div className="space-y-6 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] shadow-sm p-5 sm:p-6">
         {submitted && !isValid && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3" role="alert">
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3" role="alert">
             <p className="text-sm font-medium text-red-700">
               Vul alle verplichte velden correct in om door te gaan
             </p>
@@ -240,7 +240,7 @@ export function OnboardingIdentity({
             placeholder="Je naam"
             aria-invalid={!!showError('full_name')}
             aria-describedby={showError('full_name') ? 'ob-name-error' : undefined}
-            className={`w-full rounded-lg bg-[var(--subtle)]px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('full_name')}`}
+            className={`w-full rounded-xl bg-[var(--subtle)]px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('full_name')}`}
           />
           {showError('full_name') && (
             <p id="ob-name-error" className="mt-1 text-xs text-red-500" role="alert">{showError('full_name')}</p>
@@ -260,7 +260,7 @@ export function OnboardingIdentity({
             onBlur={() => markTouched('date_of_birth')}
             aria-invalid={!!showError('date_of_birth')}
             aria-describedby={showError('date_of_birth') ? 'ob-dob-error' : undefined}
-            className={`w-full rounded-lg bg-[var(--subtle)]px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('date_of_birth')}`}
+            className={`w-full rounded-xl bg-[var(--subtle)]px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('date_of_birth')}`}
           />
           {showError('date_of_birth') && (
             <p id="ob-dob-error" className="mt-1 text-xs text-red-500" role="alert">{showError('date_of_birth')}</p>
@@ -319,7 +319,7 @@ export function OnboardingIdentity({
               onBlur={() => markTouched('number_of_children')}
               aria-invalid={!!showError('number_of_children')}
               aria-describedby={showError('number_of_children') ? 'ob-children-error' : undefined}
-              className={`w-full sm:w-24 min-h-[44px] rounded-lg bg-[var(--subtle)]px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('number_of_children')}`}
+              className={`w-full sm:w-24 min-h-[44px] rounded-xl bg-[var(--subtle)]px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('number_of_children')}`}
             />
             {showError('number_of_children') && (
               <p id="ob-children-error" className="mt-1 text-xs text-red-500" role="alert">{showError('number_of_children')}</p>
@@ -348,7 +348,7 @@ export function OnboardingIdentity({
               autoComplete="off"
               aria-invalid={!!showError('net_monthly_income')}
               aria-describedby={showError('net_monthly_income') ? 'ob-income-error' : 'ob-income-hint'}
-              className={`w-full rounded-lg bg-[var(--subtle)]py-2.5 pr-3 pl-7 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('net_monthly_income')}`}
+              className={`w-full rounded-xl bg-[var(--subtle)]py-2.5 pr-3 pl-7 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('net_monthly_income')}`}
             />
           </div>
           {showError('net_monthly_income') ? (
@@ -369,7 +369,7 @@ export function OnboardingIdentity({
         </SpeechBubble>
       </div>
 
-      <div className="space-y-6 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-5 sm:p-6">
+      <div className="space-y-6 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] shadow-sm p-5 sm:p-6">
         <div className="flex items-center gap-2">
           <h3 className="font-display text-sm font-semibold tracking-[-0.02em] text-[var(--ink)]">Vrijheidsberekening</h3>
           <span className="rounded-full bg-[var(--subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink-3)]">optioneel</span>
@@ -420,10 +420,10 @@ export function OnboardingIdentity({
                   autoComplete="off"
                   aria-invalid={!!showError('retirement_custom_amount')}
                   aria-describedby={showError('retirement_custom_amount') ? 'ob-custom-amount-error' : undefined}
-                  className={`w-full min-h-[44px] rounded-lg bg-[var(--subtle)]py-2.5 pr-3 pl-8 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${
+                  className={`w-full min-h-[44px] rounded-xl bg-[var(--subtle)]py-2.5 pr-3 pl-8 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${
                     showError('retirement_custom_amount')
                       ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
-                      : 'border-[var(--border-ed)] focus:border-[var(--border-md)] focus:ring-[var(--border-md)]'
+                      : 'border-[var(--border-ed)] focus:border-wil-500 focus:ring-wil-500'
                   }`}
                 />
               </div>
@@ -480,10 +480,10 @@ export function OnboardingIdentity({
                   autoComplete="off"
                   aria-invalid={!!showError('fire_legacy_amount')}
                   aria-describedby={showError('fire_legacy_amount') ? 'ob-legacy-amount-error' : 'ob-legacy-amount-hint'}
-                  className={`w-full min-h-[44px] rounded-lg bg-[var(--subtle)]py-2.5 pr-3 pl-8 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${
+                  className={`w-full min-h-[44px] rounded-xl bg-[var(--subtle)]py-2.5 pr-3 pl-8 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${
                     showError('fire_legacy_amount')
                       ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
-                      : 'border-[var(--border-ed)] focus:border-[var(--border-md)] focus:ring-[var(--border-md)]'
+                      : 'border-[var(--border-ed)] focus:border-wil-500 focus:ring-wil-500'
                   }`}
                 />
               </div>
@@ -513,10 +513,10 @@ export function OnboardingIdentity({
                 placeholder="90"
                 aria-invalid={!!showError('fire_end_age')}
                 aria-describedby={showError('fire_end_age') ? 'ob-end-age-error' : 'ob-end-age-hint'}
-                className={`w-full sm:w-32 min-h-[44px] rounded-lg bg-[var(--subtle)]px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${
+                className={`w-full sm:w-32 min-h-[44px] rounded-xl bg-[var(--subtle)]px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${
                   showError('fire_end_age')
                     ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
-                    : 'border-[var(--border-ed)] focus:border-[var(--border-md)] focus:ring-[var(--border-md)]'
+                    : 'border-[var(--border-ed)] focus:border-wil-500 focus:ring-wil-500'
                 }`}
               />
               {showError('fire_end_age') ? (
@@ -539,7 +539,7 @@ export function OnboardingIdentity({
         </SpeechBubble>
       </div>
 
-      <div className="space-y-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+      <div className="space-y-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] shadow-sm p-5 sm:p-6">
         <div className="flex items-center gap-2">
           <h3 className="font-display text-sm font-semibold tracking-[-0.02em] text-[var(--ink)]">Temporeel evenwicht</h3>
           <span className="rounded-full bg-[var(--subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink-3)]">optioneel</span>
@@ -597,7 +597,7 @@ export function OnboardingIdentity({
         <button
           onClick={handleNext}
           disabled={disableNext}
-          className="w-full min-h-[44px] rounded-lg bg-wil-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-wil-700 active:bg-wil-800 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full min-h-[44px] rounded-xl bg-wil-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-wil-700 active:bg-wil-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Volgende
         </button>

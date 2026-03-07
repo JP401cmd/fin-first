@@ -138,7 +138,7 @@ export function MiniAssetForm({
     <div className="space-y-3">
       {/* Summary cards */}
       {items.map((item, i) => (
-        <div key={i} className="flex items-center justify-between rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5">
+        <div key={i} className="flex items-center justify-between rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-[var(--ink)]">{item.name}</p>
             <p className="text-xs text-[var(--ink-3)]">
@@ -155,7 +155,7 @@ export function MiniAssetForm({
       {/* Add button */}
       <button
         onClick={openNew}
-        className="flex w-full min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-dashed border-[var(--border-ed)] py-2 text-xs font-medium text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)] active:bg-[var(--subtle)]"
+        className="flex w-full min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--border-ed)] py-2 text-xs font-medium text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)] active:bg-[var(--subtle)]"
       >
         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -181,7 +181,7 @@ export function MiniAssetForm({
                 <select
                   value={draft.asset_type}
                   onChange={(e) => handleTypeChange(e.target.value as AssetType)}
-                  className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
+                  className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                 >
                   {ALL_TYPES.map((t) => (
                     <option key={t} value={t}>{ASSET_TYPE_LABELS[t]}</option>
@@ -197,7 +197,7 @@ export function MiniAssetForm({
                   placeholder="Bijv. Spaarrekening ING"
                   value={draft.name}
                   onChange={(e) => updateDraft({ name: e.target.value })}
-                  className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
+                  className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                 />
               </div>
 
@@ -208,7 +208,7 @@ export function MiniAssetForm({
                   <select
                     value={draft.subtype}
                     onChange={(e) => handleSubtypeChange(e.target.value)}
-                    className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
+                    className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                   >
                     <option value="">— Kies subtype —</option>
                     {Object.entries(subtypeLabels).map(([k, v]) => (
@@ -232,7 +232,7 @@ export function MiniAssetForm({
                     min={0}
                     value={draft.current_value}
                     onChange={(e) => updateDraft({ current_value: e.target.value })}
-                    className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] py-2 pr-3 pl-7 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
+                    className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] py-2 pr-3 pl-7 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                   />
                 </div>
               </div>
@@ -251,7 +251,7 @@ export function MiniAssetForm({
                     min={0}
                     value={draft.purchase_value}
                     onChange={(e) => updateDraft({ purchase_value: e.target.value })}
-                    className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] py-2 pr-3 pl-7 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
+                    className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] py-2 pr-3 pl-7 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                   />
                 </div>
               </div>
@@ -266,7 +266,7 @@ export function MiniAssetForm({
                     step={0.1}
                     value={draft.expected_return}
                     onChange={(e) => updateDraft({ expected_return: e.target.value })}
-                    className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 pr-8 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
+                    className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 pr-8 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">%</span>
                 </div>
@@ -285,7 +285,7 @@ export function MiniAssetForm({
                       min={0}
                       value={draft.monthly_contribution}
                       onChange={(e) => updateDraft({ monthly_contribution: e.target.value })}
-                      className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] py-2 pr-3 pl-7 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
+                      className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] py-2 pr-3 pl-7 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                     />
                   </div>
                 </div>
@@ -300,7 +300,7 @@ export function MiniAssetForm({
                     placeholder="Bijv. ING, DEGIRO, ABP"
                     value={draft.institution}
                     onChange={(e) => updateDraft({ institution: e.target.value })}
-                    className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
+                    className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                   />
                 </div>
               )}
@@ -314,7 +314,7 @@ export function MiniAssetForm({
                   <select
                     value={draft.risk_profile}
                     onChange={(e) => updateDraft({ risk_profile: e.target.value })}
-                    className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
+                    className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                   >
                     <option value="">— Kies —</option>
                     {Object.entries(RISK_PROFILE_LABELS).map(([k, v]) => (
@@ -326,7 +326,7 @@ export function MiniAssetForm({
 
               {/* Tax benefit */}
               {visibleFields.includes('tax_benefit') && (
-                <label className="flex items-center gap-2 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5">
+                <label className="flex items-center gap-2 rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5">
                   <input
                     type="checkbox"
                     checked={draft.tax_benefit}
@@ -339,7 +339,7 @@ export function MiniAssetForm({
 
               {/* Is liquid */}
               {visibleFields.includes('is_liquid') && (
-                <label className="flex items-center gap-2 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5">
+                <label className="flex items-center gap-2 rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5">
                   <input
                     type="checkbox"
                     checked={draft.is_liquid}
@@ -358,7 +358,7 @@ export function MiniAssetForm({
                     type="date"
                     value={draft.lock_end_date}
                     onChange={(e) => updateDraft({ lock_end_date: e.target.value })}
-                    className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
+                    className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                   />
                 </div>
               )}
@@ -372,7 +372,7 @@ export function MiniAssetForm({
                     placeholder="Bijv. VWRL, IWDA, BTC"
                     value={draft.ticker_symbol}
                     onChange={(e) => updateDraft({ ticker_symbol: e.target.value })}
-                    className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
+                    className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                   />
                 </div>
               )}
@@ -384,7 +384,7 @@ export function MiniAssetForm({
                   <select
                     value={draft.retirement_provider_type}
                     onChange={(e) => updateDraft({ retirement_provider_type: e.target.value })}
-                    className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
+                    className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                   >
                     <option value="">— Kies —</option>
                     {Object.entries(RETIREMENT_PROVIDER_LABELS).map(([k, v]) => (
@@ -407,7 +407,7 @@ export function MiniAssetForm({
                       min={0}
                       value={draft.woz_value}
                       onChange={(e) => updateDraft({ woz_value: e.target.value })}
-                      className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] py-2 pr-3 pl-7 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
+                      className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] py-2 pr-3 pl-7 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                     />
                   </div>
                 </div>
@@ -423,7 +423,7 @@ export function MiniAssetForm({
                       placeholder="1234AB"
                       value={draft.address_postcode}
                       onChange={(e) => updateDraft({ address_postcode: e.target.value })}
-                      className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
+                      className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                     />
                   </div>
                   <div>
@@ -433,7 +433,7 @@ export function MiniAssetForm({
                       placeholder="12a"
                       value={draft.address_house_number}
                       onChange={(e) => updateDraft({ address_house_number: e.target.value })}
-                      className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
+                      className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                     />
                   </div>
                 </div>
@@ -452,7 +452,7 @@ export function MiniAssetForm({
                       min={0}
                       value={draft.rental_income}
                       onChange={(e) => updateDraft({ rental_income: e.target.value })}
-                      className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] py-2 pr-3 pl-7 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
+                      className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] py-2 pr-3 pl-7 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                     />
                   </div>
                 </div>
@@ -470,7 +470,7 @@ export function MiniAssetForm({
                       min={0}
                       value={draft.depreciation_rate}
                       onChange={(e) => updateDraft({ depreciation_rate: e.target.value })}
-                      className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 pr-8 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
+                      className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 pr-8 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">%</span>
                   </div>
@@ -482,14 +482,14 @@ export function MiniAssetForm({
             <div className="mt-5 flex gap-3">
               <button
                 onClick={() => setEditingIndex(null)}
-                className="flex-1 min-h-[44px] rounded-lg border border-[var(--border-ed)] px-4 py-2.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] active:bg-[var(--subtle)]"
+                className="flex-1 min-h-[44px] rounded-xl border border-[var(--border-ed)] px-4 py-2.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] active:bg-[var(--subtle)]"
               >
                 Annuleer
               </button>
               <button
                 onClick={save}
                 disabled={!draft.name || !draft.current_value}
-                className="flex-1 min-h-[44px] rounded-lg bg-wil-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-wil-700 active:bg-wil-800 disabled:opacity-40"
+                className="flex-1 min-h-[44px] rounded-xl bg-wil-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-wil-700 active:bg-wil-800 disabled:opacity-40"
               >
                 {editingIndex === -1 ? 'Toevoegen' : 'Opslaan'}
               </button>

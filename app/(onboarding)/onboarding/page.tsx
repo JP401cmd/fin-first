@@ -434,7 +434,7 @@ export default function OnboardingPage() {
 
           {state.step === 'saving' && (
             <div className="flex min-h-[60vh] flex-col items-center justify-center sm:min-h-0">
-              <div className="w-full max-w-sm rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-8 text-center">
+              <div className="w-full max-w-sm rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] shadow-sm p-8 text-center">
                 <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center">
                   <div className="animate-pulse">
                     <FinnAvatar size={64} />
