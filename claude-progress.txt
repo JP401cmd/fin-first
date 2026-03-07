@@ -1,3 +1,39 @@
+## Session 2026-03-07 - Features #346, #351, #355
+
+### Feature #346: Sparkline tool uitbreiden naar meerdere datasets - PASSING
+- Extended SparklineCardSpec.dataKey from literal 'netWorthHistory' to enum: netWorthHistory | savingsHistory | expenseHistory
+- Updated showSparkline tool schema in lib/ai/dna/briefing.ts with z.enum
+- Added savingsHistory and expenseHistory to DashboardData type
+- Computed savingsHistory from net_worth_snapshots.savings_rate column
+- Computed expenseHistory from monthly negative transaction aggregates (12-month window)
+- SparklineCard uses type-safe getHistoryData() helper with graceful empty fallback
+- Updated both dashboard/page.tsx and daishboard/page.tsx with new queries + data
+- Updated test mock in draggable-widget-grid.test.tsx
+
+### Feature #351: Per-card feedback: thumbs up/down UI - PASSING
+- Created card-feedback-context.tsx with CardFeedbackContext + useCardFeedback hook + CardFeedbackProvider
+- BriefingCard shows ThumbsUp/ThumbsDown buttons on hover (absolute bottom-right, group-hover opacity)
+- After clicking: shows 'Bedankt' confirmation text, disables further feedback on that card
+- DAIshboard passes handleFeedback callback to BriefingCardGrid via onFeedback prop
+- BriefingCardGrid wraps each card with CardFeedbackProvider (binds cardIndex + cardType)
+- Feedback stored in sessionStorage as JSON array: { cardIndex, cardType, positive, timestamp }[]
+- No circular dependency: context in separate file from both grid and card
+
+### Feature #355: Beheer preview functionaliteit voor briefing directieven - PASSING
+- Added 'Toon prompt preview' toggle button at bottom of beheer/briefing page
+- PromptPreview component shows per-directive lines with visual status badges
+- Active temporal directives: green background + 'ACTIEF' badge
+- Enabled but inactive temporal directives: amber background + 'INACTIEF' badge
+- Disabled directives: grey background + 'UIT' badge
+- Functional directives: green (enabled) or grey (disabled)
+- Dark code block at bottom of each section shows the actual formatted prompt-blok
+- Uses formatDirectivesForPrompt() and formatFunctionalDirectivesForPrompt() directly
+- Preview updates live as directives are edited (before saving)
+
+### Current Status
+- 3 features completed this session (#346, #351, #355)
+- All type-checks pass cleanly
+
 ## Session 2026-03-07 - Features #349, #350
 
 ### Feature #349: Briefing-continuiteit: vorige samenvatting meegeven - PASSING
@@ -8725,3 +8761,37 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#337, #342, #339)
 - All type-checks pass cleanly (pre-existing errors from other agents only)
 - Commits: b0a814f, b178db3
+
+## Session 2026-03-07 - Features #359, #367, #365
+
+### Feature #359: Persoonlijke trend-herkenning voor briefing context - PASSING
+- Created lib/briefing/trends.ts with computePersonalTrends(data: DashboardData): PersonalTrends
+- savingsRateTrend: stijgend/dalend/stabiel based on last 3 months of savingsHistory
+- expenseTrend: ratio + direction comparing current expenses to 3-month average
+- wealthGrowthRate: compound monthly growth rate from netWorthHistory
+- consecutiveGrowthMonths: streak count from netWorthHistory
+- budgetDisciplineScore: percentage of budgets (categories + favorites) within limit
+- Integrated into condense.ts as PERSOONLIJKE TRENDS section
+- Handles minimal data gracefully (< 3 months)
+
+### Feature #367: Doel-coaching: actieve doel-opvolging in briefing - PASSING
+- Enriched DOELEN section in condense.ts with on-track analysis per goal
+- Per goal: calculates expected progress vs actual, monthly amount needed
+- Status labels: [BEREIKT], [OP SCHEMA], [ACHTERLOOPT] with specific amounts
+- Added DOEL-COACHING section to briefing system prompt in lib/ai/dna/briefing.ts
+- Instructions: showAction for lagging goals, showMilestone for achieved, showGoalProgress for active
+
+### Feature #365: Patroon-alerts: persoonlijke uitgavenpatronen detecteren - PASSING
+- Created lib/briefing/pattern-detection.ts with detectPatterns(data): PatternAlert[]
+- Pattern 1: uitgaven_stijging - 3 consecutive months of rising expenses
+- Pattern 2: budget_overschrijding_herhaald - expense budget exceeded 2+ months
+- Pattern 3: vermogensstagnatie/vermogensdaling - < 1% or < -5% growth over 3 months
+- Pattern 4: positief_momentum - savings rate rising 3 months in a row
+- Each alert has type, severity (info/warning), message, relatedModule
+- Integrated into condense.ts as GEDETECTEERDE PATRONEN section
+- Guards against false positives with insufficient history
+
+### Current Status
+- 3 features completed this session (#359, #367, #365)
+- All type-checks pass cleanly (zero errors)
+- Commit: 8e4d603
