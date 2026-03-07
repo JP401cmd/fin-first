@@ -42,7 +42,7 @@ export function MonteCarloWidget({ size, data, href }: Props) {
     )
   }
 
-  // ── Half-size: prominent success rate + icon + explanation + CTA ────
+  // ── Half-size (2col × 1row = 160px landscape) ────
   if (size === 'half') {
     if (successRate == null) {
       return (
@@ -51,7 +51,7 @@ export function MonteCarloWidget({ size, data, href }: Props) {
             <BarChart2 className="h-5 w-5 text-horizon-500 shrink-0" />
             <p className="text-sm text-[var(--ink-3)]">Scenario-analyse</p>
           </div>
-          <p className="mt-2 font-serif italic text-[12px] text-[var(--ink-3)]">
+          <p className="mt-1 font-serif italic text-[12px] text-[var(--ink-3)]">
             Simuleer duizenden mogelijke toekomsten &rarr;
           </p>
         </WidgetShell>
@@ -81,13 +81,8 @@ export function MonteCarloWidget({ size, data, href }: Props) {
             </p>
           </div>
         </div>
-
-        <p className="mt-3 text-xs text-[var(--ink-3)]">
+        <p className="mt-1 text-xs text-[var(--ink-3)]">
           Gebaseerd op historische simulaties
-        </p>
-
-        <p className="mt-2 font-serif italic text-[12px] text-[var(--ink-3)]">
-          Simuleer duizenden mogelijke toekomsten &rarr;
         </p>
       </WidgetShell>
     )

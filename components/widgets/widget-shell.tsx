@@ -24,11 +24,13 @@ const MODULE_KICKER: Record<WidgetModule, string> = {
   cross:   'text-[var(--ink-3)]',
 }
 
-// ── Fixed heights (quarter×2 + gap = half = full) ────────────
-// 160×2 + 16(gap) = 336
+// ── Fixed heights (match grid: quarter/half = 1 row, full = 2 rows) ──
+// quarter = 1col × 1row = 160px
+// half    = 2col × 1row = 160px (wide but compact)
+// full    = 2col × 2row = 160×2 + 16(gap) = 336px
 const SIZE_HEIGHT: Record<WidgetSize, string> = {
   quarter: 'h-[160px]',
-  half:    'h-[336px]',
+  half:    'h-[160px]',
   full:    'h-[336px]',
 }
 

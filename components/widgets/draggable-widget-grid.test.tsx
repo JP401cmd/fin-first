@@ -129,7 +129,7 @@ describe('DraggableWidgetGrid', () => {
     expect(screen.getByTestId('widget-item-acties')).toBeInTheDocument()
   })
 
-  it('applies sm:col-span-2 to full-size widgets', () => {
+  it('applies sm:col-span-2 and row-span-2 to full-size widgets', () => {
     const prefs = makePrefs(['fire_prognose'], ['full'])
     render(
       <DraggableWidgetGrid
@@ -141,9 +141,11 @@ describe('DraggableWidgetGrid', () => {
 
     const item = screen.getByTestId('widget-item-fire_prognose')
     expect(item.className).toContain('sm:col-span-2')
+    expect(item.className).toContain('row-span-2')
+    expect(item.className).not.toContain('col-span-4')
   })
 
-  it('does not apply sm:col-span-2 to half-size widgets', () => {
+  it('applies sm:col-span-2 to half-size widgets (2 cols wide, 1 row)', () => {
     const prefs = makePrefs(['netto_vermogen'], ['half'])
     render(
       <DraggableWidgetGrid
@@ -154,7 +156,8 @@ describe('DraggableWidgetGrid', () => {
     )
 
     const item = screen.getByTestId('widget-item-netto_vermogen')
-    expect(item.className).not.toContain('sm:col-span-2')
+    expect(item.className).toContain('sm:col-span-2')
+    expect(item.className).not.toContain('row-span-2')
   })
 
   it('shows Volgorde button when not in edit mode', () => {

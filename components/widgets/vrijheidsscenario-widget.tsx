@@ -49,10 +49,10 @@ export function VrijheidsScenarioWidget({ size, data, href }: Props) {
 
   return (
     <WidgetShell module="horizon" size={size} kicker="Vrijheidsscenario's" href={href}>
-      <div className="grid grid-cols-3 gap-2 mt-1">
+      <div className="grid grid-cols-3 gap-2">
         {scenarios.map(({ label, proj, dotColor }) => (
           <div key={label} className="text-center">
-            <p className="text-[9px] uppercase tracking-wider text-[var(--ink-4)] mb-1">{label}</p>
+            <p className="text-[9px] uppercase tracking-wider text-[var(--ink-4)] mb-0.5">{label}</p>
             {proj.fireAge != null ? (
               <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
                 {Math.round(proj.fireAge)}
@@ -60,12 +60,12 @@ export function VrijheidsScenarioWidget({ size, data, href }: Props) {
             ) : (
               <p className="font-mono text-lg text-[var(--ink-3)]">—</p>
             )}
-            <div className={`mx-auto mt-1 h-1.5 w-1.5 rounded-full ${dotColor}`} />
+            <div className={`mx-auto mt-0.5 h-1.5 w-1.5 rounded-full ${dotColor}`} />
           </div>
         ))}
       </div>
       {bandwidth != null && (
-        <p className="mt-3 text-center text-xs text-[var(--ink-3)]">
+        <p className={`${size === 'half' ? 'mt-1.5' : 'mt-3'} text-center text-xs text-[var(--ink-3)]`}>
           Bandbreedte:{' '}
           <span className="font-mono font-semibold text-[var(--ink)]">{bandwidth} jaar</span>
         </p>

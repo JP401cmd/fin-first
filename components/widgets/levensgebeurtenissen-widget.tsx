@@ -35,7 +35,7 @@ export function LevensgebeurtenissenWidget({ size, data, href }: Props) {
     )
   }
 
-  // ── Half-size: timeline of next 3 events ────
+  // ── Half-size (2col × 1row = 160px landscape) ────
   if (size === 'half') {
     const events = topLifeEvents?.slice(0, 3) ?? []
     return (
@@ -44,24 +44,24 @@ export function LevensgebeurtenissenWidget({ size, data, href }: Props) {
           <div className="relative pl-4">
             {/* Vertical connecting line */}
             <div className="absolute left-[5px] top-1 bottom-1 w-px bg-horizon-300/50" />
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               {events.map((evt) => (
-                <div key={evt.id} className="relative flex items-start gap-2">
+                <div key={evt.id} className="relative flex items-center gap-2">
                   {/* Timeline dot */}
-                  <div className="absolute -left-4 top-1 h-2.5 w-2.5 rounded-full border-2 border-horizon-400 bg-[var(--paper)]" />
+                  <div className="absolute -left-4 top-1 h-2 w-2 rounded-full border-2 border-horizon-400 bg-[var(--paper)]" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       {evt.year && (
-                        <span className="font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
+                        <span className="font-mono text-[10px] tabular-nums text-[var(--ink-3)]">
                           {evt.year}
                         </span>
                       )}
-                      <span className="text-xs font-medium text-[var(--ink-2)] truncate">
+                      <span className="text-[11px] font-medium text-[var(--ink-2)] truncate">
                         {evt.name}
                       </span>
                     </div>
                   </div>
-                  <span className={`shrink-0 text-xs font-semibold ${evt.impactType === 'positive' ? 'text-emerald-600' : 'text-red-500'}`}>
+                  <span className={`shrink-0 text-[11px] font-semibold ${evt.impactType === 'positive' ? 'text-emerald-600' : 'text-red-500'}`}>
                     {evt.impactType === 'positive' ? '↑' : '↓'}
                   </span>
                 </div>
@@ -69,9 +69,9 @@ export function LevensgebeurtenissenWidget({ size, data, href }: Props) {
             </div>
           </div>
         ) : (
-          <p className="text-sm text-[var(--ink-3)]">Geen life events gepland</p>
+          <p className="text-xs text-[var(--ink-3)]">Geen life events gepland</p>
         )}
-        <p className="mt-2 text-[11px] text-[var(--ink-3)]">
+        <p className="mt-1 text-[10px] text-[var(--ink-3)]">
           {lifeEvents} {lifeEvents === 1 ? 'life event' : 'life events'} totaal
         </p>
       </WidgetShell>

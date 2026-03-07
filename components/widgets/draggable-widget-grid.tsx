@@ -80,8 +80,8 @@ function SortableWidgetItem({ pref, data, features, isEditMode, isDragging, onRe
       ref={setNodeRef}
       style={style}
       className={
-        pref.size === 'full' ? 'sm:col-span-2 lg:col-span-4 row-span-2'
-        : pref.size === 'half' ? 'lg:col-span-2 row-span-2'
+        pref.size === 'full' ? 'sm:col-span-2 row-span-2'
+        : pref.size === 'half' ? 'sm:col-span-2'
         : ''
       }
       data-testid={`widget-item-${pref.id}`}
@@ -126,8 +126,8 @@ function GhostCard({ pref }: { pref: WidgetPref }) {
   return (
     <div
       className={`opacity-90 scale-[1.02] rotate-[0.8deg] shadow-[var(--s2)] cursor-grabbing ${
-        pref.size === 'full' ? 'sm:col-span-2 lg:col-span-4 row-span-2'
-        : pref.size === 'half' ? 'lg:col-span-2 row-span-2'
+        pref.size === 'full' ? 'sm:col-span-2 row-span-2'
+        : pref.size === 'half' ? 'sm:col-span-2'
         : ''
       }`}
     >

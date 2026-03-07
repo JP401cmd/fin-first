@@ -212,33 +212,30 @@ export function VeerkrachtScoreWidget({ size, data, href }: Props) {
     )
   }
 
-  // ── Half ───────────────────────────────────────────────────
+  // ── Half (2col × 1row = 160px landscape) ───────────────────
   if (size === 'half') {
     return (
       <WidgetShell module="horizon" size={size} kicker="Veerkracht Score" href={href}>
-        <HalfGauge score={score} size={120} />
-
-        <div className="mt-2 space-y-1.5">
-          <SubFactorRow
-            label="Buffer"
-            value={`${monthsCovered.toFixed(1)} mnd`}
-            pct={bufferPct}
-          />
-          <SubFactorRow
-            label="Schuldratio"
-            value={`${debtRatio}%`}
-            pct={debtHealthPct}
-          />
-          <SubFactorRow
-            label="Inkomensdekking"
-            value={`${Math.round(savingsRate)}%`}
-            pct={incomeCoveragePct}
-          />
+        <div className="flex items-start gap-3">
+          <HalfGauge score={score} size={90} />
+          <div className="flex-1 min-w-0 space-y-1">
+            <SubFactorRow
+              label="Buffer"
+              value={`${monthsCovered.toFixed(1)} mnd`}
+              pct={bufferPct}
+            />
+            <SubFactorRow
+              label="Schuldratio"
+              value={`${debtRatio}%`}
+              pct={debtHealthPct}
+            />
+            <SubFactorRow
+              label="Inkomensdekking"
+              value={`${Math.round(savingsRate)}%`}
+              pct={incomeCoveragePct}
+            />
+          </div>
         </div>
-
-        <p className="mt-2 text-[10px] text-[var(--ink-3)]">
-          Gebaseerd op {monthsCovered.toFixed(1)} maanden buffer
-        </p>
       </WidgetShell>
     )
   }

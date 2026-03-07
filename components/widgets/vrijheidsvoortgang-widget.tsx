@@ -65,20 +65,25 @@ export function VrijheidsvoortgangWidget({ size, data, href }: Props) {
     )
   }
 
-  // ── Half-size: percentage + bar + amount/goal + delta + date ────
+  // ── Half-size (2col × 1row = 160px landscape) ────
   if (size === 'half') {
     return (
       <WidgetShell module="cross" size={size} kicker="Vrijheidsvoortgang" href={href}>
         <div ref={inViewRef}>
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-1">
             <Compass className="h-3.5 w-3.5 text-horizon-600 shrink-0" />
-            <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
+            <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
               {effectivePct.toFixed(1)}%
             </p>
+            {pctDelta !== null && (
+              <span className={`text-xs font-mono tabular-nums ${pctDelta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {pctDelta >= 0 ? '+' : ''}{pctDelta.toFixed(1)}%
+              </span>
+            )}
           </div>
 
           {/* Progress bar */}
-          <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] mb-2">
+          <div className="h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] mb-1.5">
             <div
               className="h-full rounded-full bg-gradient-to-r from-horizon-400 to-horizon-600"
               style={{
@@ -88,25 +93,8 @@ export function VrijheidsvoortgangWidget({ size, data, href }: Props) {
             />
           </div>
 
-          <p className="text-xs text-[var(--ink-3)] font-mono tabular-nums">
-            {formatCurrency(netWorth)} / {formatCurrency(effectiveFire)}{simRequiredPortfolio ? ' (simulatie)' : ''}
-          </p>
-
-          {pctDelta !== null && (
-            <p className={`mt-1 text-xs font-mono tabular-nums ${pctDelta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-              {pctDelta >= 0 ? '+' : ''}{pctDelta.toFixed(1)}% deze maand
-            </p>
-          )}
-
-          <p className="mt-1.5 font-serif italic text-[11px] text-[var(--ink-3)]">
-            {(() => {
-              const cd = data.simFireCountdown ?? fireProjResult
-              return cd.fireDate === 'Bereikt!'
-                ? 'Volledige vrijheid bereikt!'
-                : cd.fireDate === 'Niet haalbaar'
-                  ? 'Verhoog spaarcapaciteit'
-                  : `Vrijheid: ${cd.fireDate}`
-            })()}
+          <p className="text-[11px] text-[var(--ink-3)] font-mono tabular-nums">
+            {formatCurrency(netWorth)} / {formatCurrency(effectiveFire)}{simRequiredPortfolio ? ' (sim)' : ''}
           </p>
         </div>
       </WidgetShell>

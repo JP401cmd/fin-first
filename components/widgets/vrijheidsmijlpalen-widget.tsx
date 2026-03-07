@@ -70,7 +70,7 @@ export function VrijheidsMijlpalenWidget({ size, data, href }: Props) {
 
   return (
     <WidgetShell module="horizon" size={size} kicker="Vrijheidsmijlpalen" href={href}>
-      <div className="mt-1 space-y-2">
+      <div className={`${size === 'half' ? 'space-y-1' : 'mt-1 space-y-2'}`}>
         {MILESTONES.map((m, i) => {
           const reached = effectivePct >= m.pct
           const isActive = i === activeMilestoneIdx
@@ -79,14 +79,14 @@ export function VrijheidsMijlpalenWidget({ size, data, href }: Props) {
           return (
             <div
               key={m.pct}
-              className={`flex items-center gap-2.5 ${isActive ? 'opacity-100' : reached ? 'opacity-60' : 'opacity-40'}`}
+              className={`flex items-center gap-2 ${isActive ? 'opacity-100' : reached ? 'opacity-60' : 'opacity-40'}`}
             >
               {/* Icon */}
               <div className="shrink-0">
                 {reached ? (
-                  <CheckCircle2 className="h-4 w-4 text-horizon-600" />
+                  <CheckCircle2 className="h-3.5 w-3.5 text-horizon-600" />
                 ) : (
-                  <Circle className={`h-4 w-4 ${isActive ? 'text-horizon-500' : 'text-[var(--border-md)]'}`} />
+                  <Circle className={`h-3.5 w-3.5 ${isActive ? 'text-horizon-500' : 'text-[var(--border-md)]'}`} />
                 )}
               </div>
 
