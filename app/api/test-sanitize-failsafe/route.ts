@@ -54,7 +54,8 @@ export async function GET() {
           String.prototype.replace = originalReplace // restore immediately
           throw new Error('Simulated sanitize failure')
         }
-        return originalReplace.apply(this, args)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (originalReplace as any).apply(this, args)
       }
 
       try {
