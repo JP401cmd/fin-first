@@ -1,3 +1,25 @@
+## Session 2026-03-07 - Feature #401
+
+### Feature #401: Onboarding: budgetteringMode gebruiken in API - PASSING
+- Added `budgeting_active` BOOLEAN column to profiles via migration (default: true)
+- save-own-data API now extracts `budgetteringMode` and sets `budgeting_active: budgetteringMode !== 'none'`
+- When user chooses 'Nee, niet nu' (none) → budgeting_active = false; template/manual → true
+- Budgets are always created (app functionality preserved)
+- Dashboard fetches budgeting_active with graceful fallback (column may not exist yet)
+- BudgettenWidget shows "Activeer budgetteren" hint with Sparkles icon when budgeting_active = false
+- Hint links to /core/budgets for activation
+- New API: GET/PUT /api/budgeting-active for reading/toggling the flag
+- DashboardData type extended with `budgetingActive: boolean`
+- All test mocks (draggable-widget-grid.test.tsx, mock-dashboard-data.ts, daishboard) updated
+- Zero TypeScript errors, zero console errors
+- Migration file: supabase/migrations/20260307000001_add_budgeting_active.sql
+- Note: Migration needs to be applied to Supabase (MCP tools needed permission approval)
+- Commit: 1f7574c
+
+### Current Status
+- 1 feature completed this session (#401)
+- 389/397 features passing (97.9%)
+
 ## Session 2026-03-07 - Feature #391
 
 ### Feature #391: Onboarding netwerk- en save-fouten met retry - PASSING
@@ -9287,6 +9309,25 @@ For Feature #51 (Transaction Import):
 - Commit: 0d65977
 - 390/397 features passing (98.2%)
 
+## Session 2026-03-07 - Features #399, #400
+
+### Feature #399: Onboarding FIRE strategie - vraag legacy bedrag en eind-leeftijd - PASSING
+- Added fire_legacy_amount and fire_end_age to IdentityData interface
+- Conditional UI: legacy strategy shows euro input, end-of-life strategy shows end age input
+- Validation: legacy amount must be positive, end age must be 60-120
+- API schema and profile save extended with both fields
+- Verified via browser with test page
+
+### Feature #400: Onboarding uitlog-optie toevoegen - PASSING
+- OnboardingIntro: optional onLogout prop with discrete Uitloggen button
+- Header on other steps: Uitloggen positioned top-right
+- handleLogout calls supabase.auth.signOut() and redirects to /login
+- Commit: 84e70d3
+
+### Current Status
+- 2 features completed this session (#399, #400)
+- Zero TypeScript errors
+
 ## Session 2026-03-07 - Feature #396
 
 ### Feature #396: Onboarding: stap-transitie animatie tussen schermen - PASSING
@@ -9305,3 +9346,33 @@ For Feature #51 (Transaction Import):
 - 1 feature completed this session (#396)
 - Commit: 53cee67
 - 389/397 features passing (97.9%)
+
+## Session 2026-03-07 - Features #395, #397, #398
+
+### Feature #395: Onboarding: verwijder dode bestanden en update testpagina - PASSING
+- Deleted onboarding-choose.tsx, onboarding-persona-select.tsx, onboarding-seeding.tsx
+- Verified no imports reference these files (grep clean)
+- Updated test-onboarding-workflow page: removed old choose/persona-select steps
+- Updated architecture flow diagram to match current flow (intro->identity->extras->budgets->preferences->save)
+- Commit: 2142ec0
+
+### Feature #397: Onboarding: extras stap — verwijder dubbele skip/volgende knoppen - PASSING
+- Removed onSkip prop from OnboardingExtras component
+- Replaced two buttons (Sla over + Volgende) with single dynamic button
+- Button shows 'Overslaan' when no data entered, 'Volgende' when data exists (hasData computed)
+- Removed onSkip prop from page.tsx caller
+- Updated verify-onboarding-double-submit route to match single-button design
+- Commit: ee3f03f
+
+### Feature #398: Onboarding: voorkeuren skip-optie met standaard instellingen - PASSING
+- Added DEFAULT_PREFERENCES constant: overzicht, wekelijks, all modules, AI on, all categories
+- Added handleSkipDefaults() that applies defaults and calls onNext
+- Subtle underlined link "Standaard instellingen gebruiken" on first question only
+- Speech bubble includes "Je kunt dit ook later aanpassen in Instellingen." hint
+- Tested via test-onboarding-preferences page: defaults correctly applied, 32 widgets enabled
+- Zero console errors
+- Commit: 89dc259
+
+### Current Status
+- 3 features completed this session (#395, #397, #398)
+- Zero TypeScript errors (only pre-existing IdentityData issues from other agents)
