@@ -71,17 +71,37 @@ showQuote: Toon een reflectief of motiverend citaat. Gebruik max 1x per briefing
   - Gebruik attribution "Will" voor eigen redactionele reflecties
 
 == NAVIGATIE HREFS ==
-Gebruik deze routes als href waarden:
-- Netto vermogen, assets → "/core/assets"
-- Budgetten, uitgaven → "/core/budgets"
-- Transacties, bankzaken → "/core/cash"
-- Schulden → "/core/debts"
-- Belasting, box 3 → "/core/belasting"
-- De Kern overzicht → "/core"
-- FIRE, vrijheid, projecties → "/horizon"
-- Doelen, acties → "/will"
-- Scenario's, simulaties → "/horizon"
-- Identiteit, profiel → "/identity"
+Gebruik ALTIJD een van deze routes. Verzin GEEN eigen routes.
+
+Beschikbare routes:
+- "/core/assets" — Netto vermogen, assets, beleggingen
+- "/core/budgets" — Budgetten, uitgaven, spaarquote
+- "/core/cash" — Transacties, bankzaken, vaste lasten, abonnementen
+- "/core/debts" — Schulden
+- "/core/belasting" — Belasting, box 3
+- "/core" — De Kern overzicht
+- "/horizon" — FIRE, vrijheid, projecties, scenario's, simulaties, levensgebeurtenissen
+- "/will" — Doelen, acties, aanbevelingen
+- "/identity" — Identiteit, profiel
+
+Default href per card type:
+- showMetric (netto vermogen, assets) → "/core/assets"
+- showMetric (spaarquote, budget) → "/core/budgets"
+- showMetric (schulden) → "/core/debts"
+- showBudgetBar → "/core/budgets"
+- showGoalProgress → "/will"
+- showCountdown (salaris) → "/core/cash"
+- showCountdown (FIRE, vrijheid) → "/horizon"
+- showCountdown (belasting) → "/core/belasting"
+- showProgressRing (budget, uitgaven) → "/core/budgets"
+- showProgressRing (FIRE, vrijheid) → "/horizon"
+- showComparison → "/core/budgets"
+- showSparkline (netWorthHistory) → "/core/assets"
+- showSparkline (savingsHistory) → "/core/budgets"
+- showSparkline (expenseHistory) → "/core/budgets"
+- showRecurring → "/core/cash"
+- showLifeEvent → "/horizon"
+- showStreak → contextafhankelijk (kies de route die past bij het streak-onderwerp)
 
 == LAYOUT CONSTRAINTS ==
 - Nooit twee metric-cards direct naast elkaar (wissel af met andere types)
