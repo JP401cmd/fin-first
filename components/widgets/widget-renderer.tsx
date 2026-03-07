@@ -26,6 +26,14 @@ import { Box3DragWidget } from './box3-drag-widget'
 import { VrijheidsMijlpalenWidget } from './vrijheidsmijlpalen-widget'
 import { BacktestingScoreWidget } from './backtesting-score-widget'
 import { BudgetFavWidget } from './budget-fav-widget'
+import { MeldingenWidget } from './meldingen-widget'
+import { BadgesWidget } from './badges-widget'
+import { StreaksWidget } from './streaks-widget'
+import { AiInzichtWidget } from './ai-inzicht-widget'
+import { VolgendeStapWidget } from './volgende-stap-widget'
+import { MaandoverzichtWidget } from './maandoverzicht-widget'
+import { AgendaWidget } from './agenda-widget'
+import { NoodfondsWidget } from './noodfonds-widget'
 import { getWidgetDef, WIDGET_HREFS } from '@/lib/widget-catalog'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { FireProjection, FireRange, FireCountdown } from '@/lib/horizon-data'
@@ -249,6 +257,14 @@ const WIDGET_MIN_LEVEL: Record<string, number> = {
   box3_drag: 1,
   vrijheidsmijlpalen: 0,
   backtesting_score: 3,
+  meldingen: -2,
+  badges: -2,
+  streaks: -2,
+  ai_inzicht: 0,
+  volgende_stap: -2,
+  maandoverzicht: -2,
+  agenda: -2,
+  noodfonds: -2,
 }
 
 interface WidgetRendererProps {
@@ -338,6 +354,22 @@ export function WidgetRenderer({ id, size, data }: WidgetRendererProps) {
       return <VrijheidsMijlpalenWidget size={size} data={data} href={href} />
     case 'backtesting_score':
       return <BacktestingScoreWidget size={size} data={data} href={href} />
+    case 'meldingen':
+      return <MeldingenWidget size={size} data={data} href={href} />
+    case 'badges':
+      return <BadgesWidget size={size} data={data} href={href} />
+    case 'streaks':
+      return <StreaksWidget size={size} data={data} href={href} />
+    case 'ai_inzicht':
+      return <AiInzichtWidget size={size} data={data} href={href} />
+    case 'volgende_stap':
+      return <VolgendeStapWidget size={size} data={data} href={href} />
+    case 'maandoverzicht':
+      return <MaandoverzichtWidget size={size} data={data} href={href} />
+    case 'agenda':
+      return <AgendaWidget size={size} data={data} href={href} />
+    case 'noodfonds':
+      return <NoodfondsWidget size={size} data={data} href={href} />
     default:
       return null
   }

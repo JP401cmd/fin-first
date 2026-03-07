@@ -53,7 +53,7 @@ export default async function DAIshboardPage() {
     supabase.from('transactions').select('amount').lt('amount', 0).gte('date', prev3MonthStart).lt('date', monthStart),
     supabase.from('bank_accounts').select('id, balance').eq('is_active', true).is('linked_asset_id', null),
     supabase.from('budgets').select('id, name, icon, budget_type, default_limit, interval, parent_id, is_favorite').eq('is_favorite', true),
-    supabase.from('transactions').select('amount').lt('amount', 0).gte('date', prevMonthStart).lt('date', monthStart),
+    supabase.from('transactions').select('amount').gte('date', prevMonthStart).lt('date', monthStart),
   ])
 
   // ── Core calculations ─────────────────────────────────────
@@ -326,8 +326,14 @@ export default async function DAIshboardPage() {
     ? Number((latestSnapshotFireAge as { fire_age?: number | null }).fire_age)
     : null
 
-  // ── Previous month expenses + net worth delta ─────────────
-  const prevMonthExpenses = (prevMonthTxResult.data ?? []).reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
+  // ── Previous month income/expenses + net worth delta ─────────────
+  let prevMonthIncome = 0
+  let prevMonthExpenses = 0
+  for (const tx of prevMonthTxResult.data ?? []) {
+    const amt = Number(tx.amount)
+    if (amt > 0) prevMonthIncome += amt
+    else prevMonthExpenses += Math.abs(amt)
+  }
   const netWorthDelta = netWorthHistory.length >= 2
     ? netWorthHistory[netWorthHistory.length - 1].value - netWorthHistory[netWorthHistory.length - 2].value
     : null
@@ -418,7 +424,7 @@ export default async function DAIshboardPage() {
     box3Tax, simFireCountdown,
     fireEndStrategy: fireStrategy.strategy,
     fireEndAge: fireStrategy.endAge,
-    prevMonthIncome: 0,
+    prevMonthIncome,
     prevMonthExpenses,
     netWorthDelta,
     favoriteBudgets,
