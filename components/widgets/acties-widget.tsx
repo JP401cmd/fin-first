@@ -56,6 +56,25 @@ export function ActiesWidget({ size, data, href }: Props) {
   const top = size === 'full' ? topOpenActions.slice(0, 5) : topOpenActions.slice(0, 3)
   const roundedDays = Math.round(totalFreedomDaysOpen)
 
+  // ── Quarter-size: stacked KPIs ────
+  if (size === 'quarter') {
+    return (
+      <WidgetShell module="wil" size={size} kicker="Acties" href={href}>
+        <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
+          {openActions} <span className="text-xs font-normal text-[var(--ink-3)]">open</span>
+        </p>
+        <p className="mt-1 text-xs text-[var(--ink-3)]">
+          {completedActionsThisMonth} afgerond
+        </p>
+        {roundedDays > 0 && (
+          <p className="mt-1 font-mono text-xs tabular-nums text-wil-700">
+            +{roundedDays}d te winnen
+          </p>
+        )}
+      </WidgetShell>
+    )
+  }
+
   if (size === 'half') {
     return (
       <WidgetShell module="wil" size={size} kicker="Acties" href={href}>
