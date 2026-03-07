@@ -18,7 +18,7 @@ interface Props {
 const SVG_W = 200
 
 export function NettoVermogenWidget({ size, data, href }: Props) {
-  const { netWorth, monthlyExpenses, monthlyIncome, monthlyContributions, netWorthHistory } = data
+  const { netWorth, monthlyExpenses, monthlyIncome, monthlyContributions, netWorthHistory, totalAssets, totalDebts } = data
 
   // Empty state: no assets or income data at all
   const isEmpty = netWorth === 0 && monthlyIncome === 0 && netWorthHistory.length === 0
@@ -102,6 +102,24 @@ export function NettoVermogenWidget({ size, data, href }: Props) {
   // Show axis labels only for full-size widgets (half-size is too compact)
   const showAxisLabels = size === 'full' && sparkline !== null
 
+  // MoM delta: compare current netWorth with last month's snapshot
+  const momDelta = useMemo(() => {
+    if (netWorthHistory.length === 0) return null
+    const prevValue = netWorthHistory[netWorthHistory.length - 1].value
+    const delta = netWorth - prevValue
+    const pct = prevValue !== 0 ? (delta / Math.abs(prevValue)) * 100 : 0
+    return { delta, pct }
+  }, [netWorthHistory, netWorth])
+
+  // Assets vs debts bar proportions (for full-size breakdown)
+  const assetDebtBar = useMemo(() => {
+    const total = totalAssets + totalDebts
+    if (total === 0) return null
+    const assetPct = (totalAssets / total) * 100
+    const debtPct = (totalDebts / total) * 100
+    return { assetPct, debtPct }
+  }, [totalAssets, totalDebts])
+
   if (isEmpty) {
     return (
       <WidgetShell module="kern" size={size} kicker="Netto Vermogen" href={href}>
@@ -110,12 +128,47 @@ export function NettoVermogenWidget({ size, data, href }: Props) {
     )
   }
 
+  // ── Quarter-size: compact amount + freedom time + delta ────
+  if (size === 'quarter') {
+    return (
+      <WidgetShell module="kern" size={size} kicker="Netto Vermogen" href={href}>
+        <div>
+          <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
+            {formatCurrency(netWorth)}
+          </p>
+          {freedomStr && (
+            <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
+              ≈ {freedomStr} vrijheid
+            </p>
+          )}
+          {momDelta && (
+            <p className={`mt-1 font-mono text-[11px] tabular-nums font-medium ${
+              momDelta.delta >= 0 ? 'text-emerald-600' : 'text-red-500'
+            }`}>
+              {momDelta.delta >= 0 ? '▲' : '▼'}{' '}
+              {momDelta.delta >= 0 ? '+' : ''}{formatCurrency(momDelta.delta)}
+            </p>
+          )}
+        </div>
+      </WidgetShell>
+    )
+  }
+
   return (
     <WidgetShell module="kern" size={size} kicker="Netto Vermogen" href={href}>
       <div ref={ref}>
-        <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
-          {formatCurrency(netWorth)}
-        </p>
+        <div className="flex items-baseline gap-2">
+          <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
+            {formatCurrency(netWorth)}
+          </p>
+          {momDelta && (
+            <span className={`font-mono text-sm tabular-nums font-medium ${
+              momDelta.delta >= 0 ? 'text-emerald-600' : 'text-red-500'
+            }`}>
+              {momDelta.delta >= 0 ? '+' : ''}{formatCurrency(momDelta.delta)}
+            </span>
+          )}
+        </div>
         {freedomStr && (
           <p className="mt-1 font-serif italic text-[12px] text-[var(--ink-3)]">
             ≈ {freedomStr} vrijheid
@@ -208,6 +261,49 @@ export function NettoVermogenWidget({ size, data, href }: Props) {
                 </span>
                 <span className="font-mono text-[9px] tabular-nums" style={{ color: 'var(--hor-t)' }}>
                   +6m prognose
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Full-size: vermogensopbouw breakdown */}
+        {size === 'full' && assetDebtBar && (
+          <div className="mt-3 space-y-2">
+            {/* Stacked bar: assets (green) vs debts (red) */}
+            <div className="flex h-3 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+              <div
+                className="h-full rounded-l-full bg-emerald-500/80 transition-all duration-500"
+                style={{ width: `${assetDebtBar.assetPct}%` }}
+              />
+              <div
+                className="h-full rounded-r-full bg-red-500/70 transition-all duration-500"
+                style={{ width: `${assetDebtBar.debtPct}%` }}
+              />
+            </div>
+            {/* Labels: Bezittingen left, Schulden right */}
+            <div className="flex justify-between text-[11px]">
+              <span className="font-mono tabular-nums text-emerald-600">
+                Bezittingen {formatCurrency(totalAssets)}
+              </span>
+              <span className="font-mono tabular-nums text-red-500">
+                Schulden {formatCurrency(totalDebts)}
+              </span>
+            </div>
+            {/* MoM delta row */}
+            {momDelta && (
+              <div className="flex items-center gap-1.5 text-[11px]">
+                <span className="text-[var(--ink-3)]">&Delta; deze maand:</span>
+                <span
+                  className={`font-mono tabular-nums font-medium ${
+                    momDelta.delta >= 0 ? 'text-emerald-600' : 'text-red-500'
+                  }`}
+                >
+                  {momDelta.delta >= 0 ? '+' : ''}
+                  {formatCurrency(momDelta.delta)}
+                  {' '}
+                  ({momDelta.delta >= 0 ? '+' : ''}
+                  {momDelta.pct.toFixed(1)}%)
                 </span>
               </div>
             )}
