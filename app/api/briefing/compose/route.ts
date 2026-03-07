@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { streamText } from 'ai'
 import { getModel } from '@/lib/ai/config'
 import { buildBriefingSystemPrompt, briefingTools } from '@/lib/ai/dna/briefing'
+import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import type {
   BriefingCardSpec,
   BriefingComposeRequest,
@@ -146,6 +147,28 @@ export async function POST(request: Request) {
     const model = await getModel(supabase)
     const systemPrompt = buildBriefingSystemPrompt(temporal, phase, level, directivesBlock, previousBriefing, longTermMemory, serverUserPreferences || undefined, phaseTransition, briefingFrequency)
 
+    /* Sanitize PII from data summary before sending to AI provider */
+    let sanitizedDataSummary = dataSummary
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, date_of_birth')
+        .eq('id', user.id)
+        .single()
+
+      const sanitizeOpts: SanitizeOptions = {}
+      if (profile) {
+        const names = [profile.full_name].filter(Boolean) as string[]
+        if (names.length > 0) sanitizeOpts.names = names
+        if (profile.date_of_birth) sanitizeOpts.dateOfBirth = profile.date_of_birth
+      }
+
+      sanitizedDataSummary = sanitizeForAI(dataSummary, sanitizeOpts)
+    } catch {
+      // Non-fatal: proceed with unsanitized summary
+      console.warn('[briefing/compose] Sanitization failed, proceeding with raw data')
+    }
+
     // Create a ReadableStream that emits SSE events as tool calls complete
     const encoder = new TextEncoder()
     const stream = new ReadableStream({
@@ -154,7 +177,7 @@ export async function POST(request: Request) {
           const result = streamText({
             model,
             system: systemPrompt,
-            prompt: dataSummary,
+            prompt: sanitizedDataSummary,
             tools: briefingTools,
             toolChoice: 'required',
             maxOutputTokens: 2000,

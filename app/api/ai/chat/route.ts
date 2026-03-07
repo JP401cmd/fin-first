@@ -5,6 +5,7 @@ import { buildSystemPrompt, type AIDomain, type ChatContext } from '@/lib/ai/dna
 import { buildContext } from '@/lib/ai/context/builder'
 import { getTools } from '@/lib/ai/tools'
 import { WHATIF_PROMPT } from '@/lib/ai/dna/wil'
+import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 
 /* AI response timeout in milliseconds (60 seconds) */
 const AI_TIMEOUT_MS = 60_000
@@ -56,6 +57,27 @@ export async function POST(req: Request) {
       { error: 'Kon financiele context niet laden. Probeer het opnieuw.' },
       { status: 500 },
     )
+  }
+
+  /* Sanitize PII from financial context before sending to AI provider */
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, date_of_birth')
+      .eq('id', user.id)
+      .single()
+
+    const sanitizeOpts: SanitizeOptions = {}
+    if (profile) {
+      const names = [profile.full_name].filter(Boolean) as string[]
+      if (names.length > 0) sanitizeOpts.names = names
+      if (profile.date_of_birth) sanitizeOpts.dateOfBirth = profile.date_of_birth
+    }
+
+    financialContext = sanitizeForAI(financialContext, sanitizeOpts)
+  } catch (err) {
+    // Non-fatal: if sanitization fails, proceed with unsanitized context
+    console.warn('[AI Chat] Sanitization failed, proceeding with raw context:', err)
   }
 
   const tools = getTools(safeDomain, supabase, chatContext)
