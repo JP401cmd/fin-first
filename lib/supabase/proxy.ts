@@ -392,6 +392,7 @@ export async function updateSession(request: NextRequest) {
     '/test-berichten-footer',
     '/test-sanitize-failsafe',
     '/api/test-sanitize-failsafe',
+    '/api/verify-news-error-handling',
   ]
 
   // Protected route prefixes that require authentication
