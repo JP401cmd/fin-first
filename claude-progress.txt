@@ -9572,3 +9572,20 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#417)
 - 408/414 features passing (98.6%)
+
+## Session 2026-03-07 - Feature #429
+
+### Feature #429: Onboarding speech bubbles: editorial stijl - PASSING
+- Restyled SpeechBubble: bg-[var(--subtle)] with border-l-3 border-wil-400 (left accent for Will's voice)
+- Restyled SpeechBubbleCentered: border-y border-[var(--border-ed)] (top/bottom editorial borders)
+- Both: font-serif text-sm leading-relaxed text-[var(--ink-2)] for comfortable reading
+- Removed dated arrow decoration (rotate-45 div) from SpeechBubble
+- Responsive padding: px-4 py-3 sm:px-5 sm:py-4
+- Mobile: max-w-[85%] with sm:max-w-none for full-width on larger screens
+- Created test page at /test-speech-bubbles for visual verification
+- Zero TypeScript errors, zero console errors
+- Commit: 73a9d0f
+
+### Current Status
+- 1 feature completed this session (#429)
+- 415/425 features passing (97.6%)
