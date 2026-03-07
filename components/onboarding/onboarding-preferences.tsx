@@ -51,6 +51,14 @@ export const INITIAL_PREFERENCES: PreferencesData = {
   dashboardCategories: [],
 }
 
+export const DEFAULT_PREFERENCES: PreferencesData = {
+  mainGoal: 'overzicht',
+  activityLevel: 'wekelijks',
+  modules: ['kern', 'wil', 'horizon'],
+  aiInsights: true,
+  dashboardCategories: ['vermogen', 'budgetten', 'doelen', 'fire', 'beleggingen', 'voortgang'],
+}
+
 // ── Question definitions ─────────────────────────────────────
 
 interface CardOption<T extends string> {
@@ -305,6 +313,11 @@ export function OnboardingPreferences({
 }) {
   const [questionIndex, setQuestionIndex] = useState(0)
 
+  function handleSkipDefaults() {
+    onChange(DEFAULT_PREFERENCES)
+    onNext()
+  }
+
   // Check if current question has a valid answer
   function canProceed(): boolean {
     switch (questionIndex) {
@@ -368,8 +381,26 @@ export function OnboardingPreferences({
       {/* Finn speech bubble */}
       <div className="mb-6 flex items-start gap-3">
         <div className="shrink-0"><FinnAvatar size={48} /></div>
-        <SpeechBubble>{SPEECH_BUBBLES[questionIndex]}</SpeechBubble>
+        <SpeechBubble>
+          {SPEECH_BUBBLES[questionIndex]}
+          {questionIndex === 0 && (
+            <span className="mt-1 block text-xs text-zinc-400">
+              Je kunt dit ook later aanpassen in Instellingen.
+            </span>
+          )}
+        </SpeechBubble>
       </div>
+
+      {/* Skip with defaults link — only on first question */}
+      {questionIndex === 0 && !saving && (
+        <button
+          type="button"
+          onClick={handleSkipDefaults}
+          className="mb-4 w-full text-center text-sm text-zinc-400 underline underline-offset-2 transition-colors hover:text-zinc-600"
+        >
+          Standaard instellingen gebruiken
+        </button>
+      )}
 
       {/* Question 1: Hoofddoel */}
       {questionIndex === 0 && (
