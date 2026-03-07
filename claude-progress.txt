@@ -9615,3 +9615,28 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#429)
 - 415/425 features passing (97.6%)
+
+## Session 2026-03-07 - Features #425, #426, #419
+
+### Feature #425: Verwijder FhinAvatar en FfinAvatar uit onboarding - PASSING
+- Replaced FhinAvatar (kern) and FfinAvatar (horizon) with Lucide icons in onboarding-intro.tsx
+- Shield (amber), Zap (teal), Telescope (purple) in module-colored circles
+- Updated onboarding-success.tsx: icons instead of avatars, single-assistant framing
+- Speech: 'Ik begeleid je door drie perspectieven' instead of 'Samen met mijn team'
+- Sub-heading: 'Drie perspectieven, een doel' instead of 'Ontmoet je team'
+- Zero FhinAvatar/FfinAvatar references in components/onboarding/
+
+### Feature #426: Will's avatar consistent gebruiken - PASSING
+- Renamed comment 'FINN question' to 'Will question' in onboarding-identity.tsx
+- Renamed comment 'Finn speech bubble' to 'Will speech bubble' in onboarding-preferences.tsx
+- Code hygiene only, no functional changes
+
+### Feature #419: Verwijder rendement en inflatie sliders uit onboarding identity - PASSING
+- Removed expected return slider (3-12%), inflation slider (0-5%), effective SWR badge
+- Removed formatPct helper, effectiveSwr calc, BOX3_DRAG and Info imports
+- FIRE section now only shows: retirement expense method (3 cards) + end strategy (3 cards)
+- Defaults (0.07 return, 0.02 inflation) hardcoded in onboarding page state
+
+### Current Status
+- 3 features completed this session (#425, #426, #419)
+- Zero TypeScript errors, zero console errors
