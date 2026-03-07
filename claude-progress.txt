@@ -1,3 +1,18 @@
+## Session 2026-03-07 - Feature #431
+
+### Feature #431: Onboarding preferences: beperk widget selectie tot max 8 enabled widgets - PASSING
+- Modified buildWidgetPrefsFromPreferences() to cap enabled widgets at 8
+- Priority order: baseline (4) → goal → activity → module → AI → category
+- 4 baseline widgets (netto_vermogen, cash_flow, jouw_pad, vrijheidsvoortgang) always kept
+- Added note on last preferences question: "Je dashboard start met maximaal 8 widgets..."
+- Created test page at /test-widget-cap verifying 4 scenarios all cap at 8
+- Zero TypeScript errors, zero console errors
+- Commit: c14ea47
+
+### Current Status
+- 1 feature completed this session (#431)
+- 417/427 features passing (97.7%)
+
 ## Session 2026-03-07 - Feature #430
 
 ### Feature #430: Onboarding: gebruik tf. logo in plaats van regenboog/TriFinity tekst - PASSING
