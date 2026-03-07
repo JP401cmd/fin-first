@@ -852,7 +852,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         </div>
 
         {/* Box 3 stays as a separate gated quick link */}
-        <FeatureGate featureId="box3_belasting" fallback="locked">
+        <FeatureGate featureId="box3_belasting" fallback="hidden">
           <div className="mt-4">
             <Link
               href="/core/belasting"
@@ -908,7 +908,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
               Gebaseerd op je werkelijke transacties en budgetinstellingen.
             </p>
           </div>
-          <FeatureGate featureId="data_export" fallback="locked">
+          <FeatureGate featureId="data_export" fallback="hidden">
             <ExportDropdown />
           </FeatureGate>
         </div>
@@ -998,6 +998,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       >
         <div className="space-y-8 p-6">
           {/* Vermogensverloop */}
+          <FeatureGate featureId="vermogensverloop" fallback="hidden">
           {snapshots.length > 0 && (
             <section>
               <div className="mb-3 flex items-center justify-between">
@@ -1014,6 +1015,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
               <NetWorthChart snapshots={snapshots} fireTarget={coreSimTarget ?? data.fireTarget} earnedBadges={[]} />
             </section>
           )}
+          </FeatureGate>
 
           {/* Vermogensprognose */}
           <section>
@@ -1035,12 +1037,14 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           )}
 
           {/* Vergelijking snapshots */}
+          <FeatureGate featureId="snapshot_vergelijking" fallback="hidden">
           {snapshots.length >= 2 && (
             <section>
               <h3 className="mb-3 text-sm font-semibold text-[var(--ink-2)]">Vergelijking snapshots</h3>
               <SnapshotComparisonView snapshots={snapshots} />
             </section>
           )}
+          </FeatureGate>
         </div>
       </FullScreenModal>
 

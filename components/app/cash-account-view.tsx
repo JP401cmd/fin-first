@@ -874,6 +874,7 @@ export function CashAccountView({
       )}
 
       {/* Sankey flow diagram */}
+      <FeatureGate featureId="cashflow_sankey" fallback="hidden">
       {sankeyData && sankeyData.nodes.length > 0 && (
         <section className="mt-3 sm:mt-6">
           <button
@@ -900,6 +901,7 @@ export function CashAccountView({
           )}
         </section>
       )}
+      </FeatureGate>
 
       {/* Tab strip */}
       <div className="mt-3 sm:mt-6 flex border-b border-[var(--border-ed)]">
@@ -1029,7 +1031,7 @@ export function CashAccountView({
       </section>
 
       {/* Cashflow Prognose */}
-      <FeatureGate featureId="cashflow_forecast" fallback="locked">
+      <FeatureGate featureId="cashflow_forecast" fallback="hidden">
         {cashFlowHasData && cashFlowForecast.length >= 2 && (
           <section className="mt-3 sm:mt-6" data-testid="cashflow-forecast-section">
             <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4">
