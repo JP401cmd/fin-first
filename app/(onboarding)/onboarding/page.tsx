@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useReducer, useCallback } from 'react'
+import { useState, useEffect, useReducer, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { FinnAvatar } from '@/components/app/avatars'
@@ -37,8 +37,13 @@ type Step =
   | 'saving'
   | 'success'
 
+type Direction = 'forward' | 'back'
+
+const STEP_ORDER: Step[] = ['intro', 'identity', 'extras', 'budgets', 'preferences', 'saving', 'success']
+
 interface State {
   step: Step
+  direction: Direction
   identity: IdentityData
   budgetAmounts: Record<string, number>
   bankAccounts: BankAccountEntry[]
@@ -58,6 +63,7 @@ type Action =
 
 const initialState: State = {
   step: 'intro',
+  direction: 'forward',
   identity: {
     full_name: '',
     date_of_birth: '',
@@ -69,6 +75,8 @@ const initialState: State = {
     retirement_expense_method: 'essential_budgets',
     retirement_custom_amount: '',
     fire_end_strategy: 'deplete',
+    fire_legacy_amount: '',
+    fire_end_age: 90,
   },
   budgetAmounts: {},
   bankAccounts: [],
@@ -79,8 +87,12 @@ const initialState: State = {
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
-    case 'SET_STEP':
-      return { ...state, step: action.step }
+    case 'SET_STEP': {
+      const oldIdx = STEP_ORDER.indexOf(state.step)
+      const newIdx = STEP_ORDER.indexOf(action.step)
+      const direction: Direction = newIdx >= oldIdx ? 'forward' : 'back'
+      return { ...state, step: action.step, direction }
+    }
     case 'SET_IDENTITY':
       return { ...state, identity: action.data }
     case 'SET_BUDGET_AMOUNTS':
@@ -96,6 +108,19 @@ function reducer(state: State, action: Action): State {
     default:
       return state
   }
+}
+
+// ── Step transition wrapper ──────────────────────────────
+
+function StepTransition({ direction, children }: {
+  direction: Direction
+  children: React.ReactNode
+}) {
+  return (
+    <div className={direction === 'forward' ? 'step-enter-forward' : 'step-enter-back'}>
+      {children}
+    </div>
+  )
 }
 
 // ── Main Component ───────────────────────────────────────────
@@ -177,6 +202,8 @@ export default function OnboardingPage() {
           ...identity,
           net_monthly_income: Number(identity.net_monthly_income),
           retirement_custom_amount: identity.retirement_custom_amount ? Number(identity.retirement_custom_amount) : undefined,
+          fire_legacy_amount: identity.fire_legacy_amount ? Number(identity.fire_legacy_amount) : undefined,
+          fire_end_age: identity.fire_end_strategy === 'deplete' ? identity.fire_end_age : undefined,
         },
         budgetAmounts,
         widgetPrefs,
@@ -278,6 +305,8 @@ export default function OnboardingPage() {
     }
   }, [saving, state])
 
+  const dismissError = useCallback(() => setSaveError(null), [])
+
   // ── Render ───────────────────────────────────────────────────
 
   if (loading) {
@@ -287,8 +316,6 @@ export default function OnboardingPage() {
       </div>
     )
   }
-
-  const dismissError = useCallback(() => setSaveError(null), [])
 
   const showHeader = !['intro', 'success', 'saving'].includes(state.step)
 
@@ -344,81 +371,83 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {state.step === 'intro' && (
-          <OnboardingIntro onNext={() => dispatch({ type: 'SET_STEP', step: 'identity' })} />
-        )}
+        <StepTransition key={state.step} direction={state.direction}>
+          {state.step === 'intro' && (
+            <OnboardingIntro onNext={() => dispatch({ type: 'SET_STEP', step: 'identity' })} />
+          )}
 
-        {state.step === 'identity' && (
-          <OnboardingIdentity
-            data={state.identity}
-            onChange={(data) => dispatch({ type: 'SET_IDENTITY', data })}
-            onNext={() => dispatch({ type: 'SET_STEP', step: 'extras' })}
-            onBack={() => dispatch({ type: 'SET_STEP', step: 'intro' })}
-          />
-        )}
+          {state.step === 'identity' && (
+            <OnboardingIdentity
+              data={state.identity}
+              onChange={(data) => dispatch({ type: 'SET_IDENTITY', data })}
+              onNext={() => dispatch({ type: 'SET_STEP', step: 'extras' })}
+              onBack={() => dispatch({ type: 'SET_STEP', step: 'intro' })}
+            />
+          )}
 
-        {state.step === 'extras' && (
-          <OnboardingExtras
-            bankAccounts={state.bankAccounts}
-            assets={state.assets}
-            debts={state.debts}
-            onBankChange={(items) => dispatch({ type: 'SET_BANK_ACCOUNTS', items })}
-            onAssetChange={(items) => dispatch({ type: 'SET_ASSETS', items })}
-            onDebtChange={(items) => dispatch({ type: 'SET_DEBTS', items })}
-            onNext={() => dispatch({ type: 'SET_STEP', step: 'budgets' })}
-            onSkip={() => dispatch({ type: 'SET_STEP', step: 'budgets' })}
-            onBack={() => dispatch({ type: 'SET_STEP', step: 'identity' })}
-          />
-        )}
+          {state.step === 'extras' && (
+            <OnboardingExtras
+              bankAccounts={state.bankAccounts}
+              assets={state.assets}
+              debts={state.debts}
+              onBankChange={(items) => dispatch({ type: 'SET_BANK_ACCOUNTS', items })}
+              onAssetChange={(items) => dispatch({ type: 'SET_ASSETS', items })}
+              onDebtChange={(items) => dispatch({ type: 'SET_DEBTS', items })}
+              onNext={() => dispatch({ type: 'SET_STEP', step: 'budgets' })}
+              onSkip={() => dispatch({ type: 'SET_STEP', step: 'budgets' })}
+              onBack={() => dispatch({ type: 'SET_STEP', step: 'identity' })}
+            />
+          )}
 
-        {state.step === 'budgets' && (
-          <OnboardingBudgets
-            amounts={state.budgetAmounts}
-            onChange={(amounts) => dispatch({ type: 'SET_BUDGET_AMOUNTS', amounts })}
-            netIncome={Number(state.identity.net_monthly_income) || 0}
-            householdType={state.identity.household_type}
-            numberOfChildren={state.identity.number_of_children}
-            onNext={() => dispatch({ type: 'SET_STEP', step: 'preferences' })}
-            onBack={() => dispatch({ type: 'SET_STEP', step: 'extras' })}
-          />
-        )}
+          {state.step === 'budgets' && (
+            <OnboardingBudgets
+              amounts={state.budgetAmounts}
+              onChange={(amounts) => dispatch({ type: 'SET_BUDGET_AMOUNTS', amounts })}
+              netIncome={Number(state.identity.net_monthly_income) || 0}
+              householdType={state.identity.household_type}
+              numberOfChildren={state.identity.number_of_children}
+              onNext={() => dispatch({ type: 'SET_STEP', step: 'preferences' })}
+              onBack={() => dispatch({ type: 'SET_STEP', step: 'extras' })}
+            />
+          )}
 
-        {state.step === 'preferences' && (
-          <OnboardingPreferences
-            data={state.preferences}
-            onChange={(data) => dispatch({ type: 'SET_PREFERENCES', data })}
-            onNext={handleSaveOwnData}
-            onBack={() => dispatch({ type: 'SET_STEP', step: 'budgets' })}
-            saving={saving}
-          />
-        )}
+          {state.step === 'preferences' && (
+            <OnboardingPreferences
+              data={state.preferences}
+              onChange={(data) => dispatch({ type: 'SET_PREFERENCES', data })}
+              onNext={handleSaveOwnData}
+              onBack={() => dispatch({ type: 'SET_STEP', step: 'budgets' })}
+              saving={saving}
+            />
+          )}
 
-        {state.step === 'saving' && (
-          <div className="flex min-h-[60vh] flex-col items-center justify-center sm:min-h-0">
-            <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-8 text-center">
-              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center">
-                <div className="animate-pulse">
-                  <FinnAvatar size={64} />
+          {state.step === 'saving' && (
+            <div className="flex min-h-[60vh] flex-col items-center justify-center sm:min-h-0">
+              <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-8 text-center">
+                <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center">
+                  <div className="animate-pulse">
+                    <FinnAvatar size={64} />
+                  </div>
                 </div>
+                <p className="mb-4 text-sm font-medium text-zinc-700 transition-opacity duration-300">
+                  {SAVING_MESSAGES[saveMessageIdx]}
+                </p>
+                {/* Progress bar */}
+                <div className="mx-auto h-2 w-full overflow-hidden rounded-full bg-zinc-100">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-amber-400 via-teal-400 to-purple-500 transition-all duration-300 ease-out"
+                    style={{ width: `${saveProgress}%` }}
+                  />
+                </div>
+                <p className="mt-2 font-mono text-xs tabular-nums text-zinc-400">{saveProgress}%</p>
               </div>
-              <p className="mb-4 text-sm font-medium text-zinc-700 transition-opacity duration-300">
-                {SAVING_MESSAGES[saveMessageIdx]}
-              </p>
-              {/* Progress bar */}
-              <div className="mx-auto h-2 w-full overflow-hidden rounded-full bg-zinc-100">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-amber-400 via-teal-400 to-purple-500 transition-all duration-300 ease-out"
-                  style={{ width: `${saveProgress}%` }}
-                />
-              </div>
-              <p className="mt-2 font-mono text-xs tabular-nums text-zinc-400">{saveProgress}%</p>
             </div>
-          </div>
-        )}
+          )}
 
-        {state.step === 'success' && (
-          <OnboardingSuccess onDashboard={() => router.push('/dashboard')} />
-        )}
+          {state.step === 'success' && (
+            <OnboardingSuccess onDashboard={() => router.push('/dashboard')} />
+          )}
+        </StepTransition>
       </div>
     </div>
   )

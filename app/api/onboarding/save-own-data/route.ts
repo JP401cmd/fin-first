@@ -16,6 +16,8 @@ const bodySchema = z.object({
     retirement_expense_method: z.enum(['essential_budgets', 'custom_amount', 'current_income']).optional(),
     retirement_custom_amount: z.number().min(0).optional(),
     fire_end_strategy: z.enum(['perpetual', 'legacy', 'deplete']).optional(),
+    fire_legacy_amount: z.number().positive().optional(),
+    fire_end_age: z.number().int().min(60).max(120).optional(),
   }),
   budgetAmounts: z.record(z.string(), z.number().min(0)),
   bankAccounts: z.array(z.object({
@@ -90,7 +92,7 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Ongeldige invoer', details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { identity, budgetAmounts, bankAccounts, assets, debts, widgetPrefs } = parsed.data
+  const { identity, budgetAmounts, bankAccounts, assets, debts, widgetPrefs, budgetteringMode } = parsed.data
 
   try {
     // Idempotency check: if onboarding is already completed, skip all inserts
@@ -115,14 +117,17 @@ export async function POST(req: Request) {
       net_monthly_income: identity.net_monthly_income,
       onboarding_completed: true,
       is_demo_user: false,
+      budgeting_active: budgetteringMode !== 'none',
       updated_at: new Date().toISOString(),
     }
     // Add FIRE parameters if provided
     if (identity.expected_return != null) profileData.expected_return = identity.expected_return
     if (identity.inflation_rate != null) profileData.inflation_rate = identity.inflation_rate
     if (identity.retirement_expense_method) profileData.retirement_expense_method = identity.retirement_expense_method
-    if (identity.retirement_custom_amount != null) profileData.retirement_custom_amount = identity.retirement_custom_amount
+    if (identity.retirement_custom_amount != null) profileData.retirement_expense_custom_amount = identity.retirement_custom_amount
     if (identity.fire_end_strategy) profileData.fire_end_strategy = identity.fire_end_strategy
+    if (identity.fire_legacy_amount != null) profileData.fire_legacy_amount = identity.fire_legacy_amount
+    if (identity.fire_end_age != null) profileData.fire_end_age = identity.fire_end_age
     if (widgetPrefs) profileData.widget_prefs = widgetPrefs
 
     const { error: profileErr } = await supabase
