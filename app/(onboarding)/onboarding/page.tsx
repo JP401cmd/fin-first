@@ -369,7 +369,7 @@ export default function OnboardingPage() {
       <div className={`w-full max-w-[480px] sm:max-w-[640px] ${saveError ? 'mt-16' : ''}`}>
         {/* Logo / Header */}
         {showHeader && (
-          <div className="relative mb-10 text-center">
+          <div className="relative mb-10 sm:mb-12 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 via-teal-400 to-purple-500">
               <span className="text-2xl font-black text-white">T</span>
             </div>

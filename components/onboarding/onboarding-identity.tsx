@@ -205,17 +205,19 @@ export function OnboardingIdentity({
         Terug
       </button>
 
-      <div className="mb-6">
+      <div className="mb-8">
         <StepProgress current="profiel" />
       </div>
 
+      <p className="label-editorial mb-2 text-[var(--ink-4)]">Jouw gegevens</p>
+
       {/* Will question */}
-      <div className="mb-6 flex items-start gap-3">
+      <div className="mb-6 sm:mb-8 flex items-start gap-3">
         <div className="shrink-0"><FinnAvatar size={48} /></div>
         <SpeechBubble>Om je pad naar vrijheid te berekenen, moet ik je eerst leren kennen. Je inkomen bepaalt hoeveel vrijheidstijd je elke maand opbouwt &mdash; en je leeftijd helpt me inschatten hoeveel tijd er nog voor je ligt.</SpeechBubble>
       </div>
 
-      <div className="space-y-5 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+      <div className="space-y-6 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-5 sm:p-6">
         {submitted && !isValid && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3" role="alert">
             <p className="text-sm font-medium text-red-700">
@@ -270,7 +272,7 @@ export function OnboardingIdentity({
           <span className="mb-2 block text-sm font-medium text-[var(--ink-2)]">
             Huishouden <span className="text-red-400">*</span>
           </span>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
             {([
               { type: 'solo' as const, label: 'Solo', desc: 'Ik woon alleen', Icon: User },
               { type: 'samen' as const, label: 'Samen', desc: 'Samen / getrouwd', Icon: Users },
@@ -358,14 +360,16 @@ export function OnboardingIdentity({
       </div>
 
       {/* ── FIRE Instellingen ─────────────────────────────────────── */}
-      <div className="mt-6 mb-6 flex items-start gap-3">
+      <p className="label-editorial mt-8 sm:mt-12 mb-2 text-[var(--ink-4)]">Vrijheidsberekening</p>
+
+      <div className="mb-6 sm:mb-8 flex items-start gap-3">
         <div className="shrink-0"><FinnAvatar size={40} /></div>
         <SpeechBubble>
           Hoe wil je dat we je financiële toekomst berekenen? De standaardinstellingen werken voor de meeste mensen &mdash; je kunt dit later altijd finetunen in je instellingen.
         </SpeechBubble>
       </div>
 
-      <div className="space-y-5 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+      <div className="space-y-6 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-5 sm:p-6">
         <div className="flex items-center gap-2">
           <h3 className="font-display text-sm font-semibold tracking-[-0.02em] text-[var(--ink)]">Vrijheidsberekening</h3>
           <span className="rounded-full bg-[var(--subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink-3)]">optioneel</span>
@@ -374,7 +378,7 @@ export function OnboardingIdentity({
         {/* Retirement expense method — 3 choice cards */}
         <div>
           <span className="mb-2 block text-sm font-medium text-[var(--ink-2)]">Pensioenuitgaven methode</span>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
             {RETIREMENT_METHODS.map(({ value, label, desc }) => {
               const isSelected = data.retirement_expense_method === value
               return (
@@ -433,7 +437,7 @@ export function OnboardingIdentity({
         {/* FIRE end strategy — 3 choice cards */}
         <div>
           <span className="mb-2 block text-sm font-medium text-[var(--ink-2)]">Vermogensstrategie op einddatum</span>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
             {FIRE_STRATEGIES.map(({ value, label, desc }) => {
               const isSelected = data.fire_end_strategy === value
               return (
@@ -526,7 +530,9 @@ export function OnboardingIdentity({
       </div>
 
       {/* ── Temporeel evenwicht ──────────────────────────────────── */}
-      <div className="mt-6 mb-6 flex items-start gap-3">
+      <p className="label-editorial mt-8 sm:mt-12 mb-2 text-[var(--ink-4)]">Jouw balans</p>
+
+      <div className="mb-6 sm:mb-8 flex items-start gap-3">
         <div className="shrink-0"><FinnAvatar size={40} /></div>
         <SpeechBubble>
           Hoeveel van je huidige tijd wil je investeren in je toekomstige vrijheid? Dit is geen goed of fout &mdash; het is jouw persoonlijke balans.
@@ -587,7 +593,7 @@ export function OnboardingIdentity({
       </div>
 
       {/* Sticky nav on mobile */}
-      <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-[var(--border-ed)] bg-[var(--paper)]/95 px-4 pb-[env(safe-area-inset-bottom,8px)] pt-3 backdrop-blur-sm sm:static sm:mt-5 sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
+      <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-[var(--border-ed)] bg-[var(--paper)]/95 px-4 pb-[env(safe-area-inset-bottom,8px)] pt-3 backdrop-blur-sm sm:static sm:mt-8 sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
         <button
           onClick={handleNext}
           disabled={disableNext}

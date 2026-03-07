@@ -177,18 +177,20 @@ export function OnboardingBudgets({
         Terug
       </button>
 
-      <div className="mb-6">
+      <div className="mb-8">
         <StepProgress current="budgetten" />
       </div>
 
-      <div className="mb-6 flex items-start gap-3">
+      <p className="label-editorial mb-2 text-[var(--ink-4)]">Budgettering</p>
+
+      <div className="mb-6 sm:mb-8 flex items-start gap-3">
         <div className="shrink-0"><FinnAvatar size={48} /></div>
         <SpeechBubble>Een budget vertaalt je inkomen naar bewuste keuzes. Elke euro die je bespaart is opgeslagen vrijheidstijd &mdash; tijd die je later kunt besteden aan wat jij écht belangrijk vindt. Maar het is niet verplicht: jij bepaalt het tempo.</SpeechBubble>
       </div>
 
       {/* Budget choice: skip, template, or manual */}
       {subChoice === null && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           <button
             onClick={onNext}
             disabled={saving}
@@ -245,8 +247,8 @@ export function OnboardingBudgets({
 
       {/* Profile-based template selection */}
       {subChoice === 'template' && (
-        <div className="space-y-3">
-          <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+        <div className="space-y-4">
+          <p className="label-editorial mb-4 text-[var(--ink-3)]">
             Kies een budgetprofiel
           </p>
           {profileBreakdowns.map((template) => {

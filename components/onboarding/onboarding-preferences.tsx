@@ -372,12 +372,14 @@ export function OnboardingPreferences({
         Terug
       </button>
 
-      <div className="mb-6">
+      <div className="mb-8">
         <StepProgress current="voorkeuren" />
       </div>
 
+      <p className="label-editorial mb-2 text-[var(--ink-4)]">Voorkeuren</p>
+
       {/* Question progress dots */}
-      <div className="mb-5 flex items-center justify-center gap-2">
+      <div className="mb-6 flex items-center justify-center gap-2">
         {[0, 1, 2, 3, 4].map((i) => (
           <div
             key={i}
@@ -393,7 +395,7 @@ export function OnboardingPreferences({
       </div>
 
       {/* Will speech bubble */}
-      <div className="mb-6 flex items-start gap-3">
+      <div className="mb-6 sm:mb-8 flex items-start gap-3">
         <div className="shrink-0"><FinnAvatar size={48} /></div>
         <SpeechBubble>
           {SPEECH_BUBBLES[questionIndex]}
@@ -420,7 +422,7 @@ export function OnboardingPreferences({
       {questionIndex === 0 && (
         <div className="space-y-3">
           <h2 className="mb-4 font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">Wat is je hoofddoel?</h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
             {GOAL_OPTIONS.map((opt) => (
               <SelectCard
                 key={opt.id}
@@ -476,7 +478,7 @@ export function OnboardingPreferences({
       {questionIndex === 3 && (
         <div className="space-y-3">
           <h2 className="mb-4 font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">Wil je AI-inzichten?</h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
             {AI_OPTIONS.map((opt) => (
               <SelectCard
                 key={opt.id}
@@ -496,7 +498,7 @@ export function OnboardingPreferences({
       {questionIndex === 4 && (
         <div className="space-y-3">
           <h2 className="mb-4 font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">Wat wil je op je dashboard?</h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
             {DASHBOARD_OPTIONS.map((opt) => (
               <MultiSelectCard
                 key={opt.id}
@@ -518,7 +520,7 @@ export function OnboardingPreferences({
       )}
 
       {/* Sticky navigation */}
-      <div className="fixed bottom-0 left-0 right-0 z-10 flex gap-3 border-t border-[var(--border-ed)] bg-[var(--paper)]/80 px-4 pb-[env(safe-area-inset-bottom,12px)] pt-3 backdrop-blur-sm sm:static sm:mt-6 sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
+      <div className="fixed bottom-0 left-0 right-0 z-10 flex gap-3 border-t border-[var(--border-ed)] bg-[var(--paper)]/80 px-4 pb-[env(safe-area-inset-bottom,12px)] pt-3 backdrop-blur-sm sm:static sm:mt-8 sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
         <button
           onClick={handleBack}
           className="flex-1 min-h-[44px] rounded-lg border border-[var(--border-ed)] px-4 py-3 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] active:bg-[var(--subtle)]"
