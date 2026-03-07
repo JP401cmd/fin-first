@@ -266,6 +266,20 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
     lines.push('')
   }
 
+  // Personal seasonal context (year-over-year comparison from localStorage)
+  if (typeof window !== 'undefined') {
+    const seasonalCtx = getSeasonalContext(
+      temporal.month,
+      temporal.year,
+      data.monthlyExpenses,
+      data.monthlyIncome,
+    )
+    if (seasonalCtx) {
+      lines.push(`SEIZOENSCONTEXT: ${seasonalCtx}`)
+      lines.push('')
+    }
+  }
+
   // Progression events
   if (progressionEvents && progressionEvents.length > 0) {
     lines.push('PROGRESSIE:')

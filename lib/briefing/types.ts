@@ -228,6 +228,11 @@ export interface BriefingLongTermMemory {
   adviceHistory: string[]  // last 5 insight/tip texts, max 50 chars each
 }
 
+export interface PhaseTransitionInfo {
+  previousPhase: string
+  currentPhase: string
+}
+
 export interface BriefingComposeRequest {
   dataSummary: string
   temporal: TemporalContext
@@ -235,6 +240,7 @@ export interface BriefingComposeRequest {
   level: number
   previousBriefing?: PreviousBriefingSummary
   longTermMemory?: BriefingLongTermMemory
+  phaseTransition?: PhaseTransitionInfo
 }
 
 export interface BriefingComposeResponse {

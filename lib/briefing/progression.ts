@@ -3,6 +3,8 @@
 // financial achievements by comparing current state to the
 // previous briefing snapshot stored in localStorage.
 
+import { levelToPhaseId } from '@/lib/feature-phases'
+
 export const LONG_TERM_KEY = 'briefing_progression'
 
 // ── Types ──────────────────────────────────────────────────
@@ -19,6 +21,7 @@ export interface ProgressionSnapshot {
 export type ProgressionEventType =
   | 'level_up'
   | 'level_down'
+  | 'phase_transition'
   | 'milestone_reached'
   | 'debt_free'
   | 'emergency_fund_reached'
@@ -100,6 +103,18 @@ export function detectProgressionEvents(
       label: `Sovereignty level gedaald van ${previous.sovereigntyLevel} naar ${current.sovereigntyLevel}`,
       previousValue: previous.sovereigntyLevel,
       currentValue: current.sovereigntyLevel,
+    })
+  }
+
+  // ── Phase transition ──────────────────────────────────────
+  const previousPhase = levelToPhaseId(previous.sovereigntyLevel)
+  const currentPhase = levelToPhaseId(current.sovereigntyLevel)
+  if (previousPhase !== currentPhase) {
+    events.push({
+      type: 'phase_transition',
+      label: `Fase-transitie van ${previousPhase} naar ${currentPhase}`,
+      previousValue: previousPhase,
+      currentValue: currentPhase,
     })
   }
 

@@ -215,6 +215,12 @@ export function DAIshboard({ data, temporal, userName }: Props) {
     // Save current snapshot for next briefing comparison
     saveSnapshot(currentSnapshot)
 
+    // Extract phase transition info for prominent AI instruction
+    const phaseTransitionEvent = progressionEvents.find(e => e.type === 'phase_transition')
+    const phaseTransition = phaseTransitionEvent
+      ? { previousPhase: String(phaseTransitionEvent.previousValue), currentPhase: String(phaseTransitionEvent.currentValue) }
+      : undefined
+
     const dataSummary = condenseDashboardData(data, temporal, progressionEvents)
 
     controllerRef.current?.abort()
