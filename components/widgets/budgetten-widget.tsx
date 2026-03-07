@@ -158,6 +158,50 @@ export function BudgettenWidget({ size, data, href }: Props) {
     )
   }
 
+  // Budget health: how many of 4 types are on track (spent <= limit)
+  const onTrackCount = BUDGET_TYPE_CONFIGS.filter(c => {
+    const t = budgetTotals[c.key]
+    return t.limit > 0 && t.spent <= t.limit
+  }).length
+  const configuredCount = BUDGET_TYPE_CONFIGS.filter(c => budgetTotals[c.key].limit > 0).length
+
+  // ── Quarter-size: budget health summary + mini 4-segment bar ──
+  if (size === 'quarter') {
+    return (
+      <WidgetShell module="kern" size={size} kicker="Budgetten" href={href}>
+        <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
+          {onTrackCount}/{configuredCount > 0 ? configuredCount : 4} op schema
+        </p>
+        <p className="mt-1 font-serif italic text-[11px] text-[var(--ink-3)]">
+          {onTrackCount === configuredCount && configuredCount > 0 ? 'Alle budgetten op koers' : 'Budgetten deze maand'}
+        </p>
+        {/* Mini 4-segment bar */}
+        <div ref={inViewRef} className="mt-2 flex gap-0.5">
+          {BUDGET_TYPE_CONFIGS.map((config) => {
+            const t = budgetTotals[config.key]
+            const hasData = t.limit > 0
+            const onTrack = hasData && t.spent <= t.limit
+            return (
+              <div
+                key={config.key}
+                className="h-2 flex-1 rounded-sm"
+                style={{
+                  backgroundColor: !hasData
+                    ? 'var(--border-ed)'
+                    : onTrack
+                      ? 'var(--color-emerald-500, #10b981)'
+                      : 'var(--color-red-500, #ef4444)',
+                  opacity: hasEntered ? 1 : 0.3,
+                  transition: 'opacity 400ms ease',
+                }}
+              />
+            )
+          })}
+        </div>
+      </WidgetShell>
+    )
+  }
+
   const nettoBalans =
     budgetTotals.income.spent
     - budgetTotals.expense.spent
