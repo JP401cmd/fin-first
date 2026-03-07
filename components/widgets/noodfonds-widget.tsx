@@ -1,7 +1,8 @@
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { formatCurrency } from '@/lib/format'
+import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import type { DashboardData } from './widget-renderer'
+import { ShieldCheck, Lightbulb } from 'lucide-react'
 
 interface Props {
   size: WidgetSize
@@ -9,44 +10,197 @@ interface Props {
   href?: string
 }
 
+/** Color based on months covered: red <3m, orange 3-5m, green >=6m */
+function progressColor(months: number): { text: string; bar: string; bg: string } {
+  if (months >= 6) return { text: 'text-emerald-600', bar: 'bg-emerald-500', bg: 'bg-emerald-50' }
+  if (months >= 3) return { text: 'text-amber-600', bar: 'bg-amber-500', bg: 'bg-amber-50' }
+  return { text: 'text-red-600', bar: 'bg-red-500', bg: 'bg-red-50' }
+}
+
 export function NoodfondsWidget({ size, data, href }: Props) {
   const { emergencyFund } = data
   const { currentAmount, targetAmount, monthsCovered, targetMonths, isComplete } = emergencyFund
-  const pct = targetAmount > 0 ? (currentAmount / targetAmount) * 100 : 0
+  const pct = targetAmount > 0 ? Math.min((currentAmount / targetAmount) * 100, 100) : 0
+  const colors = progressColor(monthsCovered)
+  const monthlyExpenses = targetMonths > 0 ? targetAmount / targetMonths : 0
 
+  // Freedom time framing
+  const dailyExp = data.monthlyExpenses / 30
+  const freedomTime = dailyExp > 0 && currentAmount > 0
+    ? calculateFreedomTime(currentAmount, dailyExp)
+    : null
+  const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
+
+  // ── Quarter: compact months + mini progress bar ──
   if (size === 'quarter') {
     return (
       <WidgetShell module="kern" size={size} kicker="Noodfonds" href={href}>
-        <p className={`font-mono text-2xl font-semibold tabular-nums ${isComplete ? 'text-emerald-600' : 'text-[var(--ink)]'}`}>
-          {monthsCovered}<span className="text-sm text-[var(--ink-3)]">/{targetMonths} mnd</span>
+        <p className={`font-mono text-lg font-semibold tabular-nums ${colors.text}`}>
+          {monthsCovered.toFixed(1)} <span className="text-xs text-[var(--ink-3)]">van {targetMonths} maanden</span>
         </p>
-        {isComplete && <p className="mt-1 text-xs text-emerald-600 font-medium">Compleet</p>}
+        {/* Mini progress bar */}
+        <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+          <div
+            className={`h-full rounded-full transition-all ${colors.bar}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        {isComplete && (
+          <p className="mt-1 text-[10px] font-medium text-emerald-600">Compleet</p>
+        )}
       </WidgetShell>
     )
   }
 
+  // ── Half: progress bar + bedrag + maanden + vrijheidstijd + complete state ──
+  if (size === 'half') {
+    return (
+      <WidgetShell module="kern" size={size} kicker="Noodfonds" href={href}>
+        {/* Header with icon */}
+        <div className="flex items-start gap-3">
+          <div className={`flex-shrink-0 rounded-lg p-2 ${colors.bg}`}>
+            <ShieldCheck className={`h-5 w-5 ${colors.text}`} strokeWidth={1.5} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className={`font-mono text-2xl font-semibold tabular-nums ${isComplete ? 'text-emerald-600' : 'text-[var(--ink)]'}`}>
+              {monthsCovered.toFixed(1)}<span className="text-base text-[var(--ink-3)]"> / {targetMonths} maanden</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div className="mt-3 h-[6px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+          <div
+            className={`h-full rounded-full transition-all ${colors.bar}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+
+        {/* Amount */}
+        <div className="mt-2 flex justify-between text-xs text-[var(--ink-3)] font-mono tabular-nums">
+          <span>{formatCurrency(currentAmount)}</span>
+          <span>{formatCurrency(targetAmount)}</span>
+        </div>
+
+        {/* Complete state */}
+        {isComplete && (
+          <p className="mt-3 text-sm font-medium text-emerald-600">
+            Noodfonds bereikt!
+          </p>
+        )}
+
+        {/* Freedom time framing */}
+        {freedomStr && !isComplete && (
+          <p className="mt-2 font-serif italic text-[12px] text-[var(--ink-3)]">
+            {freedomStr} vrijheid opgebouwd als vangnet
+          </p>
+        )}
+
+        {isComplete && (
+          <p className="mt-1 font-serif italic text-[12px] text-emerald-600">
+            Je hebt {targetMonths} maanden financiele ademruimte
+          </p>
+        )}
+      </WidgetShell>
+    )
+  }
+
+  // ── Full: progress bar with milestones + bedrag + berekening + tips ──
+  // Milestone positions on the bar
+  const milestones = [1, 3, 6].map(m => ({
+    months: m,
+    pct: targetMonths > 0 ? Math.min((m / targetMonths) * 100, 100) : 0,
+    reached: monthsCovered >= m,
+    label: `${m}m`,
+  }))
+
+  const remaining = Math.max(targetAmount - currentAmount, 0)
+
   return (
     <WidgetShell module="kern" size={size} kicker="Noodfonds" href={href}>
-      <p className={`font-mono text-2xl font-semibold tabular-nums ${isComplete ? 'text-emerald-600' : 'text-[var(--ink)]'}`}>
-        {monthsCovered}<span className="text-base text-[var(--ink-3)]">/{targetMonths} maanden</span>
-      </p>
-
-      {/* Progress bar */}
-      <div className="mt-2 h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
-        <div
-          className={`h-full rounded-full transition-all ${isComplete ? 'bg-emerald-500' : 'bg-amber-500'}`}
-          style={{ width: `${Math.min(pct, 100)}%` }}
-        />
+      {/* Header with icon */}
+      <div className="flex items-start gap-3">
+        <div className={`flex-shrink-0 rounded-lg p-2 ${colors.bg}`}>
+          <ShieldCheck className={`h-5 w-5 ${colors.text}`} strokeWidth={1.5} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className={`font-mono text-2xl font-semibold tabular-nums ${isComplete ? 'text-emerald-600' : 'text-[var(--ink)]'}`}>
+            {monthsCovered.toFixed(1)}<span className="text-base text-[var(--ink-3)]"> / {targetMonths} maanden gedekt</span>
+          </p>
+          {isComplete && (
+            <p className="mt-0.5 text-sm font-medium text-emerald-600">
+              Noodfonds bereikt!
+            </p>
+          )}
+        </div>
       </div>
 
-      <div className="mt-2 flex justify-between text-xs text-[var(--ink-3)]">
+      {/* Progress bar with milestone markers */}
+      <div className="mt-3 relative">
+        <div className="h-[8px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+          <div
+            className={`h-full rounded-full transition-all ${colors.bar}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        {/* Milestone markers */}
+        <div className="relative h-4 mt-0.5">
+          {milestones.map(m => (
+            <div
+              key={m.months}
+              className="absolute flex flex-col items-center"
+              style={{ left: `${m.pct}%`, transform: 'translateX(-50%)' }}
+            >
+              <div className={`w-[2px] h-[6px] ${m.reached ? colors.bar : 'bg-[var(--border-md)]'}`} />
+              <span className={`text-[9px] font-mono tabular-nums ${m.reached ? colors.text : 'text-[var(--ink-4)]'}`}>
+                {m.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Amounts */}
+      <div className="mt-1 flex justify-between text-xs text-[var(--ink-3)] font-mono tabular-nums">
         <span>{formatCurrency(currentAmount)}</span>
         <span>Doel: {formatCurrency(targetAmount)}</span>
       </div>
 
-      {isComplete && (
-        <p className="mt-1 font-serif italic text-[12px] text-emerald-600">
-          Je noodfonds is op het streefniveau
+      {/* Calculation explanation */}
+      <div className="mt-3 rounded-lg bg-[var(--subtle)] px-3 py-2 text-[11px] text-[var(--ink-3)]">
+        <p className="font-medium text-[var(--ink-2)]">Berekening</p>
+        <p className="mt-0.5">
+          {targetMonths}&times; {formatCurrency(monthlyExpenses)} maanduitgaven = {formatCurrency(targetAmount)} doel
+        </p>
+        {!isComplete && remaining > 0 && (
+          <p className="mt-0.5">
+            Nog {formatCurrency(remaining)} te gaan
+          </p>
+        )}
+      </div>
+
+      {/* Tips to reach faster (only when not complete) */}
+      {!isComplete && (
+        <div className="mt-3 flex items-start gap-2 text-[11px] text-[var(--ink-3)]">
+          <Lightbulb className="h-3.5 w-3.5 flex-shrink-0 text-amber-500 mt-0.5" strokeWidth={1.5} />
+          <div>
+            <p className="font-medium text-[var(--ink-2)]">Sneller bereiken</p>
+            <ul className="mt-0.5 space-y-0.5 list-none">
+              <li>Automatiseer een vaste storting per maand</li>
+              <li>Zet onverwachte meevallers direct opzij</li>
+              <li>Begin met 1 maand, bouw stap voor stap op</li>
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Freedom time framing */}
+      {freedomStr && (
+        <p className="mt-2 font-serif italic text-[12px] text-[var(--ink-3)]">
+          {isComplete
+            ? `${freedomStr} vrijheid als vangnet — financiele rust`
+            : `${freedomStr} vrijheid opgebouwd, op weg naar volledige rust`
+          }
         </p>
       )}
     </WidgetShell>
