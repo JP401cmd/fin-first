@@ -1,3 +1,46 @@
+## Session 2026-03-07 - Features #447, #449, #450
+
+### Feature #447: Change FeatureGate default fallback to hidden - PASSING
+- Changed default fallback from 'locked' to 'hidden' in feature-gate.tsx
+- Updated all production FeatureGate instances: core (2x), will (4x), debts (2x), horizon (5x), cash-account-view (1x), projections-modal (1x)
+- Test pages intentionally left with locked fallback
+
+### Feature #449: Remove LockedFeaturesFooter from all module pages - PASSING
+- Removed import and JSX usage from core/page.tsx, will/page.tsx, horizon/page.tsx, core/debts/page.tsx
+- No more LockedFeaturesFooter references in any production page
+
+### Feature #450: Hide LockedFeatureCard rendering path in FeatureGate - PASSING
+- Changed fallback='locked' branch to return null instead of rendering LockedFeatureCard
+- Added design comment explaining intentional hidden behavior
+- LockedFeatureCard component kept for test pages but no longer rendered from FeatureGate
+
+### Current Status
+- 3 features completed this session (#447, #449, #450)
+- Zero TypeScript errors, zero console errors
+- All commits clean
+
+## Session 2026-03-07 - Features #438, #439, #448
+
+### Feature #438: Add widget_backtesting_score feature definition to feature-phases.ts - PASSING
+- Added { id: 'widget_backtesting_score', label: 'Historische Weerbaarheid Widget', description: '...' } to FEATURES
+- Added widget_backtesting_score: { recovery: false, stability: false, momentum: true, mastery: true } to DEFAULT_MATRIX
+- Matches minLevel: 3 (Momentum) from widget-catalog.ts
+
+### Feature #439: Add widget_ai_inzicht feature definition to feature-phases.ts - PASSING
+- Added { id: 'widget_ai_inzicht', label: 'AI Inzicht Widget', description: '...' } to FEATURES
+- Added widget_ai_inzicht: { recovery: true, stability: true, momentum: true, mastery: true } to DEFAULT_MATRIX
+- Matches minLevel: 0 (Recovery) from widget-catalog.ts
+
+### Feature #448: Dashboard widgets: return null instead of LockedWidgetShell - PASSING
+- Changed isLocked check from rendering LockedWidgetShell to return null
+- Locked widgets are now completely invisible (not rendered at all)
+- Removed unused LockedWidgetShell import from widget-renderer.tsx
+- Zero TypeScript errors
+
+### Current Status
+- 3 features completed this session (#438, #439, #448)
+- Commit: be7e542
+
 ## Session 2026-03-07 - Feature #420
 
 ### Feature #420: Voeg temporeel evenwicht toe aan onboarding identity stap - PASSING
@@ -9725,3 +9768,38 @@ For Feature #51 (Transaction Import):
 - 2 features completed this session (#427, #428)
 - Zero TypeScript errors, zero console errors
 - Commit: a598cd6
+
+## Session 2026-03-07 - Features #440, #441, #442
+
+### Feature #440: Add FeatureGate wrapper for vermogensverloop section on core/page.tsx - PASSING
+- Wrapped Vermogensverloop section (snapshots + NetWorthChart) in FeatureGate featureId='vermogensverloop' fallback='hidden'
+
+### Feature #441: Add FeatureGate wrapper for snapshot_vergelijking section on core/page.tsx - PASSING
+- Wrapped Vergelijking snapshots section (SnapshotComparisonView) in FeatureGate featureId='snapshot_vergelijking' fallback='hidden'
+
+### Feature #442: Add FeatureGate wrapper for cashflow_sankey on cash-account-view.tsx - PASSING
+- Wrapped Sankey flow diagram section (SankeyDiagram) in FeatureGate featureId='cashflow_sankey' fallback='hidden'
+
+### Current Status
+- 3 features completed this session (#440, #441, #442)
+- Zero TypeScript errors
+- Commit: 2e93f89
+
+## Session 2026-03-07 - Features #435, #436, #437
+
+### Feature #435: Add widget_passief_inkomen feature definition - PASSING
+- Added to FEATURES: id=widget_passief_inkomen, label=Passief Inkomen Widget
+- Added to DEFAULT_MATRIX: recovery:false, stability:true, momentum:true, mastery:true
+
+### Feature #436: Add widget_box3_drag feature definition - PASSING
+- Added to FEATURES: id=widget_box3_drag, label=Box 3 Belastingdrag Widget
+- Added to DEFAULT_MATRIX: recovery:false, stability:true, momentum:true, mastery:true
+
+### Feature #437: Add widget_vrijheidsmijlpalen feature definition - PASSING
+- Added to FEATURES: id=widget_vrijheidsmijlpalen, label=Vrijheidsmijlpalen Widget
+- Added to DEFAULT_MATRIX: recovery:true, stability:true, momentum:true, mastery:true (minLevel 0)
+
+### Current Status
+- 3 features completed this session (#435, #436, #437)
+- Zero TypeScript errors
+- Commit: 9ecadcf
