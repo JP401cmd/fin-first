@@ -1,17 +1,19 @@
 export function SpeechBubble({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative max-w-[85%] rounded-2xl border border-wil-200 bg-wil-50/60 px-5 py-4 text-sm text-zinc-700 sm:max-w-none">
-      {/* Arrow pointing left */}
-      <div className="absolute top-5 -left-2 h-3 w-3 rotate-45 border-b border-l border-wil-200 bg-wil-50/60" />
-      {children}
+    <div className="relative max-w-[85%] border-l-3 border-wil-400 bg-[var(--subtle)] px-4 py-3 sm:max-w-none sm:px-5 sm:py-4">
+      <div className="font-serif text-sm leading-relaxed text-[var(--ink-2)]">
+        {children}
+      </div>
     </div>
   )
 }
 
 export function SpeechBubbleCentered({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto max-w-[85%] rounded-2xl border border-wil-200 bg-wil-50/60 px-5 py-4 text-sm text-zinc-700 sm:max-w-none">
-      {children}
+    <div className="mx-auto max-w-[85%] border-y border-[var(--border-ed)] bg-[var(--subtle)] px-4 py-3 sm:max-w-none sm:px-5 sm:py-4">
+      <div className="font-serif text-center text-sm leading-relaxed text-[var(--ink-2)]">
+        {children}
+      </div>
     </div>
   )
 }
