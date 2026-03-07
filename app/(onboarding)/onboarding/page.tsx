@@ -49,6 +49,11 @@ const initialState: State = {
     household_type: 'solo',
     number_of_children: 0,
     net_monthly_income: '',
+    expected_return: 0.07,
+    inflation_rate: 0.02,
+    retirement_expense_method: 'essential_budgets',
+    retirement_custom_amount: '',
+    fire_end_strategy: 'deplete',
   },
   budgetAmounts: {},
   bankAccounts: [],
@@ -123,6 +128,7 @@ export default function OnboardingPage() {
         identity: {
           ...identity,
           net_monthly_income: Number(identity.net_monthly_income),
+          retirement_custom_amount: identity.retirement_custom_amount ? Number(identity.retirement_custom_amount) : undefined,
         },
         budgetAmounts,
       }

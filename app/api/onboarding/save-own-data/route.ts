@@ -10,6 +10,12 @@ const bodySchema = z.object({
     household_type: z.enum(['solo', 'samen', 'gezin']),
     number_of_children: z.number().int().min(0).default(0),
     net_monthly_income: z.number().positive(),
+    // FIRE parameters (optional, with sensible defaults)
+    expected_return: z.number().min(0.01).max(0.20).optional(),
+    inflation_rate: z.number().min(0).max(0.10).optional(),
+    retirement_expense_method: z.enum(['essential_budgets', 'custom_amount', 'current_income']).optional(),
+    retirement_custom_amount: z.number().min(0).optional(),
+    fire_end_strategy: z.enum(['perpetual', 'legacy', 'deplete']).optional(),
   }),
   budgetAmounts: z.record(z.string(), z.number().min(0)),
   bankAccounts: z.array(z.object({
@@ -91,19 +97,27 @@ export async function POST(req: Request) {
     }
 
     // 1. Update profile
+    const profileData: Record<string, unknown> = {
+      id: user.id,
+      full_name: identity.full_name,
+      date_of_birth: identity.date_of_birth,
+      household_type: identity.household_type,
+      number_of_children: identity.number_of_children,
+      net_monthly_income: identity.net_monthly_income,
+      onboarding_completed: true,
+      is_demo_user: false,
+      updated_at: new Date().toISOString(),
+    }
+    // Add FIRE parameters if provided
+    if (identity.expected_return != null) profileData.expected_return = identity.expected_return
+    if (identity.inflation_rate != null) profileData.inflation_rate = identity.inflation_rate
+    if (identity.retirement_expense_method) profileData.retirement_expense_method = identity.retirement_expense_method
+    if (identity.retirement_custom_amount != null) profileData.retirement_custom_amount = identity.retirement_custom_amount
+    if (identity.fire_end_strategy) profileData.fire_end_strategy = identity.fire_end_strategy
+
     const { error: profileErr } = await supabase
       .from('profiles')
-      .upsert({
-        id: user.id,
-        full_name: identity.full_name,
-        date_of_birth: identity.date_of_birth,
-        household_type: identity.household_type,
-        number_of_children: identity.number_of_children,
-        net_monthly_income: identity.net_monthly_income,
-        onboarding_completed: true,
-        is_demo_user: false,
-        updated_at: new Date().toISOString(),
-      })
+      .upsert(profileData)
     if (profileErr) throw new Error(`Profiel opslaan mislukt: ${profileErr.message}`)
 
     // 2. Create budget hierarchy with user amounts
