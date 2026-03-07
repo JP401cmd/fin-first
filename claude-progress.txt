@@ -1,3 +1,138 @@
+## Session 2026-03-07 - Features #504, #502, #503
+
+### Feature #504: Unit tests voor sanitizeForAI functie - PASSING
+- Created lib/ai/sanitize.test.ts with 36 Vitest unit tests
+- Tests cover: IBANs (with/without spaces, multiple), BSN patterns, email variants
+- Tests cover: financial data preservation (amounts, percentages, categories)
+- Tests cover: combined PII, edge cases (empty/whitespace), name replacement, phones, addresses
+
+### Feature #502: sanitizeForAI integratie in bestaande AI-calls - PASSING
+- Integrated sanitizeForAI in /api/ai/chat (kern/wil/horizon personas)
+- Integrated sanitizeForAI in /api/briefing/compose (DAIshboard briefing)
+- Both endpoints fetch user profile (full_name, date_of_birth) for sanitization options
+- Non-fatal try/catch: if sanitization fails, proceeds with unsanitized context
+
+### Feature #503: sanitizeForAI integratie in /api/news endpoint - PASSING
+- Integrated sanitizeForAI in /api/news (berichten nieuwsgeneratie)
+- Financial context from buildSharedContext sanitized before AI call
+- Same pattern as chat/briefing: fetch profile, build options, sanitize
+- Commit: 7ed2550
+
+### Current Status
+- 3 features completed this session (#504, #502, #503)
+- Zero TypeScript errors in changed files
+- All 36 sanitize unit tests passing
+
+## Session 2026-03-07 - Features #501, #507, #505
+
+### Feature #501: sanitizeForAI utility functie voor data minimalisatie - PASSING
+- Created lib/ai/sanitize.ts with sanitizeForAI(), sanitizeTransaction(), birthDateToAge() exports
+- Regex patterns: IBAN (NL + international), BSN (9-digit), email, phone, street address, postal code
+- Name replacement: sorted longest-first, individual parts >=3 chars, Dutch prepositions excluded
+- Birth date: ISO + DD-MM-YYYY formats → age in years
+- Transaction sanitisation: strips description + counterparty_name, keeps category + amount + month
+- Financial amounts (€), percentages (%), ratios preserved (not filtered)
+- Test API at /api/test-sanitize: 12/12 tests passing
+- Zero TypeScript errors
+
+### Feature #507: Privacy-sectie in Instellingen pagina - PASSING
+- Added Section F "Privacy & AI" to /identity/instellingen with collapsible accordion
+- Three info cards: "Wat wordt gedeeld" (teal), "Wat NOOIT wordt gedeeld" (red), "Hoe je data wordt verwerkt" (purple)
+- Shared: aggregated amounts, percentages, categories, age, household type
+- Never shared: names, IBANs, BSN, emails, phone, addresses, raw transaction descriptions
+- Processing: zero-retention, no training, data minimisation, HTTPS/TLS encrypted
+- Shield badge at bottom: "Alle data wordt automatisch gesanitiseerd"
+- Style consistent with other sections (border-ed, paper bg, label-editorial, ChevronDown)
+
+### Feature #505: Privacy-protocol in AI system prompts - PASSING
+- Added PRIVACY PROTOCOL block to lib/ai/dna/wil.ts (WIL_PROMPT)
+- Added PRIVACY PROTOCOL block to lib/ai/dna/briefing.ts (briefing system prompt)
+- Added Privacy protocol to DEFAULT_NEWS_PROMPT in beheer/nieuws/page.tsx
+- Protocol content: geanonimiseerde data, negeer PII, je/jij niet bij naam, nooit banken/werkgevers/adressen
+- Zero TypeScript errors in modified files
+- Commit: dcda89a
+
+### Current Status
+- 3 features completed this session (#501, #507, #505)
+- 469/509 features passing (92.1%)
+
+## Session 2026-03-07 - Features #472, #473, #489
+
+### Feature #472: 30-dagen meldingenhistorie op berichten-pagina - PASSING
+- API accepts optional `days` query param (default 7, clamped 1-90)
+- Berichten page fetches with `?days=30` independently from provider
+- Storage retains 30 days of history, response filtered by requested days
+- Local state wrappers for markAsRead/markAllRead to update 30-day history
+- Zero TypeScript errors
+- Commit: 842c369
+
+### Feature #473: Meldingen gegroepeerd per dag met inklapbare secties - PASSING
+- Already implemented: formatDayLabel (Vandaag/Gisteren/weekday/date)
+- getDayKey + grouping logic partitions into todayItems and earlierGroups
+- CollapsedDayGroup with useState(false) - older groups collapsed by default
+- Count shown per group ("N berichten")
+- No changes needed - existing code met all requirements
+
+### Feature #489: Mobiel: meldingen-sectie compact en touch-friendly - PASSING
+- Added min-h-[44px] to tab buttons (sm:min-h-0 for desktop)
+- Added min-h-[44px] to CollapsedDayGroup toggle button
+- Added min-h-[44px] to "Alles gelezen" button (sm:min-h-0 for desktop)
+- Added min-h-[44px] + larger padding to "Vraag Will" button in notification-item.tsx (sm:min-h-0 for desktop)
+- Single-column layout inherent (max-w-[720px] px-4)
+- overflow-hidden on card container prevents horizontal overflow
+- Commit: 842c369
+
+### Current Status
+- 3 features completed this session (#472, #473, #489)
+- Zero TypeScript errors
+- 461/496 features passing (92.9%)
+
+## Session 2026-03-07 - Feature #499
+
+### Feature #499: Lege staat zonder meldingen en nieuws - PASSING
+- Added editorial empty state to /berichten page when both notifications AND news are empty
+- Checks `hasNoMeldingen` (!loading && history.length === 0) and `hasNoNieuws` (RELEASE_NOTES.length === 0)
+- Shows "Geen berichten — stilte is ook een vorm van rijkdom" in font-source-serif italic (serif italic)
+- Uses Masthead header with py-32 whitespace for intentional empty design
+- Zero TypeScript errors, no mock data patterns
+- Commit: 460aab8
+
+## Session 2026-03-07 - Features #462, #477, #466
+
+### Feature #462: Berichten pagina route bestaat en is toegankelijk - PASSING
+- Created app/(app)/berichten/page.tsx as Next.js App Router page
+- Page uses (app) layout group (inherits AppHeader, BottomNav, etc.)
+- Unauthenticated users get 307 redirect to /login (verified with curl)
+- Page displays notifications tab (with 30-day history) and nieuws tab (release notes)
+- Added /berichten and /rapportages to VALID_ROUTES in validate-hrefs.ts
+
+### Feature #477: API endpoint voor AI-gegenereerd nieuws - PASSING
+- Created app/api/news/route.ts with GET handler
+- Uses buildSharedContext for financial personalization
+- Zod schema enforces 5-10 items with id, headline, summary, personalImpact, category, date, sourceContext
+- Categories: fiscaal, rente, woningmarkt, beleggingen, pensioen, macro
+- 401 for unauthenticated (verified with curl)
+- Uses same AI patterns as recommendations endpoint (getModel, generateObject)
+
+### Feature #466: Berichten pagina masthead in krantstijl - PASSING
+- Replaced generic hero with Masthead component in newspaper/FD.nl style
+- Title: "TriFinity Berichten" in font-playfair, centered, responsive sizing
+- Dateline: Dutch date in font-source-serif italic (weekday, day, month, year)
+- Edition number: "Editie N" based on days since launch (1 jan 2026)
+- Subtitle: "Persoonlijk financieel overzicht" in serif italic
+- Double rule: 3px top rule + 2px/1px double bottom rule (newspaper style)
+- Used on both main view and empty state
+- Commit: ad64f08
+
+## Session 2026-03-07 - Feature #492
+
+### Feature #492: Briefing-systeemprompt kent /berichten als href - PASSING
+- Added "/berichten" route to NAVIGATIE HREFS section in lib/ai/dna/briefing.ts (line 99)
+- validate-hrefs.ts already had /berichten in VALID_ROUTES (line 22) — no change needed
+- /berichten page exists at app/(app)/berichten/page.tsx
+- Will can now link to /berichten in briefing cards
+- Commit: 97ff871
+
 ## Session 2026-03-07 - Features #451, #453, #452
 
 ### Feature #451: Widget settings: hide non-available widgets from widget selector - PASSING
@@ -9895,3 +10030,56 @@ For Feature #51 (Transaction Import):
 - Prevents drift between widget-catalog and feature-phases
 - Zero TypeScript errors, zero console errors
 - Both features committed in d0fb850 (parallel agent overlap)
+
+## Session 2026-03-07 - Features #494, #495, #496
+
+### Feature #494: Nieuw Nieuws tab in beheer-navigatie - PASSING
+- Added { label: 'Nieuws', href: '/beheer/nieuws' } to tabs array in beheer-nav.tsx
+- Uses default amber active styling (no custom activeClass)
+- Navigation verified: /beheer/nieuws returns 307 (redirect to login for unauthenticated)
+
+### Feature #495: Bewerkbare textarea voor nieuws-systeemprompt - PASSING
+- Created /beheer/nieuws/page.tsx with textarea (rows=16) for system prompt
+- DEFAULT_NEWS_PROMPT constant with Dutch financial news analyst instructions
+- useState(DEFAULT_NEWS_PROMPT) pre-fills textarea
+- useEffect loads saved prompt from /api/admin/news-prompt on mount
+- font-mono text-sm styling, loading state with "Laden..." text
+
+### Feature #496: Opslaan en terugzetten nieuws-systeemprompt - PASSING
+- Created /api/admin/news-prompt/route.ts (GET/PUT/DELETE)
+- All endpoints check isSuperAdmin before proceeding
+- PUT: upserts to app_settings with key 'news_system_prompt'
+- DELETE: removes the key (resets to default)
+- Opslaan button: disabled when no changes, shows saving state
+- Terugzetten naar standaard button: calls DELETE, resets textarea to DEFAULT_NEWS_PROMPT
+- Success/error status messages with auto-clear after 4 seconds
+- "Niet-opgeslagen wijzigingen" indicator when prompt differs from saved
+- Verification route: 17/17 tests passing
+- Commit: 0f9d2bc
+
+### Current Status
+- 3 features completed this session (#494, #495, #496)
+- Zero mock data patterns in production code
+- All API endpoints auth-gated with isSuperAdmin
+
+## Session 2026-03-07 - Features #463, #464, #465
+
+### Feature #463: Meldingen-widget href wijst naar /berichten - PASSING
+- Changed WIDGET_HREFS.meldingen from '/dashboard' to '/berichten' in lib/widget-catalog.ts
+
+### Feature #464: Notification-modal footer linkt naar /berichten - PASSING
+- Added 'Bekijk alles' link in notification-panel.tsx footer pointing to /berichten
+- Wrapped both links in flex container with gap-4
+- onClick={closeModal} closes modal before navigation
+
+### Feature #465: Cross-link tussen /berichten en /daishboard - PASSING
+- Added prominent Link card on /berichten page to /daishboard (Will's Briefing)
+- Card with Sparkles icon, wil-colored accent, editorial typography
+- Also present in empty state layout
+- Briefing system prompt already had /berichten in NAVIGATIE HREFS (line 99)
+- Href validation already included /berichten in VALID_ROUTES
+
+### Current Status
+- 3 features completed this session (#463, #464, #465)
+- Zero TypeScript errors
+- Commit: 6483df8
