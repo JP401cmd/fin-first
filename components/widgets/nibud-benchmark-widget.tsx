@@ -84,42 +84,99 @@ export function NibudBenchmarkWidget({ size, data, href }: Props) {
     )
   }
 
-  // ── Full-size: detailed comparison ────
+  // ── Full-size: dual bar chart comparison ────
+  const totalActual = comparison.reduce((s, c) => s + c.actual, 0)
+  const avgPct = NIBUD_TOTAL > 0 ? Math.round((totalActual / NIBUD_TOTAL) * 100) : 0
+
   return (
     <WidgetShell module="kern" size={size} kicker="NIBUD Benchmark" href={href}>
       <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
         {formatCurrency(monthlyExpenses)}
       </p>
-      <p className="mt-1 text-xs text-[var(--ink-3)]">
-        Jouw maanduitgaven vs. NIBUD richtlijnen
-      </p>
-      <ul className="mt-3 space-y-2 border-t border-[var(--border-ed)] pt-3">
+      <p className="mt-0.5 text-xs text-[var(--ink-3)]">Jouw maanduitgaven</p>
+
+      {/* Total score banner */}
+      <div className="mt-3 flex items-center justify-between rounded-lg bg-[var(--subtle)] px-3 py-2">
+        <span className="text-[11px] text-[var(--ink-3)]">Gemiddeld</span>
+        <span
+          className={`font-mono text-sm font-semibold tabular-nums ${
+            avgPct <= 100 ? 'text-emerald-600' : avgPct <= 130 ? 'text-amber-600' : 'text-red-600'
+          }`}
+        >
+          {avgPct}% van NIBUD norm
+        </span>
+      </div>
+
+      {/* Dual bar chart rows */}
+      <div className="mt-3 space-y-2.5">
         {comparison.map((c) => {
-          const pct = c.norm > 0 ? Math.min(Math.round((c.actual / c.norm) * 100), 200) : 0
+          const pctOfNorm = c.norm > 0 ? Math.round((c.actual / c.norm) * 100) : 0
+          const maxAmount = Math.max(c.actual, c.norm) || 1
+          const userBarW = (c.actual / maxAmount) * 100
+          const normBarW = (c.norm / maxAmount) * 100
+
           return (
-            <li key={c.key}>
-              <div className="flex items-center justify-between text-xs text-[var(--ink-2)]">
-                <span>{c.label}</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-mono tabular-nums">{formatCurrency(c.actual)}</span>
-                  <span className="text-[var(--ink-4)]">/</span>
-                  <span className="font-mono tabular-nums text-[var(--ink-4)]">{formatCurrency(c.norm)}</span>
-                  <span className="text-[11px]">{c.overNorm ? '\u26A0\uFE0F' : '\u2705'}</span>
+            <div key={c.key}>
+              <div className="flex items-center justify-between mb-0.5">
+                <span className="text-[11px] text-[var(--ink-2)]">{c.label}</span>
+                <span
+                  className={`font-mono text-[11px] font-medium tabular-nums ${
+                    c.overNorm
+                      ? pctOfNorm > 130 ? 'text-red-600' : 'text-amber-600'
+                      : 'text-emerald-600'
+                  }`}
+                >
+                  {pctOfNorm}%
+                </span>
+              </div>
+              {/* User bar (colored) */}
+              <div className="flex items-center gap-2">
+                <span className="w-7 shrink-0 text-[9px] text-[var(--ink-3)]">Jij</span>
+                <div className="relative h-[6px] flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      c.overNorm
+                        ? pctOfNorm > 130 ? 'bg-red-400' : 'bg-amber-400'
+                        : 'bg-emerald-400'
+                    }`}
+                    style={{ width: `${Math.min(userBarW, 100)}%` }}
+                  />
                 </div>
+                <span className="w-16 shrink-0 text-right font-mono text-[10px] tabular-nums text-[var(--ink-2)]">
+                  {formatCurrency(c.actual)}
+                </span>
               </div>
-              <div className="mt-0.5 h-1.5 w-full rounded-full bg-[var(--subtle)]">
-                <div
-                  className={`h-full rounded-full transition-all ${c.overNorm ? 'bg-red-500' : 'bg-emerald-500'}`}
-                  style={{ width: `${Math.min(pct, 100)}%` }}
-                />
+              {/* NIBUD norm bar (grey) */}
+              <div className="mt-[2px] flex items-center gap-2">
+                <span className="w-7 shrink-0 text-[9px] text-[var(--ink-4)]">Norm</span>
+                <div className="relative h-[6px] flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                  <div
+                    className="h-full rounded-full bg-zinc-300 dark:bg-zinc-600"
+                    style={{ width: `${Math.min(normBarW, 100)}%` }}
+                  />
+                </div>
+                <span className="w-16 shrink-0 text-right font-mono text-[10px] tabular-nums text-[var(--ink-4)]">
+                  {formatCurrency(c.norm)}
+                </span>
               </div>
-            </li>
+            </div>
           )
         })}
-      </ul>
-      <p className="mt-3 font-serif italic text-[12px] text-[var(--ink-3)]">
-        Vergelijk met NIBUD richtlijnen →
-      </p>
+      </div>
+
+      {/* Summary footer */}
+      <div className="mt-3 flex items-center gap-3 text-[10px] text-[var(--ink-3)]">
+        {overCount > 0 && (
+          <span>
+            <span className="font-medium text-amber-600">{overCount}</span> boven norm
+          </span>
+        )}
+        {comparison.length - overCount > 0 && (
+          <span>
+            <span className="font-medium text-emerald-600">{comparison.length - overCount}</span> op koers
+          </span>
+        )}
+      </div>
     </WidgetShell>
   )
 }
