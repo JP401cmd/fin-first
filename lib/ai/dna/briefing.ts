@@ -185,11 +185,11 @@ export const briefingTools = {
   }),
 
   showSparkline: tool({
-    description: 'Toon een mini trendlijn van vermogenshistorie.',
+    description: 'Toon een mini trendlijn. Kies dataKey: netWorthHistory (vermogen), savingsHistory (spaarquote %), expenseHistory (maandelijkse uitgaven).',
     inputSchema: z.object({
-      label: z.string().describe('Label, bijv. "Vermogensverloop"'),
+      label: z.string().describe('Label, bijv. "Vermogensverloop", "Spaarquote trend", "Uitgavenverloop"'),
       value: z.string().describe('Huidige waarde'),
-      dataKey: z.literal('netWorthHistory').describe('Altijd "netWorthHistory"'),
+      dataKey: z.enum(['netWorthHistory', 'savingsHistory', 'expenseHistory']).describe('Dataset: netWorthHistory, savingsHistory, of expenseHistory'),
       module: moduleEnum.describe('Kleurmodule'),
     }),
   }),
@@ -275,6 +275,26 @@ export const briefingTools = {
       remainingDays: z.number().optional().describe('Resterende dagen in de maand'),
       status: z.enum(['healthy', 'warning', 'over']).describe('Budget status: healthy (<75%), warning (75-100%), over (>100%)'),
       href: z.string().optional().describe('Link naar budget detail'),
+    }),
+  }),
+
+  showQuote: tool({
+    description: 'Toon een motiverend of reflectief citaat passend bij de financiele situatie. Gebruik voor inspirerende of filosofische reflecties over vrijheid en geld.',
+    inputSchema: z.object({
+      text: z.string().describe('Het citaat zelf (max 2-3 zinnen, motiverend of reflectief)'),
+      attribution: z.string().optional().describe('Bron van het citaat, bijv. "Will" of "Stoicijnse wijsheid"'),
+      module: moduleEnum.describe('Kleurmodule (gebruik "wil" voor redactionele citaten)'),
+    }),
+  }),
+
+  showStreak: tool({
+    description: 'Vier een positieve streak (bijv. 4 maanden vermogensgroei, 12 dagen binnen budget). Vuur-visueel.',
+    inputSchema: z.object({
+      label: z.string().describe('Streak naam, bijv. "Vermogensgroei"'),
+      count: z.number().describe('Aantal perioden, bijv. 4'),
+      unit: z.enum(['dagen', 'weken', 'maanden']).describe('Tijdseenheid'),
+      description: z.string().describe('Korte beschrijving, bijv. "Al 4 maanden op rij stijgt je vermogen"'),
+      module: moduleEnum.describe('Kleurmodule'),
     }),
   }),
 }

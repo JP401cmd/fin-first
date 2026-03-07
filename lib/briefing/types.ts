@@ -66,11 +66,13 @@ export interface ProgressRingCardSpec {
   href?: string
 }
 
+export type SparklineDataKey = 'netWorthHistory' | 'savingsHistory' | 'expenseHistory'
+
 export interface SparklineCardSpec {
   type: 'sparkline'
   label: string
   value: string
-  dataKey: 'netWorthHistory'
+  dataKey: SparklineDataKey
   module: CardModule
 }
 
@@ -142,6 +144,30 @@ export interface BudgetBarCardSpec {
   href?: string
 }
 
+export interface QuoteCardSpec {
+  type: 'quote'
+  text: string
+  attribution?: string
+  module: CardModule
+}
+
+export interface StreakCardSpec {
+  type: 'streak'
+  label: string
+  count: number
+  unit: 'dagen' | 'weken' | 'maanden'
+  description: string
+  module: CardModule
+}
+
+export interface RecurringCardSpec {
+  type: 'recurring'
+  title: string
+  items: { name: string; amount: string; freedomStr?: string }[]
+  totalAmount: string
+  totalFreedomStr?: string
+}
+
 // ── Union Type ──────────────────────────────────────────────
 
 export type BriefingCardSpec =
@@ -157,6 +183,9 @@ export type BriefingCardSpec =
   | CountdownCardSpec
   | GoalProgressCardSpec
   | BudgetBarCardSpec
+  | QuoteCardSpec
+  | StreakCardSpec
+  | RecurringCardSpec
 
 // ── SSE Event Types ─────────────────────────────────────────
 
@@ -210,4 +239,7 @@ export const CARD_SPAN: Record<BriefingCardSpec['type'], number> = {
   comparison: 2,
   insight: 2,
   milestone: 4,
+  quote: 2,
+  streak: 1,
+  recurring: 2,
 }

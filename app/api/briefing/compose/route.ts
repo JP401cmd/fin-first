@@ -41,6 +41,10 @@ function toolCallToCardSpec(toolName: string, input: Record<string, unknown>): B
       return { type: 'goalProgress', ...input } as BriefingCardSpec
     case 'showBudgetBar':
       return { type: 'budgetBar', ...input } as BriefingCardSpec
+    case 'showQuote':
+      return { type: 'quote', ...input } as BriefingCardSpec
+    case 'showStreak':
+      return { type: 'streak', ...input } as BriefingCardSpec
     default:
       return null
   }
