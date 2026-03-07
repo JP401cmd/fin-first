@@ -573,6 +573,7 @@ body {
 }
 .animate-fade-up {
   animation: fadeUp 0.4s ease-out both;
+  animation-delay: var(--stagger, 0ms);
 }
 
 @keyframes progIn {

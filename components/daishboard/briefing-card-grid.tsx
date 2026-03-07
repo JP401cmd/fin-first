@@ -14,6 +14,8 @@ import { ComparisonCard } from './cards/comparison-card'
 import { CountdownCard } from './cards/countdown-card'
 import { GoalProgressCard } from './cards/goal-progress-card'
 import { BudgetBarCard } from './cards/budget-bar-card'
+import { QuoteCard } from './cards/quote-card'
+import { StreakCard } from './cards/streak-card'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 
 interface BriefingCardGridProps {
@@ -41,6 +43,8 @@ function renderCard(card: BriefingCardSpec, data: DashboardData) {
     case 'countdown': return <CountdownCard spec={card} />
     case 'goalProgress': return <GoalProgressCard spec={card} />
     case 'budgetBar': return <BudgetBarCard spec={card} />
+    case 'quote': return <QuoteCard spec={card} />
+    case 'streak': return <StreakCard spec={card} />
   }
 }
 
@@ -48,7 +52,11 @@ export function BriefingCardGrid({ cards, data }: BriefingCardGridProps) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       {cards.map((card, i) => (
-        <div key={`${card.type}-${i}`} className={SPAN_CLASSES[CARD_SPAN[card.type]] ?? 'col-span-1'}>
+        <div
+          key={`${card.type}-${i}`}
+          className={SPAN_CLASSES[CARD_SPAN[card.type]] ?? 'col-span-1'}
+          style={{ '--stagger': `${i * 80}ms` } as React.CSSProperties}
+        >
           {renderCard(card, data)}
         </div>
       ))}
