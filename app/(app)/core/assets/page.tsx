@@ -29,6 +29,7 @@ import {
   getDefaultAssets,
   projectPortfolio,
 } from '@/lib/asset-data'
+import { FeatureGate } from '@/components/app/feature-gate'
 
 type Mortgage = { id: string; name: string; current_balance: number; linked_asset_id: string | null }
 
@@ -376,31 +377,33 @@ export default function AssetsPage() {
 
       {/* Allocation + projection */}
       <div className="mt-3 sm:mt-6 grid gap-3 sm:gap-6 lg:grid-cols-2">
-        {/* Allocation */}
-        <section className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
-          <h2 className="text-sm font-semibold text-[var(--ink-2)]">Verdeling</h2>
-          <div className="mt-4 flex items-center gap-6">
-            <AllocationPie byType={byType} total={totalValue} dailyExpenses={dailyExpenses} />
-            <div className="flex-1 space-y-2">
-              {(Object.keys(ASSET_TYPE_LABELS) as AssetType[]).map((type) => {
-                const data = byType[type]
-                if (!data || data.total === 0) return null
-                const pct = totalValue > 0 ? (data.total / totalValue) * 100 : 0
-                return (
-                  <div key={type} className="flex items-center gap-2">
-                    <span
-                      className="inline-block h-3 w-3 rounded-sm"
-                      style={{ backgroundColor: ASSET_TYPE_COLORS[type] }}
-                    />
-                    <span className="flex-1 text-xs text-[var(--ink-2)]">{ASSET_TYPE_LABELS[type]}</span>
-                    <span className="text-xs font-medium text-[var(--ink)]">{pct.toFixed(0)}%</span>
-                    <span className="text-xs text-[var(--ink-3)]">{formatCurrency(data.total)}</span>
-                  </div>
-                )
-              })}
+        {/* Allocation — gated by asset_allocatie */}
+        <FeatureGate featureId="asset_allocatie" fallback="hidden">
+          <section className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+            <h2 className="text-sm font-semibold text-[var(--ink-2)]">Verdeling</h2>
+            <div className="mt-4 flex items-center gap-6">
+              <AllocationPie byType={byType} total={totalValue} dailyExpenses={dailyExpenses} />
+              <div className="flex-1 space-y-2">
+                {(Object.keys(ASSET_TYPE_LABELS) as AssetType[]).map((type) => {
+                  const data = byType[type]
+                  if (!data || data.total === 0) return null
+                  const pct = totalValue > 0 ? (data.total / totalValue) * 100 : 0
+                  return (
+                    <div key={type} className="flex items-center gap-2">
+                      <span
+                        className="inline-block h-3 w-3 rounded-sm"
+                        style={{ backgroundColor: ASSET_TYPE_COLORS[type] }}
+                      />
+                      <span className="flex-1 text-xs text-[var(--ink-2)]">{ASSET_TYPE_LABELS[type]}</span>
+                      <span className="text-xs font-medium text-[var(--ink)]">{pct.toFixed(0)}%</span>
+                      <span className="text-xs text-[var(--ink-3)]">{formatCurrency(data.total)}</span>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </FeatureGate>
 
         {/* Projection chart */}
         <section className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6" data-testid="portfolio-projection-section">

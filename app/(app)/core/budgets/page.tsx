@@ -27,6 +27,7 @@ import { UncategorizedTransactionsBanner } from '@/components/app/uncategorized-
 import { TransactionForm } from '@/components/app/transaction-form'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
+import { FeatureGate } from '@/components/app/feature-gate'
 
 
 type Goal = {
@@ -737,38 +738,41 @@ export default function BudgetsPage() {
         </div>
 
         {/* Te Verdelen + Dekkingsgraad */}
-        <div className={`mt-4 flex items-center justify-between gap-3 rounded-lg border px-4 py-3 ${teVerdelen >= 0 ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
-          <div>
-            <p className={`text-[10px] font-semibold uppercase tracking-wider ${teVerdelen >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>Te Verdelen</p>
-            <p className={`mt-0.5 font-mono text-lg font-bold ${teVerdelen >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-              {teVerdelen >= 0 ? '' : '–'}{formatCurrency(Math.abs(teVerdelen))}
-            </p>
-            <p className={`text-[11px] ${teVerdelen >= 0 ? 'text-emerald-600/70' : 'text-red-600/70'}`}>
-              {dekkingsgraad.toFixed(0)}% van inkomen toegewezen
-            </p>
-            {dekkingsgraad > 100 && (
-              <p className="mt-1 text-[11px] font-medium text-red-600">
-                Je hebt {formatCurrency(Math.abs(teVerdelen))} meer toegewezen dan je verwacht te verdienen.
+        {/* FeatureGate: budget_optimalisatie — Te Verdelen allocatie bar + tools */}
+        <FeatureGate featureId="budget_optimalisatie" fallback="hidden">
+          <div className={`mt-4 flex items-center justify-between gap-3 rounded-lg border px-4 py-3 ${teVerdelen >= 0 ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
+            <div>
+              <p className={`text-[10px] font-semibold uppercase tracking-wider ${teVerdelen >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>Te Verdelen</p>
+              <p className={`mt-0.5 font-mono text-lg font-bold ${teVerdelen >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                {teVerdelen >= 0 ? '' : '–'}{formatCurrency(Math.abs(teVerdelen))}
               </p>
-            )}
+              <p className={`text-[11px] ${teVerdelen >= 0 ? 'text-emerald-600/70' : 'text-red-600/70'}`}>
+                {dekkingsgraad.toFixed(0)}% van inkomen toegewezen
+              </p>
+              {dekkingsgraad > 100 && (
+                <p className="mt-1 text-[11px] font-medium text-red-600">
+                  Je hebt {formatCurrency(Math.abs(teVerdelen))} meer toegewezen dan je verwacht te verdienen.
+                </p>
+              )}
+            </div>
+            <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => setShowEnvelopeTransfer(true)}
+                className="rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--paper)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+              >
+                Verplaats →
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAllocationModal(true)}
+                className="rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--paper)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+              >
+                Budgetplan instellen
+              </button>
+            </div>
           </div>
-          <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
-            <button
-              type="button"
-              onClick={() => setShowEnvelopeTransfer(true)}
-              className="rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--paper)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-            >
-              Verplaats →
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowAllocationModal(true)}
-              className="rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--paper)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-            >
-              Budgetplan instellen
-            </button>
-          </div>
-        </div>
+        </FeatureGate>
 
         <UncategorizedTransactionsBanner
           count={uncategorizedCount}
@@ -778,7 +782,8 @@ export default function BudgetsPage() {
         />
       </section>
 
-      {/* G3: Will AI Budget Insights kaart */}
+      {/* G3: Will AI Budget Insights kaart — gated by budget_optimalisatie */}
+      <FeatureGate featureId="budget_optimalisatie" fallback="hidden">
       {hasAIInsights && (
         <div className="mt-4 overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)]">
           {/* Kleur-accent bovenaan — editorial pattern */}
@@ -820,6 +825,7 @@ export default function BudgetsPage() {
           </div>
         </div>
       )}
+      </FeatureGate>
 
       {/* View toggle + New budget button */}
       <div className="mt-3 sm:mt-6 flex items-center justify-between">

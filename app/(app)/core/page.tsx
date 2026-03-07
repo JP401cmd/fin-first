@@ -1013,7 +1013,8 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           )}
           </FeatureGate>
 
-          {/* Vermogensprognose */}
+          {/* Vermogensprognose — gated by vermogensprognose_kern */}
+          <FeatureGate featureId="vermogensprognose_kern" fallback="hidden">
           <section>
             <h3 className="mb-3 text-sm font-semibold text-[var(--ink-2)]">Vermogensprognose</h3>
             {nwProjection && nwProjection.points.length >= 2 ? (
@@ -1024,6 +1025,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
               </p>
             )}
           </section>
+          </FeatureGate>
 
           {/* Vermogensopbouw (per-entity balance history) */}
           {balanceHistory.length > 0 && (
