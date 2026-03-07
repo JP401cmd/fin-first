@@ -8984,3 +8984,40 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#372)
 - 365/369 features passing (98.9%)
+
+## Session 2026-03-07 - Feature #373
+
+### Feature #373: Card grid responsive beeldvulling op mobiel - PASSING
+- Added grid-flow-dense to briefing-card-grid.tsx grid container
+- Prevents empty cells when span-2 cards follow span-1 cards on mobile (2-col) or desktop (4-col)
+- Verified SPAN_CLASSES mapping: 1->col-span-1, 2->col-span-2, 4->col-span-full
+- All breakpoints verified: mobile 2-col (1+1 or 2), desktop 4-col (1+1+2, 2+2, 1+1+1+1, 4)
+- TypeScript type-check passes, no lint errors in changed file
+- Progress: 365/369 passing (98.9%)
+
+## Session 2026-03-07 - Features #369, #371, #370
+
+### Feature #369: Href toevoegen aan comparison, sparkline, recurring, lifeEvent en streak card types - PASSING
+- Added href?: string to 5 TypeScript interfaces in types.ts (ComparisonCardSpec, SparklineCardSpec, RecurringCardSpec, LifeEventCardSpec, StreakCardSpec)
+- Added href zod parameter to 5 tool schemas in briefing.ts
+- Pass spec.href to BriefingCard in all 5 card components
+- Commit: ae00307
+
+### Feature #371: System prompt explicieter href-richtlijnen per card type - PASSING
+- Expanded NAVIGATIE HREFS block with all available routes
+- Added default href mapping per card type
+- Added instruction: always use listed routes, never invent routes
+- Commit: a9b6b61
+
+### Feature #370: Href-validatie ongeldige routes corrigeren server-side - PASSING
+- Created lib/briefing/validate-hrefs.ts
+- VALID_ROUTES set with all app routes, ROUTE_ALIASES map for common hallucinations
+- validateHref: exact match, alias match, prefix match, or remove
+- validateCardHrefs: validates all card hrefs including checklist items
+- Integrated into compose route before layout validation
+- Commit: 850f229
+
+### Current Status
+- 3 features completed this session (#369, #371, #370)
+- Zero TypeScript errors
+- 367/369 features passing
