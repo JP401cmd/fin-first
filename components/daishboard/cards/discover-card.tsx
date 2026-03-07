@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback } from 'react'
-import { Compass, ArrowRight } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { BriefingCard } from '../briefing-card'
 import { markFeatureVisitedLocal } from '@/components/app/discover-carousel'
 import type { DiscoverCardSpec } from '@/lib/briefing/types'
@@ -59,23 +59,19 @@ export function DiscoverCard({ spec }: Props) {
       onEngage={trackVisit}
       className={`border-dashed ${borderClass}`}
     >
-      <div className="flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--subtle)]">
-          <Compass className="h-4 w-4 text-[var(--ink-3)]" />
-        </div>
+      <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase ${badgeClass}`}>
               Ontdek
             </span>
           </div>
-          <p className="text-xs font-medium text-[var(--ink-3)] italic">{spec.teaser}</p>
+          <p className="text-sm font-medium text-[var(--ink-3)] italic">{spec.teaser}</p>
           <p className="text-sm font-semibold text-[var(--ink)] mt-1">{spec.label}</p>
-          <p className="text-xs text-[var(--ink-3)] mt-1 line-clamp-2">{spec.description}</p>
-          <div className="flex items-center gap-1 text-xs font-medium text-[var(--ink-4)] mt-2 min-h-[44px] sm:min-h-0">
-            <ArrowRight className="h-3.5 w-3.5" />
-            <span>Ontdek meer</span>
-          </div>
+          <p className="text-xs sm:text-sm text-[var(--ink-3)] mt-1 line-clamp-2">{spec.description}</p>
+        </div>
+        <div className="flex shrink-0 items-center justify-center h-10 w-10 rounded-full bg-[var(--subtle)]">
+          <ArrowRight className="h-4 w-4 text-[var(--ink-3)]" />
         </div>
       </div>
     </BriefingCard>

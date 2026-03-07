@@ -52,7 +52,7 @@ export function getVisitedFeaturesLocal(): Set<string> {
   }
 }
 
-function markFeatureVisitedLocal(featureId: string) {
+export function markFeatureVisitedLocal(featureId: string) {
   try {
     const visited = getVisitedFeaturesLocal()
     visited.add(featureId)
