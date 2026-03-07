@@ -16,7 +16,7 @@ import {
   ArrowRight, Zap, Compass, TrendingUp, Settings2, Info,
 } from 'lucide-react'
 import { mergeWidgetPrefs, type WidgetPref, type WidgetSize } from '@/lib/widget-catalog'
-import type { DashboardData, TopAction, TopGoal, TopRecurringTransaction, TopRecommendation, TopLifeEvent } from '@/components/widgets/widget-renderer'
+import type { DashboardData, TopAction, TopGoal, TopRecurringTransaction, TopRecommendation, TopLifeEvent, Notification, StreakData, AiInsight, NextStep, UpcomingEvent } from '@/components/widgets/widget-renderer'
 import { DraggableWidgetGrid } from '@/components/widgets/draggable-widget-grid'
 
 export default async function DashboardPage() {
@@ -37,6 +37,7 @@ export default async function DashboardPage() {
     goalsResult, recurringResult, netWorthSnapshotsResult,
     income12Result, earliestIncomeResult, sovereigntyTxResult,
     bankAccountsResult, favBudgetsResult, prevMonthTxResult,
+    badgesResult, userBadgesResult, userStreaksResult, nextStepCompletionsResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('id, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
@@ -59,6 +60,10 @@ export default async function DashboardPage() {
     supabase.from('bank_accounts').select('id, balance').eq('is_active', true).is('linked_asset_id', null),
     supabase.from('budgets').select('id, name, icon, budget_type, default_limit, interval, parent_id, is_favorite').eq('is_favorite', true),
     supabase.from('transactions').select('amount').gte('date', prevMonthStart).lt('date', monthStart),
+    supabase.from('badges').select('id, slug, name, icon, category, criteria_type, sort_order'),
+    supabase.from('user_badges').select('id, badge_id, earned_at'),
+    supabase.from('user_streaks').select('id, streak_type, current_count, longest_count, last_activity_date'),
+    supabase.from('next_step_completions').select('step_key, dismissed'),
   ])
 
   // Core calculations
@@ -466,6 +471,283 @@ export default async function DashboardPage() {
       }
     })
 
+  // ── Notifications: derived from budget alerts, streaks, milestones ──
+  const notifications: Notification[] = []
+  // Budget overspending alerts
+  for (const [type, vals] of Object.entries(budgetTotals) as [string, { limit: number; spent: number }][]) {
+    if (vals.limit > 0 && vals.spent > vals.limit) {
+      const pct = Math.round((vals.spent / vals.limit) * 100)
+      notifications.push({
+        id: `budget-over-${type}`,
+        type: 'budget',
+        message: `Je ${type === 'expense' ? 'uitgaven' : type === 'savings' ? 'spaar' : type}-budget is ${pct}% besteed (${formatCurrency(vals.spent)} / ${formatCurrency(vals.limit)}).`,
+        severity: pct > 120 ? 'critical' : 'warning',
+        createdAt: new Date().toISOString(),
+        actionHref: '/core/budgets',
+      })
+    }
+  }
+  // Budget alert thresholds per individual budget
+  for (const b of allParentBudgets) {
+    const bData = b as unknown as { id: string; name: string; alert_threshold?: number | null; default_limit: number; interval: string; budget_type: string }
+    const threshold = bData.alert_threshold
+    if (threshold == null || threshold <= 0) continue
+    const children = allChildren.filter(c => c.parent_id === bData.id)
+    let limit = children.length > 0
+      ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
+      : Number(bData.default_limit)
+    if (bData.interval === 'quarterly') limit = limit / 3
+    else if (bData.interval === 'yearly') limit = limit / 12
+    // Sum spent for this budget + children
+    const relevantIds = new Set<string>([bData.id])
+    for (const c of children) relevantIds.add(c.id)
+    let spent = 0
+    for (const tx of txData) {
+      const bid = (tx as { budget_id?: string | null }).budget_id
+      if (bid && relevantIds.has(bid)) spent += Math.abs(Number(tx.amount))
+    }
+    const pctUsed = limit > 0 ? (spent / limit) * 100 : 0
+    if (pctUsed >= threshold) {
+      notifications.push({
+        id: `budget-alert-${bData.id}`,
+        type: 'budget',
+        message: `Budget "${bData.name}" is ${Math.round(pctUsed)}% besteed.`,
+        severity: pctUsed >= 100 ? 'critical' : 'warning',
+        createdAt: new Date().toISOString(),
+        actionHref: '/core/budgets',
+      })
+    }
+  }
+  // FIRE milestone proximity
+  if (freedomPct >= 90 && freedomPct < 100) {
+    notifications.push({
+      id: 'milestone-fire-near',
+      type: 'milestone',
+      message: `Je bent op ${Math.round(freedomPct)}% van je FIRE-doel — bijna volledige vrijheid!`,
+      severity: 'info',
+      createdAt: new Date().toISOString(),
+      actionHref: '/horizon',
+    })
+  } else if (freedomPct >= 100) {
+    notifications.push({
+      id: 'milestone-fire-reached',
+      type: 'positive',
+      message: 'Gefeliciteerd! Je hebt je FIRE-doel bereikt!',
+      severity: 'info',
+      createdAt: new Date().toISOString(),
+      actionHref: '/horizon',
+    })
+  }
+  // Positive: monthly growth
+  if (monthlyGrowth > 0 && dailyExpenses > 0) {
+    const freedomDaysGained = monthlyGrowth / dailyExpenses
+    if (freedomDaysGained >= 5) {
+      notifications.push({
+        id: 'positive-growth',
+        type: 'positive',
+        message: `Je hebt deze maand ${Math.round(freedomDaysGained)} vrijheidsdagen opgebouwd!`,
+        severity: 'info',
+        createdAt: new Date().toISOString(),
+      })
+    }
+  }
+
+  // ── Badge Summary: from user_badges + badges ──────────────
+  const allBadges = (badgesResult.data ?? []) as { id: string; slug: string; name: string; icon: string; category: string; sort_order: number }[]
+  const earnedBadges = (userBadgesResult.data ?? []) as { id: string; badge_id: string; earned_at: string }[]
+  const earnedBadgeIds = new Set(earnedBadges.map(ub => ub.badge_id))
+  const latestEarned = earnedBadges.length > 0
+    ? [...earnedBadges].sort((a, b) => new Date(b.earned_at).getTime() - new Date(a.earned_at).getTime())[0]
+    : null
+  const latestBadgeDef = latestEarned ? allBadges.find(b => b.id === latestEarned.badge_id) : null
+  const badgeSummary = {
+    earned: earnedBadges.length,
+    total: allBadges.length,
+    latestBadge: latestBadgeDef && latestEarned
+      ? { name: latestBadgeDef.name, icon: latestBadgeDef.icon, earnedAt: latestEarned.earned_at }
+      : null,
+    nearestBadge: (() => {
+      // Find first unearned badge by sort_order as "nearest"
+      const unearned = allBadges
+        .filter(b => !earnedBadgeIds.has(b.id))
+        .sort((a, b) => a.sort_order - b.sort_order)
+      if (unearned.length === 0) return null
+      // Estimate progress (simple: earned count / total as proxy)
+      const progress = allBadges.length > 0 ? Math.round((earnedBadges.length / allBadges.length) * 100) : 0
+      return { name: unearned[0].name, progress: Math.min(progress, 99) }
+    })(),
+  }
+
+  // ── Streaks: from user_streaks ──────────────────────────────
+  const rawStreaks = (userStreaksResult.data ?? []) as { id: string; streak_type: string; current_count: number; longest_count: number; last_activity_date: string | null }[]
+  const streaks: StreakData[] = rawStreaks.map(s => ({
+    type: (s.streak_type === 'budget_compliance' ? 'budget' : s.streak_type === 'action_completion' ? 'action' : 'login') as 'login' | 'budget' | 'action',
+    currentCount: s.current_count,
+    longestCount: s.longest_count,
+    lastActivityDate: s.last_activity_date ?? new Date().toISOString().split('T')[0],
+  }))
+  // Streak notifications
+  for (const s of streaks) {
+    if (s.currentCount >= 7 && s.currentCount === s.longestCount) {
+      notifications.push({
+        id: `streak-record-${s.type}`,
+        type: 'streak',
+        message: `Nieuw record! ${s.currentCount} dagen ${s.type === 'login' ? 'ingelogd' : s.type === 'budget' ? 'budget op orde' : 'acties voltooid'} op rij.`,
+        severity: 'info',
+        createdAt: new Date().toISOString(),
+      })
+    }
+  }
+
+  // ── AI Insights: derived from financial data (no DB table) ──
+  const aiInsights: AiInsight[] = []
+  if (monthlyIncome > 0 && monthlyExpenses > 0) {
+    const savingsRate = ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100
+    if (savingsRate >= 50) {
+      aiInsights.push({
+        id: 'insight-high-savings',
+        text: `Je spaarquote is ${Math.round(savingsRate)}% — uitstekend voor versnelde vrijheid.`,
+        module: 'kern',
+        createdAt: new Date().toISOString(),
+      })
+    } else if (savingsRate < 10 && savingsRate >= 0) {
+      aiInsights.push({
+        id: 'insight-low-savings',
+        text: `Je spaarquote is ${Math.round(savingsRate)}%. Kleine besparingen kunnen al dagen vrijheid opleveren.`,
+        module: 'wil',
+        createdAt: new Date().toISOString(),
+      })
+    }
+  }
+  if (totalRecurringAmount > 0 && monthlyIncome > 0) {
+    const recurringPct = (totalRecurringAmount / monthlyIncome) * 100
+    if (recurringPct > 60) {
+      aiInsights.push({
+        id: 'insight-high-recurring',
+        text: `${Math.round(recurringPct)}% van je inkomen gaat naar vaste lasten. Flexibiliteit vergroten geeft meer vrijheid.`,
+        module: 'kern',
+        createdAt: new Date().toISOString(),
+      })
+    }
+  }
+  if (simFireCountdown && simFireCountdown.countdownYears <= 5 && simFireCountdown.countdownDays > 0) {
+    aiInsights.push({
+      id: 'insight-fire-near',
+      text: `Nog ${simFireCountdown.countdownYears} jaar en ${simFireCountdown.countdownMonths} maanden tot financiële vrijheid — de eindstreep is in zicht!`,
+      module: 'horizon',
+      createdAt: new Date().toISOString(),
+    })
+  }
+
+  // ── Next Steps: based on data completeness ──────────────────
+  const completedSteps = (nextStepCompletionsResult.data ?? []) as { step_key: string; dismissed: boolean }[]
+  const completedStepMap = new Map(completedSteps.map(s => [s.step_key, s.dismissed]))
+  const potentialSteps: NextStep[] = []
+  const txCount = (txResult.data ?? []).length
+  const assetCount = (assetsResult.data ?? []).length
+  const debtCount = (debtsResult.data ?? []).length
+  const budgetCount = allParentBudgets.length
+  const goalCount = (goalsResult.data ?? []).length
+  const actionCount = openActions.length
+  if (txCount === 0) {
+    potentialSteps.push({ key: 'import_transactions', title: 'Transacties importeren', description: 'Importeer je bankgegevens voor inzicht in je cashflow.', impact: null, href: '/core/cash/import', dismissed: false })
+  }
+  if (assetCount === 0) {
+    potentialSteps.push({ key: 'add_assets', title: 'Bezittingen toevoegen', description: 'Voeg je spaargeld, beleggingen en andere bezittingen toe.', impact: null, href: '/core/assets', dismissed: false })
+  }
+  if (debtCount === 0 && netWorth < 0) {
+    potentialSteps.push({ key: 'add_debts', title: 'Schulden registreren', description: 'Registreer je schulden voor een compleet vermogensoverzicht.', impact: null, href: '/core/debts', dismissed: false })
+  }
+  if (budgetCount === 0) {
+    potentialSteps.push({ key: 'create_budgets', title: 'Budgetten aanmaken', description: 'Stel budgetten in om je uitgaven te beheersen.', impact: null, href: '/core/budgets', dismissed: false })
+  }
+  if (goalCount === 0) {
+    potentialSteps.push({ key: 'set_goals', title: 'Doelen stellen', description: 'Definieer financiële doelen om je voortgang te volgen.', impact: null, href: '/will#doelen', dismissed: false })
+  }
+  if (actionCount === 0 && txCount > 0) {
+    potentialSteps.push({ key: 'review_actions', title: 'Acties bekijken', description: 'Bekijk aanbevolen acties om vrijheidsdagen te winnen.', impact: totalFreedomDaysOpen > 0 ? Math.round(totalFreedomDaysOpen) : null, href: '/will#acties', dismissed: false })
+  }
+  if (!profileResult.data?.date_of_birth) {
+    potentialSteps.push({ key: 'set_dob', title: 'Geboortedatum invullen', description: 'Nodig voor FIRE-berekeningen en tijdlijn.', impact: null, href: '/identity/profiel', dismissed: false })
+  }
+  const nextSteps = potentialSteps
+    .map(s => ({ ...s, dismissed: completedStepMap.get(s.key) === true }))
+    .filter(s => !completedStepMap.has(s.key) || !s.dismissed)
+
+  // ── Month Summary: derived from existing calculations ────────
+  const savingsRate = monthlyIncome > 0 ? ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100 : 0
+  // Budget score: average % of budgets within limit (0-100)
+  const budgetScoreEntries = Object.values(budgetTotals).filter(v => v.limit > 0)
+  const budgetScore = budgetScoreEntries.length > 0
+    ? Math.round(budgetScoreEntries.reduce((s, v) => s + Math.min(100, (1 - Math.max(0, v.spent - v.limit) / v.limit) * 100), 0) / budgetScoreEntries.length)
+    : 100
+  // Net worth delta from snapshots
+  const prevSnapshot = snapshotRows.length >= 2 ? snapshotRows[snapshotRows.length - 2] : null
+  const netWorthDeltaComputed = prevSnapshot ? netWorth - Number(prevSnapshot.net_worth) : null
+  const freedomDaysWon = dailyExpenses > 0 && monthlyGrowth > 0 ? monthlyGrowth / dailyExpenses : 0
+  const prevExpenseComparison = prevMonthExpenses > 0
+    ? Math.round(((monthlyExpenses - prevMonthExpenses) / prevMonthExpenses) * 100)
+    : 0
+  const monthSummary = {
+    netWorthDelta: netWorthDeltaComputed ?? monthlyGrowth,
+    freedomDaysWon: Math.round(freedomDaysWon * 10) / 10,
+    savingsRate: Math.round(savingsRate * 10) / 10,
+    budgetScore,
+    prevMonthComparison: prevExpenseComparison,
+  }
+
+  // ── Upcoming Events: from recurring + goals + life events ──
+  const upcomingEvents: UpcomingEvent[] = []
+  // Goal deadlines
+  for (const g of (goalsResult.data ?? []) as { id: string; name: string; target_date?: string | null; target_value?: number | null }[]) {
+    if (g.target_date) {
+      upcomingEvents.push({
+        id: `goal-${g.id}`,
+        name: g.name,
+        date: g.target_date,
+        amount: g.target_value != null ? Number(g.target_value) : null,
+        direction: 'neutral',
+        source: 'goal',
+      })
+    }
+  }
+  // Life events with target dates
+  for (const e of allLifeEvents) {
+    if (e.target_date) {
+      const cost = Number(e.one_time_cost) || 0
+      upcomingEvents.push({
+        id: `life-${e.id}`,
+        name: e.name,
+        date: e.target_date,
+        amount: cost !== 0 ? Math.abs(cost) : null,
+        direction: cost > 0 ? 'out' : cost < 0 ? 'in' : 'neutral',
+        source: 'life_event',
+      })
+    }
+  }
+  // Sort by date ascending, take first 10
+  upcomingEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  const upcomingEventsLimited = upcomingEvents.slice(0, 10)
+
+  // ── Emergency Fund: derived from liquid assets + expenses ──
+  const TARGET_EMERGENCY_MONTHS = 6
+  // Liquid assets = unlinked bank accounts + savings-type assets
+  const liquidAssets = (assetsResult.data ?? [])
+    .filter(a => {
+      const type = (a as { asset_type?: string }).asset_type
+      return type === 'savings' || type === 'checking' || type === 'cash'
+    })
+    .reduce((s, a) => s + Number(a.current_value), 0) + unlinkedCash
+  const targetEmergencyAmount = monthlyExpenses * TARGET_EMERGENCY_MONTHS
+  const emergencyMonthsCovered = monthlyExpenses > 0 ? liquidAssets / monthlyExpenses : 0
+  const emergencyFund = {
+    currentAmount: Math.round(liquidAssets * 100) / 100,
+    targetAmount: Math.round(targetEmergencyAmount * 100) / 100,
+    monthsCovered: Math.round(emergencyMonthsCovered * 10) / 10,
+    targetMonths: TARGET_EMERGENCY_MONTHS,
+    isComplete: emergencyMonthsCovered >= TARGET_EMERGENCY_MONTHS,
+  }
+
   // DashboardData bundle for widgets
   const dashboardData: DashboardData = {
     netWorth,
@@ -516,17 +798,17 @@ export default async function DashboardPage() {
     fireEndAge: fireStrategy.endAge,
     prevMonthIncome,
     prevMonthExpenses,
-    netWorthDelta: null,
+    netWorthDelta: netWorthDeltaComputed,
     favoriteBudgets,
-    // New widget data (defaults until widgets are implemented)
-    notifications: [],
-    badgeSummary: { earned: 0, total: 0, latestBadge: null, nearestBadge: null },
-    streaks: [],
-    aiInsights: [],
-    nextSteps: [],
-    monthSummary: { netWorthDelta: 0, freedomDaysWon: 0, savingsRate: 0, budgetScore: 0, prevMonthComparison: 0 },
-    upcomingEvents: [],
-    emergencyFund: { currentAmount: 0, targetAmount: 0, monthsCovered: 0, targetMonths: 6, isComplete: false },
+    // Real widget data from queries and computations
+    notifications,
+    badgeSummary,
+    streaks,
+    aiInsights,
+    nextSteps,
+    monthSummary,
+    upcomingEvents: upcomingEventsLimited,
+    emergencyFund,
     topRecurringTransactions,
     totalRecurringAmount: Math.round(totalRecurringAmount * 100) / 100,
     topRecommendations,
