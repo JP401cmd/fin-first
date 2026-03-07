@@ -9079,3 +9079,58 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#369, #371, #370)
 - Zero TypeScript errors
 - 367/369 features passing
+
+## Session 2026-03-07 - Features #377, #378, #379
+
+### Feature #377: Onboarding profiel formulier met persoonlijke gegevens - PASSING
+- Large clickable household cards with Lucide icons (User, Users, Baby) + descriptions
+- All inputs min-h-[44px] with text-base for mobile touch targets
+- Income input: type="text" with inputMode="decimal" + euro prefix + character filter
+- Native date picker (type="date") for mobile
+- Children input full-width on mobile (w-full sm:w-24)
+- Sticky bottom nav already present from prior agent
+
+### Feature #378: Onboarding FIRE parameters in profielstap - PASSING
+- FIRE Instellingen section with "optioneel" badge, visually separated
+- Expected return slider: 3-12%, step 0.5%, default 7%, value shown in badge
+- Inflation slider: 0-5%, step 0.5%, default 2%, value shown in badge
+- Effective SWR info badge: "2.9% = rendement - box3 - inflatie"
+- Retirement expense method: 3 choice cards (Huidige uitgaven / % van inkomen / Vast bedrag)
+- FIRE end strategy: 3 choice cards (Behouden / Nalatenschap / Opteren)
+- Finn speech bubble explaining FIRE settings
+- Save API extended with FIRE params (expected_return, inflation_rate, retirement_expense_method, fire_end_strategy)
+- IdentityData type extended, initial state updated, profile upsert wires through
+
+### Feature #379: Onboarding validatie profiel en FIRE velden - PASSING
+- Age validation changed from 16 to 18-100 (more accurate with month/day comparison)
+- Custom amount field appears when retirement method is 'custom_amount', validated > 0
+- Scroll-to-first-error: scrolls and focuses first invalid field on submit
+- Volgende button disabled after first submit while errors exist
+- FIELD_IDS mapping for scroll targets
+- retirement_custom_amount field added to IdentityData, initial state, save API schema
+- Test page updated with new fields
+- Zero TypeScript errors, zero console errors
+
+### Current Status
+- 3 features completed this session (#377, #378, #379)
+- Zero TypeScript errors
+- Commit: 7d4caac
+
+## Session 2026-03-07 - Feature #392
+
+### Feature #392: Onboarding sliders voor FIRE rendement en inflatie op mobiel - PASSING
+- Added touch-optimized slider CSS in globals.css (.slider-touch class)
+- 24px round thumb with white border and box-shadow (Webkit + Firefox)
+- Active track coloring via linear-gradient on inline style
+- Hover/active scale animations for touch feedback
+- Neutral variant (.slider-touch--neutral) for inflation slider (zinc-600)
+- Value badge: font-mono tabular-nums, right of slider in flex layout
+- Info tooltip on each slider label (Finn-style)
+- Step size 0.5%, min/max labels under track
+- Component changes were already in place from previous session (7d4caac)
+- CSS styles were the missing piece - added in commit be92338
+- Verified via test-onboarding-validation page, zero console errors
+
+### Current Status
+- 1 feature completed this session (#392)
+- 378/388 features passing (97.4%)
