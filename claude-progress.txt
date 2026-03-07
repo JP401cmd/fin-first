@@ -1,3 +1,34 @@
+## Session 2026-03-07 - Features #497, #508, #510
+
+### Feature #497: Preview van actieve vs default nieuws-prompt - PASSING
+- Added collapsible default prompt preview to /beheer/nieuws (pattern from beheer/ai)
+- Shows "Bekijk standaard prompt" button with ChevronDown/ChevronUp toggle
+- Only visible when admin has saved a custom prompt (savedPrompt !== null)
+- Default prompt shown read-only in <pre> with max-h-64 overflow
+- Added ChevronDown, ChevronUp imports and showDefaultPreview state
+
+### Feature #508: AI opt-out toggle in Instellingen - PASSING
+- Added ai_enabled toggle to Privacy & AI section in /identity/instellingen
+- Toggle saves to profiles.ai_enabled column (migration created)
+- Toggle styled as iOS-like switch with teal-500 active color
+- DAIshboard reads ai_enabled from profiles, passes to component
+- When AI disabled: briefing compose skipped, shows "AI-features zijn uitgeschakeld" message
+- Berichten page: fetches ai_enabled, hides news section when off with message
+- Optimistic UI: toggle updates immediately, reverts on failure
+
+### Feature #510: Privacy-verklaring modal vanuit Instellingen - PASSING
+- Added "Volledige privacyverklaring" button with FileText icon in Privacy & AI section
+- Opens BottomSheet with full privacy statement in editorial TriFinity style
+- 5 sections: Welke gegevens, Waar opgeslagen, Bewaartermijn, Jouw rechten (AVG), Contact
+- Module-colored bullet points (teal, purple, amber)
+- Contact email: privacy@trifinity.nl
+- Version footer: "Versie 1.0 — Laatst bijgewerkt: maart 2026"
+
+### Current Status
+- 3 features completed this session (#497, #508, #510)
+- Zero TypeScript errors, zero console errors
+- Commit: 8dcf6a3
+
 ## Session 2026-03-07 - Features #513, #498, #500
 
 ### Feature #513: Fail-safe: blokkeer AI-call als sanitize faalt - PASSING
@@ -10285,3 +10316,28 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#471, #493, #482)
 - Zero TypeScript errors, zero console errors
 - Changes committed in 369b116 (parallel agent commit)
+
+## Session 2026-03-07 - Features #469, #490, #470
+
+### Feature #469: Overige nieuwsartikelen in 2-koloms grid - PASSING
+- Changed NewsArticle from flat divider-separated list to card-style grid items
+- Cards: rounded border, shadow, flex-col layout with category badge, headline, lead, date, impact
+- Container: grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 (2 cols on desktop)
+- flex-1 on summary paragraph ensures equal card heights
+- Verified desktop: 2 equal-width columns with consistent spacing
+
+### Feature #490: Mobiel: nieuws-sectie single-column krantlayout - PASSING
+- Already handled by grid-cols-1 default (mobile) with sm:grid-cols-2 (desktop)
+- Verified at 375px viewport: hero full-width, all articles stacked single column
+- Typography scales properly, tags not truncated, readable on mobile
+
+### Feature #470: Kolom-scheiders en typografische krant-accenten - PASSING
+- Added dropcap on hero article: first letter in Playfair Display, 3.2rem, float-left
+- Added news-grid-columns CSS class: odd children get right border on sm+ screens
+- Applied to both news articles grid and skeleton loader grid
+- Ink hierarchy verified: --ink for headlines, --ink-2 for body, --ink-3 for meta, --ink-4 for dates
+
+### Current Status
+- 3 features completed this session (#469, #490, #470)
+- Zero TypeScript errors in changed files
+- Commit: 0e8c928
