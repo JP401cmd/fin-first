@@ -19,6 +19,8 @@ const VALID_ROUTES = new Set([
   '/identity/instellingen',
   '/daishboard',
   '/dashboard',
+  '/berichten',
+  '/rapportages',
 ])
 
 /** Common AI hallucinations → correct route */
