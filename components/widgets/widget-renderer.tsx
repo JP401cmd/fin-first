@@ -55,6 +55,94 @@ export interface TopGoal {
   icon: string
 }
 
+export interface TopRecurringTransaction {
+  id: string
+  name: string
+  amount: number
+  frequency: string
+  category: string | null
+}
+
+export interface TopRecommendation {
+  id: string
+  title: string
+  freedomDaysImpact: number
+  priority: number
+  category: string
+}
+
+export interface TopLifeEvent {
+  id: string
+  name: string
+  year: number | null
+  impactType: 'positive' | 'negative'
+  estimatedImpact: number | null
+}
+
+export interface Notification {
+  id: string
+  type: 'budget' | 'streak' | 'milestone' | 'anomaly' | 'badge' | 'positive'
+  message: string
+  severity: 'info' | 'warning' | 'critical'
+  createdAt: string
+  actionHref?: string
+}
+
+export interface BadgeSummary {
+  earned: number
+  total: number
+  latestBadge: { name: string; icon: string; earnedAt: string } | null
+  nearestBadge: { name: string; progress: number } | null
+}
+
+export interface StreakData {
+  type: 'login' | 'budget' | 'action'
+  currentCount: number
+  longestCount: number
+  lastActivityDate: string
+}
+
+export interface AiInsight {
+  id: string
+  text: string
+  module: 'kern' | 'wil' | 'horizon'
+  createdAt: string
+}
+
+export interface NextStep {
+  key: string
+  title: string
+  description: string
+  impact: number | null
+  href: string
+  dismissed: boolean
+}
+
+export interface MonthSummary {
+  netWorthDelta: number
+  freedomDaysWon: number
+  savingsRate: number
+  budgetScore: number
+  prevMonthComparison: number
+}
+
+export interface UpcomingEvent {
+  id: string
+  name: string
+  date: string
+  amount: number | null
+  direction: 'in' | 'out' | 'neutral'
+  source: 'recurring' | 'goal' | 'life_event'
+}
+
+export interface EmergencyFund {
+  currentAmount: number
+  targetAmount: number
+  monthsCovered: number
+  targetMonths: number
+  isComplete: boolean
+}
+
 export interface DashboardData {
   // Core financial
   netWorth: number
@@ -125,6 +213,22 @@ export interface DashboardData {
     limit: number
     spent: number
   }[]
+  // New widget data fields
+  notifications: Notification[]
+  badgeSummary: BadgeSummary
+  streaks: StreakData[]
+  aiInsights: AiInsight[]
+  nextSteps: NextStep[]
+  monthSummary: MonthSummary
+  upcomingEvents: UpcomingEvent[]
+  emergencyFund: EmergencyFund
+  // Enriched widget data: top recurring transactions (vaste lasten)
+  topRecurringTransactions: TopRecurringTransaction[]
+  totalRecurringAmount: number
+  // Enriched widget data: top recommendations
+  topRecommendations: TopRecommendation[]
+  // Enriched widget data: top life events
+  topLifeEvents: TopLifeEvent[]
 }
 
 // ── Gating: widget id → min sovereignty level ─────────────────

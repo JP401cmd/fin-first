@@ -52,6 +52,7 @@ export function WidgetShell({ module, size, kicker, href, onClick, children, cla
   const kickerColor = MODULE_KICKER[module]
   const h = SIZE_HEIGHT[size]
   const isInteractive = !!(href ?? onClick)
+  const isQuarter = size === 'quarter'
 
   const baseClasses = `group relative overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] transition-all ${h} ${className}`
   const interactiveClasses = isInteractive
@@ -89,9 +90,9 @@ export function WidgetShell({ module, size, kicker, href, onClick, children, cla
       {/* 3px top accent bar */}
       <div className={`h-[3px] w-full ${accent}`} />
 
-      <div className="p-4 flex flex-col h-full">
+      <div className={`${isQuarter ? 'p-3' : 'p-4'} flex flex-col h-full`}>
         {/* Kicker */}
-        <p className={`label-editorial ${kickerColor} mb-2`}>{kicker}</p>
+        <p className={`label-editorial ${kickerColor} ${isQuarter ? 'mb-1' : 'mb-2'}`}>{kicker}</p>
 
         {/* Widget content */}
         <div className="flex-1 min-w-0">
@@ -100,7 +101,7 @@ export function WidgetShell({ module, size, kicker, href, onClick, children, cla
 
         {/* Hover arrow */}
         {isInteractive && (
-          <div className="mt-3 flex justify-end">
+          <div className={`${isQuarter ? 'mt-1' : 'mt-3'} flex justify-end`}>
             <ArrowRight className="h-3.5 w-3.5 text-[var(--ink-4)] opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         )}
@@ -143,6 +144,7 @@ interface LockedWidgetShellProps {
 export function LockedWidgetShell({ module, size, name, requiredPhase }: LockedWidgetShellProps) {
   const accent = MODULE_ACCENT[module]
   const minH = SIZE_HEIGHT[size]
+  const isQuarter = size === 'quarter'
 
   return (
     <div
@@ -151,11 +153,11 @@ export function LockedWidgetShell({ module, size, name, requiredPhase }: LockedW
       {/* Faded accent bar */}
       <div className={`h-[3px] w-full ${accent} opacity-30`} />
 
-      <div className="flex flex-col items-center justify-center h-[calc(100%-3px)] gap-2 p-4 text-center">
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
-          <Lock className="h-4 w-4 text-[var(--ink-4)]" />
+      <div className={`flex flex-col items-center justify-center h-[calc(100%-3px)] ${isQuarter ? 'gap-1 p-3' : 'gap-2 p-4'} text-center`}>
+        <div className={`flex ${isQuarter ? 'h-7 w-7' : 'h-9 w-9'} items-center justify-center rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]`}>
+          <Lock className={`${isQuarter ? 'h-3 w-3' : 'h-4 w-4'} text-[var(--ink-4)]`} />
         </div>
-        <p className="text-sm font-medium text-[var(--ink-3)]">{name}</p>
+        <p className={`${isQuarter ? 'text-xs' : 'text-sm'} font-medium text-[var(--ink-3)]`}>{name}</p>
         <span className="rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-3)]">
           Beschikbaar in {requiredPhase}
         </span>

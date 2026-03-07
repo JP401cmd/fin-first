@@ -16,7 +16,7 @@ import {
   ArrowRight, Zap, Compass, TrendingUp, Settings2, Info,
 } from 'lucide-react'
 import { mergeWidgetPrefs, type WidgetPref, type WidgetSize } from '@/lib/widget-catalog'
-import type { DashboardData, TopAction, TopGoal } from '@/components/widgets/widget-renderer'
+import type { DashboardData, TopAction, TopGoal, TopRecurringTransaction, TopRecommendation, TopLifeEvent } from '@/components/widgets/widget-renderer'
 import { DraggableWidgetGrid } from '@/components/widgets/draggable-widget-grid'
 
 export default async function DashboardPage() {
@@ -46,10 +46,10 @@ export default async function DashboardPage() {
       .in('status', ['open', 'postponed', 'completed']),
     supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, alert_threshold, parent_id').is('parent_id', null),
-    supabase.from('recommendations').select('id, freedom_days_per_year, status').in('status', ['pending', 'postponed']),
+    supabase.from('recommendations').select('id, title, freedom_days_per_year, priority_score, recommendation_type, status').in('status', ['pending', 'postponed']),
     supabase.from('budgets').select('id, parent_id, default_limit').not('parent_id', 'is', null),
     supabase.from('goals').select('id, name, goal_type, current_value, target_value, target_date, color, icon').eq('is_completed', false).order('sort_order', { ascending: true }),
-    supabase.from('recurring_transactions').select('id').eq('is_active', true),
+    supabase.from('recurring_transactions').select('id, name, amount, frequency, budget_id').eq('is_active', true),
     supabase.from('net_worth_snapshots').select('snapshot_date, net_worth, fire_age').gte('snapshot_date', twelveMonthsAgo).order('snapshot_date', { ascending: true }).limit(12),
     supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
     supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
@@ -397,6 +397,63 @@ export default async function DashboardPage() {
     ? Number((latestSnapshotFireAge as { fire_age?: number | null }).fire_age)
     : null
 
+  // Top recurring transactions (vaste lasten): top 5 by absolute amount
+  const allRecurring = (recurringResult.data ?? []) as { id: string; name: string; amount: number; frequency: string; budget_id: string | null }[]
+  const budgetNameMap = new Map<string, string>()
+  for (const b of allParentBudgets) budgetNameMap.set(b.id, (b as unknown as { name: string }).name ?? '')
+  const topRecurringTransactions: TopRecurringTransaction[] = [...allRecurring]
+    .sort((a, b) => Math.abs(Number(b.amount)) - Math.abs(Number(a.amount)))
+    .slice(0, 5)
+    .map(r => ({
+      id: r.id,
+      name: r.name,
+      amount: Number(r.amount),
+      frequency: r.frequency,
+      category: r.budget_id ? (budgetNameMap.get(r.budget_id) ?? null) : null,
+    }))
+  // Monthly total for all recurring
+  const totalRecurringAmount = allRecurring.reduce((sum, r) => {
+    const amt = Math.abs(Number(r.amount))
+    switch (r.frequency) {
+      case 'weekly': return sum + amt * (52 / 12)
+      case 'monthly': return sum + amt
+      case 'quarterly': return sum + amt / 3
+      case 'yearly': return sum + amt / 12
+      default: return sum + amt
+    }
+  }, 0)
+
+  // Top recommendations: top 5 pending by priority
+  const allRecs = (recsResult.data ?? []) as { id: string; title: string; freedom_days_per_year: number | null; priority_score: number | null; recommendation_type: string; status: string }[]
+  const topRecommendations: TopRecommendation[] = allRecs
+    .filter(r => r.status === 'pending')
+    .sort((a, b) => (Number(b.priority_score) || 0) - (Number(a.priority_score) || 0))
+    .slice(0, 5)
+    .map(r => ({
+      id: r.id,
+      title: r.title ?? '',
+      freedomDaysImpact: Number(r.freedom_days_per_year) || 0,
+      priority: Number(r.priority_score) || 0,
+      category: r.recommendation_type ?? 'general',
+    }))
+
+  // Top life events: top 5 active by impact
+  const allLifeEvents = (eventsResult.data ?? []) as LifeEvent[]
+  const topLifeEvents: TopLifeEvent[] = allLifeEvents
+    .slice(0, 5)
+    .map(e => {
+      const netImpact = (Number(e.one_time_cost) || 0) + (Number(e.monthly_cost_change) || 0) * (Number(e.duration_months) || 0)
+      const incomeImpact = (Number(e.monthly_income_change) || 0) * (Number(e.duration_months) || 0)
+      const totalImpact = netImpact - incomeImpact
+      return {
+        id: e.id,
+        name: e.name,
+        year: e.target_date ? new Date(e.target_date).getFullYear() : (e.target_age != null ? null : null),
+        impactType: (totalImpact > 0 ? 'negative' : 'positive') as 'positive' | 'negative',
+        estimatedImpact: totalImpact !== 0 ? Math.abs(totalImpact) : null,
+      }
+    })
+
   // DashboardData bundle for widgets
   const dashboardData: DashboardData = {
     netWorth,
@@ -448,6 +505,19 @@ export default async function DashboardPage() {
     prevMonthExpenses: 0,
     netWorthDelta: null,
     favoriteBudgets,
+    // New widget data (defaults until widgets are implemented)
+    notifications: [],
+    badgeSummary: { earned: 0, total: 0, latestBadge: null, nearestBadge: null },
+    streaks: [],
+    aiInsights: [],
+    nextSteps: [],
+    monthSummary: { netWorthDelta: 0, freedomDaysWon: 0, savingsRate: 0, budgetScore: 0, prevMonthComparison: 0 },
+    upcomingEvents: [],
+    emergencyFund: { currentAmount: 0, targetAmount: 0, monthsCovered: 0, targetMonths: 6, isComplete: false },
+    topRecurringTransactions,
+    totalRecurringAmount: Math.round(totalRecurringAmount * 100) / 100,
+    topRecommendations,
+    topLifeEvents,
   }
 
   return (

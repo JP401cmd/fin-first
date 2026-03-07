@@ -10,7 +10,7 @@ import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
-import type { DashboardData, TopAction, TopGoal } from '@/components/widgets/widget-renderer'
+import type { DashboardData, TopAction, TopGoal, TopRecurringTransaction, TopRecommendation, TopLifeEvent } from '@/components/widgets/widget-renderer'
 import { buildTemporalContext } from '@/lib/briefing/temporal'
 import { DAIshboard } from '@/components/daishboard/daishboard'
 
@@ -365,6 +365,19 @@ export default async function DAIshboardPage() {
     prevMonthExpenses,
     netWorthDelta,
     favoriteBudgets,
+    // New widget data (defaults until widgets are implemented)
+    notifications: [],
+    badgeSummary: { earned: 0, total: 0, latestBadge: null, nearestBadge: null },
+    streaks: [],
+    aiInsights: [],
+    nextSteps: [],
+    monthSummary: { netWorthDelta: 0, freedomDaysWon: 0, savingsRate: 0, budgetScore: 0, prevMonthComparison: 0 },
+    upcomingEvents: [],
+    emergencyFund: { currentAmount: 0, targetAmount: 0, monthsCovered: 0, targetMonths: 6, isComplete: false },
+    topRecurringTransactions: [],
+    totalRecurringAmount: 0,
+    topRecommendations: [],
+    topLifeEvents: [],
   }
 
   // ── Build temporal context ────────────────────────────────
