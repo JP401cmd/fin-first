@@ -58,8 +58,9 @@ export function FeatureGate({ featureId, fallback = 'hidden', children }: Featur
     return null
   }
 
+  // Locked features are intentionally hidden per design — no locked cards shown
   if (fallback === 'locked') {
-    return <LockedFeatureCard featureId={featureId} currentPhase={currentPhase} />
+    return null
   }
 
   // Custom fallback
