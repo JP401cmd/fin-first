@@ -258,8 +258,24 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
   }
   lines.push('')
 
-  // Life events
-  lines.push(`Levensgebeurtenissen: ${data.lifeEvents}`)
+  // Life events (detailed)
+  if (data.topLifeEvents && data.topLifeEvents.length > 0) {
+    lines.push('LEVENSGEBEURTENISSEN:')
+    for (const le of data.topLifeEvents) {
+      const year = le.year ? ` (${le.year})` : ''
+      const type = le.impactType === 'positive' ? 'positief' : 'negatief'
+      const amt = le.estimatedImpact != null
+        ? `, ${formatCurrency(Math.abs(le.estimatedImpact))} ${le.impactType === 'positive' ? 'opbrengst' : 'kosten'}`
+        : ''
+      const freedom = le.estimatedImpact != null && dailyExp > 0
+        ? ` (${freedomStr(Math.abs(le.estimatedImpact), dailyExp)})`
+        : ''
+      lines.push(`- ${le.name}${year}: ${type}${amt}${freedom}`)
+    }
+    lines.push('')
+  } else {
+    lines.push(`Levensgebeurtenissen: ${data.lifeEvents}`)
+  }
 
   return lines.join('\n')
 }
