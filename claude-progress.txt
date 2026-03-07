@@ -1,3 +1,28 @@
+## Session 2026-03-07 - Features #263, #324, #325
+
+### Feature #263: Widget renderer uitbreiden met nieuwe widgets - PASSING
+- Created 8 new widget components: meldingen, badges, streaks, ai_inzicht, volgende_stap, maandoverzicht, agenda, noodfonds
+- Added all 8 to WIDGET_CATALOG with sizes, modules, minLevels, and WIDGET_HREFS
+- Added imports, WIDGET_MIN_LEVEL entries, and switch cases in widget-renderer.tsx
+- All widgets support quarter/half/full sizes with appropriate content scaling
+
+### Feature #324: Nieuwe widget: Meldingen (quarter/half/full) - PASSING
+- Enhanced meldingen-widget.tsx with detailed views per size
+- Quarter: urgency color badge with animated red dot for critical notifications
+- Half: top-5 notifications with type icons and severity badges
+- Full: all notifications grouped by type with timestamps and action links
+
+### Feature #325: Nieuwe widget: Badges (quarter/half/full) - PASSING
+- Enhanced badges-widget.tsx with detailed views per size
+- Quarter: latest badge icon + X/Y earned counter
+- Half: overall progress bar + latest badge card + near-badge with progress bar
+- Full: highlighted amber/teal cards for latest and nearest badges with dates
+
+### Current Status
+- 266/331 features passing (263 before + #263, #324, #325)
+
+---
+
 ## Session 2026-03-07 - Features #272, #273, #274
 
 ### Feature #272: Schulden widget quarter-size - PASSING
