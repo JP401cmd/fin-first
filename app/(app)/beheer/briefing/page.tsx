@@ -10,12 +10,17 @@ import {
   Sparkles,
   Calendar,
   Activity,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import type { BriefingDirective, FunctionalDirective } from '@/lib/briefing/directives'
 import {
   isDirectiveActive,
   getDefaultDirectives,
   getDefaultFunctionalDirectives,
+  formatDirectivesForPrompt,
+  formatFunctionalDirectivesForPrompt,
+  getActiveDirectives,
   DIRECTIVE_METRICS,
   resolveMetricLabels,
 } from '@/lib/briefing/directives'
@@ -376,6 +381,141 @@ function FunctionalRow({
   )
 }
 
+// ── Prompt Preview Component ─────────────────────────────────
+
+function PromptPreview({
+  directives,
+  funcDirectives,
+  currentMonth,
+  currentDay,
+}: {
+  directives: BriefingDirective[]
+  funcDirectives: FunctionalDirective[]
+  currentMonth: number
+  currentDay: number
+}) {
+  // Get active temporal directives (today)
+  const activeTemporalIds = new Set(
+    getActiveDirectives(directives, currentMonth, currentDay).map((d) => d.id),
+  )
+
+  // Format the prompt blocks using the same functions Will's system prompt uses
+  const activeTemporalDirectives = directives.filter((d) => d.enabled && activeTemporalIds.has(d.id))
+  const temporalPrompt = formatDirectivesForPrompt(activeTemporalDirectives)
+  const functionalPrompt = formatFunctionalDirectivesForPrompt(funcDirectives)
+
+  // Build per-line info for visual highlighting
+  const temporalLines = directives.map((d) => {
+    const isActive = d.enabled && activeTemporalIds.has(d.id)
+    const prefix = d.priority === 'high' ? '[PRIORITEIT]' : d.priority === 'low' ? '[optioneel]' : '-'
+    const line = `${prefix} ${d.instruction || '(geen instructie)'}`
+    return { line, isActive, enabled: d.enabled, title: d.title }
+  })
+
+  const functionalLines = funcDirectives.map((d) => {
+    const { metric, condition } = resolveMetricLabels(d.metric, d.condition)
+    const prefix = d.priority === 'high' ? '[PRIORITEIT]' : d.priority === 'low' ? '[optioneel]' : '-'
+    const line = `${prefix} Wanneer ${metric.toLowerCase()} ${condition.toLowerCase()}: ${d.instruction || '(geen instructie)'}`
+    return { line, isActive: d.enabled, enabled: d.enabled, title: d.title }
+  })
+
+  return (
+    <div className="space-y-4">
+      {/* Temporal prompt block */}
+      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+        <div className="border-b border-[var(--border-ed)] bg-[var(--subtle)] px-4 py-2">
+          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--ink-2)]">
+            Temporele richtlijnen prompt
+          </p>
+        </div>
+        {temporalLines.length > 0 ? (
+          <div className="divide-y divide-[var(--border-ed)]">
+            {temporalLines.map((item, i) => (
+              <div
+                key={directives[i].id}
+                className={`px-4 py-2 ${
+                  item.isActive
+                    ? 'bg-green-50'
+                    : item.enabled
+                      ? 'bg-amber-50/50'
+                      : 'bg-zinc-100'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--ink-3)]">
+                    {item.title || 'Naamloos'}
+                  </span>
+                  {item.isActive ? (
+                    <span className="rounded-full bg-green-200 px-1.5 py-0.5 text-[9px] font-bold text-green-700">ACTIEF</span>
+                  ) : item.enabled ? (
+                    <span className="rounded-full bg-amber-200 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">INACTIEF</span>
+                  ) : (
+                    <span className="rounded-full bg-zinc-200 px-1.5 py-0.5 text-[9px] font-bold text-zinc-500">UIT</span>
+                  )}
+                </div>
+                <pre className="whitespace-pre-wrap text-xs font-mono text-[var(--ink-2)]">{item.line}</pre>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="px-4 py-6 text-center text-sm text-[var(--ink-3)]">Geen temporele richtlijnen</div>
+        )}
+        {temporalPrompt && (
+          <div className="border-t border-[var(--border-ed)] bg-zinc-900 px-4 py-3">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-zinc-400">
+              Resultaat prompt-blok
+            </p>
+            <pre className="whitespace-pre-wrap text-xs font-mono text-green-400">{temporalPrompt}</pre>
+          </div>
+        )}
+      </div>
+
+      {/* Functional prompt block */}
+      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+        <div className="border-b border-[var(--border-ed)] bg-[var(--subtle)] px-4 py-2">
+          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--ink-2)]">
+            Functionele richtlijnen prompt
+          </p>
+        </div>
+        {functionalLines.length > 0 ? (
+          <div className="divide-y divide-[var(--border-ed)]">
+            {functionalLines.map((item, i) => (
+              <div
+                key={funcDirectives[i].id}
+                className={`px-4 py-2 ${
+                  item.isActive ? 'bg-green-50' : 'bg-zinc-100'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--ink-3)]">
+                    {item.title || 'Naamloos'}
+                  </span>
+                  {item.isActive ? (
+                    <span className="rounded-full bg-green-200 px-1.5 py-0.5 text-[9px] font-bold text-green-700">ACTIEF</span>
+                  ) : (
+                    <span className="rounded-full bg-zinc-200 px-1.5 py-0.5 text-[9px] font-bold text-zinc-500">UIT</span>
+                  )}
+                </div>
+                <pre className="whitespace-pre-wrap text-xs font-mono text-[var(--ink-2)]">{item.line}</pre>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="px-4 py-6 text-center text-sm text-[var(--ink-3)]">Geen functionele richtlijnen</div>
+        )}
+        {functionalPrompt && (
+          <div className="border-t border-[var(--border-ed)] bg-zinc-900 px-4 py-3">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-zinc-400">
+              Resultaat prompt-blok
+            </p>
+            <pre className="whitespace-pre-wrap text-xs font-mono text-green-400">{functionalPrompt}</pre>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Main Page ────────────────────────────────────────────────
 
 export default function BriefingDirectivesPage() {
@@ -387,6 +527,7 @@ export default function BriefingDirectivesPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [showPreview, setShowPreview] = useState(false)
 
   const now = new Date()
   const currentMonth = now.getMonth() + 1
@@ -670,6 +811,33 @@ export default function BriefingDirectivesPage() {
         <Plus className="h-4 w-4" />
         Functionele richtlijn toevoegen
       </button>
+
+      {/* ═══ Prompt Preview ═══ */}
+      <div className="border-t border-[var(--border-ed)] pt-6">
+        <div className="flex items-center justify-between">
+          <SectionHeader icon={showPreview ? EyeOff : Eye} label="Prompt Preview" />
+          <button
+            type="button"
+            onClick={() => setShowPreview((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-md)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
+          >
+            {showPreview ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            {showPreview ? 'Verberg preview' : 'Toon prompt preview'}
+          </button>
+        </div>
+        <p className="mt-1 mb-4 text-xs text-[var(--ink-3)]">
+          Bekijk hoe de huidige richtlijnen als prompt-blok aan Will worden meegegeven.
+        </p>
+      </div>
+
+      {showPreview && (
+        <PromptPreview
+          directives={directives}
+          funcDirectives={funcDirectives}
+          currentMonth={currentMonth}
+          currentDay={currentDay}
+        />
+      )}
     </div>
   )
 }
