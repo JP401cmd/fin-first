@@ -8,6 +8,7 @@ import type {
   BriefingSSEEvent,
 } from '@/lib/briefing/types'
 import { validateBriefingLayout } from '@/lib/briefing/validate-layout'
+import { validateCardHrefs } from '@/lib/briefing/validate-hrefs'
 import {
   getActiveDirectives,
   formatDirectivesForPrompt,
@@ -143,8 +144,9 @@ export async function POST(request: Request) {
             }
           }
 
-          // Validate layout and reorder if needed
-          const validatedCards = validateBriefingLayout(collectedCards)
+          // Validate hrefs (correct hallucinated routes) then layout
+          const hrefValidatedCards = validateCardHrefs(collectedCards)
+          const validatedCards = validateBriefingLayout(hrefValidatedCards)
 
           // Emit all validated cards in order
           for (const card of validatedCards) {
