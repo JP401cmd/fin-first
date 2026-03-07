@@ -18,7 +18,6 @@ export function OnboardingExtras({
   onAssetChange,
   onDebtChange,
   onNext,
-  onSkip,
   onBack,
   saving = false,
 }: {
@@ -29,7 +28,6 @@ export function OnboardingExtras({
   onAssetChange: (items: AssetEntry[]) => void
   onDebtChange: (items: DebtEntry[]) => void
   onNext: () => void
-  onSkip: () => void
   onBack: () => void
   saving?: boolean
 }) {
@@ -48,6 +46,8 @@ export function OnboardingExtras({
     { key: 'assets', label: 'Bezittingen', description: 'Spaargeld, beleggingen, woning, etc.', count: assets.length },
     { key: 'debts', label: 'Schulden', description: 'Hypotheek, leningen, creditcard, etc.', count: debts.length },
   ]
+
+  const hasData = bankAccounts.length > 0 || assets.length > 0 || debts.length > 0
 
   return (
     <div className="pb-20 sm:pb-0">
@@ -115,19 +115,12 @@ export function OnboardingExtras({
       {/* Sticky nav on mobile */}
       <div className="fixed bottom-0 left-0 right-0 z-10 flex gap-3 border-t border-zinc-200 bg-white/80 px-4 pb-[env(safe-area-inset-bottom,12px)] pt-3 backdrop-blur-sm sm:static sm:mt-6 sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
         <button
-          onClick={onSkip}
-          disabled={saving}
-          className="flex-1 min-h-[44px] rounded-lg border border-zinc-300 px-4 py-3 text-sm font-medium text-zinc-600 hover:bg-zinc-50 active:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Sla over
-        </button>
-        <button
           onClick={onNext}
           disabled={saving}
           data-testid="onboarding-save-next"
-          className="flex-1 min-h-[44px] rounded-lg bg-wil-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-wil-700 active:bg-wil-800 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full min-h-[44px] rounded-lg bg-wil-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-wil-700 active:bg-wil-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Volgende
+          {hasData ? 'Volgende' : 'Overslaan'}
         </button>
       </div>
     </div>

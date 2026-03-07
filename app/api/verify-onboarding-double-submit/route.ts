@@ -45,27 +45,25 @@ export async function GET() {
     results.push({ name: 'Client guard: handlePersonaSeed', passed: false, detail: String(e) })
   }
 
-  // Test 3: Buttons disabled when saving (OnboardingExtras)
+  // Test 3: Button disabled when saving (OnboardingExtras)
   try {
     const extrasPath = path.join(process.cwd(), 'components', 'onboarding', 'onboarding-extras.tsx')
     const extrasContent = fs.readFileSync(extrasPath, 'utf-8')
 
     const hasSavingProp = extrasContent.includes('saving?: boolean') || extrasContent.includes('saving: boolean')
-    const hasDisabledOnSkip = extrasContent.includes('onClick={onSkip}') &&
-                              extrasContent.includes('disabled={saving}')
     const hasDisabledOnNext = extrasContent.includes('onClick={onNext}') &&
                               extrasContent.includes('disabled={saving}')
-    const allButtonsDisabled = hasSavingProp && hasDisabledOnSkip && hasDisabledOnNext
+    const allButtonsDisabled = hasSavingProp && hasDisabledOnNext
 
     results.push({
-      name: 'OnboardingExtras: Buttons disabled when saving',
+      name: 'OnboardingExtras: Button disabled when saving',
       passed: allButtonsDisabled,
       detail: allButtonsDisabled
-        ? 'Both "Sla over" and "Opslaan & verder" buttons have disabled={saving}'
-        : `Issues: saving prop=${hasSavingProp}, skip disabled=${hasDisabledOnSkip}, next disabled=${hasDisabledOnNext}`,
+        ? 'Single "Volgende/Overslaan" button has disabled={saving}'
+        : `Issues: saving prop=${hasSavingProp}, next disabled=${hasDisabledOnNext}`,
     })
   } catch (e) {
-    results.push({ name: 'OnboardingExtras buttons disabled', passed: false, detail: String(e) })
+    results.push({ name: 'OnboardingExtras button disabled', passed: false, detail: String(e) })
   }
 
   // Test 4: Saving prop passed from parent to OnboardingExtras
