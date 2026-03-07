@@ -9134,3 +9134,41 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#392)
 - 378/388 features passing (97.4%)
+
+## Session 2026-03-07 - Features #380, #381, #382
+
+### Feature #380: Onboarding financieel startpunt - PASSING
+- Reordered onboarding flow: identity -> extras(startpunt) -> budgets -> save
+- Changed OnboardingExtras StepProgress from "voorkeuren" to "startpunt"
+- Changed button text from "Opslaan & verder" to "Volgende" (no longer final save step)
+- Added inputMode="decimal" to all numeric inputs in MiniBankForm, MiniAssetForm, MiniDebtForm
+- Updated onboarding page.tsx flow: identity onNext -> extras, extras onNext/onSkip -> budgets
+- Budgets is now the final step before saving (onNext=handleSaveOwnData)
+- Added saving prop to OnboardingBudgets with disabled state + "Opslaan..." text
+
+### Feature #381: Onboarding budget keuze - PASSING
+- Replaced old 3 sub-choice buttons (template/AI/manual) with new cards
+- "Nee, niet nu" (Hand icon) -> calls onNext directly (saves with defaults)
+- "Ja, met een template" (LayoutTemplate icon) -> shows template selection
+- "Ja, handmatig" (SlidersHorizontal icon) -> shows manual budget editor
+- Removed AI suggestion sub-choice (handleAISuggest, aiContext, aiLoading, aiError state)
+- Speech bubble changed to: "Budgetteren helpt je bewust te kiezen. Maar het is niet verplicht."
+- Cards are full-width, min-h-[60px], stack vertically on mobile
+
+### Feature #382: Budget templates gebaseerd op profiel - PASSING
+- Created 3 profile-based templates with percentage allocations:
+  - Zuinig: 55% vaste, 20% dagelijks, 10% leuk, 15% sparen (Coins icon)
+  - Gebalanceerd: 45% vaste, 20% dagelijks, 15% leuk, 20% sparen (PiggyBank icon)
+  - FIRE-gericht: 40% vaste, 15% dagelijks, 10% leuk, 35% sparen (Flame icon)
+- buildProfileAmounts() calculates concrete euro amounts from netIncome
+- Template cards show 2x2 category breakdown with formatCurrency amounts
+- Colored percentage bar (amber/teal/purple/emerald) per template
+- After selection: BudgetAmountEditor with pre-filled amounts (adjustable)
+- Replaced old BUDGET_TEMPLATES (starter/gezin/zzp/pensioen) with new profile-based templates in onboarding
+- Old templates still available in beheer/testdata for admin use
+
+### Current Status
+- 3 features completed this session (#380, #381, #382)
+- Zero TypeScript errors
+- Commit: 08b95df
+- 381/388 features passing (98.2%)
