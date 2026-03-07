@@ -23,25 +23,29 @@ function freedomStr(amount: number, dailyExp: number): string {
 }
 
 export function condenseDashboardData(data: DashboardData, temporal: TemporalContext, progressionEvents?: ProgressionEvent[]): string {
-  const dailyExp = data.monthlyExpenses > 0 ? data.monthlyExpenses / 30 : 0
-  const savingsRate = data.monthlyIncome > 0
-    ? Math.round(((data.monthlyIncome - data.monthlyExpenses) / data.monthlyIncome) * 100)
+  const dailyExp = (data.monthlyExpenses ?? 0) > 0 ? (data.monthlyExpenses ?? 0) / 30 : 0
+  const monthlyIncome = data.monthlyIncome ?? 0
+  const monthlyExpenses = data.monthlyExpenses ?? 0
+  const savingsRate = monthlyIncome > 0
+    ? Math.round(((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100)
     : 0
-  const phase = levelToPhaseId(data.sovereigntyLevel)
+  const phase = levelToPhaseId(data.sovereigntyLevel ?? 0)
+
+  const fireAge = data.fireProjResult?.fireAge ?? 'onbekend'
 
   const lines: string[] = [
     `FINANCIEEL OVERZICHT (${temporal.date})`,
-    `Netto vermogen: ${formatCurrency(data.netWorth)} (${freedomStr(data.netWorth, dailyExp)})`,
-    `Totale assets: ${formatCurrency(data.totalAssets)}`,
-    `Totale schulden: ${formatCurrency(data.totalDebts)}`,
-    `Maandinkomen: ${formatCurrency(data.monthlyIncome)}`,
-    `Maanduitgaven: ${formatCurrency(data.monthlyExpenses)}`,
+    `Netto vermogen: ${formatCurrency(data.netWorth ?? 0)} (${freedomStr(data.netWorth ?? 0, dailyExp)})`,
+    `Totale assets: ${formatCurrency(data.totalAssets ?? 0)}`,
+    `Totale schulden: ${formatCurrency(data.totalDebts ?? 0)}`,
+    `Maandinkomen: ${formatCurrency(monthlyIncome)}`,
+    `Maanduitgaven: ${formatCurrency(monthlyExpenses)}`,
     `Spaarquote: ${savingsRate}%`,
-    `Vrijheidspercentage: ${Math.round(data.freedomPct)}%`,
-    `FIRE doel: ${formatCurrency(data.fireTarget)}`,
-    `FIRE leeftijd: ${data.fireProjResult.fireAge ?? 'onbekend'}`,
-    `Sovereignty level: ${data.sovereigntyLevel} (${phase})`,
-    `Maanden buffer: ${Math.round(data.monthsCovered * 10) / 10}`,
+    `Vrijheidspercentage: ${Math.round(data.freedomPct ?? 0)}%`,
+    `FIRE doel: ${formatCurrency(data.fireTarget ?? 0)}`,
+    `FIRE leeftijd: ${fireAge}`,
+    `Sovereignty level: ${data.sovereigntyLevel ?? 0} (${phase})`,
+    `Maanden buffer: ${Math.round((data.monthsCovered ?? 0) * 10) / 10}`,
     `Consumentenschuld: ${data.hasConsumerDebt ? 'ja' : 'nee'}`,
     '',
   ]
@@ -65,18 +69,19 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
   }
 
   // Consecutive positive growth months
-  if (data.netWorthHistory.length >= 2) {
+  const netWorthHistory = data.netWorthHistory ?? []
+  if (netWorthHistory.length >= 2) {
     let streak = 0
-    for (let i = data.netWorthHistory.length - 1; i > 0; i--) {
-      if (data.netWorthHistory[i].value > data.netWorthHistory[i - 1].value) streak++
+    for (let i = netWorthHistory.length - 1; i > 0; i--) {
+      if (netWorthHistory[i].value > netWorthHistory[i - 1].value) streak++
       else break
     }
     if (streak > 0) lines.push(`Opeenvolgende maanden groei: ${streak}`)
   }
 
   // Previous month expenses comparison
-  if (data.prevMonthExpenses > 0) {
-    const delta = data.monthlyExpenses - data.prevMonthExpenses
+  if ((data.prevMonthExpenses ?? 0) > 0) {
+    const delta = monthlyExpenses - data.prevMonthExpenses
     const sign = delta >= 0 ? '+' : ''
     lines.push(`Vorige maand uitgaven: ${formatCurrency(data.prevMonthExpenses)} (verschil: ${sign}${formatCurrency(delta)})`)
   }
@@ -86,20 +91,25 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
   lines.push('')
 
   // Budget totals
-  const bt = data.budgetTotals
+  const defaultBucket = { limit: 0, spent: 0 }
+  const bt = data.budgetTotals ?? { income: defaultBucket, expense: defaultBucket, savings: defaultBucket, debt: defaultBucket }
+  const btIncome = bt.income ?? defaultBucket
+  const btExpense = bt.expense ?? defaultBucket
+  const btSavings = bt.savings ?? defaultBucket
+  const btDebt = bt.debt ?? defaultBucket
   lines.push('BUDGETTEN DEZE MAAND:')
-  lines.push(`- Inkomen: ${formatCurrency(bt.income.spent)} van ${formatCurrency(bt.income.limit)} (${pct(bt.income.spent, bt.income.limit)}%)`)
-  lines.push(`- Uitgaven: ${formatCurrency(bt.expense.spent)} van ${formatCurrency(bt.expense.limit)} (${pct(bt.expense.spent, bt.expense.limit)}%)`)
-  lines.push(`- Sparen: ${formatCurrency(bt.savings.spent)} van ${formatCurrency(bt.savings.limit)} (${pct(bt.savings.spent, bt.savings.limit)}%)`)
-  lines.push(`- Schuld: ${formatCurrency(bt.debt.spent)} van ${formatCurrency(bt.debt.limit)} (${pct(bt.debt.spent, bt.debt.limit)}%)`)
+  lines.push(`- Inkomen: ${formatCurrency(btIncome.spent)} van ${formatCurrency(btIncome.limit)} (${pct(btIncome.spent, btIncome.limit)}%)`)
+  lines.push(`- Uitgaven: ${formatCurrency(btExpense.spent)} van ${formatCurrency(btExpense.limit)} (${pct(btExpense.spent, btExpense.limit)}%)`)
+  lines.push(`- Sparen: ${formatCurrency(btSavings.spent)} van ${formatCurrency(btSavings.limit)} (${pct(btSavings.spent, btSavings.limit)}%)`)
+  lines.push(`- Schuld: ${formatCurrency(btDebt.spent)} van ${formatCurrency(btDebt.limit)} (${pct(btDebt.spent, btDebt.limit)}%)`)
 
   // Budget pressure indicator
-  const expensePct = bt.expense.limit > 0 ? (bt.expense.spent / bt.expense.limit) * 100 : 0
+  const expensePct = btExpense.limit > 0 ? (btExpense.spent / btExpense.limit) * 100 : 0
   if (expensePct > 90) lines.push(`⚠ Budget bijna op: ${Math.round(expensePct)}% besteed`)
   else if (expensePct > 75) lines.push(`Budget druk: ${Math.round(expensePct)}% besteed`)
 
   // Favorite budget breakdowns
-  if (data.favoriteBudgets.length > 0) {
+  if (data.favoriteBudgets && data.favoriteBudgets.length > 0) {
     lines.push('')
     lines.push('FAVORIETE BUDGETTEN:')
     for (const fb of data.favoriteBudgets) {
@@ -165,10 +175,10 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
   }
 
   // Actions
-  lines.push(`OPENSTAANDE ACTIES: ${data.openActions}`)
-  lines.push(`Vrijheidsdagen te winnen: ${Math.round(data.totalFreedomDaysOpen)}`)
-  lines.push(`Acties afgerond deze maand: ${data.completedActionsThisMonth}`)
-  if (data.topOpenActions.length > 0) {
+  lines.push(`OPENSTAANDE ACTIES: ${data.openActions ?? 0}`)
+  lines.push(`Vrijheidsdagen te winnen: ${Math.round(data.totalFreedomDaysOpen ?? 0)}`)
+  lines.push(`Acties afgerond deze maand: ${data.completedActionsThisMonth ?? 0}`)
+  if (data.topOpenActions && data.topOpenActions.length > 0) {
     for (const a of data.topOpenActions.slice(0, 3)) {
       const impact = a.freedom_days_impact != null ? ` (${a.freedom_days_impact}d)` : ''
       lines.push(`- ${a.title}${impact}`)
@@ -177,8 +187,8 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
   lines.push('')
 
   // Goals with deadlines + coaching context
-  lines.push(`DOELEN: ${data.goals}`)
-  if (data.topGoals.length > 0) {
+  lines.push(`DOELEN: ${data.goals ?? 0}`)
+  if (data.topGoals && data.topGoals.length > 0) {
     const now = new Date()
     for (const g of data.topGoals) {
       const goalPct = g.target_value > 0 ? Math.round((g.current_value / g.target_value) * 100) : 0
@@ -223,8 +233,8 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
   lines.push('')
 
   // Net worth history (compact sparkline data)
-  if (data.netWorthHistory.length > 0) {
-    const histStr = data.netWorthHistory
+  if (netWorthHistory.length > 0) {
+    const histStr = netWorthHistory
       .map(h => `${h.month.slice(5, 7)}:${Math.round(h.value / 1000)}k`)
       .join(' ')
     lines.push(`VERMOGEN 12M: ${histStr}`)
@@ -271,8 +281,8 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
     const seasonalCtx = getSeasonalContext(
       temporal.month,
       temporal.year,
-      data.monthlyExpenses,
-      data.monthlyIncome,
+      monthlyExpenses,
+      monthlyIncome,
     )
     if (seasonalCtx) {
       lines.push(`SEIZOENSCONTEXT: ${seasonalCtx}`)
@@ -306,11 +316,11 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
     }
     lines.push('')
   } else {
-    lines.push(`Terugkerende transacties: ${data.recurringTransactions}`)
+    lines.push(`Terugkerende transacties: ${data.recurringTransactions ?? 0}`)
   }
 
   // Recommendations (detailed)
-  lines.push(`AANBEVELINGEN: ${data.recommendations} totaal`)
+  lines.push(`AANBEVELINGEN: ${data.recommendations ?? 0} totaal`)
   if (data.topRecommendations && data.topRecommendations.length > 0) {
     for (const rec of data.topRecommendations.slice(0, 3)) {
       const impact = rec.freedomDaysImpact > 0 ? ` — ${rec.freedomDaysImpact} vrijheidsdagen/jaar` : ''
@@ -335,7 +345,7 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
     }
     lines.push('')
   } else {
-    lines.push(`Levensgebeurtenissen: ${data.lifeEvents}`)
+    lines.push(`Levensgebeurtenissen: ${data.lifeEvents ?? 0}`)
   }
 
   // Personal trends

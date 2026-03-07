@@ -58,11 +58,15 @@ function detectExpenseRise(data: DashboardData, alerts: PatternAlert[]): void {
 function detectRepeatedBudgetOverrun(data: DashboardData, alerts: PatternAlert[]): void {
   const { favoriteBudgets, budgetTotals } = data
 
+  if (!budgetTotals) return
+
+  const expense = budgetTotals.expense ?? { limit: 0, spent: 0 }
+
   // Check main expense budget
-  if (budgetTotals.expense.limit > 0 && budgetTotals.expense.spent > budgetTotals.expense.limit) {
+  if (expense.limit > 0 && expense.spent > expense.limit) {
     // Check if prev month expenses also exceeded — using prevMonthExpenses as proxy
-    if (data.prevMonthExpenses > 0 && budgetTotals.expense.limit > 0 &&
-        data.prevMonthExpenses > budgetTotals.expense.limit) {
+    if ((data.prevMonthExpenses ?? 0) > 0 && expense.limit > 0 &&
+        (data.prevMonthExpenses ?? 0) > expense.limit) {
       alerts.push({
         type: 'budget_overschrijding_herhaald',
         severity: 'warning',

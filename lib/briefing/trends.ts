@@ -124,8 +124,11 @@ function computeConsecutiveGrowthMonths(data: DashboardData): number {
 function computeBudgetDisciplineScore(data: DashboardData): number {
   const { budgetTotals, favoriteBudgets } = data
 
+  if (!budgetTotals) return 100
+
   // Count budget categories that are within their limit
-  const categories = [budgetTotals.expense, budgetTotals.savings, budgetTotals.debt]
+  const defaultBucket = { limit: 0, spent: 0 }
+  const categories = [budgetTotals.expense ?? defaultBucket, budgetTotals.savings ?? defaultBucket, budgetTotals.debt ?? defaultBucket]
   let total = 0
   let withinLimit = 0
 

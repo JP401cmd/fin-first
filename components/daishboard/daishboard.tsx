@@ -98,15 +98,17 @@ function updateLongTermMemory(
     const mergedAdvice = [...prevAdvice, ...newAdvice].slice(-5)
 
     // Compute savings rate from data
-    const savingsRate = data.monthlyIncome > 0
-      ? Math.round(((data.monthlyIncome - data.monthlyExpenses) / data.monthlyIncome) * 100)
+    const income = data.monthlyIncome ?? 0
+    const expenses = data.monthlyExpenses ?? 0
+    const savingsRate = income > 0
+      ? Math.round(((income - expenses) / income) * 100)
       : 0
 
     const memory: BriefingLongTermMemory = {
       lastBriefingDate: composedAt,
-      lastNetWorth: Math.round(data.netWorth),
+      lastNetWorth: Math.round(data.netWorth ?? 0),
       lastSavingsRate: savingsRate,
-      lastFreedomPct: Math.round(data.freedomPct),
+      lastFreedomPct: Math.round(data.freedomPct ?? 0),
       briefingCount: (existing?.briefingCount ?? 0) + 1,
       adviceHistory: mergedAdvice,
     }
@@ -116,17 +118,20 @@ function updateLongTermMemory(
 
 /** Compact hash of key financial metrics for cache invalidation */
 function hashDashboardData(data: DashboardData): string {
+  const bt = data.budgetTotals
+  const expense = bt?.expense ?? { spent: 0, limit: 0 }
+  const income = bt?.income ?? { spent: 0, limit: 0 }
   const parts = [
-    Math.round(data.netWorth),
-    Math.round(data.totalAssets),
-    Math.round(data.totalDebts),
-    Math.round(data.monthlyExpenses),
-    Math.round(data.monthlyIncome),
-    Math.round(data.budgetTotals.expense.spent),
-    Math.round(data.budgetTotals.expense.limit),
-    Math.round(data.budgetTotals.income.spent),
-    data.openActions,
-    Math.round(data.freedomPct),
+    Math.round(data.netWorth ?? 0),
+    Math.round(data.totalAssets ?? 0),
+    Math.round(data.totalDebts ?? 0),
+    Math.round(data.monthlyExpenses ?? 0),
+    Math.round(data.monthlyIncome ?? 0),
+    Math.round(expense.spent),
+    Math.round(expense.limit),
+    Math.round(income.spent),
+    data.openActions ?? 0,
+    Math.round(data.freedomPct ?? 0),
   ]
   return parts.join('|')
 }
@@ -206,11 +211,11 @@ export function DAIshboard({ data, temporal, userName }: Props) {
     // Detect progression events by comparing with previous snapshot
     const previousSnapshot = loadPreviousSnapshot()
     const currentSnapshot = buildSnapshot(
-      data.sovereigntyLevel,
-      data.freedomPct,
-      data.hasConsumerDebt,
-      data.netWorth,
-      data.monthsCovered,
+      data.sovereigntyLevel ?? 0,
+      data.freedomPct ?? 0,
+      data.hasConsumerDebt ?? false,
+      data.netWorth ?? 0,
+      data.monthsCovered ?? 0,
     )
     const progressionEvents = detectProgressionEvents(previousSnapshot, currentSnapshot)
     // Save current snapshot for next briefing comparison
@@ -287,7 +292,7 @@ export function DAIshboard({ data, temporal, userName }: Props) {
                 // Update long-term memory in localStorage
                 updateLongTermMemory(streamedCards, event.composedAt, data)
                 // Update seasonal snapshot for year-over-year comparisons
-                updateSeasonalSnapshot(temporal.month, temporal.year, data.monthlyExpenses, data.monthlyIncome)
+                updateSeasonalSnapshot(temporal.month, temporal.year, data.monthlyExpenses ?? 0, data.monthlyIncome ?? 0)
                 break
               case 'error':
                 setError(event.message)
