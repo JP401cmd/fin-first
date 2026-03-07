@@ -8949,3 +8949,38 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#357, #360, #358)
 - Zero TypeScript errors
 - All commits clean
+
+## Session 2026-03-07 - Feature #368
+
+### Feature #368: Advies-effectmeting: impact van eerder gegeven suggesties - PASSING
+- Extended completed actions query from 30 to 60 days in daishboard/page.tsx
+- Added EFFECTMETING section to condense.ts: filters recentCompletedActions for freedom_days_impact > 0
+- Per action: title, freedom days/year, estimated monthly savings (via dailyExp), completion date
+- Totals: sum of freedom days gained + estimated monthly savings
+- Budget context: compares current vs previous month expenses as indicator of action effect
+- Added EFFECTMETING instruction block to briefing.ts AI prompt
+- Instructions: celebrate with showInsight when impact > 5 days/year, link expense decrease to actions
+- Section hidden when no impactful completed actions exist
+- Zero TypeScript errors, server running clean
+- Commit: fec9cc7
+
+### Current Status
+- 1 feature completed this session (#368)
+- 361/364 features passing (99.2%)
+
+## Session 2026-03-07 - Feature #372
+
+### Feature #372: Beeldvullende layout-optimalisatie: rijen van 4 kolommen vullen - PASSING
+- Added optimizeRowFill() function to lib/briefing/validate-layout.ts
+- Greedy row-fill algorithm: builds rows of exactly 4 columns
+- Takes next card in order if it fits; looks ahead for fitting card if not
+- Milestone (span=4) naturally gets its own row
+- Valid row patterns: 4, 2+2, 1+1+2, 2+1+1, 1+1+1+1
+- Called in validateBriefingLayout BEFORE existing rules (milestone-position, adjacent-fix, last-card)
+- Exported for direct use/testing
+- Zero TypeScript errors
+- Commit: 7a3dea0
+
+### Current Status
+- 1 feature completed this session (#372)
+- 365/369 features passing (98.9%)
