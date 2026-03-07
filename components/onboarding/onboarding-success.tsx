@@ -1,32 +1,37 @@
-import { FinnAvatar, FhinAvatar, FfinAvatar } from '@/components/app/avatars'
+import { FinnAvatar } from '@/components/app/avatars'
 import { SpeechBubbleCentered } from './speech-bubble'
+import { Shield, Zap, Telescope } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
-const MODULE_CARDS = [
+const MODULE_CARDS: readonly { Icon: LucideIcon; name: string; description: string; borderColor: string; bgColor: string; iconBg: string; textColor: string }[] = [
   {
-    Avatar: FhinAvatar,
+    Icon: Shield,
     name: 'De Kern',
-    description: 'Je financiële fundament: vermogen, budgetten, schulden en cashflow. Hier zie je waar je nu staat.',
+    description: 'Je financiele fundament: vermogen, budgetten, schulden en cashflow. Hier zie je waar je nu staat.',
     borderColor: 'border-amber-200',
     bgColor: 'bg-amber-50/50',
+    iconBg: 'bg-amber-100',
     textColor: 'text-amber-700',
   },
   {
-    Avatar: FinnAvatar,
+    Icon: Zap,
     name: 'De Wil',
-    description: 'Bewuste keuzes en acties. Ik help je met slimme aanbevelingen en houd je doelen in zicht.',
+    description: 'Bewuste keuzes en acties. Will helpt je met slimme aanbevelingen en houdt je doelen in zicht.',
     borderColor: 'border-wil-200',
     bgColor: 'bg-wil-50/50',
+    iconBg: 'bg-wil-100',
     textColor: 'text-wil-700',
   },
   {
-    Avatar: FfinAvatar,
+    Icon: Telescope,
     name: 'De Horizon',
-    description: 'Je pad naar financiële vrijheid: FIRE-projecties, scenario\'s en simulaties van je toekomst.',
+    description: 'Je pad naar financiële vrijheid: projecties, scenario\'s en simulaties van je toekomst.',
     borderColor: 'border-horizon-200',
     bgColor: 'bg-horizon-50/50',
+    iconBg: 'bg-horizon-100',
     textColor: 'text-horizon-700',
   },
-] as const
+]
 
 export function OnboardingSuccess({ onDashboard }: { onDashboard: () => void }) {
   return (
@@ -36,12 +41,12 @@ export function OnboardingSuccess({ onDashboard }: { onDashboard: () => void }) 
       </div>
 
       <h2 className="text-2xl font-bold text-zinc-900">Welkom bij TriFinity!</h2>
-      <p className="mt-2 text-sm text-zinc-500">Ontmoet je team</p>
+      <p className="mt-2 text-sm text-zinc-500">Drie perspectieven, een doel</p>
 
       {/* Will introduces the modules */}
       <div className="mt-5 w-full">
         <SpeechBubbleCentered>
-          Ik ben Will, je persoonlijke financiële coach. Samen met mijn team begeleid ik je naar financiële vrijheid. Laat me de drie modules voorstellen:
+          Ik ben Will, je persoonlijke financiele coach. Ik begeleid je door drie perspectieven naar financiele vrijheid. Laat me ze voorstellen:
         </SpeechBubbleCentered>
       </div>
 
@@ -52,7 +57,9 @@ export function OnboardingSuccess({ onDashboard }: { onDashboard: () => void }) 
             key={card.name}
             className={`flex flex-col items-center rounded-2xl border-2 ${card.borderColor} ${card.bgColor} p-5`}
           >
-            <card.Avatar size={48} />
+            <div className={`flex h-12 w-12 items-center justify-center rounded-full ${card.iconBg}`}>
+              <card.Icon className={`h-6 w-6 ${card.textColor}`} />
+            </div>
             <p className={`mt-2 text-sm font-semibold ${card.textColor}`}>{card.name}</p>
             <p className="mt-1 text-xs leading-relaxed text-zinc-500">{card.description}</p>
           </div>
