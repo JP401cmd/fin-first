@@ -30,7 +30,12 @@ export const FEATURES: FeatureDef[] = [
   { id: 'widget_assets',      label: 'Vermogen Widget',        description: 'Assets widget op dashboard' },
   { id: 'widget_belasting',   label: 'Box 3 Widget',           description: 'Belasting widget op dashboard' },
   { id: 'widget_holdings',    label: 'Beleggingen Widget',     description: 'Holdings widget op dashboard' },
-  { id: 'widget_monte_carlo', label: 'Monte Carlo Widget',     description: 'Monte Carlo widget op dashboard' },
+  { id: 'widget_monte_carlo',    label: 'Monte Carlo Widget',     description: 'Monte Carlo widget op dashboard' },
+  { id: 'widget_passief_inkomen', label: 'Passief Inkomen Widget', description: 'Passieve inkomsten vs. FIRE-doel widget' },
+  { id: 'widget_box3_drag',       label: 'Box 3 Belastingdrag Widget', description: 'Jaarlijkse Box 3-belasting in euro en vrijheidsdagen widget' },
+  { id: 'widget_vrijheidsmijlpalen', label: 'Vrijheidsmijlpalen Widget', description: 'Voortgang naar de 4 vrijheidsmijlpalen met datums widget' },
+  { id: 'widget_voorstellen', label: 'Voorstellen Widget',    description: 'Persoonlijke aanbevelingen widget op dashboard' },
+  { id: 'widget_vrijheidsscenarios', label: "Vrijheidsscenario's Widget", description: 'Pessimistisch/verwacht/optimistisch FIRE-leeftijd widget' },
   { id: 'box3_belasting',       label: 'Box 3 Belasting',        description: 'Vermogensbelasting berekening' },
   { id: 'budget_optimalisatie', label: 'Budget Optimalisatie',    description: 'Slimmer omgaan met uitgaven' },
   { id: 'schulden_aflosplan',   label: 'Schulden Aflosplan',     description: 'Strategisch schulden aflossen' },
@@ -55,6 +60,9 @@ export const FEATURES: FeatureDef[] = [
   { id: 'doelen_systeem',           label: 'Doelen Systeem',              description: 'Financiele doelen instellen, voortgang volgen, ETA-berekening' },
   { id: 'beslissingspatronen',      label: 'Beslissingspatronen',         description: 'Bar chart met vrijheidsdagen per actie-type + impact-analyse' },
   { id: 'spending_patterns',        label: 'Uitgavenpatronen',            description: 'AI-gestuurde seizoenspatronen en trendanalyse van uitgaven' },
+  // Widget sovereignty gates — Horizon
+  { id: 'widget_backtesting_score', label: 'Historische Weerbaarheid Widget', description: 'Hoe je plan presteert bij historische marktcrises widget' },
+  { id: 'widget_ai_inzicht',       label: 'AI Inzicht Widget',              description: 'Persoonlijke AI-gedreven inzichten widget' },
 ]
 
 /**
@@ -140,4 +148,10 @@ export const DEFAULT_MATRIX: FeaturePhaseMatrix = {
   widget_belasting:          { recovery: false, stability: true,  momentum: true,  mastery: true },
   widget_holdings:           { recovery: false, stability: false, momentum: true,  mastery: true },
   widget_monte_carlo:        { recovery: false, stability: false, momentum: true,  mastery: true },
+  widget_passief_inkomen:    { recovery: false, stability: true,  momentum: true,  mastery: true },
+  widget_box3_drag:          { recovery: false, stability: true,  momentum: true,  mastery: true },
+  widget_vrijheidsmijlpalen: { recovery: true,  stability: true,  momentum: true,  mastery: true },
+  widget_backtesting_score:  { recovery: false, stability: false, momentum: true,  mastery: true },
+  widget_voorstellen:        { recovery: false, stability: true,  momentum: true,  mastery: true },
+  widget_ai_inzicht:         { recovery: true,  stability: true,  momentum: true,  mastery: true },
 }
