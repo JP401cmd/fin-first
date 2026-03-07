@@ -1,3 +1,61 @@
+## Session 2026-03-07 - Features #384, #385, #386
+
+### Feature #384: Onboarding voorkeuren - 'Wat vind jij belangrijk?' - PASSING
+- Created OnboardingPreferences component with 5 questions, one per screen section
+- Q1: Hoofddoel (4 single-select cards: overzicht/schulden/vermogen/FIRE)
+- Q2: Activiteitsniveau (3 single-select cards: dagelijks/wekelijks/maandelijks)
+- Q3: Module-interesse (3 multi-select cards: Kern/Wil/Horizon)
+- Q4: AI-inzichten (2 single-select cards: Ja/Nee)
+- Q5: Dashboard categorieën (6 multi-select cards: vermogen/budgetten/doelen/FIRE/beleggingen/voortgang)
+- Each question has Finn speech bubble with contextual explanation
+- Question progress dots (5 dots) showing current position
+- Visual feedback: border highlight + check icon on selection
+- Minimum 48px touch targets for mobile
+- Step progress shows "Voorkeuren" as step 4
+- Integrated into onboarding flow between budgets and saving
+
+### Feature #385: Voorkeuren naar widget_prefs mapping - PASSING
+- buildWidgetPrefsFromPreferences() maps all answers to WidgetPrefs
+- GOAL_WIDGETS: maps each goal to primary widgets
+- MODULE_WIDGETS: kern/wil/horizon module-specific widgets
+- CATEGORY_WIDGETS: dashboard categories to specific widget IDs
+- ACTIVITY_WIDGETS: dagelijks enables streaks/badges/meldingen, wekelijks/maandelijks lighter
+- AI insights: enables ai_inzicht widget
+- Baseline always-on: netto_vermogen, cash_flow, jouw_pad, vrijheidsvoortgang
+- Enabled widgets sorted first, disabled after, order preserved
+- Saved to profiles.widget_prefs via save-own-data API
+
+### Feature #386: Gecombineerde save-flow met voortgangsanimatie - PASSING
+- Progress animation: FinnAvatar with pulse, 5 rotating messages (800ms interval)
+- Gradient progress bar (amber→teal→purple) animating from 0 to 90% during save
+- Percentage display in monospace font
+- Error state: red alert card with error message, "Terug" and "Opnieuw proberen" buttons
+- Mobile-centered layout (min-h-[60vh] flex items-center justify-center)
+- budgetteringMode field added to save-own-data API ('none'/'template'/'manual')
+- Success: completes bar to 100%, then transitions to success screen
+- Zero TypeScript errors, zero console errors
+- Commit: 1f9db59
+
+### Current Status
+- 3 features completed this session (#384, #385, #386)
+- 386/388 features passing (99.5%)
+
+## Session 2026-03-07 - Feature #383
+
+### Feature #383: Onboarding: handmatige budget editor in onboarding - PASSING
+- All 7 steps already implemented in prior commits (08b95df, f71fdff)
+- BudgetAmountEditor reused in onboarding-budgets.tsx with getDefaultBudgets() pre-fill
+- Running total shows netto inkomen, totale uitgaven + sparen, over/tekort
+- Collapsible accordion groups per budget category with toggle + group total badges
+- Mobile: inputs full-width (w-full sm:w-28), labels stack above (flex-col sm:flex-row)
+- Running total sticky on mobile (sticky bottom-0 z-10 shadow-lg, sm:static)
+- Red warning border + tekort amount when total > income
+- TypeScript compiles cleanly, no mock data patterns
+- No code changes needed — implementation was already complete from #380/#381/#382 batch
+
+### Current Status
+- 382/388 features passing (98.5%)
+
 ## Session 2026-03-07 - Features #388, #389, #390
 
 ### Feature #388: Onboarding: mobile-first responsive layout - PASSING
