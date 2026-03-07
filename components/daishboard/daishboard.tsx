@@ -18,6 +18,7 @@ interface Props {
   data: DashboardData
   temporal: TemporalContext
   userName?: string
+  aiEnabled?: boolean
 }
 
 /** Cache TTL: 2 hours */
@@ -181,7 +182,7 @@ function parseSSEBuffer(buffer: string, onEvent: (event: BriefingSSEEvent) => vo
   return remaining
 }
 
-export function DAIshboard({ data, temporal, userName }: Props) {
+export function DAIshboard({ data, temporal, userName, aiEnabled = true }: Props) {
   const [cards, setCards] = useState<BriefingCardSpec[]>([])
   const [composedAt, setComposedAt] = useState('')
   const [composing, setComposing] = useState(true)
@@ -330,6 +331,10 @@ export function DAIshboard({ data, temporal, userName }: Props) {
 
   // Only fetch from AI on mount if there was no valid cache hit
   useEffect(() => {
+    if (!aiEnabled) {
+      setComposing(false)
+      return
+    }
     if (hasFetchedRef.current) return
     hasFetchedRef.current = true
     streamFromAI()
@@ -337,7 +342,7 @@ export function DAIshboard({ data, temporal, userName }: Props) {
       controllerRef.current?.abort()
       hasFetchedRef.current = false
     }
-  }, [streamFromAI])
+  }, [streamFromAI, aiEnabled])
 
   const handleRefresh = useCallback(() => {
     try { sessionStorage.removeItem(CACHE_KEY) } catch { /* ignore */ }
@@ -372,7 +377,17 @@ export function DAIshboard({ data, temporal, userName }: Props) {
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       <BriefingHeader temporal={temporal} userName={userName} />
 
-      {error && cards.length === 0 ? (
+      {!aiEnabled ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+          </div>
+          <h3 className="text-sm font-semibold text-[var(--ink-2)]">AI-features zijn uitgeschakeld</h3>
+          <p className="mt-1 max-w-sm text-xs text-[var(--ink-3)]">
+            Je kunt AI weer inschakelen via Instellingen &gt; Privacy &amp; AI. Zonder AI werkt de app als puur financieel dashboard.
+          </p>
+        </div>
+      ) : error && cards.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <p className="text-sm text-[var(--ink-3)] mb-3">{error}</p>
           <button

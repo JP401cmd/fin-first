@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { NOTIFICATION_TYPES } from '@/lib/identity-constants'
-import { Lock, GripVertical, ChevronDown, Shield, Eye, EyeOff, Server } from 'lucide-react'
+import { Lock, GripVertical, ChevronDown, Shield, Eye, EyeOff, Server, FileText } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -35,6 +35,7 @@ import { reassignOrders } from '@/lib/widget-order'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { NL_SWR, BOX3_DRAG } from '@/lib/horizon-data'
 import { KassabonShell } from '@/components/app/kassabon-shell'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import { useModuleColors, useBudgetColors, usePhaseColors, useFontTheme } from '@/components/app/module-color-provider'
 import type { FontTheme } from '@/components/app/module-color-provider'
 import { DEFAULT_MODULE_COLORS, DEFAULT_BUDGET_COLORS, DEFAULT_PHASE_COLORS } from '@/lib/color-palette'
@@ -216,6 +217,11 @@ export default function InstellingenPage() {
   const [gegevensOpen, setGegevensOpen] = useState(false)
   const [privacyOpen, setPrivacyOpen] = useState(false)
 
+  // ─ Section F: Privacy & AI ─
+  const [aiEnabled, setAiEnabled] = useState(true)
+  const [aiSaving, setAiSaving] = useState(false)
+  const [privacyModalOpen, setPrivacyModalOpen] = useState(false)
+
   // ─ Section A: Notificaties ─
   const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>({
     budget: true, sync: true,
@@ -285,7 +291,7 @@ export default function InstellingenPage() {
       const [notifData, profileData, assetsResult, debtsResult, txResult, briefingPrefsData] = await Promise.all([
         supabase.from('app_settings').select('value').eq('key', `notifications_preferences_${user.id}`).maybeSingle(),
         supabase.from('profiles').select(
-          'widget_prefs, expected_return, inflation_rate, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, module_colors, budget_colors, phase_colors, typography_theme'
+          'widget_prefs, expected_return, inflation_rate, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, module_colors, budget_colors, phase_colors, typography_theme, ai_enabled'
         ).eq('id', user.id).single(),
         supabase.from('assets').select('current_value').eq('is_active', true),
         supabase.from('debts').select('current_balance, debt_type').eq('is_active', true),
@@ -366,6 +372,11 @@ export default function InstellingenPage() {
         // Weergave: typography
         if (d.typography_theme) {
           setFontTheme(d.typography_theme as FontTheme)
+        }
+
+        // Privacy & AI
+        if (d.ai_enabled != null) {
+          setAiEnabled(d.ai_enabled as boolean)
         }
 
       }
@@ -544,6 +555,21 @@ export default function InstellingenPage() {
     }
     setFireSaving(false)
   }, [supabase, retirementMethod, retirementCustomAmount, fireEndStrategy, fireEndAge, fireLegacyAmount])
+
+  // ─ Section F: Privacy & AI handler ────────────────────────────────────────
+  const toggleAiEnabled = useCallback(async (enabled: boolean) => {
+    setAiEnabled(enabled)
+    setAiSaving(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not authenticated')
+      const { error } = await supabase.from('profiles').update({ ai_enabled: enabled }).eq('id', user.id)
+      if (error) throw error
+    } catch {
+      setAiEnabled(!enabled) // revert on failure
+    }
+    setAiSaving(false)
+  }, [supabase])
 
   // ─ Section D handlers ────────────────────────────────────────────────────
   const saveTypography = useCallback(async () => {
@@ -1362,6 +1388,28 @@ export default function InstellingenPage() {
 
         {privacyOpen && (
           <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 pb-6 pt-4 space-y-6">
+            {/* AI Toggle */}
+            <div className="flex items-center justify-between rounded-xl border border-[var(--border-ed)] p-4">
+              <div className="flex-1 pr-4">
+                <h3 className="text-sm font-semibold text-[var(--ink)]">AI-features inschakelen</h3>
+                <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+                  {aiEnabled
+                    ? 'AI-briefing, chat en gepersonaliseerd nieuws zijn actief.'
+                    : 'AI is uitgeschakeld. De app werkt als puur financieel dashboard.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={aiEnabled}
+                disabled={aiSaving}
+                onClick={() => toggleAiEnabled(!aiEnabled)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 ${aiEnabled ? 'bg-teal-500' : 'bg-zinc-300'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${aiEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
+
             {/* Intro */}
             <p className="text-sm text-[var(--ink-2)] leading-relaxed">
               TriFinity gebruikt AI om je financiële inzichten en aanbevelingen te geven. Hieronder zie je precies welke data wordt gedeeld en hoe deze wordt beschermd.
@@ -1470,6 +1518,16 @@ export default function InstellingenPage() {
                 Alle data wordt automatisch gesanitiseerd voordat het naar een AI-provider wordt verstuurd.
               </p>
             </div>
+
+            {/* Full privacy statement link */}
+            <button
+              type="button"
+              onClick={() => setPrivacyModalOpen(true)}
+              className="flex items-center gap-2 text-sm font-medium text-teal-600 hover:text-teal-700 transition-colors"
+            >
+              <FileText className="h-4 w-4" />
+              Volledige privacyverklaring
+            </button>
           </div>
         )}
       </section>
@@ -1545,6 +1603,127 @@ export default function InstellingenPage() {
           </div>
         </div>
       )}
+
+      {/* Privacy statement modal */}
+      <BottomSheet
+        open={privacyModalOpen}
+        onClose={() => setPrivacyModalOpen(false)}
+        title="Privacyverklaring"
+      >
+        <div className="space-y-6 px-1 pb-4">
+          {/* Introductie */}
+          <p className="text-sm leading-relaxed text-[var(--ink-2)]">
+            TriFinity hecht grote waarde aan de bescherming van je persoonsgegevens. Deze verklaring beschrijft welke gegevens we verzamelen, hoe we ze gebruiken en welke rechten je hebt.
+          </p>
+
+          {/* 1. Welke gegevens */}
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-[var(--ink)]">1. Welke gegevens verzamelen we</h3>
+            <ul className="space-y-1.5 text-sm text-[var(--ink-2)]">
+              <li className="flex items-start gap-2">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                <span><strong>Accountgegevens:</strong> e-mailadres en versleuteld wachtwoord</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                <span><strong>Profielgegevens:</strong> naam, geboortedatum, huishoudtype</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                <span><strong>Financiële gegevens:</strong> bankrekeningen, transacties, budgetten, bezittingen, schulden, doelen</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                <span><strong>Voorkeuren:</strong> widget-instellingen, kleurconfiguratie, FIRE-parameters</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 2. Waarheen */}
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-[var(--ink)]">2. Waar worden je gegevens opgeslagen</h3>
+            <ul className="space-y-1.5 text-sm text-[var(--ink-2)]">
+              <li className="flex items-start gap-2">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-purple-400" />
+                <span><strong>Database:</strong> Supabase (PostgreSQL) met row-level security — alleen jij hebt toegang tot jouw data</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-purple-400" />
+                <span><strong>AI-providers:</strong> Anthropic of OpenAI ontvangen alleen geanonimiseerde, geaggregeerde financiële data</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-purple-400" />
+                <span><strong>Lokaal:</strong> sommige voorkeuren worden opgeslagen in je browser (localStorage)</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 3. Bewaartermijn */}
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-[var(--ink)]">3. Hoe lang bewaren we je data</h3>
+            <ul className="space-y-1.5 text-sm text-[var(--ink-2)]">
+              <li className="flex items-start gap-2">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
+                <span><strong>Financiële data:</strong> zolang je account actief is</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
+                <span><strong>AI-verwerking:</strong> zero-retention — providers bewaren je data niet na verwerking</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
+                <span><strong>Na verwijdering:</strong> bij het wissen van je account worden alle gegevens permanent verwijderd</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 4. Jouw rechten */}
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-[var(--ink)]">4. Jouw rechten</h3>
+            <p className="mb-2 text-sm text-[var(--ink-2)]">Op grond van de AVG heb je de volgende rechten:</p>
+            <ul className="space-y-1.5 text-sm text-[var(--ink-2)]">
+              <li className="flex items-start gap-2">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                <span><strong>Inzage:</strong> je kunt al je opgeslagen data bekijken in de app</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                <span><strong>Correctie:</strong> je kunt je gegevens op elk moment aanpassen via Profiel</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                <span><strong>Verwijdering:</strong> je kunt alle data wissen via Instellingen &gt; Gegevens Resetten</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                <span><strong>Bezwaar:</strong> je kunt AI-verwerking uitschakelen via de AI-toggle hierboven</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                <span><strong>Overdraagbaarheid:</strong> je kunt je data exporteren (neem contact op)</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 5. Contact */}
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-[var(--ink)]">5. Contact</h3>
+            <p className="text-sm text-[var(--ink-2)] leading-relaxed">
+              Heb je vragen over je privacy of wil je een van je rechten uitoefenen? Neem contact op via{' '}
+              <a href="mailto:privacy@trifinity.nl" className="font-medium text-teal-600 hover:text-teal-700 underline underline-offset-2">
+                privacy@trifinity.nl
+              </a>
+            </p>
+          </div>
+
+          {/* Versie */}
+          <div className="border-t border-[var(--border-ed)] pt-4">
+            <p className="text-xs text-[var(--ink-4)]">
+              Versie 1.0 — Laatst bijgewerkt: maart 2026
+            </p>
+          </div>
+        </div>
+      </BottomSheet>
 
     </div>
   )

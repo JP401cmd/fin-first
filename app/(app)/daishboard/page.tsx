@@ -38,7 +38,7 @@ export default async function DAIshboardPage() {
     supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('id, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
     supabase.from('debts').select('id, current_balance, debt_type, net_worth_inclusion_pct, is_tax_deductible, linked_asset_id').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, full_name').single(),
+    supabase.from('profiles').select('date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, full_name, ai_enabled').single(),
     supabase.from('budgets').select('id, default_limit, interval').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
     supabase.from('actions')
       .select('id, title, status, freedom_days_impact, priority_score, due_date, source, completed_at')
@@ -772,6 +772,7 @@ export default async function DAIshboardPage() {
   // ── Build temporal context ────────────────────────────────
   const temporal = buildTemporalContext(now)
   const userName = (profileResult.data as { full_name?: string | null })?.full_name?.split(' ')[0] ?? undefined
+  const aiEnabled = (profileResult.data as { ai_enabled?: boolean | null })?.ai_enabled !== false
 
-  return <DAIshboard data={dashboardData} temporal={temporal} userName={userName} />
+  return <DAIshboard data={dashboardData} temporal={temporal} userName={userName} aiEnabled={aiEnabled} />
 }

@@ -5,8 +5,9 @@ import { createClient } from '@/lib/supabase/client'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { NotificationItem } from '@/components/app/notifications/notification-item'
 import { RELEASE_NOTES, type ReleaseNote } from '@/lib/release-notes'
-import { Bell, Newspaper, ChevronRight, CheckCheck, Sparkles, TrendingUp, AlertCircle, Loader2, RefreshCw } from 'lucide-react'
+import { Bell, Newspaper, ChevronRight, CheckCheck, Sparkles, TrendingUp, AlertCircle, Loader2, RefreshCw, MessageSquare } from 'lucide-react'
 import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
+import { useChatContext } from '@/components/app/chat/chat-provider'
 import Link from 'next/link'
 import type { Notification } from '@/app/api/notifications/route'
 import type { NewsItem } from '@/app/api/news/route'
@@ -270,6 +271,28 @@ function ImpactBlock({ impact }: { impact: string }) {
   )
 }
 
+// ── Discuss with Will button ─────────────────────────────────────────
+
+function DiscussWithWillButton({ item }: { item: NewsItem }) {
+  const { openWithMessage } = useChatContext()
+
+  const handleClick = useCallback(() => {
+    const message = `Ik las dit nieuwsartikel:\n\n"${item.headline}"\n\n${item.summary}\n\nWat betekent dit voor mijn financiële situatie?`
+    openWithMessage(message)
+  }, [item.headline, item.summary, openWithMessage])
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-[var(--r-sm)] border border-wil-200 bg-wil-50 px-3 py-2 font-inter text-[11px] font-medium text-wil-700 transition-colors hover:bg-wil-100 sm:min-h-0 sm:px-2 sm:py-1"
+    >
+      <MessageSquare className="h-3 w-3" />
+      Bespreek met Will
+    </button>
+  )
+}
+
 // ── Hero news article (first item — front-page style) ───────────────
 
 function HeroNewsArticle({ item }: { item: NewsItem }) {
@@ -516,6 +539,37 @@ function NewspaperFooter() {
   )
 }
 
+// ── Section anchor navigation ────────────────────────────────────────
+
+function SectionAnchors() {
+  const scrollTo = (id: string) => {
+    const el = document.getElementById(id)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  return (
+    <nav className="mb-6 flex items-center justify-center gap-1" aria-label="Sectie-navigatie">
+      <button
+        type="button"
+        onClick={() => scrollTo('sectie-meldingen')}
+        className="flex min-h-[44px] items-center gap-1.5 rounded-[var(--r)] px-3 py-1.5 font-inter text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] sm:min-h-0"
+      >
+        <Bell className="h-3.5 w-3.5" />
+        Meldingen
+      </button>
+      <span className="text-[var(--ink-4)]" aria-hidden="true">&middot;</span>
+      <button
+        type="button"
+        onClick={() => scrollTo('sectie-nieuws')}
+        className="flex min-h-[44px] items-center gap-1.5 rounded-[var(--r)] px-3 py-1.5 font-inter text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] sm:min-h-0"
+      >
+        <Newspaper className="h-3.5 w-3.5" />
+        Nieuws
+      </button>
+    </nav>
+  )
+}
+
 // ── Main page ────────────────────────────────────────────────────────
 
 export default function BerichtenPage() {
@@ -714,6 +768,9 @@ export default function BerichtenPage() {
     <div className="mx-auto max-w-[720px] px-4 py-6 md:px-8">
       <Masthead />
 
+      {/* Section anchor navigation */}
+      <SectionAnchors />
+
       {/* Cross-link to Will's briefing */}
       <Link
         href="/daishboard"
@@ -733,6 +790,7 @@ export default function BerichtenPage() {
       </Link>
 
       {/* ── MELDINGEN sectie ─────────────────────────────────────── */}
+      <section id="sectie-meldingen" className="scroll-mt-4">
       <SectionHeading label="Meldingen" />
 
       <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
@@ -830,7 +888,10 @@ export default function BerichtenPage() {
           )}
         </div>
 
+      </section>
+
       {/* ── FINANCIEEL NIEUWS sectie ──────────────────────────────── */}
+      <section id="sectie-nieuws" className="scroll-mt-4">
       <SectionHeading label="Financieel Nieuws" />
 
       {!aiEnabled ? (
@@ -929,6 +990,8 @@ export default function BerichtenPage() {
           )}
         </div>
       )}
+
+      </section>
 
       {/* Krant-footer */}
       <NewspaperFooter />
