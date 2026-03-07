@@ -1,3 +1,19 @@
+## Session 2026-03-07 - Feature #430
+
+### Feature #430: Onboarding: gebruik tf. logo in plaats van regenboog/TriFinity tekst - PASSING
+- Replaced all 'TriFinity' text references in onboarding components with the clean tf. mark
+- onboarding-intro.tsx: "Bij TriFinity kijken we anders" → "Hier kijken we anders"
+- onboarding-success.tsx: "Welkom bij TriFinity!" heading → tf. mark (font-playfair, kern-600) + "Welkom" + italic tagline "Geld is opgeslagen tijd"
+- onboarding-preferences.tsx: "TriFinity heeft drie perspectieven" → "Er zijn drie perspectieven"
+- No rainbow gradients found to remove (already clean)
+- tf. mark matches rapportage footer pattern exactly
+- Verified with browser automation via test page, zero console errors
+- Commit: 20385d3
+
+### Current Status
+- 1 feature completed this session (#430)
+- 417/427 features passing (97.7%)
+
 ## Session 2026-03-07 - Feature #421
 
 ### Feature #421: Toelichtende speech bubbles bij elke onboarding stap - PASSING
