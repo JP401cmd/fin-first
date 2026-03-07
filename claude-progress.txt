@@ -1,3 +1,29 @@
+## Session 2026-03-07 - Feature #421
+
+### Feature #421: Toelichtende speech bubbles bij elke onboarding stap - PASSING
+- Updated all onboarding speech bubbles with warmer, contextual Dutch explanations
+- onboarding-intro.tsx: Warmer welcome, explains 'geld is opgeslagen tijd' in 3 accessible sentences
+- onboarding-identity.tsx: Explains WHY personal info is needed (freedom time calculation), FIRE settings bubble updated
+- onboarding-extras.tsx: Explains value of adding accounts/debts for freedom percentage
+- onboarding-budgets.tsx: Frames budgeting as freedom time, emphasizes optional nature
+- onboarding-preferences.tsx: All 5 SPEECH_BUBBLES rewritten with more context and warmth
+- Removed FIRE/SWR/box3 jargon from all user-visible labels:
+  - "FIRE Instellingen" -> "Vrijheidsberekening"
+  - "FIRE eindstrategie" -> "Vermogensstrategie op einddatum"
+  - "Effectieve opnamerate" -> "Wat je vermogen netto per jaar groeit"
+  - "box3" -> "belasting" in visible text
+  - "FIRE bereiken" -> "Financiele vrijheid" in goal options
+  - "FIRE-gericht" -> "Vrijheidsgericht" in budget templates
+  - Step progress label: "Profiel & FIRE" -> "Profiel & Vrijheid"
+  - Success page: removed "FIRE-projecties" from De Horizon description
+- Zero TypeScript errors
+- Could not authenticate for browser testing (Supabase email rate limit)
+- Commit: 2677cab
+
+### Current Status
+- 1 feature completed this session (#421)
+- 415/425 features passing (97.6%)
+
 ## Session 2026-03-07 - Feature #411
 
 ### Feature #411: User preferences doorvoeren naar briefing system prompt - PASSING
