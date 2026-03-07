@@ -65,19 +65,19 @@ export function BudgetAmountEditor({
           )
 
           return (
-            <div key={parent.slug} className="rounded-xl border border-zinc-200 bg-white">
+            <div key={parent.slug} className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
               <button
                 onClick={() => toggleGroup(parent.slug)}
                 className="flex w-full min-h-[44px] items-center justify-between px-4 py-3 text-left"
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-zinc-800">{parent.name}</span>
-                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500">
+                  <span className="text-sm font-semibold text-[var(--ink)]">{parent.name}</span>
+                  <span className="rounded-full bg-[var(--subtle)] px-2 py-0.5 text-xs font-medium text-[var(--ink-3)]">
                     &euro;{groupTotal.toLocaleString('nl-NL')}
                   </span>
                 </div>
                 <svg
-                  className={`h-4 w-4 text-zinc-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                  className={`h-4 w-4 text-[var(--ink-4)] transition-transform ${isOpen ? 'rotate-180' : ''}`}
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -88,23 +88,23 @@ export function BudgetAmountEditor({
               </button>
 
               {isOpen && parent.children && (
-                <div className="border-t border-zinc-100 px-4 py-3 space-y-3">
+                <div className="border-t border-[var(--border-ed)] px-4 py-3 space-y-3">
                   {parent.children.map((child) => {
                     const val = amounts[child.slug] ?? child.default_limit
                     return (
                       <div key={child.slug} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
-                        <label className="min-w-0 text-xs text-zinc-600 truncate sm:flex-1" title={child.name}>
+                        <label className="min-w-0 text-xs text-[var(--ink-2)] truncate sm:flex-1" title={child.name}>
                           {child.name}
                         </label>
                         <div className="relative w-full sm:w-28 sm:shrink-0">
-                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-zinc-400">&euro;</span>
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-[var(--ink-4)]">&euro;</span>
                           <input
                             type="number"
                             min={0}
                             step={5}
                             value={val}
                             onChange={(e) => setAmount(child.slug, Number(e.target.value))}
-                            className="w-full rounded-md border border-zinc-300 bg-zinc-50 py-2 pr-2 pl-6 text-right text-base text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 sm:py-1.5 sm:text-xs"
+                            className="w-full rounded-md border border-[var(--border-ed)] bg-[var(--subtle)] py-2 pr-2 pl-6 text-right text-base text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)] sm:py-1.5 sm:text-xs"
                           />
                         </div>
                       </div>
@@ -117,16 +117,16 @@ export function BudgetAmountEditor({
         })}
 
       {/* Running total — sticky on mobile */}
-      <div className={`sticky bottom-0 z-10 rounded-xl border-2 p-4 shadow-lg sm:static sm:shadow-none ${isOver ? 'border-red-300 bg-red-50' : 'border-zinc-200 bg-zinc-50'}`}>
+      <div className={`sticky bottom-0 z-10 rounded-xl border-2 p-4 shadow-lg sm:static sm:shadow-none ${isOver ? 'border-red-300 bg-red-50' : 'border-[var(--border-ed)] bg-[var(--subtle)]'}`}>
         <div className="flex justify-between text-sm">
-          <span className="text-zinc-600">Netto inkomen</span>
-          <span className="font-semibold text-zinc-800">&euro;{netIncome.toLocaleString('nl-NL')}</span>
+          <span className="text-[var(--ink-2)]">Netto inkomen</span>
+          <span className="font-semibold text-[var(--ink)]">&euro;{netIncome.toLocaleString('nl-NL')}</span>
         </div>
         <div className="mt-1 flex justify-between text-sm">
-          <span className="text-zinc-600">Totale uitgaven + sparen</span>
-          <span className="font-medium text-zinc-700">&euro;{totalOut.toLocaleString('nl-NL')}</span>
+          <span className="text-[var(--ink-2)]">Totale uitgaven + sparen</span>
+          <span className="font-medium text-[var(--ink-2)]">&euro;{totalOut.toLocaleString('nl-NL')}</span>
         </div>
-        <div className="mt-2 border-t border-zinc-200 pt-2 flex justify-between text-sm">
+        <div className="mt-2 border-t border-[var(--border-ed)] pt-2 flex justify-between text-sm">
           <span className={`font-semibold ${isOver ? 'text-red-600' : 'text-emerald-600'}`}>
             {isOver ? 'Tekort' : 'Over'}
           </span>

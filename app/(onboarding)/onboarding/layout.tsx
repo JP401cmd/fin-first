@@ -14,7 +14,7 @@ export default async function OnboardingLayout({
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-zinc-50">
+    <div className="min-h-screen overflow-x-hidden bg-[var(--subtle)]">
       {children}
     </div>
   )

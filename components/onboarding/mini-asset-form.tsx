@@ -138,10 +138,10 @@ export function MiniAssetForm({
     <div className="space-y-3">
       {/* Summary cards */}
       {items.map((item, i) => (
-        <div key={i} className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+        <div key={i} className="flex items-center justify-between rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5">
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-zinc-900">{item.name}</p>
-            <p className="text-xs text-zinc-500">
+            <p className="truncate text-sm font-medium text-[var(--ink)]">{item.name}</p>
+            <p className="text-xs text-[var(--ink-3)]">
               {ASSET_TYPE_LABELS[item.asset_type]} &middot; &euro;{Number(item.current_value).toLocaleString('nl-NL')}
             </p>
           </div>
@@ -155,7 +155,7 @@ export function MiniAssetForm({
       {/* Add button */}
       <button
         onClick={openNew}
-        className="flex w-full min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-dashed border-zinc-300 py-2 text-xs font-medium text-zinc-500 hover:border-zinc-400 hover:text-zinc-700 active:bg-zinc-50"
+        className="flex w-full min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-dashed border-[var(--border-ed)] py-2 text-xs font-medium text-[var(--ink-3)] hover:border-[var(--border-md)] hover:text-[var(--ink-2)] active:bg-[var(--subtle)]"
       >
         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -167,21 +167,21 @@ export function MiniAssetForm({
       {editingIndex !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={() => setEditingIndex(null)}>
           <div
-            className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-xl sm:p-6 [&_input]:text-base [&_input]:sm:text-sm [&_select]:text-base [&_select]:sm:text-sm"
+            className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-[var(--paper)] p-4 shadow-xl sm:p-6 [&_input]:text-base [&_input]:sm:text-sm [&_select]:text-base [&_select]:sm:text-sm"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="mb-4 text-lg font-semibold text-zinc-900">
+            <h3 className="mb-4 text-lg font-semibold text-[var(--ink)]">
               {editingIndex === -1 ? 'Bezitting toevoegen' : 'Bezitting bewerken'}
             </h3>
 
             <div className="space-y-3">
               {/* Type */}
               <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-600">Type</label>
+                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Type</label>
                 <select
                   value={draft.asset_type}
                   onChange={(e) => handleTypeChange(e.target.value as AssetType)}
-                  className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                  className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
                 >
                   {ALL_TYPES.map((t) => (
                     <option key={t} value={t}>{ASSET_TYPE_LABELS[t]}</option>
@@ -191,24 +191,24 @@ export function MiniAssetForm({
 
               {/* Name */}
               <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-600">Naam</label>
+                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Naam</label>
                 <input
                   type="text"
                   placeholder="Bijv. Spaarrekening ING"
                   value={draft.name}
                   onChange={(e) => updateDraft({ name: e.target.value })}
-                  className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                  className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
                 />
               </div>
 
               {/* Subtype */}
               {visibleFields.includes('subtype') && subtypeLabels && (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-600">Subtype</label>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Subtype</label>
                   <select
                     value={draft.subtype}
                     onChange={(e) => handleSubtypeChange(e.target.value)}
-                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                    className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
                   >
                     <option value="">— Kies subtype —</option>
                     {Object.entries(subtypeLabels).map(([k, v]) => (
@@ -220,11 +220,11 @@ export function MiniAssetForm({
 
               {/* Current value */}
               <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-600">
+                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
                   {draft.asset_type === 'eigen_huis' ? 'Marktwaarde' : 'Huidige waarde'}
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">&euro;</span>
                   <input
                     type="number"
                     inputMode="decimal"
@@ -232,18 +232,18 @@ export function MiniAssetForm({
                     min={0}
                     value={draft.current_value}
                     onChange={(e) => updateDraft({ current_value: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-300 bg-white py-2 pr-3 pl-7 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                    className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] py-2 pr-3 pl-7 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
                   />
                 </div>
               </div>
 
               {/* Purchase value */}
               <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-600">
+                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
                   {draft.asset_type === 'eigen_huis' ? 'Aankoopprijs' : 'Aankoopwaarde'}
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">&euro;</span>
                   <input
                     type="number"
                     inputMode="decimal"
@@ -251,14 +251,14 @@ export function MiniAssetForm({
                     min={0}
                     value={draft.purchase_value}
                     onChange={(e) => updateDraft({ purchase_value: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-300 bg-white py-2 pr-3 pl-7 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                    className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] py-2 pr-3 pl-7 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
                   />
                 </div>
               </div>
 
               {/* Expected return */}
               <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-600">Verwacht rendement (% per jaar)</label>
+                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Verwacht rendement (% per jaar)</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -266,18 +266,18 @@ export function MiniAssetForm({
                     step={0.1}
                     value={draft.expected_return}
                     onChange={(e) => updateDraft({ expected_return: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 pr-8 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                    className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 pr-8 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">%</span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">%</span>
                 </div>
               </div>
 
               {/* Monthly contribution (hidden for eigen_huis) */}
               {draft.asset_type !== 'eigen_huis' && (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-600">Maandelijkse inleg</label>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Maandelijkse inleg</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">&euro;</span>
                     <input
                       type="number"
                       inputMode="decimal"
@@ -285,7 +285,7 @@ export function MiniAssetForm({
                       min={0}
                       value={draft.monthly_contribution}
                       onChange={(e) => updateDraft({ monthly_contribution: e.target.value })}
-                      className="w-full rounded-lg border border-zinc-300 bg-white py-2 pr-3 pl-7 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                      className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] py-2 pr-3 pl-7 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
                     />
                   </div>
                 </div>
@@ -294,13 +294,13 @@ export function MiniAssetForm({
               {/* Institution (hidden for eigen_huis) */}
               {draft.asset_type !== 'eigen_huis' && (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-600">Instelling</label>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Instelling</label>
                   <input
                     type="text"
                     placeholder="Bijv. ING, DEGIRO, ABP"
                     value={draft.institution}
                     onChange={(e) => updateDraft({ institution: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                    className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
                   />
                 </div>
               )}
@@ -310,11 +310,11 @@ export function MiniAssetForm({
               {/* Risk profile */}
               {visibleFields.includes('risk_profile') && (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-600">Risicoprofiel</label>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Risicoprofiel</label>
                   <select
                     value={draft.risk_profile}
                     onChange={(e) => updateDraft({ risk_profile: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                    className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
                   >
                     <option value="">— Kies —</option>
                     {Object.entries(RISK_PROFILE_LABELS).map(([k, v]) => (
@@ -326,39 +326,39 @@ export function MiniAssetForm({
 
               {/* Tax benefit */}
               {visibleFields.includes('tax_benefit') && (
-                <label className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+                <label className="flex items-center gap-2 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5">
                   <input
                     type="checkbox"
                     checked={draft.tax_benefit}
                     onChange={(e) => updateDraft({ tax_benefit: e.target.checked })}
-                    className="h-4 w-4 rounded border-zinc-300 text-wil-600 focus:ring-wil-500"
+                    className="h-4 w-4 rounded border-[var(--border-ed)] text-wil-600 focus:ring-wil-500"
                   />
-                  <span className="text-sm text-zinc-700">Fiscaal voordeel</span>
+                  <span className="text-sm text-[var(--ink-2)]">Fiscaal voordeel</span>
                 </label>
               )}
 
               {/* Is liquid */}
               {visibleFields.includes('is_liquid') && (
-                <label className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+                <label className="flex items-center gap-2 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5">
                   <input
                     type="checkbox"
                     checked={draft.is_liquid}
                     onChange={(e) => updateDraft({ is_liquid: e.target.checked })}
-                    className="h-4 w-4 rounded border-zinc-300 text-wil-600 focus:ring-wil-500"
+                    className="h-4 w-4 rounded border-[var(--border-ed)] text-wil-600 focus:ring-wil-500"
                   />
-                  <span className="text-sm text-zinc-700">Vrij opneembaar</span>
+                  <span className="text-sm text-[var(--ink-2)]">Vrij opneembaar</span>
                 </label>
               )}
 
               {/* Lock end date */}
               {visibleFields.includes('lock_end_date') && !draft.is_liquid && (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-600">Einddatum vastperiode</label>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Einddatum vastperiode</label>
                   <input
                     type="date"
                     value={draft.lock_end_date}
                     onChange={(e) => updateDraft({ lock_end_date: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                    className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
                   />
                 </div>
               )}
@@ -366,13 +366,13 @@ export function MiniAssetForm({
               {/* Ticker symbol */}
               {visibleFields.includes('ticker_symbol') && (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-600">Ticker / symbool</label>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Ticker / symbool</label>
                   <input
                     type="text"
                     placeholder="Bijv. VWRL, IWDA, BTC"
                     value={draft.ticker_symbol}
                     onChange={(e) => updateDraft({ ticker_symbol: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                    className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
                   />
                 </div>
               )}
@@ -380,11 +380,11 @@ export function MiniAssetForm({
               {/* Retirement provider */}
               {visibleFields.includes('retirement_provider_type') && (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-600">Type pensioenuitvoerder</label>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Type pensioenuitvoerder</label>
                   <select
                     value={draft.retirement_provider_type}
                     onChange={(e) => updateDraft({ retirement_provider_type: e.target.value })}
-                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                    className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
                   >
                     <option value="">— Kies —</option>
                     {Object.entries(RETIREMENT_PROVIDER_LABELS).map(([k, v]) => (
@@ -397,9 +397,9 @@ export function MiniAssetForm({
               {/* WOZ value */}
               {visibleFields.includes('woz_value') && (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-600">WOZ-waarde</label>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">WOZ-waarde</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">&euro;</span>
                     <input
                       type="number"
                       inputMode="decimal"
@@ -407,7 +407,7 @@ export function MiniAssetForm({
                       min={0}
                       value={draft.woz_value}
                       onChange={(e) => updateDraft({ woz_value: e.target.value })}
-                      className="w-full rounded-lg border border-zinc-300 bg-white py-2 pr-3 pl-7 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                      className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] py-2 pr-3 pl-7 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
                     />
                   </div>
                 </div>
@@ -417,23 +417,23 @@ export function MiniAssetForm({
               {visibleFields.includes('address_postcode') && (
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Postcode</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Postcode</label>
                     <input
                       type="text"
                       placeholder="1234AB"
                       value={draft.address_postcode}
                       onChange={(e) => updateDraft({ address_postcode: e.target.value })}
-                      className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                      className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Huisnummer</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Huisnummer</label>
                     <input
                       type="text"
                       placeholder="12a"
                       value={draft.address_house_number}
                       onChange={(e) => updateDraft({ address_house_number: e.target.value })}
-                      className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                      className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
                     />
                   </div>
                 </div>
@@ -442,9 +442,9 @@ export function MiniAssetForm({
               {/* Rental income */}
               {visibleFields.includes('rental_income') && (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-600">Huurinkomsten (per maand)</label>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Huurinkomsten (per maand)</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">&euro;</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">&euro;</span>
                     <input
                       type="number"
                       inputMode="decimal"
@@ -452,7 +452,7 @@ export function MiniAssetForm({
                       min={0}
                       value={draft.rental_income}
                       onChange={(e) => updateDraft({ rental_income: e.target.value })}
-                      className="w-full rounded-lg border border-zinc-300 bg-white py-2 pr-3 pl-7 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                      className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] py-2 pr-3 pl-7 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
                     />
                   </div>
                 </div>
@@ -461,7 +461,7 @@ export function MiniAssetForm({
               {/* Depreciation rate */}
               {visibleFields.includes('depreciation_rate') && (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-600">Afschrijving (% per jaar)</label>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Afschrijving (% per jaar)</label>
                   <div className="relative">
                     <input
                       type="number"
@@ -470,9 +470,9 @@ export function MiniAssetForm({
                       min={0}
                       value={draft.depreciation_rate}
                       onChange={(e) => updateDraft({ depreciation_rate: e.target.value })}
-                      className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 pr-8 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                      className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 pr-8 text-sm text-[var(--ink)] outline-none focus:border-[var(--border-md)] focus:ring-1 focus:ring-[var(--border-md)]"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400">%</span>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">%</span>
                   </div>
                 </div>
               )}
@@ -482,7 +482,7 @@ export function MiniAssetForm({
             <div className="mt-5 flex gap-3">
               <button
                 onClick={() => setEditingIndex(null)}
-                className="flex-1 min-h-[44px] rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50 active:bg-zinc-100"
+                className="flex-1 min-h-[44px] rounded-lg border border-[var(--border-ed)] px-4 py-2.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] active:bg-[var(--subtle)]"
               >
                 Annuleer
               </button>
