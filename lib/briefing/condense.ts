@@ -186,13 +186,38 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
   }
   lines.push('')
 
-  // Recently completed actions (last 30 days)
+  // Recently completed actions (last 60 days)
   if (data.recentCompletedActions && data.recentCompletedActions.length > 0) {
-    lines.push('AFGERONDE ACTIES (laatste 30 dagen):')
+    lines.push('AFGERONDE ACTIES (laatste 60 dagen):')
     for (const a of data.recentCompletedActions) {
       const impact = a.freedomDaysImpact != null ? ` — ${a.freedomDaysImpact} vrijheidsdagen gewonnen` : ''
       const date = a.completedAt ? ` (${a.completedAt.slice(0, 10)})` : ''
       lines.push(`- ${a.title}${impact}${date}`)
+    }
+    lines.push('')
+  }
+
+  // Effectmeting: impact of completed actions with measurable freedom_days_impact
+  const impactActions = (data.recentCompletedActions ?? []).filter(a => a.freedomDaysImpact != null && a.freedomDaysImpact > 0)
+  if (impactActions.length > 0) {
+    const totalFreedomDays = impactActions.reduce((sum, a) => sum + (a.freedomDaysImpact ?? 0), 0)
+    const estimatedMonthlySavings = dailyExp > 0 ? Math.round(totalFreedomDays * dailyExp) : 0
+
+    lines.push('EFFECTMETING (impact van uitgevoerde acties):')
+    for (const a of impactActions) {
+      const monthlySaving = dailyExp > 0 ? Math.round((a.freedomDaysImpact ?? 0) * dailyExp) : 0
+      const savingStr = monthlySaving > 0 ? `, ~${formatCurrency(monthlySaving)}/mnd besparing` : ''
+      lines.push(`- ${a.title}: ${a.freedomDaysImpact} vrijheidsdagen/jaar${savingStr} (afgerond ${a.completedAt ? a.completedAt.slice(0, 10) : 'onbekend'})`)
+    }
+    lines.push(`Totaal: ${totalFreedomDays} vrijheidsdagen/jaar gewonnen`)
+    if (estimatedMonthlySavings > 0) {
+      lines.push(`Geschatte maandelijkse besparing: ${formatCurrency(estimatedMonthlySavings)}`)
+    }
+
+    // Budget context: if expenses decreased, note the trend
+    if ((data.prevMonthExpenses ?? 0) > 0 && monthlyExpenses < data.prevMonthExpenses) {
+      const saving = data.prevMonthExpenses - monthlyExpenses
+      lines.push(`Context: uitgaven daalden ${formatCurrency(saving)}/mnd t.o.v. vorige maand — mogelijk effect van deze acties`)
     }
     lines.push('')
   }

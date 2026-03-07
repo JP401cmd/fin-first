@@ -307,15 +307,15 @@ export default async function DAIshboardPage() {
       }
     })
 
-  // Recently completed actions (last 30 days) for briefing context
-  const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30).toISOString().slice(0, 10)
+  // Recently completed actions (last 60 days) for briefing context + effectmeting
+  const sixtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 60).toISOString().slice(0, 10)
   const ninetyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90).toISOString().slice(0, 10)
 
   const recentCompletedActions: CompletedAction[] = allActions
     .filter(a => {
       if (a.status !== 'completed') return false
       const completedAt = (a as { completed_at?: string | null }).completed_at
-      return completedAt != null && completedAt >= thirtyDaysAgo
+      return completedAt != null && completedAt >= sixtyDaysAgo
     })
     .slice(0, 10)
     .map(a => {
