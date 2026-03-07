@@ -37,6 +37,9 @@ export function TerugkerendeTransactiesWidget({ size, data, href }: Props) {
     ? calculateFreedomTime(totalRecurringAmount, dailyExp)
     : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
+  const freedomDays = dailyExp > 0 && totalRecurringAmount > 0
+    ? Math.round(totalRecurringAmount / dailyExp)
+    : 0
 
   // ── Quarter-size: compact count + icon ────
   if (size === 'quarter') {
@@ -57,7 +60,7 @@ export function TerugkerendeTransactiesWidget({ size, data, href }: Props) {
 
   // ── Half-size: total + top-3 + freedom time ────
   if (size === 'half') {
-    const top3 = topRecurringTransactions.slice(0, 3)
+    const top5 = topRecurringTransactions.slice(0, 5)
     return (
       <WidgetShell module="kern" size={size} kicker="Vaste Lasten" href={href}>
         <div className="flex items-center gap-2">
@@ -66,9 +69,9 @@ export function TerugkerendeTransactiesWidget({ size, data, href }: Props) {
             {formatCurrency(totalRecurringAmount)} <span className="text-sm font-normal text-[var(--ink-3)]">per maand</span>
           </p>
         </div>
-        {top3.length > 0 && (
+        {top5.length > 0 && (
           <ul className="mt-2 space-y-1">
-            {top3.map((t) => (
+            {top5.map((t) => (
               <li key={t.id} className="flex items-center justify-between text-xs text-[var(--ink-2)]">
                 <span className="truncate mr-2">{t.name}</span>
                 <span className="font-mono tabular-nums shrink-0">{formatCurrency(t.amount)}</span>
@@ -76,9 +79,12 @@ export function TerugkerendeTransactiesWidget({ size, data, href }: Props) {
             ))}
           </ul>
         )}
+        <p className="mt-2 text-[11px] font-mono tabular-nums text-[var(--ink-2)]">
+          Totaal: {formatCurrency(totalRecurringAmount)}/maand
+        </p>
         {freedomStr && (
-          <p className="mt-2 font-serif italic text-[11px] text-[var(--ink-3)]">
-            = {freedomStr} vrijheid per maand
+          <p className="mt-1 font-serif italic text-[11px] text-[var(--ink-3)]">
+            = {freedomDays} vrijheidsdagen per maand
           </p>
         )}
         <p className="mt-2 text-[11px] text-[var(--ink-4)]">
