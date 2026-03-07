@@ -1,3 +1,34 @@
+## Session 2026-03-07 - Features #388, #389, #390
+
+### Feature #388: Onboarding: mobile-first responsive layout - PASSING
+- Container: max-w-[480px] on mobile, max-w-[640px] on desktop, px-4/sm:px-6
+- All buttons min-h-[44px] for WCAG touch targets
+- Form inputs text-base (16px) on mobile to prevent iOS zoom, sm:text-sm on desktop
+- Choice cards min-h-[60px] with hover/active states
+- Speech bubbles max-w-[85%] on mobile, sm:max-w-none
+- Layout overflow-x-hidden to prevent horizontal scroll
+- All 13 onboarding files updated
+
+### Feature #389: Onboarding: sticky navigatie knoppen op mobiel - PASSING
+- Sticky nav: fixed bottom-0 left-0 right-0 on mobile, sm:static on desktop
+- Background: bg-white/80 backdrop-blur-sm border-t border-zinc-200
+- Safe-area: pb-[env(safe-area-inset-bottom,12px)] for iPhone home indicator
+- Content padding: pb-20 sm:pb-0 to prevent content overlap
+- Applied to: identity, budgets (manual editor), extras steps
+
+### Feature #390: Onboarding: keuzekaarten responsive design - PASSING
+- Household type cards: rounded-xl border-2, icon + title + description
+- Selected state: border-wil-500 bg-wil-50 with check icon top-right
+- Default state: border-zinc-200 bg-white, hover: border-zinc-300 shadow-sm
+- Grid: grid-cols-1 on mobile, grid-cols-3 on desktop
+- Active tap feedback: active:scale-[0.98/0.99]
+- Budget method cards: min-h-[60px], icon + title + desc, hover/active states
+
+### Current Status
+- 3 features completed this session (#388, #389, #390)
+- Zero TypeScript errors
+- Commit: f71fdff
+
 ## Session 2026-03-07 - Features #374, #375, #376
 
 ### Feature #374: Onboarding: verwijder demo-data pad en persona-select - PASSING
