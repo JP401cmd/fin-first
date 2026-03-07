@@ -211,11 +211,19 @@ export type BriefingSSEEvent =
 
 // ── API Types ───────────────────────────────────────────────
 
+/** Summary of the previous briefing for continuity */
+export interface PreviousBriefingSummary {
+  composedAt: string
+  cardTypes: string[]
+  keyMetrics: Record<string, string>
+}
+
 export interface BriefingComposeRequest {
   dataSummary: string
   temporal: TemporalContext
   phase: string
   level: number
+  previousBriefing?: PreviousBriefingSummary
 }
 
 export interface BriefingComposeResponse {

@@ -16,6 +16,7 @@ import { GoalProgressCard } from './cards/goal-progress-card'
 import { BudgetBarCard } from './cards/budget-bar-card'
 import { QuoteCard } from './cards/quote-card'
 import { StreakCard } from './cards/streak-card'
+import { RecurringCard } from './cards/recurring-card'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 
 interface BriefingCardGridProps {
@@ -45,6 +46,7 @@ function renderCard(card: BriefingCardSpec, data: DashboardData) {
     case 'budgetBar': return <BudgetBarCard spec={card} />
     case 'quote': return <QuoteCard spec={card} />
     case 'streak': return <StreakCard spec={card} />
+    case 'recurring': return <RecurringCard spec={card} />
   }
 }
 
