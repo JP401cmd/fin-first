@@ -1,3 +1,62 @@
+## Session 2026-03-07 - Features #290, #291, #292
+
+### Feature #290: Spaarquote widget quarter-size - PASSING
+- Quarter: large percentage with green/red color + mini 3px progress bar
+### Feature #291: Spaarquote widget half-size maandvergelijking - PASSING
+- Half: previous month delta with arrow indicator
+### Feature #292: Spaarquote widget full-size trend en benchmark - PASSING
+- Full: 6-month sparkline SVG, 3m/6m averages, FIRE-optimal 50% benchmark line
+- Commit: 31fce02
+
+## Session 2026-03-07 - Feature #261
+
+### Feature #261: Dashboard page.tsx data fetching voor nieuwe DashboardData velden - PASSING
+- Added 4 new Supabase queries: badges, user_badges, user_streaks, next_step_completions
+- Compute notifications from: budget overspending alerts, per-budget alert_threshold, FIRE milestone proximity, monthly growth
+- Compute badgeSummary: earned count, total count, latest earned badge, nearest unearned badge with progress
+- Map user_streaks → StreakData[] (login/budget/action types), generate streak record notifications
+- Derive AI insights from savings rate, recurring cost ratio, FIRE countdown proximity
+- Compute nextSteps based on data completeness (missing transactions, assets, budgets, goals, DOB, etc.)
+- Compute monthSummary: netWorthDelta from snapshots, freedomDaysWon, savingsRate, budgetScore, prevMonthComparison
+- Build upcomingEvents from goal deadlines + life events with target_date
+- Compute emergencyFund from liquid assets (savings/checking/cash + unlinked bank accounts) vs 6-month target
+- Also fixed netWorthDelta (was hardcoded null, now computed from snapshots)
+- Applied to both dashboard/page.tsx and daishboard/page.tsx
+- TypeScript: clean, ESLint: 0 errors (7 pre-existing warnings)
+- Commit: 88df2ea
+
+### Current Status
+- 269/331 features passing (268 before + #261)
+
+---
+
+## Session 2026-03-07 - Features #284, #285, #286
+
+### Feature #284: Monte Carlo widget quarter-size - PASSING
+- Quarter shows backtestSuccessRate as font-mono text-lg with color (green>=85, amber>=65, red<65)
+- No data state: BarChart2 icon + 'Simuleer →'
+- Label: 'succeskans'
+
+### Feature #285: Monte Carlo widget half-size - PASSING
+- Prominent success rate with colored BarChart2 icon in tinted bg square
+- Label: 'Scenario-analyse succeskans'
+- Explanation: 'Gebaseerd op historische simulaties'
+- CTA: 'Simuleer duizenden mogelijke toekomsten →'
+- No data state: simplified with icon + CTA
+
+### Feature #286: Monte Carlo widget full-size verrijking - PASSING
+- Success rate prominent with colored icon
+- Crisis badges reused from backtesting-score-widget pattern (✓/✗ + label)
+- Model description: Monte Carlo simulation explanation
+- Shows X van Y historische crises overleefd
+- CTA: 'Open volledige simulatie →'
+- No data state: icon + description + CTA
+
+### Current Status
+- 3 features completed this session (#284, #285, #286)
+- All type-checks pass cleanly
+- Commit: cbea150
+
 ## Session 2026-03-07 - Features #281, #282, #283
 
 ### Feature #281: Doelen widget quarter-size - PASSING
@@ -8188,4 +8247,79 @@ For Feature #51 (Transaction Import):
 
 ### Current Status
 - 3 features completed this session (#269, #270, #271)
+- All type-checks pass cleanly
+
+## Session 2026-03-07 - Features #287, #288, #289
+
+### Feature #287: Levensgebeurtenissen widget quarter-size - PASSING
+- Added quarter-size early return with Calendar icon
+- Shows lifeEvents count as font-mono text-lg
+- Shows 'life events gepland' label
+- Shows next event name from topLifeEvents[0] if available
+
+### Feature #288: Levensgebeurtenissen widget half-size with timeline - PASSING
+- Added half-size rendering with vertical timeline (max 3 events)
+- Per event: year + name + impact direction (↑ green / ↓ red)
+- Vertical connecting line with dots
+- Total count as footer
+- Empty state for no events
+
+### Feature #289: Levensgebeurtenissen widget full-size with complete timeline - PASSING
+- Full-size shows up to 5 events as extended timeline
+- Per event: year + name + estimated impact in euros + direction arrow
+- Color-coded timeline dots: green for positive, red for negative
+- Cumulative impact summary at bottom with FIRE label
+- formatCurrency imported for euro amounts
+
+### Current Status
+- 3 features completed this session (#287, #288, #289)
+- All type-checks pass cleanly
+- Commit: da84d89
+
+## Session 2026-03-07 - Features #296, #297, #298
+
+### Feature #296: Abonnementen widget quarter-size - PASSING
+- Quarter early return: recurringTransactions as font-mono text-lg + RefreshCw icon + 'abonnementen' label
+- Compact within 160px constraints
+
+### Feature #297: Abonnementen widget half-size verrijking - PASSING
+- Total amount: formatCurrency(totalRecurringAmount) per maand as font-mono text-xl
+- Top-3 duurste from topRecurringTransactions: naam + bedrag
+- Freedom time: '= X dagen vrijheid per maand'
+- Footer teller: 'X abonnementen totaal'
+
+### Feature #298: Abonnementen widget full-size - PASSING
+- Complete list up to 8 items with naam + bedrag + frequentie
+- Monthly + yearly totals
+- Percentage of monthly income
+- Freedom time: 'X per maand aan vaste lasten'
+- Footer teller retained
+
+### Current Status
+- 3 features completed this session (#296, #297, #298)
+- All type-checks pass cleanly
+- Commit: 805dd3f
+
+## Session 2026-03-07 - Features #293, #294, #295
+
+### Feature #293: Vrijheidsvoortgang widget quarter-size - PASSING
+- Quarter shows effectivePct as font-mono text-lg with Compass icon (h-3 w-3)
+- Mini progress bar h-[3px] with horizon gradient
+- FIRE date/status label as text-[10px] truncated
+
+### Feature #294: Vrijheidsvoortgang widget half-size delta - PASSING
+- Computes prevMonthPct from netWorthHistory second-to-last entry
+- Shows delta: '+X.X% deze maand' in emerald (positive) or red (negative)
+- Placed after amount/goal line, before FIRE date
+
+### Feature #295: Vrijheidsvoortgang widget full-size milestones - PASSING
+- Progress bar with 4 milestone markers at 25/50/75/100%
+- Markers colored horizon-600 when reached, ink-4 when pending
+- Wealth vs Goal: 'Vermogen X / Doel Y' breakdown
+- Monthly growth rate from netWorthHistory (oldest to newest)
+- Estimated dates per milestone based on linear growth projection
+- Commit: f759c42
+
+### Current Status
+- 3 features completed this session (#293, #294, #295)
 - All type-checks pass cleanly
