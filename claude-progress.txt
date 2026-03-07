@@ -1,3 +1,31 @@
+## Session 2026-03-07 - Features #405, #407, #413
+
+### Feature #405: showDiscover briefing tool definitie - PASSING
+- Added showDiscover tool to briefingTools in lib/ai/dna/briefing.ts
+- Schema: label, teaser, description, href, module (moduleEnum), featureId (string)
+- Added CARD TYPE RICHTLIJNEN guidance for showDiscover (max 1, unvisited features, near end)
+- Added LAYOUT CONSTRAINTS: showDiscover als lichte afsluiter, nooit als eerste card
+- Added default href mapping in NAVIGATIE HREFS section
+
+### Feature #407: Briefing card renderer voor showDiscover - PASSING
+- Created DiscoverCard component with dashed border and module-colored border
+- Compass icon, "Ontdek" badge, teaser (italic), label, description, "Ontdek meer" CTA
+- Visit tracking via onEngage callback: sendBeacon + markFeatureVisitedLocal
+- Mobile: min-h-[44px] touch target on CTA
+- Desktop: hover effect via BriefingCard wrapper
+- Added DiscoverCardSpec to types.ts with CARD_SPAN = 2
+- Registered in compose/route.ts and briefing-card-grid.tsx
+
+### Feature #413: DiscoverCarousel verwijderen van module-pagina's - PASSING
+- Removed DiscoverCarousel JSX + import from core/page.tsx, will/page.tsx, horizon/page.tsx
+- discover-carousel.tsx kept intact (DISCOVER_ITEMS used by condense.ts)
+- Zero TypeScript errors in changed files
+
+### Current Status
+- 3 features completed this session (#405, #407, #413)
+- Zero TypeScript errors in our files
+- Commits: 6c4f413, 1694f69
+
 ## Session 2026-03-07 - Feature #401
 
 ### Feature #401: Onboarding: budgetteringMode gebruiken in API - PASSING
@@ -9376,3 +9404,46 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 3 features completed this session (#395, #397, #398)
 - Zero TypeScript errors (only pre-existing IdentityData issues from other agents)
+
+## Session 2026-03-07 - Features #402, #403, #404
+
+### Feature #402: Next steps data toevoegen aan condenseDashboardData - PASSING
+- Imported computeAllKernSteps, computeAllWilSteps, computeAllHorizonSteps from next-step-card.tsx
+- Added VOLGENDE STAPPEN section after AANBEVELINGEN in condenseDashboardData
+- Derives compute function params from DashboardData: totalAssets, budgetTotals, favoriteBudgets, etc.
+- Output format: count summary + per-step lines with [module] title: description (href)
+
+### Feature #403: Discover items data toevoegen aan condenseDashboardData - PASSING
+- Exported DISCOVER_ITEMS and DiscoverItem from discover-carousel.tsx
+- Exported getVisitedFeaturesLocal from discover-carousel.tsx
+- Added optional visitedFeatureIds parameter to condenseDashboardData
+- Added ONTDEKBARE FEATURES section listing unvisited items with label, description, teaser, href
+- Wired getVisitedFeaturesLocal() into daishboard.tsx caller
+
+### Feature #404: showNextStep briefing tool definitie - PASSING
+- Added showNextStep tool to briefingTools with schema: title, description, href, module, icon, dismissKey
+- Created NextStepCardSpec interface in types.ts with type 'nextStep'
+- Added nextStep: 2 to CARD_SPAN
+- Created NextStepBriefingCard component (cards/next-step-card.tsx) with module badge + ArrowRight CTA
+- Registered in briefing-card-grid.tsx and compose/route.ts
+- Updated system prompt: CARD TYPE RICHTLIJNEN, NAVIGATIE HREFS, LAYOUT CONSTRAINTS
+
+### Current Status
+- 3 features completed this session (#402, #403, #404)
+- Zero TypeScript errors
+- Commit: f2b8086
+
+## Session 2026-03-07 - Feature #412
+
+### Feature #412: NextStepSection verwijderen van alle module-pagina's - PASSING
+- Removed NextStepSection import and JSX from core/page.tsx (import line 27, JSX lines 901-920)
+- Removed NextStepSection import and JSX from will/page.tsx (import line 31, JSX lines 501-512)
+- Removed NextStepSection import and JSX from horizon/page.tsx (import line 45, JSX lines 805-815)
+- Kept next-step-card.tsx intact - compute functions still used by lib/briefing/condense.ts
+- All three pages return HTTP 307 (redirect to login) - no compilation errors
+- Zero remaining NextStepSection references in any of the three pages
+- Commit: c7404bc
+
+### Current Status
+- 1 feature completed this session (#412)
+- 402/414 features passing (97.1%)
