@@ -425,7 +425,7 @@ export const WIDGET_HREFS: Record<string, string> = {
   box3_drag:                '/core/debts',
   vrijheidsmijlpalen:       '/horizon',
   backtesting_score:        '/horizon?modal=backtesting',
-  meldingen:                '/dashboard',
+  meldingen:                '/berichten',
   badges:                   '/identity',
   streaks:                  '/identity',
   ai_inzicht:               '/dashboard',

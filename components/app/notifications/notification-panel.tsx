@@ -320,13 +320,22 @@ export function NotificationModal() {
           <span className="font-[family-name:var(--font-source-serif)] text-[11px] italic text-[var(--ink-4)]">
             afgelopen 7 dagen
           </span>
-          <a
-            href="/identity/instellingen"
-            onClick={closeModal}
-            className="font-[family-name:var(--font-source-serif)] text-[11px] italic text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)]"
-          >
-            Instellingen &rarr;
-          </a>
+          <div className="flex items-center gap-4">
+            <a
+              href="/berichten"
+              onClick={closeModal}
+              className="font-[family-name:var(--font-source-serif)] text-[11px] italic text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)]"
+            >
+              Bekijk alles &rarr;
+            </a>
+            <a
+              href="/identity/instellingen"
+              onClick={closeModal}
+              className="font-[family-name:var(--font-source-serif)] text-[11px] italic text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)]"
+            >
+              Instellingen &rarr;
+            </a>
+          </div>
         </div>
       </div>
     </div>

@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { NotificationItem } from '@/components/app/notifications/notification-item'
 import { RELEASE_NOTES, type ReleaseNote } from '@/lib/release-notes'
-import { Bell, Newspaper, ChevronRight, CheckCheck } from 'lucide-react'
+import { Bell, Newspaper, ChevronRight, CheckCheck, Sparkles } from 'lucide-react'
+import Link from 'next/link'
 import type { Notification } from '@/app/api/notifications/route'
 
 const BERICHTEN_HISTORY_DAYS = 30
@@ -310,6 +311,24 @@ export default function BerichtenPage() {
       <div className="mx-auto max-w-[720px] px-4 py-6 md:px-8">
         <Masthead />
 
+        {/* Cross-link to Will's briefing */}
+        <Link
+          href="/daishboard"
+          className="mb-6 flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 shadow-[var(--s0)] transition-shadow hover:shadow-[var(--s1)]"
+        >
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-wil-100">
+            <Sparkles className="h-4 w-4 text-wil-600" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-inter text-xs font-medium text-[var(--ink)]">
+              Will&apos;s Briefing
+            </p>
+            <p className="font-source-serif text-[11px] italic text-[var(--ink-3)]">
+              Bekijk je persoonlijke dagbriefing &rarr;
+            </p>
+          </div>
+        </Link>
+
         {/* Editorial empty state */}
         <div className="flex flex-col items-center justify-center py-32 text-center">
           <p className="font-source-serif text-lg italic text-[var(--ink-3)]">
@@ -323,6 +342,24 @@ export default function BerichtenPage() {
   return (
     <div className="mx-auto max-w-[720px] px-4 py-6 md:px-8">
       <Masthead />
+
+      {/* Cross-link to Will's briefing */}
+      <Link
+        href="/daishboard"
+        className="mb-6 flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 shadow-[var(--s0)] transition-shadow hover:shadow-[var(--s1)]"
+      >
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-wil-100">
+          <Sparkles className="h-4 w-4 text-wil-600" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-inter text-xs font-medium text-[var(--ink)]">
+            Will&apos;s Briefing
+          </p>
+          <p className="font-source-serif text-[11px] italic text-[var(--ink-3)]">
+            Bekijk je persoonlijke dagbriefing &rarr;
+          </p>
+        </div>
+      </Link>
 
       {/* Tab bar */}
       <div className="mb-6 flex gap-1 rounded-[var(--r)] bg-[var(--subtle)] p-1">
