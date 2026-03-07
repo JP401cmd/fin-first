@@ -1,3 +1,43 @@
+## Session 2026-03-07 - Features #281, #282, #283
+
+### Feature #281: Doelen widget quarter-size - PASSING
+- Added quarter-size early return in doelen-widget.tsx
+- Shows first goal from topGoals: name (truncated), percentage with color coding
+- Mini progress bar (h-[3px]) with animated width transition
+- Deadline shown as font-mono text-[10px] with overdue styling
+- Empty state: Target icon + 'Geen doelen' text
+- Percentage color: red for overdue, emerald >=90%, amber >=50%, default otherwise
+
+### Feature #282: FIRE Prognose widget quarter-size - PASSING
+- Added quarter-size early return in fire-prognose-widget.tsx
+- Normal state: countdown (Xj Xm) as font-mono text-lg + FIRE leeftijd as text-xs text-horizon-600
+- Reached state: Compass icon + 'Bereikt!' with party emoji
+- Not feasible state: dash + 'Niet haalbaar' subtitle
+- Compact format without progress bar
+
+### Feature #283: FIRE Prognose widget full-size mini vermogenspad - PASSING
+- Added mini SVG vermogenspad chart above the existing progress bar in full-size
+- Uses accumulation-phase rows from simRows (DashboardData)
+- Gradient area fill under the line path
+- FIRE point marked with circle dot at fireAgeFractional position
+- Age labels (min/max) below chart with FIRE age label in center
+- Gracefully hidden when simRows unavailable or <2 accumulation rows
+
+### Current Status
+- 3 features completed this session (#281, #282, #283)
+- All type-checks pass, zero errors
+- Commit: 51df9c5
+
+## Session 2026-03-07 - Features #278, #279, #280
+
+### Feature #278: Voorstellen widget half-size verrijking met top-3 lijst - PASSING
+### Feature #279: Voorstellen widget full-size met uitgebreide lijst - PASSING
+### Feature #280: Acties widget quarter-size - PASSING
+- Voorstellen half: top-3 list with priority dots, freedom days badges, total days
+- Voorstellen full: stats grid + top-5 with category badges (ActiesWidget pattern)
+- Acties quarter: stacked KPIs (open count, completed, days to win)
+- All type-checks pass, commit: ba760a7
+
 ## Session 2026-03-07 - Features #263, #324, #325
 
 ### Feature #263: Widget renderer uitbreiden met nieuwe widgets - PASSING
