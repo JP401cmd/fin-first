@@ -4,8 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { NotificationItem } from '@/components/app/notifications/notification-item'
-import { RELEASE_NOTES, type ReleaseNote } from '@/lib/release-notes'
-import { Bell, Newspaper, ChevronRight, CheckCheck, Sparkles, TrendingUp, AlertCircle, Loader2, RefreshCw, MessageSquare } from 'lucide-react'
+import { Bell, Newspaper, ChevronRight, ChevronDown, CheckCheck, Sparkles, TrendingUp, AlertCircle, Loader2, RefreshCw, MessageSquare } from 'lucide-react'
 import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import Link from 'next/link'
@@ -96,17 +95,6 @@ function SectionHeading({ label }: { label: string }) {
   )
 }
 
-// ── Module color mapping ─────────────────────────────────────────────
-
-const MODULE_DOT: Record<string, string> = {
-  amber: 'bg-kern-400',
-  teal: 'bg-wil-400',
-  purple: 'bg-horizon-400',
-  zinc: 'bg-zinc-400',
-  blue: 'bg-blue-400',
-  rose: 'bg-rose-400',
-}
-
 // ── Category config ──────────────────────────────────────────────────
 
 const CATEGORY_CONFIG: Record<string, { label: string; color: string; dotColor: string }> = {
@@ -156,69 +144,6 @@ function CollapsedDayGroup({
               onClose={() => {}}
             />
           ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Release note card ────────────────────────────────────────────────
-
-function ReleaseNoteCard({ release, defaultExpanded }: { release: ReleaseNote; defaultExpanded?: boolean }) {
-  const [expanded, setExpanded] = useState(defaultExpanded ?? false)
-
-  return (
-    <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] transition-shadow hover:shadow-[var(--s1)]">
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-start gap-3 p-4 text-left"
-      >
-        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
-          <Newspaper className="h-4 w-4 text-[var(--ink-3)]" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-4)]">
-              {release.version}
-            </span>
-            <span className="font-inter text-[10px] text-[var(--ink-4)]">
-              {new Date(release.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}
-            </span>
-          </div>
-          <p className="mt-0.5 font-inter text-sm font-medium text-[var(--ink)]">
-            {release.title}
-          </p>
-          <p className="mt-1 font-inter text-[11px] text-[var(--ink-3)]">
-            {release.sections.length} {release.sections.length === 1 ? 'module' : 'modules'} — {release.sections.reduce((sum, s) => sum + s.items.length, 0)} wijzigingen
-          </p>
-        </div>
-        <ChevronRight
-          className={`mt-1 h-4 w-4 shrink-0 text-[var(--ink-4)] transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
-        />
-      </button>
-      {expanded && (
-        <div className="border-t border-[var(--border-ed)] px-4 py-3">
-          <div className="space-y-4">
-            {release.sections.map((section) => (
-              <div key={section.module}>
-                <div className="mb-2 flex items-center gap-2">
-                  <span className={`h-1.5 w-1.5 rounded-full ${MODULE_DOT[section.color] ?? 'bg-zinc-400'}`} />
-                  <span className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-                    {section.module}
-                  </span>
-                </div>
-                <div className="space-y-1.5 pl-3.5">
-                  {section.items.map((item, i) => (
-                    <div key={i}>
-                      <p className="font-inter text-xs font-medium text-[var(--ink)]">{item.title}</p>
-                      <p className="font-source-serif text-[12px] leading-relaxed text-[var(--ink-2)]">{item.description}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       )}
     </div>
@@ -580,20 +505,20 @@ function SectionAnchors() {
     <nav className="mb-6 flex items-center justify-center gap-1" aria-label="Sectie-navigatie">
       <button
         type="button"
-        onClick={() => scrollTo('sectie-meldingen')}
-        className="flex min-h-[44px] items-center gap-1.5 rounded-[var(--r)] px-3 py-1.5 font-inter text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] sm:min-h-0"
-      >
-        <Bell className="h-3.5 w-3.5" />
-        Meldingen
-      </button>
-      <span className="text-[var(--ink-4)]" aria-hidden="true">&middot;</span>
-      <button
-        type="button"
         onClick={() => scrollTo('sectie-nieuws')}
         className="flex min-h-[44px] items-center gap-1.5 rounded-[var(--r)] px-3 py-1.5 font-inter text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] sm:min-h-0"
       >
         <Newspaper className="h-3.5 w-3.5" />
         Nieuws
+      </button>
+      <span className="text-[var(--ink-4)]" aria-hidden="true">&middot;</span>
+      <button
+        type="button"
+        onClick={() => scrollTo('sectie-meldingen')}
+        className="flex min-h-[44px] items-center gap-1.5 rounded-[var(--r)] px-3 py-1.5 font-inter text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] sm:min-h-0"
+      >
+        <Bell className="h-3.5 w-3.5" />
+        Meldingen
       </button>
     </nav>
   )
@@ -614,6 +539,9 @@ export default function BerichtenPage() {
 
   // AI enabled state
   const [aiEnabled, setAiEnabled] = useState(true)
+
+  // Meldingen section collapsed by default
+  const [meldingenExpanded, setMeldingenExpanded] = useState(false)
 
   // News state
   const [newsItems, setNewsItems] = useState<NewsItem[]>([])
@@ -783,7 +711,7 @@ export default function BerichtenPage() {
   }
 
   const hasNoMeldingen = !loading && history.length === 0
-  const hasNoNieuws = RELEASE_NOTES.length === 0 && newsItems.length === 0 && !newsLoading
+  const hasNoNieuws = newsItems.length === 0 && !newsLoading
   const isCompletelyEmpty = hasNoMeldingen && hasNoNieuws
 
   if (isCompletelyEmpty) {
@@ -829,126 +757,7 @@ export default function BerichtenPage() {
       {/* Section anchor navigation */}
       <SectionAnchors />
 
-      {/* Cross-link to Will's briefing */}
-      <Link
-        href="/daishboard"
-        className="mb-6 flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 shadow-[var(--s0)] transition-shadow hover:shadow-[var(--s1)]"
-      >
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-wil-100">
-          <Sparkles className="h-4 w-4 text-wil-600" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-inter text-xs font-medium text-[var(--ink)]">
-            Will&apos;s Briefing
-          </p>
-          <p className="font-source-serif text-[11px] italic text-[var(--ink-3)]">
-            Bekijk je persoonlijke dagbriefing &rarr;
-          </p>
-        </div>
-      </Link>
-
-      {/* ── MELDINGEN sectie ─────────────────────────────────────── */}
-      <section id="sectie-meldingen" className="scroll-mt-4">
-      <SectionHeading label="Meldingen" />
-
-      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-4 py-3">
-            <span className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-              Recente meldingen
-            </span>
-            {unreadCount > 0 && (
-              <button
-                type="button"
-                onClick={handleMarkAllRead}
-                className="flex min-h-[44px] items-center gap-1 font-inter text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)] sm:min-h-0"
-              >
-                <CheckCheck className="h-3 w-3" />
-                Alles gelezen
-              </button>
-            )}
-          </div>
-
-          {/* Content */}
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--border-md)] border-t-[var(--ink-2)]" />
-            </div>
-          ) : history.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 px-8 py-16 text-center">
-              <Bell className="h-8 w-8 text-[var(--ink-4)]" />
-              <p className="font-inter text-sm text-[var(--ink-3)]">
-                Geen meldingen.
-              </p>
-              <p className="font-source-serif text-[13px] italic text-[var(--ink-4)]">
-                &ldquo;Stilte is ook een vorm van rijkdom.&rdquo;
-              </p>
-            </div>
-          ) : (
-            <div>
-              {/* Urgent */}
-              {urgent.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 border-b border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/60 px-4 py-2">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#b33a2e]" />
-                    <span className="font-inter text-[10px] font-bold uppercase tracking-[.1em] text-[#b33a2e]">
-                      Dringend
-                    </span>
-                  </div>
-                  {urgent.map((notification) => (
-                    <NotificationItem
-                      key={notification.id}
-                      notification={notification}
-                      onRead={handleMarkAsRead}
-                      onClose={() => {}}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Today */}
-              {todayItems.length > 0 && (
-                <div>
-                  <div className="border-b border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/60 px-4 py-2">
-                    <span className="font-inter text-[10px] font-bold uppercase tracking-[.1em] text-[var(--ink-3)]">
-                      Vandaag
-                    </span>
-                  </div>
-                  {todayItems.map((notification) => (
-                    <NotificationItem
-                      key={notification.id}
-                      notification={notification}
-                      onRead={handleMarkAsRead}
-                      onClose={() => {}}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Earlier */}
-              {earlierGroups.length > 0 && (
-                <div>
-                  <div className="border-b border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/60 px-4 py-2">
-                    <span className="font-inter text-[10px] font-bold uppercase tracking-[.1em] text-[var(--ink-3)]">
-                      Eerder
-                    </span>
-                  </div>
-                  {earlierGroups.map((group) => (
-                    <CollapsedDayGroup
-                      key={group.key}
-                      group={group}
-                      markAsRead={handleMarkAsRead}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-      </section>
-
-      {/* ── FINANCIEEL NIEUWS sectie ──────────────────────────────── */}
+      {/* ── FINANCIEEL NIEUWS sectie (hoofdcontent — bovenaan) ──── */}
       <section id="sectie-nieuws" className="scroll-mt-4">
       <SectionHeading label="Financieel Nieuws" />
 
@@ -1030,24 +839,158 @@ export default function BerichtenPage() {
             )}
           </div>
 
-          {/* Release notes section */}
-          {RELEASE_NOTES.length > 0 && (
-            <div>
-              <div className="mb-3 flex items-center gap-2">
-                <span className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-                  Release notes
-                </span>
-                <div className="h-px flex-1 bg-[var(--border-ed)]" />
-              </div>
-              <div className="space-y-3">
-                {RELEASE_NOTES.map((release, i) => (
-                  <ReleaseNoteCard key={release.version} release={release} defaultExpanded={i === 0} />
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
+
+      </section>
+
+      {/* Cross-link to Will's briefing */}
+      <Link
+        href="/daishboard"
+        className="my-6 flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 shadow-[var(--s0)] transition-shadow hover:shadow-[var(--s1)]"
+      >
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-wil-100">
+          <Sparkles className="h-4 w-4 text-wil-600" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-inter text-xs font-medium text-[var(--ink)]">
+            Will&apos;s Briefing
+          </p>
+          <p className="font-source-serif text-[11px] italic text-[var(--ink-3)]">
+            Bekijk je persoonlijke dagbriefing &rarr;
+          </p>
+        </div>
+      </Link>
+
+      {/* ── MELDINGEN sectie (ingeklapt, onder nieuws) ────────── */}
+      <section id="sectie-meldingen" className="scroll-mt-4">
+      <SectionHeading label="Meldingen" />
+
+      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
+          {/* Collapsible header */}
+          <button
+            type="button"
+            onClick={() => setMeldingenExpanded(!meldingenExpanded)}
+            className="flex w-full min-h-[44px] items-center justify-between px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]/50"
+          >
+            <div className="flex items-center gap-2">
+              {meldingenExpanded ? (
+                <ChevronDown className="h-3.5 w-3.5 text-[var(--ink-3)]" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5 text-[var(--ink-3)]" />
+              )}
+              <Bell className="h-3.5 w-3.5 text-[var(--ink-3)]" />
+              <span className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                Meldingen
+              </span>
+              {!loading && history.length > 0 && (
+                <span className="font-inter text-[11px] text-[var(--ink-4)]">
+                  — {history.length} {history.length === 1 ? 'bericht' : 'berichten'}
+                </span>
+              )}
+            </div>
+            {unreadCount > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-wil-500 px-1.5 font-inter text-[10px] font-bold text-white">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
+          {/* Expanded content */}
+          {meldingenExpanded && (
+            <>
+              {/* Mark all read button */}
+              {unreadCount > 0 && (
+                <div className="flex justify-end border-t border-[var(--border-ed)] px-4 py-2">
+                  <button
+                    type="button"
+                    onClick={handleMarkAllRead}
+                    className="flex min-h-[44px] items-center gap-1 font-inter text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)] sm:min-h-0"
+                  >
+                    <CheckCheck className="h-3 w-3" />
+                    Alles gelezen
+                  </button>
+                </div>
+              )}
+
+              {/* Content */}
+              {loading ? (
+                <div className="flex items-center justify-center border-t border-[var(--border-ed)] py-12">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--border-md)] border-t-[var(--ink-2)]" />
+                </div>
+              ) : history.length === 0 ? (
+                <div className="flex flex-col items-center gap-3 border-t border-[var(--border-ed)] px-8 py-16 text-center">
+                  <Bell className="h-8 w-8 text-[var(--ink-4)]" />
+                  <p className="font-inter text-sm text-[var(--ink-3)]">
+                    Geen meldingen.
+                  </p>
+                  <p className="font-source-serif text-[13px] italic text-[var(--ink-4)]">
+                    &ldquo;Stilte is ook een vorm van rijkdom.&rdquo;
+                  </p>
+                </div>
+              ) : (
+                <div className="border-t border-[var(--border-ed)]">
+                  {/* Urgent */}
+                  {urgent.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 border-b border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/60 px-4 py-2">
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#b33a2e]" />
+                        <span className="font-inter text-[10px] font-bold uppercase tracking-[.1em] text-[#b33a2e]">
+                          Dringend
+                        </span>
+                      </div>
+                      {urgent.map((notification) => (
+                        <NotificationItem
+                          key={notification.id}
+                          notification={notification}
+                          onRead={handleMarkAsRead}
+                          onClose={() => {}}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Today */}
+                  {todayItems.length > 0 && (
+                    <div>
+                      <div className="border-b border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/60 px-4 py-2">
+                        <span className="font-inter text-[10px] font-bold uppercase tracking-[.1em] text-[var(--ink-3)]">
+                          Vandaag
+                        </span>
+                      </div>
+                      {todayItems.map((notification) => (
+                        <NotificationItem
+                          key={notification.id}
+                          notification={notification}
+                          onRead={handleMarkAsRead}
+                          onClose={() => {}}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Earlier */}
+                  {earlierGroups.length > 0 && (
+                    <div>
+                      <div className="border-b border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/60 px-4 py-2">
+                        <span className="font-inter text-[10px] font-bold uppercase tracking-[.1em] text-[var(--ink-3)]">
+                          Eerder
+                        </span>
+                      </div>
+                      {earlierGroups.map((group) => (
+                        <CollapsedDayGroup
+                          key={group.key}
+                          group={group}
+                          markAsRead={handleMarkAsRead}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
 
       </section>
 
