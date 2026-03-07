@@ -7,6 +7,7 @@ import type {
   BriefingComposeRequest,
   BriefingSSEEvent,
 } from '@/lib/briefing/types'
+import { validateBriefingLayout } from '@/lib/briefing/validate-layout'
 import {
   getActiveDirectives,
   formatDirectivesForPrompt,
@@ -130,16 +131,25 @@ export async function POST(request: Request) {
             abortSignal: request.signal,
           })
 
-          // Process the full stream — extract tool calls as they complete
+          // Collect all cards from the AI stream
+          const collectedCards: BriefingCardSpec[] = []
           for await (const part of result.fullStream) {
             if (part.type === 'tool-call') {
               const input = 'args' in part ? part.args : 'input' in part ? part.input : null
               const card = input ? toolCallToCardSpec(part.toolName, input as Record<string, unknown>) : null
               if (card) {
-                const event: BriefingSSEEvent = { type: 'card', spec: card }
-                controller.enqueue(encoder.encode(encodeSSE(event)))
+                collectedCards.push(card)
               }
             }
+          }
+
+          // Validate layout and reorder if needed
+          const validatedCards = validateBriefingLayout(collectedCards)
+
+          // Emit all validated cards in order
+          for (const card of validatedCards) {
+            const event: BriefingSSEEvent = { type: 'card', spec: card }
+            controller.enqueue(encoder.encode(encodeSSE(event)))
           }
 
           // Stream complete — send done event
