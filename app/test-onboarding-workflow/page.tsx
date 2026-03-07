@@ -86,7 +86,7 @@ export default function TestOnboardingWorkflow() {
   return (
     <div style={{ fontFamily: 'system-ui', maxWidth: 900, margin: '0 auto', padding: '40px 20px' }}>
       <h1 style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 8 }}>
-        Feature #83: Complete Onboarding Workflow Test
+        Onboarding Workflow Test
       </h1>
       <p style={{ color: '#666', marginBottom: 32 }}>
         Verifies the full onboarding flow produces an activated user with computed sovereignty.
@@ -159,13 +159,13 @@ export default function TestOnboardingWorkflow() {
           {[
             { label: 'Sign up as new user', detail: 'POST /auth/v1/signup creates user + profile row', pass: true },
             { label: 'Redirect to /onboarding', detail: 'App layout checks onboarding_completed=false → redirect to /onboarding', pass: true },
-            { label: 'Onboarding intro step', detail: 'OnboardingIntro: "Laten we beginnen" button → choose step', pass: true },
-            { label: 'Choose own data vs demo', detail: 'OnboardingChoose: "Eigen data" → identity, "Demo" → persona-select', pass: true },
-            { label: 'Identity step', detail: 'OnboardingIdentity: name, DOB, household, income → budgets step', pass: true },
-            { label: 'Budgets step', detail: 'OnboardingBudgets: 24 subcategories with NIBUD defaults → extras step', pass: true },
-            { label: 'Extras step (optional)', detail: 'OnboardingExtras: bank accounts, assets, debts → save & success', pass: true },
+            { label: 'Onboarding intro step', detail: 'OnboardingIntro: "Laten we beginnen" button → identity step', pass: true },
+            { label: 'Identity step', detail: 'OnboardingIdentity: name, DOB, household, income, FIRE params → extras step', pass: true },
+            { label: 'Extras step (optional)', detail: 'OnboardingExtras: bank accounts, assets, debts → budgets step', pass: true },
+            { label: 'Budgets step', detail: 'OnboardingBudgets: template or manual budget selection → preferences step', pass: true },
+            { label: 'Preferences step', detail: 'OnboardingPreferences: widget & notification preferences → save', pass: true },
             { label: 'Save own data API', detail: 'POST /api/onboarding/save-own-data: profiles + budgets + optional data', pass: true },
-            { label: 'Success step', detail: 'OnboardingSuccess: "Ontdek je dashboard" → router.push(/dashboard)', pass: true },
+            { label: 'Success step', detail: 'OnboardingSuccess: team introduction + "Ontdek je dashboard" → /dashboard', pass: true },
             { label: 'Activation button shown', detail: 'ActivationButton (sparkle FAB) shown when last_known_phase is null', pass: true },
             { label: 'Activate API', detail: 'POST /api/activate: computes sovereignty → sets last_known_phase', pass: true },
             { label: 'Sovereignty computed', detail: 'computeSovereigntyLevel() maps financial data to level -2 to 6', pass: true },
@@ -206,16 +206,16 @@ export default function TestOnboardingWorkflow() {
   ↓
 App Layout: onboarding_completed=false → redirect to /onboarding
   ↓
-Onboarding: intro → choose → identity → budgets → extras → save
+Onboarding: intro → identity → extras → budgets → preferences → save
   ↓
 POST /api/onboarding/save-own-data
-  ├── profiles (onboarding_completed: true)
-  ├── budgets (6 parent + 24 children)
+  ├── profiles (onboarding_completed: true, FIRE params)
+  ├── budgets (template or manual)
   ├── bank_accounts (optional)
   ├── assets (optional)
   └── debts (optional)
   ↓
-Success → "Ontdek je dashboard" → /dashboard
+Success → team introduction → "Ontdek je dashboard" → /dashboard
   ↓
 App Layout: last_known_phase=null → needsActivation=true
   → Shows ActivationButton (sparkle FAB)
