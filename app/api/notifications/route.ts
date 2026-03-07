@@ -78,6 +78,15 @@ export async function GET(request: NextRequest) {
 
     const notifications: Notification[] = []
     const now = new Date().toISOString()
+
+    // Accept optional `days` query parameter (default: 7, clamped 1–90)
+    const daysParam = request.nextUrl.searchParams.get('days')
+    const days = daysParam ? Math.max(1, Math.min(90, parseInt(daysParam, 10) || 7)) : 7
+
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - days)
+
+    // Keep sevenDaysAgo for backward-compat references (e.g. level-up check)
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
@@ -326,12 +335,15 @@ export async function GET(request: NextRequest) {
 
     // ── Merge into history ───────────────────────────────────────────
     // Store current notifications in history for the modal to display
-    // Keep only entries from the last 7 days
+    // Always retain up to 30 days in storage; return only `days` worth
 
-    const cutoff = sevenDaysAgo.toISOString()
+    const storageCutoff = new Date()
+    storageCutoff.setDate(storageCutoff.getDate() - 30)
+    const storageCutoffStr = storageCutoff.toISOString()
+    const returnCutoff = cutoffDate.toISOString()
 
-    // Start from stored history, prune old entries
-    let history = storedHistory.filter((h) => h.createdAt >= cutoff)
+    // Start from stored history, prune entries older than 30 days
+    let history = storedHistory.filter((h) => h.createdAt >= storageCutoffStr)
 
     // Merge current notifications into history (upsert by id)
     const historyIds = new Set(history.map((h) => h.id))
@@ -358,7 +370,7 @@ export async function GET(request: NextRequest) {
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
 
-    // Persist updated history
+    // Persist full 30-day history
     await supabase
       .from('app_settings')
       .upsert(
@@ -369,9 +381,12 @@ export async function GET(request: NextRequest) {
         { onConflict: 'key' }
       )
 
+    // Return only entries within requested `days` window
+    const returnHistory = history.filter((h) => h.createdAt >= returnCutoff)
+
     return NextResponse.json({
       notifications: filtered,
-      history,
+      history: returnHistory,
       unreadCount: filtered.filter((n) => !n.read).length,
     })
   } catch (err) {

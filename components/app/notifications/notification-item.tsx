@@ -182,7 +182,7 @@ export function NotificationItem({ notification, onRead, onClose }: Props) {
           <button
             type="button"
             onClick={handleAskAI}
-            className="mt-2 inline-flex items-center gap-1 rounded-[var(--r-sm)] px-2 py-1 font-[family-name:var(--font-inter)] text-[11px] font-medium transition-colors"
+            className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-[var(--r-sm)] px-3 py-2 font-[family-name:var(--font-inter)] text-[11px] font-medium transition-colors sm:min-h-0 sm:px-2 sm:py-1"
             style={{
               backgroundColor: module.lightVar,
               color: module.textVar,

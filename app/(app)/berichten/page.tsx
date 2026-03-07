@@ -85,7 +85,7 @@ function CollapsedDayGroup({
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]"
+        className="flex w-full min-h-[44px] items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]"
       >
         <ChevronRight
           className={`h-3.5 w-3.5 text-[var(--ink-3)] transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
@@ -369,7 +369,7 @@ export default function BerichtenPage() {
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-[var(--r-sm)] px-3 py-2 font-inter text-xs font-medium transition-all ${
+              className={`flex flex-1 min-h-[44px] items-center justify-center gap-1.5 rounded-[var(--r-sm)] px-3 py-2 font-inter text-xs font-medium transition-all sm:min-h-0 ${
                 activeTab === tab.id
                   ? 'bg-[var(--paper)] text-[var(--ink)] shadow-[var(--s0)]'
                   : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
@@ -399,7 +399,7 @@ export default function BerichtenPage() {
               <button
                 type="button"
                 onClick={handleMarkAllRead}
-                className="flex items-center gap-1 font-inter text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)]"
+                className="flex min-h-[44px] items-center gap-1 font-inter text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)] sm:min-h-0"
               >
                 <CheckCheck className="h-3 w-3" />
                 Alles gelezen
