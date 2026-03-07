@@ -8,7 +8,7 @@ import { NextResponse } from 'next/server'
 
 // ── Cache TTL ────────────────────────────────────────────────────────
 
-const CACHE_TTL_HOURS = 6
+const CACHE_TTL_HOURS = 7 * 24 // 7 days
 
 // ── Valid news categories ────────────────────────────────────────────
 
@@ -139,7 +139,7 @@ async function setCachedNews(
 
 // ── GET handler ──────────────────────────────────────────────────────
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -147,10 +147,16 @@ export async function GET() {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
-  // Check cache first
-  const cached = await getCachedNews(supabase, user.id)
-  if (cached) {
-    return NextResponse.json({ items: cached, cached: true })
+  // Check if refresh is requested (bypasses cache)
+  const url = new URL(request.url)
+  const forceRefresh = url.searchParams.get('refresh') === '1'
+
+  // Check cache first (unless refresh is forced)
+  if (!forceRefresh) {
+    const cached = await getCachedNews(supabase, user.id)
+    if (cached) {
+      return NextResponse.json({ items: cached, cached: true })
+    }
   }
 
   // Build financial context for personalization
@@ -162,6 +168,8 @@ export async function GET() {
   }
 
   /* Sanitize PII from financial context before sending to AI provider */
+  /* FAIL-SAFE: if sanitization fails, block the AI call entirely —
+     never send unsanitized data to an external AI provider. */
   try {
     const { data: profile } = await supabase
       .from('profiles')
@@ -177,9 +185,12 @@ export async function GET() {
     }
 
     financialContext = sanitizeForAI(financialContext, sanitizeOpts)
-  } catch {
-    // Non-fatal: proceed with unsanitized context
-    console.warn('[/api/news] Sanitization failed, proceeding with raw context')
+  } catch (err) {
+    console.error('[/api/news] Sanitization failed — AI call blocked (fail-safe):', err)
+    return NextResponse.json(
+      { error: 'De AI-assistent is tijdelijk niet beschikbaar vanwege een beveiligingscontrole. Probeer het later opnieuw.' },
+      { status: 503 },
+    )
   }
 
   // Get AI model

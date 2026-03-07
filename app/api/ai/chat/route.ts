@@ -60,6 +60,8 @@ export async function POST(req: Request) {
   }
 
   /* Sanitize PII from financial context before sending to AI provider */
+  /* FAIL-SAFE: if sanitization fails, block the AI call entirely —
+     never send unsanitized data to an external AI provider. */
   try {
     const { data: profile } = await supabase
       .from('profiles')
@@ -76,8 +78,11 @@ export async function POST(req: Request) {
 
     financialContext = sanitizeForAI(financialContext, sanitizeOpts)
   } catch (err) {
-    // Non-fatal: if sanitization fails, proceed with unsanitized context
-    console.warn('[AI Chat] Sanitization failed, proceeding with raw context:', err)
+    console.error('[AI Chat] Sanitization failed — AI call blocked (fail-safe):', err)
+    return Response.json(
+      { error: 'De AI-assistent is tijdelijk niet beschikbaar vanwege een beveiligingscontrole. Probeer het later opnieuw.' },
+      { status: 503 },
+    )
   }
 
   const tools = getTools(safeDomain, supabase, chatContext)

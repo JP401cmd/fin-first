@@ -148,6 +148,8 @@ export async function POST(request: Request) {
     const systemPrompt = buildBriefingSystemPrompt(temporal, phase, level, directivesBlock, previousBriefing, longTermMemory, serverUserPreferences || undefined, phaseTransition, briefingFrequency)
 
     /* Sanitize PII from data summary before sending to AI provider */
+    /* FAIL-SAFE: if sanitization fails, block the AI call entirely —
+       never send unsanitized data to an external AI provider. */
     let sanitizedDataSummary = dataSummary
     try {
       const { data: profile } = await supabase
@@ -164,9 +166,12 @@ export async function POST(request: Request) {
       }
 
       sanitizedDataSummary = sanitizeForAI(dataSummary, sanitizeOpts)
-    } catch {
-      // Non-fatal: proceed with unsanitized summary
-      console.warn('[briefing/compose] Sanitization failed, proceeding with raw data')
+    } catch (err) {
+      console.error('[briefing/compose] Sanitization failed — AI call blocked (fail-safe):', err)
+      return new Response(JSON.stringify({ error: 'De AI-assistent is tijdelijk niet beschikbaar vanwege een beveiligingscontrole. Probeer het later opnieuw.' }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' },
+      })
     }
 
     // Create a ReadableStream that emits SSE events as tool calls complete

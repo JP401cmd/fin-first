@@ -389,6 +389,9 @@ export async function updateSession(request: NextRequest) {
     '/test-widget-cap',
     '/test-sanitize',
     '/api/test-sanitize',
+    '/test-berichten-footer',
+    '/test-sanitize-failsafe',
+    '/api/test-sanitize-failsafe',
   ]
 
   // Protected route prefixes that require authentication
