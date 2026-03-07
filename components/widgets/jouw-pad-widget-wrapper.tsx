@@ -130,6 +130,28 @@ export function JouwPadWidgetWrapper({ size, data, href }: Props) {
 
   const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 700 })
 
+  // ── Quarter-size: compact identity snapshot ──
+  if (size === 'quarter') {
+    return (
+      <WidgetShell module="cross" size={size} kicker="Jouw Pad" href={href}>
+        <div className="flex items-center gap-2">
+          <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--r-sm)] ${colors.badge}`}>
+            <Shield className="h-3.5 w-3.5" />
+          </div>
+          <p className={`text-[10px] font-bold uppercase tracking-[0.12em] leading-none ${colors.text}`}>
+            {currentPhase.label}
+          </p>
+        </div>
+        <p className="mt-1.5 font-mono text-lg font-semibold tabular-nums leading-none text-[var(--ink)]">
+          {levelDisplay}
+        </p>
+        <span className={`mt-1 inline-block rounded-full px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums ${colors.badge}`}>
+          {freedomPct.toFixed(1)}% vrij
+        </span>
+      </WidgetShell>
+    )
+  }
+
   return (
     <WidgetShell module="cross" size={size} kicker="Jouw Pad" href={href}>
     <div ref={inViewRef}>
