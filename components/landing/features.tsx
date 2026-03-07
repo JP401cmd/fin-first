@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, ShieldCheck, Lock, Eye, Fingerprint, DatabaseZap, ToggleRight } from 'lucide-react'
 
 // ── Reveal on scroll ─────────────────────────────────────────
 
@@ -767,6 +767,70 @@ export function Features() {
                 </div>
                 <h4 className="mb-2 font-sans font-semibold text-[var(--ink)]">{item.title}</h4>
                 <p className="font-serif text-sm leading-relaxed text-[var(--ink-3)]">{item.body}</p>
+              </div>
+            ))}
+          </div>
+        </Reveal>
+      </section>
+
+      <SectionRule label="Privacy & vertrouwen" />
+
+      {/* ── PRIVACY & VERTROUWEN ──────────────────────────────── */}
+      <section id="privacy" className="px-6 py-16 md:px-12">
+        <Reveal className="mx-auto max-w-5xl">
+          <p className="mb-3 text-center font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-4)]">
+            Privacy & vertrouwen
+          </p>
+          <h2 className="mb-4 text-center font-display text-[1.8rem] font-bold tracking-[-0.02em] text-[var(--ink)] md:text-[2.2rem]">
+            Jouw data, jouw controle
+          </h2>
+          <p className="mx-auto mb-10 max-w-xl text-center font-serif text-base leading-relaxed text-[var(--ink-3)]">
+            TriFinity is gebouwd met privacy als fundament — niet als bijzaak.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {[
+              {
+                icon: <ShieldCheck className="h-5 w-5" />,
+                title: 'Geen namen of rekeningnummers naar AI',
+                body: 'Alleen samenvattingen en geaggregeerde bedragen worden gedeeld met de AI-coach. Je persoonlijke gegevens, bankrekeningnummers en transactiedetails verlaten nooit de beveiligde omgeving.',
+              },
+              {
+                icon: <Lock className="h-5 w-5" />,
+                title: 'Zero-retention API',
+                body: 'Je financiële data wordt niet bewaard door AI-providers en niet gebruikt voor training. Elk gesprek met Will is vluchtig — na het antwoord wordt de context gewist.',
+              },
+              {
+                icon: <Eye className="h-5 w-5" />,
+                title: 'Volledige controle',
+                body: 'AI is volledig uitschakelbaar. TriFinity werkt zonder AI net zo goed — alle berekeningen, budgetten en projecties draaien lokaal. Jij bepaalt wat je deelt.',
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 transition-all duration-200 hover:border-[var(--border-md)] hover:shadow-[var(--s1)]"
+              >
+                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] text-[var(--ink-2)]">
+                  {item.icon}
+                </div>
+                <h4 className="mb-2 font-sans text-sm font-semibold text-[var(--ink)]">{item.title}</h4>
+                <p className="font-serif text-sm leading-relaxed text-[var(--ink-3)]">{item.body}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Trust badges */}
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            {[
+              { icon: <Fingerprint className="h-3.5 w-3.5" />, label: 'Privacy by Design' },
+              { icon: <DatabaseZap className="h-3.5 w-3.5" />, label: 'Zero Data Retention' },
+              { icon: <ToggleRight className="h-3.5 w-3.5" />, label: 'AI Opt-out' },
+            ].map((badge) => (
+              <div
+                key={badge.label}
+                className="flex items-center gap-1.5 rounded-full border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-1.5 font-sans text-[11px] font-medium text-[var(--ink-3)]"
+              >
+                {badge.icon}
+                {badge.label}
               </div>
             ))}
           </div>

@@ -4,11 +4,43 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { NotificationItem } from '@/components/app/notifications/notification-item'
 import { RELEASE_NOTES, type ReleaseNote } from '@/lib/release-notes'
-import { Bell, Newspaper, ChevronRight, CheckCheck, Sparkles } from 'lucide-react'
+import { Bell, Newspaper, ChevronRight, CheckCheck, Sparkles, TrendingUp, AlertCircle, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import type { Notification } from '@/app/api/notifications/route'
+import type { NewsItem } from '@/app/api/news/route'
 
 const BERICHTEN_HISTORY_DAYS = 30
+
+// ── News cache (client-side) ────────────────────────────────────────
+
+const NEWS_LOCAL_CACHE_KEY = 'trifinity_news_cache'
+const NEWS_CACHE_TTL_MS = 6 * 60 * 60 * 1000 // 6 hours
+
+interface LocalNewsCache {
+  items: NewsItem[]
+  fetchedAt: number
+}
+
+function getLocalNewsCache(): NewsItem[] | null {
+  try {
+    const raw = localStorage.getItem(NEWS_LOCAL_CACHE_KEY)
+    if (!raw) return null
+    const cache: LocalNewsCache = JSON.parse(raw)
+    if (Date.now() - cache.fetchedAt > NEWS_CACHE_TTL_MS) return null
+    return cache.items
+  } catch {
+    return null
+  }
+}
+
+function setLocalNewsCache(items: NewsItem[]): void {
+  try {
+    const cache: LocalNewsCache = { items, fetchedAt: Date.now() }
+    localStorage.setItem(NEWS_LOCAL_CACHE_KEY, JSON.stringify(cache))
+  } catch {
+    // Silent fail — localStorage might be full
+  }
+}
 
 // ── Day grouping helpers ─────────────────────────────────────────────
 
@@ -47,18 +79,21 @@ type DayGroup = {
   notifications: Notification[]
 }
 
-type TabId = 'meldingen' | 'nieuws'
+// ── Newspaper section heading ────────────────────────────────────────
+
+function SectionHeading({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-4 pb-4 pt-2">
+      <div className="h-px flex-1 bg-[var(--border-ed)]" />
+      <span className="font-inter text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-4)]">
+        {label}
+      </span>
+      <div className="h-px flex-1 bg-[var(--border-ed)]" />
+    </div>
+  )
+}
 
 // ── Module color mapping ─────────────────────────────────────────────
-
-const MODULE_COLORS: Record<string, string> = {
-  amber: 'bg-kern-100 text-kern-700 border-kern-200',
-  teal: 'bg-wil-100 text-wil-700 border-wil-200',
-  purple: 'bg-horizon-100 text-horizon-700 border-horizon-200',
-  zinc: 'bg-zinc-100 text-zinc-700 border-zinc-200',
-  blue: 'bg-blue-100 text-blue-700 border-blue-200',
-  rose: 'bg-rose-100 text-rose-700 border-rose-200',
-}
 
 const MODULE_DOT: Record<string, string> = {
   amber: 'bg-kern-400',
@@ -67,6 +102,17 @@ const MODULE_DOT: Record<string, string> = {
   zinc: 'bg-zinc-400',
   blue: 'bg-blue-400',
   rose: 'bg-rose-400',
+}
+
+// ── Category config ──────────────────────────────────────────────────
+
+const CATEGORY_CONFIG: Record<string, { label: string; color: string; dotColor: string }> = {
+  fiscaal: { label: 'Fiscaal', color: 'bg-kern-50 text-kern-700 border-kern-200', dotColor: 'bg-kern-400' },
+  rente: { label: 'Rente', color: 'bg-blue-50 text-blue-700 border-blue-200', dotColor: 'bg-blue-400' },
+  woningmarkt: { label: 'Woningmarkt', color: 'bg-purple-50 text-purple-700 border-purple-200', dotColor: 'bg-purple-400' },
+  beleggingen: { label: 'Beleggingen', color: 'bg-wil-50 text-wil-700 border-wil-200', dotColor: 'bg-wil-400' },
+  pensioen: { label: 'Pensioen', color: 'bg-horizon-50 text-horizon-700 border-horizon-200', dotColor: 'bg-horizon-400' },
+  macro: { label: 'Macro', color: 'bg-zinc-100 text-zinc-700 border-zinc-200', dotColor: 'bg-zinc-400' },
 }
 
 // ── Collapsible day group ────────────────────────────────────────────
@@ -176,6 +222,166 @@ function ReleaseNoteCard({ release, defaultExpanded }: { release: ReleaseNote; d
   )
 }
 
+// ── Category badge ───────────────────────────────────────────────────
+
+function CategoryBadge({ category }: { category: string }) {
+  const cat = CATEGORY_CONFIG[category] ?? CATEGORY_CONFIG.macro
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 ${cat.color}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${cat.dotColor}`} />
+      <span className="font-inter text-[10px] font-bold uppercase tracking-[0.06em]">
+        {cat.label}
+      </span>
+    </span>
+  )
+}
+
+// ── Format news date ─────────────────────────────────────────────────
+
+function formatNewsDate(dateStr: string): string {
+  try {
+    return new Date(dateStr).toLocaleDateString('nl-NL', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
+  } catch {
+    return dateStr
+  }
+}
+
+// ── Impact block ─────────────────────────────────────────────────────
+
+function ImpactBlock({ impact }: { impact: string }) {
+  return (
+    <div className="mt-3 rounded-[var(--r)] border-l-3 border-wil-400 bg-wil-50/60 px-4 py-3">
+      <div className="mb-1 flex items-center gap-1.5">
+        <TrendingUp className="h-3.5 w-3.5 text-wil-600" />
+        <span className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-wil-700">
+          Impact voor jou
+        </span>
+      </div>
+      <p className="font-source-serif text-[13px] leading-relaxed text-wil-900">
+        {impact}
+      </p>
+    </div>
+  )
+}
+
+// ── Hero news article (first item — front-page style) ───────────────
+
+function HeroNewsArticle({ item }: { item: NewsItem }) {
+  return (
+    <article className="mb-8">
+      {/* Category + source context */}
+      <div className="mb-3 flex items-center gap-3">
+        <CategoryBadge category={item.category} />
+        {item.sourceContext && (
+          <span className="font-inter text-[11px] text-[var(--ink-4)]">
+            {item.sourceContext}
+          </span>
+        )}
+      </div>
+
+      {/* Large Source Serif headline */}
+      <h2
+        className="font-source-serif text-2xl font-semibold leading-snug text-[var(--ink)] sm:text-3xl"
+        style={{ letterSpacing: '-0.02em' }}
+      >
+        {item.headline}
+      </h2>
+
+      {/* Lead / summary text */}
+      <p className="mt-3 font-source-serif text-base leading-relaxed text-[var(--ink-2)] sm:text-lg">
+        {item.summary}
+      </p>
+
+      {/* Date in Inter */}
+      <div className="mt-3">
+        <span className="font-inter text-[11px] text-[var(--ink-4)]">
+          {formatNewsDate(item.date)}
+        </span>
+      </div>
+
+      {/* Impact block */}
+      <ImpactBlock impact={item.personalImpact} />
+
+      {/* Divider separating hero from rest */}
+      <div className="mt-6 h-px bg-[var(--border-ed)]" />
+    </article>
+  )
+}
+
+// ── Regular news article ────────────────────────────────────────────
+
+function NewsArticle({ item }: { item: NewsItem }) {
+  return (
+    <article className="py-4">
+      {/* Category + source */}
+      <div className="mb-2 flex items-center gap-3">
+        <CategoryBadge category={item.category} />
+        {item.sourceContext && (
+          <span className="font-inter text-[11px] text-[var(--ink-4)]">
+            {item.sourceContext}
+          </span>
+        )}
+      </div>
+
+      {/* Headline — Source Serif semibold */}
+      <h3 className="font-source-serif text-lg font-semibold leading-snug text-[var(--ink)]">
+        {item.headline}
+      </h3>
+
+      {/* Lead / summary — Source Serif normal */}
+      <p className="mt-1.5 font-source-serif text-sm leading-relaxed text-[var(--ink-2)]">
+        {item.summary}
+      </p>
+
+      {/* Date — Inter 11px */}
+      <span className="mt-2 inline-block font-inter text-[11px] text-[var(--ink-4)]">
+        {formatNewsDate(item.date)}
+      </span>
+
+      {/* Impact block */}
+      <ImpactBlock impact={item.personalImpact} />
+    </article>
+  )
+}
+
+// ── News skeleton loader ─────────────────────────────────────────────
+
+function NewsSkeletonLoader() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div
+          key={i}
+          className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 shadow-[var(--s0)]"
+        >
+          <div className="flex items-start gap-3">
+            <div className="h-8 w-8 shrink-0 animate-pulse rounded-[var(--r)] bg-[var(--subtle)]" />
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-16 animate-pulse rounded-full bg-[var(--subtle)]" />
+                <div className="h-3 w-20 animate-pulse rounded bg-[var(--subtle)]" />
+              </div>
+              <div className="h-4 w-3/4 animate-pulse rounded bg-[var(--subtle)]" />
+              <div className="h-3 w-full animate-pulse rounded bg-[var(--subtle)]" />
+              <div className="h-3 w-2/3 animate-pulse rounded bg-[var(--subtle)]" />
+            </div>
+          </div>
+        </div>
+      ))}
+      <div className="flex items-center justify-center gap-2 py-4">
+        <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--border-md)] border-t-[var(--ink-2)]" />
+        <p className="font-source-serif text-sm italic text-[var(--ink-3)]">
+          Nieuws wordt gepersonaliseerd&hellip;
+        </p>
+      </div>
+    </div>
+  )
+}
+
 // ── Newspaper masthead ───────────────────────────────────────────────
 
 function Masthead() {
@@ -227,10 +433,36 @@ function Masthead() {
   )
 }
 
+// ── Newspaper footer ─────────────────────────────────────────────────
+
+function NewspaperFooter() {
+  return (
+    <footer className="mt-12">
+      {/* Double rule — matches masthead style */}
+      <div className="h-px bg-[var(--ink)]" />
+      <div className="mt-[3px] h-[2px] bg-[var(--ink)]" />
+
+      <div className="flex flex-col items-center gap-4 py-6 text-center sm:flex-row sm:items-start sm:justify-between sm:text-left">
+        {/* Editorial closing quote */}
+        <p className="font-source-serif text-sm italic leading-relaxed text-[var(--ink-3)]">
+          &ldquo;Geld is opgeslagen tijd &mdash; elke euro vertegenwoordigt een stukje levenstijd.&rdquo;
+        </p>
+
+        {/* Link to briefing */}
+        <Link
+          href="/daishboard"
+          className="shrink-0 font-source-serif text-sm italic text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)]"
+        >
+          Naar Will&apos;s Briefing &rarr;
+        </Link>
+      </div>
+    </footer>
+  )
+}
+
 // ── Main page ────────────────────────────────────────────────────────
 
 export default function BerichtenPage() {
-  const [activeTab, setActiveTab] = useState<TabId>('meldingen')
   const {
     unreadCount,
     markAsRead,
@@ -240,6 +472,12 @@ export default function BerichtenPage() {
   // Fetch 30-day history for the berichten page (provider default is 7 days)
   const [history, setHistory] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
+
+  // News state
+  const [newsItems, setNewsItems] = useState<NewsItem[]>([])
+  const [newsLoading, setNewsLoading] = useState(false)
+  const [newsError, setNewsError] = useState<string | null>(null)
+  const [newsFetched, setNewsFetched] = useState(false)
 
   const fetchExtendedHistory = useCallback(async () => {
     try {
@@ -257,6 +495,45 @@ export default function BerichtenPage() {
   useEffect(() => {
     fetchExtendedHistory()
   }, [fetchExtendedHistory])
+
+  // Fetch news on-demand when Nieuws tab is first activated
+  const fetchNews = useCallback(async () => {
+    // Don't refetch if already loaded
+    if (newsFetched) return
+
+    // Check client-side cache first
+    const cached = getLocalNewsCache()
+    if (cached) {
+      setNewsItems(cached)
+      setNewsFetched(true)
+      return
+    }
+
+    setNewsLoading(true)
+    setNewsError(null)
+
+    try {
+      const res = await fetch('/api/news')
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: 'Onbekende fout' }))
+        throw new Error(data.error ?? `HTTP ${res.status}`)
+      }
+      const data = await res.json()
+      const items: NewsItem[] = data.items ?? data
+      setNewsItems(items)
+      setLocalNewsCache(items)
+      setNewsFetched(true)
+    } catch (err) {
+      setNewsError(err instanceof Error ? err.message : 'Nieuws kon niet worden geladen')
+    } finally {
+      setNewsLoading(false)
+    }
+  }, [newsFetched])
+
+  // Fetch news on mount
+  useEffect(() => {
+    fetchNews()
+  }, [fetchNews])
 
   // Wrap markAsRead/markAllRead to also update local 30-day history
   const handleMarkAsRead = useCallback((id: string) => {
@@ -296,13 +573,8 @@ export default function BerichtenPage() {
     }
   }
 
-  const tabs: { id: TabId; label: string; icon: typeof Bell; count?: number }[] = [
-    { id: 'meldingen', label: 'Meldingen', icon: Bell, count: unreadCount > 0 ? unreadCount : undefined },
-    { id: 'nieuws', label: 'Nieuws & Updates', icon: Newspaper },
-  ]
-
   const hasNoMeldingen = !loading && history.length === 0
-  const hasNoNieuws = RELEASE_NOTES.length === 0
+  const hasNoNieuws = RELEASE_NOTES.length === 0 && newsItems.length === 0 && !newsLoading
   const isCompletelyEmpty = hasNoMeldingen && hasNoNieuws
 
   if (isCompletelyEmpty) {
@@ -334,6 +606,9 @@ export default function BerichtenPage() {
             Geen berichten &mdash; stilte is ook een vorm van rijkdom
           </p>
         </div>
+
+        {/* Krant-footer */}
+        <NewspaperFooter />
       </div>
     )
   }
@@ -360,36 +635,10 @@ export default function BerichtenPage() {
         </div>
       </Link>
 
-      {/* Tab bar */}
-      <div className="mb-6 flex gap-1 rounded-[var(--r)] bg-[var(--subtle)] p-1">
-        {tabs.map((tab) => {
-          const Icon = tab.icon
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex flex-1 min-h-[44px] items-center justify-center gap-1.5 rounded-[var(--r-sm)] px-3 py-2 font-inter text-xs font-medium transition-all sm:min-h-0 ${
-                activeTab === tab.id
-                  ? 'bg-[var(--paper)] text-[var(--ink)] shadow-[var(--s0)]'
-                  : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-              }`}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {tab.label}
-              {tab.count !== undefined && (
-                <span className="ml-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#b33a2e] px-1 font-inter text-[10px] font-bold text-white">
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
+      {/* ── MELDINGEN sectie ─────────────────────────────────────── */}
+      <SectionHeading label="Meldingen" />
 
-      {/* Meldingen tab */}
-      {activeTab === 'meldingen' && (
-        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
+      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-4 py-3">
             <span className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
@@ -483,25 +732,84 @@ export default function BerichtenPage() {
             </div>
           )}
         </div>
-      )}
 
-      {/* Nieuws tab */}
-      {activeTab === 'nieuws' && (
-        <div className="space-y-3">
-          {RELEASE_NOTES.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-8 py-16 text-center shadow-[var(--s0)]">
-              <Newspaper className="h-8 w-8 text-[var(--ink-4)]" />
-              <p className="font-inter text-sm text-[var(--ink-3)]">
-                Nog geen release notes beschikbaar.
-              </p>
+      {/* ── FINANCIEEL NIEUWS sectie ──────────────────────────────── */}
+      <SectionHeading label="Financieel Nieuws" />
+
+      <div className="space-y-6">
+          {/* AI-generated personalized news */}
+          <div>
+            <div className="mb-3 flex items-center gap-2">
+              <span className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                Gepersonaliseerd nieuws
+              </span>
+              <div className="h-px flex-1 bg-[var(--border-ed)]" />
             </div>
-          ) : (
-            RELEASE_NOTES.map((release, i) => (
-              <ReleaseNoteCard key={release.version} release={release} defaultExpanded={i === 0} />
-            ))
+
+            {newsLoading || (!newsFetched && !newsError) ? (
+              <div className="flex flex-col items-center gap-3 py-16 text-center">
+                <Loader2 className="h-6 w-6 animate-spin text-[var(--ink-3)]" />
+                <p className="font-source-serif text-sm italic text-[var(--ink-3)]">
+                  Nieuws wordt gepersonaliseerd&hellip;
+                </p>
+              </div>
+            ) : newsError ? (
+              <div className="flex flex-col items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-6 py-12 text-center shadow-[var(--s0)]">
+                <AlertCircle className="h-8 w-8 text-[var(--ink-4)]" />
+                <p className="font-inter text-sm text-[var(--ink-3)]">
+                  {newsError}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setNewsFetched(false); setNewsError(null) }}
+                  className="min-h-[44px] font-inter text-xs font-medium text-wil-600 transition-colors hover:text-wil-700 sm:min-h-0"
+                >
+                  Probeer opnieuw
+                </button>
+              </div>
+            ) : newsItems.length > 0 ? (
+              <div>
+                {/* Hero article — front-page style, significantly larger */}
+                <HeroNewsArticle item={newsItems[0]} />
+                {/* Remaining articles — standard size with dividers */}
+                {newsItems.length > 1 && (
+                  <div className="divide-y divide-[var(--border-ed)]">
+                    {newsItems.slice(1).map((item) => (
+                      <NewsArticle key={item.id} item={item} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-8 py-16 text-center shadow-[var(--s0)]">
+                <Newspaper className="h-8 w-8 text-[var(--ink-4)]" />
+                <p className="font-inter text-sm text-[var(--ink-3)]">
+                  Nog geen nieuws beschikbaar.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Release notes section */}
+          {RELEASE_NOTES.length > 0 && (
+            <div>
+              <div className="mb-3 flex items-center gap-2">
+                <span className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                  Release notes
+                </span>
+                <div className="h-px flex-1 bg-[var(--border-ed)]" />
+              </div>
+              <div className="space-y-3">
+                {RELEASE_NOTES.map((release, i) => (
+                  <ReleaseNoteCard key={release.version} release={release} defaultExpanded={i === 0} />
+                ))}
+              </div>
+            </div>
           )}
         </div>
-      )}
+
+      {/* Krant-footer */}
+      <NewspaperFooter />
     </div>
   )
 }
