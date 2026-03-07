@@ -77,7 +77,7 @@ export function WidgetShell({ module, size, kicker, href, onClick, children, cla
           <div className="flex-1 min-w-0">
             {children}
           </div>
-          {isInteractive && (
+          {isInteractive && !isQuarter && (
             <div className="mt-1 flex justify-end">
               <ArrowRight className="h-3.5 w-3.5 text-[var(--ink-4)] opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
@@ -99,9 +99,9 @@ export function WidgetShell({ module, size, kicker, href, onClick, children, cla
           {children}
         </div>
 
-        {/* Hover arrow */}
-        {isInteractive && (
-          <div className={`${isQuarter ? 'mt-1' : 'mt-3'} flex justify-end`}>
+        {/* Hover arrow — hidden on quarter (too compact) */}
+        {isInteractive && !isQuarter && (
+          <div className="mt-3 flex justify-end">
             <ArrowRight className="h-3.5 w-3.5 text-[var(--ink-4)] opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         )}

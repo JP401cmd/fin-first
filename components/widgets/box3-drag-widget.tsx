@@ -28,8 +28,8 @@ export function Box3DragWidget({ size, data, href }: Props) {
         </p>
         <span className="text-[10px] text-[var(--ink-3)]">/jaar</span>
         {freedomDaysLost != null && (
-          <p className="mt-1 text-xs text-horizon-700">
-            = <span className="font-mono font-semibold tabular-nums">{freedomDaysLost}d</span> vrijheid
+          <p className="mt-1 font-serif italic text-[11px] text-[var(--ink-3)]">
+            = {freedomDaysLost}d vrijheid
           </p>
         )}
       </WidgetShell>

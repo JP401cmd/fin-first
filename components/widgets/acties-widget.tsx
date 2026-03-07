@@ -67,8 +67,8 @@ export function ActiesWidget({ size, data, href }: Props) {
           {completedActionsThisMonth} afgerond
         </p>
         {roundedDays > 0 && (
-          <p className="mt-1 font-mono text-xs tabular-nums text-wil-700">
-            +{roundedDays}d te winnen
+          <p className="mt-1 font-serif italic text-[11px] text-[var(--ink-3)]">
+            +{roundedDays}d vrijheid te winnen
           </p>
         )}
       </WidgetShell>

@@ -53,7 +53,7 @@ export function VrijheidsMijlpalenWidget({ size, data, href }: Props) {
       <WidgetShell module="horizon" size={size} kicker="Vrijheidsmijlpalen" href={href}>
         <div className="mt-1 flex items-center gap-2">
           <Flag className="h-3.5 w-3.5 text-horizon-500 shrink-0" />
-          <span className="font-mono text-lg text-[var(--ink)]">
+          <span className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
             {Math.round(effectivePct)}% vrijheid
           </span>
         </div>

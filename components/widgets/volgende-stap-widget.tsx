@@ -60,7 +60,7 @@ export function VolgendeStapWidget({ size, data, href }: Props) {
           <p className="text-sm font-medium text-[var(--ink)] line-clamp-1 flex-1">{first.title}</p>
         </div>
         {first.impact != null && first.impact > 0 && (
-          <p className="mt-1 text-xs text-emerald-600 font-mono tabular-nums">+{first.impact}d vrijheid</p>
+          <p className="mt-1 font-serif italic text-[11px] text-[var(--ink-3)]">+{first.impact}d vrijheid</p>
         )}
         {active.length > 1 && (
           <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
