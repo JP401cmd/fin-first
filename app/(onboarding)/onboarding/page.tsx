@@ -35,7 +35,6 @@ type Step =
   | 'extras'
   | 'preferences'
   | 'saving'
-  | 'error'
   | 'success'
 
 interface State {
@@ -239,11 +238,18 @@ export default function OnboardingPage() {
         }))
       }
 
+      // Timeout after 10 seconds
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000)
+
       const res = await fetch('/api/onboarding/save-own-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+        signal: controller.signal,
       })
+
+      clearTimeout(timeoutId)
 
       if (!res.ok) {
         const data = await res.json()
@@ -256,9 +262,17 @@ export default function OnboardingPage() {
 
       dispatch({ type: 'SET_STEP', step: 'success' })
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Onbekende fout bij opslaan'
+      let message: string
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        message = 'De server reageert niet. Controleer je internetverbinding en probeer het opnieuw.'
+      } else if (err instanceof TypeError && err.message === 'Failed to fetch') {
+        message = 'Geen internetverbinding. Controleer je netwerk en probeer het opnieuw.'
+      } else {
+        message = err instanceof Error ? err.message : 'Onbekende fout bij opslaan'
+      }
       setSaveError(message)
-      dispatch({ type: 'SET_STEP', step: 'error' })
+      // Go back to preferences step — all data is preserved in useReducer state
+      dispatch({ type: 'SET_STEP', step: 'preferences' })
     } finally {
       setSaving(false)
     }
@@ -274,11 +288,52 @@ export default function OnboardingPage() {
     )
   }
 
-  const showHeader = !['intro', 'success', 'saving', 'error'].includes(state.step)
+  const dismissError = useCallback(() => setSaveError(null), [])
+
+  const showHeader = !['intro', 'success', 'saving'].includes(state.step)
 
   return (
     <div className="flex min-h-screen flex-col items-center px-4 py-8 sm:justify-center sm:px-6 sm:py-12">
-      <div className="w-full max-w-[480px] sm:max-w-[640px]">
+      {/* ── Sticky error banner ─────────────────────────────────── */}
+      {saveError && (
+        <div
+          className="fixed inset-x-0 top-0 z-50 border-b border-red-200 bg-red-50 px-4 py-3 shadow-sm"
+          role="alert"
+          aria-live="assertive"
+        >
+          <div className="mx-auto flex max-w-[640px] items-start gap-3">
+            <div className="mt-0.5 flex-shrink-0">
+              <svg className="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-red-800">Er ging iets mis</p>
+              <p className="mt-0.5 text-sm text-red-600">{saveError}</p>
+            </div>
+            <div className="flex flex-shrink-0 items-center gap-2">
+              <button
+                onClick={handleSaveOwnData}
+                disabled={saving}
+                className="min-h-[36px] rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {saving ? 'Bezig...' : 'Opnieuw proberen'}
+              </button>
+              <button
+                onClick={dismissError}
+                className="rounded-lg p-1.5 text-red-400 hover:bg-red-100 hover:text-red-600"
+                aria-label="Sluiten"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className={`w-full max-w-[480px] sm:max-w-[640px] ${saveError ? 'mt-16' : ''}`}>
         {/* Logo / Header */}
         {showHeader && (
           <div className="mb-10 text-center">
@@ -357,34 +412,6 @@ export default function OnboardingPage() {
                 />
               </div>
               <p className="mt-2 font-mono text-xs tabular-nums text-zinc-400">{saveProgress}%</p>
-            </div>
-          </div>
-        )}
-
-        {state.step === 'error' && (
-          <div className="flex min-h-[60vh] flex-col items-center justify-center sm:min-h-0">
-            <div className="w-full max-w-sm rounded-2xl border border-red-200 bg-white p-8 text-center">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
-                <svg className="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-                </svg>
-              </div>
-              <h3 className="mb-2 text-base font-semibold text-zinc-900">Er ging iets mis</h3>
-              <p className="mb-5 text-sm text-zinc-500">{saveError}</p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => dispatch({ type: 'SET_STEP', step: 'preferences' })}
-                  className="flex-1 min-h-[44px] rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
-                >
-                  Terug
-                </button>
-                <button
-                  onClick={handleSaveOwnData}
-                  className="flex-1 min-h-[44px] rounded-lg bg-wil-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-wil-700"
-                >
-                  Opnieuw proberen
-                </button>
-              </div>
             </div>
           </div>
         )}

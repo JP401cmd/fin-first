@@ -384,6 +384,7 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-cost-splitting',
     '/test-snapshot-comparison',
     '/api/verify-snapshot-comparison',
+    '/test-onboarding-error-handling',
   ]
 
   // Protected route prefixes that require authentication
