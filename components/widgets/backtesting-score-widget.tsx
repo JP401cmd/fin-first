@@ -24,6 +24,23 @@ export function BacktestingScoreWidget({ size, data, href }: Props) {
     backtestSuccessRate >= 85 ? 'text-emerald-600' :
     backtestSuccessRate >= 65 ? 'text-horizon-600' : 'text-red-600'
 
+  if (size === 'quarter') {
+    return (
+      <WidgetShell module="horizon" size={size} kicker="Historische Weerbaarheid" href={href}>
+        <div className="mt-1 flex items-center gap-2">
+          {backtestSuccessRate >= 75
+            ? <ShieldCheck className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+            : <ShieldAlert className="h-3.5 w-3.5 text-red-400 shrink-0" />
+          }
+          <span className={`font-mono text-lg font-semibold tabular-nums leading-none ${successColor}`}>
+            {backtestSuccessRate}%
+          </span>
+        </div>
+        <p className="text-[10px] text-[var(--ink-3)] mt-0.5">historisch</p>
+      </WidgetShell>
+    )
+  }
+
   const successes = backtestNamedPaths?.filter(p => p.success).length ?? 0
   const total = backtestNamedPaths?.length ?? 0
 

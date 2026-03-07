@@ -1,7 +1,7 @@
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
-import { CheckCircle2, Circle } from 'lucide-react'
+import { CheckCircle2, Circle, Flag } from 'lucide-react'
 
 interface Props {
   size: WidgetSize
@@ -44,6 +44,29 @@ export function VrijheidsMijlpalenWidget({ size, data, href }: Props) {
   }
 
   const activeMilestoneIdx = MILESTONES.findIndex(m => effectivePct < m.pct)
+  const nextMilestone = activeMilestoneIdx >= 0 ? MILESTONES[activeMilestoneIdx] : null
+  const nextDate = nextMilestone ? getMilestoneDate(nextMilestone.pct) : null
+
+  if (size === 'quarter') {
+    const fullyFree = effectivePct >= 100
+    return (
+      <WidgetShell module="horizon" size={size} kicker="Vrijheidsmijlpalen" href={href}>
+        <div className="mt-1 flex items-center gap-2">
+          <Flag className="h-3.5 w-3.5 text-horizon-500 shrink-0" />
+          <span className="font-mono text-lg text-[var(--ink)]">
+            {Math.round(effectivePct)}% vrijheid
+          </span>
+        </div>
+        {fullyFree ? (
+          <p className="text-[10px] text-horizon-600 font-medium mt-0.5">Volledige vrijheid bereikt!</p>
+        ) : nextMilestone ? (
+          <p className="text-[10px] text-[var(--ink-3)] mt-0.5 truncate">
+            Volgende: {nextMilestone.pct}%{nextDate ? ` — ${nextDate}` : ''}
+          </p>
+        ) : null}
+      </WidgetShell>
+    )
+  }
 
   return (
     <WidgetShell module="horizon" size={size} kicker="Vrijheidsmijlpalen" href={href}>
