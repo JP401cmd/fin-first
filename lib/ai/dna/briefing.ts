@@ -96,6 +96,7 @@ Beschikbare routes:
 - "/horizon" — FIRE, vrijheid, projecties, scenario's, simulaties, levensgebeurtenissen
 - "/will" — Doelen, acties, aanbevelingen
 - "/identity" — Identiteit, profiel
+- "/berichten" — Berichten, notificaties, meldingen
 
 Default href per card type:
 - showMetric (netto vermogen, assets) → "/core/assets"
