@@ -1,3 +1,90 @@
+## Session 2026-03-07 - Features #335, #264, #265
+
+### Feature #335: DraggableWidgetGrid quarter-size kolom spanning - PASSING
+- Verified existing implementation: quarter gets no col-span/row-span (1x1), half gets lg:col-span-2 row-span-2, full gets sm:col-span-2 lg:col-span-4 row-span-2
+- Grid uses auto-rows-[160px] so 2 quarters (160px each) = 1 half (320px via row-span-2)
+- GhostCard overlay uses same pattern
+- No code changes needed — implementation already correct
+
+### Feature #264: Netto Vermogen widget quarter-size - PASSING
+- Added quarter-size branch with compact rendering (text-lg amount, 11px freedom time, delta with ▲/▼ indicators)
+- No sparkline on quarter size
+- Green/red color coding for positive/negative delta
+
+### Feature #265: Netto Vermogen widget half-size verrijking met delta - PASSING
+- Added MoM delta indicator next to main amount in half/full rendering
+- Delta shown as +€X (green) or -€X (red) in font-mono text-sm tabular-nums
+- Aligned baseline with main amount using flex items-baseline
+- Existing sparkline and freedom time label preserved
+
+### Current Status
+- 258/331 features passing (255 before + #335, #264, #265)
+
+## Session 2026-03-07 - Features #266, #267, #268
+
+### Feature #266: Netto Vermogen widget full-size verrijking met vermogensopbouw breakdown - PASSING
+- Added horizontal stacked bar (emerald assets vs red debts) under sparkline in full-size mode
+- Added labels: 'Bezittingen €X' left, 'Schulden €Y' right
+- Added MoM delta row with green/red coloring
+- Preserved existing sparkline, axis labels, and freedom time
+
+### Feature #267: Cashflow Maand widget quarter-size - PASSING
+- Added quarter-size rendering with compact cashflow amount (text-lg, green/red)
+- Shows freedom days label: '+Xd vrijheid opgebouwd' or 'Xd vrijheid ingeleverd'
+- No income/expense breakdown on quarter
+
+### Feature #268: Cashflow Maand widget half-size verrijking met vorige maand vergelijking - PASSING
+- Added previous month expense comparison below income/expense breakdown
+- Uses prevMonthExpenses from DashboardData with delta indicator (green/red arrows)
+
+### Current Status
+- 258/331 features passing (255 before + #266, #267, #268)
+- Commit: 00ed16f
+
+---
+
+## Session 2026-03-07 - Features #258, #262, #260 (batch)
+
+### Feature #258: Widget catalog sizes uitbreiden naar quarter/half/full - PASSING
+- All 26 widgets in WIDGET_CATALOG now have sizes: ['quarter', 'half', 'full']
+- monte_carlo: ['full'] → ['quarter', 'half', 'full']
+- nibud_benchmark: ['full'] → ['quarter', 'half', 'full']
+- passief_inkomen: ['half'] → ['quarter', 'half', 'full']
+- box3_drag: ['half'] → ['quarter', 'half', 'full']
+- Added BUDGET_FAV_SIZES constant for dynamic budget_fav widgets
+- DEFAULT_WIDGET_PREFS unchanged (defaultSize values preserved)
+
+### Feature #262: WidgetShell quarter-size layout ondersteuning - PASSING
+- WidgetShell: quarter size uses p-3 (instead of p-4), mb-1 kicker margin (instead of mb-2), mt-1 arrow (instead of mt-3)
+- LockedWidgetShell: quarter size uses smaller lock icon (h-7 w-7 container, h-3 w-3 icon), smaller text (text-xs), gap-1 and p-3
+
+### Feature #260: DashboardData uitbreiden met velden voor nieuwe widgets - PASSING
+- Added 8 new interfaces: Notification, BadgeSummary, StreakData, AiInsight, NextStep, MonthSummary, UpcomingEvent, EmergencyFund
+- Extended DashboardData with: notifications, badgeSummary, streaks, aiInsights, nextSteps, monthSummary, upcomingEvents, emergencyFund
+- Added defaults in dashboard/page.tsx and daishboard/page.tsx
+- Also fixed missing topRecurringTransactions/totalRecurringAmount/topRecommendations/topLifeEvents in daishboard/page.tsx (added by concurrent agent)
+- Type-check clean, commit: 2ace1e0
+
+### Current Status
+- 256/331 features passing (253 before + #258, #262, #260)
+
+## Session 2026-03-07 - Feature #332
+
+### Feature #332: Widget instellingen pagina: quarter-size toggle ondersteuning - PASSING
+- Verified all quarter-size support already fully implemented across the codebase:
+  - Widget catalog: All 26 widgets have sizes: ['quarter', 'half', 'full']
+  - Settings page (/identity/instellingen): Size selector dropdown shows Kwart/Half/Volledig for all widgets
+  - changeSize handler: Updates pref state with selected size including 'quarter'
+  - API PUT (/api/widgets): Correctly sanitizes and persists 'quarter' size
+  - Grid rendering (draggable-widget-grid.tsx): Quarter gets 1-column span in 4-column grid
+  - Widget shell: Quarter height defined at 160px
+- TypeScript compilation: clean (no errors)
+- ESLint: 0 errors (1 pre-existing warning in unrelated file)
+- No code changes needed — feature was already complete
+
+### Current Status
+- 255/331 features passing (254 before + #332)
+
 ## Session 2026-02-18 - Feature #256
 
 ### Feature #256: Cost splitting calculation modes - PASSING
