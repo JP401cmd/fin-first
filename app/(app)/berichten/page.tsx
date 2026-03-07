@@ -598,6 +598,9 @@ export default function BerichtenPage() {
   const [newsError, setNewsError] = useState<string | null>(null)
   const [newsFetched, setNewsFetched] = useState(false)
 
+  // Read articles state
+  const [readArticleIds, setReadArticleIds] = useState<Set<string>>(new Set())
+
   const fetchExtendedHistory = useCallback(async () => {
     try {
       const res = await fetch(`/api/notifications?days=${BERICHTEN_HISTORY_DAYS}`)
