@@ -3,7 +3,7 @@
 
 import { z } from 'zod'
 import { tool } from 'ai'
-import type { TemporalContext, PreviousBriefingSummary, BriefingLongTermMemory } from '@/lib/briefing/types'
+import type { TemporalContext, PreviousBriefingSummary, BriefingLongTermMemory, PhaseTransitionInfo } from '@/lib/briefing/types'
 
 // ── System Prompt Builder ───────────────────────────────────
 
@@ -15,12 +15,14 @@ export function buildBriefingSystemPrompt(
   previousBriefing?: PreviousBriefingSummary,
   longTermMemory?: BriefingLongTermMemory,
   userPreferences?: string,
+  phaseTransition?: PhaseTransitionInfo,
 ): string {
   // Phase-specific card emphasis
   const phaseEmphasis = getPhaseEmphasis(phase)
   const temporalGuidance = getTemporalGuidance(temporal)
   const previousBlock = formatPreviousBriefing(previousBriefing)
   const longTermBlock = formatLongTermMemory(longTermMemory)
+  const phaseTransitionBlock = formatPhaseTransition(phaseTransition)
 
   return `Je bent Will, de financiele redacteur van TriFinity.
 
@@ -65,7 +67,7 @@ Gebruik deze routes als href waarden:
 Vandaag: ${temporal.date}, dag ${temporal.dayOfMonth} van de maand, ${temporal.dayOfWeek}.
 ${temporalGuidance}
 ${temporal.seasonalNotes.length > 0 ? `\nActueel: ${temporal.seasonalNotes.join('; ')}` : ''}
-${directivesBlock ? `\n${directivesBlock}\n` : ''}${previousBlock ? `\n${previousBlock}\n` : ''}${longTermBlock ? `\n${longTermBlock}\n` : ''}${userPreferences ? `\n${userPreferences}\n` : ''}
+${directivesBlock ? `\n${directivesBlock}\n` : ''}${previousBlock ? `\n${previousBlock}\n` : ''}${longTermBlock ? `\n${longTermBlock}\n` : ''}${userPreferences ? `\n${userPreferences}\n` : ''}${phaseTransitionBlock ? `\n${phaseTransitionBlock}\n` : ''}
 == FASE-BEWUST ==
 Gebruikersfase: ${phase} (sovereignty level ${level})
 ${phaseEmphasis}
@@ -162,6 +164,55 @@ function formatLongTermMemory(mem?: BriefingLongTermMemory): string {
     }
     lines.push('Instructie: Vermijd herhaling van deze inzichten tenzij er relevante updates zijn. Bouw voort op eerdere adviezen.')
   }
+
+  return lines.join('\n')
+}
+
+/** Phase descriptions for transition celebrations */
+const PHASE_DESCRIPTIONS: Record<string, { dutch: string; unlocks: string }> = {
+  recovery: {
+    dutch: 'Herstel',
+    unlocks: 'Basis budgettering, schuldoverzicht, en je eerste stappen naar financiele stabiliteit.',
+  },
+  stability: {
+    dutch: 'Stabiliteit',
+    unlocks: 'Box 3 belasting, FIRE berekeningen, levensgebeurtenissen, noodfonds tracking, en geavanceerde budgetanalyse.',
+  },
+  momentum: {
+    dutch: 'Momentum',
+    unlocks: 'Asset allocatie, Monte Carlo simulaties, scenarioanalyse, backtesting, en passief inkomen tracking.',
+  },
+  mastery: {
+    dutch: 'Meesterschap',
+    unlocks: 'Withdrawal strategieen, legacy planning, en volledige controle over je financiele toekomst.',
+  },
+}
+
+/** Format a phase transition into a prominent AI instruction block */
+function formatPhaseTransition(transition?: PhaseTransitionInfo): string {
+  if (!transition) return ''
+
+  const prev = PHASE_DESCRIPTIONS[transition.previousPhase]
+  const curr = PHASE_DESCRIPTIONS[transition.currentPhase]
+  const prevName = prev?.dutch ?? transition.previousPhase
+  const currName = curr?.dutch ?? transition.currentPhase
+  const unlocks = curr?.unlocks ?? ''
+
+  const lines: string[] = [
+    '== FASE-TRANSITIE (BELANGRIJK!) ==',
+    `De gebruiker is zojuist van de ${prevName}-fase naar de ${currName}-fase gegaan. Dit is een grote mijlpaal!`,
+    '',
+    'INSTRUCTIE: Begin je briefing met een feestelijke showInsight (emphasis: "celebration") die deze fase-transitie viert.',
+    `- Benoem de overgang van ${prevName} naar ${currName}`,
+    `- Leg uit wat de nieuwe ${currName}-fase betekent voor de gebruiker`,
+  ]
+
+  if (unlocks) {
+    lines.push(`- Nieuw ontgrendeld in ${currName}: ${unlocks}`)
+  }
+
+  lines.push('- Maak het persoonlijk en warm — dit is een moment om trots op te zijn')
+  lines.push('- Dit moet de EERSTE card zijn, nog voor andere metrics of inzichten')
 
   return lines.join('\n')
 }
