@@ -9879,3 +9879,19 @@ For Feature #51 (Transaction Import):
 - Zero TypeScript errors
 - All unit tests pass
 - Commit: 89cc0e5
+
+## Session 2026-03-07 - Features #458, #457
+
+### Feature #458: Update locked-features-footer MODULE_FEATURES with all feature entries - PASSING
+- Added to MODULE_FEATURES.kern: cashflow_forecast, vermogensprognose_kern, spending_patterns
+- Added to MODULE_FEATURES.wil: widget_voorstellen
+- Added to MODULE_FEATURES.horizon: widget_vrijheidsscenarios, widget_sim_vermogenspad, widget_passief_inkomen, widget_box3_drag, widget_vrijheidsmijlpalen, widget_backtesting_score
+
+### Feature #457: Widget catalog minLevel derived from feature-phase matrix - PASSING
+- Imported PHASES and DEFAULT_MATRIX from feature-phases.ts into widget-catalog.ts
+- Created deriveMinLevel(featureId) helper: finds earliest true phase, returns lowest level (-2 if not in matrix)
+- Created deriveRequiredPhase(featureId) helper: returns phase label, undefined for recovery/not-in-matrix
+- Post-processing loop after WIDGET_FEATURE_MAP syncs minLevel and requiredPhase from matrix
+- Prevents drift between widget-catalog and feature-phases
+- Zero TypeScript errors, zero console errors
+- Both features committed in d0fb850 (parallel agent overlap)
