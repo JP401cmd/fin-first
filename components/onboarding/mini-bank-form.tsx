@@ -35,19 +35,19 @@ export function MiniBankForm({
               placeholder="Naam (bijv. Betaalrekening)"
               value={item.name}
               onChange={(e) => update(i, { name: e.target.value })}
-              className="col-span-2 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs text-zinc-900 outline-none focus:border-zinc-500"
+              className="col-span-2 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-base text-zinc-900 outline-none focus:border-zinc-500 sm:text-xs"
             />
             <input
               type="text"
               placeholder="Bank (bijv. ING)"
               value={item.bank_name}
               onChange={(e) => update(i, { bank_name: e.target.value })}
-              className="rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs text-zinc-900 outline-none focus:border-zinc-500"
+              className="rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-base text-zinc-900 outline-none focus:border-zinc-500 sm:text-xs"
             />
             <select
               value={item.account_type}
               onChange={(e) => update(i, { account_type: e.target.value })}
-              className="rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs text-zinc-900 outline-none focus:border-zinc-500"
+              className="rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-base text-zinc-900 outline-none focus:border-zinc-500 sm:text-xs"
             >
               <option value="checking">Betaalrekening</option>
               <option value="savings">Spaarrekening</option>
@@ -61,7 +61,7 @@ export function MiniBankForm({
                 placeholder="Saldo"
                 value={item.balance}
                 onChange={(e) => update(i, { balance: e.target.value })}
-                className="w-full rounded-md border border-zinc-300 bg-white py-1.5 pr-2.5 pl-6 text-xs text-zinc-900 outline-none focus:border-zinc-500"
+                className="w-full rounded-md border border-zinc-300 bg-white py-1.5 pr-2.5 pl-6 text-base text-zinc-900 outline-none focus:border-zinc-500 sm:text-xs"
               />
             </div>
           </div>
@@ -69,7 +69,7 @@ export function MiniBankForm({
       ))}
       <button
         onClick={add}
-        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-zinc-300 py-2 text-xs font-medium text-zinc-500 hover:border-zinc-400 hover:text-zinc-700"
+        className="flex w-full min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-dashed border-zinc-300 py-2 text-xs font-medium text-zinc-500 hover:border-zinc-400 hover:text-zinc-700 active:bg-zinc-50"
       >
         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />

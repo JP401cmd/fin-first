@@ -1,3 +1,30 @@
+## Session 2026-03-07 - Features #374, #375, #376
+
+### Feature #374: Onboarding: verwijder demo-data pad en persona-select - PASSING
+- Removed OnboardingChoose, OnboardingPersonaSelect, OnboardingSeeding imports and usage
+- Removed 'choose', 'persona-select', 'seeding' steps from Step type and state machine
+- Removed handlePersonaSeed, processStream, SeedEvent, and all seeding-related state
+- Updated flow: intro → identity directly (was intro → choose → identity/persona-select)
+- Identity onBack now goes to intro (was choose)
+- Cleaned up unused imports (PersonaKey type)
+
+### Feature #375: Onboarding: voortgangsindicator voor 5 stappen - PASSING
+- Updated STEPS array to 5 steps: profiel, startpunt, budgetten, voorkeuren, klaar
+- Added visual progress bar with gradient (amber → teal → purple)
+- Responsive: mobile shows only numbered circles, desktop shows full labels (hidden sm:block)
+- Updated StepProgress references in onboarding-identity (profiel), onboarding-budgets (budgetten), onboarding-extras (voorkeuren)
+
+### Feature #376: Onboarding: welkomstscherm zonder demo-keuze - PASSING
+- OnboardingIntro already had no demo references — verified clean
+- Updated button text from 'Laten we beginnen' to 'Aan de slag' per spec
+- Existing layout already mobile-first: grid-cols-1 sm:grid-cols-3 for module cards
+- FinnAvatar, philosophy text, 3 module cards all present
+
+### Current Status
+- 3 features completed this session (#374, #375, #376)
+- Zero TypeScript errors
+- Commit: dd7d372
+
 ## Session 2026-03-07 - Features #347, #353
 
 ### Feature #347: System prompt bijwerken met nieuwe tools en richtlijnen - PASSING

@@ -155,7 +155,7 @@ export function MiniAssetForm({
       {/* Add button */}
       <button
         onClick={openNew}
-        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-zinc-300 py-2 text-xs font-medium text-zinc-500 hover:border-zinc-400 hover:text-zinc-700"
+        className="flex w-full min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-dashed border-zinc-300 py-2 text-xs font-medium text-zinc-500 hover:border-zinc-400 hover:text-zinc-700 active:bg-zinc-50"
       >
         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -167,7 +167,7 @@ export function MiniAssetForm({
       {editingIndex !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={() => setEditingIndex(null)}>
           <div
-            className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+            className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-xl sm:p-6 [&_input]:text-base [&_input]:sm:text-sm [&_select]:text-base [&_select]:sm:text-sm"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="mb-4 text-lg font-semibold text-zinc-900">
@@ -475,14 +475,14 @@ export function MiniAssetForm({
             <div className="mt-5 flex gap-3">
               <button
                 onClick={() => setEditingIndex(null)}
-                className="flex-1 rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+                className="flex-1 min-h-[44px] rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50 active:bg-zinc-100"
               >
                 Annuleer
               </button>
               <button
                 onClick={save}
                 disabled={!draft.name || !draft.current_value}
-                className="flex-1 rounded-lg bg-wil-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-wil-700 disabled:opacity-40"
+                className="flex-1 min-h-[44px] rounded-lg bg-wil-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-wil-700 active:bg-wil-800 disabled:opacity-40"
               >
                 {editingIndex === -1 ? 'Toevoegen' : 'Opslaan'}
               </button>

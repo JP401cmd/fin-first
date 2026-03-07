@@ -102,10 +102,10 @@ export function OnboardingBudgets({
   }
 
   return (
-    <div>
+    <div className="pb-20 sm:pb-0">
       <button
         onClick={onBack}
-        className="mb-6 flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
+        className="mb-6 flex min-h-[44px] items-center gap-1 text-sm text-zinc-500 hover:text-zinc-900 active:text-zinc-900 transition-colors"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -127,7 +127,7 @@ export function OnboardingBudgets({
         <div className="space-y-3">
           <button
             onClick={() => setSubChoice('template')}
-            className="group w-full rounded-xl border-2 border-zinc-200 bg-white p-5 text-left transition-all hover:border-kern-300 hover:shadow-md"
+            className="group w-full min-h-[60px] rounded-xl border-2 border-zinc-200 bg-white p-4 sm:p-5 text-left transition-all hover:border-kern-300 hover:shadow-md active:scale-[0.99] active:border-kern-400"
           >
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-kern-50 group-hover:bg-kern-100">
@@ -146,7 +146,7 @@ export function OnboardingBudgets({
 
           <button
             onClick={() => setSubChoice('ai')}
-            className="group w-full rounded-xl border-2 border-zinc-200 bg-white p-5 text-left transition-all hover:border-[var(--border-md)] hover:shadow-md"
+            className="group w-full min-h-[60px] rounded-xl border-2 border-zinc-200 bg-white p-4 sm:p-5 text-left transition-all hover:border-[var(--border-md)] hover:shadow-md active:scale-[0.99]"
           >
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] group-hover:bg-[var(--border-ed)]">
@@ -165,7 +165,7 @@ export function OnboardingBudgets({
 
           <button
             onClick={() => setSubChoice('manual')}
-            className="group w-full rounded-xl border-2 border-zinc-200 bg-white p-5 text-left transition-all hover:border-[var(--border-md)] hover:shadow-md"
+            className="group w-full min-h-[60px] rounded-xl border-2 border-zinc-200 bg-white p-4 sm:p-5 text-left transition-all hover:border-[var(--border-md)] hover:shadow-md active:scale-[0.99]"
           >
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] group-hover:bg-[var(--border-ed)]">
@@ -186,7 +186,7 @@ export function OnboardingBudgets({
 
       {/* AI context + generate */}
       {subChoice === 'ai' && (
-        <div className="space-y-4 rounded-xl border border-zinc-200 bg-white p-6">
+        <div className="space-y-4 rounded-xl border border-zinc-200 bg-white p-4 sm:p-6">
           <p className="text-sm text-zinc-600">
             Vertel optioneel iets meer over je situatie (woonsituatie, auto, leefstijl) zodat de AI je budget beter kan inschatten.
           </p>
@@ -195,7 +195,7 @@ export function OnboardingBudgets({
             onChange={(e) => setAiContext(e.target.value)}
             rows={3}
             placeholder="Bijv: Ik huur een appartement voor €950/mnd, heb geen auto, ga graag uit eten..."
-            className="w-full resize-none rounded-lg border border-zinc-300 bg-zinc-50 px-4 py-3 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+            className="w-full resize-none rounded-lg border border-zinc-300 bg-zinc-50 px-4 py-3 text-base text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 sm:text-sm"
           />
           {aiError && (
             <p className="text-sm text-red-600">{aiError}</p>
@@ -203,14 +203,14 @@ export function OnboardingBudgets({
           <div className="flex gap-3">
             <button
               onClick={() => setSubChoice(null)}
-              className="flex-1 rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+              className="flex-1 min-h-[44px] rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50 active:bg-zinc-100"
             >
               Terug
             </button>
             <button
               onClick={handleAISuggest}
               disabled={aiLoading}
-              className="flex-1 rounded-lg bg-horizon-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-horizon-700 disabled:opacity-50"
+              className="flex-1 min-h-[44px] rounded-lg bg-horizon-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-horizon-700 active:bg-horizon-800 disabled:opacity-50"
             >
               {aiLoading ? 'AI denkt na...' : 'Genereer suggestie'}
             </button>
@@ -230,7 +230,7 @@ export function OnboardingBudgets({
             <button
               key={template.id}
               onClick={() => handleTemplateSelect(template)}
-              className="group w-full rounded-xl border-2 border-zinc-200 bg-white p-4 text-left transition-all hover:border-kern-300 hover:shadow-md"
+              className="group w-full min-h-[60px] rounded-xl border-2 border-zinc-200 bg-white p-4 text-left transition-all hover:border-kern-300 hover:shadow-md active:scale-[0.99]"
             >
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-kern-50 group-hover:bg-kern-100">
@@ -248,7 +248,7 @@ export function OnboardingBudgets({
           )})}
           <button
             onClick={() => setSubChoice(null)}
-            className="w-full rounded-lg border border-[var(--border-md)] px-4 py-2.5 text-sm font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)]"
+            className="w-full min-h-[44px] rounded-lg border border-[var(--border-md)] px-4 py-2.5 text-sm font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)] active:bg-zinc-100"
           >
             Terug
           </button>
@@ -272,16 +272,17 @@ export function OnboardingBudgets({
             netIncome={netIncome}
           />
 
-          <div className="flex gap-3">
+          {/* Sticky nav on mobile */}
+          <div className="fixed bottom-0 left-0 right-0 z-10 flex gap-3 border-t border-zinc-200 bg-white/80 px-4 pb-[env(safe-area-inset-bottom,12px)] pt-3 backdrop-blur-sm sm:static sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
             <button
               onClick={() => setSubChoice(null)}
-              className="flex-1 rounded-lg border border-zinc-300 px-4 py-3 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+              className="flex-1 min-h-[44px] rounded-lg border border-zinc-300 px-4 py-3 text-sm font-medium text-zinc-600 hover:bg-zinc-50 active:bg-zinc-100"
             >
               Terug
             </button>
             <button
               onClick={onNext}
-              className="flex-1 rounded-lg bg-kern-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-kern-700"
+              className="flex-1 min-h-[44px] rounded-lg bg-kern-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-kern-700 active:bg-kern-800"
             >
               Volgende
             </button>

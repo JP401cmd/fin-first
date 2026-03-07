@@ -68,7 +68,7 @@ export function BudgetAmountEditor({
             <div key={parent.slug} className="rounded-xl border border-zinc-200 bg-white">
               <button
                 onClick={() => toggleGroup(parent.slug)}
-                className="flex w-full items-center justify-between px-4 py-3 text-left"
+                className="flex w-full min-h-[44px] items-center justify-between px-4 py-3 text-left"
               >
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-zinc-800">{parent.name}</span>
@@ -104,7 +104,7 @@ export function BudgetAmountEditor({
                             step={5}
                             value={val}
                             onChange={(e) => setAmount(child.slug, Number(e.target.value))}
-                            className="w-full rounded-md border border-zinc-300 bg-zinc-50 py-1.5 pr-2 pl-6 text-right text-xs text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                            className="w-full rounded-md border border-zinc-300 bg-zinc-50 py-2 pr-2 pl-6 text-right text-base text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 sm:py-1.5 sm:text-xs"
                           />
                         </div>
                       </div>

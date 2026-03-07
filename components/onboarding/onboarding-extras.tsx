@@ -50,10 +50,10 @@ export function OnboardingExtras({
   ]
 
   return (
-    <div>
+    <div className="pb-20 sm:pb-0">
       <button
         onClick={onBack}
-        className="mb-6 flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
+        className="mb-6 flex min-h-[44px] items-center gap-1 text-sm text-zinc-500 hover:text-zinc-900 active:text-zinc-900 transition-colors"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -77,7 +77,7 @@ export function OnboardingExtras({
           <div key={key} className="rounded-xl border border-zinc-200 bg-white">
             <button
               onClick={() => toggle(key)}
-              className="flex w-full items-center justify-between px-4 py-3.5 text-left"
+              className="flex w-full min-h-[44px] items-center justify-between px-4 py-3.5 text-left"
             >
               <div>
                 <div className="flex items-center gap-2">
@@ -112,11 +112,12 @@ export function OnboardingExtras({
         ))}
       </div>
 
-      <div className="mt-6 flex gap-3">
+      {/* Sticky nav on mobile */}
+      <div className="fixed bottom-0 left-0 right-0 z-10 flex gap-3 border-t border-zinc-200 bg-white/80 px-4 pb-[env(safe-area-inset-bottom,12px)] pt-3 backdrop-blur-sm sm:static sm:mt-6 sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
         <button
           onClick={onSkip}
           disabled={saving}
-          className="flex-1 rounded-lg border border-zinc-300 px-4 py-3 text-sm font-medium text-zinc-600 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex-1 min-h-[44px] rounded-lg border border-zinc-300 px-4 py-3 text-sm font-medium text-zinc-600 hover:bg-zinc-50 active:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Sla over
         </button>
@@ -124,7 +125,7 @@ export function OnboardingExtras({
           onClick={onNext}
           disabled={saving}
           data-testid="onboarding-save-next"
-          className="flex-1 rounded-lg bg-wil-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-wil-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex-1 min-h-[44px] rounded-lg bg-wil-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-wil-700 active:bg-wil-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {saving ? 'Opslaan...' : 'Opslaan & verder'}
         </button>

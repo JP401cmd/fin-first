@@ -39,7 +39,7 @@ export function OnboardingSuccess({ onDashboard }: { onDashboard: () => void }) 
 
       <button
         onClick={onDashboard}
-        className="mt-8 rounded-lg bg-wil-600 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-wil-700"
+        className="mt-8 min-h-[44px] rounded-lg bg-wil-600 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-wil-700 active:bg-wil-800"
       >
         Ontdek je dashboard
       </button>

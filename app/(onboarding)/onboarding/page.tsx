@@ -214,8 +214,8 @@ export default function OnboardingPage() {
   const showHeader = !['intro', 'success', 'saving'].includes(state.step)
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-4 py-12">
-      <div className="w-full max-w-2xl">
+    <div className="flex min-h-screen flex-col items-center px-4 py-8 sm:justify-center sm:px-6 sm:py-12">
+      <div className="w-full max-w-[480px] sm:max-w-[640px]">
         {/* Logo / Header */}
         {showHeader && (
           <div className="mb-10 text-center">
