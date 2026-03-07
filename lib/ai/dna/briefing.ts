@@ -165,7 +165,13 @@ ${phaseEmphasis}
 - Empowerend: "dit kun je doen" niet "dit moet je doen"
 - Concreet: altijd met een getal, nooit vaag advies
 - Warm maar feitelijk — als een wijze financiele partner
-- Geen emoji's`
+- Geen emoji's
+
+== PRIVACY PROTOCOL ==
+Je ontvangt geanonimiseerde financiele data (geen namen, IBANs, adressen).
+Als je onverhoopt PII detecteert: NEGEER deze en gebruik ze NIET in je output.
+Refereer aan de gebruiker als je/jij, nooit bij naam.
+Noem nooit specifieke banken, werkgevers of adressen in je output.`
 }
 
 /** Format previous briefing summary for prompt context */

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { NOTIFICATION_TYPES } from '@/lib/identity-constants'
-import { Lock, GripVertical, ChevronDown } from 'lucide-react'
+import { Lock, GripVertical, ChevronDown, Shield, Eye, EyeOff, Server } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -214,6 +214,7 @@ export default function InstellingenPage() {
   const [fireOpen, setFireOpen] = useState(false)
   const [weergaveOpen, setWeergaveOpen] = useState(false)
   const [gegevensOpen, setGegevensOpen] = useState(false)
+  const [privacyOpen, setPrivacyOpen] = useState(false)
 
   // ─ Section A: Notificaties ─
   const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>({
@@ -645,7 +646,7 @@ export default function InstellingenPage() {
           Instellingen
         </h1>
         <p className="mt-1 font-serif italic text-[13px] text-[var(--ink-3)]">
-          Notificaties, widgets, berekeningen, weergave en gegevensbeheer.
+          Notificaties, widgets, berekeningen, weergave, privacy en gegevensbeheer.
         </p>
       </div>
 
@@ -1339,6 +1340,136 @@ export default function InstellingenPage() {
             )}
           </div>
         </div>
+          </div>
+        )}
+      </section>
+
+      {/* ── F: Privacy & AI ──────────────────────────────────────────── */}
+      <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setPrivacyOpen(o => !o)}
+          className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
+        >
+          <div>
+            <h2 className="label-editorial text-[var(--ink-2)]">Privacy & AI</h2>
+            {!privacyOpen && (
+              <p className="mt-0.5 text-xs text-[var(--ink-3)]">Hoe je data wordt beschermd bij AI-verwerking</p>
+            )}
+          </div>
+          <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${privacyOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {privacyOpen && (
+          <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 pb-6 pt-4 space-y-6">
+            {/* Intro */}
+            <p className="text-sm text-[var(--ink-2)] leading-relaxed">
+              TriFinity gebruikt AI om je financiële inzichten en aanbevelingen te geven. Hieronder zie je precies welke data wordt gedeeld en hoe deze wordt beschermd.
+            </p>
+
+            {/* Wat WEL wordt gedeeld */}
+            <div className="rounded-xl border border-[var(--border-ed)] p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-50">
+                  <Eye className="h-4 w-4 text-teal-600" />
+                </div>
+                <h3 className="text-sm font-semibold text-[var(--ink)]">Wat wordt gedeeld</h3>
+              </div>
+              <ul className="space-y-2 text-sm text-[var(--ink-2)]">
+                <li className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                  <span>Geaggregeerde bedragen (netto vermogen, totale inkomsten/uitgaven)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                  <span>Percentages en ratio&apos;s (spaarquote, vrijheidspercentage, SWR)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                  <span>Budgetcategorieën en bijbehorende bedragen</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                  <span>Leeftijd (niet je geboortedatum)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                  <span>Huishoudtype en temporal balance level</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Wat NIET wordt gedeeld */}
+            <div className="rounded-xl border border-[var(--border-ed)] p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-50">
+                  <EyeOff className="h-4 w-4 text-red-500" />
+                </div>
+                <h3 className="text-sm font-semibold text-[var(--ink)]">Wat NOOIT wordt gedeeld</h3>
+              </div>
+              <ul className="space-y-2 text-sm text-[var(--ink-2)]">
+                <li className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-red-400" />
+                  <span>Namen (vervangen door &apos;gebruiker&apos; / &apos;partner&apos;)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-red-400" />
+                  <span>IBAN-nummers en bankrekeningen</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-red-400" />
+                  <span>BSN (burgerservicenummer)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-red-400" />
+                  <span>E-mailadressen en telefoonnummers</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-red-400" />
+                  <span>Adressen en postcodes</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-red-400" />
+                  <span>Ruwe transactie-omschrijvingen (alleen categorie + bedrag)</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Dataverwerking */}
+            <div className="rounded-xl border border-[var(--border-ed)] p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-50">
+                  <Server className="h-4 w-4 text-purple-600" />
+                </div>
+                <h3 className="text-sm font-semibold text-[var(--ink)]">Hoe je data wordt verwerkt</h3>
+              </div>
+              <ul className="space-y-2 text-sm text-[var(--ink-2)]">
+                <li className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-purple-400" />
+                  <span><strong>Zero-retention:</strong> AI-providers (Anthropic, OpenAI) bewaren je data niet na verwerking</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-purple-400" />
+                  <span><strong>Geen training:</strong> je gegevens worden niet gebruikt om AI-modellen te trainen</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-purple-400" />
+                  <span><strong>Data minimalisatie:</strong> alleen de noodzakelijke context wordt verstuurd via automatische sanitisatie</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-purple-400" />
+                  <span><strong>Versleuteld:</strong> alle communicatie verloopt via HTTPS/TLS</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Shield badge */}
+            <div className="flex items-center gap-2 rounded-lg bg-[var(--subtle)] px-4 py-3">
+              <Shield className="h-4 w-4 shrink-0 text-teal-600" />
+              <p className="text-xs text-[var(--ink-3)]">
+                Alle data wordt automatisch gesanitiseerd voordat het naar een AI-provider wordt verstuurd.
+              </p>
+            </div>
           </div>
         )}
       </section>

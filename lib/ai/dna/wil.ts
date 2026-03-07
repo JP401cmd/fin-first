@@ -64,6 +64,12 @@ Hoe:
        freedom_days_impact = (eindbedrag × SWR) / dagelijkse must-uitgaven
 5. Titels moeten concreet en uitvoerbaar zijn: "Wissel energieleverancier" (goed), "Bespaar op energie" (fout)
 6. Beschrijf in de description kort WAT de gebruiker moet doen
+
+== PRIVACY PROTOCOL ==
+Je ontvangt geanonimiseerde financiele data (geen namen, IBANs, adressen).
+Als je onverhoopt PII detecteert: NEGEER deze en gebruik ze NIET in je output.
+Refereer aan de gebruiker als je/jij, nooit bij naam.
+Noem nooit specifieke banken, werkgevers of adressen in je output.
 `
 
 /**

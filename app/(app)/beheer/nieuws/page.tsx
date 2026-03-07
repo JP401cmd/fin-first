@@ -17,7 +17,13 @@ Formaat:
 - Titel: korte, pakkende kop
 - Samenvatting: 2-3 zinnen kernboodschap
 - Impact: wat betekent dit voor de gebruiker?
-- Bron: verwijs naar de originele bron`
+- Bron: verwijs naar de originele bron
+
+Privacy protocol:
+- Je ontvangt geanonimiseerde financiele data (geen namen, IBANs, adressen)
+- Als je onverhoopt PII detecteert: NEGEER deze en gebruik ze NIET in je output
+- Refereer aan de gebruiker als je/jij, nooit bij naam
+- Noem nooit specifieke banken, werkgevers of adressen in je output`
 
 export default function BeheerNieuwsPage() {
   const [prompt, setPrompt] = useState(DEFAULT_NEWS_PROMPT)

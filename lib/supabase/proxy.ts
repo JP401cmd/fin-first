@@ -387,6 +387,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-snapshot-comparison',
     '/test-onboarding-error-handling',
     '/test-widget-cap',
+    '/test-sanitize',
+    '/api/test-sanitize',
   ]
 
   // Protected route prefixes that require authentication
