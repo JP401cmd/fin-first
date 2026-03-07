@@ -18,6 +18,7 @@ const bodySchema = z.object({
     fire_end_strategy: z.enum(['perpetual', 'legacy', 'deplete']).optional(),
     fire_legacy_amount: z.number().positive().optional(),
     fire_end_age: z.number().int().min(60).max(120).optional(),
+    temporal_balance: z.number().int().min(1).max(5).optional(),
   }),
   budgetAmounts: z.record(z.string(), z.number().min(0)),
   bankAccounts: z.array(z.object({
@@ -128,6 +129,7 @@ export async function POST(req: Request) {
     if (identity.fire_end_strategy) profileData.fire_end_strategy = identity.fire_end_strategy
     if (identity.fire_legacy_amount != null) profileData.fire_legacy_amount = identity.fire_legacy_amount
     if (identity.fire_end_age != null) profileData.fire_end_age = identity.fire_end_age
+    if (identity.temporal_balance != null) profileData.temporal_balance = identity.temporal_balance
     if (widgetPrefs) profileData.widget_prefs = widgetPrefs
 
     const { error: profileErr } = await supabase

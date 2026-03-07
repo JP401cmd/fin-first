@@ -5,6 +5,7 @@ import { User, Users, Baby } from 'lucide-react'
 import { FinnAvatar } from '@/components/app/avatars'
 import { SpeechBubble } from './speech-bubble'
 import { StepProgress } from './step-progress'
+import { temporalLevels } from '@/lib/identity-constants'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 
@@ -24,6 +25,7 @@ export interface IdentityData {
   fire_end_strategy: FireEndStrategy
   fire_legacy_amount: string
   fire_end_age: number
+  temporal_balance: number
 }
 
 type FieldKey = 'full_name' | 'date_of_birth' | 'net_monthly_income' | 'number_of_children' | 'retirement_custom_amount' | 'fire_legacy_amount' | 'fire_end_age'
@@ -521,6 +523,67 @@ export function OnboardingIdentity({
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── Temporeel evenwicht ──────────────────────────────────── */}
+      <div className="mt-6 mb-6 flex items-start gap-3">
+        <div className="shrink-0"><FinnAvatar size={40} /></div>
+        <SpeechBubble>
+          Hoeveel van je huidige tijd wil je investeren in je toekomstige vrijheid? Dit is geen goed of fout &mdash; het is jouw persoonlijke balans.
+        </SpeechBubble>
+      </div>
+
+      <div className="space-y-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+        <div className="flex items-center gap-2">
+          <h3 className="font-display text-sm font-semibold tracking-[-0.02em] text-[var(--ink)]">Temporeel evenwicht</h3>
+          <span className="rounded-full bg-[var(--subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink-3)]">optioneel</span>
+        </div>
+
+        {/* Slider */}
+        <div>
+          <input
+            type="range"
+            min={1}
+            max={5}
+            step={1}
+            value={data.temporal_balance}
+            onChange={(e) => onChange({ ...data, temporal_balance: Number(e.target.value) })}
+            className="w-full min-h-[44px] cursor-pointer accent-[var(--ink)] touch-manipulation"
+            aria-label="Temporeel evenwicht"
+            aria-valuemin={1}
+            aria-valuemax={5}
+            aria-valuenow={data.temporal_balance}
+            aria-valuetext={temporalLevels[data.temporal_balance - 1]?.nameNl}
+          />
+          <div className="mt-1 flex justify-between text-base sm:text-sm">
+            {temporalLevels.map((l) => (
+              <span
+                key={l.level}
+                className={data.temporal_balance === l.level ? 'font-semibold text-[var(--ink)]' : 'text-[var(--ink-3)]'}
+              >
+                {l.icon}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Active level description */}
+        {(() => {
+          const activeLevel = temporalLevels[data.temporal_balance - 1]
+          if (!activeLevel) return null
+          return (
+            <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+              <div className="flex items-start gap-3">
+                <span className="text-3xl">{activeLevel.icon}</span>
+                <div className="min-w-0">
+                  <p className="font-display text-sm font-bold text-[var(--ink)]">{activeLevel.nameNl}</p>
+                  <p className="text-[11px] text-[var(--ink-3)]">{activeLevel.name}</p>
+                  <p className="mt-1.5 text-sm leading-relaxed text-[var(--ink-2)]">{activeLevel.description}</p>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Sticky nav on mobile */}

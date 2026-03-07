@@ -77,6 +77,7 @@ const initialState: State = {
     fire_end_strategy: 'deplete',
     fire_legacy_amount: '',
     fire_end_age: 90,
+    temporal_balance: 3,
   },
   budgetAmounts: {},
   bankAccounts: [],
@@ -317,7 +318,7 @@ export default function OnboardingPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--border-ed)] border-t-[var(--ink)]" />
       </div>
     )
   }
@@ -372,10 +373,10 @@ export default function OnboardingPage() {
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 via-teal-400 to-purple-500">
               <span className="text-2xl font-black text-white">T</span>
             </div>
-            <h1 className="text-3xl font-bold text-zinc-900">TriFinity</h1>
+            <h1 className="font-display text-3xl font-bold tracking-[-0.02em] text-[var(--ink)]">TriFinity</h1>
             <button
               onClick={handleLogout}
-              className="absolute right-0 top-0 text-xs text-zinc-400 transition-colors hover:text-zinc-600"
+              className="absolute right-0 top-0 text-xs text-[var(--ink-4)] transition-colors hover:text-[var(--ink-2)]"
             >
               Uitloggen
             </button>
@@ -433,23 +434,23 @@ export default function OnboardingPage() {
 
           {state.step === 'saving' && (
             <div className="flex min-h-[60vh] flex-col items-center justify-center sm:min-h-0">
-              <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-8 text-center">
+              <div className="w-full max-w-sm rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-8 text-center">
                 <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center">
                   <div className="animate-pulse">
                     <FinnAvatar size={64} />
                   </div>
                 </div>
-                <p className="mb-4 text-sm font-medium text-zinc-700 transition-opacity duration-300">
+                <p className="mb-4 text-sm font-medium text-[var(--ink-2)] transition-opacity duration-300">
                   {SAVING_MESSAGES[saveMessageIdx]}
                 </p>
                 {/* Progress bar */}
-                <div className="mx-auto h-2 w-full overflow-hidden rounded-full bg-zinc-100">
+                <div className="mx-auto h-2 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
                   <div
                     className="h-full rounded-full bg-gradient-to-r from-amber-400 via-teal-400 to-purple-500 transition-all duration-300 ease-out"
                     style={{ width: `${saveProgress}%` }}
                   />
                 </div>
-                <p className="mt-2 font-mono text-xs tabular-nums text-zinc-400">{saveProgress}%</p>
+                <p className="mt-2 font-mono text-xs tabular-nums text-[var(--ink-4)]">{saveProgress}%</p>
               </div>
             </div>
           )}

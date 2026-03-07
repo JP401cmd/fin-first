@@ -17,6 +17,7 @@ export default function TestOnboardingValidation() {
     fire_end_strategy: 'deplete',
     fire_legacy_amount: '',
     fire_end_age: 90,
+    temporal_balance: 3,
   })
   const [step, setStep] = useState<'form' | 'success'>('form')
   const [testResults, setTestResults] = useState<{ label: string; pass: boolean }[]>([])
@@ -90,6 +91,7 @@ export default function TestOnboardingValidation() {
               fire_end_strategy: 'deplete',
               fire_legacy_amount: '',
               fire_end_age: 90,
+              temporal_balance: 3,
             })
           }}
           className="mt-4 rounded-lg bg-zinc-900 px-4 py-2 text-sm text-white"
