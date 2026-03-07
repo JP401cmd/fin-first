@@ -94,6 +94,60 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
   }
   lines.push('')
 
+  // Month summary
+  if (data.monthSummary) {
+    const ms = data.monthSummary
+    lines.push('MAANDOVERZICHT:')
+    lines.push(`- Vermogensdelta: ${ms.netWorthDelta >= 0 ? '+' : ''}${formatCurrency(ms.netWorthDelta)}`)
+    lines.push(`- Vrijheidsdagen gewonnen: ${Math.round(ms.freedomDaysWon)}`)
+    lines.push(`- Spaarquote: ${Math.round(ms.savingsRate)}%`)
+    lines.push(`- Budgetscore: ${Math.round(ms.budgetScore)}%`)
+    if (ms.prevMonthComparison !== 0) {
+      lines.push(`- Vergelijking vorige maand: ${ms.prevMonthComparison >= 0 ? '+' : ''}${Math.round(ms.prevMonthComparison)}%`)
+    }
+    lines.push('')
+  }
+
+  // Streaks
+  if (data.streaks && data.streaks.length > 0) {
+    lines.push('STREAKS:')
+    for (const s of data.streaks) {
+      if (s.currentCount > 0) {
+        const typeLabel = s.type === 'login' ? 'Inlog' : s.type === 'budget' ? 'Budget' : 'Actie'
+        lines.push(`- ${typeLabel}: ${s.currentCount} dagen (record: ${s.longestCount})`)
+      }
+    }
+    lines.push('')
+  }
+
+  // Notifications (urgent, max 3)
+  if (data.notifications && data.notifications.length > 0) {
+    const urgent = data.notifications
+      .filter(n => n.severity === 'critical' || n.severity === 'warning')
+      .slice(0, 3)
+    if (urgent.length > 0) {
+      lines.push('MELDINGEN:')
+      for (const n of urgent) {
+        const prefix = n.severity === 'critical' ? '⚠' : '⚡'
+        lines.push(`- ${prefix} [${n.type}] ${n.message}`)
+      }
+      lines.push('')
+    }
+  }
+
+  // Badges
+  if (data.badgeSummary) {
+    const bs = data.badgeSummary
+    lines.push(`BADGES: ${bs.earned}/${bs.total} behaald`)
+    if (bs.latestBadge) {
+      lines.push(`- Laatste: ${bs.latestBadge.name} (${bs.latestBadge.earnedAt})`)
+    }
+    if (bs.nearestBadge) {
+      lines.push(`- Bijna: ${bs.nearestBadge.name} (${bs.nearestBadge.progress}%)`)
+    }
+    lines.push('')
+  }
+
   // Actions
   lines.push(`OPENSTAANDE ACTIES: ${data.openActions}`)
   lines.push(`Vrijheidsdagen te winnen: ${Math.round(data.totalFreedomDaysOpen)}`)
@@ -162,9 +216,37 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
     lines.push('')
   }
 
-  // Recommendations & misc
-  lines.push(`Voorstellen: ${data.recommendations}`)
-  lines.push(`Terugkerende transacties: ${data.recurringTransactions}`)
+  // Recurring transactions (vaste lasten)
+  if (data.topRecurringTransactions && data.topRecurringTransactions.length > 0) {
+    lines.push('TERUGKERENDE KOSTEN:')
+    const top5 = data.topRecurringTransactions.slice(0, 5)
+    for (const rt of top5) {
+      const amt = Math.abs(rt.amount)
+      const cat = rt.category ? ` [${rt.category}]` : ''
+      const freedom = dailyExp > 0 ? ` (${freedomStr(amt, dailyExp)})` : ''
+      lines.push(`- ${rt.name}: ${formatCurrency(amt)}/mnd${cat}${freedom}`)
+    }
+    const totalRecurring = data.totalRecurringAmount ?? 0
+    if (totalRecurring > 0) {
+      const totalFreedom = dailyExp > 0 ? ` (${freedomStr(totalRecurring, dailyExp)})` : ''
+      lines.push(`Totaal terugkerend: ${formatCurrency(totalRecurring)}/mnd${totalFreedom}`)
+    }
+    lines.push('')
+  } else {
+    lines.push(`Terugkerende transacties: ${data.recurringTransactions}`)
+  }
+
+  // Recommendations (detailed)
+  lines.push(`AANBEVELINGEN: ${data.recommendations} totaal`)
+  if (data.topRecommendations && data.topRecommendations.length > 0) {
+    for (const rec of data.topRecommendations.slice(0, 3)) {
+      const impact = rec.freedomDaysImpact > 0 ? ` — ${rec.freedomDaysImpact} vrijheidsdagen/jaar` : ''
+      lines.push(`- ${rec.title} (${rec.category})${impact}`)
+    }
+  }
+  lines.push('')
+
+  // Life events
   lines.push(`Levensgebeurtenissen: ${data.lifeEvents}`)
 
   return lines.join('\n')
