@@ -6,6 +6,8 @@ import type { DashboardData } from '@/components/widgets/widget-renderer'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { levelToPhaseId } from '@/lib/feature-phases'
 import type { TemporalContext } from './types'
+import type { ProgressionEvent } from './progression'
+import { computePersonalTrends } from './trends'
 
 function pct(value: number, total: number): string {
   if (total === 0) return '0'
@@ -18,7 +20,7 @@ function freedomStr(amount: number, dailyExp: number): string {
   return formatFreedomTimeString(ft, 'short')
 }
 
-export function condenseDashboardData(data: DashboardData, temporal: TemporalContext): string {
+export function condenseDashboardData(data: DashboardData, temporal: TemporalContext, progressionEvents?: ProgressionEvent[]): string {
   const dailyExp = data.monthlyExpenses > 0 ? data.monthlyExpenses / 30 : 0
   const savingsRate = data.monthlyIncome > 0
     ? Math.round(((data.monthlyIncome - data.monthlyExpenses) / data.monthlyIncome) * 100)
@@ -228,6 +230,15 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
     lines.push('')
   }
 
+  // Progression events
+  if (progressionEvents && progressionEvents.length > 0) {
+    lines.push('PROGRESSIE:')
+    for (const event of progressionEvents) {
+      lines.push(`- [${event.type}] ${event.label} (was: ${event.previousValue}, nu: ${event.currentValue})`)
+    }
+    lines.push('')
+  }
+
   // Recurring transactions (vaste lasten)
   if (data.topRecurringTransactions && data.topRecurringTransactions.length > 0) {
     lines.push('TERUGKERENDE KOSTEN:')
@@ -276,6 +287,18 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
   } else {
     lines.push(`Levensgebeurtenissen: ${data.lifeEvents}`)
   }
+
+  // Personal trends
+  const trends = computePersonalTrends(data)
+  lines.push('PERSOONLIJKE TRENDS:')
+  lines.push(`- Spaarquote trend: ${trends.savingsRateTrend}`)
+  lines.push(`- Uitgaven trend: ${trends.expenseTrend.direction} (ratio: ${trends.expenseTrend.ratio})`)
+  if (trends.wealthGrowthRate != null) {
+    lines.push(`- Vermogensgroei: ${trends.wealthGrowthRate}% per maand`)
+  }
+  lines.push(`- Opeenvolgende groeimaanden: ${trends.consecutiveGrowthMonths}`)
+  lines.push(`- Budget discipline: ${trends.budgetDisciplineScore}%`)
+  lines.push('')
 
   return lines.join('\n')
 }
