@@ -766,6 +766,7 @@ export default async function DAIshboardPage() {
     totalRecurringAmount: Math.round(totalRecurringAmount * 100) / 100,
     topRecommendations,
     topLifeEvents,
+    budgetingActive: true,
   }
 
   // ── Build temporal context ────────────────────────────────

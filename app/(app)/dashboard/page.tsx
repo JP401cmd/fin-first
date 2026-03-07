@@ -68,6 +68,15 @@ export default async function DashboardPage() {
     supabase.from('transactions').select('amount, date').lt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
   ])
 
+  // Fetch budgeting_active separately (column may not exist yet before migration)
+  let budgetingActive = true
+  try {
+    const { data: ba } = await supabase.from('profiles').select('budgeting_active').single()
+    if (ba && typeof (ba as Record<string, unknown>).budgeting_active === 'boolean') {
+      budgetingActive = (ba as Record<string, unknown>).budgeting_active as boolean
+    }
+  } catch { /* column not yet migrated — default to true */ }
+
   // Core calculations
   let monthlyIncome = 0
   let monthlyExpenses = 0
@@ -837,6 +846,7 @@ export default async function DashboardPage() {
     totalRecurringAmount: Math.round(totalRecurringAmount * 100) / 100,
     topRecommendations,
     topLifeEvents,
+    budgetingActive,
   }
 
   return (

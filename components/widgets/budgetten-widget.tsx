@@ -5,7 +5,7 @@ import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import type { DashboardData } from './widget-renderer'
-import { TrendingUp, ShoppingCart, PiggyBank, CreditCard, LayoutGrid } from 'lucide-react'
+import { TrendingUp, ShoppingCart, PiggyBank, CreditCard, LayoutGrid, Sparkles } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
@@ -154,6 +154,31 @@ export function BudgettenWidget({ size, data, href }: Props) {
     return (
       <WidgetShell module="kern" size={size} kicker="Budgetten" href={href}>
         <WidgetEmpty icon={LayoutGrid} message="Maak je eerste budget aan om je bestedingen te volgen." />
+      </WidgetShell>
+    )
+  }
+
+  // When user chose not to actively budget during onboarding, show activation hint
+  if (!data.budgetingActive) {
+    return (
+      <WidgetShell module="kern" size={size} kicker="Budgetten" href={href}>
+        <div className="flex flex-col items-center gap-2 py-2 text-center">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-50">
+            <Sparkles className="text-amber-500" size={16} />
+          </div>
+          <p className="text-sm font-medium text-[var(--ink)]">
+            Activeer budgetteren
+          </p>
+          <p className="text-[11px] leading-snug text-[var(--ink-3)]">
+            Je hebt budgetten klaarstaan. Activeer ze om inzicht te krijgen in je bestedingen en vrijheid op te bouwen.
+          </p>
+          <a
+            href="/core/budgets"
+            className="mt-1 inline-flex items-center gap-1 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100"
+          >
+            Bekijk budgetten
+          </a>
+        </div>
       </WidgetShell>
     )
   }

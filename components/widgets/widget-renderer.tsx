@@ -34,7 +34,7 @@ import { VolgendeStapWidget } from './volgende-stap-widget'
 import { MaandoverzichtWidget } from './maandoverzicht-widget'
 import { AgendaWidget } from './agenda-widget'
 import { NoodfondsWidget } from './noodfonds-widget'
-import { getWidgetDef, WIDGET_HREFS } from '@/lib/widget-catalog'
+import { getWidgetDef, WIDGET_HREFS, WIDGET_CATALOG } from '@/lib/widget-catalog'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { FireProjection, FireRange, FireCountdown } from '@/lib/horizon-data'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
@@ -256,34 +256,14 @@ export interface DashboardData {
   topRecommendations: TopRecommendation[]
   // Enriched widget data: top life events
   topLifeEvents: TopLifeEvent[]
+  // Whether user actively chose to budget during onboarding
+  budgetingActive: boolean
 }
 
-// ── Gating: widget id → min sovereignty level ─────────────────
-const WIDGET_MIN_LEVEL: Record<string, number> = {
-  assets:      1,
-  holdings:    3,
-  voorstellen: 1,
-  doelen:      1,
-  fire_prognose: 1,
-  monte_carlo: 3,
-  levensgebeurtenissen: 1,
-  veerkracht_score: 1,
-  belasting_box3: 1,
-  vrijheidsscenarios: 1,
-  sim_vermogenspad: 1,
-  passief_inkomen: 1,
-  box3_drag: 1,
-  vrijheidsmijlpalen: 0,
-  backtesting_score: 3,
-  meldingen: -2,
-  badges: -2,
-  streaks: -2,
-  ai_inzicht: 0,
-  volgende_stap: -2,
-  maandoverzicht: -2,
-  agenda: -2,
-  noodfonds: -2,
-}
+// ── Gating: widget id → min sovereignty level (derived from catalog) ──
+const WIDGET_MIN_LEVEL: Record<string, number> = Object.fromEntries(
+  WIDGET_CATALOG.map(w => [w.id, w.minLevel])
+)
 
 interface WidgetRendererProps {
   id: string
