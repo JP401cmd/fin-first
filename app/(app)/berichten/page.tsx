@@ -273,38 +273,58 @@ function ImpactBlock({ impact }: { impact: string }) {
 
 // ── Discuss with Will button ─────────────────────────────────────────
 
-function DiscussWithWillButton({ item }: { item: NewsItem }) {
+function NewsArticleActions({ item, isRead, onMarkRead }: { item: NewsItem; isRead: boolean; onMarkRead: (id: string) => void }) {
   const { openWithMessage } = useChatContext()
 
-  const handleClick = useCallback(() => {
+  const handleDiscuss = useCallback(() => {
+    onMarkRead(item.id)
     const message = `Ik las dit nieuwsartikel:\n\n"${item.headline}"\n\n${item.summary}\n\nWat betekent dit voor mijn financiële situatie?`
     openWithMessage(message)
-  }, [item.headline, item.summary, openWithMessage])
+  }, [item, onMarkRead, openWithMessage])
+
+  const handleToggleRead = useCallback(() => {
+    onMarkRead(item.id)
+  }, [item.id, onMarkRead])
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-[var(--r-sm)] border border-wil-200 bg-wil-50 px-3 py-2 font-inter text-[11px] font-medium text-wil-700 transition-colors hover:bg-wil-100 sm:min-h-0 sm:px-2 sm:py-1"
-    >
-      <MessageSquare className="h-3 w-3" />
-      Bespreek met Will
-    </button>
+    <div className="mt-3 flex items-center gap-2">
+      <button
+        type="button"
+        onClick={handleDiscuss}
+        className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[var(--r-sm)] border border-wil-200 bg-wil-50 px-3 py-2 font-inter text-[11px] font-medium text-wil-700 transition-colors hover:bg-wil-100 sm:min-h-0 sm:px-2 sm:py-1"
+      >
+        <MessageSquare className="h-3 w-3" />
+        Bespreek met Will
+      </button>
+      {!isRead && (
+        <button
+          type="button"
+          onClick={handleToggleRead}
+          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[var(--r-sm)] border border-[var(--border-ed)] px-3 py-2 font-inter text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] sm:min-h-0 sm:px-2 sm:py-1"
+        >
+          <CheckCheck className="h-3 w-3" />
+          Gelezen
+        </button>
+      )}
+    </div>
   )
 }
 
 // ── Hero news article (first item — front-page style) ───────────────
 
-function HeroNewsArticle({ item }: { item: NewsItem }) {
+function HeroNewsArticle({ item, isRead, onMarkRead }: { item: NewsItem; isRead: boolean; onMarkRead: (id: string) => void }) {
   // Split summary into first letter + rest for dropcap effect
   const firstLetter = item.summary.charAt(0)
   const restOfSummary = item.summary.slice(1)
 
   return (
-    <article className="mb-8">
+    <article className={`mb-8 transition-opacity duration-300 ${isRead ? 'opacity-70' : ''}`}>
       {/* Category + source context */}
       <div className="mb-3 flex items-center gap-3">
         <CategoryBadge category={item.category} />
+        {!isRead && (
+          <span className="h-2 w-2 rounded-full bg-wil-500" title="Nieuw" />
+        )}
         {item.sourceContext && (
           <span className="font-inter text-[11px] text-[var(--ink-4)]">
             {item.sourceContext}
@@ -342,7 +362,7 @@ function HeroNewsArticle({ item }: { item: NewsItem }) {
       <ImpactBlock impact={item.personalImpact} />
 
       {/* Discuss with Will */}
-      <DiscussWithWillButton item={item} />
+      <NewsArticleActions item={item} isRead={isRead} onMarkRead={onMarkRead} />
 
       {/* Divider separating hero from rest */}
       <div className="mt-6 h-px bg-[var(--border-ed)]" />
@@ -352,12 +372,15 @@ function HeroNewsArticle({ item }: { item: NewsItem }) {
 
 // ── Regular news article (grid card) ────────────────────────────────
 
-function NewsArticle({ item }: { item: NewsItem }) {
+function NewsArticle({ item, isRead, onMarkRead }: { item: NewsItem; isRead: boolean; onMarkRead: (id: string) => void }) {
   return (
-    <article className="flex flex-col rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 shadow-[var(--s0)] transition-shadow hover:shadow-[var(--s1)]">
+    <article className={`flex flex-col rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 shadow-[var(--s0)] transition-opacity transition-shadow duration-300 hover:shadow-[var(--s1)] ${isRead ? 'opacity-70' : ''}`}>
       {/* Category tag */}
       <div className="mb-2.5 flex items-center gap-3">
         <CategoryBadge category={item.category} />
+        {!isRead && (
+          <span className="h-2 w-2 rounded-full bg-wil-500" title="Nieuw" />
+        )}
         {item.sourceContext && (
           <span className="font-inter text-[11px] text-[var(--ink-4)]">
             {item.sourceContext}
@@ -384,7 +407,7 @@ function NewsArticle({ item }: { item: NewsItem }) {
       <ImpactBlock impact={item.personalImpact} />
 
       {/* Discuss with Will */}
-      <DiscussWithWillButton item={item} />
+      <NewsArticleActions item={item} isRead={isRead} onMarkRead={onMarkRead} />
     </article>
   )
 }
@@ -625,6 +648,32 @@ export default function BerichtenPage() {
       })
     })
   }, [fetchExtendedHistory])
+
+  // Fetch read article IDs on mount
+  useEffect(() => {
+    fetch('/api/news/read')
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data?.readIds) setReadArticleIds(new Set(data.readIds))
+      })
+      .catch(() => { /* Silent fail */ })
+  }, [])
+
+  // Mark article as read (optimistic + persist)
+  const markArticleRead = useCallback((articleId: string) => {
+    setReadArticleIds((prev) => {
+      if (prev.has(articleId)) return prev
+      const next = new Set(prev)
+      next.add(articleId)
+      return next
+    })
+    // Fire-and-forget persist
+    fetch('/api/news/read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ articleId }),
+    }).catch(() => { /* Silent fail */ })
+  }, [])
 
   // Fetch news on-demand when Nieuws tab is first activated
   const fetchNews = useCallback(async () => {
@@ -961,12 +1010,12 @@ export default function BerichtenPage() {
             ) : newsItems.length > 0 ? (
               <div>
                 {/* Hero article — front-page style, significantly larger */}
-                <HeroNewsArticle item={newsItems[0]} />
+                <HeroNewsArticle item={newsItems[0]} isRead={readArticleIds.has(newsItems[0].id)} onMarkRead={markArticleRead} />
                 {/* Remaining articles — 2-column grid on desktop with column rules */}
                 {newsItems.length > 1 && (
                   <div className="news-grid-columns grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
                     {newsItems.slice(1).map((item) => (
-                      <NewsArticle key={item.id} item={item} />
+                      <NewsArticle key={item.id} item={item} isRead={readArticleIds.has(item.id)} onMarkRead={markArticleRead} />
                     ))}
                   </div>
                 )}
