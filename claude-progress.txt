@@ -1,3 +1,23 @@
+## Session 2026-03-07 - Features #349, #350
+
+### Feature #349: Briefing-continuiteit: vorige samenvatting meegeven - PASSING
+- After each briefing: save PreviousBriefingSummary to sessionStorage (composedAt, cardTypes, keyMetrics)
+- On next streamFromAI(): read previous summary and include as `previousBriefing` in compose request body
+- buildBriefingSystemPrompt accepts optional previousBriefing parameter
+- Formats as VORIGE BRIEFING section: time since last briefing, card types used, metrics shown
+- AI instructed to reference prior observations and vary card types
+
+### Feature #350: Briefing-continuiteit: localStorage voor langetermijngeheugen - PASSING
+- BriefingLongTermMemory type with lastBriefingDate, lastNetWorth, lastSavingsRate, lastFreedomPct, briefingCount, adviceHistory
+- After each briefing: update localStorage with financial snapshot + last 5 insight/tip texts (max 50 chars each)
+- On next streamFromAI(): read long-term memory and include as `longTermMemory` in compose request
+- Formats as LANGETERMIJN GEHEUGEN section in system prompt
+- AI instructed to avoid repeating previous advice and build on earlier insights
+- Commits: c36262b, c214d78
+
+### Current Status
+- 341/352 features passing (339 before + #349, #350)
+
 ## Session 2026-03-07 - Features #338, #345, #348
 
 ### Feature #338: Condense: aanbevelingen detail meegeven - PASSING
