@@ -62,7 +62,7 @@ export function OnboardingExtras({
       </button>
 
       <div className="mb-6">
-        <StepProgress current="extras" />
+        <StepProgress current="voorkeuren" />
       </div>
 
       <div className="mb-6 flex items-start gap-3">

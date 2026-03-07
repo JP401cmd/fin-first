@@ -114,7 +114,7 @@ export function OnboardingBudgets({
       </button>
 
       <div className="mb-6">
-        <StepProgress current="budgets" />
+        <StepProgress current="budgetten" />
       </div>
 
       <div className="mb-6 flex items-start gap-3">

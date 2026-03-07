@@ -129,7 +129,7 @@ export function OnboardingIdentity({
       </button>
 
       <div className="mb-6">
-        <StepProgress current="identity" />
+        <StepProgress current="profiel" />
       </div>
 
       {/* FINN question */}

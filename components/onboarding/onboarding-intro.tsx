@@ -46,7 +46,7 @@ export function OnboardingIntro({ onNext }: { onNext: () => void }) {
         onClick={onNext}
         className="mt-8 rounded-lg bg-wil-600 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-wil-700"
       >
-        Laten we beginnen
+        Aan de slag
       </button>
       <p className="mt-3 text-xs text-zinc-400">Dit duurt nog geen 2 minuten</p>
     </div>

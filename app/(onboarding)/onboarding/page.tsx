@@ -3,41 +3,26 @@
 import { useState, useEffect, useReducer } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import type { PersonaKey } from '@/lib/test-personas'
 import type { IdentityData } from '@/components/onboarding/onboarding-identity'
 import type { BankAccountEntry } from '@/components/onboarding/mini-bank-form'
 import type { AssetEntry } from '@/components/onboarding/mini-asset-form'
 import type { DebtEntry } from '@/components/onboarding/mini-debt-form'
 
 import { OnboardingIntro } from '@/components/onboarding/onboarding-intro'
-import { OnboardingChoose } from '@/components/onboarding/onboarding-choose'
 import { OnboardingIdentity } from '@/components/onboarding/onboarding-identity'
 import { OnboardingBudgets } from '@/components/onboarding/onboarding-budgets'
 import { OnboardingExtras } from '@/components/onboarding/onboarding-extras'
-import { OnboardingPersonaSelect } from '@/components/onboarding/onboarding-persona-select'
-import { OnboardingSeeding } from '@/components/onboarding/onboarding-seeding'
 import { OnboardingSuccess } from '@/components/onboarding/onboarding-success'
 
 // ── Types ────────────────────────────────────────────────────
 
 type Step =
   | 'intro'
-  | 'choose'
   | 'identity'
   | 'budgets'
   | 'extras'
   | 'saving'
-  | 'persona-select'
-  | 'seeding'
   | 'success'
-
-interface SeedEvent {
-  step?: string
-  progress?: number
-  done?: boolean
-  summary?: Record<string, number>
-  error?: string
-}
 
 interface State {
   step: Step
@@ -46,10 +31,6 @@ interface State {
   bankAccounts: BankAccountEntry[]
   assets: AssetEntry[]
   debts: DebtEntry[]
-  seedProgress: number
-  seedStep: string
-  seedError: string | null
-  seedingMessageIndex: number
 }
 
 type Action =
@@ -59,10 +40,6 @@ type Action =
   | { type: 'SET_BANK_ACCOUNTS'; items: BankAccountEntry[] }
   | { type: 'SET_ASSETS'; items: AssetEntry[] }
   | { type: 'SET_DEBTS'; items: DebtEntry[] }
-  | { type: 'SEED_UPDATE'; progress: number; stepText: string }
-  | { type: 'SEED_ERROR'; error: string }
-  | { type: 'SEED_CLEAR_ERROR' }
-  | { type: 'SEED_MESSAGE_INDEX'; index: number }
 
 const initialState: State = {
   step: 'intro',
@@ -77,10 +54,6 @@ const initialState: State = {
   bankAccounts: [],
   assets: [],
   debts: [],
-  seedProgress: 0,
-  seedStep: '',
-  seedError: null,
-  seedingMessageIndex: 0,
 }
 
 function reducer(state: State, action: Action): State {
@@ -97,14 +70,6 @@ function reducer(state: State, action: Action): State {
       return { ...state, assets: action.items }
     case 'SET_DEBTS':
       return { ...state, debts: action.items }
-    case 'SEED_UPDATE':
-      return { ...state, seedProgress: action.progress, seedStep: action.stepText }
-    case 'SEED_ERROR':
-      return { ...state, seedError: action.error }
-    case 'SEED_CLEAR_ERROR':
-      return { ...state, seedError: null }
-    case 'SEED_MESSAGE_INDEX':
-      return { ...state, seedingMessageIndex: action.index }
     default:
       return state
   }
@@ -142,15 +107,6 @@ export default function OnboardingPage() {
     }
     check()
   }, [supabase, router])
-
-  // Cycle seeding messages
-  useEffect(() => {
-    if (state.step !== 'seeding' || state.seedError) return
-    const interval = setInterval(() => {
-      dispatch({ type: 'SEED_MESSAGE_INDEX', index: (state.seedingMessageIndex + 1) % 6 })
-    }, 3000)
-    return () => clearInterval(interval)
-  }, [state.step, state.seedError, state.seedingMessageIndex])
 
   // ── Handlers ─────────────────────────────────────────────────
 
@@ -239,67 +195,9 @@ export default function OnboardingPage() {
 
       dispatch({ type: 'SET_STEP', step: 'success' })
     } catch (err) {
-      dispatch({ type: 'SEED_ERROR', error: err instanceof Error ? err.message : 'Onbekende fout' })
       dispatch({ type: 'SET_STEP', step: 'extras' })
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function handlePersonaSeed(personaKey: PersonaKey) {
-    // Prevent double-submit: if already saving/seeding, ignore
-    if (saving || state.step === 'seeding') return
-    dispatch({ type: 'SET_STEP', step: 'seeding' })
-    dispatch({ type: 'SEED_UPDATE', progress: 0, stepText: 'Starten...' })
-    dispatch({ type: 'SEED_CLEAR_ERROR' })
-    dispatch({ type: 'SEED_MESSAGE_INDEX', index: 0 })
-
-    try {
-      const res = await fetch('/api/onboarding/seed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'persona', persona: personaKey }),
-      })
-
-      if (!res.ok || !res.body) throw new Error('Seed request mislukt')
-      await processStream(res.body)
-    } catch (e) {
-      dispatch({ type: 'SEED_ERROR', error: e instanceof Error ? e.message : 'Onbekende fout' })
-    }
-  }
-
-  async function processStream(body: ReadableStream) {
-    const reader = body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() ?? ''
-
-      for (const line of lines) {
-        if (!line.trim()) continue
-        const event: SeedEvent = JSON.parse(line)
-
-        if (event.error) {
-          dispatch({ type: 'SEED_ERROR', error: event.error })
-          return
-        }
-
-        if (event.done) {
-          dispatch({ type: 'SEED_UPDATE', progress: 100, stepText: 'Klaar!' })
-          dispatch({ type: 'SET_STEP', step: 'success' })
-          return
-        }
-
-        if (event.step && event.progress !== undefined) {
-          dispatch({ type: 'SEED_UPDATE', progress: event.progress, stepText: event.step })
-        }
-      }
     }
   }
 
@@ -313,7 +211,7 @@ export default function OnboardingPage() {
     )
   }
 
-  const showHeader = !['intro', 'success', 'seeding', 'saving'].includes(state.step)
+  const showHeader = !['intro', 'success', 'saving'].includes(state.step)
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4 py-12">
@@ -329,14 +227,7 @@ export default function OnboardingPage() {
         )}
 
         {state.step === 'intro' && (
-          <OnboardingIntro onNext={() => dispatch({ type: 'SET_STEP', step: 'choose' })} />
-        )}
-
-        {state.step === 'choose' && (
-          <OnboardingChoose
-            onOwnData={() => dispatch({ type: 'SET_STEP', step: 'identity' })}
-            onDemo={() => dispatch({ type: 'SET_STEP', step: 'persona-select' })}
-          />
+          <OnboardingIntro onNext={() => dispatch({ type: 'SET_STEP', step: 'identity' })} />
         )}
 
         {state.step === 'identity' && (
@@ -344,7 +235,7 @@ export default function OnboardingPage() {
             data={state.identity}
             onChange={(data) => dispatch({ type: 'SET_IDENTITY', data })}
             onNext={() => dispatch({ type: 'SET_STEP', step: 'budgets' })}
-            onBack={() => dispatch({ type: 'SET_STEP', step: 'choose' })}
+            onBack={() => dispatch({ type: 'SET_STEP', step: 'intro' })}
           />
         )}
 
@@ -380,26 +271,6 @@ export default function OnboardingPage() {
             <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-teal-600" />
             <p className="text-sm text-zinc-600">Je gegevens worden opgeslagen...</p>
           </div>
-        )}
-
-        {state.step === 'persona-select' && (
-          <OnboardingPersonaSelect
-            onSelect={handlePersonaSeed}
-            onBack={() => dispatch({ type: 'SET_STEP', step: 'choose' })}
-          />
-        )}
-
-        {state.step === 'seeding' && (
-          <OnboardingSeeding
-            progress={state.seedProgress}
-            stepText={state.seedStep}
-            messageIndex={state.seedingMessageIndex}
-            error={state.seedError}
-            onRetry={() => {
-              dispatch({ type: 'SEED_CLEAR_ERROR' })
-              dispatch({ type: 'SET_STEP', step: 'choose' })
-            }}
-          />
         )}
 
         {state.step === 'success' && (
