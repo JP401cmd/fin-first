@@ -69,8 +69,8 @@ export async function POST(request: Request) {
       })
     }
 
-    const body = await request.json() as BriefingComposeRequest & { userPreferences?: string }
-    const { dataSummary, temporal, phase, level, previousBriefing, longTermMemory, userPreferences, phaseTransition } = body
+    const body = await request.json() as BriefingComposeRequest & { userPreferences?: string; briefingFrequency?: 'daily' | 'weekly' | 'monthly' | 'rare' }
+    const { dataSummary, temporal, phase, level, previousBriefing, longTermMemory, userPreferences, phaseTransition, briefingFrequency } = body
 
     if (!dataSummary || !temporal) {
       return new Response(JSON.stringify({ error: 'Missing dataSummary or temporal' }), {
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
       // Functional directives
       if (settingsMap.briefing_functional_directives) {
         const all: FunctionalDirective[] = JSON.parse(settingsMap.briefing_functional_directives)
-        const block = formatFunctionalDirectivesForPrompt(all)
+        const block = formatFunctionalDirectivesForPrompt(all, dataSummary)
         if (block) blocks.push(block)
       }
 
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
     }
 
     const model = await getModel(supabase)
-    const systemPrompt = buildBriefingSystemPrompt(temporal, phase, level, directivesBlock, previousBriefing, longTermMemory, userPreferences, phaseTransition)
+    const systemPrompt = buildBriefingSystemPrompt(temporal, phase, level, directivesBlock, previousBriefing, longTermMemory, userPreferences, phaseTransition, briefingFrequency)
 
     // Create a ReadableStream that emits SSE events as tool calls complete
     const encoder = new TextEncoder()

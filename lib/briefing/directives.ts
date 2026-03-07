@@ -174,10 +174,173 @@ export function resolveMetricLabels(metricId: string, conditionId: string): { me
   }
 }
 
-/** Format functional directives as a prompt block. */
-export function formatFunctionalDirectivesForPrompt(directives: FunctionalDirective[]): string {
+/** Extract key metrics from condensed dataSummary text for directive evaluation. */
+export function extractMetricsFromSummary(dataSummary: string): Record<string, string | number | boolean | null> {
+  const metrics: Record<string, string | number | boolean | null> = {}
+
+  // Net worth delta
+  const deltaMatch = dataSummary.match(/Vermogensdelta \(MoM\): ([+-]?)€\s?([\d.,]+)/)
+  if (deltaMatch) {
+    const sign = deltaMatch[1] === '-' ? -1 : 1
+    const value = parseFloat(deltaMatch[2].replace(/\./g, '').replace(',', '.'))
+    metrics.netWorthDelta = sign * value
+  }
+
+  // Consecutive growth months
+  const growthMatch = dataSummary.match(/Opeenvolgende maanden groei: (\d+)/)
+  metrics.consecutiveGrowthMonths = growthMatch ? parseInt(growthMatch[1]) : 0
+
+  // Savings rate
+  const savingsMatch = dataSummary.match(/Spaarquote: (-?\d+)%/)
+  metrics.savingsRate = savingsMatch ? parseInt(savingsMatch[1]) : null
+
+  // Savings rate trend
+  const trendMatch = dataSummary.match(/Spaarquote trend: (\w+)/)
+  metrics.savingsRateTrend = trendMatch ? trendMatch[1] : null
+
+  // Budget expense percentage
+  const budgetMatch = dataSummary.match(/Uitgaven: €\s?[\d.,]+ van €\s?[\d.,]+ \((\d+)%\)/)
+  metrics.budgetExpensePct = budgetMatch ? parseInt(budgetMatch[1]) : null
+
+  // Budget pressure
+  metrics.budgetPressure = dataSummary.includes('Budget bijna op') || dataSummary.includes('Budget druk')
+  metrics.budgetOver = dataSummary.includes('Budget bijna op')
+
+  // Consumer debt
+  metrics.hasConsumerDebt = dataSummary.includes('Consumentenschuld: ja')
+
+  // Total debts
+  const debtMatch = dataSummary.match(/Totale schulden: €\s?([\d.,]+)/)
+  if (debtMatch) {
+    metrics.totalDebts = parseFloat(debtMatch[1].replace(/\./g, '').replace(',', '.'))
+  }
+
+  // FIRE percentage
+  const firePctMatch = dataSummary.match(/Vrijheidspercentage: (\d+)%/)
+  metrics.freedomPct = firePctMatch ? parseInt(firePctMatch[1]) : null
+
+  // Months buffer
+  const bufferMatch = dataSummary.match(/Maanden buffer: ([\d.,]+)/)
+  metrics.monthsBuffer = bufferMatch ? parseFloat(bufferMatch[1].replace(',', '.')) : null
+
+  // Emergency fund status
+  metrics.emergencyFundSufficient = dataSummary.includes('Status: voldoende')
+  metrics.emergencyFundInsufficient = dataSummary.includes('Status: onvoldoende')
+
+  // Previous month expenses comparison
+  const prevExpMatch = dataSummary.match(/verschil: ([+-])€\s?([\d.,]+)/)
+  if (prevExpMatch) {
+    const sign = prevExpMatch[1] === '-' ? -1 : 1
+    const value = parseFloat(prevExpMatch[2].replace(/\./g, '').replace(',', '.'))
+    metrics.expenseDelta = sign * value
+  }
+
+  // Expense trend
+  const expTrendMatch = dataSummary.match(/Uitgaven trend: (\w+)/)
+  metrics.expenseTrend = expTrendMatch ? expTrendMatch[1] : null
+
+  // Income
+  const incomeMatch = dataSummary.match(/Maandinkomen: €\s?([\d.,]+)/)
+  if (incomeMatch) {
+    metrics.monthlyIncome = parseFloat(incomeMatch[1].replace(/\./g, '').replace(',', '.'))
+  }
+
+  return metrics
+}
+
+/** Evaluate whether a functional directive's condition matches the data. */
+export function evaluateFunctionalDirective(
+  directive: FunctionalDirective,
+  metrics: Record<string, string | number | boolean | null>,
+): boolean {
+  const { metric, condition } = directive
+
+  switch (metric) {
+    case 'net_worth': {
+      const delta = metrics.netWorthDelta as number | undefined
+      const growth = (metrics.consecutiveGrowthMonths as number) ?? 0
+      if (condition === 'rising') return (delta != null && delta > 0) || growth >= 2
+      if (condition === 'declining') return delta != null && delta < 0
+      if (condition === 'stagnant') return delta != null && Math.abs(delta) < 100
+      return false
+    }
+    case 'savings_rate': {
+      const rate = metrics.savingsRate as number | null
+      const trend = metrics.savingsRateTrend as string | null
+      if (rate == null) return false
+      if (condition === 'high') return rate > 20
+      if (condition === 'low') return rate < 10
+      if (condition === 'improving') return trend === 'stijgend' || trend === 'improving'
+      if (condition === 'declining') return trend === 'dalend' || trend === 'declining'
+      return false
+    }
+    case 'budget': {
+      const pct = metrics.budgetExpensePct as number | null
+      if (condition === 'on_track') return pct != null && pct <= 75
+      if (condition === 'over') return pct != null && pct > 100
+      if (condition === 'warning') return pct != null && pct > 75 && pct <= 100
+      return false
+    }
+    case 'debt': {
+      const hasDebt = metrics.hasConsumerDebt as boolean
+      const totalDebts = (metrics.totalDebts as number) ?? 0
+      if (condition === 'none') return !hasDebt && totalDebts === 0
+      if (condition === 'decreasing') return hasDebt // Can't fully determine trend from snapshot alone
+      if (condition === 'increasing') return false   // Would need historical data
+      if (condition === 'nearly_paid') return hasDebt && totalDebts > 0 && totalDebts < 1000
+      return false
+    }
+    case 'fire': {
+      const pct = metrics.freedomPct as number | null
+      if (pct == null) return false
+      if (condition === 'on_track') return pct >= 50
+      if (condition === 'behind') return pct < 25
+      if (condition === 'milestone_near') {
+        // Near a 25% milestone boundary
+        const nextMilestone = Math.ceil(pct / 25) * 25
+        return nextMilestone - pct <= 5 && nextMilestone <= 100
+      }
+      return false
+    }
+    case 'spending': {
+      const expDelta = metrics.expenseDelta as number | undefined
+      const trend = metrics.expenseTrend as string | null
+      if (condition === 'spike') return (expDelta != null && expDelta > 0) || trend === 'stijgend'
+      if (condition === 'decreasing') return (expDelta != null && expDelta < 0) || trend === 'dalend'
+      if (condition === 'stable') return trend === 'stabiel' || trend === 'stable'
+      return false
+    }
+    case 'emergency_fund': {
+      const buffer = metrics.monthsBuffer as number | null
+      const sufficient = metrics.emergencyFundSufficient as boolean
+      const insufficient = metrics.emergencyFundInsufficient as boolean
+      if (condition === 'sufficient') return sufficient || (buffer != null && buffer >= 3)
+      if (condition === 'insufficient') return insufficient || (buffer != null && buffer < 3)
+      if (condition === 'reached') return sufficient
+      return false
+    }
+    case 'income': {
+      const income = metrics.monthlyIncome as number | null
+      if (income == null) return false
+      if (condition === 'stable') return income > 0
+      if (condition === 'variable') return false // Would need history
+      if (condition === 'increased') return false // Would need history
+      return false
+    }
+    default:
+      return false
+  }
+}
+
+/** Format functional directives as a prompt block, with pre-evaluated conditions. */
+export function formatFunctionalDirectivesForPrompt(
+  directives: FunctionalDirective[],
+  dataSummary?: string,
+): string {
   const enabled = directives.filter((d) => d.enabled)
   if (enabled.length === 0) return ''
+
+  const metrics = dataSummary ? extractMetricsFromSummary(dataSummary) : null
 
   const PRIORITY_ORDER: Record<string, number> = { high: 0, normal: 1, low: 2 }
   const sorted = [...enabled].sort(
@@ -189,12 +352,24 @@ export function formatFunctionalDirectivesForPrompt(directives: FunctionalDirect
     const prefix =
       d.priority === 'high' ? '[PRIORITEIT]' :
       d.priority === 'low' ? '[optioneel]' : '-'
+
+    // Pre-evaluate condition if data is available
+    if (metrics) {
+      const isActive = evaluateFunctionalDirective(d, metrics)
+      const status = isActive ? '[ACTIEF]' : '[INACTIEF]'
+      return `${prefix} ${status} Wanneer ${metric.toLowerCase()} ${condition.toLowerCase()}: ${d.instruction}`
+    }
+
     return `${prefix} Wanneer ${metric.toLowerCase()} ${condition.toLowerCase()}: ${d.instruction}`
   })
 
-  return `== FUNCTIONELE RICHTLIJNEN ==
-Pas de volgende richtlijnen toe wanneer je de betreffende situatie herkent in de gebruikersdata:
-${lines.join('\n')}`
+  const header = metrics
+    ? `== FUNCTIONELE RICHTLIJNEN ==
+Condities zijn vooraf geevalueerd. Geef prioriteit aan [ACTIEF] richtlijnen — deze zijn bevestigd op basis van actuele data. [INACTIEF] richtlijnen kun je negeren tenzij je eigen analyse anders uitwijst.`
+    : `== FUNCTIONELE RICHTLIJNEN ==
+Pas de volgende richtlijnen toe wanneer je de betreffende situatie herkent in de gebruikersdata:`
+
+  return `${header}\n${lines.join('\n')}`
 }
 
 /** Default functional directive seeds. */
