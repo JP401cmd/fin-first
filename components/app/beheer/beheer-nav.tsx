@@ -14,6 +14,7 @@ const tabs = [
   { label: 'Mobile Preview', href: '/beheer/testdata#mobile-preview' },
   { label: 'GoCardless', href: '/beheer/gocardless' },
   { label: 'Tiers', href: '/beheer/tiers', activeClass: 'border-[var(--ink)] text-[var(--ink)]' },
+  { label: 'Nieuws', href: '/beheer/nieuws' },
 ] as const
 
 export function BeheerNav() {
