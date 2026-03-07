@@ -21,14 +21,38 @@ const CACHE_TTL_MS = 2 * 60 * 60 * 1000
 /** Stable cache key */
 const CACHE_KEY = 'briefing_v2'
 
+/** Compact hash of key financial metrics for cache invalidation */
+function hashDashboardData(data: DashboardData): string {
+  const parts = [
+    Math.round(data.netWorth),
+    Math.round(data.totalAssets),
+    Math.round(data.totalDebts),
+    Math.round(data.monthlyExpenses),
+    Math.round(data.monthlyIncome),
+    Math.round(data.budgetTotals.expense.spent),
+    Math.round(data.budgetTotals.expense.limit),
+    Math.round(data.budgetTotals.income.spent),
+    data.openActions,
+    Math.round(data.freedomPct),
+  ]
+  return parts.join('|')
+}
+
+interface CachedBriefing extends BriefingComposeResponse {
+  dataHash?: string
+}
+
 /** Read cache synchronously — called during initial render, not in an effect */
-function readCache(): BriefingComposeResponse | null {
+function readCache(currentHash: string): BriefingComposeResponse | null {
   try {
     const raw = sessionStorage.getItem(CACHE_KEY)
     if (!raw) return null
-    const parsed = JSON.parse(raw) as BriefingComposeResponse
+    const parsed = JSON.parse(raw) as CachedBriefing
     const age = Date.now() - new Date(parsed.composedAt).getTime()
-    if (age < CACHE_TTL_MS && parsed.cards.length > 0) return parsed
+    // Invalidate if TTL expired, no cards, or data has changed
+    if (age >= CACHE_TTL_MS || parsed.cards.length === 0) return null
+    if (parsed.dataHash && parsed.dataHash !== currentHash) return null
+    return parsed
   } catch { /* SSR / storage errors */ }
   return null
 }
@@ -67,17 +91,20 @@ export function DAIshboard({ data, temporal, userName }: Props) {
   const controllerRef = useRef<AbortController | null>(null)
   const hasFetchedRef = useRef(false)
 
+  // Compute data hash for cache invalidation
+  const dataHash = hashDashboardData(data)
+
   // Read cache after hydration but before paint — avoids hydration mismatch
   // while preventing a flash of the composing indicator for cached briefings
   useLayoutEffect(() => {
-    const cached = readCache()
+    const cached = readCache(dataHash)
     if (cached) {
       setCards(cached.cards)
       setComposedAt(cached.composedAt)
       setComposing(false)
       hasFetchedRef.current = true
     }
-  }, [])
+  }, [dataHash])
 
   const phase = data.currentPhaseId
   const level = data.sovereigntyLevel
@@ -126,12 +153,13 @@ export function DAIshboard({ data, temporal, userName }: Props) {
                 setComposedAt(event.composedAt)
                 setComposing(false)
                 setRefreshing(false)
-                // Cache the complete response
+                // Cache the complete response with data hash
                 try {
-                  const cacheData: BriefingComposeResponse = {
+                  const cacheData: CachedBriefing = {
                     cards: streamedCards,
                     composedAt: event.composedAt,
                     source: 'ai',
+                    dataHash,
                   }
                   sessionStorage.setItem(CACHE_KEY, JSON.stringify(cacheData))
                 } catch { /* quota */ }

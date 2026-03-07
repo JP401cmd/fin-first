@@ -297,4 +297,18 @@ export const briefingTools = {
       module: moduleEnum.describe('Kleurmodule'),
     }),
   }),
+
+  showRecurring: tool({
+    description: 'Toon een overzicht van de top terugkerende kosten (vaste lasten/abonnementen) met maandelijks bedrag en vrijheidstijd-impact per item.',
+    inputSchema: z.object({
+      title: z.string().describe('Titel, bijv. "Terugkerende kosten"'),
+      items: z.array(z.object({
+        name: z.string().describe('Naam van de terugkerende kost, bijv. "Netflix"'),
+        amount: z.string().describe('Maandelijks bedrag, bijv. "€ 15,99"'),
+        freedomStr: z.string().optional().describe('Vrijheidstijd-impact, bijv. "0,5 dag"'),
+      })).describe('Top 3-5 terugkerende kosten'),
+      totalAmount: z.string().describe('Totaal maandelijks bedrag, bijv. "€ 1.250"'),
+      totalFreedomStr: z.string().optional().describe('Totale vrijheidstijd-impact, bijv. "12,5 dagen"'),
+    }),
+  }),
 }

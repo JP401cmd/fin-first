@@ -42,6 +42,18 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
     '',
   ]
 
+  // Emergency fund
+  if (data.emergencyFund) {
+    const ef = data.emergencyFund
+    const status = ef.isComplete ? 'voldoende' : 'onvoldoende'
+    lines.push('NOODFONDS:')
+    lines.push(`- Huidig: ${formatCurrency(ef.currentAmount)} (${freedomStr(ef.currentAmount, dailyExp)})`)
+    lines.push(`- Doel: ${formatCurrency(ef.targetAmount)}`)
+    lines.push(`- Buffer: ${Math.round(ef.monthsCovered * 10) / 10} van ${ef.targetMonths} maanden`)
+    lines.push(`- Status: ${status}`)
+    lines.push('')
+  }
+
   // Net worth delta (month-over-month)
   if (data.netWorthDelta != null) {
     const sign = data.netWorthDelta >= 0 ? '+' : ''
