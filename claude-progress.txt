@@ -1,3 +1,49 @@
+## Session 2026-03-07 - Features #451, #453, #452
+
+### Feature #451: Widget settings: hide non-available widgets from widget selector - PASSING
+- Added sovereignty level filter to WIDGET_CATALOG in instellingen/page.tsx
+- `WIDGET_CATALOG.filter(w => w.module === module && sovereigntyLevel >= w.minLevel)`
+- Users now only see widgets they have sufficient sovereignty level for
+- Module groups with no available widgets are hidden entirely
+
+### Feature #453: Verify NewFeatureSpotlight works correctly with hidden mode - PASSING
+- Verified FeatureAccessProvider correctly computes newlyUnlockedFeatures from phase matrix diff
+- Verified FeatureGate spotlight path: features[id] !== false → check newlyUnlockedFeatures → wrap in NewFeatureSpotlight
+- Hidden features (fallback='hidden') correctly transition to visible+spotlight on phase change
+- No code changes needed — verification only
+
+### Feature #452: Update beheer/features page to show all new feature entries - PASSING
+- Verified all 8 new widget features present in FEATURES[] and DEFAULT_MATRIX in feature-phases.ts
+- FeaturePhaseMatrix component reads from these arrays automatically
+- No code changes needed — verification only
+
+### Current Status
+- 3 features completed this session (#451, #453, #452)
+- Commit: d0fb850
+
+## Session 2026-03-07 - Features #443, #444, #445
+
+### Feature #443: Add FeatureGate wrapper for budget_optimalisatie - PASSING
+- Added FeatureGate import to core/budgets/page.tsx
+- Wrapped "Te Verdelen" allocation bar + envelope/plan buttons (lines 741-775)
+- Wrapped "Will AI Budget Insights" card (lines 786-828)
+- Both use fallback='hidden'
+
+### Feature #444: Add FeatureGate wrapper for asset_allocatie - PASSING
+- Added FeatureGate import to core/assets/page.tsx
+- Wrapped "Verdeling" section with AllocationPie donut chart and type breakdown (lines 381-406)
+- Uses fallback='hidden'
+
+### Feature #445: Add FeatureGate wrapper for vermogensprognose_kern - PASSING
+- Wrapped "Vermogensprognose" section with NetWorthProjectionChart on core/page.tsx (line 1017)
+- FeatureGate import was already present
+- Uses fallback='hidden'
+
+### Current Status
+- 3 features completed this session (#443, #444, #445)
+- Zero TypeScript errors in changed files
+- Commit: f32c7c1
+
 ## Session 2026-03-07 - Features #447, #449, #450
 
 ### Feature #447: Change FeatureGate default fallback to hidden - PASSING
@@ -9803,3 +9849,33 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#435, #436, #437)
 - Zero TypeScript errors
 - Commit: 9ecadcf
+
+## Session 2026-03-07 - Features #454, #455, #456
+
+### Feature #454: Create WIDGET_FEATURE_MAP mapping widget ids to feature-phase ids - PASSING
+- Created WIDGET_FEATURE_MAP in lib/widget-catalog.ts
+- Maps 17 widget catalog ids to their feature-phase matrix ids
+- All gated widgets (minLevel > -2 or requiredPhase) have corresponding entries
+- Widgets not in map are always available (no feature gating)
+
+### Feature #455: Widget renderer reads gating from feature-phase matrix via WIDGET_FEATURE_MAP - PASSING
+- Replaced WIDGET_MIN_LEVEL check with WIDGET_FEATURE_MAP + features prop check
+- Added features (Record<string, boolean>) to WidgetRendererProps
+- Import WIDGET_FEATURE_MAP instead of WIDGET_CATALOG
+- Gating logic: if WIDGET_FEATURE_MAP[id] exists and features[featureId] === false, return null
+- Updated widgets-test page to pass features={{}} (all widgets visible in admin test)
+
+### Feature #456: DraggableWidgetGrid passes features and filters non-available widgets - PASSING
+- Imported useFeatureAccess from feature-access-provider
+- Imported WIDGET_FEATURE_MAP from widget-catalog
+- Added isWidgetAccessible() helper function
+- Filters initialPrefs to remove inaccessible widgets before rendering
+- Passes features to SortableWidgetItem -> WidgetRenderer
+- Updated test mock for useFeatureAccess
+- All 6 unit tests pass
+
+### Current Status
+- 3 features completed this session (#454, #455, #456)
+- Zero TypeScript errors
+- All unit tests pass
+- Commit: 89cc0e5
