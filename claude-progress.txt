@@ -1,3 +1,20 @@
+## Session 2026-03-07 - Feature #364
+
+### Feature #364: Briefing-frequentie adaptatie: korte vs uitgebreide briefing - PASSING
+- Added detectBriefingFrequency(lastVisits: Date[]): 'daily'|'weekly'|'monthly'|'rare' to user-preferences.ts
+- Uses median gap between visits: daily<=2d, weekly<=9d, monthly<=35d, rare>35d
+- logVisitTimestamp() stores visits in localStorage key 'briefing_visits' (last 30 timestamps)
+- readVisitTimestamps() reads visit history from localStorage
+- DAIshboard logs visit on mount via useEffect, detects frequency, sends as briefingFrequency in compose request
+- BriefingComposeRequest type extended with optional briefingFrequency field
+- Compose route passes briefingFrequency to buildBriefingSystemPrompt
+- Card count adapted per frequency: daily=5-7, weekly=7-9, monthly/rare=8-10
+- Frequency-specific prompt instructions: daily=delta focus, monthly=maandterugblik met trends, rare=full reorientation
+- Commits: e229493, 347285e
+
+### Current Status
+- 357/364 features passing (97.8% + #364)
+
 ## Session 2026-03-07 - Features #366, #343, #341
 
 ### Feature #366: Seizoensgeheugen: persoonlijke seizoenspatronen - PASSING
@@ -8881,3 +8898,29 @@ For Feature #51 (Transaction Import):
 
 ### Current Status
 - 1 feature completed this session (#356)
+
+## Session 2026-03-07 - Features #357, #360, #358
+
+### Feature #357: Progressie-detectie voor sovereignty level changes en mijlpalen - PASSING
+- Created lib/briefing/progression.ts with localStorage-based snapshot tracking
+- LONG_TERM_KEY = 'briefing_progression' for localStorage persistence
+- detectProgressionEvents compares previous vs current: level_up, level_down, phase_transition, milestone_reached (25/50/75/100%), debt_free, emergency_fund_reached (3m/6m), net_worth_ath
+- Added PROGRESSIE section to condense.ts
+- Integrated into DAIshboard streamFromAI flow
+
+### Feature #360: Fase-transitie viering in briefing - PASSING
+- Added phase_transition event type to progression detection
+- Phase descriptions with Dutch names (Herstel/Stabiliteit/Momentum/Meesterschap) and unlock descriptions
+- Prominent AI instruction block (FASE-TRANSITIE BELANGRIJK\!) for celebrating transitions
+- PhaseTransitionInfo passed through compose request to system prompt
+
+### Feature #358: Actie-opvolging: afgeronde acties context voor briefing - PASSING
+- Query recently completed (30d) and rejected (90d) actions in daishboard/page.tsx
+- Added CompletedAction and RejectedAction types to DashboardData
+- AFGERONDE ACTIES and AFGEWEZEN ACTIES sections in condense.ts
+- ACTIE-OPVOLGING instruction in briefing system prompt
+
+### Current Status
+- 3 features completed this session (#357, #360, #358)
+- Zero TypeScript errors
+- All commits clean
