@@ -370,10 +370,9 @@ export default function OnboardingPage() {
         {/* Logo / Header */}
         {showHeader && (
           <div className="relative mb-10 sm:mb-12 text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 via-teal-400 to-purple-500">
-              <span className="text-2xl font-black text-white">T</span>
-            </div>
-            <h1 className="font-display text-3xl font-bold tracking-[-0.02em] text-[var(--ink)]">TriFinity</h1>
+            <h1 className="font-display text-4xl font-bold tracking-tight text-[var(--ink)]">
+              <span className="lowercase">t</span>ri<span className="lowercase">f</span>inity<span className="text-kern-500">.</span>
+            </h1>
             <button
               onClick={handleLogout}
               className="absolute right-0 top-0 text-xs text-[var(--ink-4)] transition-colors hover:text-[var(--ink-2)]"
@@ -446,7 +445,7 @@ export default function OnboardingPage() {
                 {/* Progress bar */}
                 <div className="mx-auto h-2 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-amber-400 via-teal-400 to-purple-500 transition-all duration-300 ease-out"
+                    className="h-full rounded-full bg-[var(--ink)] transition-all duration-300 ease-out"
                     style={{ width: `${saveProgress}%` }}
                   />
                 </div>

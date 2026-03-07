@@ -17,7 +17,7 @@ export function StepProgress({ current }: { current: StepKey }) {
       {/* Progress bar */}
       <div className="mb-4 h-1 w-full overflow-hidden rounded-full bg-[var(--border-ed)]">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-amber-400 via-teal-400 to-purple-500 transition-all duration-500"
+          className="h-full rounded-full bg-[var(--ink)] transition-all duration-500"
           style={{ width: `${progressPct}%` }}
         />
       </div>
@@ -32,9 +32,9 @@ export function StepProgress({ current }: { current: StepKey }) {
               <div
                 className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
                   isDone
-                    ? 'bg-wil-500 text-white'
+                    ? 'bg-[var(--ink)] text-white'
                     : isActive
-                      ? 'border-2 border-wil-500 text-wil-600'
+                      ? 'border-2 border-[var(--ink)] text-[var(--ink)]'
                       : 'border border-[var(--border-ed)] text-[var(--ink-4)]'
                 }`}
               >
@@ -49,7 +49,7 @@ export function StepProgress({ current }: { current: StepKey }) {
               {/* Desktop: full label, Mobile: hidden */}
               <span
                 className={`hidden text-[10px] font-medium sm:block ${
-                  isActive ? 'text-wil-700' : isDone ? 'text-[var(--ink-2)]' : 'text-[var(--ink-4)]'
+                  isActive ? 'text-[var(--ink)]' : isDone ? 'text-[var(--ink-2)]' : 'text-[var(--ink-4)]'
                 }`}
               >
                 {step.label}
