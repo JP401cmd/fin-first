@@ -786,6 +786,8 @@ export default async function DashboardPage() {
     totalFreedomDaysOpen,
     completedActionsThisMonth,
     topOpenActions,
+    recentCompletedActions: [],
+    recentRejectedActions: [],
     sovereigntyLevel,
     currentPhaseId,
     monthsCovered: monthlyExpenses > 0 ? netWorth / monthlyExpenses : 0,

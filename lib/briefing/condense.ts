@@ -186,6 +186,26 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
   }
   lines.push('')
 
+  // Recently completed actions (last 30 days)
+  if (data.recentCompletedActions && data.recentCompletedActions.length > 0) {
+    lines.push('AFGERONDE ACTIES (laatste 30 dagen):')
+    for (const a of data.recentCompletedActions) {
+      const impact = a.freedomDaysImpact != null ? ` — ${a.freedomDaysImpact} vrijheidsdagen gewonnen` : ''
+      const date = a.completedAt ? ` (${a.completedAt.slice(0, 10)})` : ''
+      lines.push(`- ${a.title}${impact}${date}`)
+    }
+    lines.push('')
+  }
+
+  // Recently rejected actions (last 90 days) — do NOT re-suggest these
+  if (data.recentRejectedActions && data.recentRejectedActions.length > 0) {
+    lines.push('AFGEWEZEN ACTIES (niet opnieuw voorstellen):')
+    for (const a of data.recentRejectedActions) {
+      lines.push(`- ${a.title}`)
+    }
+    lines.push('')
+  }
+
   // Goals with deadlines + coaching context
   lines.push(`DOELEN: ${data.goals ?? 0}`)
   if (data.topGoals && data.topGoals.length > 0) {

@@ -51,6 +51,8 @@ const mockData: DashboardData = {
   totalFreedomDaysOpen: 15,
   completedActionsThisMonth: 1,
   topOpenActions: [],
+  recentCompletedActions: [],
+  recentRejectedActions: [],
   sovereigntyLevel: 2,
   currentPhaseId: 'stability',
   monthsCovered: 25,

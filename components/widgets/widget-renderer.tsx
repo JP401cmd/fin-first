@@ -52,6 +52,18 @@ export interface TopAction {
   source: string
 }
 
+export interface CompletedAction {
+  id: string
+  title: string
+  freedomDaysImpact: number | null
+  completedAt: string
+}
+
+export interface RejectedAction {
+  id: string
+  title: string
+}
+
 export interface TopGoal {
   id: string
   name: string
@@ -175,6 +187,8 @@ export interface DashboardData {
   totalFreedomDaysOpen: number
   completedActionsThisMonth: number
   topOpenActions: TopAction[]
+  recentCompletedActions: CompletedAction[]
+  recentRejectedActions: RejectedAction[]
   // Sovereignty
   sovereigntyLevel: number
   currentPhaseId: string

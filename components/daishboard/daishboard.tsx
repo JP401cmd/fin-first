@@ -5,7 +5,7 @@ import type { DashboardData } from '@/components/widgets/widget-renderer'
 import type { BriefingCardSpec, BriefingComposeResponse, BriefingSSEEvent, TemporalContext, PreviousBriefingSummary, BriefingLongTermMemory, CardModule } from '@/lib/briefing/types'
 import { condenseDashboardData } from '@/lib/briefing/condense'
 import { logCardEngagement } from '@/lib/briefing/engagement'
-import { buildUserPreferenceBlock, persistFeedback } from '@/lib/briefing/user-preferences'
+import { buildUserPreferenceBlock, persistFeedback, logVisitTimestamp, readVisitTimestamps, detectBriefingFrequency } from '@/lib/briefing/user-preferences'
 import { loadPreviousSnapshot, saveSnapshot, buildSnapshot, detectProgressionEvents } from '@/lib/briefing/progression'
 import { updateSeasonalSnapshot } from '@/lib/briefing/seasonal'
 import { BriefingHeader } from './briefing-header'
@@ -192,6 +192,11 @@ export function DAIshboard({ data, temporal, userName }: Props) {
   // Compute data hash for cache invalidation
   const dataHash = hashDashboardData(data)
 
+  // Log visit timestamp on mount for briefing frequency detection
+  useEffect(() => {
+    logVisitTimestamp()
+  }, [])
+
   // Read cache after hydration but before paint — avoids hydration mismatch
   // while preventing a flash of the composing indicator for cached briefings
   useLayoutEffect(() => {
@@ -246,11 +251,14 @@ export function DAIshboard({ data, temporal, userName }: Props) {
     const longTermMemory = readLongTermMemory()
     // Build user preference block from engagement + feedback data
     const userPreferences = buildUserPreferenceBlock()
+    // Detect briefing frequency from visit history
+    const visitTimestamps = readVisitTimestamps()
+    const briefingFrequency = detectBriefingFrequency(visitTimestamps)
 
     fetch('/api/briefing/compose', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dataSummary, temporal, phase, level, previousBriefing, longTermMemory, userPreferences, phaseTransition }),
+      body: JSON.stringify({ dataSummary, temporal, phase, level, previousBriefing, longTermMemory, userPreferences, phaseTransition, briefingFrequency }),
       signal: controller.signal,
     })
       .then(async (res) => {

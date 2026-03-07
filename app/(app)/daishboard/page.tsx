@@ -10,7 +10,7 @@ import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { calculateFreedomTime, formatFreedomTimeString, formatCurrency } from '@/lib/format'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
-import type { DashboardData, TopAction, TopGoal, TopRecurringTransaction, TopRecommendation, TopLifeEvent, Notification, StreakData, AiInsight, NextStep, UpcomingEvent } from '@/components/widgets/widget-renderer'
+import type { DashboardData, TopAction, CompletedAction, RejectedAction, TopGoal, TopRecurringTransaction, TopRecommendation, TopLifeEvent, Notification, StreakData, AiInsight, NextStep, UpcomingEvent } from '@/components/widgets/widget-renderer'
 import { buildTemporalContext } from '@/lib/briefing/temporal'
 import { DAIshboard } from '@/components/daishboard/daishboard'
 
@@ -42,7 +42,7 @@ export default async function DAIshboardPage() {
     supabase.from('budgets').select('id, default_limit, interval').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
     supabase.from('actions')
       .select('id, title, status, freedom_days_impact, priority_score, due_date, source, completed_at')
-      .in('status', ['open', 'postponed', 'completed']),
+      .in('status', ['open', 'postponed', 'completed', 'rejected']),
     supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, alert_threshold, parent_id').is('parent_id', null),
     supabase.from('recommendations').select('id, title, freedom_days_per_year, priority_score, recommendation_type, status').in('status', ['pending', 'postponed']),
@@ -305,6 +305,40 @@ export default async function DAIshboardPage() {
         priority_score: act.priority_score != null ? Number(act.priority_score) : null,
         due_date: act.due_date ?? null, source: act.source ?? '',
       }
+    })
+
+  // Recently completed actions (last 30 days) for briefing context
+  const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30).toISOString().slice(0, 10)
+  const ninetyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90).toISOString().slice(0, 10)
+
+  const recentCompletedActions: CompletedAction[] = allActions
+    .filter(a => {
+      if (a.status !== 'completed') return false
+      const completedAt = (a as { completed_at?: string | null }).completed_at
+      return completedAt != null && completedAt >= thirtyDaysAgo
+    })
+    .slice(0, 10)
+    .map(a => {
+      const act = a as { id: string; title: string; freedom_days_impact?: number | null; completed_at?: string | null }
+      return {
+        id: act.id,
+        title: act.title,
+        freedomDaysImpact: act.freedom_days_impact != null ? Number(act.freedom_days_impact) : null,
+        completedAt: act.completed_at ?? '',
+      }
+    })
+
+  const recentRejectedActions: RejectedAction[] = allActions
+    .filter(a => {
+      if (a.status !== 'rejected') return false
+      const completedAt = (a as { completed_at?: string | null }).completed_at
+      // Use completed_at as rejection timestamp, or include all rejected if no date
+      return completedAt == null || completedAt >= ninetyDaysAgo
+    })
+    .slice(0, 10)
+    .map(a => {
+      const act = a as { id: string; title: string }
+      return { id: act.id, title: act.title }
     })
 
   // Sovereignty level
@@ -691,7 +725,8 @@ export default async function DAIshboardPage() {
     yearlyMustExpenses, budgetTotals, freedomPct, fireTarget, fireProjResult,
     fireAgeFractional,
     openActions: openActions.length, totalFreedomDaysOpen, completedActionsThisMonth,
-    topOpenActions, sovereigntyLevel, currentPhaseId,
+    topOpenActions, recentCompletedActions, recentRejectedActions,
+    sovereigntyLevel, currentPhaseId,
     monthsCovered: monthlyExpenses > 0 ? netWorth / monthlyExpenses : 0,
     hasConsumerDebt,
     recommendations: (recsResult.data ?? []).filter(r => (r as { status: string }).status === 'pending').length,

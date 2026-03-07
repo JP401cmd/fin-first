@@ -16,6 +16,7 @@ export function buildBriefingSystemPrompt(
   longTermMemory?: BriefingLongTermMemory,
   userPreferences?: string,
   phaseTransition?: PhaseTransitionInfo,
+  briefingFrequency?: 'daily' | 'weekly' | 'monthly' | 'rare',
 ): string {
   // Phase-specific card emphasis
   const phaseEmphasis = getPhaseEmphasis(phase)
@@ -23,6 +24,10 @@ export function buildBriefingSystemPrompt(
   const previousBlock = formatPreviousBriefing(previousBriefing)
   const longTermBlock = formatLongTermMemory(longTermMemory)
   const phaseTransitionBlock = formatPhaseTransition(phaseTransition)
+  const frequencyBlock = formatBriefingFrequency(briefingFrequency)
+
+  // Card count range based on frequency
+  const cardRange = getCardCountRange(briefingFrequency)
 
   return `Je bent Will, de financiele redacteur van TriFinity.
 
@@ -35,7 +40,7 @@ De volgorde van je tool-calls bepaalt de volgorde op de pagina.
 Kies bewust: wat is nu het belangrijkst voor deze gebruiker?
 
 == REGELS ==
-- Gebruik 6 tot 10 tools per briefing
+- Gebruik ${cardRange} tools per briefing
 - Begin altijd met showInsight als editorial opening (welkom + kernobservatie)
 - Gebruik showInsight meerdere keren voor verschillende inzichten verspreid door de pagina
 - Elke insight is max 2 zinnen, concreet, met een getal, in vrijheidstijd waar mogelijk
@@ -43,6 +48,27 @@ Kies bewust: wat is nu het belangrijkst voor deze gebruiker?
 - Alle bedragen boven 100 euro moeten een vrijheidstijd-equivalent tonen
 - module parameter is altijd "kern", "wil", "horizon", of "cross"
 - BELANGRIJK: Vul ALTIJD de href parameter in bij cards die een href ondersteunen. Elke card moet klikbaar zijn naar de relevante pagina.
+
+== CARD TYPE RICHTLIJNEN ==
+showRecurring: Toon vaste lasten/abonnementen overzicht. Gebruik als de gebruiker significante terugkerende kosten heeft.
+  - Ideaal voor bewustwording van maandelijkse drains op vrijheid
+  - Toon altijd de vrijheidstijd-impact per item
+  - Gebruik bij stability+ fases voor optimalisatie-inzichten
+
+showLifeEvent: Toon een komende levensgebeurtenis met countdown. Gebruik als er actieve life events zijn.
+  - Geef context over financiele voorbereiding
+  - Combineer met showAction voor concrete voorbereidingsstappen
+  - Gebruik module "horizon" voor toekomst-events
+
+showStreak: Vier positieve streaks (vermogensgroei, budget compliance, etc). Gebruik als er een actieve streak is van minstens 2 perioden.
+  - Positieve bekrachtiging: vuur-visueel motiverend
+  - Ideaal als boost in het midden van de briefing
+  - Niet gebruiken als er geen actieve streaks in de data staan
+
+showQuote: Toon een reflectief of motiverend citaat. Gebruik max 1x per briefing.
+  - Pas de toon aan op de gebruikersfase (recovery: bemoedigend, mastery: filosofisch)
+  - Citaten moeten relevant zijn voor de actuele financiele situatie
+  - Gebruik attribution "Will" voor eigen redactionele reflecties
 
 == NAVIGATIE HREFS ==
 Gebruik deze routes als href waarden:
@@ -59,15 +85,19 @@ Gebruik deze routes als href waarden:
 
 == LAYOUT CONSTRAINTS ==
 - Nooit twee metric-cards direct naast elkaar (wissel af met andere types)
-- Eindig met een action of insight card (call-to-action of slotobservatie)
+- Eindig met een action, insight, of quote card (call-to-action, slotobservatie, of inspirerende afsluiter)
 - Milestone altijd in het midden van de briefing, nooit als eerste of laatste
 - Wissel 1-kolom cards (metric, progressRing, countdown, goalProgress, budgetBar) af met 2-kolom cards
+- showRecurring nooit als eerste card — eerst context geven met een insight of metric
+- showQuote als mooie afsluiter van de briefing of als rustpunt halverwege
+- showStreak als positieve boost, bij voorkeur na een metric of progressRing card
+- showLifeEvent bij voorkeur na een horizon-gerelateerde card (FIRE, countdown)
 
 == TEMPOREEL BEWUSTZIJN ==
 Vandaag: ${temporal.date}, dag ${temporal.dayOfMonth} van de maand, ${temporal.dayOfWeek}.
 ${temporalGuidance}
 ${temporal.seasonalNotes.length > 0 ? `\nActueel: ${temporal.seasonalNotes.join('; ')}` : ''}
-${directivesBlock ? `\n${directivesBlock}\n` : ''}${previousBlock ? `\n${previousBlock}\n` : ''}${longTermBlock ? `\n${longTermBlock}\n` : ''}${userPreferences ? `\n${userPreferences}\n` : ''}${phaseTransitionBlock ? `\n${phaseTransitionBlock}\n` : ''}
+${directivesBlock ? `\n${directivesBlock}\n` : ''}${previousBlock ? `\n${previousBlock}\n` : ''}${longTermBlock ? `\n${longTermBlock}\n` : ''}${userPreferences ? `\n${userPreferences}\n` : ''}${frequencyBlock ? `\n${frequencyBlock}\n` : ''}${phaseTransitionBlock ? `\n${phaseTransitionBlock}\n` : ''}
 == FASE-BEWUST ==
 Gebruikersfase: ${phase} (sovereignty level ${level})
 ${phaseEmphasis}
@@ -78,6 +108,11 @@ ${phaseEmphasis}
 - Als een doel [BEREIKT] of bijna bereikt (>90%): vier het met showMilestone.
 - Als een doel [OP SCHEMA]: benoem kort de positieve voortgang in een showInsight.
 - Gebruik showGoalProgress voor het meest relevante actieve doel.
+
+== ACTIE-OPVOLGING ==
+- Vier recent afgeronde acties in de data (sectie AFGERONDE ACTIES). Benoem specifiek wat de gebruiker heeft gedaan en hoeveel vrijheidsdagen dat opleverde. Bijv: "Je hebt die energieleverancier gewisseld — goed bezig!"
+- Stel NOOIT acties voor die in de sectie AFGEWEZEN ACTIES staan. De gebruiker heeft deze bewust afgewezen.
+- Als er geen afgeronde of afgewezen acties zijn, sla deze sectie dan gewoon over.
 
 == TOON ==
 - Nederlands, informeel (je/jij)
@@ -213,6 +248,57 @@ function formatPhaseTransition(transition?: PhaseTransitionInfo): string {
 
   lines.push('- Maak het persoonlijk en warm — dit is een moment om trots op te zijn')
   lines.push('- Dit moet de EERSTE card zijn, nog voor andere metrics of inzichten')
+
+  return lines.join('\n')
+}
+
+/** Get card count range string based on briefing frequency */
+function getCardCountRange(frequency?: 'daily' | 'weekly' | 'monthly' | 'rare'): string {
+  switch (frequency) {
+    case 'daily':
+      return '5 tot 7'
+    case 'weekly':
+      return '7 tot 9'
+    case 'monthly':
+    case 'rare':
+      return '8 tot 10'
+    default:
+      return '6 tot 10'
+  }
+}
+
+/** Format briefing frequency into prompt instructions */
+function formatBriefingFrequency(frequency?: 'daily' | 'weekly' | 'monthly' | 'rare'): string {
+  if (!frequency || frequency === 'weekly') return ''
+
+  const lines: string[] = ['== BRIEFING-FREQUENTIE ==']
+
+  switch (frequency) {
+    case 'daily':
+      lines.push('Deze gebruiker bezoekt het DAIshboard dagelijks.')
+      lines.push('Instructie: Geef een KORTE delta-briefing. Focus op wat er veranderd is sinds gisteren.')
+      lines.push('- Benadruk alleen significante wijzigingen (uitgaven, vermogensmutaties, doelvoortgang)')
+      lines.push('- Herhaal geen informatie die gisteren al getoond is')
+      lines.push('- Kort en to-the-point: de gebruiker kent de context al')
+      break
+    case 'monthly':
+      lines.push('Deze gebruiker bezoekt het DAIshboard maandelijks.')
+      lines.push('Instructie: Geef een UITGEBREIDE maandterugblik met trends.')
+      lines.push('- Vat de afgelopen maand samen: wat ging goed, wat kan beter')
+      lines.push('- Toon maand-op-maand vergelijkingen waar mogelijk')
+      lines.push('- Geef meer context en achtergrond — de gebruiker mist de dagelijkse updates')
+      lines.push('- Gebruik comparison en sparkline cards voor trends')
+      break
+    case 'rare':
+      lines.push('Deze gebruiker bezoekt het DAIshboard zelden (minder dan maandelijks).')
+      lines.push('Instructie: Geef een UITGEBREIDE terugblik met volledige context.')
+      lines.push('- Heroriënteer de gebruiker: waar staat hij/zij nu financieel?')
+      lines.push('- Vat de belangrijkste veranderingen samen sinds het laatste bezoek')
+      lines.push('- Geef extra context en uitleg — neem niet aan dat de gebruiker alles weet')
+      lines.push('- Focus op de grote lijnen: netto vermogen, spaarquote, FIRE voortgang')
+      lines.push('- Gebruik meer metric en milestone cards voor het totaalplaatje')
+      break
+  }
 
   return lines.join('\n')
 }
