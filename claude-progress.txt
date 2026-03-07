@@ -1,3 +1,22 @@
+## Session 2026-03-07 - Feature #420
+
+### Feature #420: Voeg temporeel evenwicht toe aan onboarding identity stap - PASSING
+- Added temporal_balance (number, default 3) to IdentityData interface
+- Imported temporalLevels from lib/identity-constants
+- Added section after FIRE settings with Will speech bubble explaining the concept
+- Range slider 1-5 with emoji icons and active level card (name, description)
+- Slider: min-h-[44px], touch-manipulation, accent-[var(--ink)]
+- Save API schema updated with temporal_balance (z.number().int().min(1).max(5).optional())
+- Profile upsert includes temporal_balance when provided
+- Initial state default: 3 (midpoint = De Architect)
+- Updated test-onboarding-validation page with temporal_balance field
+- Zero TypeScript errors, zero console errors
+- Verified via browser: slider changes update active level card correctly
+- Commit: 0f6a934
+
+### Current Status
+- 420/427 features passing (98.4%)
+
 ## Session 2026-03-07 - Feature #431
 
 ### Feature #431: Onboarding preferences: beperk widget selectie tot max 8 enabled widgets - PASSING
