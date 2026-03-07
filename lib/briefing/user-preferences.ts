@@ -2,7 +2,7 @@
 // Combines engagement (clicks) and feedback (thumbs up/down) to build
 // a preference block that steers Will's card selection.
 
-import { getEngagementSummary } from './engagement'
+import { getEngagementSummary, getModuleEngagementSummary } from './engagement'
 
 const FEEDBACK_KEY = 'briefing_feedback_history'
 const MIN_DATA_POINTS = 10
@@ -55,8 +55,25 @@ function getFeedbackSummary(): Record<string, { up: number; down: number }> {
 }
 
 /**
+ * Compute module preference percentages from engagement data.
+ * Returns a map like { kern: 45, horizon: 30, wil: 20, cross: 5 }
+ */
+function getModulePreferences(): Record<string, number> | null {
+  const moduleCounts = getModuleEngagementSummary()
+  const total = Object.values(moduleCounts).reduce((a, b) => a + b, 0)
+  if (total === 0) return null
+
+  const percentages: Record<string, number> = {}
+  for (const [mod, count] of Object.entries(moduleCounts)) {
+    percentages[mod] = Math.round((count / total) * 100)
+  }
+  return percentages
+}
+
+/**
  * Build a user preference prompt block for Will's system prompt.
- * Combines engagement (clicks) and feedback (thumbs up/down) to score card types.
+ * Combines engagement (clicks) and feedback (thumbs up/down) to score card types,
+ * plus module preference percentages from engagement data.
  * Returns null if fewer than MIN_DATA_POINTS data points exist.
  */
 export function buildUserPreferenceBlock(): string | null {
@@ -99,22 +116,39 @@ export function buildUserPreferenceBlock(): string | null {
     .sort((a, b) => a.score - b.score)
     .slice(0, 3)
 
-  if (preferred.length === 0 && avoided.length === 0) {
-    return null
-  }
-
   const lines: string[] = ['== GEBRUIKERSVOORKEUREN ==']
+  let hasContent = false
 
   if (preferred.length > 0) {
     const types = preferred.map((s) => s.type).join(', ')
     lines.push(
       `Deze gebruiker vindt ${types} cards het meest waardevol. Gebruik deze vaker.`,
     )
+    hasContent = true
   }
 
   if (avoided.length > 0) {
     const types = avoided.map((s) => s.type).join(', ')
     lines.push(`Gebruik minder ${types} cards.`)
+    hasContent = true
+  }
+
+  // Module preferences from engagement data
+  const modulePrefs = getModulePreferences()
+  if (modulePrefs) {
+    const moduleEntries = Object.entries(modulePrefs)
+      .filter(([mod]) => mod !== 'cross') // exclude cross — it's generic
+      .sort((a, b) => b[1] - a[1])
+
+    if (moduleEntries.length > 0) {
+      const parts = moduleEntries.map(([mod, pct]) => `${mod} ${pct}%`)
+      lines.push(`Module-voorkeur: ${parts.join(', ')}. Stem je card-mix hierop af.`)
+      hasContent = true
+    }
+  }
+
+  if (!hasContent) {
+    return null
   }
 
   return lines.join('\n')

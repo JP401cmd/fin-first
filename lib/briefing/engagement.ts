@@ -53,3 +53,14 @@ export function getEngagementSummary(): Record<string, number> {
   }
   return summary
 }
+
+/** Get engagement counts per module */
+export function getModuleEngagementSummary(): Record<string, number> {
+  const entries = readEntries()
+  const summary: Record<string, number> = {}
+  for (const entry of entries) {
+    const mod = entry.module ?? 'cross'
+    summary[mod] = (summary[mod] ?? 0) + 1
+  }
+  return summary
+}
