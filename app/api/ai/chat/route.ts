@@ -6,6 +6,7 @@ import { buildContext } from '@/lib/ai/context/builder'
 import { getTools } from '@/lib/ai/tools'
 import { WHATIF_PROMPT } from '@/lib/ai/dna/wil'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
+import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
 
 /* AI response timeout in milliseconds (60 seconds) */
 const AI_TIMEOUT_MS = 60_000
@@ -105,8 +106,25 @@ export async function POST(req: Request) {
       abortSignal: abortController.signal,
     })
 
+    /* PII output filter — mask any IBANs/BSNs that slip through in AI output.
+     * We wrap the UIMessageStream with a TransformStream that applies maskPIIInOutput
+     * to each chunk's string content. The UIMessageStream encodes chunks as strings
+     * at the wire level, so we intercept at that layer. */
+    const rawStream = result.toUIMessageStream()
+    const piiFilter = new TransformStream({
+      transform(chunk: unknown, controller: TransformStreamDefaultController) {
+        if (typeof chunk === 'string') {
+          controller.enqueue(maskPIIInOutput(chunk))
+        } else {
+          controller.enqueue(chunk)
+        }
+      },
+    })
+    const filteredStream = rawStream.pipeThrough(piiFilter)
+
     return createUIMessageStreamResponse({
-      stream: result.toUIMessageStream(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      stream: filteredStream as any,
     })
   } catch (err) {
     clearTimeout(timeoutId)

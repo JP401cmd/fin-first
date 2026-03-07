@@ -3,6 +3,7 @@ import { streamText } from 'ai'
 import { getModel } from '@/lib/ai/config'
 import { buildBriefingSystemPrompt, briefingTools } from '@/lib/ai/dna/briefing'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
+import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
 import type {
   BriefingCardSpec,
   BriefingComposeRequest,
@@ -201,8 +202,11 @@ export async function POST(request: Request) {
             }
           }
 
+          // PII output filter — mask any IBANs/BSNs that slip through in AI output
+          const piiFilteredCards = collectedCards.map(maskPIIInObject)
+
           // Validate hrefs (correct hallucinated routes) then layout
-          const hrefValidatedCards = validateCardHrefs(collectedCards)
+          const hrefValidatedCards = validateCardHrefs(piiFilteredCards)
           const validatedCards = validateBriefingLayout(hrefValidatedCards)
 
           // Emit all validated cards in order

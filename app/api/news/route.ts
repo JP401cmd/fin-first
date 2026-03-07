@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getModel, AIConfigError } from '@/lib/ai/config'
 import { buildSharedContext } from '@/lib/ai/context/shared-context'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
+import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
 import { NextResponse } from 'next/server'
 
 // ── Cache TTL ────────────────────────────────────────────────────────
@@ -219,10 +220,13 @@ ${financialContext}
 Genereer 5-10 gepersonaliseerde Nederlandse financiele nieuwsitems. Focus op nieuws dat relevant is voor deze specifieke gebruiker, gebaseerd op hun financiele situatie. Gebruik concrete bedragen en vrijheidstijd in de personalImpact.`,
     })
 
-    // Cache the result
-    await setCachedNews(supabase, user.id, object.items)
+    // PII output filter — mask any IBANs/BSNs that slip through in AI output
+    const filteredItems = object.items.map(maskPIIInObject)
 
-    return NextResponse.json({ items: object.items, cached: false })
+    // Cache the filtered result
+    await setCachedNews(supabase, user.id, filteredItems)
+
+    return NextResponse.json({ items: filteredItems, cached: false })
   } catch (err) {
     console.error('[/api/news] AI generation failed:', err)
     return NextResponse.json(

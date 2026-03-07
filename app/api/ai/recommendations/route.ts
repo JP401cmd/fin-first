@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getModel, AIConfigError } from '@/lib/ai/config'
 import { RECOMMENDATIONS_SYSTEM_PROMPT } from '@/lib/ai/dna/recommendations'
 import { buildRecommendationContext } from '@/lib/ai/context/recommendation-context'
+import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
 
 const recommendationSchema = z.object({
   recommendations: z.array(z.object({
@@ -97,8 +98,8 @@ export async function POST() {
       .from('recommendations')
       .insert({
         user_id: user.id,
-        title: rec.title,
-        description: rec.description,
+        title: maskPIIInOutput(rec.title),
+        description: maskPIIInOutput(rec.description),
         recommendation_type: rec.recommendation_type,
         euro_impact_monthly: rec.euro_impact_monthly,
         euro_impact_yearly: rec.euro_impact_yearly,

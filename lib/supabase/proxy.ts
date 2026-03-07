@@ -394,6 +394,7 @@ export async function updateSession(request: NextRequest) {
     '/api/test-sanitize-failsafe',
     '/api/verify-news-error-handling',
     '/api/verify-no-ai-fallback',
+    '/api/test-pii-output-filter',
   ]
 
   // Protected route prefixes that require authentication
