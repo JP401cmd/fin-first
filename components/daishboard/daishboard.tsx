@@ -7,6 +7,7 @@ import { condenseDashboardData } from '@/lib/briefing/condense'
 import { logCardEngagement } from '@/lib/briefing/engagement'
 import { buildUserPreferenceBlock, persistFeedback } from '@/lib/briefing/user-preferences'
 import { loadPreviousSnapshot, saveSnapshot, buildSnapshot, detectProgressionEvents } from '@/lib/briefing/progression'
+import { updateSeasonalSnapshot } from '@/lib/briefing/seasonal'
 import { BriefingHeader } from './briefing-header'
 import { BriefingCardGrid } from './briefing-card-grid'
 import { BriefingComposingIndicator } from './briefing-skeleton'
@@ -244,7 +245,7 @@ export function DAIshboard({ data, temporal, userName }: Props) {
     fetch('/api/briefing/compose', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dataSummary, temporal, phase, level, previousBriefing, longTermMemory, userPreferences }),
+      body: JSON.stringify({ dataSummary, temporal, phase, level, previousBriefing, longTermMemory, userPreferences, phaseTransition }),
       signal: controller.signal,
     })
       .then(async (res) => {
@@ -285,6 +286,8 @@ export function DAIshboard({ data, temporal, userName }: Props) {
                 saveBriefingSummary(streamedCards, event.composedAt)
                 // Update long-term memory in localStorage
                 updateLongTermMemory(streamedCards, event.composedAt, data)
+                // Update seasonal snapshot for year-over-year comparisons
+                updateSeasonalSnapshot(temporal.month, temporal.year, data.monthlyExpenses, data.monthlyIncome)
                 break
               case 'error':
                 setError(event.message)
