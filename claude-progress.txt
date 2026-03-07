@@ -1,3 +1,67 @@
+## Session 2026-03-07 - Features #366, #343, #341
+
+### Feature #366: Seizoensgeheugen: persoonlijke seizoenspatronen - PASSING
+- Created lib/briefing/seasonal.ts with localStorage-based seasonal snapshots
+- localStorage key 'briefing_seasonal': Record<month(1-12), {avgExpenses, avgIncome, year}[]>
+- updateSeasonalSnapshot() stores monthly data, max 2 years per month
+- getSeasonalContext() compares current month with same month last year
+- Generates: 'Vorig jaar [maand] gaf je [bedrag] uit, nu [bedrag] — X% meer/minder'
+- Added SEIZOENSCONTEXT section to condenseDashboardData (with typeof window guard)
+- Hooked updateSeasonalSnapshot into daishboard.tsx after briefing completion
+- Commit: 68eac93
+
+### Feature #343: Nieuw card type showLifeEvent - PASSING
+- Added LifeEventCardSpec interface to lib/briefing/types.ts (type, name, daysUntil, amount, amountType, freedomStr, module)
+- Added lifeEvent to BriefingCardSpec union and CARD_SPAN (2-col)
+- Added showLifeEvent tool to lib/ai/dna/briefing.ts with zod schema
+- Created components/daishboard/cards/life-event-card.tsx with Calendar icon, countdown, financial impact, freedom time
+- Registered in briefing-card-grid.tsx and compose/route.ts
+- Commit: 58627fa
+
+### Feature #341: Functionele directieven server-side pre-evalueren - PASSING
+- Added extractMetricsFromSummary() to parse condensed dataSummary for key metrics
+- Added evaluateFunctionalDirective() to check each metric/condition against actual data
+- Updated formatFunctionalDirectivesForPrompt() to accept optional dataSummary param
+- Matched directives marked as [ACTIEF], unmatched as [INACTIEF] in prompt
+- Updated system prompt header to instruct Will to prioritize [ACTIEF] directives
+- Compose route now passes dataSummary to the formatter
+- Covers all 8 metric types: net_worth, savings_rate, budget, debt, fire, spending, emergency_fund, income
+- Commit: 8549fa3
+
+### Current Status
+- 3 features completed this session (#366, #343, #341)
+- All type-checks pass cleanly (pre-existing errors only)
+
+## Session 2026-03-07 - Features #361, #362, #363
+
+### Feature #361: Card-engagement tracking: klik-registratie op briefing cards - PASSING
+- Created lib/briefing/engagement.ts with logCardEngagement() and getEngagementSummary()
+- Stores engagement in localStorage key 'briefing_engagement' as FIFO array (max 100)
+- Added onEngage callback prop to BriefingCard component
+- BriefingCardGrid passes onCardEngage via onClick on wrapper div (event delegation)
+- DAIshboard creates handleCardEngage and passes to grid
+- Added getModuleEngagementSummary() for module-level tracking
+
+### Feature #362: Feedback-gewogen prompting: gebruik feedback om Will te sturen - PASSING
+- Created lib/briefing/user-preferences.ts with buildUserPreferenceBlock()
+- Scores card types: clicks + thumbs_up - thumbs_down
+- Generates prompt block with top 3 preferred and bottom 3 avoided card types
+- Only activates with >= 10 data points (MIN_DATA_POINTS threshold)
+- Added persistFeedback() for long-term localStorage storage (key: briefing_feedback_history)
+- Wired into compose route: userPreferences passed in request body
+- Added to buildBriefingSystemPrompt as optional parameter
+
+### Feature #363: Interestprofiel: module-voorkeur tracking - PASSING
+- Extended buildUserPreferenceBlock with module preference percentages
+- Computes module scores from engagement data via getModuleEngagementSummary()
+- Generates prompt line: 'Module-voorkeur: kern X%, horizon Y%, wil Z%. Stem je card-mix hierop af.'
+- Integrated into existing userPreferences block (no separate prompt section needed)
+
+### Current Status
+- 3 features completed this session (#361, #362, #363)
+- All type-checks pass cleanly
+- Commit: 7456190
+
 ## Session 2026-03-07 - Features #346, #351, #355
 
 ### Feature #346: Sparkline tool uitbreiden naar meerdere datasets - PASSING
@@ -8795,3 +8859,25 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#359, #367, #365)
 - All type-checks pass cleanly (zero errors)
 - Commit: 8e4d603
+
+## Session 2026-03-07 - Feature #356
+
+### Feature #356: DAIshboard graceful degradation bij gedeeltelijke data - PASSING
+- Added null/undefined guards throughout condenseDashboardData for ALL fields:
+  - Core fields: netWorth, totalAssets, totalDebts, monthlyIncome, monthlyExpenses, freedomPct, fireTarget, sovereigntyLevel, monthsCovered
+  - fireProjResult?.fireAge with optional chaining
+  - budgetTotals with full fallback object (income/expense/savings/debt buckets)
+  - Arrays: netWorthHistory, favoriteBudgets, topOpenActions, topGoals
+  - Counts: openActions, totalFreedomDaysOpen, completedActionsThisMonth, recommendations, recurringTransactions, lifeEvents, goals
+- Fixed hashDashboardData in daishboard.tsx to guard budgetTotals and all numeric fields
+- Fixed buildSnapshot call to use ?? defaults for all 5 parameters
+- Fixed updateLongTermMemory to guard monthlyIncome, monthlyExpenses, netWorth, freedomPct
+- Fixed updateSeasonalSnapshot call to use ?? 0 defaults
+- Fixed computeBudgetDisciplineScore in trends.ts to early-return if budgetTotals missing
+- Fixed detectRepeatedBudgetOverrun in pattern-detection.ts to early-return if budgetTotals missing
+- All existing null checks for emergencyFund, monthSummary, streaks, notifications, badgeSummary, topRecurringTransactions, topRecommendations, topLifeEvents were already correct
+- Zero TypeScript errors
+- Commit: afd9fb8
+
+### Current Status
+- 1 feature completed this session (#356)
