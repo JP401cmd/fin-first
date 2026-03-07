@@ -631,6 +631,28 @@ body {
   }
 }
 
+/* ── Onboarding step transition animations ─────────────── */
+@keyframes step-slide-from-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes step-slide-from-left {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.step-enter-forward {
+  animation: step-slide-from-right 250ms ease-out both;
+}
+.step-enter-back {
+  animation: step-slide-from-left 250ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .step-enter-forward,
+  .step-enter-back {
+    animation: none !important;
+  }
+}
+
 /* ── Print styles (PDF export) ──────────────────────────── */
 @media print {
   @page {

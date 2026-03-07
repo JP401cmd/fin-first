@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useReducer, useCallback, useRef } from 'react'
+import { useState, useEffect, useReducer, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { FinnAvatar } from '@/components/app/avatars'
