@@ -1,4 +1,3 @@
-import { LockedWidgetShell } from './widget-shell'
 import { NettoVermogenWidget } from './netto-vermogen-widget'
 import { CashFlowWidget } from './cash-flow-widget'
 import { BudgettenWidget } from './budgetten-widget'
@@ -286,16 +285,7 @@ export function WidgetRenderer({ id, size, data }: WidgetRendererProps) {
   const minLevel = WIDGET_MIN_LEVEL[id] ?? -2
   const isLocked = data.sovereigntyLevel < minLevel
 
-  if (isLocked) {
-    return (
-      <LockedWidgetShell
-        module={def.module}
-        size={size}
-        name={def.name}
-        requiredPhase={def.requiredPhase ?? 'Stability'}
-      />
-    )
-  }
+  if (isLocked) return null
 
   const href = WIDGET_HREFS[id]
 

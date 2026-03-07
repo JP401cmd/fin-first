@@ -36,6 +36,7 @@ export const FEATURES: FeatureDef[] = [
   { id: 'widget_vrijheidsmijlpalen', label: 'Vrijheidsmijlpalen Widget', description: 'Voortgang naar de 4 vrijheidsmijlpalen met datums widget' },
   { id: 'widget_voorstellen', label: 'Voorstellen Widget',    description: 'Persoonlijke aanbevelingen widget op dashboard' },
   { id: 'widget_vrijheidsscenarios', label: "Vrijheidsscenario's Widget", description: 'Pessimistisch/verwacht/optimistisch FIRE-leeftijd widget' },
+  { id: 'widget_sim_vermogenspad', label: 'Vermogenspad Widget', description: 'Gesimuleerd vermogenspad naar FIRE widget' },
   { id: 'box3_belasting',       label: 'Box 3 Belasting',        description: 'Vermogensbelasting berekening' },
   { id: 'budget_optimalisatie', label: 'Budget Optimalisatie',    description: 'Slimmer omgaan met uitgaven' },
   { id: 'schulden_aflosplan',   label: 'Schulden Aflosplan',     description: 'Strategisch schulden aflossen' },
@@ -153,5 +154,7 @@ export const DEFAULT_MATRIX: FeaturePhaseMatrix = {
   widget_vrijheidsmijlpalen: { recovery: true,  stability: true,  momentum: true,  mastery: true },
   widget_backtesting_score:  { recovery: false, stability: false, momentum: true,  mastery: true },
   widget_voorstellen:        { recovery: false, stability: true,  momentum: true,  mastery: true },
+  widget_vrijheidsscenarios: { recovery: false, stability: true,  momentum: true,  mastery: true },
+  widget_sim_vermogenspad:   { recovery: false, stability: true,  momentum: true,  mastery: true },
   widget_ai_inzicht:         { recovery: true,  stability: true,  momentum: true,  mastery: true },
 }
