@@ -3,6 +3,7 @@
 import { useCallback } from 'react'
 import { Compass, ArrowRight } from 'lucide-react'
 import { BriefingCard } from '../briefing-card'
+import { markFeatureVisitedLocal } from '@/components/app/discover-carousel'
 import type { DiscoverCardSpec } from '@/lib/briefing/types'
 
 const MODULE_BADGE: Record<string, string> = {
@@ -28,14 +29,27 @@ export function DiscoverCard({ spec }: Props) {
   const borderClass = MODULE_BORDER[spec.module] ?? MODULE_BORDER.cross
 
   const trackVisit = useCallback(() => {
-    // Fire-and-forget: record the feature visit for tracking
-    fetch('/api/feature-visits', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ feature_slug: spec.featureId }),
-    }).catch(() => {
-      // Silent fail — visit tracking is non-critical
-    })
+    const payload = JSON.stringify({ feature_slug: spec.featureId })
+
+    // Update localStorage immediately so next briefing excludes this feature
+    markFeatureVisitedLocal(spec.featureId)
+
+    // Use sendBeacon for reliable delivery during navigation (won't be cancelled)
+    if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+      navigator.sendBeacon(
+        '/api/feature-visits',
+        new Blob([payload], { type: 'application/json' }),
+      )
+    } else {
+      // Fallback: fire-and-forget fetch
+      fetch('/api/feature-visits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+      }).catch(() => {
+        // Silent fail — visit tracking is non-critical
+      })
+    }
   }, [spec.featureId])
 
   return (

@@ -42,6 +42,7 @@ import type { ModuleColorConfig, ModuleName, BudgetColorConfig, PhaseColorConfig
 import { ColorPickerCard } from '@/components/app/color-picker-card'
 import { Palette, RotateCcw, Type } from 'lucide-react'
 import { useDashboardType } from '@/components/app/dashboard-type-provider'
+import { readBriefingContentPrefs, saveBriefingContentPrefs, type BriefingContentPrefs } from '@/lib/briefing/user-preferences'
 import { type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { type FireEndStrategy, STRATEGY_LABELS, parseFireStrategy } from '@/lib/fire-strategy'
 
@@ -231,6 +232,7 @@ export default function InstellingenPage() {
   const [widgetsSaving, setWidgetsSaving] = useState(false)
   const [widgetsMessage, setWidgetsMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [sovereigntyLevel, setSovereigntyLevel] = useState<number>(-2)
+  const [briefingContentPrefs, setBriefingContentPrefs] = useState<BriefingContentPrefs>({ showNextSteps: true, showDiscover: true })
 
   // ─ Section C: FIRE Instellingen ─
   const [expectedReturn, setExpectedReturn] = useState(7)
@@ -299,6 +301,9 @@ export default function InstellingenPage() {
         } catch { /* ignore */ }
       }
       setNotifLoading(false)
+
+      // Briefing content preferences (localStorage)
+      setBriefingContentPrefs(readBriefingContentPrefs())
 
       // FIRE parameters
       const d = profileData.data
@@ -438,6 +443,14 @@ export default function InstellingenPage() {
     await setDashboardType(type)
     setDashTypeSaving(false)
   }, [setDashboardType])
+
+  const toggleBriefingContentPref = useCallback((key: keyof BriefingContentPrefs) => {
+    setBriefingContentPrefs(prev => {
+      const updated = { ...prev, [key]: !prev[key] }
+      saveBriefingContentPrefs(updated)
+      return updated
+    })
+  }, [])
 
   const saveWidgets = useCallback(async () => {
     setWidgetsSaving(true)
@@ -738,9 +751,55 @@ export default function InstellingenPage() {
                 </button>
               </div>
               {dashboardType === 'briefing' && (
-                <p className="mt-2 text-xs text-[var(--ink-3)]">
-                  Widget-instellingen hieronder gelden alleen voor het widgets-dashboard.
-                </p>
+                <div className="mt-3 space-y-3">
+                  <p className="text-xs text-[var(--ink-3)]">
+                    Widget-instellingen hieronder gelden alleen voor het widgets-dashboard.
+                  </p>
+
+                  <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3 space-y-3">
+                    <p className="text-xs font-medium text-[var(--ink-2)]">Briefing-inhoud</p>
+
+                    <label className="flex items-center justify-between gap-3 min-h-[44px] cursor-pointer">
+                      <div>
+                        <span className="text-sm text-[var(--ink)]">Volgende stappen tonen</span>
+                        <p className="text-xs text-[var(--ink-3)]">Will toont relevante volgende stappen in je DAIshboard</p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={briefingContentPrefs.showNextSteps}
+                        onClick={() => toggleBriefingContentPref('showNextSteps')}
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                          briefingContentPrefs.showNextSteps ? 'bg-[var(--ink)]' : 'bg-[var(--border-md)]'
+                        }`}
+                      >
+                        <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                          briefingContentPrefs.showNextSteps ? 'translate-x-6' : 'translate-x-1'
+                        }`} />
+                      </button>
+                    </label>
+
+                    <label className="flex items-center justify-between gap-3 min-h-[44px] cursor-pointer">
+                      <div>
+                        <span className="text-sm text-[var(--ink)]">Ontdek-suggesties tonen</span>
+                        <p className="text-xs text-[var(--ink-3)]">Will toont tips over features die je nog niet hebt ontdekt</p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={briefingContentPrefs.showDiscover}
+                        onClick={() => toggleBriefingContentPref('showDiscover')}
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                          briefingContentPrefs.showDiscover ? 'bg-[var(--ink)]' : 'bg-[var(--border-md)]'
+                        }`}
+                      >
+                        <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                          briefingContentPrefs.showDiscover ? 'translate-x-6' : 'translate-x-1'
+                        }`} />
+                      </button>
+                    </label>
+                  </div>
+                </div>
               )}
             </div>
 

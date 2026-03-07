@@ -6,8 +6,37 @@ import { getEngagementSummary, getModuleEngagementSummary } from './engagement'
 
 const FEEDBACK_KEY = 'briefing_feedback_history'
 const VISITS_KEY = 'briefing_visits'
+const BRIEFING_PREFS_KEY = 'briefing_content_prefs'
 const MAX_VISITS = 30
 const MIN_DATA_POINTS = 10
+
+export interface BriefingContentPrefs {
+  showNextSteps: boolean
+  showDiscover: boolean
+}
+
+const DEFAULT_BRIEFING_CONTENT_PREFS: BriefingContentPrefs = {
+  showNextSteps: true,
+  showDiscover: true,
+}
+
+/** Read briefing content preferences from localStorage */
+export function readBriefingContentPrefs(): BriefingContentPrefs {
+  try {
+    const raw = localStorage.getItem(BRIEFING_PREFS_KEY)
+    if (!raw) return { ...DEFAULT_BRIEFING_CONTENT_PREFS }
+    return { ...DEFAULT_BRIEFING_CONTENT_PREFS, ...JSON.parse(raw) }
+  } catch {
+    return { ...DEFAULT_BRIEFING_CONTENT_PREFS }
+  }
+}
+
+/** Save briefing content preferences to localStorage */
+export function saveBriefingContentPrefs(prefs: BriefingContentPrefs): void {
+  try {
+    localStorage.setItem(BRIEFING_PREFS_KEY, JSON.stringify(prefs))
+  } catch { /* quota / SSR */ }
+}
 
 export type BriefingFrequency = 'daily' | 'weekly' | 'monthly' | 'rare'
 
@@ -208,6 +237,17 @@ export function buildUserPreferenceBlock(): string | null {
       lines.push(`Module-voorkeur: ${parts.join(', ')}. Stem je card-mix hierop af.`)
       hasContent = true
     }
+  }
+
+  // Briefing content preferences (next steps / discover toggles)
+  const contentPrefs = readBriefingContentPrefs()
+  if (!contentPrefs.showNextSteps) {
+    lines.push('Gebruiker heeft "Volgende stappen" uitgeschakeld. Gebruik GEEN showNextStep cards.')
+    hasContent = true
+  }
+  if (!contentPrefs.showDiscover) {
+    lines.push('Gebruiker heeft "Ontdek-suggesties" uitgeschakeld. Gebruik GEEN showDiscover cards.')
+    hasContent = true
   }
 
   if (!hasContent) {

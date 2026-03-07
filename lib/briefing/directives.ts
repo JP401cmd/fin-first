@@ -162,6 +162,22 @@ export const DIRECTIVE_METRICS: DirectiveMetric[] = [
       { id: 'increased', label: 'Gestegen' },
     ],
   },
+  {
+    id: 'next_steps',
+    label: 'Volgende stappen',
+    conditions: [
+      { id: 'available', label: 'Stappen beschikbaar' },
+      { id: 'all_done', label: 'Alles afgerond' },
+    ],
+  },
+  {
+    id: 'discover',
+    label: 'Ontdekbare features',
+    conditions: [
+      { id: 'unvisited_features', label: 'Onontdekte features' },
+      { id: 'all_visited', label: 'Alles ontdekt' },
+    ],
+  },
 ]
 
 /** Resolve human-readable labels for a metric + condition combo. */
@@ -245,6 +261,19 @@ export function extractMetricsFromSummary(dataSummary: string): Record<string, s
     metrics.monthlyIncome = parseFloat(incomeMatch[1].replace(/\./g, '').replace(',', '.'))
   }
 
+  // Next steps count
+  const stepsMatch = dataSummary.match(/VOLGENDE STAPPEN: (\d+) kern, (\d+) wil, (\d+) horizon/)
+  if (stepsMatch) {
+    metrics.nextStepsTotal = parseInt(stepsMatch[1]) + parseInt(stepsMatch[2]) + parseInt(stepsMatch[3])
+  }
+
+  // Discoverable features
+  const discoverMatch = dataSummary.match(/ONTDEKBARE FEATURES: (\d+) van (\d+) onontdekt/)
+  if (discoverMatch) {
+    metrics.unvisitedFeatures = parseInt(discoverMatch[1])
+    metrics.totalDiscoverFeatures = parseInt(discoverMatch[2])
+  }
+
   return metrics
 }
 
@@ -325,6 +354,20 @@ export function evaluateFunctionalDirective(
       if (condition === 'stable') return income > 0
       if (condition === 'variable') return false // Would need history
       if (condition === 'increased') return false // Would need history
+      return false
+    }
+    case 'next_steps': {
+      const total = metrics.nextStepsTotal as number | undefined
+      if (total == null) return false
+      if (condition === 'available') return total > 0
+      if (condition === 'all_done') return total === 0
+      return false
+    }
+    case 'discover': {
+      const unvisited = metrics.unvisitedFeatures as number | undefined
+      if (unvisited == null) return false
+      if (condition === 'unvisited_features') return unvisited > 0
+      if (condition === 'all_visited') return unvisited === 0
       return false
     }
     default:
@@ -445,6 +488,33 @@ export function getDefaultFunctionalDirectives(): FunctionalDirective[] {
       condition: 'spike',
       instruction: 'Waarschuw voor ongebruikelijk hoge uitgaven, maar wees niet veroordelend. Bied context en vergelijking.',
       priority: 'normal',
+      enabled: true,
+    },
+    {
+      id: crypto.randomUUID(),
+      title: 'Volgende stappen beschikbaar',
+      metric: 'next_steps',
+      condition: 'available',
+      instruction: 'Toon de meest relevante volgende stap via showNextStep. Kies de stap die het beste past bij de huidige financiële situatie. Max 2 per briefing.',
+      priority: 'normal',
+      enabled: true,
+    },
+    {
+      id: crypto.randomUUID(),
+      title: 'Alle stappen afgerond',
+      metric: 'next_steps',
+      condition: 'all_done',
+      instruction: 'Feliciteer de gebruiker — alle volgende stappen zijn afgerond. Geen showNextStep nodig.',
+      priority: 'low',
+      enabled: true,
+    },
+    {
+      id: crypto.randomUUID(),
+      title: 'Onontdekte features',
+      metric: 'discover',
+      condition: 'unvisited_features',
+      instruction: 'Toon max 1 ontdek-suggestie via showDiscover. Kies een feature die past bij de gebruikersfase en huidige behoeften.',
+      priority: 'low',
       enabled: true,
     },
   ]
