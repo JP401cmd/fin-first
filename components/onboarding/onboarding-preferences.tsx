@@ -139,39 +139,53 @@ const CATEGORY_WIDGETS: Record<DashboardCategory, string[]> = {
   voortgang: ['jouw_pad', 'badges', 'streaks'],
 }
 
+const MAX_ONBOARDING_WIDGETS = 8
+
+const BASELINE_WIDGETS = ['netto_vermogen', 'cash_flow', 'jouw_pad', 'vrijheidsvoortgang'] as const
+
 export function buildWidgetPrefsFromPreferences(prefs: PreferencesData): WidgetPrefs {
-  const enabledSet = new Set<string>()
+  // Collect widgets in priority order (baseline → goal → activity → module → AI → category)
+  // Each widget is added once; duplicates are skipped via the seen set.
+  const ordered: string[] = []
+  const seen = new Set<string>()
 
-  // Always-on baseline widgets
-  enabledSet.add('netto_vermogen')
-  enabledSet.add('cash_flow')
-  enabledSet.add('jouw_pad')
-  enabledSet.add('vrijheidsvoortgang')
+  function add(id: string) {
+    if (!seen.has(id)) {
+      seen.add(id)
+      ordered.push(id)
+    }
+  }
 
-  // Goal-driven widgets
+  // 1. Always-on baseline widgets (always kept)
+  for (const id of BASELINE_WIDGETS) add(id)
+
+  // 2. Goal-driven widgets
   if (prefs.mainGoal) {
-    for (const id of GOAL_WIDGETS[prefs.mainGoal]) enabledSet.add(id)
+    for (const id of GOAL_WIDGETS[prefs.mainGoal]) add(id)
   }
 
-  // Activity-driven widgets
+  // 3. Activity-driven widgets
   if (prefs.activityLevel) {
-    for (const id of ACTIVITY_WIDGETS[prefs.activityLevel]) enabledSet.add(id)
+    for (const id of ACTIVITY_WIDGETS[prefs.activityLevel]) add(id)
   }
 
-  // Module-driven widgets
+  // 4. Module-driven widgets
   for (const mod of prefs.modules) {
-    for (const id of MODULE_WIDGETS[mod]) enabledSet.add(id)
+    for (const id of MODULE_WIDGETS[mod]) add(id)
   }
 
-  // AI insights
+  // 5. AI insights
   if (prefs.aiInsights) {
-    enabledSet.add('ai_inzicht')
+    add('ai_inzicht')
   }
 
-  // Dashboard categories
+  // 6. Dashboard category widgets
   for (const cat of prefs.dashboardCategories) {
-    for (const id of CATEGORY_WIDGETS[cat]) enabledSet.add(id)
+    for (const id of CATEGORY_WIDGETS[cat]) add(id)
   }
+
+  // Cap at MAX_ONBOARDING_WIDGETS — keep first N by priority order
+  const enabledSet = new Set(ordered.slice(0, MAX_ONBOARDING_WIDGETS))
 
   // Build ordered widget prefs from catalog
   // Enabled widgets first (in catalog order), disabled widgets after
@@ -221,22 +235,22 @@ function SelectCard<T extends string>({
       className={`group w-full min-h-[48px] rounded-xl border-2 p-4 text-left transition-all active:scale-[0.99] ${
         selected
           ? 'border-wil-500 bg-wil-50/60 shadow-sm'
-          : 'border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-md'
+          : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)] hover:shadow-md'
       }`}
     >
       <div className="flex items-center gap-3">
         <div
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors ${
-            selected ? 'bg-wil-100' : 'bg-zinc-100 group-hover:bg-zinc-200'
+            selected ? 'bg-wil-100' : 'bg-[var(--subtle)] group-hover:bg-[var(--border-ed)]'
           }`}
         >
-          <Icon className={`h-5 w-5 ${selected ? 'text-wil-600' : 'text-zinc-500'}`} />
+          <Icon className={`h-5 w-5 ${selected ? 'text-wil-600' : 'text-[var(--ink-3)]'}`} />
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className={`text-sm font-semibold ${selected ? 'text-wil-900' : 'text-zinc-900'}`}>
+          <h3 className={`text-sm font-semibold ${selected ? 'text-wil-900' : 'text-[var(--ink)]'}`}>
             {option.label}
           </h3>
-          <p className="mt-0.5 text-xs text-zinc-500">{option.description}</p>
+          <p className="mt-0.5 text-xs text-[var(--ink-3)]">{option.description}</p>
         </div>
         {selected && (
           <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-wil-500">
@@ -267,26 +281,26 @@ function MultiSelectCard<T extends string>({
       className={`group w-full min-h-[48px] rounded-xl border-2 p-4 text-left transition-all active:scale-[0.99] ${
         selected
           ? 'border-wil-500 bg-wil-50/60 shadow-sm'
-          : 'border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-md'
+          : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)] hover:shadow-md'
       }`}
     >
       <div className="flex items-center gap-3">
         <div
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors ${
-            selected ? 'bg-wil-100' : 'bg-zinc-100 group-hover:bg-zinc-200'
+            selected ? 'bg-wil-100' : 'bg-[var(--subtle)] group-hover:bg-[var(--border-ed)]'
           }`}
         >
-          <Icon className={`h-5 w-5 ${selected ? 'text-wil-600' : 'text-zinc-500'}`} />
+          <Icon className={`h-5 w-5 ${selected ? 'text-wil-600' : 'text-[var(--ink-3)]'}`} />
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className={`text-sm font-semibold ${selected ? 'text-wil-900' : 'text-zinc-900'}`}>
+          <h3 className={`text-sm font-semibold ${selected ? 'text-wil-900' : 'text-[var(--ink)]'}`}>
             {option.label}
           </h3>
-          <p className="mt-0.5 text-xs text-zinc-500">{option.description}</p>
+          <p className="mt-0.5 text-xs text-[var(--ink-3)]">{option.description}</p>
         </div>
         <div
           className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-            selected ? 'border-wil-500 bg-wil-500' : 'border-zinc-300'
+            selected ? 'border-wil-500 bg-wil-500' : 'border-[var(--border-ed)]'
           }`}
         >
           {selected && <Check className="h-3.5 w-3.5 text-white" />}
@@ -350,7 +364,7 @@ export function OnboardingPreferences({
     <div className="pb-20 sm:pb-0">
       <button
         onClick={handleBack}
-        className="mb-6 flex min-h-[44px] items-center gap-1 text-sm text-zinc-500 hover:text-zinc-900 active:text-zinc-900 transition-colors"
+        className="mb-6 flex min-h-[44px] items-center gap-1 text-sm text-[var(--ink-3)] hover:text-[var(--ink)] active:text-[var(--ink)] transition-colors"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -372,7 +386,7 @@ export function OnboardingPreferences({
                 ? 'w-6 bg-wil-500'
                 : i < questionIndex
                   ? 'w-2 bg-wil-300'
-                  : 'w-2 bg-zinc-200'
+                  : 'w-2 bg-[var(--border-ed)]'
             }`}
           />
         ))}
@@ -384,7 +398,7 @@ export function OnboardingPreferences({
         <SpeechBubble>
           {SPEECH_BUBBLES[questionIndex]}
           {questionIndex === 0 && (
-            <span className="mt-1 block text-xs text-zinc-400">
+            <span className="mt-1 block text-xs text-[var(--ink-4)]">
               Je kunt dit ook later aanpassen in Instellingen.
             </span>
           )}
@@ -396,7 +410,7 @@ export function OnboardingPreferences({
         <button
           type="button"
           onClick={handleSkipDefaults}
-          className="mb-4 w-full text-center text-sm text-zinc-400 underline underline-offset-2 transition-colors hover:text-zinc-600"
+          className="mb-4 w-full text-center text-sm text-[var(--ink-4)] underline underline-offset-2 transition-colors hover:text-zinc-600"
         >
           Standaard instellingen gebruiken
         </button>
@@ -405,7 +419,7 @@ export function OnboardingPreferences({
       {/* Question 1: Hoofddoel */}
       {questionIndex === 0 && (
         <div className="space-y-3">
-          <h2 className="mb-4 text-lg font-bold text-zinc-900">Wat is je hoofddoel?</h2>
+          <h2 className="mb-4 text-lg font-bold text-[var(--ink)]">Wat is je hoofddoel?</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {GOAL_OPTIONS.map((opt) => (
               <SelectCard
@@ -422,7 +436,7 @@ export function OnboardingPreferences({
       {/* Question 2: Activiteit */}
       {questionIndex === 1 && (
         <div className="space-y-3">
-          <h2 className="mb-4 text-lg font-bold text-zinc-900">Hoe actief wil je bezig zijn?</h2>
+          <h2 className="mb-4 text-lg font-bold text-[var(--ink)]">Hoe actief wil je bezig zijn?</h2>
           <div className="grid grid-cols-1 gap-3">
             {ACTIVITY_OPTIONS.map((opt) => (
               <SelectCard
@@ -439,7 +453,7 @@ export function OnboardingPreferences({
       {/* Question 3: Modules (multi-select) */}
       {questionIndex === 2 && (
         <div className="space-y-3">
-          <h2 className="mb-4 text-lg font-bold text-zinc-900">Welke modules interesseren je?</h2>
+          <h2 className="mb-4 text-lg font-bold text-[var(--ink)]">Welke modules interesseren je?</h2>
           <div className="grid grid-cols-1 gap-3">
             {MODULE_OPTIONS.map((opt) => (
               <MultiSelectCard
@@ -461,7 +475,7 @@ export function OnboardingPreferences({
       {/* Question 4: AI inzichten */}
       {questionIndex === 3 && (
         <div className="space-y-3">
-          <h2 className="mb-4 text-lg font-bold text-zinc-900">Wil je AI-inzichten?</h2>
+          <h2 className="mb-4 text-lg font-bold text-[var(--ink)]">Wil je AI-inzichten?</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {AI_OPTIONS.map((opt) => (
               <SelectCard
@@ -481,7 +495,7 @@ export function OnboardingPreferences({
       {/* Question 5: Dashboard categorieën (multi-select) */}
       {questionIndex === 4 && (
         <div className="space-y-3">
-          <h2 className="mb-4 text-lg font-bold text-zinc-900">Wat wil je op je dashboard?</h2>
+          <h2 className="mb-4 text-lg font-bold text-[var(--ink)]">Wat wil je op je dashboard?</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {DASHBOARD_OPTIONS.map((opt) => (
               <MultiSelectCard
@@ -497,6 +511,9 @@ export function OnboardingPreferences({
               />
             ))}
           </div>
+          <p className="mt-3 text-xs text-[var(--ink-4)]">
+            Je dashboard start met maximaal 8 widgets. Je kunt er later meer aanzetten in je instellingen.
+          </p>
         </div>
       )}
 
@@ -504,7 +521,7 @@ export function OnboardingPreferences({
       <div className="fixed bottom-0 left-0 right-0 z-10 flex gap-3 border-t border-zinc-200 bg-white/80 px-4 pb-[env(safe-area-inset-bottom,12px)] pt-3 backdrop-blur-sm sm:static sm:mt-6 sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
         <button
           onClick={handleBack}
-          className="flex-1 min-h-[44px] rounded-lg border border-zinc-300 px-4 py-3 text-sm font-medium text-zinc-600 hover:bg-zinc-50 active:bg-zinc-100"
+          className="flex-1 min-h-[44px] rounded-lg border border-[var(--border-ed)] px-4 py-3 text-sm font-medium text-zinc-600 hover:bg-zinc-50 active:bg-zinc-100"
         >
           Terug
         </button>

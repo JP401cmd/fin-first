@@ -40,7 +40,9 @@ export function OnboardingSuccess({ onDashboard }: { onDashboard: () => void }) 
         <FinnAvatar size={80} />
       </div>
 
-      <h2 className="text-2xl font-bold text-zinc-900">Welkom bij TriFinity!</h2>
+      <span className="font-playfair text-2xl font-bold text-[var(--ink)]">t<span className="text-kern-600">f.</span></span>
+      <h2 className="mt-2 text-2xl font-bold text-zinc-900">Welkom</h2>
+      <p className="mt-1 font-source-serif text-[13px] italic text-[var(--ink-3)]">&ldquo;Geld is opgeslagen tijd&rdquo;</p>
       <p className="mt-2 text-sm text-zinc-500">Drie perspectieven, een doel</p>
 
       {/* Will introduces the modules */}

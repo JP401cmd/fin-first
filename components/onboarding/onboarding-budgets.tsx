@@ -34,7 +34,7 @@ interface ProfileTemplate {
 const PROFILE_TEMPLATES: Omit<ProfileTemplate, 'icon'>[] = [
   { id: 'zuinig', name: 'Zuinig', description: 'Focus op lage kosten, bewust leven', vaste: 0.55, dagelijks: 0.20, leuk: 0.10, sparen: 0.15 },
   { id: 'gebalanceerd', name: 'Gebalanceerd', description: 'Evenwicht tussen genieten en sparen', vaste: 0.45, dagelijks: 0.20, leuk: 0.15, sparen: 0.20 },
-  { id: 'fire', name: 'FIRE-gericht', description: 'Maximaal sparen voor financiele vrijheid', vaste: 0.40, dagelijks: 0.15, leuk: 0.10, sparen: 0.35 },
+  { id: 'fire', name: 'Vrijheidsgericht', description: 'Maximaal sparen voor financiële vrijheid', vaste: 0.40, dagelijks: 0.15, leuk: 0.10, sparen: 0.35 },
 ]
 
 const TEMPLATE_ICONS: Record<ProfileTemplateId, React.ComponentType<LucideProps>> = {
@@ -169,7 +169,7 @@ export function OnboardingBudgets({
     <div className="pb-20 sm:pb-0">
       <button
         onClick={onBack}
-        className="mb-6 flex min-h-[44px] items-center gap-1 text-sm text-zinc-500 hover:text-zinc-900 active:text-zinc-900 transition-colors"
+        className="mb-6 flex min-h-[44px] items-center gap-1 text-sm text-[var(--ink-3)] hover:text-[var(--ink)] active:text-[var(--ink)] transition-colors"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -183,7 +183,7 @@ export function OnboardingBudgets({
 
       <div className="mb-6 flex items-start gap-3">
         <div className="shrink-0"><FinnAvatar size={48} /></div>
-        <SpeechBubble>Budgetteren helpt je bewust te kiezen. Maar het is niet verplicht.</SpeechBubble>
+        <SpeechBubble>Een budget vertaalt je inkomen naar bewuste keuzes. Elke euro die je bespaart is opgeslagen vrijheidstijd &mdash; tijd die je later kunt besteden aan wat jij écht belangrijk vindt. Maar het is niet verplicht: jij bepaalt het tempo.</SpeechBubble>
       </div>
 
       {/* Budget choice: skip, template, or manual */}
@@ -192,15 +192,15 @@ export function OnboardingBudgets({
           <button
             onClick={onNext}
             disabled={saving}
-            className="group w-full min-h-[60px] rounded-xl border-2 border-zinc-200 bg-white p-4 sm:p-5 text-left transition-all hover:border-zinc-300 hover:shadow-md active:scale-[0.99]"
+            className="group w-full min-h-[60px] rounded-xl border-2 border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 text-left transition-all hover:border-[var(--border-md)] hover:shadow-md active:scale-[0.99]"
           >
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-100 group-hover:bg-zinc-200">
-                <Hand className="h-5 w-5 text-zinc-500" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] group-hover:bg-[var(--border-ed)]">
+                <Hand className="h-5 w-5 text-[var(--ink-3)]" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-zinc-900">Nee, niet nu</h3>
-                <p className="mt-0.5 text-xs text-zinc-500">
+                <h3 className="text-sm font-semibold text-[var(--ink)]">Nee, niet nu</h3>
+                <p className="mt-0.5 text-xs text-[var(--ink-3)]">
                   Default budgetten worden op de achtergrond aangemaakt
                 </p>
               </div>
@@ -209,15 +209,15 @@ export function OnboardingBudgets({
 
           <button
             onClick={() => setSubChoice('template')}
-            className="group w-full min-h-[60px] rounded-xl border-2 border-zinc-200 bg-white p-4 sm:p-5 text-left transition-all hover:border-kern-300 hover:shadow-md active:scale-[0.99] active:border-kern-400"
+            className="group w-full min-h-[60px] rounded-xl border-2 border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 text-left transition-all hover:border-kern-300 hover:shadow-md active:scale-[0.99] active:border-kern-400"
           >
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-kern-50 group-hover:bg-kern-100">
                 <LayoutTemplate className="h-5 w-5 text-kern-600" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-zinc-900">Ja, met een template</h3>
-                <p className="mt-0.5 text-xs text-zinc-500">
+                <h3 className="text-sm font-semibold text-[var(--ink)]">Ja, met een template</h3>
+                <p className="mt-0.5 text-xs text-[var(--ink-3)]">
                   Kies een profiel dat bij je past
                 </p>
               </div>
@@ -226,15 +226,15 @@ export function OnboardingBudgets({
 
           <button
             onClick={() => setSubChoice('manual')}
-            className="group w-full min-h-[60px] rounded-xl border-2 border-zinc-200 bg-white p-4 sm:p-5 text-left transition-all hover:border-kern-300 hover:shadow-md active:scale-[0.99]"
+            className="group w-full min-h-[60px] rounded-xl border-2 border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 text-left transition-all hover:border-kern-300 hover:shadow-md active:scale-[0.99]"
           >
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-kern-50 group-hover:bg-kern-100">
                 <SlidersHorizontal className="h-5 w-5 text-kern-600" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-zinc-900">Ja, handmatig</h3>
-                <p className="mt-0.5 text-xs text-zinc-500">
+                <h3 className="text-sm font-semibold text-[var(--ink)]">Ja, handmatig</h3>
+                <p className="mt-0.5 text-xs text-[var(--ink-3)]">
                   Stel elk budget zelf in
                 </p>
               </div>
@@ -255,7 +255,7 @@ export function OnboardingBudgets({
               <button
                 key={template.id}
                 onClick={() => handleProfileTemplateSelect(template.id)}
-                className="group w-full rounded-xl border-2 border-zinc-200 bg-white p-4 text-left transition-all hover:border-kern-300 hover:shadow-md active:scale-[0.99]"
+                className="group w-full rounded-xl border-2 border-[var(--border-ed)] bg-[var(--paper)] p-4 text-left transition-all hover:border-kern-300 hover:shadow-md active:scale-[0.99]"
               >
                 <div className="flex items-start gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-kern-50 group-hover:bg-kern-100">
@@ -263,18 +263,18 @@ export function OnboardingBudgets({
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-zinc-900">{template.name}</h3>
-                      <svg className="ml-2 h-4 w-4 shrink-0 text-zinc-400 group-hover:text-kern-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <h3 className="text-sm font-semibold text-[var(--ink)]">{template.name}</h3>
+                      <svg className="ml-2 h-4 w-4 shrink-0 text-[var(--ink-4)] group-hover:text-kern-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                       </svg>
                     </div>
-                    <p className="mt-0.5 text-xs text-zinc-500">{template.description}</p>
+                    <p className="mt-0.5 text-xs text-[var(--ink-3)]">{template.description}</p>
                     {/* Category breakdown */}
                     <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
                       {template.breakdown.map((cat) => (
                         <div key={cat.label} className="flex items-center justify-between">
-                          <span className="text-[11px] text-zinc-500">{cat.label}</span>
-                          <span className="font-mono text-[11px] tabular-nums text-zinc-700">
+                          <span className="text-[11px] text-[var(--ink-3)]">{cat.label}</span>
+                          <span className="font-mono text-[11px] tabular-nums text-[var(--ink-2)]">
                             {formatCurrency(cat.amount)}
                           </span>
                         </div>
@@ -310,7 +310,7 @@ export function OnboardingBudgets({
           })}
           <button
             onClick={() => setSubChoice(null)}
-            className="w-full min-h-[44px] rounded-lg border border-[var(--border-md)] px-4 py-2.5 text-sm font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)] active:bg-zinc-100"
+            className="w-full min-h-[44px] rounded-lg border border-[var(--border-md)] px-4 py-2.5 text-sm font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)] active:bg-[var(--subtle)]"
           >
             Terug
           </button>
@@ -333,10 +333,10 @@ export function OnboardingBudgets({
           />
 
           {/* Sticky nav on mobile */}
-          <div className="fixed bottom-0 left-0 right-0 z-10 flex gap-3 border-t border-zinc-200 bg-white/80 px-4 pb-[env(safe-area-inset-bottom,12px)] pt-3 backdrop-blur-sm sm:static sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
+          <div className="fixed bottom-0 left-0 right-0 z-10 flex gap-3 border-t border-[var(--border-ed)] bg-[var(--paper)]/80 px-4 pb-[env(safe-area-inset-bottom,12px)] pt-3 backdrop-blur-sm sm:static sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
             <button
               onClick={() => setSubChoice(null)}
-              className="flex-1 min-h-[44px] rounded-lg border border-zinc-300 px-4 py-3 text-sm font-medium text-zinc-600 hover:bg-zinc-50 active:bg-zinc-100"
+              className="flex-1 min-h-[44px] rounded-lg border border-[var(--border-ed)] px-4 py-3 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] active:bg-[var(--subtle)]"
             >
               Terug
             </button>

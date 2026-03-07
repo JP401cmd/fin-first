@@ -1,13 +1,12 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
-import { User, Users, Baby, Info } from 'lucide-react'
+import { User, Users, Baby } from 'lucide-react'
 import { FinnAvatar } from '@/components/app/avatars'
 import { SpeechBubble } from './speech-bubble'
 import { StepProgress } from './step-progress'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
-import { BOX3_DRAG } from '@/lib/constants'
 
 type HouseholdType = 'solo' | 'samen' | 'gezin'
 
@@ -140,10 +139,6 @@ const FIRE_STRATEGIES: { value: FireEndStrategy; label: string; desc: string }[]
   { value: 'deplete', label: 'Opteren', desc: 'Vermogen wordt volledig opgemaakt' },
 ]
 
-function formatPct(value: number): string {
-  return `${(value * 100).toFixed(1)}%`
-}
-
 export function OnboardingIdentity({
   data,
   onChange,
@@ -168,8 +163,6 @@ export function OnboardingIdentity({
     showError(field)
       ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
       : 'border-[var(--border-ed)] focus:border-[var(--border-md)] focus:ring-[var(--border-md)]'
-
-  const effectiveSwr = Math.max(0.001, data.expected_return - BOX3_DRAG - data.inflation_rate)
 
   // After first submit, disable button while errors exist
   const disableNext = submitted && !isValid
@@ -374,82 +367,6 @@ export function OnboardingIdentity({
         <div className="flex items-center gap-2">
           <h3 className="font-display text-sm font-semibold tracking-[-0.02em] text-[var(--ink)]">Vrijheidsberekening</h3>
           <span className="rounded-full bg-[var(--subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink-3)]">optioneel</span>
-        </div>
-
-        {/* Expected return slider: 3-12%, step 0.5%, default 7% */}
-        <div>
-          <div className="mb-2 flex items-center gap-2">
-            <label htmlFor="ob-return" className="text-sm font-medium text-[var(--ink-2)]">Verwacht rendement</label>
-            <div className="group relative">
-              <Info className="h-3.5 w-3.5 text-[var(--ink-4)] cursor-help" />
-              <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 w-52 -translate-x-1/2 rounded-lg bg-zinc-800 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                Gemiddeld jaarlijks rendement op je beleggingen voor belasting en inflatie.
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <input
-              id="ob-return"
-              type="range"
-              min={0.03}
-              max={0.12}
-              step={0.005}
-              value={data.expected_return}
-              onChange={(e) => onChange({ ...data, expected_return: Number(e.target.value) })}
-              className="slider-touch min-w-0 flex-1"
-              style={{ background: `linear-gradient(to right, var(--color-wil-500) ${((data.expected_return - 0.03) / (0.12 - 0.03)) * 100}%, #e4e4e7 ${((data.expected_return - 0.03) / (0.12 - 0.03)) * 100}%)` }}
-            />
-            <span className="w-14 shrink-0 rounded-md bg-wil-50 px-2 py-1 text-center font-mono text-sm font-semibold tabular-nums text-wil-700">
-              {formatPct(data.expected_return)}
-            </span>
-          </div>
-          <div className="mt-1 flex justify-between text-[10px] text-[var(--ink-4)]">
-            <span>3%</span>
-            <span>12%</span>
-          </div>
-        </div>
-
-        {/* Inflation slider: 0-5%, step 0.5%, default 2% */}
-        <div>
-          <div className="mb-2 flex items-center gap-2">
-            <label htmlFor="ob-inflation" className="text-sm font-medium text-[var(--ink-2)]">Inflatie</label>
-            <div className="group relative">
-              <Info className="h-3.5 w-3.5 text-[var(--ink-4)] cursor-help" />
-              <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 w-52 -translate-x-1/2 rounded-lg bg-zinc-800 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                Verwachte jaarlijkse stijging van je levenskosten.
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <input
-              id="ob-inflation"
-              type="range"
-              min={0}
-              max={0.05}
-              step={0.005}
-              value={data.inflation_rate}
-              onChange={(e) => onChange({ ...data, inflation_rate: Number(e.target.value) })}
-              className="slider-touch slider-touch--neutral min-w-0 flex-1"
-              style={{ background: `linear-gradient(to right, #52525b ${((data.inflation_rate - 0) / (0.05 - 0)) * 100}%, #e4e4e7 ${((data.inflation_rate - 0) / (0.05 - 0)) * 100}%)` }}
-            />
-            <span className="w-14 shrink-0 rounded-md bg-[var(--subtle)] px-2 py-1 text-center font-mono text-sm font-semibold tabular-nums text-[var(--ink-2)]">
-              {formatPct(data.inflation_rate)}
-            </span>
-          </div>
-          <div className="mt-1 flex justify-between text-[10px] text-[var(--ink-4)]">
-            <span>0%</span>
-            <span>5%</span>
-          </div>
-        </div>
-
-        {/* Effective SWR info badge */}
-        <div className="flex items-center gap-2 rounded-lg border border-wil-200 bg-wil-50/50 px-3 py-2">
-          <Info className="h-4 w-4 shrink-0 text-wil-500" />
-          <p className="text-xs text-[var(--ink-2)]">
-            Wat je vermogen netto per jaar groeit:{' '}
-            <span className="font-mono font-semibold text-wil-700">{formatPct(effectiveSwr)}</span>
-            <span className="text-[var(--ink-4)]"> = rendement − belasting − inflatie</span>
-          </p>
         </div>
 
         {/* Retirement expense method — 3 choice cards */}

@@ -1,5 +1,5 @@
 const STEPS = [
-  { key: 'profiel', label: 'Profiel & FIRE', icon: '👤' },
+  { key: 'profiel', label: 'Profiel & Vrijheid', icon: '👤' },
   { key: 'startpunt', label: 'Startpunt', icon: '📍' },
   { key: 'budgetten', label: 'Budgetten', icon: '💰' },
   { key: 'voorkeuren', label: 'Voorkeuren', icon: '⚙️' },
@@ -15,7 +15,7 @@ export function StepProgress({ current }: { current: StepKey }) {
   return (
     <div className="w-full">
       {/* Progress bar */}
-      <div className="mb-4 h-1 w-full overflow-hidden rounded-full bg-zinc-200">
+      <div className="mb-4 h-1 w-full overflow-hidden rounded-full bg-[var(--border-ed)]">
         <div
           className="h-full rounded-full bg-gradient-to-r from-amber-400 via-teal-400 to-purple-500 transition-all duration-500"
           style={{ width: `${progressPct}%` }}
@@ -35,7 +35,7 @@ export function StepProgress({ current }: { current: StepKey }) {
                     ? 'bg-wil-500 text-white'
                     : isActive
                       ? 'border-2 border-wil-500 text-wil-600'
-                      : 'border border-zinc-300 text-zinc-400'
+                      : 'border border-[var(--border-ed)] text-[var(--ink-4)]'
                 }`}
               >
                 {isDone ? (
@@ -49,7 +49,7 @@ export function StepProgress({ current }: { current: StepKey }) {
               {/* Desktop: full label, Mobile: hidden */}
               <span
                 className={`hidden text-[10px] font-medium sm:block ${
-                  isActive ? 'text-wil-700' : isDone ? 'text-zinc-600' : 'text-zinc-400'
+                  isActive ? 'text-wil-700' : isDone ? 'text-[var(--ink-2)]' : 'text-[var(--ink-4)]'
                 }`}
               >
                 {step.label}

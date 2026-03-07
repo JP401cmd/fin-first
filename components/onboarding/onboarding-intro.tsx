@@ -10,10 +10,10 @@ export function OnboardingIntro({ onNext, onLogout }: { onNext: () => void; onLo
       </div>
 
       <SpeechBubbleCentered>
-        <p className="font-medium text-zinc-900">Hoi! Ik ben Will, je persoonlijke gids naar financiële vrijheid.</p>
+        <p className="font-medium text-[var(--ink)]">Hoi! Ik ben Will, je persoonlijke gids naar financiële vrijheid.</p>
         <p className="mt-2">
           Wist je dat elke euro die je verdient eigenlijk een stukje levenstijd vertegenwoordigt?
-          Bij TriFinity kijken we anders naar geld: geld is opgeslagen tijd. Tijd die je kunt
+          Hier kijken we anders naar geld: geld is opgeslagen tijd. Tijd die je kunt
           gebruiken om te doen wat jij écht belangrijk vindt.
         </p>
         <p className="mt-2">
@@ -30,7 +30,7 @@ export function OnboardingIntro({ onNext, onLogout }: { onNext: () => void; onLo
           </div>
           <div className="text-left">
             <p className="text-xs font-semibold text-amber-700">De Kern</p>
-            <p className="text-xs text-zinc-500">Je financiele fundament</p>
+            <p className="text-xs text-[var(--ink-3)]">Je financiele fundament</p>
           </div>
         </div>
         <div className="flex items-center gap-3 rounded-xl border border-wil-200 bg-wil-50/50 p-3">
@@ -39,7 +39,7 @@ export function OnboardingIntro({ onNext, onLogout }: { onNext: () => void; onLo
           </div>
           <div className="text-left">
             <p className="text-xs font-semibold text-wil-700">De Wil</p>
-            <p className="text-xs text-zinc-500">Bewuste keuzes maken</p>
+            <p className="text-xs text-[var(--ink-3)]">Bewuste keuzes maken</p>
           </div>
         </div>
         <div className="flex items-center gap-3 rounded-xl border border-horizon-200 bg-horizon-50/50 p-3">
@@ -48,7 +48,7 @@ export function OnboardingIntro({ onNext, onLogout }: { onNext: () => void; onLo
           </div>
           <div className="text-left">
             <p className="text-xs font-semibold text-horizon-700">De Horizon</p>
-            <p className="text-xs text-zinc-500">Je pad naar vrijheid</p>
+            <p className="text-xs text-[var(--ink-3)]">Je pad naar vrijheid</p>
           </div>
         </div>
       </div>
@@ -59,12 +59,12 @@ export function OnboardingIntro({ onNext, onLogout }: { onNext: () => void; onLo
       >
         Aan de slag
       </button>
-      <p className="mt-3 text-xs text-zinc-400">Dit duurt nog geen 2 minuten</p>
+      <p className="mt-3 text-xs text-[var(--ink-4)]">Dit duurt nog geen 2 minuten</p>
 
       {onLogout && (
         <button
           onClick={onLogout}
-          className="mt-6 text-xs text-zinc-400 transition-colors hover:text-zinc-600"
+          className="mt-6 text-xs text-[var(--ink-4)] transition-colors hover:text-[var(--ink-2)]"
         >
           Uitloggen
         </button>
