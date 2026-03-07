@@ -40,50 +40,39 @@ export function BadgesWidget({ size, data, href }: Props) {
     )
   }
 
-  // ── Half: verdiende badges grid + locked badges + 'Bijna' met progress bar ──
+  // ── Half: compact for 1-row 160px height ──
   if (size === 'half') {
     return (
       <WidgetShell module="cross" size={size} kicker="Badges" href={href}>
-        <div className="flex items-baseline gap-2">
-          <span className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
-            {earned}<span className="text-base text-[var(--ink-3)]">/{total}</span>
+        <div className="flex items-center gap-3 mb-1.5">
+          <span className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
+            {earned}<span className="text-sm text-[var(--ink-3)]">/{total}</span>
           </span>
+          <span className="text-xs text-[var(--ink-3)]">verdiend</span>
         </div>
 
         {/* Overall progress bar */}
-        <div className="mt-2 h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+        <div className="h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
           <div
             className="h-full rounded-full bg-amber-500 transition-all"
             style={{ width: `${Math.min(pct, 100)}%` }}
           />
         </div>
 
-        {/* Latest earned badge */}
+        {/* Latest earned badge — inline */}
         {latestBadge && (
-          <div className="mt-3 flex items-center gap-2">
-            <span className="text-lg">{latestBadge.icon}</span>
-            <div>
-              <p className="text-sm font-medium text-[var(--ink)]">{latestBadge.name}</p>
-              <p className="text-[10px] text-[var(--ink-4)]">
-                {new Date(latestBadge.earnedAt).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
-              </p>
-            </div>
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-base">{latestBadge.icon}</span>
+            <span className="text-xs text-[var(--ink-2)] truncate">{latestBadge.name}</span>
           </div>
         )}
 
-        {/* Near badge with progress bar */}
+        {/* Near badge — compact inline */}
         {nearestBadge && (
-          <div className="mt-3 rounded-md bg-[var(--subtle)] px-2.5 py-2">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-[var(--ink-3)]">Bijna: {nearestBadge.name}</span>
-              <span className="text-xs font-mono tabular-nums text-[var(--ink-3)]">{nearPct}%</span>
-            </div>
-            <div className="h-[3px] w-full overflow-hidden rounded-full bg-[var(--paper)]">
-              <div
-                className="h-full rounded-full bg-teal-400 transition-all"
-                style={{ width: `${Math.min(nearPct, 100)}%` }}
-              />
-            </div>
+          <div className="mt-1.5 flex items-center gap-2">
+            <span className="text-xs text-[var(--ink-3)] shrink-0">Bijna:</span>
+            <span className="text-xs text-[var(--ink-2)] truncate">{nearestBadge.name}</span>
+            <span className="shrink-0 text-xs font-mono tabular-nums text-[var(--ink-3)]">{nearPct}%</span>
           </div>
         )}
       </WidgetShell>

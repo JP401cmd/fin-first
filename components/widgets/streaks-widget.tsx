@@ -71,30 +71,26 @@ export function StreaksWidget({ size, data, href }: Props) {
     )
   }
 
-  // Half: 3 streak-meters side by side
+  // ── Half: compact 3 streak-meters for 1-row 160px height ──
   if (size === 'half') {
     return (
       <WidgetShell module="cross" size={size} kicker="Streaks" href={href}>
-        <div ref={ref} className="grid grid-cols-3 gap-3">
+        <div ref={ref} className="grid grid-cols-3 gap-2">
           {streaks.map(s => {
             const pct = s.longestCount > 0 ? Math.min(s.currentCount / s.longestCount, 1) : 0
             return (
-              <div key={s.type} className="flex flex-col items-center text-center gap-1">
+              <div key={s.type} className="flex flex-col items-center text-center gap-0.5">
                 <span className="text-sm leading-none">{fireEmoji(s.currentCount) || '\u{1F6AB}'}</span>
                 <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)] leading-tight">
                   {s.currentCount}
                 </p>
                 <p className="text-[10px] text-[var(--ink-3)]">{STREAK_LABELS[s.type] ?? s.type}</p>
-                {/* Mini bar */}
                 <div className="w-full h-1 rounded-full bg-[var(--subtle)] overflow-hidden">
                   <div
                     className="h-full rounded-full bg-amber-500 transition-all duration-500"
                     style={{ width: hasEntered ? `${pct * 100}%` : '0%' }}
                   />
                 </div>
-                <p className="text-[9px] text-[var(--ink-4)] font-mono tabular-nums">
-                  record: {s.longestCount}
-                </p>
               </div>
             )
           })}

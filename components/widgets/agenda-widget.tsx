@@ -78,23 +78,21 @@ export function AgendaWidget({ size, data, href }: Props) {
     )
   }
 
-  // ── Half: 7-day list with direction arrows ─────────────────
+  // ── Half: compact for 1-row 160px height ─────────────────
   if (size === 'half') {
     const now = new Date()
     const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
-    const weekEvents = upcomingEvents.filter(e => new Date(e.date) <= weekFromNow).slice(0, 5)
+    const weekEvents = upcomingEvents.filter(e => new Date(e.date) <= weekFromNow).slice(0, 3)
     const shown = weekEvents.length > 0 ? weekEvents : upcomingEvents.slice(0, 3)
 
     return (
       <WidgetShell module="kern" size={size} kicker="Agenda" href={href}>
-        <ul className="space-y-2">
+        <ul className="space-y-1.5">
           {shown.map(event => (
             <li key={event.id} className="flex items-center gap-2">
               <DirectionIcon direction={event.direction} />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-[var(--ink)] line-clamp-1">{event.name}</p>
-                <p className="text-[10px] text-[var(--ink-4)]">{relativeDate(event.date)}</p>
-              </div>
+              <span className="flex-1 min-w-0 text-sm text-[var(--ink)] truncate">{event.name}</span>
+              <span className="shrink-0 text-[10px] text-[var(--ink-4)]">{relativeDate(event.date)}</span>
               {event.amount != null && (
                 <span className={`shrink-0 font-mono text-xs tabular-nums ${DIR_COLORS[event.direction]}`}>
                   {event.direction === 'in' ? '+' : event.direction === 'out' ? '-' : ''}{formatCurrency(Math.abs(event.amount))}
@@ -104,7 +102,7 @@ export function AgendaWidget({ size, data, href }: Props) {
           ))}
         </ul>
         {upcomingEvents.length > shown.length && (
-          <p className="mt-2 text-[11px] text-[var(--ink-4)]">
+          <p className="mt-1 text-[11px] text-[var(--ink-4)]">
             +{upcomingEvents.length - shown.length} meer
           </p>
         )}

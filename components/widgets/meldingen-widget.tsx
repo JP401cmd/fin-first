@@ -71,15 +71,15 @@ export function MeldingenWidget({ size, data, href }: Props) {
     )
   }
 
-  // ── Half: top-5 meldingen als lijst met icoon + tekst + type-badge ──
+  // ── Half: compact for 1-row 160px height ──
   if (size === 'half') {
-    const shown = notifications.slice(0, 5)
+    const shown = notifications.slice(0, 3)
     return (
       <WidgetShell module="cross" size={size} kicker="Meldingen" href={href}>
-        <ul className="space-y-2">
+        <ul className="space-y-1.5">
           {shown.map(n => (
-            <li key={n.id} className="flex items-start gap-2 text-sm text-[var(--ink-2)]">
-              <span className="shrink-0">{TYPE_ICONS[n.type] ?? '\u2139\ufe0f'}</span>
+            <li key={n.id} className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
+              <span className="shrink-0 text-xs">{TYPE_ICONS[n.type] ?? '\u2139\ufe0f'}</span>
               <span className="flex-1 line-clamp-1">{n.message}</span>
               <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
                 n.severity === 'critical' ? 'bg-red-100 text-red-700' :
@@ -91,8 +91,8 @@ export function MeldingenWidget({ size, data, href }: Props) {
             </li>
           ))}
         </ul>
-        {count > 5 && (
-          <p className="mt-2 text-xs text-[var(--ink-4)]">+{count - 5} meer</p>
+        {count > 3 && (
+          <p className="mt-1 text-[11px] text-[var(--ink-4)]">+{count - 3} meer</p>
         )}
       </WidgetShell>
     )
@@ -129,9 +129,9 @@ export function MeldingenWidget({ size, data, href }: Props) {
                   <div className="flex shrink-0 items-center gap-2">
                     <span className="text-[10px] text-[var(--ink-4)]">{formatTimestamp(n.createdAt)}</span>
                     {n.actionHref && (
-                      <a href={n.actionHref} className="text-[10px] font-medium text-blue-600 hover:underline">
+                      <span className="text-[10px] font-medium text-blue-600">
                         Bekijk
-                      </a>
+                      </span>
                     )}
                   </div>
                 </li>

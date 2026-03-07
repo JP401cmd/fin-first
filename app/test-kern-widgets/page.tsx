@@ -106,10 +106,24 @@ const MOCK_DATA: DashboardData = {
     { id: 'fav1', name: 'Boodschappen', icon: 'shopping-cart', budgetType: 'expense', limit: 600, spent: 450 },
     { id: 'fav2', name: 'Sparen', icon: 'piggy-bank', budgetType: 'savings', limit: 1500, spent: 1200 },
   ],
-  notifications: [],
-  badgeSummary: { earned: 5, total: 20, latestBadge: null, nearestBadge: null },
-  streaks: [],
-  aiInsights: [],
+  notifications: [
+    { id: 'n1', type: 'budget', message: 'Je boodschappenbudget is 80% op', severity: 'warning', createdAt: '2026-03-07T10:00:00Z' },
+    { id: 'n2', type: 'streak', message: 'Login streak: 12 weken!', severity: 'info', createdAt: '2026-03-06T08:00:00Z' },
+    { id: 'n3', type: 'anomaly', message: 'Ongebruikelijke betaling van €450 gedetecteerd', severity: 'critical', createdAt: '2026-03-05T14:00:00Z' },
+    { id: 'n4', type: 'positive', message: 'Je spaarquote is gestegen naar 32%', severity: 'info', createdAt: '2026-03-04T09:00:00Z' },
+    { id: 'n5', type: 'milestone', message: 'Netto vermogen boven €125.000!', severity: 'info', createdAt: '2026-03-03T12:00:00Z' },
+  ],
+  badgeSummary: { earned: 5, total: 20, latestBadge: { name: 'Spaarmeester', icon: '\u{1F3C6}', earnedAt: '2026-03-01' }, nearestBadge: { name: 'Budget Ninja', progress: 0.72 } },
+  streaks: [
+    { type: 'login', currentCount: 12, longestCount: 18, lastActivityDate: '2026-03-07' },
+    { type: 'budget', currentCount: 4, longestCount: 8, lastActivityDate: '2026-03-07' },
+    { type: 'action', currentCount: 2, longestCount: 5, lastActivityDate: '2026-03-06' },
+  ],
+  aiInsights: [
+    { id: 'ai1', text: 'Je energiekosten liggen 15% boven het landelijk gemiddelde. Overweeg een overstap.', module: 'kern', createdAt: '2026-03-07T10:00:00Z' },
+    { id: 'ai2', text: 'Met je huidige spaarsnelheid bereik je je autospardoel 3 maanden eerder dan gepland.', module: 'wil', createdAt: '2026-03-06T08:00:00Z' },
+    { id: 'ai3', text: 'Je FIRE-datum schuift op met elk jaar dat je inflatie niet meeneemt.', module: 'horizon', createdAt: '2026-03-05T14:00:00Z' },
+  ],
   nextSteps: [
     { key: 'ns1', title: 'Stel je eerste spaardoel in', description: 'Begin met een concreet doel om je motivatie te versterken', impact: 5, href: '/will/goals', dismissed: false },
     { key: 'ns2', title: 'Controleer je vaste lasten', description: 'Bekijk of je kunt besparen op abonnementen', impact: 3, href: '/core/cash', dismissed: false },
@@ -118,7 +132,12 @@ const MOCK_DATA: DashboardData = {
     { key: 'ns5', title: 'Voeg je pensioen toe', description: 'Verbeter je vermogensoverzicht door pensioenaanspraken toe te voegen', impact: 8, href: '/core/assets', dismissed: false },
   ],
   monthSummary: { netWorthDelta: 3000, freedomDaysWon: 8, savingsRate: 30, budgetScore: 75, prevMonthComparison: 5 },
-  upcomingEvents: [],
+  upcomingEvents: [
+    { id: 'e1', name: 'Salaris', date: '2026-03-25', amount: 5000, direction: 'in', source: 'recurring' },
+    { id: 'e2', name: 'Hypotheek', date: '2026-03-28', amount: 850, direction: 'out', source: 'recurring' },
+    { id: 'e3', name: 'Zorgverzekering', date: '2026-04-01', amount: 140, direction: 'out', source: 'recurring' },
+    { id: 'e4', name: 'Vakantiegeld', date: '2026-05-01', amount: 3500, direction: 'in', source: 'recurring' },
+  ],
   emergencyFund: { currentAmount: 14000, targetAmount: 21000, monthsCovered: 4, targetMonths: 6, isComplete: false },
   topRecurringTransactions: [
     { id: 'r1', name: 'Hypotheek', amount: 850, frequency: 'maand', category: 'wonen' },
@@ -162,6 +181,15 @@ const WIL_WIDGETS = [
   'volgende_stap',
 ]
 
+const CROSS_WIDGETS = [
+  'meldingen',
+  'badges',
+  'streaks',
+  'ai_inzicht',
+  'jouw_pad',
+  'agenda',
+]
+
 const SIZES: WidgetSize[] = ['quarter', 'half', 'full']
 
 export default function TestKernWidgetsPage() {
@@ -196,6 +224,29 @@ export default function TestKernWidgetsPage() {
       {/* ── Wil-module widgets ── */}
       <h1 className="text-2xl font-bold mt-12 pt-8 border-t-2">Wil Widget Format Test</h1>
       {WIL_WIDGETS.map((widgetId) => (
+        <div key={widgetId} className="space-y-3">
+          <h2 className="text-lg font-semibold border-b pb-1">{widgetId}</h2>
+          <div className="grid grid-cols-2 gap-4">
+            {SIZES.map((size) => (
+              <div
+                key={size}
+                className={
+                  size === 'full' ? 'col-span-2' :
+                  size === 'half' ? 'col-span-2' :
+                  'col-span-1'
+                }
+              >
+                <p className="text-xs text-zinc-400 mb-1 font-mono">{size}</p>
+                <WidgetRenderer id={widgetId} size={size} data={MOCK_DATA} features={{}} />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {/* ── Cross-module widgets ── */}
+      <h1 className="text-2xl font-bold mt-12 pt-8 border-t-2">Cross Widget Format Test</h1>
+      {CROSS_WIDGETS.map((widgetId) => (
         <div key={widgetId} className="space-y-3">
           <h2 className="text-lg font-semibold border-b pb-1">{widgetId}</h2>
           <div className="grid grid-cols-2 gap-4">

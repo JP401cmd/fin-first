@@ -152,6 +152,67 @@ export function JouwPadWidgetWrapper({ size, data, href }: Props) {
     )
   }
 
+  // ── Half-size: compact header + phase bar for 1-row 160px height ──
+  if (size === 'half') {
+    return (
+      <WidgetShell module="cross" size={size} kicker="Jouw Pad" href={href}>
+        <div ref={inViewRef}>
+          {/* Header: shield + phase + freedom badge */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--r-sm)] ${colors.badge}`}>
+                <Shield className="h-3.5 w-3.5" />
+              </div>
+              <div className="min-w-0">
+                <p className={`text-[10px] font-bold uppercase tracking-[0.12em] leading-none ${colors.text}`}>
+                  {currentPhase.label}
+                </p>
+                <p className="mt-0.5 truncate text-[11px] text-[var(--ink-2)]">{levelName}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">{levelDisplay}</span>
+              <span className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums ${colors.badge}`}>
+                {freedomPct.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+
+          {/* Phase progress bar (4 segments) */}
+          <div className="mt-2">
+            <div className="flex gap-1">
+              {PHASES.map((phase) => {
+                const pColors  = PHASE_STYLES[phase.color]
+                const phaseIdx = PHASES.findIndex((p) => p.id === phase.id)
+                const curIdx   = PHASES.findIndex((p) => p.id === currentPhase.id)
+                const isActive = phase.id === currentPhase.id
+                const isPast   = phaseIdx < curIdx
+                return (
+                  <div key={phase.id} className="flex-1">
+                    <div className={`h-1.5 overflow-hidden rounded-full ${
+                      isPast ? pColors.bar : isActive ? 'bg-[var(--subtle)] border border-[var(--border-ed)]' : 'bg-[var(--subtle)]'
+                    }`}>
+                      {isActive && (
+                        <div
+                          className={`h-full rounded-full ${pColors.bar}`}
+                          style={{
+                            width: hasEntered ? `${progressInPhase}%` : '0%',
+                            transition: hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1) 150ms' : 'none',
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      </WidgetShell>
+    )
+  }
+
+  // ── Full-size: expanded with criteria + next level (336px height) ──
   return (
     <WidgetShell module="cross" size={size} kicker="Jouw Pad" href={href}>
     <div ref={inViewRef}>
@@ -268,7 +329,7 @@ export function JouwPadWidgetWrapper({ size, data, href }: Props) {
       )}
 
       {/* ── Full-size: volgend niveau preview ── */}
-      {size === 'full' && nextLevelName && nextUnlock && (
+      {nextLevelName && nextUnlock && (
         <div className="mt-auto pt-4">
           <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/60 px-3 py-2.5">
             <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">

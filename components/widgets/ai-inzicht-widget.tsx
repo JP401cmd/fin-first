@@ -69,17 +69,17 @@ export function AiInzichtWidget({ size, data, href }: Props) {
     )
   }
 
-  // Half: latest AI insight fully written + source module badge + date
+  // ── Half: compact for 1-row 160px height ──
   if (size === 'half') {
     return (
       <WidgetShell module="cross" size={size} kicker="AI Inzicht" href={href}>
-        <div className="space-y-2.5">
+        <div className="space-y-1.5">
           <div className="flex items-start gap-2">
             <div className="shrink-0 mt-0.5 flex items-center gap-1">
               <Lightbulb className="h-4 w-4 text-amber-500" />
               <AiPrivacyIndicator size={12} />
             </div>
-            <p className="text-sm text-[var(--ink-2)] leading-relaxed">
+            <p className="text-sm text-[var(--ink-2)] leading-relaxed line-clamp-3">
               {latest.text}
             </p>
           </div>
@@ -128,13 +128,9 @@ export function AiInzichtWidget({ size, data, href }: Props) {
                     {formatDate(insight.createdAt)}
                   </span>
                   {moduleHref && (
-                    <a
-                      href={moduleHref}
-                      className={`text-[10px] font-medium ${ic.text} hover:underline`}
-                      onClick={e => e.stopPropagation()}
-                    >
+                    <span className={`text-[10px] font-medium ${ic.text}`}>
                       Bekijk &rarr;
-                    </a>
+                    </span>
                   )}
                 </div>
               </div>
