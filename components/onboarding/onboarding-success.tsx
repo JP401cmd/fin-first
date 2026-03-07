@@ -1,87 +1,121 @@
 import { FinnAvatar } from '@/components/app/avatars'
-import { SpeechBubbleCentered } from './speech-bubble'
-import { Shield, Zap, Telescope } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
-
-const MODULE_CARDS: readonly { Icon: LucideIcon; name: string; description: string; borderColor: string; bgColor: string; iconBg: string; textColor: string }[] = [
-  {
-    Icon: Shield,
-    name: 'De Kern',
-    description: 'Je financiele fundament: vermogen, budgetten, schulden en cashflow. Hier zie je waar je nu staat.',
-    borderColor: 'border-amber-200',
-    bgColor: 'bg-amber-50/50',
-    iconBg: 'bg-amber-100',
-    textColor: 'text-amber-700',
-  },
-  {
-    Icon: Zap,
-    name: 'De Wil',
-    description: 'Bewuste keuzes en acties. Will helpt je met slimme aanbevelingen en houdt je doelen in zicht.',
-    borderColor: 'border-wil-200',
-    bgColor: 'bg-wil-50/50',
-    iconBg: 'bg-wil-100',
-    textColor: 'text-wil-700',
-  },
-  {
-    Icon: Telescope,
-    name: 'De Horizon',
-    description: 'Je pad naar financiële vrijheid: projecties, scenario\'s en simulaties van je toekomst.',
-    borderColor: 'border-horizon-200',
-    bgColor: 'bg-horizon-50/50',
-    iconBg: 'bg-horizon-100',
-    textColor: 'text-horizon-700',
-  },
-]
+import { Shield, Zap, Telescope, type LucideIcon } from 'lucide-react'
 
 export function OnboardingSuccess({ onDashboard }: { onDashboard: () => void }) {
   return (
-    <div className="flex flex-col items-center text-center">
-      <div className="mb-4">
-        <FinnAvatar size={80} />
+    <div className="flex flex-col items-center py-8 text-center sm:py-12">
+      {/* Will's avatar — celebration emphasis with subtle pulse */}
+      <div className="mb-6 animate-[pulse_3s_ease-in-out_1]">
+        <FinnAvatar size={140} />
       </div>
 
-      <span className="font-playfair text-2xl font-bold text-[var(--ink)]">t<span className="text-kern-600">f.</span></span>
-      <h2 className="mt-2 font-display text-2xl font-bold tracking-[-0.02em] text-[var(--ink)]">Welkom</h2>
-      <p className="mt-1 font-source-serif text-[13px] italic text-[var(--ink-3)]">&ldquo;Geld is opgeslagen tijd&rdquo;</p>
-      <p className="mt-2 text-sm text-[var(--ink-3)]">Drie perspectieven, een doel</p>
+      {/* Celebration heading — font-display */}
+      <h1 className="font-display text-2xl font-semibold tracking-[-0.02em] text-[var(--ink)] sm:text-3xl">
+        Welkom bij TriFinity!
+      </h1>
 
-      {/* Will introduces the modules */}
-      <div className="mt-5 w-full">
-        <SpeechBubbleCentered>
-          Ik ben Will, je persoonlijke financiele coach. Ik begeleid je door drie perspectieven naar financiele vrijheid. Laat me ze voorstellen:
-        </SpeechBubbleCentered>
+      {/* Philosophical closing — font-serif italic */}
+      <p className="mt-3 max-w-sm font-serif text-base italic leading-relaxed text-[var(--ink-2)] sm:text-lg">
+        &ldquo;Geld is opgeslagen tijd &mdash; en jouw reis naar vrijheid begint nu.&rdquo;
+      </p>
+
+      {/* Editorial divider */}
+      <div className="mx-auto mt-8 mb-8 h-px w-16 bg-[var(--border-md)]" />
+
+      {/* Introduction text */}
+      <div className="mx-auto max-w-md font-serif text-sm leading-relaxed text-[var(--ink-3)]">
+        <p>
+          Ik ben Will, je persoonlijke financiële coach. Ik begeleid je door drie
+          perspectieven naar financiële vrijheid.
+        </p>
       </div>
 
-      {/* Three module cards — stack vertically on mobile, 3-col on desktop */}
-      <div className="mt-6 grid w-full grid-cols-1 gap-4 sm:grid-cols-3">
+      {/* Three module cards — card-editorial with module-colored left border */}
+      <div className="mt-10 grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
         {MODULE_CARDS.map((card) => (
-          <div
-            key={card.name}
-            className={`flex flex-col items-center rounded-2xl border-2 ${card.borderColor} ${card.bgColor} p-5`}
-          >
-            <div className={`flex h-12 w-12 items-center justify-center rounded-full ${card.iconBg}`}>
-              <card.Icon className={`h-6 w-6 ${card.textColor}`} />
-            </div>
-            <p className={`mt-2 text-sm font-semibold ${card.textColor}`}>{card.name}</p>
-            <p className="mt-1 text-xs leading-relaxed text-[var(--ink-3)]">{card.description}</p>
-          </div>
+          <ModuleCard key={card.name} {...card} />
         ))}
       </div>
 
-      {/* Will closing speech bubble */}
-      <div className="mt-6 w-full">
-        <SpeechBubbleCentered>
+      {/* Will's closing — font-serif italic */}
+      <div className="mx-auto mt-10 max-w-md border-y border-[var(--border-ed)] px-4 py-4">
+        <p className="font-serif text-sm italic leading-relaxed text-[var(--ink-2)]">
           Veel ontdekkingen! Elke bewuste keuze brengt je dichter bij vrijheid.
-        </SpeechBubbleCentered>
+        </p>
       </div>
 
-      {/* Prominent dashboard button — full-width on mobile */}
+      {/* Decorative module-color line before CTA */}
+      <div className="mt-8 flex w-full max-w-xs items-center gap-0">
+        <div className="h-0.5 flex-1 bg-kern-300" />
+        <div className="h-0.5 flex-1 bg-wil-300" />
+        <div className="h-0.5 flex-1 bg-horizon-300" />
+      </div>
+
+      {/* Dashboard button — prominent, full-width mobile, bg-wil-600 rounded-xl */}
       <button
         onClick={onDashboard}
-        className="mt-8 w-full min-h-[48px] rounded-lg bg-wil-600 px-8 py-3 text-base font-semibold text-white transition-colors hover:bg-wil-700 active:bg-wil-800 sm:w-auto sm:text-sm sm:font-medium sm:min-h-[44px]"
+        className="mt-6 min-h-[48px] w-full max-w-xs rounded-xl bg-wil-600 px-8 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-wil-700 hover:shadow-md active:bg-wil-800 active:shadow-none sm:w-auto sm:min-w-[200px]"
       >
         Ontdek je dashboard
       </button>
     </div>
   )
 }
+
+/* ── Module card component ───────────────────────────────── */
+
+function ModuleCard({ name, description, icon: Icon, borderClass, iconBgClass, iconTextClass, nameTextClass }: ModuleCardDef) {
+  return (
+    <div className={`card-editorial flex items-start gap-3 border-l-3 p-4 text-left ${borderClass}`}>
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${iconBgClass}`}>
+        <Icon className={`h-5 w-5 ${iconTextClass}`} />
+      </div>
+      <div>
+        <p className={`font-display text-sm font-semibold ${nameTextClass}`}>{name}</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-[var(--ink-3)]">{description}</p>
+      </div>
+    </div>
+  )
+}
+
+/* ── Module card data ────────────────────────────────────── */
+
+interface ModuleCardDef {
+  name: string
+  description: string
+  icon: LucideIcon
+  borderClass: string
+  iconBgClass: string
+  iconTextClass: string
+  nameTextClass: string
+}
+
+const MODULE_CARDS: ModuleCardDef[] = [
+  {
+    name: 'De Kern',
+    description: 'Je financieel fundament: vermogen, budgetten, schulden en cashflow.',
+    icon: Shield,
+    borderClass: 'border-kern-400',
+    iconBgClass: 'bg-kern-100',
+    iconTextClass: 'text-kern-700',
+    nameTextClass: 'text-kern-700',
+  },
+  {
+    name: 'De Wil',
+    description: 'Bewuste keuzes en acties met slimme aanbevelingen en doelen.',
+    icon: Zap,
+    borderClass: 'border-wil-400',
+    iconBgClass: 'bg-wil-100',
+    iconTextClass: 'text-wil-700',
+    nameTextClass: 'text-wil-700',
+  },
+  {
+    name: 'De Horizon',
+    description: 'Je pad naar financiële vrijheid: projecties, scenario\'s en simulaties.',
+    icon: Telescope,
+    borderClass: 'border-horizon-400',
+    iconBgClass: 'bg-horizon-100',
+    iconTextClass: 'text-horizon-700',
+    nameTextClass: 'text-horizon-700',
+  },
+]
