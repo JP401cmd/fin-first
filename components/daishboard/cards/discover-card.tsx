@@ -3,7 +3,6 @@
 import { useCallback } from 'react'
 import { Compass, ArrowRight } from 'lucide-react'
 import { BriefingCard } from '../briefing-card'
-import { markFeatureVisitedLocal } from '@/components/app/discover-carousel'
 import type { DiscoverCardSpec } from '@/lib/briefing/types'
 
 const MODULE_BADGE: Record<string, string> = {
