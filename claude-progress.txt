@@ -1,3 +1,73 @@
+## Session 2026-03-07 - Features #333, #334
+
+### Feature #333: Quarter-size widget visuele consistentie - PASSING
+- widget-shell.tsx: Hide hover arrows on quarter-size (both top and left kicker paths)
+- acties-widget.tsx: Freedom label changed to font-serif italic text-[11px] text-[var(--ink-3)]
+- volgende-stap-widget.tsx: Freedom label changed to font-serif italic text-[11px] text-[var(--ink-3)]
+- box3-drag-widget.tsx: Freedom label changed to font-serif italic text-[11px] text-[var(--ink-3)]
+- vrijheidsmijlpalen-widget.tsx: Added tabular-nums + font-semibold to quarter number
+- All quarter widgets verified: p-3 padding (via WidgetShell), text-lg max, label-editorial kickers, tabular-nums on numbers
+- Commit: 80f3961
+
+### Feature #334: Size-aware content hiërarchie: progressive disclosure per formaat - PASSING
+- Audited all ~36 widgets for content hierarchy compliance
+- Quarter = 1 KPI + 1 subtitle + 1 indicator (max) ✓
+- Half = main number + context (list, bar, trend) + footer ✓
+- Full = all half content + extra breakdown/detail ✓
+- No overflow-auto/scroll within widgets ✓
+- overflow-hidden on WidgetShell + truncate/line-clamp for text overflow ✓
+- Changes from #333 directly support this hierarchy (hover arrows, text sizing, freedom labels)
+
+### Current Status
+- 324/331 features passing (322 before + #333 + #334)
+
+## Session 2026-03-07 - Features #323, #326, #327
+
+### Feature #323: Budget Favoriet widget full-size (nieuw) - PASSING
+- Separated full-size from half-size rendering in budget-fav-widget.tsx
+- Full-size: 180x180 ring chart with percentage + amount + 'van €limit' in center
+- Status badge: 'Op schema' (green) or 'Over budget' (red)
+- Daily average grid: 'Gem. per dag' + 'Nog beschikbaar' per day
+- Remaining + days left footer with border separator
+- Progress bar h-2 (thicker than half-size h-1.5)
+
+### Feature #326: Nieuwe widget: Streaks (quarter/half/full) - PASSING
+- Enhanced streaks-widget.tsx with three distinct size renderings
+- Quarter: fire emoji scaling (1-4 flames based on streak length) + count + type label
+- Half: 3-column grid with per-streak meters (bar toward record) + record count
+- Full: expanded rows with description + progress bars + milestone badges (4/12/26/52 wk) + longest streak record
+- Empty state: 'Start je eerste streak!'
+- Uses useInViewAnimation for animated progress bars
+
+### Feature #327: Nieuwe widget: AI Inzicht (quarter/half/full) - PASSING
+- Enhanced ai-inzicht-widget.tsx with three distinct size renderings
+- Quarter: Lightbulb icon + 1-line truncated tip + module-color dot
+- Half: full insight text + module badge (kern/wil/horizon color) + date
+- Full: up to 3 insight cards with module-colored backgrounds + 'Bekijk' links to module pages
+- Empty state updated to 'Gebruik de app om inzichten te genereren'
+- Module colors with dark mode support
+
+### Current Status
+- 3 features completed this session (#323, #326, #327)
+- All type-checks pass cleanly
+- Commit: d95e1c6
+
+## Session 2026-03-07 - Feature #331
+
+### Feature #331: Nieuwe widget: Noodfonds (quarter/half/full) - PASSING
+- Enhanced noodfonds-widget.tsx with three distinct size layouts
+- Quarter: "X.X van 6 maanden" + mini progress bar + color coding (red <3m, orange 3-5m, green >=6m)
+- Half: ShieldCheck icon + progress bar + amounts (EUR/EUR) + freedom time framing + complete celebration
+- Full: milestone markers (1m, 3m, 6m) on progress bar + calculation breakdown + tips to reach faster + freedom framing
+- All data from emergencyFund in DashboardData (no Supabase calls)
+- TypeScript: clean, ESLint: 0 errors
+- Commit: 7df7787
+
+### Current Status
+- 323/331 features passing (97.3%)
+
+---
+
 ## Session 2026-03-07 - Features #290, #291, #292
 
 ### Feature #290: Spaarquote widget quarter-size - PASSING
@@ -8323,3 +8393,222 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 3 features completed this session (#293, #294, #295)
 - All type-checks pass cleanly
+
+## Session 2026-03-07 - Features #308, #309, #310
+
+### Feature #308: Terugkerende Transacties widget full-size met volledige lijst - PASSING
+- Added quarter/half/full size rendering to terugkerende-transacties-widget.tsx
+- Quarter: count + RefreshCcw icon + 'vaste lasten actief' label
+- Half: total amount + top-3 items + freedom time + total count
+- Full: complete list (up to 10) with category icons + monthly/yearly totals + income % + freedom time
+- Category icons map: wonen/boodschappen/vervoer/energie/verzekering/telecom/abonnement
+- Uses formatCurrency, calculateFreedomTime, formatFreedomTimeString from lib/format
+
+### Feature #309: NIBUD Benchmark widget quarter-size - PASSING
+- Added quarter-size to nibud-benchmark-widget.tsx
+- Shows BarChart3 icon + score: 'Op schema' or 'X boven norm'
+- Computes how many NIBUD categories exceed norms
+- 'NIBUD benchmark' label
+
+### Feature #310: NIBUD Benchmark widget half-size (nieuw) - PASSING
+- Added half-size to nibud-benchmark-widget.tsx
+- 4-row comparison: Wonen, Voeding, Vervoer, Overig
+- Per row: category label + actual amount + NIBUD norm + indicator emoji
+- NIBUD norms hardcoded: Wonen 850, Voeding 450, Vervoer 300, Overig 400
+- Summary: 'Alle categorieën binnen norm' or 'X categorieën boven norm'
+- Full-size enhanced with progress bars per category
+
+### Current Status
+- 3 features completed this session (#308, #309, #310)
+- All type-checks pass (only pre-existing error in veerkracht-score-widget.tsx)
+- Commit: c047b5b
+
+## Session 2026-03-07 - Features #299, #300, #301
+
+### Feature #299: Jouw Pad widget quarter-size - PASSING
+- Added quarter-size early return in jouw-pad-widget-wrapper.tsx
+- Shows Shield icon in phase-color badge (reuses PHASE_STYLES)
+- Phase label as text-[10px] uppercase with phase color
+- Level number as font-mono text-lg (e.g. +2)
+- Freedom percentage badge: 'X% vrij'
+- No phase bars or criteria checklist on quarter
+
+### Feature #300: Veerkracht Score widget quarter-size - PASSING
+- Added quarter-size early return with Shield icon
+- Shows score as font-mono text-lg with scoreColor (green/orange/red)
+- Shows '/100' as text-sm text-ink-3
+- No buffer months detail on quarter
+
+### Feature #301: Veerkracht Score widget half-size with gauge SVG - PASSING
+- Added HalfGauge SVG component: half-circle arc colored by score
+- Arc colors: red <40, orange 40-70, green >70
+- Score number displayed in center of gauge
+- 3 sub-factor rows with mini progress bars:
+  - Buffer: X.X mnd (12 months = 100%)
+  - Schuldratio: X% (lower = better)
+  - Inkomensdekking: X% (based on savingsRate from monthSummary)
+- Full-size also enhanced with larger gauge + sub-factors
+- Commit: a5c0b5e
+
+### Current Status
+- 3 features completed this session (#299, #300, #301)
+- All type-checks pass cleanly
+
+## Session 2026-03-07 - Features #305, #306, #307
+
+### Feature #305: Belasting Box 3 widget full-size met breakdown tabel - PASSING
+- Full-size now shows kassabon-style breakdown table with dashed separators
+- Breakdown rows: Totaal vermogen, Vrijstelling (-€57.684), Belastbaar vermogen, Fictief rendement (5.88%), Tarief (36%), Netto belasting
+- Shows effectief tarief percentage
+- Shows vrijheidsdagen impact (days of freedom this tax costs per year)
+- Uses NL_FICTIEF_BELEGGINGEN and BOX3_TARIEF constants from lib/constants.ts
+- Quarter and half sizes also improved with proper sizing
+- Commit: cbd8f50
+
+### Feature #306: Terugkerende Transacties widget quarter-size - PASSING
+- Already implemented: shows recurringTransactions count as font-mono text-lg
+- RefreshCcw icon + 'vaste lasten' label already present
+- No code changes needed
+
+### Feature #307: Terugkerende Transacties widget half-size verrijking - PASSING
+- Expanded top recurring list from 3 to 5 items
+- Added explicit 'Totaal: €X/maand' line with font-mono tabular-nums
+- Added vrijheidsdagen count (days of freedom per month)
+- Retained counter footer
+- Commit: cbd8f50
+
+### Current Status
+- 3 features completed this session (#305, #306, #307)
+- All type-checks pass cleanly (only pre-existing error in veerkracht-score-widget.tsx)
+
+## Session 2026-03-07 - Features #314, #315, #316
+
+### Feature #314: Sim Vermogenspad widget quarter-size - PASSING
+- Added quarter-size early return with mini sparkline SVG (W=120, H=40)
+- Only accumulation path rendered (no grid lines, no retirement path)
+- FIRE point marked with small dot (r=2.5)
+- FIRE age label: 'FIRE Xj' as text-[10px] font-mono
+- Empty state: 'Geen simulatie' short text
+
+### Feature #315: Sim Vermogenspad widget full-size verrijking met labels - PASSING
+- Added peak value label (formatCurrency) near highest point in SVG
+- Added end balance label at last data point (when different from peak)
+- Added age axis markers at 40, 50, 60, 70, 80 (filtered to data range)
+- Tick marks + text labels on x-axis for age markers
+- All labels animated with delayed opacity transitions
+- Existing accumulation + retirement paths and FIRE marking preserved
+
+### Feature #316: Passief Inkomen widget quarter-size - PASSING
+- Updated quarter-size: removed progress bar per spec (compact, no progress bar)
+- Added '/mnd' label next to amount
+- Changed 'X% van doel' to 'X% van FIRE doel'
+- Commit: d3a3c65
+
+### Current Status
+- 3 features completed this session (#314, #315, #316)
+- All type-checks pass cleanly (only pre-existing error in veerkracht-score-widget.tsx)
+
+## Session 2026-03-07 - Features #311, #312, #313
+
+### Feature #311: NIBUD Benchmark widget full-size verrijking met staafdiagrammen - PASSING
+- Full-size enriched with dual horizontal bar charts per NIBUD category
+- Per category: 'Jij' colored bar (green/amber/red) + 'Norm' grey bar
+- Percentage of norm shown per category (e.g. '120%')
+- Color coding: emerald (<100%), amber (100-130%), red (>130%)
+- Total score banner: 'Gemiddeld X% van NIBUD norm'
+- Monthly expenses preserved as header
+- Summary footer: X boven norm / Y op koers
+
+### Feature #312: Vrijheidsscenarios widget quarter-size - PASSING
+- Quarter early return with expected FIRE age as font-mono text-lg
+- Bandwidth shown as +/-Xj in text-xs
+- 'verwacht' label as text-[10px]
+- No 3-column grid on quarter
+
+### Feature #313: Vrijheidsscenarios widget full-size SVG axis - PASSING
+- Mini SVG with 3 markers on age axis added under 3-col grid
+- Green dot (optimistic), purple dot (expected), red dot (pessimistic)
+- Connecting line between points
+- Age labels below each marker (monospace font)
+- Existing grid + model text preserved
+
+### Current Status
+- 3 features completed this session (#311, #312, #313)
+- All type-checks pass cleanly
+- Commit: f65edb7
+
+## Session 2026-03-07 - Features #320, #321, #322
+
+### Feature #320: Vrijheidsmijlpalen widget quarter-size - PASSING
+- Added quarter-size early return with Flag icon
+- Shows effectivePct as font-mono text-lg: 'X% vrijheid'
+- Shows next milestone: 'Volgende: Y% — datum' or 'Volledige vrijheid bereikt\!'
+
+### Feature #321: Backtesting Score widget quarter-size - PASSING
+- Added quarter-size early return with ShieldCheck/ShieldAlert icon (h-3.5)
+- Shows backtestSuccessRate as font-mono text-lg with successColor
+- Label: 'historisch'
+- No data state handled by existing null check
+
+### Feature #322: Budget Favoriet widget half-size - PASSING
+- Added half/full-size rendering with larger ring chart (150x150, r=60)
+- Details panel: 'Deze maand' spent/limit, progress bar, remaining/over budget
+- Days left counter + daily available amount
+- Color-coded: red when over budget, emerald when under
+
+### Current Status
+- 3 features completed this session (#320, #321, #322)
+- All type-checks pass cleanly (only pre-existing errors in veerkracht-score-widget.tsx)
+- Commit: 0d0eb27
+
+## Session 2026-03-07 - Features #317, #318, #319
+
+### Feature #317: Passief Inkomen widget full-size - PASSING
+- Full-size with 2-col layout: bedrag+/mnd + percentage badge
+- Progress bar with horizon gradient
+- 'Nog X/mnd nodig voor FIRE' or 'FIRE-doel bereikt\!'
+- Freedom framing: 'Huidig passief inkomen dekt X.X dagen per maand'
+- 2-col breakdown cards: Passief inkomen + FIRE-doel
+- Freedom time string via calculateFreedomTime + formatFreedomTimeString
+
+### Feature #318: Box 3 Belastingdrag widget quarter-size - PASSING
+- Compact: annualDrag as font-mono text-lg + /jaar label
+- Freedom days: '= Xd vrijheid'
+
+### Feature #319: Box 3 Belastingdrag widget full-size - PASSING
+- Header: 2xl bedrag + tarief + freedom days badge
+- 5-year projection table: year 1-5 with estimated wealth, tax, freedom days
+- Growth rate derived from netWorthHistory trend (default 5%)
+- Totals row: sum of 5-year tax + total freedom days lost
+- Italic footer with growth rate assumption
+
+### Current Status
+- 3 features completed this session (#317, #318, #319)
+- All type-checks pass cleanly (pre-existing errors in veerkracht-score-widget and vrijheidsscenario-widget)
+- Commit: 3fc6df7
+
+## Session 2026-03-07 - Features #328, #329, #330
+
+### Feature #328: Volgende Stap widget quarter/half/full - PASSING
+- Quarter: ArrowRight icon + 1-line action text + impact days + count of remaining steps
+- Half: 1-2 prioritized steps with ArrowRight icon, title link, description, impact in freedom days, remaining count
+- Full: top-3 steps as StepCard components with border, hover effect, ExternalLink icon, description, impact
+- Empty state: CheckCircle2 icon + 'Alles op orde' message
+- Widget catalog module changed from wil to cross
+
+### Feature #329: Maandoverzicht widget quarter/half/full - PASSING
+- Quarter: netto vermogensdelta in EUR (formatCurrency) + vrijheidsdagen with color
+- Half: 4 KPIs in 2x2 grid (vermogen, vrijheidsdagen, spaarquote, budgetscore) each with TrendArrow
+- Full: 4 KPIs with MiniSparkline SVGs, best/worst budget section, 3-month average comparison, vs vorige maand
+- Widget catalog module changed from kern to cross
+
+### Feature #330: Financiele Agenda widget quarter/half/full - PASSING
+- Quarter: Calendar icon + next event name + relative date (vandaag/morgen/overmorgen/over X dagen) + amount
+- Half: 7-day event list with DirectionIcon arrows (up-right green/down-right red/right neutral) + relative dates
+- Full: 30-day timeline with date column + direction + amounts, weekly cashflow bars, total in/out summary
+- Widget catalog module changed from kern to cross
+
+### Current Status
+- 3 features completed this session (#328, #329, #330)
+- All type-checks pass cleanly
+- Commit: 2663490
