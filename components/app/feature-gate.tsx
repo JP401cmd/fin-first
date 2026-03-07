@@ -41,7 +41,7 @@ const PHASE_BAR_COLORS: Record<string, string> = {
   amber: 'bg-amber-400',
 }
 
-export function FeatureGate({ featureId, fallback = 'locked', children }: FeatureGateProps) {
+export function FeatureGate({ featureId, fallback = 'hidden', children }: FeatureGateProps) {
   const { features, phase: currentPhase, newlyUnlockedFeatures } = useFeatureAccess()
 
   // Fail-open: features not in the map are shown

@@ -408,7 +408,7 @@ export default function DebtsPage() {
       </section>
 
       {/* ═══ 3. AFLOSSTRATEGIE ═══ */}
-      <FeatureGate featureId="schulden_aflosplan" fallback="locked">
+      <FeatureGate featureId="schulden_aflosplan" fallback="hidden">
       <section className="mt-5 sm:mt-8" data-testid="strategy-section">
         <div className="mb-4 flex items-center gap-2">
           <div className="h-5 w-1 rounded-full bg-kern-500" />
@@ -609,7 +609,7 @@ export default function DebtsPage() {
       </section>
 
       {/* ═══ 5. BOX 3 BELASTING ═══ */}
-      <FeatureGate featureId="box3_belasting" fallback="locked">
+      <FeatureGate featureId="box3_belasting" fallback="hidden">
         <BelastingSection dailyExpenses={dailyExpenses} />
       </FeatureGate>
 

@@ -1080,7 +1080,7 @@ export default function HorizonPage() {
 
       {/* === 6. Verken-kaarten (Explore Cards / Primary Content) === */}
       <section className="mt-4 sm:mt-8 space-y-3 sm:space-y-4">
-        <FeatureGate featureId="fire_projecties" fallback="locked">
+        <FeatureGate featureId="fire_projecties" fallback="hidden">
           <ExploreCard
             onClick={() => setActiveModal('projections')}
             icon={<TrendingUp className="h-5 w-5 text-horizon-600" />}
@@ -1089,7 +1089,7 @@ export default function HorizonPage() {
             subtitle="vrijheidsvoorspelling"
           />
         </FeatureGate>
-        <FeatureGate featureId="withdrawal_strategie" fallback="locked">
+        <FeatureGate featureId="withdrawal_strategie" fallback="hidden">
           <ExploreCard
             onClick={() => setActiveModal('withdrawal')}
             icon={<Landmark className="h-5 w-5 text-horizon-600" />}
@@ -1098,7 +1098,7 @@ export default function HorizonPage() {
             subtitle="hoe je vermogen opneemt"
           />
         </FeatureGate>
-        <FeatureGate featureId="veerkracht_score" fallback="locked">
+        <FeatureGate featureId="veerkracht_score" fallback="hidden">
           <button
             type="button"
             onClick={() => setShowResilienceReceipt(true)}
@@ -1123,7 +1123,7 @@ export default function HorizonPage() {
       </section>
 
       {/* === 7. Tijdlijn + Levensgebeurtenissen (Primary Content) === */}
-      <FeatureGate featureId="levensgebeurtenissen" fallback="locked">
+      <FeatureGate featureId="levensgebeurtenissen" fallback="hidden">
       <section className="mt-5 sm:mt-8">
         <div className="mb-5">
           <h2 className="label-editorial text-[var(--ink-2)]">
@@ -1313,7 +1313,7 @@ export default function HorizonPage() {
       )}
 
       {/* === 10. Projectie-chart (Deep Dive) === */}
-      <FeatureGate featureId="vermogensprojectie_chart" fallback="locked">
+      <FeatureGate featureId="vermogensprojectie_chart" fallback="hidden">
       <section className="mt-5 sm:mt-8">
         <div className="mb-5">
           <h2 className="label-editorial text-[var(--ink-2)]">

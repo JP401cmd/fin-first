@@ -615,7 +615,7 @@ export default function WillPage() {
       </section>
 
       {/* === 5. Budget Gezondheidscheck (NIBUD) (Primary Content) === */}
-      <FeatureGate featureId="nibud_benchmark" fallback="locked">
+      <FeatureGate featureId="nibud_benchmark" fallback="hidden">
         <section id="section-gezondheidscheck" className="mt-4 sm:mt-8 scroll-mt-8">
           <NibudBenchmarkSection />
         </section>
@@ -652,7 +652,7 @@ export default function WillPage() {
       </section>
 
       {/* === 7. Doelen (Primary Content) === */}
-      <FeatureGate featureId="doelen_systeem" fallback="locked">
+      <FeatureGate featureId="doelen_systeem" fallback="hidden">
       <section id="section-doelen" className="mt-5 sm:mt-8 scroll-mt-8">
         <div className="mb-5 flex items-center justify-between">
           <div>
@@ -706,7 +706,7 @@ export default function WillPage() {
       </FeatureGate>
 
       {/* === 8. Beslissingspatronen (Deep Dive) === */}
-      <FeatureGate featureId="beslissingspatronen" fallback="locked">
+      <FeatureGate featureId="beslissingspatronen" fallback="hidden">
       <section className="mt-5 sm:mt-8">
         <CollapsibleSection
           storageKey="wil_beslissingspatronen"
@@ -748,7 +748,7 @@ export default function WillPage() {
       </section>
 
       {/* === Modals === */}
-      <FeatureGate featureId="doelen_systeem" fallback="locked">
+      <FeatureGate featureId="doelen_systeem" fallback="hidden">
       <GoalDetailModal
         open={showGoalModal}
         onClose={() => setShowGoalModal(false)}
