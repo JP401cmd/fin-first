@@ -168,6 +168,16 @@ export interface RecurringCardSpec {
   totalFreedomStr?: string
 }
 
+export interface LifeEventCardSpec {
+  type: 'lifeEvent'
+  name: string
+  daysUntil: number
+  amount: string
+  amountType: 'eenmalig' | 'maandelijks'
+  freedomStr?: string
+  module: CardModule
+}
+
 // ── Union Type ──────────────────────────────────────────────
 
 export type BriefingCardSpec =
@@ -186,6 +196,7 @@ export type BriefingCardSpec =
   | QuoteCardSpec
   | StreakCardSpec
   | RecurringCardSpec
+  | LifeEventCardSpec
 
 // ── SSE Event Types ─────────────────────────────────────────
 
@@ -241,6 +252,7 @@ export interface BriefingComposeRequest {
   previousBriefing?: PreviousBriefingSummary
   longTermMemory?: BriefingLongTermMemory
   phaseTransition?: PhaseTransitionInfo
+  briefingFrequency?: 'daily' | 'weekly' | 'monthly' | 'rare'
 }
 
 export interface BriefingComposeResponse {
@@ -267,4 +279,5 @@ export const CARD_SPAN: Record<BriefingCardSpec['type'], number> = {
   quote: 2,
   streak: 1,
   recurring: 2,
+  lifeEvent: 2,
 }

@@ -454,4 +454,16 @@ export const briefingTools = {
       totalFreedomStr: z.string().optional().describe('Totale vrijheidstijd-impact, bijv. "12,5 dagen"'),
     }),
   }),
+
+  showLifeEvent: tool({
+    description: 'Toon een komende levensgebeurtenis met countdown, financiele impact en vrijheidstijd-impact. Gebruik voor belangrijke life events zoals verhuizing, kind, pensioen.',
+    inputSchema: z.object({
+      name: z.string().describe('Naam van het life event, bijv. "Verhuizing naar Amsterdam"'),
+      daysUntil: z.number().describe('Aantal dagen tot het event'),
+      amount: z.string().describe('Geschat bedrag, bijv. "€ 15.000"'),
+      amountType: z.enum(['eenmalig', 'maandelijks']).describe('Type bedrag: eenmalige kost of maandelijkse impact'),
+      freedomStr: z.string().optional().describe('Vrijheidstijd-impact, bijv. "5 maanden"'),
+      module: moduleEnum.describe('Kleurmodule (gebruik "horizon" voor toekomst-events)'),
+    }),
+  }),
 }
