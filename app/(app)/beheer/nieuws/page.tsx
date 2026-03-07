@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Newspaper, Save, RotateCcw, Check, AlertCircle } from 'lucide-react'
+import { Newspaper, Save, RotateCcw, Check, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
 
 const DEFAULT_NEWS_PROMPT = `Je bent een financieel nieuwsanalist voor TriFinity, een Nederlandse personal finance app.
 
@@ -31,6 +31,7 @@ export default function BeheerNieuwsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [showDefaultPreview, setShowDefaultPreview] = useState(false)
 
   const clearStatus = useCallback(() => {
     setStatus(null)
@@ -177,6 +178,31 @@ export default function BeheerNieuwsPage() {
           Terugzetten naar standaard
         </button>
       </div>
+
+      {/* Default prompt preview */}
+      {savedPrompt !== null && (
+        <div className="mt-6 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]">
+          <button
+            type="button"
+            onClick={() => setShowDefaultPreview(!showDefaultPreview)}
+            className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors"
+          >
+            <span>Bekijk standaard prompt</span>
+            {showDefaultPreview ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </button>
+          {showDefaultPreview && (
+            <div className="border-t border-[var(--border-ed)] px-4 py-3">
+              <pre className="max-h-64 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-[var(--ink-3)]">
+                {DEFAULT_NEWS_PROMPT}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

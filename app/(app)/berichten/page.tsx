@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { NotificationItem } from '@/components/app/notifications/notification-item'
 import { RELEASE_NOTES, type ReleaseNote } from '@/lib/release-notes'
-import { Bell, Newspaper, ChevronRight, CheckCheck, Sparkles, TrendingUp, AlertCircle, Loader2 } from 'lucide-react'
+import { Bell, Newspaper, ChevronRight, CheckCheck, Sparkles, TrendingUp, AlertCircle, Loader2, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import type { Notification } from '@/app/api/notifications/route'
 import type { NewsItem } from '@/app/api/news/route'
@@ -312,13 +312,13 @@ function HeroNewsArticle({ item }: { item: NewsItem }) {
   )
 }
 
-// ── Regular news article ────────────────────────────────────────────
+// ── Regular news article (grid card) ────────────────────────────────
 
 function NewsArticle({ item }: { item: NewsItem }) {
   return (
-    <article className="py-4">
-      {/* Category + source */}
-      <div className="mb-2 flex items-center gap-3">
+    <article className="flex flex-col rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 shadow-[var(--s0)] transition-shadow hover:shadow-[var(--s1)]">
+      {/* Category tag */}
+      <div className="mb-2.5 flex items-center gap-3">
         <CategoryBadge category={item.category} />
         {item.sourceContext && (
           <span className="font-inter text-[11px] text-[var(--ink-4)]">
@@ -333,7 +333,7 @@ function NewsArticle({ item }: { item: NewsItem }) {
       </h3>
 
       {/* Lead / summary — Source Serif normal */}
-      <p className="mt-1.5 font-source-serif text-sm leading-relaxed text-[var(--ink-2)]">
+      <p className="mt-1.5 flex-1 font-source-serif text-sm leading-relaxed text-[var(--ink-2)]">
         {item.summary}
       </p>
 
@@ -352,28 +352,72 @@ function NewsArticle({ item }: { item: NewsItem }) {
 
 function NewsSkeletonLoader() {
   return (
-    <div className="space-y-3">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div
-          key={i}
-          className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 shadow-[var(--s0)]"
-        >
-          <div className="flex items-start gap-3">
-            <div className="h-8 w-8 shrink-0 animate-pulse rounded-[var(--r)] bg-[var(--subtle)]" />
-            <div className="flex-1 space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="h-4 w-16 animate-pulse rounded-full bg-[var(--subtle)]" />
-                <div className="h-3 w-20 animate-pulse rounded bg-[var(--subtle)]" />
-              </div>
-              <div className="h-4 w-3/4 animate-pulse rounded bg-[var(--subtle)]" />
-              <div className="h-3 w-full animate-pulse rounded bg-[var(--subtle)]" />
-              <div className="h-3 w-2/3 animate-pulse rounded bg-[var(--subtle)]" />
-            </div>
-          </div>
+    <div>
+      {/* Hero article skeleton */}
+      <div className="mb-8">
+        {/* Category tag placeholder */}
+        <div className="mb-3 flex items-center gap-3">
+          <div className="h-5 w-20 animate-pulse rounded-full bg-[var(--subtle)]" />
+          <div className="h-3 w-24 animate-pulse rounded bg-[var(--subtle)]" />
         </div>
-      ))}
-      <div className="flex items-center justify-center gap-2 py-4">
-        <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--border-md)] border-t-[var(--ink-2)]" />
+
+        {/* Large headline placeholder */}
+        <div className="space-y-2">
+          <div className="h-7 w-full animate-pulse rounded bg-[var(--subtle)] sm:h-9" />
+          <div className="h-7 w-3/4 animate-pulse rounded bg-[var(--subtle)] sm:h-9" />
+        </div>
+
+        {/* Summary text placeholder */}
+        <div className="mt-3 space-y-1.5">
+          <div className="h-4 w-full animate-pulse rounded bg-[var(--subtle)]" />
+          <div className="h-4 w-5/6 animate-pulse rounded bg-[var(--subtle)]" />
+          <div className="h-4 w-2/3 animate-pulse rounded bg-[var(--subtle)]" />
+        </div>
+
+        {/* Date placeholder */}
+        <div className="mt-3 h-3 w-32 animate-pulse rounded bg-[var(--subtle)]" />
+
+        {/* Impact block placeholder */}
+        <div className="mt-3 rounded-[var(--r)] border-l-3 border-[var(--subtle)] bg-[var(--subtle)]/30 px-4 py-3">
+          <div className="mb-1 h-3 w-24 animate-pulse rounded bg-[var(--subtle)]" />
+          <div className="h-3 w-full animate-pulse rounded bg-[var(--subtle)]" />
+        </div>
+
+        {/* Divider */}
+        <div className="mt-6 h-px bg-[var(--border-ed)]" />
+      </div>
+
+      {/* Grid article skeletons (2-column on desktop) */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex flex-col rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 shadow-[var(--s0)]"
+          >
+            {/* Category tag placeholder */}
+            <div className="mb-2.5 h-5 w-20 animate-pulse rounded-full bg-[var(--subtle)]" />
+
+            {/* Headline placeholder */}
+            <div className="space-y-1.5">
+              <div className="h-5 w-full animate-pulse rounded bg-[var(--subtle)]" />
+              <div className="h-5 w-2/3 animate-pulse rounded bg-[var(--subtle)]" />
+            </div>
+
+            {/* Summary placeholder */}
+            <div className="mt-2 space-y-1">
+              <div className="h-3 w-full animate-pulse rounded bg-[var(--subtle)]" />
+              <div className="h-3 w-5/6 animate-pulse rounded bg-[var(--subtle)]" />
+            </div>
+
+            {/* Date placeholder */}
+            <div className="mt-2 h-3 w-24 animate-pulse rounded bg-[var(--subtle)]" />
+          </div>
+        ))}
+      </div>
+
+      {/* Loading indicator */}
+      <div className="flex items-center justify-center gap-2 py-6">
+        <Loader2 className="h-4 w-4 animate-spin text-[var(--ink-3)]" />
         <p className="font-source-serif text-sm italic text-[var(--ink-3)]">
           Nieuws wordt gepersonaliseerd&hellip;
         </p>
@@ -529,6 +573,36 @@ export default function BerichtenPage() {
       setNewsLoading(false)
     }
   }, [newsFetched])
+
+  // Force refresh: clear all caches and re-generate news
+  const refreshNews = useCallback(async () => {
+    // Clear client-side cache
+    try { localStorage.removeItem(NEWS_LOCAL_CACHE_KEY) } catch { /* noop */ }
+
+    // Reset state to trigger fresh fetch
+    setNewsItems([])
+    setNewsFetched(false)
+    setNewsLoading(true)
+    setNewsError(null)
+
+    try {
+      // Use cache-busting query param to bypass server cache
+      const res = await fetch('/api/news?refresh=1')
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: 'Onbekende fout' }))
+        throw new Error(data.error ?? `HTTP ${res.status}`)
+      }
+      const data = await res.json()
+      const items: NewsItem[] = data.items ?? data
+      setNewsItems(items)
+      setLocalNewsCache(items)
+      setNewsFetched(true)
+    } catch (err) {
+      setNewsError(err instanceof Error ? err.message : 'Nieuws kon niet worden geladen')
+    } finally {
+      setNewsLoading(false)
+    }
+  }, [])
 
   // Fetch news on mount
   useEffect(() => {
@@ -744,36 +818,51 @@ export default function BerichtenPage() {
                 Gepersonaliseerd nieuws
               </span>
               <div className="h-px flex-1 bg-[var(--border-ed)]" />
+              {newsFetched && !newsLoading && (
+                <button
+                  type="button"
+                  onClick={refreshNews}
+                  disabled={newsLoading}
+                  className="flex min-h-[44px] items-center gap-1.5 rounded-[var(--r)] px-2 py-1 font-inter text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-50 sm:min-h-0"
+                  title="Ververs nieuws"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Ververs</span>
+                </button>
+              )}
             </div>
 
             {newsLoading || (!newsFetched && !newsError) ? (
-              <div className="flex flex-col items-center gap-3 py-16 text-center">
-                <Loader2 className="h-6 w-6 animate-spin text-[var(--ink-3)]" />
-                <p className="font-source-serif text-sm italic text-[var(--ink-3)]">
-                  Nieuws wordt gepersonaliseerd&hellip;
-                </p>
-              </div>
+              <NewsSkeletonLoader />
             ) : newsError ? (
-              <div className="flex flex-col items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-6 py-12 text-center shadow-[var(--s0)]">
-                <AlertCircle className="h-8 w-8 text-[var(--ink-4)]" />
-                <p className="font-inter text-sm text-[var(--ink-3)]">
-                  {newsError}
-                </p>
+              <div className="flex flex-col items-center gap-4 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-6 py-12 text-center shadow-[var(--s0)]">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--subtle)]">
+                  <AlertCircle className="h-6 w-6 text-[var(--ink-3)]" />
+                </div>
+                <div className="space-y-1">
+                  <p className="font-inter text-sm font-medium text-[var(--ink-2)]">
+                    Nieuws kon niet worden geladen
+                  </p>
+                  <p className="font-source-serif text-[13px] italic text-[var(--ink-4)]">
+                    {newsError}
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={() => { setNewsFetched(false); setNewsError(null) }}
-                  className="min-h-[44px] font-inter text-xs font-medium text-wil-600 transition-colors hover:text-wil-700 sm:min-h-0"
+                  className="flex min-h-[44px] items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-2 font-inter text-sm font-medium text-[var(--ink)] shadow-[var(--s0)] transition-all hover:bg-[var(--subtle)] hover:shadow-[var(--s1)] active:scale-[0.98] sm:min-h-0"
                 >
-                  Probeer opnieuw
+                  <RefreshCw className="h-4 w-4" />
+                  Opnieuw proberen
                 </button>
               </div>
             ) : newsItems.length > 0 ? (
               <div>
                 {/* Hero article — front-page style, significantly larger */}
                 <HeroNewsArticle item={newsItems[0]} />
-                {/* Remaining articles — standard size with dividers */}
+                {/* Remaining articles — 2-column grid on desktop */}
                 {newsItems.length > 1 && (
-                  <div className="divide-y divide-[var(--border-ed)]">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
                     {newsItems.slice(1).map((item) => (
                       <NewsArticle key={item.id} item={item} />
                     ))}
