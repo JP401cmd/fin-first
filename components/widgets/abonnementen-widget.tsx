@@ -36,7 +36,7 @@ export function AbonnementenWidget({ size, data, href }: Props) {
     )
   }
 
-  // ── Half-size: total amount + top-3 + freedom time ────
+  // ── Half-size: compact for 1-row height — total + top-3 + freedom time ────
   if (size === 'half') {
     const top3 = topRecurringTransactions.slice(0, 3)
     return (
@@ -45,7 +45,7 @@ export function AbonnementenWidget({ size, data, href }: Props) {
           {formatCurrency(totalRecurringAmount)} <span className="text-sm font-normal text-[var(--ink-3)]">per maand</span>
         </p>
         {top3.length > 0 && (
-          <ul className="mt-2 space-y-1">
+          <ul className="mt-1.5 space-y-0.5">
             {top3.map((t) => (
               <li key={t.id} className="flex items-center justify-between text-xs text-[var(--ink-2)]">
                 <span className="truncate mr-2">{t.name}</span>
@@ -55,13 +55,10 @@ export function AbonnementenWidget({ size, data, href }: Props) {
           </ul>
         )}
         {freedomStr && (
-          <p className="mt-2 font-serif italic text-[11px] text-[var(--ink-3)]">
+          <p className="mt-1.5 font-serif italic text-[11px] text-[var(--ink-3)]">
             = {freedomStr} vrijheid per maand
           </p>
         )}
-        <p className="mt-2 text-[11px] text-[var(--ink-4)]">
-          {recurringTransactions} {recurringTransactions === 1 ? 'abonnement' : 'abonnementen'} totaal
-        </p>
       </WidgetShell>
     )
   }

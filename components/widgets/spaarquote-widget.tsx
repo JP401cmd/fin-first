@@ -96,77 +96,75 @@ export function SpaarquoteWidget({ size, data, href }: Props) {
 
     return (
       <WidgetShell module="kern" size={size} kicker="Spaarquote" href={href}>
-        <div className="flex items-start justify-between gap-4">
-          {/* Left: percentage + bar + bedrag */}
-          <div className="flex-1 min-w-0">
-            <p className={`font-mono text-2xl font-semibold tabular-nums ${isPositive ? 'text-[var(--ink)]' : 'text-red-600'}`}>
-              {rate.toFixed(1)}%
-            </p>
+        {/* Percentage + bar + bedrag (stacked vertically for 2-col full) */}
+        <div>
+          <p className={`font-mono text-2xl font-semibold tabular-nums ${isPositive ? 'text-[var(--ink)]' : 'text-red-600'}`}>
+            {rate.toFixed(1)}%
+          </p>
 
-            <div className="mt-2 h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
-              <div
-                className={`h-full rounded-full transition-all ${isPositive ? 'bg-emerald-500' : 'bg-red-400'}`}
-                style={{ width: `${Math.min(Math.abs(rate), 100)}%` }}
-              />
-            </div>
-
-            <p className="mt-2 text-xs text-[var(--ink-3)]">
-              {formatCurrency(Math.max(savings, 0))} gespaard per maand
-            </p>
-
-            {hasPrevData && (
-              <p className={`mt-1 text-xs font-mono tabular-nums ${delta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                {delta >= 0 ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}% t.o.v. vorige maand
-              </p>
-            )}
-
-            {freedomStr && (
-              <p className="mt-0.5 font-serif italic text-[12px] text-[var(--ink-3)]">
-                +{freedomStr} vrijheid per maand
-              </p>
-            )}
+          <div className="mt-2 h-[4px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+            <div
+              className={`h-full rounded-full transition-all ${isPositive ? 'bg-emerald-500' : 'bg-red-400'}`}
+              style={{ width: `${Math.min(Math.abs(rate), 100)}%` }}
+            />
           </div>
 
-          {/* Right: sparkline */}
-          {sparkData.length >= 2 && (
-            <div className="flex-shrink-0">
-              <svg width={svgW} height={svgH} viewBox={`0 0 ${svgW} ${svgH}`} className="overflow-visible">
-                {/* FIRE benchmark lijn */}
-                <line
-                  x1={0} y1={benchmarkY} x2={svgW} y2={benchmarkY}
-                  stroke="var(--ink-4)" strokeWidth={1} strokeDasharray="4 3" opacity={0.5}
-                />
-                <text x={svgW} y={benchmarkY - 3} textAnchor="end" className="fill-[var(--ink-4)]" fontSize={9}>
-                  50%
-                </text>
-                {/* Trend lijn */}
-                <polyline
-                  points={points}
-                  fill="none"
-                  stroke={isPositive ? '#10b981' : '#ef4444'}
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                {/* Data punten */}
-                {sparkData.map((v, i) => {
-                  const x = sparkData.length > 1 ? (i / (sparkData.length - 1)) * svgW : svgW / 2
-                  const y = svgH - ((v - minVal) / range) * svgH
-                  return (
-                    <circle
-                      key={i}
-                      cx={x} cy={y} r={2.5}
-                      fill={v >= 0 ? '#10b981' : '#ef4444'}
-                    />
-                  )
-                })}
-              </svg>
-            </div>
+          <p className="mt-2 text-xs text-[var(--ink-3)]">
+            {formatCurrency(Math.max(savings, 0))} gespaard per maand
+          </p>
+
+          {hasPrevData && (
+            <p className={`mt-1 text-xs font-mono tabular-nums ${delta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              {delta >= 0 ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}% t.o.v. vorige maand
+            </p>
+          )}
+
+          {freedomStr && (
+            <p className="mt-0.5 font-serif italic text-[12px] text-[var(--ink-3)]">
+              +{freedomStr} vrijheid per maand
+            </p>
           )}
         </div>
 
+        {/* Sparkline — full width below content */}
+        {sparkData.length >= 2 && (
+          <div className="mt-3">
+            <svg width="100%" height={svgH} viewBox={`0 0 ${svgW} ${svgH}`} preserveAspectRatio="none" className="overflow-visible">
+              {/* FIRE benchmark lijn */}
+              <line
+                x1={0} y1={benchmarkY} x2={svgW} y2={benchmarkY}
+                stroke="var(--ink-4)" strokeWidth={1} strokeDasharray="4 3" opacity={0.5}
+              />
+              <text x={svgW} y={benchmarkY - 3} textAnchor="end" className="fill-[var(--ink-4)]" fontSize={9}>
+                50%
+              </text>
+              {/* Trend lijn */}
+              <polyline
+                points={points}
+                fill="none"
+                stroke={isPositive ? '#10b981' : '#ef4444'}
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {/* Data punten */}
+              {sparkData.map((v, i) => {
+                const x = sparkData.length > 1 ? (i / (sparkData.length - 1)) * svgW : svgW / 2
+                const y = svgH - ((v - minVal) / range) * svgH
+                return (
+                  <circle
+                    key={i}
+                    cx={x} cy={y} r={2.5}
+                    fill={v >= 0 ? '#10b981' : '#ef4444'}
+                  />
+                )
+              })}
+            </svg>
+          </div>
+        )}
+
         {/* Gemiddelden + benchmark */}
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-[var(--ink-3)] font-mono tabular-nums">
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-[var(--ink-3)] font-mono tabular-nums">
           {avg3m !== null && (
             <span>3m gem: {avg3m.toFixed(1)}%</span>
           )}

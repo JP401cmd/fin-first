@@ -58,9 +58,9 @@ export function TerugkerendeTransactiesWidget({ size, data, href }: Props) {
     )
   }
 
-  // ── Half-size: total + top-3 + freedom time ────
+  // ── Half-size: total + top-3 + freedom time (compact for 1-row height) ────
   if (size === 'half') {
-    const top5 = topRecurringTransactions.slice(0, 5)
+    const top5 = topRecurringTransactions.slice(0, 3)
     return (
       <WidgetShell module="kern" size={size} kicker="Vaste Lasten" href={href}>
         <div className="flex items-center gap-2">
@@ -79,17 +79,11 @@ export function TerugkerendeTransactiesWidget({ size, data, href }: Props) {
             ))}
           </ul>
         )}
-        <p className="mt-2 text-[11px] font-mono tabular-nums text-[var(--ink-2)]">
-          Totaal: {formatCurrency(totalRecurringAmount)}/maand
-        </p>
         {freedomStr && (
-          <p className="mt-1 font-serif italic text-[11px] text-[var(--ink-3)]">
+          <p className="mt-1.5 font-serif italic text-[11px] text-[var(--ink-3)]">
             = {freedomDays} vrijheidsdagen per maand
           </p>
         )}
-        <p className="mt-2 text-[11px] text-[var(--ink-4)]">
-          {recurringTransactions} {recurringTransactions === 1 ? 'vaste last' : 'vaste lasten'} totaal
-        </p>
       </WidgetShell>
     )
   }

@@ -46,7 +46,7 @@ export function BelastingBox3Widget({ size, data, href }: Props) {
     )
   }
 
-  // ── Half-size ─────────────────────────────────────────────
+  // ── Half-size: compact for 1-row height ──────────────────
   if (size === 'half') {
     return (
       <WidgetShell module="kern" size={size} kicker="Box 3 Belasting" href={href}>
@@ -60,18 +60,15 @@ export function BelastingBox3Widget({ size, data, href }: Props) {
           Schatting vermogensbelasting
         </p>
         {effectiefTarief > 0 && (
-          <p className="mt-1.5 text-[11px] text-[var(--ink-2)]">
+          <p className="mt-1 text-[11px] text-[var(--ink-2)]">
             Effectief tarief: <span className="font-mono tabular-nums font-medium">{effectiefTarief.toFixed(2)}%</span>
           </p>
         )}
         {vrijheidsdagen > 0 && (
-          <p className="mt-1 font-serif italic text-[12px] text-[var(--ink-3)]">
+          <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
             = {vrijheidsdagen} {vrijheidsdagen === 1 ? 'dag' : 'dagen'} vrijheid per jaar
           </p>
         )}
-        <p className="mt-2 font-serif italic text-[12px] text-[var(--ink-3)]">
-          Bekijk Box 3 berekening &rarr;
-        </p>
       </WidgetShell>
     )
   }

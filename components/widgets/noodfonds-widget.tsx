@@ -52,24 +52,22 @@ export function NoodfondsWidget({ size, data, href }: Props) {
     )
   }
 
-  // ── Half: progress bar + bedrag + maanden + vrijheidstijd + complete state ──
+  // ── Half: compact for 1-row height — progress bar + bedrag + maanden ──
   if (size === 'half') {
     return (
       <WidgetShell module="kern" size={size} kicker="Noodfonds" href={href}>
         {/* Header with icon */}
-        <div className="flex items-start gap-3">
-          <div className={`flex-shrink-0 rounded-lg p-2 ${colors.bg}`}>
-            <ShieldCheck className={`h-5 w-5 ${colors.text}`} strokeWidth={1.5} />
+        <div className="flex items-center gap-2">
+          <div className={`flex-shrink-0 rounded-md p-1.5 ${colors.bg}`}>
+            <ShieldCheck className={`h-4 w-4 ${colors.text}`} strokeWidth={1.5} />
           </div>
-          <div className="min-w-0 flex-1">
-            <p className={`font-mono text-2xl font-semibold tabular-nums ${isComplete ? 'text-emerald-600' : 'text-[var(--ink)]'}`}>
-              {monthsCovered.toFixed(1)}<span className="text-base text-[var(--ink-3)]"> / {targetMonths} maanden</span>
-            </p>
-          </div>
+          <p className={`font-mono text-xl font-semibold tabular-nums ${isComplete ? 'text-emerald-600' : 'text-[var(--ink)]'}`}>
+            {monthsCovered.toFixed(1)}<span className="text-sm text-[var(--ink-3)]"> / {targetMonths} mnd</span>
+          </p>
         </div>
 
         {/* Progress bar */}
-        <div className="mt-3 h-[6px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
+        <div className="mt-2 h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]">
           <div
             className={`h-full rounded-full transition-all ${colors.bar}`}
             style={{ width: `${pct}%` }}
@@ -77,30 +75,21 @@ export function NoodfondsWidget({ size, data, href }: Props) {
         </div>
 
         {/* Amount */}
-        <div className="mt-2 flex justify-between text-xs text-[var(--ink-3)] font-mono tabular-nums">
+        <div className="mt-1.5 flex justify-between text-[11px] text-[var(--ink-3)] font-mono tabular-nums">
           <span>{formatCurrency(currentAmount)}</span>
           <span>{formatCurrency(targetAmount)}</span>
         </div>
 
-        {/* Complete state */}
-        {isComplete && (
-          <p className="mt-3 text-sm font-medium text-emerald-600">
-            Noodfonds bereikt!
+        {/* Freedom time or complete state */}
+        {isComplete ? (
+          <p className="mt-1.5 font-serif italic text-[11px] text-emerald-600">
+            Noodfonds bereikt — {targetMonths} maanden ademruimte
           </p>
-        )}
-
-        {/* Freedom time framing */}
-        {freedomStr && !isComplete && (
-          <p className="mt-2 font-serif italic text-[12px] text-[var(--ink-3)]">
+        ) : freedomStr ? (
+          <p className="mt-1.5 font-serif italic text-[11px] text-[var(--ink-3)]">
             {freedomStr} vrijheid opgebouwd als vangnet
           </p>
-        )}
-
-        {isComplete && (
-          <p className="mt-1 font-serif italic text-[12px] text-emerald-600">
-            Je hebt {targetMonths} maanden financiele ademruimte
-          </p>
-        )}
+        ) : null}
       </WidgetShell>
     )
   }

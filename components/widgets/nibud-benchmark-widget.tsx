@@ -55,14 +55,14 @@ export function NibudBenchmarkWidget({ size, data, href }: Props) {
     )
   }
 
-  // ── Half-size: 4-rij vergelijking met indicator ────
+  // ── Half-size: compact 4-rij vergelijking ────
   if (size === 'half') {
     return (
       <WidgetShell module="kern" size={size} kicker="NIBUD Benchmark" href={href}>
         <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
           {formatCurrency(monthlyExpenses)} <span className="text-xs font-normal text-[var(--ink-3)]">per maand</span>
         </p>
-        <ul className="mt-2 space-y-1.5">
+        <ul className="mt-1.5 space-y-0.5">
           {comparison.map((c) => (
             <li key={c.key} className="flex items-center justify-between text-xs text-[var(--ink-2)]">
               <span>{c.label}</span>
@@ -75,11 +75,6 @@ export function NibudBenchmarkWidget({ size, data, href }: Props) {
             </li>
           ))}
         </ul>
-        <p className="mt-2 text-[11px] text-[var(--ink-4)]">
-          {overCount === 0
-            ? 'Alle categorieën binnen NIBUD norm'
-            : `${overCount} ${overCount === 1 ? 'categorie' : 'categorieën'} boven norm`}
-        </p>
       </WidgetShell>
     )
   }

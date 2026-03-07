@@ -44,7 +44,7 @@ export function SchuldenWidget({ size, data, href }: Props) {
   const schuldRatio = totalAssets > 0 ? Math.min((totalDebts / totalAssets) * 100, 100) : (totalDebts > 0 ? 100 : 0)
   const monthlyRepayment = budgetTotals.debt.spent
 
-  // ── Half-size: enriched with progress bar, ratio, repayment ────
+  // ── Half-size: compact for 1-row — progress bar, ratio, repayment ────
   if (size === 'half') {
     return (
       <WidgetShell module="kern" size={size} kicker="Schulden" href={href}>
@@ -52,20 +52,20 @@ export function SchuldenWidget({ size, data, href }: Props) {
           {totalDebts > 0 ? '-' : ''}{formatCurrency(totalDebts)}
         </p>
         {freedomStr && (
-          <p className="mt-0.5 font-serif italic text-[12px] text-[var(--ink-3)]">
+          <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-3)]">
             {freedomStr} vrijheid terug te winnen
           </p>
         )}
 
         {totalDebts > 0 && (
-          <div className="mt-3 space-y-2">
+          <div className="mt-2 space-y-1.5">
             {/* Schuldratio progress bar */}
             <div>
-              <div className="flex justify-between text-[11px] mb-1">
+              <div className="flex justify-between text-[11px] mb-0.5">
                 <span className="text-[var(--ink-3)]">Schuldratio</span>
                 <span className="font-mono tabular-nums text-red-600">{schuldRatio.toFixed(0)}%</span>
               </div>
-              <div className="flex h-2 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+              <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
                 <div
                   className="h-full rounded-full bg-red-500/70 transition-all duration-500"
                   style={{ width: `${schuldRatio}%` }}
@@ -81,10 +81,6 @@ export function SchuldenWidget({ size, data, href }: Props) {
             )}
           </div>
         )}
-
-        <p className="mt-2 text-xs text-[var(--ink-3)]">
-          {totalDebts > 0 ? 'Vrijheid die je terugkoopt' : 'Schuldenvrij — alle vrijheid is van jou'}
-        </p>
       </WidgetShell>
     )
   }

@@ -241,6 +241,48 @@ export function BudgettenWidget({ size, data, href }: Props) {
     : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
 
+  // ── Half-size: compact 4-category inline rows ──
+  if (size === 'half') {
+    return (
+      <WidgetShell module="kern" size={size} kicker="Budgetten" href={href}>
+        <div ref={inViewRef} className="flex flex-col gap-1">
+          {BUDGET_TYPE_CONFIGS.map((config) => {
+            const typeData = budgetTotals[config.key]
+            const { icon: Icon, label, iconBg, iconText, labelText, barFillVar, barWarnVar } = config
+            const hasData = typeData.limit > 0
+            const pct = progressPct(typeData.spent, typeData.limit)
+            const overBudget = hasData && typeData.spent > typeData.limit
+            const fillColor = overBudget ? barWarnVar : barFillVar
+
+            return (
+              <div key={config.key} className="flex items-center gap-2">
+                <div className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[var(--r-sm)] ${iconBg}`}>
+                  <Icon className={iconText} size={8} strokeWidth={2} />
+                </div>
+                <span className={`text-[9px] font-bold uppercase tracking-[0.08em] w-16 shrink-0 ${hasData ? labelText : 'text-[var(--ink-3)]'}`}>
+                  {label}
+                </span>
+                <div className="flex-1 h-1.5 overflow-hidden rounded-full bg-[var(--border-ed)]">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: hasEntered ? `${pct}%` : '0%',
+                      backgroundColor: hasData ? fillColor : 'transparent',
+                      transition: hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1)' : 'none',
+                    }}
+                  />
+                </div>
+                <span className={`font-mono tabular-nums text-[10px] w-10 text-right ${overBudget ? 'text-red-500' : 'text-[var(--ink-3)]'}`}>
+                  {hasData ? `${Math.round(pct)}%` : '—'}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </WidgetShell>
+    )
+  }
+
   return (
     <WidgetShell module="kern" size={size} kicker="Budgetten" href={href}>
 
