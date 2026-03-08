@@ -37,8 +37,8 @@ export async function GET(request: NextRequest) {
   const partnerMember = members?.find(m => m.user_id !== user.id)
   const partnerId = partnerMember?.user_id
 
-  // Fetch all deelneming assets (RLS scoped)
-  const [{ data: assetsRaw }, { data: vorderingenRaw }] = await Promise.all([
+  // Fetch all deelneming assets, DGA-vorderingen, and DGA-schulden (RLS scoped)
+  const [{ data: assetsRaw }, { data: vorderingenRaw }, { data: dgaSchuldenRaw }] = await Promise.all([
     supabase
       .from('assets')
       .select('*')
@@ -50,29 +50,43 @@ export async function GET(request: NextRequest) {
       .eq('is_active', true)
       .eq('asset_type', 'vordering')
       .eq('subtype', 'dga_lening'),
+    supabase
+      .from('debts')
+      .select('id, name, current_balance, user_id, debt_type, ownership')
+      .eq('is_active', true)
+      .eq('debt_type', 'dga_schuld'),
   ])
 
   const allAssets = (assetsRaw ?? []) as Asset[]
-  const dgaLeningen = (vorderingenRaw ?? []) as { id: string; name: string; current_value: number; user_id: string; subtype: string; ownership: string; linked_asset_id: string | null }[]
+  const dgaVorderingen = (vorderingenRaw ?? []) as { id: string; name: string; current_value: number; user_id: string; subtype: string; ownership: string; linked_asset_id: string | null }[]
+  const dgaSchulden = (dgaSchuldenRaw ?? []) as { id: string; name: string; current_balance: number; user_id: string; debt_type: string; ownership: string }[]
 
-  // Calculate total DGA-leningen per perspective
-  const myDgaTotal = dgaLeningen
-    .filter(v => v.user_id === user.id && v.ownership !== 'shared')
-    .reduce((s, v) => s + Number(v.current_value), 0)
-    + dgaLeningen
-    .filter(v => v.ownership === 'shared')
-    .reduce((s, v) => s + Number(v.current_value), 0)
+  // Calculate netto DGA-leningen per perspective
+  // Netto = DGA-vorderingen (BV owes you) - DGA-schulden (you owe BV)
+  // Wet excessief lenen applies when netto > €500.000
+  function calcDgaForUser(userId: string) {
+    const vorderingenOwn = dgaVorderingen
+      .filter(v => v.user_id === userId && v.ownership !== 'shared')
+      .reduce((s, v) => s + Number(v.current_value), 0)
+    const vorderingenShared = dgaVorderingen
+      .filter(v => v.ownership === 'shared')
+      .reduce((s, v) => s + Number(v.current_value), 0)
+    const schuldenOwn = dgaSchulden
+      .filter(d => d.user_id === userId && d.ownership !== 'shared')
+      .reduce((s, d) => s + Number(d.current_balance), 0)
+    const schuldenShared = dgaSchulden
+      .filter(d => d.ownership === 'shared')
+      .reduce((s, d) => s + Number(d.current_balance), 0)
+    return Math.max(0, (vorderingenOwn + vorderingenShared) - (schuldenOwn + schuldenShared))
+  }
 
-  const partnerDgaTotal = partnerId
-    ? dgaLeningen
-        .filter(v => v.user_id === partnerId && v.ownership !== 'shared')
-        .reduce((s, v) => s + Number(v.current_value), 0)
-      + dgaLeningen
-        .filter(v => v.ownership === 'shared')
-        .reduce((s, v) => s + Number(v.current_value), 0)
-    : 0
+  const myDgaTotal = calcDgaForUser(user.id)
 
-  const combinedDgaTotal = dgaLeningen.reduce((s, v) => s + Number(v.current_value), 0)
+  const partnerDgaTotal = partnerId ? calcDgaForUser(partnerId) : 0
+
+  const totalVorderingen = dgaVorderingen.reduce((s, v) => s + Number(v.current_value), 0)
+  const totalSchulden = dgaSchulden.reduce((s, d) => s + Number(d.current_balance), 0)
+  const combinedDgaTotal = Math.max(0, totalVorderingen - totalSchulden)
 
   // Get monthly expenses for freedom days calculation
   const { data: budgets } = await supabase

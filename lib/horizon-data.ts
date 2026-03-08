@@ -198,6 +198,7 @@ export interface ChildrenMetadata {
   aantalKinderen?: number
   kinderopvangDagen?: number
   kinderbijslag?: boolean
+  babyuitzet?: number
 }
 
 export interface AOWMetadata {
@@ -227,6 +228,7 @@ export interface HousePurchaseMetadata {
   hypotheekRente?: number
   eersteWoning?: boolean
   huidigeHuur?: number
+  hypotheekLasten?: number
   nhg?: boolean
 }
 
@@ -680,6 +682,7 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
         { value: 5, label: '5 dagen/week' },
       ], tip: 'Dagopvang ca. €9,50/uur (2026). Kinderopvangtoeslag vergoedt 33%–96% afhankelijk van inkomen (Belastingdienst).' },
       { key: 'kinderbijslag', label: 'Kinderbijslag meenemen', fieldType: 'toggle', default: true, tip: 'Kinderbijslag 2026: ca. €279/kwartaal (0–5 jr), €339 (6–11 jr), €399 (12–17 jr) per kind (SVB).' },
+      { key: 'babyuitzet', label: 'Eenmalige kosten (uitzet, kinderkamer)', fieldType: 'number', default: 3000, tip: 'Gemiddelde eenmalige kosten voor babyuitzet, kinderkamer inrichten, autostoel, kinderwagen etc. Bron: Nibud, ca. €2.500–€5.000.' },
     ],
   },
   renovation: {
@@ -802,7 +805,8 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
       { key: 'aankoopprijs', label: 'Aankoopprijs', fieldType: 'number', default: 350000, tip: 'Gemiddelde koopsom NL 2025: ca. €430.000. In Randstad hoger, buiten Randstad lager.' },
       { key: 'hypotheekRente', label: 'Hypotheekrente', fieldType: 'percentage', default: 4.0, tip: 'Indicatie 2026: 10-jarig vast ca. 3,8–4,2%. NHG-rente ca. 0,2% lager. Check hypotheker.nl voor actuele tarieven.', suffix: '%' },
       { key: 'eersteWoning', label: 'Eerste woning (starter)', fieldType: 'toggle', default: true, tip: 'Starters (18–35 jaar) zijn vrijgesteld van 2% overdrachtsbelasting tot €510.000 (Belastingdienst, 2026).' },
-      { key: 'huidigeHuur', label: 'Huidige maandhuur', fieldType: 'number', default: 1000, tip: 'Gemiddelde vrije sector huur NL: ca. €1.100–€1.400/mnd. Dit bedrag bespaar je — verschil met hypotheek is de netto maandlast.' },
+      { key: 'hypotheekLasten', label: 'Verwachte hypotheeklasten/mnd', fieldType: 'number', default: 1200, tip: 'Geschatte bruto hypotheeklasten per maand. Indicatie: €350K hypotheek à 4% = ca. €1.200/mnd annuïteit. Check hypotheker.nl voor je persoonlijke berekening.', suffix: '/mnd' },
+      { key: 'huidigeHuur', label: 'Huidige huur/mnd', fieldType: 'number', default: 1000, tip: 'Gemiddelde vrije sector huur NL: ca. €1.100–€1.400/mnd. Dit bedrag bespaar je — verschil met hypotheek + onderhoud is de netto maandlast.', suffix: '/mnd' },
       { key: 'nhg', label: 'Nationale Hypotheek Garantie (NHG)', fieldType: 'toggle', default: false, tip: 'NHG-grens 2026: €435.000. Eenmalige kosten: 0,6% van hypotheeksom. Levert ca. 0,2% rentekorting op.' },
     ],
   },

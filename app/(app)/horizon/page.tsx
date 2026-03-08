@@ -815,16 +815,20 @@ export default function HorizonPage() {
       }
     }
 
-    // Special handling for house_purchase: kosten koper + monthly cost change (mortgage - rent)
+    // Special handling for house_purchase: kosten koper + monthly cost change (mortgage + onderhoud - rent)
     if (formType === 'house_purchase') {
       const huidigeHuur = Number(formMetadata.huidigeHuur) || 0
-      const defaultMonthlyCost = Number(LIFE_EVENT_CATALOG.house_purchase?.defaultMonthlyCost) || 300
-      const hypotheekMaand = defaultMonthlyCost // simplified estimate
-      // If current rent > 0, the net monthly change is mortgage - rent savings
-      if (huidigeHuur > 0 && hypotheekMaand > huidigeHuur) {
-        monthlyCostChange = hypotheekMaand - huidigeHuur
-      } else if (huidigeHuur > 0 && hypotheekMaand <= huidigeHuur) {
-        monthlyIncomeChange = huidigeHuur - hypotheekMaand // saving money
+      const hypotheekLasten = Number(formMetadata.hypotheekLasten) || 1200
+      const aankoopprijs = Number(formMetadata.aankoopprijs) || 350000
+      const onderhoudMaand = Math.round((aankoopprijs * 0.01) / 12) // ~1% woningwaarde/jaar
+      const bruteMaandlast = hypotheekLasten + onderhoudMaand
+      const nettoMaandlast = bruteMaandlast - huidigeHuur
+      if (nettoMaandlast > 0) {
+        monthlyCostChange = nettoMaandlast
+        monthlyIncomeChange = 0
+      } else {
+        monthlyCostChange = 0
+        monthlyIncomeChange = Math.abs(nettoMaandlast) // saving money
       }
     }
 
@@ -1102,6 +1106,14 @@ export default function HorizonPage() {
       oneTimeCost = 0
       durMonths = aowGapMaanden
       // formAge is already set to pensioenLeeftijd via setFormAge in openAddForm
+    }
+
+    // Special handling for children: add one-time baby costs (babyuitzet)
+    if (formType === 'children') {
+      const babyuitzet = Number(formMetadata.babyuitzet ?? 3000)
+      if (babyuitzet > 0) {
+        oneTimeCost = babyuitzet
+      }
     }
 
     // Special handling for car_purchase: compute monthly costs from breakdown
@@ -2672,36 +2684,61 @@ export default function HorizonPage() {
                         const nhgKosten = (hasNHG && prijs <= 435000) ? Math.round(prijs * 0.006) : 0
                         const totaal = overdracht + notaris + taxatie + bankgarantie + nhgKosten
                         const pct = prijs > 0 ? ((totaal / prijs) * 100).toFixed(1) : '0.0'
+                        const hypotheekLasten = Number(formMetadata.hypotheekLasten ?? 1200)
+                        const huidigeHuur = Number(formMetadata.huidigeHuur ?? 1000)
+                        const onderhoudMaand = Math.round((prijs * 0.01) / 12)
+                        const bruteMaandlast = hypotheekLasten + onderhoudMaand
+                        const nettoMaandlast = bruteMaandlast - huidigeHuur
                         return (
-                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
-                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Kosten koper ({pct}%)</p>
-                            <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
-                              <div className="flex justify-between">
-                                <span>Overdrachtsbelasting (2%)</span>
-                                <span className="font-mono tabular-nums">
-                                  {overdracht === 0 ? (
-                                    <span className="text-emerald-600">Vrijgesteld (starter &lt;35j)</span>
-                                  ) : (
-                                    formatCurrency(overdracht)
-                                  )}
-                                </span>
+                          <div className="mt-2 space-y-2">
+                            <div className="rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                              <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Kosten koper ({pct}%)</p>
+                              <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                                <div className="flex justify-between">
+                                  <span>Overdrachtsbelasting (2%)</span>
+                                  <span className="font-mono tabular-nums">
+                                    {overdracht === 0 ? (
+                                      <span className="text-emerald-600">Vrijgesteld (starter &lt;35j)</span>
+                                    ) : (
+                                      formatCurrency(overdracht)
+                                    )}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between"><span>Notariskosten</span><span className="font-mono tabular-nums">{formatCurrency(notaris)}</span></div>
+                                <div className="flex justify-between"><span>Taxatiekosten</span><span className="font-mono tabular-nums">{formatCurrency(taxatie)}</span></div>
+                                <div className="flex justify-between"><span>Bankgarantie (0,1%)</span><span className="font-mono tabular-nums">{formatCurrency(bankgarantie)}</span></div>
+                                {nhgKosten > 0 && (
+                                  <div className="flex justify-between"><span>NHG-premie (0,6%)</span><span className="font-mono tabular-nums">{formatCurrency(nhgKosten)}</span></div>
+                                )}
+                                <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
+                                  <span>Totaal kosten koper</span>
+                                  <span className="font-mono tabular-nums">{formatCurrency(totaal)}</span>
+                                </div>
                               </div>
-                              <div className="flex justify-between"><span>Notariskosten</span><span className="font-mono tabular-nums">{formatCurrency(notaris)}</span></div>
-                              <div className="flex justify-between"><span>Taxatiekosten</span><span className="font-mono tabular-nums">{formatCurrency(taxatie)}</span></div>
-                              <div className="flex justify-between"><span>Bankgarantie (0,1%)</span><span className="font-mono tabular-nums">{formatCurrency(bankgarantie)}</span></div>
-                              {nhgKosten > 0 && (
-                                <div className="flex justify-between"><span>NHG-premie (0,6%)</span><span className="font-mono tabular-nums">{formatCurrency(nhgKosten)}</span></div>
+                              {isStarter && prijs > 510000 && (
+                                <p className="text-[10px] text-amber-600">
+                                  Let op: startersvrijstelling geldt alleen tot €510.000 (2026).
+                                </p>
                               )}
-                              <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
-                                <span>Totaal kosten koper</span>
-                                <span className="font-mono tabular-nums">{formatCurrency(totaal)}</span>
+                            </div>
+                            <div className="rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                              <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Netto maandlasten</p>
+                              <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                                <div className="flex justify-between"><span>Hypotheeklasten</span><span className="font-mono tabular-nums">{formatCurrency(hypotheekLasten)}/mnd</span></div>
+                                <div className="flex justify-between"><span>Onderhoud (~1% woningwaarde/jaar)</span><span className="font-mono tabular-nums">{formatCurrency(onderhoudMaand)}/mnd</span></div>
+                                <div className="flex justify-between"><span>Huidige huur (besparing)</span><span className="font-mono tabular-nums text-emerald-600">-{formatCurrency(huidigeHuur)}/mnd</span></div>
+                                <div className="h-px bg-horizon-200 my-1" />
+                                <div className="flex justify-between font-semibold">
+                                  <span>Netto extra maandlast</span>
+                                  <span className={`font-mono tabular-nums ${nettoMaandlast > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                    {nettoMaandlast > 0 ? '+' : ''}{formatCurrency(nettoMaandlast)}/mnd
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                            {isStarter && prijs > 510000 && (
-                              <p className="text-[10px] text-amber-600">
-                                Let op: startersvrijstelling geldt alleen tot €510.000 (2026).
-                              </p>
-                            )}
+                            <p className="text-[10px] leading-relaxed text-amber-600">
+                              Tip: vergeet niet je woning als asset toe te voegen in De Kern → Bezittingen, zodat je vermogensoverzicht klopt.
+                            </p>
                           </div>
                         )
                       })()}
@@ -2710,6 +2747,29 @@ export default function HorizonPage() {
                           Kosten schalen niet lineair (NIBUD): 1 kind ~&#8364;500/mnd, 2 kinderen ~&#8364;830/mnd, 3 ~&#8364;1.100/mnd, 4 ~&#8364;1.320/mnd. Het bedrag hierboven is automatisch aangepast, maar blijft handmatig aanpasbaar.
                         </p>
                       )}
+                      {formType === 'children' && field.key === 'babyuitzet' && (() => {
+                        const aantalKinderen = Number(formMetadata.aantalKinderen ?? 1)
+                        const maandkosten = Number(formAmount) || nibudChildrenCost(aantalKinderen)
+                        const babyuitzet = Number(formMetadata.babyuitzet ?? 3000)
+                        const duurMaanden = Number(formDuration) || 216
+                        const totaalMaandelijk = maandkosten * duurMaanden
+                        const totaal = totaalMaandelijk + babyuitzet
+                        return (
+                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Financieel overzicht kinderen</p>
+                            <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                              <p className="text-[10px] font-semibold text-horizon-500 mb-1">Eenmalige kosten</p>
+                              <div className="flex justify-between"><span>Babyuitzet &amp; kinderkamer</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(babyuitzet)}</span></div>
+                              <div className="h-px bg-horizon-200 my-1" />
+                              <p className="text-[10px] font-semibold text-horizon-500 mb-1">Structurele kosten</p>
+                              <div className="flex justify-between"><span>Maandkosten ({aantalKinderen} {aantalKinderen === 1 ? 'kind' : 'kinderen'})</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(maandkosten)}/mnd</span></div>
+                              <div className="flex justify-between text-[var(--ink-4)]"><span>Duur</span><span>{Math.round(duurMaanden / 12)} jaar ({duurMaanden} mnd)</span></div>
+                              <div className="h-px bg-horizon-200 my-1" />
+                              <div className="flex justify-between font-semibold"><span>Totale geschatte kosten</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(totaal)}</span></div>
+                            </div>
+                          </div>
+                        )
+                      })()}
                       {formType === 'pension' && field.key === 'brutoBedrag' && (
                         <p className="mt-1 text-[10px] leading-relaxed text-[var(--ink-4)]">
                           Gemiddeld aanvullend pensioen Nederland: ca. &#8364;675/mnd bruto. Check <span className="underline">mijnpensioenoverzicht.nl</span> voor je persoonlijke verwachte uitkering.
