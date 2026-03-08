@@ -24,10 +24,12 @@ export async function GET() {
       assetsResult,
       transactionsResult,
       actionsResult,
+      actionsWithImpactResult,
       lifeEventsResult,
       debtsResult,
       profileResult,
       budgetsResult,
+      recommendationsResult,
     ] = await Promise.all([
       supabase
         .from('assets')
@@ -40,6 +42,11 @@ export async function GET() {
       supabase
         .from('actions')
         .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'done'),
+      supabase
+        .from('actions')
+        .select('freedom_days_impact')
         .eq('user_id', user.id)
         .eq('status', 'done'),
       supabase
@@ -60,6 +67,11 @@ export async function GET() {
         .from('budgets')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id),
+      supabase
+        .from('recommendations')
+        .select('id, status', { count: 'exact', head: false })
+        .eq('user_id', user.id)
+        .eq('status', 'pending'),
     ])
 
     // Calculate net worth
@@ -174,6 +186,10 @@ export async function GET() {
     const completedActionsCount = actionsResult.count ?? 0
     const lifeEventsCount = lifeEventsResult.count ?? 0
     const budgetsCount = budgetsResult.count ?? 0
+    const pendingRecommendationsCount = recommendationsResult.count ?? 0
+    const wonFreedomDays = (actionsWithImpactResult.data ?? []).reduce(
+      (sum, a) => sum + (Number(a.freedom_days_impact) || 0), 0
+    )
 
     // Per-step completion booleans
     const steps = {
@@ -194,6 +210,8 @@ export async function GET() {
         lifeEvents: lifeEventsCount,
         budgets: budgetsCount,
         debts: debts.length,
+        pendingRecommendations: pendingRecommendationsCount,
+        wonFreedomDays: Math.round(wonFreedomDays * 10) / 10,
       },
       financial: {
         netWorth: Math.round(netWorth * 100) / 100,
