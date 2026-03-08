@@ -1,3 +1,43 @@
+## Session 2026-03-08 - Features #590, #591, #592
+
+### Feature #590: Auto kopen: brandstoftype en totale maandkosten breakdown - PASSING
+- Added AUTO_MAANDKOSTEN constants per brandstoftype (benzine/diesel/elektrisch/hybride)
+- berekenAutoMaandkosten helper: scales fuel costs by km, calculates total
+- Breakdown card after jaarlijkseKm field: verzekering, wegenbelasting, onderhoud, brandstof
+- Elektrisch: wegenbelasting = Vrijgesteld (EV), lower fuel costs
+- Vervangt huidige auto toggle: shows netto verschil when enabled
+- huidigeAutoKosten field conditionally shown when toggle is on
+- Auto-updates form amount when brandstof or km changes
+- Special save handler: uses breakdown total (minus huidige kosten if replacing)
+- Commit: ff08bd4
+
+### Feature #591: Erfenis: erfbelasting berekening op basis van relatie tot erflater - PASSING
+- Added ERFBELASTING_VRIJSTELLING constants (partner: 804698, kind: 25490, kleinkind: 25490, overig: 2658)
+- Added ERFBELASTING_TARIEVEN constants (10-20% kind/partner, 18-36% kleinkind, 30-40% overig)
+- berekenErfbelasting helper: vrijstelling, schijf 1/2, netto, effectief tarief
+- Updated catalog: kind/partner/kleinkind/overig options with correct vrijstellingen
+- Breakdown card: bruto, vrijstelling, belastbaar, schijven, totaal, effectief tarief, netto
+- Partner vrijstelling note when fully exempt
+- Auto-updates netto erfenis when bruto or relatie changes
+- Save handler: netto erfenis as negative one_time_cost (income)
+- Verified: 100k als kind → belasting 7451 (10%), netto 92549 ✓
+- Commit: 29d7e0f
+
+### Feature #592: Sabbatical: doorbetalingspercentage en automatisch inkomensverlies - PASSING
+- Added doorbetalingsPct, nettoInkomen, extraKosten to SabbaticalMetadata
+- Updated catalog: nettoInkomen, doorbetalingsPct (percentage), extraKosten fields
+- Netto inkomen pre-filled from profile (effectiveInput.monthlyIncome)
+- Breakdown card: netto inkomen, doorbetaling werkgever, inkomensverlies, extra kosten, totaal
+- Tips: 0% = suggest asking employer; 100% = only extra costs apply
+- Auto-update when inkomen or doorbetalingsPct changes
+- Save handler: inkomensverlies as monthly income loss + extra as one-time cost
+- Commit: 8e2549a
+
+### Current Status
+- 3 features completed this session (#590, #591, #592)
+- Zero TypeScript errors
+- Could not verify via browser (Supabase auth rate limiting - no working credentials)
+
 ## Session 2026-03-08 - Features #593, #594, #595
 
 ### Feature #593: Wereldreis reisstijl presets en vaste-lasten-thuis toggle - PASSING
