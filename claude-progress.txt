@@ -11186,3 +11186,73 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 3 features completed this session (#608, #609, #610)
 - Zero TypeScript errors in changed files
+
+## Session 2026-03-08 - Features #642, #643, #645
+
+### Feature #642: Box 2 API endpoint - PASSING
+- Created app/api/household/box2/route.ts
+- Auth check (401 if not logged in)
+- Fetches all assets with asset_type='deelneming'
+- Builds Box2Input with dividend per deelneming via assetToDeelneming()
+- Calls calculateBox2() from lib/box2-data.ts
+- Returns Box2Result + enriched deelneming details (assetId, currentValue, ownershipPct)
+- Supports year query parameter (2025/2026)
+- Household mode: per-partner + combined calculations
+- Follows same patterns as existing /api/household/box3
+
+### Feature #643: Box 2 sectie op belasting-pagina - PASSING
+- Fetches Box 2 data alongside Box 3 in parallel (Promise.all)
+- Box2Section component shown only when user has deelnemingen with income
+- Hero card: teal color accent, Building2 icon, tax amount + freedom days
+- 4 KPI cards: Box 2 inkomen, totaal dividend, vervreemdingswinst, effectief tarief
+- Collapsible calculation breakdown (staffelberekening: 24.5% + 33%)
+- Per-deelneming rows with dividend, verv. winst, total, share %
+- Asset values section showing intrinsic value + belang %
+- Respects viewMode (personal/partner1/partner2/combined)
+
+### Feature #645: Gecombineerd belastingoverzicht Box 1+2+3 - PASSING
+- CombinedTaxSummary component added above Box 3 hero
+- Total tax amount + total freedom days headline
+- Stacked horizontal bar: kern-400 (Box 3) + teal-400 (Box 2)
+- Box 1 row: informatief ("via IB-aangifte") with tooltip
+- Box 2 row: tax + freedom days (or n.v.t. if no deelnemingen)
+- Box 3 row: tax + freedom days
+- Consistent card-editorial design
+
+### Current Status
+- 3 features completed this session (#642, #643, #645)
+- Zero TypeScript errors
+- Commit: f84c111
+
+## Session 2026-03-08 - Features #627, #629, #630
+
+### Feature #627: Database migratie voor deelneming-specifieke kolommen - PASSING
+- Created migration 20260308000006_add_asset_deelneming_fields.sql
+- ALTER TABLE assets ADD COLUMN IF NOT EXISTS kvk_number text
+- ALTER TABLE assets ADD COLUMN IF NOT EXISTS ownership_percentage numeric
+- ALTER TABLE assets ADD COLUMN IF NOT EXISTS annual_dividend numeric
+- Added COMMENT on each column explaining deelneming-only relevance
+- Added fields to Asset interface in lib/asset-data.ts
+
+### Feature #629: Deelneming weergave op assets-pagina - PASSING
+- Asset card subtitle shows belang% for deelneming assets
+- Annual dividend displayed as extra metric (teal colored) when filled
+- Detail modal type-specific details include KvK-nummer, Belang%, Jaarlijks dividend
+- Building2 icon and teal color (#0d9488) already configured from #625
+- No holdings-sync warning for deelneming (not in investment-type array)
+
+### Feature #630: DGA-lening tracking bij deelneming - PASSING
+- Added "Gekoppelde DGA-lening" section to deelneming detail modal
+- Teal-themed section with "Koppel schuld" button to link existing debts
+- Dropdown shows available (unlinked) debts for linking via linked_asset_id
+- Linked debts shown with balance and unlink (X) button
+- Calculates total DGA-leningen across ALL deelneming assets
+- Red warning banner when total >= €500,000 (Wet excessief lenen drempel overschreden)
+- Orange warning banner when total >= €400,000 and < €500,000 (nadert drempel)
+- Both warnings link to belastingdienst.nl for more information
+- Explains fictief regulier voordeel Box 2 consequence
+
+### Current Status
+- 3 features completed this session (#627, #629, #630)
+- Zero TypeScript errors
+- All data from real Supabase queries, no mock data
