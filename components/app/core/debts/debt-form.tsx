@@ -56,6 +56,8 @@ export function DebtForm({
   // Belastingschuld fields
   const [taxYear, setTaxYear] = useState(String(debt?.tax_year ?? ''))
   const [hasPaymentPlan, setHasPaymentPlan] = useState(debt?.has_payment_plan ?? false)
+  // Familielening fields
+  const [hasWrittenAgreement, setHasWrittenAgreement] = useState(debt?.has_written_agreement ?? false)
   const [validationError, setValidationError] = useState<string | null>(null)
   // Household ownership
   const [ownership, setOwnership] = useState<OwnershipType>(debt?.ownership ?? 'personal')
@@ -169,6 +171,7 @@ export function DebtForm({
       // Belastingschuld fields
       tax_year: taxYear ? Number(taxYear) : null,
       has_payment_plan: debtType === 'belastingschuld' ? hasPaymentPlan : false,
+      has_written_agreement: debtType === 'familielening' ? hasWrittenAgreement : false,
       // Household fields
       ownership: ownership,
       household_id: ownership === 'shared' ? householdId : null,
@@ -521,6 +524,17 @@ export function DebtForm({
                       className="rounded border-[var(--border-md)]"
                     />
                     Betalingsregeling
+                  </label>
+                )}
+                {visibleFields.includes('has_written_agreement') && (
+                  <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
+                    <input
+                      type="checkbox"
+                      checked={hasWrittenAgreement}
+                      onChange={(e) => setHasWrittenAgreement(e.target.checked)}
+                      className="rounded border-[var(--border-md)]"
+                    />
+                    Schriftelijke overeenkomst
                   </label>
                 )}
               </div>

@@ -164,6 +164,11 @@ export const DEBT_SUBTYPE_DEFAULTS: Record<string, Partial<{
   aflossingsvrij: { repayment_type: 'aflossingsvrij', is_tax_deductible: false },
   spaarhypotheek: { repayment_type: 'aflossingsvrij', is_tax_deductible: true },
   beleggingshypotheek: { repayment_type: 'aflossingsvrij', is_tax_deductible: true },
+  // Familielening subtypes
+  ouders: { repayment_type: 'lineair' },
+  familie: { repayment_type: 'lineair' },
+  vrienden: { repayment_type: 'lineair' },
+  overig_onderhand: { repayment_type: 'lineair' },
 }
 
 /** Which type-specific fields to show per debt_type */
@@ -176,7 +181,7 @@ export const DEBT_TYPE_FIELDS: Record<DebtType, string[]> = {
   car_loan: [],
   payment_plan: [],
   belastingschuld: ['subtype', 'tax_year', 'has_payment_plan'],
-  familielening: ['subtype', 'has_written_agreement'],
+  familielening: ['subtype', 'repayment_type', 'has_written_agreement'],
   dga_schuld: ['linked_asset_id', 'repayment_type'],
   other: [],
 }
