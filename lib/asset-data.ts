@@ -16,6 +16,7 @@ export type AssetType =
   | 'physical'
   | 'deelneming'
   | 'levensverzekering'
+  | 'vordering'
   | 'other'
 
 export type RiskProfile = 'laag' | 'middel' | 'hoog'
@@ -31,6 +32,7 @@ export type VehicleSubtype = 'auto_eigendom' | 'auto_financial_lease' | 'motor' 
 export type PhysicalSubtype = 'kunst' | 'sieraden' | 'inboedel' | 'verzameling'
 export type DeelnemingSubtype = 'holding_bv' | 'familie_bv' | 'startup' | 'overig_belang'
 export type LevensverzekeringSubtype = 'kapitaalverzekering' | 'uitvaartverzekering' | 'gemengde_polis' | 'overig_verzekering'
+export type VorderingSubtype = 'lening_derden' | 'dga_lening' | 'familielening' | 'overig_vordering'
 
 export type AssetSubtype =
   | CashSubtype
@@ -43,6 +45,7 @@ export type AssetSubtype =
   | PhysicalSubtype
   | DeelnemingSubtype
   | LevensverzekeringSubtype
+  | VorderingSubtype
 
 export interface Asset {
   id: string
@@ -97,6 +100,7 @@ export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
   physical: 'Fysieke bezittingen',
   deelneming: 'Deelneming / Aanmerkelijk belang',
   levensverzekering: 'Levensverzekering',
+  vordering: 'Vordering / Lening u/g',
   other: 'Overig',
 }
 
@@ -112,6 +116,7 @@ export const ASSET_TYPE_ICONS: Record<AssetType, string> = {
   physical: 'Gem',
   deelneming: 'Building2',
   levensverzekering: 'Shield',
+  vordering: 'HandCoins',
   other: 'Briefcase',
 }
 
@@ -127,6 +132,7 @@ export const ASSET_TYPE_COLORS: Record<AssetType, string> = {
   physical: '#ec4899',
   deelneming: '#0d9488',
   levensverzekering: '#7c3aed',
+  vordering: '#0ea5e9',
   other: '#71717a',
 }
 
@@ -143,6 +149,7 @@ export const TYPICAL_RETURNS: Record<AssetType, number> = {
   physical: 0,
   deelneming: 0, // waarde is intrinsiek — handmatige waardering
   levensverzekering: 1.5, // conservatief rendement op opbouwwaarde
+  vordering: 3, // rente op uitstaande leningen (typisch 2-4%)
   other: 0,
 }
 
@@ -210,6 +217,12 @@ export const ASSET_SUBTYPE_LABELS: Partial<Record<AssetType, Record<string, stri
     gemengde_polis: 'Gemengde polis',
     overig_verzekering: 'Overige levensverzekering',
   },
+  vordering: {
+    lening_derden: 'Lening aan derden',
+    dga_lening: 'DGA-lening aan eigen BV',
+    familielening: 'Familielening',
+    overig_vordering: 'Overige vordering',
+  },
 }
 
 export const RISK_PROFILE_LABELS: Record<RiskProfile, string> = {
@@ -267,6 +280,11 @@ export const ASSET_SUBTYPE_DEFAULTS: Record<string, Partial<{
   uitvaartverzekering: { risk_profile: 'laag', is_liquid: false, expected_return: 1 },
   gemengde_polis: { risk_profile: 'middel', is_liquid: false, expected_return: 1.5 },
   overig_verzekering: { risk_profile: 'laag', is_liquid: false, expected_return: 1.5 },
+  // Vordering
+  lening_derden: { risk_profile: 'middel', is_liquid: false, expected_return: 4 },
+  dga_lening: { risk_profile: 'middel', is_liquid: false, expected_return: 2.5 },
+  familielening: { risk_profile: 'middel', is_liquid: false, expected_return: 2 },
+  overig_vordering: { risk_profile: 'middel', is_liquid: false, expected_return: 3 },
 }
 
 /** Which type-specific fields to show per asset_type */
@@ -280,8 +298,9 @@ export const ASSET_TYPE_FIELDS: Record<AssetType, string[]> = {
   crypto: ['subtype', 'risk_profile', 'ticker_symbol'],
   vehicle: ['subtype', 'depreciation_rate'],
   physical: ['subtype'],
-  deelneming: ['subtype', 'risk_profile'],
+  deelneming: ['subtype', 'institution', 'kvk_number', 'ownership_percentage', 'annual_dividend', 'risk_profile'],
   levensverzekering: ['subtype', 'risk_profile', 'is_liquid', 'expiry_date', 'beneficiary'],
+  vordering: ['subtype', 'risk_profile', 'is_liquid', 'expiry_date'],
   other: [],
 }
 
@@ -357,7 +376,7 @@ export function projectPortfolio(
   for (let m = 0; m < months; m++) {
     const byType: Record<AssetType, number> = {
       cash: 0, savings: 0, investment: 0, retirement: 0, eigen_huis: 0, real_estate: 0,
-      crypto: 0, vehicle: 0, physical: 0, deelneming: 0, levensverzekering: 0, other: 0,
+      crypto: 0, vehicle: 0, physical: 0, deelneming: 0, levensverzekering: 0, vordering: 0, other: 0,
     }
     let total = 0
     for (const p of projections) {

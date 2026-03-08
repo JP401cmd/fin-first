@@ -37,6 +37,9 @@ export interface AssetEntry {
   address_house_number: string
   expiry_date: string
   beneficiary: string
+  kvk_number: string
+  ownership_percentage: string
+  annual_dividend: string
 }
 
 const EMPTY: AssetEntry = {
@@ -61,9 +64,12 @@ const EMPTY: AssetEntry = {
   address_house_number: '',
   expiry_date: '',
   beneficiary: '',
+  kvk_number: '',
+  ownership_percentage: '',
+  annual_dividend: '',
 }
 
-const ALL_TYPES: AssetType[] = ['savings', 'investment', 'retirement', 'eigen_huis', 'real_estate', 'crypto', 'vehicle', 'physical', 'deelneming', 'levensverzekering', 'other']
+const ALL_TYPES: AssetType[] = ['savings', 'investment', 'retirement', 'eigen_huis', 'real_estate', 'crypto', 'vehicle', 'physical', 'deelneming', 'levensverzekering', 'vordering', 'other']
 
 export function MiniAssetForm({
   items,
@@ -121,6 +127,9 @@ export function MiniAssetForm({
       address_house_number: '',
       expiry_date: '',
       beneficiary: '',
+      kvk_number: '',
+      ownership_percentage: '',
+      annual_dividend: '',
       expected_return: defaults ? String(defaults) : '',
       monthly_contribution: asset_type === 'eigen_huis' ? '0' : draft.monthly_contribution,
     })
@@ -227,7 +236,7 @@ export function MiniAssetForm({
               {/* Current value */}
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
-                  {draft.asset_type === 'eigen_huis' ? 'Marktwaarde' : draft.asset_type === 'levensverzekering' ? 'Afkoopwaarde' : 'Huidige waarde'}
+                  {draft.asset_type === 'eigen_huis' ? 'Marktwaarde' : draft.asset_type === 'levensverzekering' ? 'Afkoopwaarde' : draft.asset_type === 'deelneming' ? 'Intrinsieke waarde' : 'Huidige waarde'}
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">&euro;</span>
@@ -299,8 +308,8 @@ export function MiniAssetForm({
                 </div>
               )}
 
-              {/* Institution (hidden for eigen_huis) */}
-              {draft.asset_type !== 'eigen_huis' && (
+              {/* Institution (hidden for eigen_huis, shown as 'Naam vennootschap' for deelneming) */}
+              {draft.asset_type !== 'eigen_huis' && !visibleFields.includes('institution') && (
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
                     {draft.asset_type === 'levensverzekering' ? 'Verzekeraar' : 'Instelling'}
@@ -511,6 +520,74 @@ export function MiniAssetForm({
                     onChange={(e) => updateDraft({ beneficiary: e.target.value })}
                     className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                   />
+                </div>
+              )}
+
+              {/* Institution — shown with custom label for deelneming */}
+              {visibleFields.includes('institution') && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Naam vennootschap</label>
+                  <input
+                    type="text"
+                    placeholder="Bijv. Holding BV, Familie BV"
+                    value={draft.institution}
+                    onChange={(e) => updateDraft({ institution: e.target.value })}
+                    className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                  />
+                </div>
+              )}
+
+              {/* KvK-nummer (deelneming) */}
+              {visibleFields.includes('kvk_number') && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">KvK-nummer</label>
+                  <input
+                    type="text"
+                    placeholder="Bijv. 12345678"
+                    value={draft.kvk_number}
+                    onChange={(e) => updateDraft({ kvk_number: e.target.value })}
+                    className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                  />
+                </div>
+              )}
+
+              {/* Ownership percentage (deelneming) */}
+              {visibleFields.includes('ownership_percentage') && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Belang (%)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step={1}
+                      min={0}
+                      max={100}
+                      placeholder="100"
+                      value={draft.ownership_percentage}
+                      onChange={(e) => updateDraft({ ownership_percentage: e.target.value })}
+                      className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 pr-8 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">%</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Annual dividend (deelneming) */}
+              {visibleFields.includes('annual_dividend') && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Jaarlijks dividend</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">&euro;</span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step={100}
+                      min={0}
+                      value={draft.annual_dividend}
+                      onChange={(e) => updateDraft({ annual_dividend: e.target.value })}
+                      className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] py-2 pr-3 pl-7 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                    />
+                  </div>
                 </div>
               )}
             </div>
