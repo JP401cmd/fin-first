@@ -1,3 +1,33 @@
+## Session 2026-03-08 - Features #537, #539, #584
+
+### Feature #537: Privacy verborgen-modus verbergt categorie volledig - PASSING
+- Already fully implemented across all pages (debts, assets, budgets, cash, core, dashboard)
+- filterPartnerItems() removes partner personal items when privacy='hidden'
+- PrivacyHiddenNotice component shows subtle indication of hidden data
+- Core page and dashboard zero out partner totals for hidden categories
+- Household data API applies applyPrivacyFilter() for hidden categories
+
+### Feature #539: Privacy wijzigingen werken direct door - PASSING
+- PATCH /api/household/privacy stores directly in Supabase (no cache)
+- GET /api/household/partner-privacy reads fresh from DB on every request
+- usePartnerPrivacy hook fetches on component mount (no stale cache)
+- Changes take effect immediately on next page load
+
+### Feature #584: Kinderen: kinderopvang en kinderbijslag verrekening - PASSING
+- Added berekenKinderopvangNetto(dagen, kinderen) to horizon-data.ts
+- KINDEROPVANG_BRUTO_PER_DAG_PER_MAAND = 440, TOESLAG_DEKKING_PCT = 0.70
+- Added kinderbijslagPerMaand(kinderen) with SVB 2026 rates (€279/339/399 per kwartaal)
+- Form shows kinderopvang breakdown: bruto, toeslag (~70%), netto eigen bijdrage
+- Financial overview: netto = basiskosten + opvang - kinderbijslag
+- Tip about kinderopvangtoeslag dekking 33-96%
+- Fire simulation: separate cashflows for opvang (0-4yr) and kinderbijslag (0-18yr income)
+- Commit: 263c4bc
+
+### Current Status
+- 3 features completed this session (#537, #539, #584)
+- Zero TypeScript errors
+- Could not verify via browser due to Supabase auth rate limiting
+
 ## Session 2026-03-08 - Features #662, #663, #664
 
 ### Feature #662: Reis-stap 1: Weet waar je staat (De Kern) - PASSING
@@ -11970,3 +12000,39 @@ For Feature #51 (Transaction Import):
 - Zero TypeScript errors
 - Could not verify via browser (Supabase email rate limiting)
 - Commit: 237e051
+
+## Session 2026-03-08 - Features #667, #668, #660
+
+### Feature #667: Ontdekken-sectie op gids-pagina - PASSING
+- Created OntdekkenSection component (components/app/ontdekken-section.tsx)
+- 2-column responsive grid showing max 6 discovery cards
+- Available unvisited features: module-colored cards with 'Probeer het →' link
+- Coming soon features: muted cards with Lock icon + 'Binnenkort beschikbaar' badge
+- Uses existing DISCOVER_ITEMS, feature-phases gating, and localStorage visit tracking
+- Integrated into gids page between accordion sections and pro tips
+- Commit: 7a3eea3
+
+### Feature #668: Ontdekken-kaarten data en configuratie - PASSING
+- Added minLevel field to DiscoverItem interface for sovereignty-based filtering
+- Expanded DISCOVER_ITEMS from 14 to 18 features across all modules
+- New items: budget_optimalisatie, schulden_aflosplan, spending_patterns, vermogensprojectie_chart
+- DiscoverCarousel and OntdekkenSection both filter by minLevel vs user's sovereignty level
+- OntdekkenSection sorts newly-unlocked features first (minLevel == current level)
+- Coming-soon items filter by proximity to current level (within 2 levels)
+- Commit: 029daf8
+
+### Feature #660: Gids voortgangstracker met live data - PASSING
+- Created GuideProgressBar component (components/app/guide-progress-bar.tsx)
+- 5-segment horizontal progress bar with staggered fill animations
+- Steps: (1) bezittingen/schulden (2) transacties (3) actie afgerond (4) FIRE-data (5) levensgebeurtenis
+- Each segment colored by module: kern-amber, wil-teal, horizon-purple
+- Step icons row with Check icon for completed, feature icon for pending
+- Shows 'X van 5 stappen doorlopen' label + 'Alle stappen voltooid!' when complete
+- Fetches real data from /api/guide-progress endpoint
+- Integrated under hero section on gids page
+- Commit: 516bfda
+
+### Current Status
+- 3 features completed this session (#667, #668, #660)
+- Zero TypeScript errors
+- Could not verify via browser (Supabase email rate limit - no test credentials)
