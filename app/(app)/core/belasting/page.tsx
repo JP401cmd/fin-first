@@ -640,6 +640,22 @@ export default function BelastingPage() {
                           }`}
                         />
                         <span className="truncate text-[var(--ink-2)]">{ac.asset.name}</span>
+                        {ac.asset.asset_type === 'vordering' && ac.asset.subtype === 'dga_lening' && (
+                          <span className="group relative shrink-0">
+                            <Info className="h-3 w-3 text-[var(--ink-4)] cursor-help" />
+                            <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1 w-56 rounded bg-gray-900 px-2 py-1 text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                              {BOX3_TOOLTIPS.vorderingDGA}
+                            </span>
+                          </span>
+                        )}
+                        {ac.note && (
+                          <span className="group relative shrink-0">
+                            <Info className="h-3 w-3 text-[var(--ink-4)] cursor-help" />
+                            <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1 w-56 rounded bg-gray-900 px-2 py-1 text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                              {ac.note}
+                            </span>
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
                         <span className="text-[10px] font-medium text-[var(--ink-3)] uppercase">

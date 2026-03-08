@@ -28,6 +28,7 @@ export interface AssetClassification {
   asset: Asset
   category: Box3Category
   exclusionReason: string | null
+  note: string | null
 }
 
 export interface DebtClassification {
@@ -142,30 +143,44 @@ export const BOX3_TOOLTIPS: Record<string, string> = {
   eigenWoning: 'Je eigen woning valt onder Box 1 (eigenwoningforfait), niet onder Box 3.',
   cryptoAlsBelegging: 'De Belastingdienst classificeert alle crypto — ook stablecoins — als "overige bezittingen", niet als spaargeld.',
   pensioenVrijstelling: 'Pensioen en lijfrente met fiscaal voordeel vallen niet in Box 3. Ze zijn al belast bij uitkering (Box 1).',
+  vorderingDGA: 'De vordering op uw BV valt in Box 3, het aanmerkelijk belang zelf in Box 2.',
+  levensverzekering: 'Polissen van vóór 2001 kunnen onder overgangsrecht vrijgesteld zijn. Raadpleeg uw verzekeraar of belastingadviseur.',
 }
 
 // ── Classification ───────────────────────────────────────────
 
-export function classifyAsset(asset: Asset): { category: Box3Category; exclusionReason: string | null } {
+export function classifyAsset(asset: Asset): { category: Box3Category; exclusionReason: string | null; note: string | null } {
   const type = asset.asset_type as AssetType
 
   if (type === 'eigen_huis') {
-    return { category: null, exclusionReason: 'Eigen woning valt onder Box 1' }
+    return { category: null, exclusionReason: 'Eigen woning valt onder Box 1', note: null }
   }
 
   if (type === 'retirement') {
     if (asset.tax_benefit) {
-      return { category: null, exclusionReason: 'Pensioen met fiscaal voordeel (Box 1)' }
+      return { category: null, exclusionReason: 'Pensioen met fiscaal voordeel (Box 1)', note: null }
     }
-    return { category: 'beleggingen', exclusionReason: null }
+    return { category: 'beleggingen', exclusionReason: null, note: null }
   }
 
   if (type === 'savings') {
-    return { category: 'spaargeld', exclusionReason: null }
+    return { category: 'spaargeld', exclusionReason: null, note: null }
+  }
+
+  if (type === 'deelneming') {
+    return { category: null, exclusionReason: 'Aanmerkelijk belang — belast in Box 2', note: null }
+  }
+
+  if (type === 'vordering') {
+    return { category: 'beleggingen', exclusionReason: null, note: null }
+  }
+
+  if (type === 'levensverzekering') {
+    return { category: 'beleggingen', exclusionReason: null, note: BOX3_TOOLTIPS.levensverzekering }
   }
 
   // All other types are beleggingen
-  return { category: 'beleggingen', exclusionReason: null }
+  return { category: 'beleggingen', exclusionReason: null, note: null }
 }
 
 export function classifyDebt(
@@ -200,8 +215,8 @@ export function calculateBox3(input: Box3Input): Box3Result {
   )
 
   const assetClassifications: AssetClassification[] = activeAssets.map(asset => {
-    const { category, exclusionReason } = classifyAsset(asset)
-    return { asset, category, exclusionReason }
+    const { category, exclusionReason, note } = classifyAsset(asset)
+    return { asset, category, exclusionReason, note }
   })
 
   // Step 2: Classify debts

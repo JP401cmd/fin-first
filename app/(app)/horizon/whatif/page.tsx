@@ -640,6 +640,7 @@ export default function WhatIfPage() {
                   baseline={baseline}
                   overrides={overrides}
                   onChange={setOverrides}
+                  isHousehold={isHousehold}
                 />
               </div>
             </div>
