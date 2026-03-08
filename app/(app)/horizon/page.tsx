@@ -13,7 +13,7 @@ import {
   computeResilienceScore, formatFireAge, formatCountdown,
   computeLifeEventImpact, ageAtDate, deriveCountdown,
   runMonteCarlo,
-  LIFE_EVENT_CATALOG, LIFE_EVENT_GROUPS, nibudChildrenCost, berekenSchenkbelasting, berekenAutoMaandkosten, berekenErfbelasting, WERELDREIS_STIJL_PRESETS, VERBOUWING_TYPE_KOSTEN,
+  LIFE_EVENT_CATALOG, LIFE_EVENT_GROUPS, nibudChildrenCost, berekenSchenkbelasting, berekenAutoMaandkosten, berekenErfbelasting, WERELDREIS_STIJL_PRESETS, VERBOUWING_TYPE_KOSTEN, STUDIE_TYPE_KOSTEN,
   type LifeEventGroup,
   type FinancialInput, type FireProjection, type FireRange,
   type ProjectionMonth, type ResilienceScore,
@@ -608,6 +608,19 @@ export default function HorizonPage() {
       setFormDurationType(isPermanent ? 'continuous' : 'period')
       if (!isPermanent) setFormDuration(catalog?.defaultDuration ?? 60)
     }
+    // Study: set cost from type preset
+    if (type === 'study') {
+      const studieType = String(metaDefaults.studieType ?? 'master')
+      const preset = STUDIE_TYPE_KOSTEN[studieType]
+      if (preset) {
+        setFormAmount(preset.bedrag)
+        metaDefaults.collegegeld = preset.bedrag
+        setFormMetadata({ ...metaDefaults })
+        setFormDurationType('one_time')
+        setFormDirection('expense')
+        setFormDuration(preset.duur)
+      }
+    }
     setEditingEvent(null)
     setShowForm(true)
   }
@@ -911,6 +924,22 @@ export default function HorizonPage() {
       durMonths = Number(formDuration) || LIFE_EVENT_CATALOG.world_trip?.defaultDuration || 12
     }
 
+    // Special handling for study: collegegeld + salary increase after completion
+    if (formType === 'study') {
+      const collegegeld = Number(formMetadata.collegegeld ?? formAmount) || 5000
+      const salarisstijging = Number(formMetadata.salarisstijging) || 0
+      const studiePreset = STUDIE_TYPE_KOSTEN[String(formMetadata.studieType ?? 'master')]
+      const studieDuur = Number(formDuration) || studiePreset?.duur || 12
+      // One-time cost = collegegeld
+      oneTimeCost = collegegeld
+      monthlyCostChange = 0
+      // Salary increase after completion (continuous positive income change)
+      if (salarisstijging > 0) {
+        monthlyIncomeChange = salarisstijging
+      }
+      durMonths = studieDuur
+    }
+
     // Special handling for inheritance: calculate netto erfenis after erfbelasting
     if (formType === 'inheritance') {
       const brutoBedrag = Number(formMetadata.brutoBedrag ?? 50000)
@@ -962,6 +991,20 @@ export default function HorizonPage() {
       } else {
         durMonths = Number(uitkeringsduur) * 12
       }
+    }
+
+    // Special handling for part_time: income loss from hours reduction
+    if (formType === 'part_time') {
+      const huidigUren = Number(formMetadata.huidigUren ?? 40)
+      const nieuwUren = Number(formMetadata.nieuwUren ?? 32)
+      const nettoInkomen = Number(formMetadata.nettoInkomen ?? 3000)
+      const reductie = huidigUren > 0 ? 1 - (nieuwUren / huidigUren) : 0
+      const inkomensVerlies = Math.round(nettoInkomen * Math.max(0, reductie))
+      monthlyIncomeChange = -inkomensVerlies
+      monthlyCostChange = 0
+      oneTimeCost = 0
+      const isPermanent = Boolean(formMetadata.isPermanent ?? false)
+      durMonths = isPermanent ? 0 : (Number(formDuration) || 60)
     }
 
     // Special handling for early_retirement: income loss from pensioenleeftijd to AOW
@@ -2288,6 +2331,14 @@ export default function HorizonPage() {
                                 setFormAge(leeftijd)
                                 setFormDuration(aowGapMaanden)
                               }
+                              // Part-time: auto-update income loss when hours or income changes
+                              if (formType === 'part_time' && ['huidigUren', 'nieuwUren', 'nettoInkomen'].includes(field.key)) {
+                                const huidig = Number(field.key === 'huidigUren' ? val : updated.huidigUren ?? 40)
+                                const nieuw = Number(field.key === 'nieuwUren' ? val : updated.nieuwUren ?? 32)
+                                const inkomen = Number(field.key === 'nettoInkomen' ? val : updated.nettoInkomen ?? 3000)
+                                const reductie = huidig > 0 ? 1 - (nieuw / huidig) : 0
+                                setFormAmount(Math.round(inkomen * Math.max(0, reductie)))
+                              }
                               // Auto-update car monthly costs when km changes
                               if (formType === 'car_purchase' && field.key === 'jaarlijkseKm') {
                                 const brandstof = String(updated.brandstof ?? 'benzine')
@@ -2313,6 +2364,12 @@ export default function HorizonPage() {
                               if (formType === 'world_trip' && field.key === 'vertrekkosten') {
                                 const vertrek = Number(val) || 4000
                                 setFormAmount(vertrek)
+                                setFormDirection('expense')
+                                setFormDurationType('one_time')
+                              }
+                              // Study: auto-update cost when collegegeld changes
+                              if (formType === 'study' && field.key === 'collegegeld') {
+                                setFormAmount(Number(val) || 0)
                                 setFormDirection('expense')
                                 setFormDurationType('one_time')
                               }
@@ -2358,6 +2415,17 @@ export default function HorizonPage() {
                                 setFormDirection('expense')
                                 setFormDurationType('one_time')
                                 setFormMetadata(prev => ({ ...prev, type: val, waardevermeerdering: preset.waardePct }))
+                              }
+                            }
+                            // Study: auto-update cost and duration based on type preset
+                            if (formType === 'study' && field.key === 'studieType') {
+                              const preset = STUDIE_TYPE_KOSTEN[val]
+                              if (preset) {
+                                setFormAmount(preset.bedrag)
+                                setFormDirection('expense')
+                                setFormDurationType('one_time')
+                                setFormDuration(preset.duur)
+                                setFormMetadata(prev => ({ ...prev, studieType: val, collegegeld: preset.bedrag }))
                               }
                             }
                             if (formType === 'aow' && field.key === 'leefsituatie') {
@@ -2421,6 +2489,16 @@ export default function HorizonPage() {
                                 // Pension: sync isGeindexeerd toggle with formIsIndexed
                                 if (formType === 'pension' && field.key === 'isGeindexeerd') {
                                   setFormIsIndexed(checked)
+                                }
+                                // Part-time: toggle permanent ↔ tijdelijk
+                                if (formType === 'part_time' && field.key === 'isPermanent') {
+                                  if (checked) {
+                                    setFormDurationType('continuous')
+                                    setFormDuration(0)
+                                  } else {
+                                    setFormDurationType('period')
+                                    setFormDuration(60)
+                                  }
                                 }
                                 // Side hustle: toggle doorlopend ↔ tijdelijk project
                                 if (formType === 'side_hustle' && field.key === 'doorlopend') {
@@ -2525,6 +2603,74 @@ export default function HorizonPage() {
                           Gemiddeld aanvullend pensioen Nederland: ca. &#8364;675/mnd bruto. Check <span className="underline">mijnpensioenoverzicht.nl</span> voor je persoonlijke verwachte uitkering.
                         </p>
                       )}
+                      {formType === 'part_time' && field.key === 'behoudtPensioen' && (() => {
+                        const ptHuidigUren = Number(formMetadata.huidigUren ?? 40)
+                        const ptNieuwUren = Number(formMetadata.nieuwUren ?? 32)
+                        const ptNettoInkomen = Number(formMetadata.nettoInkomen ?? 3000)
+                        const ptReductie = ptHuidigUren > 0 ? 1 - (ptNieuwUren / ptHuidigUren) : 0
+                        const ptInkomensVerlies = Math.round(ptNettoInkomen * Math.max(0, ptReductie))
+                        const ptUrenPct = ptHuidigUren > 0 ? Math.round((ptNieuwUren / ptHuidigUren) * 100) : 100
+                        const ptBehoudtPensioen = Boolean(formMetadata.behoudtPensioen ?? false)
+                        const ptPensioenReductie = ptBehoudtPensioen ? 0 : Math.min(100, Math.round(ptReductie * 1.65 * 100))
+                        return (
+                          <div className="mt-2 space-y-3">
+                            <div className="rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                              <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Inkomensverlies berekening</p>
+                              <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                                <div className="flex justify-between">
+                                  <span>Huidig</span>
+                                  <span className="font-mono tabular-nums">{ptHuidigUren} uur/week — {formatCurrency(ptNettoInkomen)}/mnd</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Nieuw</span>
+                                  <span className="font-mono tabular-nums">{ptNieuwUren} uur/week ({ptUrenPct}%)</span>
+                                </div>
+                                <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
+                                  <span>Inkomensverlies</span>
+                                  <span className="font-mono tabular-nums text-red-600">-{formatCurrency(ptInkomensVerlies)}/mnd</span>
+                                </div>
+                              </div>
+                            </div>
+                            {!ptBehoudtPensioen && ptReductie > 0 && (
+                              <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                                <div className="text-xs text-amber-800 space-y-1">
+                                  <p className="font-semibold">Pensioenimpact (franchise-effect)</p>
+                                  <p>
+                                    {Math.round(ptReductie * 100)}% minder uren kan leiden tot ~{ptPensioenReductie}% minder pensioenopbouw.
+                                    Dit komt door de franchise (drempel van ca. &#8364;16.300): je bouwt alleen pensioen op over het salaris <em>boven</em> de franchise. Bij parttime daalt je salaris, maar de franchise blijft gelijk.
+                                  </p>
+                                  <p className="text-[10px] text-amber-600">
+                                    Tip: vraag je werkgever of je pensioen over het voltijdsalaris kunt opbouwen.
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
+                      {formType === 'inheritance' && field.key === 'erfbelastingSchijf' && (() => {
+                        const bruto = Number(formMetadata.brutoBedrag ?? 50000)
+                        const relatie = String(formMetadata.erfbelastingSchijf ?? 'kind')
+                        const erf = berekenErfbelasting(bruto, relatie)
+                        const tariefLabel: Record<string, string> = { kind: '10–20%', partner: '10–20%', kleinkind: '18–36%', overig: '30–40%' }
+                        return (
+                          <div className="mt-2 space-y-1.5 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Erfbelasting berekening (2026)</p>
+                            <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                              <div className="flex justify-between"><span>Bruto erfenis</span><span className="font-mono tabular-nums">{formatCurrency(bruto)}</span></div>
+                              <div className="flex justify-between text-emerald-600"><span>Vrijstelling ({relatie})</span><span className="font-mono tabular-nums">-{formatCurrency(erf.vrijstelling)}</span></div>
+                              <div className="flex justify-between"><span>Belastbaar bedrag</span><span className="font-mono tabular-nums">{formatCurrency(erf.belastbaar)}</span></div>
+                              {erf.belastingLaag > 0 && (<div className="flex justify-between text-[var(--ink-3)]"><span className="pl-3">Schijf 1 ({tariefLabel[relatie]})</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(erf.belastingLaag)}</span></div>)}
+                              {erf.belastingHoog > 0 && (<div className="flex justify-between text-[var(--ink-3)]"><span className="pl-3">Schijf 2</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(erf.belastingHoog)}</span></div>)}
+                              <div className="flex justify-between"><span>Totaal erfbelasting</span><span className={`font-mono tabular-nums ${erf.totaalBelasting > 0 ? 'text-red-600' : ''}`}>{erf.totaalBelasting > 0 ? `-${formatCurrency(erf.totaalBelasting)}` : formatCurrency(0)}</span></div>
+                              {erf.effectiefTarief > 0 && (<div className="flex justify-between text-[var(--ink-4)]"><span>Effectief tarief</span><span className="font-mono tabular-nums">{erf.effectiefTarief}%</span></div>)}
+                              <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold"><span>Netto erfenis</span><span className="font-mono tabular-nums text-emerald-600">+{formatCurrency(erf.netto)}</span></div>
+                            </div>
+                            {relatie === 'partner' && bruto <= erf.vrijstelling && (<p className="text-[10px] text-emerald-700">Volledig vrijgesteld: de partnervrijstelling ({formatCurrency(erf.vrijstelling)}) overschrijdt het bedrag.</p>)}
+                          </div>
+                        )
+                      })()}
                       {formType === 'early_retirement' && field.key === 'overbruggingsUitkering' && (() => {
                         const pensioenLeeftijd = Number(formMetadata.pensioenLeeftijd ?? 62)
                         const aowLeeftijd = 67

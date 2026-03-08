@@ -284,9 +284,20 @@ export const VERBOUWING_TYPE_KOSTEN: Record<string, { label: string; bedrag: num
 }
 
 export interface StudyMetadata {
-  studieType?: 'cursus' | 'bachelor' | 'master' | 'promotie'
+  studieType?: 'cursus' | 'mbo' | 'bachelor' | 'master' | 'mba' | 'promotie'
   parttime?: boolean
   salarisstijging?: number
+  collegegeld?: number
+}
+
+/** Default cost presets per study type */
+export const STUDIE_TYPE_KOSTEN: Record<string, { label: string; bedrag: number; duur: number }> = {
+  cursus:    { label: 'Korte cursus / certificering', bedrag: 1000,  duur: 3 },
+  mbo:       { label: 'MBO opleiding',               bedrag: 3000,  duur: 24 },
+  bachelor:  { label: 'HBO / WO Bachelor',            bedrag: 7500,  duur: 36 },
+  master:    { label: 'Master',                       bedrag: 5000,  duur: 12 },
+  mba:       { label: 'MBA',                          bedrag: 30000, duur: 18 },
+  promotie:  { label: 'Promotietraject',              bedrag: 2000,  duur: 48 },
 }
 
 export interface CareerChangeMetadata {
@@ -332,8 +343,12 @@ export interface MoveMetadata {
 
 export interface SideHustleMetadata {
   type?: 'freelance' | 'verhuur' | 'ecommerce' | 'content' | 'overig'
+  brutoOmzet?: number
+  kostenPerMaand?: number
   opstartkosten?: number
-  groeipercentage?: number
+  opbouwperiode?: number
+  opbouwOmzetPct?: number
+  doorlopend?: boolean
 }
 
 export interface ScheidingMetadata {
@@ -676,22 +691,25 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     label: 'Studie',
     icon: 'GraduationCap',
     group: 'vrije_tijd',
-    impactRange: '€5K–€30K totaal',
-    defaultCost: 8000,
+    impactRange: '€1K–€30K totaal',
+    defaultCost: 5000,
     defaultMonthlyCost: 0,
     defaultMonthlyIncome: 0,
-    defaultDuration: 24,
+    defaultDuration: 12,
     description: 'Opleiding of cursus',
-    tip: 'Collegegeld 2025/2026: wettelijk €2.530/jr (bachelor/master). MBA: €15K–€40K totaal. Korte cursus/certificering: €500–€5.000. Studiekosten zijn soms aftrekbaar via scholingsaftrek.',
+    tip: 'Collegegeld 2025/2026: wettelijk €2.530/jr (bachelor/master). MBA: €15K–€40K totaal. STAP-budget (max €1.000) en scholingsaftrek kunnen de kosten verlagen.',
     fields: [
-      { key: 'studieType', label: 'Type studie', fieldType: 'select', default: 'master', options: [
-        { value: 'cursus', label: 'Korte cursus / certificering' },
-        { value: 'bachelor', label: 'Bachelor' },
-        { value: 'master', label: 'Master / MBA' },
-        { value: 'promotie', label: 'Promotietraject' },
+      { key: 'studieType', label: 'Type opleiding', fieldType: 'select', default: 'master', options: [
+        { value: 'cursus', label: 'Korte cursus / certificering — ~€1.000' },
+        { value: 'mbo', label: 'MBO opleiding — ~€3.000' },
+        { value: 'bachelor', label: 'HBO / WO Bachelor — ~€7.500' },
+        { value: 'master', label: 'Master — ~€5.000' },
+        { value: 'mba', label: 'MBA — ~€30.000' },
+        { value: 'promotie', label: 'Promotietraject — ~€2.000' },
       ]},
+      { key: 'collegegeld', label: 'Collegegeld / cursuskosten (totaal)', fieldType: 'number', default: 5000, tip: 'Totale studiekosten inclusief boeken en materiaal. Het bedrag wordt automatisch ingesteld o.b.v. type, maar is handmatig aanpasbaar.' },
       { key: 'parttime', label: 'Parttime studie (naast werk)', fieldType: 'toggle', default: false, tip: 'Bij fulltime studie valt je netto inkomen weg. Sommige werkgevers bieden studieverlof of scholingsbudget.' },
-      { key: 'salarisstijging', label: 'Verwachte salarisstijging na afronding', fieldType: 'percentage', default: 15, tip: 'Gemiddeld 10–20% meer na een master. MBA: 20–40% salarisstijging (afhankelijk van sector).', suffix: '%' },
+      { key: 'salarisstijging', label: 'Verwachte salarisverhoging na afronding', fieldType: 'number', default: 300, suffix: '/mnd', tip: 'Gemiddeld €200–€500/mnd netto meer na een master. MBA: €500–€1.500/mnd. Cursus: €0–€200/mnd. Dit creëert een positieve inkomenswijziging na je studieduur.' },
     ],
   },
   career_change: {
