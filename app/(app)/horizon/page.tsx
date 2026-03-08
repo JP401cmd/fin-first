@@ -471,6 +471,26 @@ export default function HorizonPage() {
       setFormDurationType('one_time')
       setFormDirection('income')
     }
+    // Pre-fill house_sale from active mortgage debts
+    if (type === 'house_sale' && debts.length > 0) {
+      const mortgages = debts.filter(d => d.debt_type === 'mortgage' && d.is_active)
+      if (mortgages.length > 0) {
+        const totalBalance = mortgages.reduce((sum, m) => sum + Number(m.current_balance ?? 0), 0)
+        const totalPayment = mortgages.reduce((sum, m) => sum + Number(m.monthly_payment ?? 0), 0)
+        if (totalBalance > 0) metaDefaults.resterendeHypotheek = totalBalance
+        if (totalPayment > 0) metaDefaults.oudeHypotheeklasten = totalPayment
+        setFormMetadata({ ...metaDefaults })
+        // Recalculate netto overwaarde with pre-filled values
+        const vp = Number(metaDefaults.verkoopprijs) || 400000
+        const rh = Number(metaDefaults.resterendeHypotheek) || 0
+        const mkPct = Number(metaDefaults.makelaarskosten) || 1.5
+        const mkBedrag = Math.round(vp * mkPct / 100)
+        const netto = vp - rh - mkBedrag
+        setFormAmount(Math.abs(netto))
+        setFormDirection(netto >= 0 ? 'income' : 'expense')
+        setFormDurationType('one_time')
+      }
+    }
     setEditingEvent(null)
     setShowForm(true)
   }

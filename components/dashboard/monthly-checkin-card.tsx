@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { CalendarCheck, X, ArrowRight, Loader2 } from 'lucide-react'
+import { CalendarCheck, X, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 
 const MONTH_NAMES = [
@@ -9,10 +9,17 @@ const MONTH_NAMES = [
   'juli', 'augustus', 'september', 'oktober', 'november', 'december',
 ]
 
+/** sessionStorage key to suppress card after dismiss within the same session */
+const DISMISS_KEY = 'checkin_dismissed'
+
+function currentMonthKey() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
 export function MonthlyCheckinCard() {
   const [loading, setLoading] = useState(true)
   const [visible, setVisible] = useState(false)
-  const [completing, setCompleting] = useState(false)
   const [fadingOut, setFadingOut] = useState(false)
   const [monthLabel, setMonthLabel] = useState('')
 
@@ -20,10 +27,17 @@ export function MonthlyCheckinCard() {
     const now = new Date()
     setMonthLabel(MONTH_NAMES[now.getMonth()])
 
+    // If user dismissed in this session, don't show
+    const dismissed = sessionStorage.getItem(DISMISS_KEY)
+    if (dismissed === currentMonthKey()) {
+      setLoading(false)
+      return
+    }
+
     fetch('/api/monthly-checkin')
       .then(r => r.json())
       .then(data => {
-        // Show card only if enabled and not yet completed
+        // Show card only if enabled and not yet completed this month
         if (data.enabled && !data.completed) {
           setVisible(true)
         }
@@ -34,19 +48,37 @@ export function MonthlyCheckinCard() {
       .finally(() => setLoading(false))
   }, [])
 
-  const handleComplete = useCallback(async () => {
-    setCompleting(true)
-    try {
-      const res = await fetch('/api/monthly-checkin', { method: 'POST' })
-      if (!res.ok) throw new Error('Failed')
+  // Listen for check-in completion from the wizard (via custom event or refetch)
+  useEffect(() => {
+    const handleCheckinCompleted = () => {
       setFadingOut(true)
       setTimeout(() => setVisible(false), 200)
-    } catch {
-      setCompleting(false)
     }
+    window.addEventListener('checkin-completed', handleCheckinCompleted)
+    return () => window.removeEventListener('checkin-completed', handleCheckinCompleted)
   }, [])
 
+  // Also re-check on window focus (user completes wizard in same tab, then returns)
+  useEffect(() => {
+    if (!visible) return
+    const handleFocus = () => {
+      fetch('/api/monthly-checkin')
+        .then(r => r.json())
+        .then(data => {
+          if (data.completed) {
+            setFadingOut(true)
+            setTimeout(() => setVisible(false), 200)
+          }
+        })
+        .catch(() => {})
+    }
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [visible])
+
   const handleDismiss = useCallback(() => {
+    // Persist dismiss for this session so card doesn't reappear on page refresh
+    sessionStorage.setItem(DISMISS_KEY, currentMonthKey())
     setFadingOut(true)
     setTimeout(() => setVisible(false), 200)
   }, [])
@@ -91,17 +123,10 @@ export function MonthlyCheckinCard() {
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Link
               href="/core/checkin"
-              onClick={handleComplete}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-wil-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-700 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-wil-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-700"
             >
-              {completing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <>
-                  Start check-in
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </>
-              )}
+              Start check-in
+              <ArrowRight className="h-3.5 w-3.5" />
             </Link>
             <span className="text-[10px] text-[var(--ink-4)] font-serif italic">
               Uitschakelbaar in Instellingen

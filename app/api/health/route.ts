@@ -10,25 +10,20 @@ export async function GET(request: Request) {
     // Test the database connection with a simple query
     const { data, error } = await supabase
       .from('profiles')
-      .select('count')
+      .select('id')
       .limit(1)
 
     if (error) {
-      // Try a raw SQL approach if profiles table doesn't exist
-      const { error: rawError } = await supabase.rpc('now' as never)
-
-      if (rawError) {
-        return NextResponse.json(
-          {
-            status: 'error',
-            database: 'disconnected',
-            supabase: 'error',
-            error: rawError.message,
-            timestamp: new Date().toISOString(),
-          },
-          { status: 503 }
-        )
-      }
+      return NextResponse.json(
+        {
+          status: 'error',
+          database: 'disconnected',
+          supabase: 'error',
+          error: error.message,
+          timestamp: new Date().toISOString(),
+        },
+        { status: 503 }
+      )
     }
 
     // If persistence_test is requested, verify app_settings table persistence

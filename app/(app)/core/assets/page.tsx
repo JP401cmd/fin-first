@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import {
-  Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2, BarChart3, ChevronDown, ChevronUp, Briefcase, AlertCircle,
+  Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2, BarChart3, ChevronDown, ChevronUp, Briefcase, AlertCircle, AlertTriangle, LinkIcon,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -531,9 +531,15 @@ export default function AssetsPage() {
                                 ASSET_TYPE_LABELS[asset.asset_type],
                                 asset.subtype && ASSET_SUBTYPE_LABELS[asset.asset_type]?.[asset.subtype],
                                 asset.institution,
+                                asset.asset_type === 'deelneming' && asset.ownership_percentage != null ? `${asset.ownership_percentage}% belang` : null,
                               ].filter(Boolean).join(' \u2022 ')
                           }
                         </p>
+                        {asset.asset_type === 'deelneming' && asset.annual_dividend != null && asset.annual_dividend > 0 && (
+                          <p className="text-[10px] text-teal-600/80">
+                            Dividend: {formatCurrency(asset.annual_dividend)} p.j.
+                          </p>
+                        )}
                         {(asset.net_worth_inclusion_pct ?? 100) < 100 && (
                           <span className="mt-0.5 inline-block rounded bg-kern-50 border border-kern-200 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-kern-600">
                             {asset.net_worth_inclusion_pct}% meegeteld
@@ -688,6 +694,54 @@ function AssetDetailModal({
     }
   }, [asset.id, asset.asset_type])
 
+  // DGA-lening tracking for deelneming assets
+  const isDeelneming = asset.asset_type === 'deelneming'
+  const [linkedDebts, setLinkedDebts] = useState<{ id: string; name: string; current_balance: number }[]>([])
+  const [allDebts, setAllDebts] = useState<{ id: string; name: string; current_balance: number; linked_asset_id: string | null }[]>([])
+  const [totalDgaLeningen, setTotalDgaLeningen] = useState(0)
+  const [showLinkDropdown, setShowLinkDropdown] = useState(false)
+  const WET_EXCESSIEF_LENEN_DREMPEL = 500_000
+  const WET_EXCESSIEF_LENEN_WAARSCHUWING = 400_000
+
+  useEffect(() => {
+    if (!isDeelneming) return
+    const sb = createClient()
+    Promise.all([
+      sb.from('debts').select('id, name, current_balance').eq('linked_asset_id', asset.id).eq('is_active', true),
+      sb.from('debts').select('id, name, current_balance, linked_asset_id').eq('is_active', true),
+      sb.from('assets').select('id').eq('asset_type', 'deelneming').eq('is_active', true),
+    ]).then(([linkedRes, allRes, deelnemingRes]) => {
+      setLinkedDebts(linkedRes.data ?? [])
+      setAllDebts(allRes.data ?? [])
+      const deelIds = new Set((deelnemingRes.data ?? []).map((a: { id: string }) => a.id))
+      const tot = (allRes.data ?? [])
+        .filter((d: { linked_asset_id: string | null }) => d.linked_asset_id && deelIds.has(d.linked_asset_id))
+        .reduce((s: number, d: { current_balance: number }) => s + Number(d.current_balance), 0)
+      setTotalDgaLeningen(tot)
+    })
+  }, [asset.id, isDeelneming])
+
+  const linkDebt = async (debtId: string) => {
+    const sb = createClient()
+    await sb.from('debts').update({ linked_asset_id: asset.id }).eq('id', debtId)
+    const { data } = await sb.from('debts').select('id, name, current_balance').eq('linked_asset_id', asset.id).eq('is_active', true)
+    setLinkedDebts(data ?? [])
+    setAllDebts(prev => prev.map(d => d.id === debtId ? { ...d, linked_asset_id: asset.id } : d))
+    setTotalDgaLeningen(prev => prev + Number(allDebts.find(d => d.id === debtId)?.current_balance ?? 0))
+    setShowLinkDropdown(false)
+  }
+
+  const unlinkDebt = async (debtId: string) => {
+    const sb = createClient()
+    await sb.from('debts').update({ linked_asset_id: null }).eq('id', debtId)
+    const bal = Number(linkedDebts.find(d => d.id === debtId)?.current_balance ?? 0)
+    setLinkedDebts(prev => prev.filter(d => d.id !== debtId))
+    setAllDebts(prev => prev.map(d => d.id === debtId ? { ...d, linked_asset_id: null } : d))
+    setTotalDgaLeningen(prev => prev - bal)
+  }
+
+  const availableDebts = allDebts.filter(d => !d.linked_asset_id)
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
@@ -767,16 +821,16 @@ function AssetDetailModal({
         <div className="space-y-4 px-6 py-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-[var(--r)] bg-[var(--subtle)] p-3">
-              <p className="text-xs text-[var(--ink-3)]">{isEigenHuis ? 'Aankoopprijs' : 'Aankoopwaarde'}</p>
+              <p className="text-xs text-[var(--ink-3)]">{isEigenHuis ? 'Aankoopprijs' : asset.asset_type === 'vordering' ? 'Oorspronkelijke hoofdsom' : 'Aankoopwaarde'}</p>
               <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">{purchase > 0 ? formatCurrency(purchase) : '-'}</p>
             </div>
             <div className="rounded-[var(--r)] bg-[var(--subtle)] p-3">
-              <p className="text-xs text-[var(--ink-3)]">Verwacht rendement</p>
+              <p className="text-xs text-[var(--ink-3)]">{asset.asset_type === 'vordering' ? 'Rentepercentage' : 'Verwacht rendement'}</p>
               <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">{Number(asset.expected_return)}% p.j.</p>
             </div>
             {!isEigenHuis && (
               <div className="rounded-[var(--r)] bg-[var(--subtle)] p-3">
-                <p className="text-xs text-[var(--ink-3)]">Maandelijkse inleg</p>
+                <p className="text-xs text-[var(--ink-3)]">{asset.asset_type === 'vordering' ? 'Maandelijkse aflossing' : 'Maandelijkse inleg'}</p>
                 <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">
                   {Number(asset.monthly_contribution) > 0 ? formatCurrency(Number(asset.monthly_contribution)) : '-'}
                 </p>
@@ -820,6 +874,119 @@ function AssetDetailModal({
             </div>
           )}
 
+          {/* DGA-lening section for deelneming assets */}
+          {isDeelneming && (
+            <div className="rounded-[var(--r)] border border-teal-200 bg-teal-50/50 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-teal-700/80 uppercase">Gekoppelde DGA-lening</p>
+                {availableDebts.length > 0 && (
+                  <button
+                    onClick={() => setShowLinkDropdown(!showLinkDropdown)}
+                    className="flex items-center gap-1 rounded-[var(--r)] bg-teal-100 px-2 py-1 text-[10px] font-medium text-teal-700 hover:bg-teal-200 transition-colors"
+                  >
+                    <LinkIcon className="h-3 w-3" /> Koppel schuld
+                  </button>
+                )}
+              </div>
+
+              {/* Link dropdown */}
+              {showLinkDropdown && availableDebts.length > 0 && (
+                <div className="rounded-[var(--r)] border border-teal-200 bg-white p-2 space-y-1">
+                  <p className="text-[10px] text-[var(--ink-3)] mb-1">Selecteer een schuld om te koppelen:</p>
+                  {availableDebts.map(d => (
+                    <button
+                      key={d.id}
+                      onClick={() => linkDebt(d.id)}
+                      className="flex w-full items-center justify-between rounded-[var(--r)] px-2 py-1.5 text-xs hover:bg-teal-50 transition-colors"
+                    >
+                      <span className="text-[var(--ink)]">{d.name}</span>
+                      <span className="font-mono tabular-nums text-[var(--ink-2)]">{formatCurrency(d.current_balance)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Linked debts list */}
+              {linkedDebts.length > 0 ? (
+                <div className="space-y-1.5">
+                  {linkedDebts.map(d => (
+                    <div key={d.id} className="flex items-center justify-between">
+                      <span className="text-xs text-[var(--ink-2)]">{d.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono tabular-nums text-sm font-medium text-[var(--ink)]">{formatCurrency(d.current_balance)}</span>
+                        <button
+                          onClick={() => unlinkDebt(d.id)}
+                          className="rounded p-0.5 text-[var(--ink-4)] hover:text-red-500 hover:bg-red-50 transition-colors"
+                          title="Ontkoppel"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-[var(--ink-3)]">
+                  Geen DGA-lening gekoppeld. Koppel een schuld uit De Kern &gt; Schulden.
+                </p>
+              )}
+
+              {/* Wet excessief lenen warnings */}
+              {totalDgaLeningen > 0 && (
+                <div className="border-t border-teal-200/60 pt-2 mt-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[var(--ink-2)]">Totaal DGA-leningen</span>
+                    <span className="font-mono tabular-nums font-medium text-[var(--ink)]">{formatCurrency(totalDgaLeningen)}</span>
+                  </div>
+
+                  {totalDgaLeningen >= WET_EXCESSIEF_LENEN_DREMPEL && (
+                    <div className="mt-2 flex items-start gap-2 rounded-[var(--r)] bg-red-50 border border-red-200 px-3 py-2">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-600" />
+                      <div>
+                        <p className="text-xs font-medium text-red-700">
+                          Wet excessief lenen: drempel overschreden
+                        </p>
+                        <p className="text-[10px] text-red-600 mt-0.5">
+                          Uw totale DGA-leningen ({formatCurrency(totalDgaLeningen)}) overschrijden de drempel van {formatCurrency(WET_EXCESSIEF_LENEN_DREMPEL)}. Het meerdere wordt belast als fictief regulier voordeel in Box 2.
+                        </p>
+                        <a
+                          href="https://www.belastingdienst.nl/wps/wcm/connect/nl/box-2/content/excessief-lenen"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 inline-block text-[10px] font-medium text-red-700 underline hover:text-red-800"
+                        >
+                          Meer informatie over Wet excessief lenen →
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {totalDgaLeningen >= WET_EXCESSIEF_LENEN_WAARSCHUWING && totalDgaLeningen < WET_EXCESSIEF_LENEN_DREMPEL && (
+                    <div className="mt-2 flex items-start gap-2 rounded-[var(--r)] bg-amber-50 border border-amber-200 px-3 py-2">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                      <div>
+                        <p className="text-xs font-medium text-amber-700">
+                          Wet excessief lenen: nadert drempel
+                        </p>
+                        <p className="text-[10px] text-amber-600 mt-0.5">
+                          Uw totale DGA-leningen ({formatCurrency(totalDgaLeningen)}) naderen de drempel van {formatCurrency(WET_EXCESSIEF_LENEN_DREMPEL)}. Boven deze drempel wordt het meerdere belast als fictief regulier voordeel in Box 2.
+                        </p>
+                        <a
+                          href="https://www.belastingdienst.nl/wps/wcm/connect/nl/box-2/content/excessief-lenen"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 inline-block text-[10px] font-medium text-amber-700 underline hover:text-amber-800"
+                        >
+                          Meer informatie over Wet excessief lenen →
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Type-specific details */}
           {(() => {
             const details: { label: string; value: string }[] = []
@@ -830,6 +997,10 @@ function AssetDetailModal({
             if (asset.retirement_provider_type) details.push({ label: 'Pensioenuitvoerder', value: RETIREMENT_PROVIDER_LABELS[asset.retirement_provider_type] })
             if (asset.depreciation_rate != null && asset.depreciation_rate !== 0) details.push({ label: 'Afschrijving p/j', value: `${asset.depreciation_rate}%` })
             if (asset.lock_end_date) details.push({ label: 'Vastgezet tot', value: new Date(asset.lock_end_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' }) })
+            // Deelneming-specific fields
+            if (asset.kvk_number) details.push({ label: 'KvK-nummer', value: asset.kvk_number })
+            if (asset.ownership_percentage != null) details.push({ label: 'Belang', value: `${asset.ownership_percentage}%` })
+            if (asset.annual_dividend != null && asset.annual_dividend > 0) details.push({ label: 'Jaarlijks dividend', value: formatCurrency(asset.annual_dividend) })
             if (details.length === 0) return null
             return (
               <div className="grid grid-cols-2 gap-3">
@@ -1853,6 +2024,9 @@ function AssetForm({
   const [addressHouseNumber, setAddressHouseNumber] = useState(asset?.address_house_number ?? '')
   const [expiryDate, setExpiryDate] = useState(asset?.expiry_date ?? '')
   const [beneficiary, setBeneficiary] = useState(asset?.beneficiary ?? '')
+  const [linkedAssetId, setLinkedAssetId] = useState(asset?.linked_asset_id ?? '')
+  const [deelnemingOptions, setDeelnemingOptions] = useState<{ id: string; name: string }[]>([])
+  const [dgaTotal, setDgaTotal] = useState(0)
   const [wozLoading, setWozLoading] = useState(false)
   const [wozResult, setWozResult] = useState<{ peildatum: string; waarde: number }[] | null>(null)
   const [wozError, setWozError] = useState<string | null>(null)
@@ -1863,6 +2037,27 @@ function AssetForm({
 
   const subtypeOptions = ASSET_SUBTYPE_LABELS[assetType]
   const visibleFields = ASSET_TYPE_FIELDS[assetType]
+
+  // Load deelneming options + DGA total when subtype is dga_lening
+  useEffect(() => {
+    if (subtype !== 'dga_lening') {
+      setDeelnemingOptions([])
+      setDgaTotal(0)
+      return
+    }
+    const supabase = createClient()
+    // Fetch deelneming assets
+    supabase.from('assets').select('id, name').eq('asset_type', 'deelneming').eq('is_active', true)
+      .then(({ data }) => setDeelnemingOptions(data ?? []))
+    // Fetch total DGA-leningen (excluding current asset if editing)
+    supabase.from('assets').select('id, current_value').eq('asset_type', 'vordering').eq('is_active', true)
+      .then(({ data }) => {
+        const total = (data ?? [])
+          .filter(a => a.id !== asset?.id)
+          .reduce((sum, a) => sum + Number(a.current_value), 0)
+        setDgaTotal(total)
+      })
+  }, [subtype, asset?.id])
 
   function handleTypeChange(type: AssetType) {
     setAssetType(type)
@@ -1981,6 +2176,7 @@ function AssetForm({
       address_house_number: addressHouseNumber || null,
       expiry_date: expiryDate || null,
       beneficiary: beneficiary || null,
+      linked_asset_id: subtype === 'dga_lening' ? (linkedAssetId || null) : null,
       // Household fields
       ownership: ownership,
       household_id: ownership === 'shared' ? householdId : null,
@@ -2164,7 +2360,7 @@ function AssetForm({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
-                    {assetType === 'eigen_huis' ? 'Marktwaarde' : assetType === 'levensverzekering' ? 'Afkoopwaarde' : 'Huidige waarde'}
+                    {assetType === 'eigen_huis' ? 'Marktwaarde' : assetType === 'levensverzekering' ? 'Afkoopwaarde' : assetType === 'vordering' ? 'Uitstaand bedrag' : 'Huidige waarde'}
                   </label>
                   <input
                     type="number"
@@ -2184,7 +2380,7 @@ function AssetForm({
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
-                    {assetType === 'eigen_huis' ? 'Aankoopprijs' : 'Aankoopwaarde'}
+                    {assetType === 'eigen_huis' ? 'Aankoopprijs' : assetType === 'vordering' ? 'Oorspronkelijke hoofdsom' : 'Aankoopwaarde'}
                   </label>
                   <input
                     type="number"
@@ -2197,7 +2393,7 @@ function AssetForm({
 
               <div className={`grid ${assetType === 'eigen_huis' ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Rendement (% p.j.)</label>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">{assetType === 'vordering' ? 'Rente (% p.j.)' : 'Rendement (% p.j.)'}</label>
                   <input
                     type="number"
                     step="0.1"
@@ -2209,7 +2405,7 @@ function AssetForm({
                 {assetType !== 'eigen_huis' && (
                   <div>
                     <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
-                      {assetType === 'levensverzekering' ? 'Premie p/m' : 'Inleg p/m'}
+                      {assetType === 'levensverzekering' ? 'Premie p/m' : assetType === 'vordering' ? 'Aflossing p/m' : 'Inleg p/m'}
                     </label>
                     <input
                       type="number"
@@ -2233,13 +2429,13 @@ function AssetForm({
               {assetType !== 'eigen_huis' && (
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
-                    {assetType === 'levensverzekering' ? 'Verzekeraar' : 'Instelling'}
+                    {assetType === 'levensverzekering' ? 'Verzekeraar' : assetType === 'vordering' ? 'Debiteur / Tegenpartij' : 'Instelling'}
                   </label>
                   <input
                     value={institution}
                     onChange={(e) => setInstitution(e.target.value)}
                     className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
-                    placeholder={assetType === 'levensverzekering' ? 'Nationale-Nederlanden, Aegon...' : 'ABN AMRO, DEGIRO, ABP...'}
+                    placeholder={assetType === 'levensverzekering' ? 'Nationale-Nederlanden, Aegon...' : assetType === 'vordering' ? 'Bijv. Jan Jansen, Mijn BV' : 'ABN AMRO, DEGIRO, ABP...'}
                   />
                 </div>
               )}
@@ -2449,6 +2645,42 @@ function AssetForm({
                       placeholder="Bijv. partner, kinderen"
                     />
                   </div>
+                )}
+                {/* DGA-lening: link to deelneming + warning */}
+                {subtype === 'dga_lening' && (
+                  <>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Gekoppelde deelneming</label>
+                      <select
+                        value={linkedAssetId}
+                        onChange={(e) => setLinkedAssetId(e.target.value)}
+                        className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
+                      >
+                        <option value="">— Geen koppeling —</option>
+                        {deelnemingOptions.map((d) => (
+                          <option key={d.id} value={d.id}>{d.name}</option>
+                        ))}
+                      </select>
+                      {deelnemingOptions.length === 0 && (
+                        <p className="mt-1 text-[10px] text-[var(--ink-4)]">Voeg eerst een deelneming toe onder Bezittingen.</p>
+                      )}
+                    </div>
+                    {(() => {
+                      const totalDga = dgaTotal + (Number(currentValue) || 0)
+                      if (totalDga > 500000) return (
+                        <div className="rounded-[var(--r)] border border-red-300 bg-red-50 p-3">
+                          <p className="text-xs font-medium text-red-800">Wet excessief lenen: totaal DGA-leningen &euro;{totalDga.toLocaleString('nl-NL')} overschrijdt de grens van &euro;500.000.</p>
+                          <p className="mt-0.5 text-[10px] text-red-600">Het meerdere boven &euro;500.000 wordt belast als box 2-inkomen (aanmerkelijk belang).</p>
+                        </div>
+                      )
+                      if (totalDga > 400000) return (
+                        <div className="rounded-[var(--r)] border border-amber-300 bg-amber-50 p-3">
+                          <p className="text-xs font-medium text-amber-800">Let op: totaal DGA-leningen &euro;{totalDga.toLocaleString('nl-NL')} nadert de grens van &euro;500.000 (Wet excessief lenen).</p>
+                        </div>
+                      )
+                      return null
+                    })()}
+                  </>
                 )}
               </div>
             </div>

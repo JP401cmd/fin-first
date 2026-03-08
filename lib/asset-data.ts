@@ -79,6 +79,12 @@ export interface Asset {
   address_house_number: string | null
   expiry_date: string | null
   beneficiary: string | null
+  // Deelneming fields
+  kvk_number: string | null
+  ownership_percentage: number | null
+  annual_dividend: number | null
+  // Vordering fields
+  linked_asset_id: string | null
   // Household fields
   ownership: 'personal' | 'shared'
   household_id: string | null
@@ -300,7 +306,7 @@ export const ASSET_TYPE_FIELDS: Record<AssetType, string[]> = {
   physical: ['subtype'],
   deelneming: ['subtype', 'institution', 'kvk_number', 'ownership_percentage', 'annual_dividend', 'risk_profile'],
   levensverzekering: ['subtype', 'risk_profile', 'is_liquid', 'expiry_date', 'beneficiary'],
-  vordering: ['subtype', 'risk_profile', 'is_liquid', 'expiry_date'],
+  vordering: ['subtype', 'institution', 'lock_end_date'],
   other: [],
 }
 

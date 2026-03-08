@@ -236,7 +236,7 @@ export function MiniAssetForm({
               {/* Current value */}
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
-                  {draft.asset_type === 'eigen_huis' ? 'Marktwaarde' : draft.asset_type === 'levensverzekering' ? 'Afkoopwaarde' : draft.asset_type === 'deelneming' ? 'Intrinsieke waarde' : 'Huidige waarde'}
+                  {draft.asset_type === 'eigen_huis' ? 'Marktwaarde' : draft.asset_type === 'levensverzekering' ? 'Afkoopwaarde' : draft.asset_type === 'deelneming' ? 'Intrinsieke waarde' : draft.asset_type === 'vordering' ? 'Uitstaand bedrag' : 'Huidige waarde'}
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">&euro;</span>
@@ -255,7 +255,7 @@ export function MiniAssetForm({
               {/* Purchase value */}
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
-                  {draft.asset_type === 'eigen_huis' ? 'Aankoopprijs' : 'Aankoopwaarde'}
+                  {draft.asset_type === 'eigen_huis' ? 'Aankoopprijs' : draft.asset_type === 'vordering' ? 'Oorspronkelijke hoofdsom' : 'Aankoopwaarde'}
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">&euro;</span>
@@ -273,7 +273,7 @@ export function MiniAssetForm({
 
               {/* Expected return */}
               <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Verwacht rendement (% per jaar)</label>
+                <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">{draft.asset_type === 'vordering' ? 'Rentepercentage (% per jaar)' : 'Verwacht rendement (% per jaar)'}</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -291,7 +291,7 @@ export function MiniAssetForm({
               {draft.asset_type !== 'eigen_huis' && (
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
-                    {draft.asset_type === 'levensverzekering' ? 'Maandelijkse premie' : 'Maandelijkse inleg'}
+                    {draft.asset_type === 'levensverzekering' ? 'Maandelijkse premie' : draft.asset_type === 'vordering' ? 'Maandelijkse aflossing' : 'Maandelijkse inleg'}
                   </label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">&euro;</span>
@@ -370,9 +370,9 @@ export function MiniAssetForm({
               )}
 
               {/* Lock end date */}
-              {visibleFields.includes('lock_end_date') && !draft.is_liquid && (
+              {visibleFields.includes('lock_end_date') && (draft.asset_type === 'vordering' || !draft.is_liquid) && (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Einddatum vastperiode</label>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">{draft.asset_type === 'vordering' ? 'Einddatum lening' : 'Einddatum vastperiode'}</label>
                   <input
                     type="date"
                     value={draft.lock_end_date}
@@ -523,13 +523,13 @@ export function MiniAssetForm({
                 </div>
               )}
 
-              {/* Institution — shown with custom label for deelneming */}
+              {/* Institution — shown with custom label for deelneming/vordering */}
               {visibleFields.includes('institution') && (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Naam vennootschap</label>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">{draft.asset_type === 'vordering' ? 'Debiteur / Tegenpartij' : 'Naam vennootschap'}</label>
                   <input
                     type="text"
-                    placeholder="Bijv. Holding BV, Familie BV"
+                    placeholder={draft.asset_type === 'vordering' ? 'Bijv. Jan Jansen, Mijn BV' : 'Bijv. Holding BV, Familie BV'}
                     value={draft.institution}
                     onChange={(e) => updateDraft({ institution: e.target.value })}
                     className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
