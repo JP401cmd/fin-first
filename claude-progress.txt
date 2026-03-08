@@ -10861,3 +10861,36 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#578, #579, #583)
 - Zero TypeScript errors
 - Commit: 71d2896
+
+## Session 2026-03-08 - Features #529, #569, #604
+
+### Feature #529: Gedeelde uitgaven tonen vrijheidstijd-impact per partner - PASSING
+- Already fully implemented in cash-account-view.tsx and budgets/page.tsx
+- Per-partner freedom days on shared transactions (lines 1331-1335)
+- Aggregate partner breakdown section (lines 938-967)
+- Budget per-partner breakdown (lines 1661-1689)
+- Split mode labels, computeSharePct for custom/equal/income_ratio modes
+- No code changes needed - verified existing implementation
+
+### Feature #569: Hypotheek verdeling tussen partners - PASSING
+- Added partner_split_pct column to debts table (migration 20260308000004)
+- Debt type extended with partner_split_pct: number | null
+- DebtForm: custom split toggle + slider for shared debts
+- DebtDetailModal: per-partner balance + monthly payment breakdown
+- Debts page cards: per-partner split display for shared debts
+- computePerspectiveNetWorth respects per-debt split overrides
+- Fixed test files for new Debt field
+- Commit: 32edb66
+
+### Feature #604: Impact-samenvatting toont vrijheidstijd-equivalent per levensgebeurtenis - PASSING
+- Event impact section shows freedom time using calculateFreedomTime + formatFreedomTimeString
+- Positive events (erfenis, AOW) show 'gewonnen vrijheid' in emerald green
+- Negative events show 'aan vrijheidstijd' in red
+- Only displayed for amounts >= 100 EUR (consistent with app threshold)
+- Form summary card already had freedom time display (verified)
+- Commit: 1a3fbff
+
+### Current Status
+- 3 features completed this session (#529, #569, #604)
+- Zero TypeScript errors
+- Could not verify via browser due to email rate limiting on signup
