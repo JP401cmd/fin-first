@@ -1,3 +1,34 @@
+## Session 2026-03-08 - Features #576, #606
+
+### Feature #576: Concurrent perspectief-wissels geen data-corruptie - PASSING
+- Created usePerspectiveAbort hook with AbortController-based cancellation
+- When perspective changes, previous requests are automatically cancelled
+- Updated setPerspective in PerspectiveProvider: cancels stale PATCH requests
+- Added abort signal checks to all perspective-dependent data fetches:
+  - debts/page.tsx: loadDebts, loadExpenses
+  - assets/page.tsx: loadAssets
+  - budgets/page.tsx: loadBudgets, loadSpending, BudgetCard loadSplit
+  - belasting/page.tsx: loadData (uses fetch signal directly)
+  - cash-account-view.tsx: loadBudgets, loadTransactions, loadAccount
+- perspectiveVersion counter for monotonic tracking
+- All callbacks accept optional AbortSignal, check signal.aborted before setState
+- Zero TypeScript errors
+- Commit: bae40d1
+
+### Feature #606: Event formulier validatie met duidelijke foutmeldingen - PASSING
+- Validation was already implemented by parallel agent in commit 1a3fbff
+- validateEventForm() checks: empty name, negative amounts, unrealistic ages, children count
+- AOW age < 60 → amber warning "AOW start wettelijk op leeftijd 67"
+- Children event with 0 children → red error
+- Visual field highlighting (border-red-400 / border-amber-400)
+- Errors clear on field edit, warnings don't block save
+- All messages in Dutch with TriFinity tone
+- Zero TypeScript errors
+
+### Current Status
+- 2 features completed this session (#576, #606)
+- 550/614 features passing (89.6%)
+
 ## Session 2026-03-08 - Features #573, #574, #575
 
 ### Feature #573: Huishouden-features graceful bij solo-gebruiker - PASSING
