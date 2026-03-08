@@ -2074,6 +2074,10 @@ export default function HorizonPage() {
                     if (formType === 'car_purchase' && field.key === 'huidigeAutoKosten' && !formMetadata.vervangtHuidigeAuto) {
                       return null
                     }
+                    // Conditionally hide vasteLastenBedrag when vasteLastenThuis is false
+                    if (formType === 'world_trip' && field.key === 'vasteLastenBedrag' && !formMetadata.vasteLastenThuis && formMetadata.vasteLastenThuis !== undefined) {
+                      return null
+                    }
                     return (
                     <div key={field.key}>
                       <label className="text-xs font-medium text-[var(--ink-3)]">
@@ -2557,6 +2561,67 @@ export default function HorizonPage() {
                                 Jaarlijkse schenking verlaagt je Box 3 vermogen en daarmee je belasting
                               </p>
                             )}
+                          </div>
+                        )
+                      })()}
+                      {formType === 'world_trip' && field.key === 'woningVerhuren' && (() => {
+                        const reisstijl = String(formMetadata.reisstijl ?? 'budget')
+                        const preset = WERELDREIS_STIJL_PRESETS[reisstijl]
+                        const reisbudgetPP = preset?.bedrag ?? 1200
+                        const aantalPersonen = Math.max(1, Number(formMetadata.aantalPersonen) || 1)
+                        const personFactor = aantalPersonen === 1 ? 1 : 1 + (aantalPersonen - 1) * 0.6
+                        const reisbudget = Math.round(reisbudgetPP * personFactor)
+                        const vasteLastenThuis = Boolean(formMetadata.vasteLastenThuis ?? true)
+                        const vasteLastenBedrag = vasteLastenThuis ? (Number(formMetadata.vasteLastenBedrag) || 800) : 0
+                        const vertrekkosten = Number(formMetadata.vertrekkosten ?? 4000)
+                        const inkomensverlies = Math.abs(LIFE_EVENT_CATALOG.world_trip?.defaultMonthlyIncome ?? -3000)
+                        const totaalMaandlast = reisbudget + vasteLastenBedrag + inkomensverlies
+                        const duur = Number(formDuration) || LIFE_EVENT_CATALOG.world_trip?.defaultDuration || 12
+                        const totaalKosten = vertrekkosten + (totaalMaandlast * duur)
+                        return (
+                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Kostenopbouw wereldreis</p>
+                            <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                              <div className="flex justify-between">
+                                <span>Vertrekkosten (eenmalig)</span>
+                                <span className="font-mono tabular-nums text-red-600">{formatCurrency(vertrekkosten)}</span>
+                              </div>
+                              <div className="h-px bg-horizon-200 my-1" />
+                              <div className="flex justify-between">
+                                <span>Reisbudget ({preset?.label ?? 'Budget'})</span>
+                                <span className="font-mono tabular-nums">{formatCurrency(reisbudget)}/mnd</span>
+                              </div>
+                              {aantalPersonen > 1 && (
+                                <div className="flex justify-between text-[var(--ink-4)]">
+                                  <span className="pl-3">{aantalPersonen} reizigers (factor {personFactor.toFixed(1)}×)</span>
+                                  <span className="font-mono tabular-nums">{formatCurrency(reisbudget)}</span>
+                                </div>
+                              )}
+                              {vasteLastenThuis ? (
+                                <div className="flex justify-between">
+                                  <span>Vaste lasten thuis (aanhouden)</span>
+                                  <span className="font-mono tabular-nums">{formatCurrency(vasteLastenBedrag)}/mnd</span>
+                                </div>
+                              ) : (
+                                <div className="flex justify-between text-emerald-600">
+                                  <span>Vaste lasten thuis (opgezegd)</span>
+                                  <span className="font-mono tabular-nums">€0/mnd</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between">
+                                <span>Inkomensverlies</span>
+                                <span className="font-mono tabular-nums text-red-600">-{formatCurrency(inkomensverlies)}/mnd</span>
+                              </div>
+                              <div className="h-px bg-horizon-200 my-1" />
+                              <div className="flex justify-between font-semibold">
+                                <span>Totale maandlast</span>
+                                <span className="font-mono tabular-nums text-red-600">{formatCurrency(totaalMaandlast)}/mnd</span>
+                              </div>
+                              <div className="flex justify-between font-semibold">
+                                <span>Geschatte totaalkosten ({duur} mnd)</span>
+                                <span className="font-mono tabular-nums text-red-600">{formatCurrency(totaalKosten)}</span>
+                              </div>
+                            </div>
                           </div>
                         )
                       })()}

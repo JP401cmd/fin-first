@@ -207,15 +207,19 @@ export interface AOWMetadata {
 }
 
 export interface PensionMetadata {
-  pensioenType?: 'bedrijf' | 'lijfrente' | 'privaat'
+  pensioenType?: 'bedrijf' | 'lijfrente' | 'banksparen'
+  brutoBedrag?: number
   ingangLeeftijd?: number
   uitkeringsduur?: 'levenslang' | '20' | '10' | '5'
+  isGeindexeerd?: boolean
 }
 
 export interface CarPurchaseMetadata {
   brandstof?: 'benzine' | 'diesel' | 'elektrisch' | 'hybride'
   nieuwOfTweedehands?: 'nieuw' | 'tweedehands'
   jaarlijkseKm?: number
+  vervangtHuidigeAuto?: boolean
+  huidigeAutoKosten?: number
 }
 
 export interface HousePurchaseMetadata {
@@ -250,7 +254,18 @@ export interface SabbaticalMetadata {
 export interface WorldTripMetadata {
   aantalPersonen?: number
   reistype?: 'backpacking' | 'comfort' | 'luxe'
+  reisstijl?: 'budget' | 'gemiddeld' | 'comfort'
+  vasteLastenThuis?: boolean
+  vasteLastenBedrag?: number
+  vertrekkosten?: number
   woningVerhuren?: boolean
+}
+
+/** Monthly travel budget presets per travel style (per person) */
+export const WERELDREIS_STIJL_PRESETS: Record<string, { label: string; bedrag: number }> = {
+  budget:    { label: 'Budget',    bedrag: 1200 },
+  gemiddeld: { label: 'Gemiddeld', bedrag: 2000 },
+  comfort:   { label: 'Comfort',  bedrag: 3000 },
 }
 
 export interface RenovationMetadata {
@@ -351,6 +366,33 @@ export function berekenSchenkbelasting(bedrag: number, relatie: string): { vrijs
   const hoogDeel = Math.max(0, belastbaar - tarief.grens)
   const belasting = Math.round(laagDeel * tarief.laag + hoogDeel * tarief.hoog)
   return { vrijstelling, belastbaar, belasting }
+}
+
+/** NIBUD/ANWB gemiddelde maandkosten auto per brandstoftype (2025/2026) */
+export const AUTO_MAANDKOSTEN: Record<string, { verzekering: number; wegenbelasting: number; onderhoud: number; brandstof: number }> = {
+  benzine:     { verzekering: 50, wegenbelasting: 50, onderhoud: 80, brandstof: 130 },
+  diesel:      { verzekering: 55, wegenbelasting: 75, onderhoud: 85, brandstof: 110 },
+  elektrisch:  { verzekering: 60, wegenbelasting: 0,  onderhoud: 40, brandstof: 65 },
+  hybride:     { verzekering: 55, wegenbelasting: 30, onderhoud: 70, brandstof: 95 },
+}
+
+/** Bereken totale maandkosten auto op basis van brandstof en km */
+export function berekenAutoMaandkosten(brandstof: string, jaarlijkseKm: number = 15000): {
+  verzekering: number; wegenbelasting: number; onderhoud: number; brandstof: number; totaal: number
+} {
+  const base = AUTO_MAANDKOSTEN[brandstof] ?? AUTO_MAANDKOSTEN.benzine
+  // Schaal brandstofkosten naar kilometers (basis = 15.000 km/jaar)
+  const kmFactor = jaarlijkseKm / 15000
+  const brandstofKosten = Math.round(base.brandstof * kmFactor)
+  const result = {
+    verzekering: base.verzekering,
+    wegenbelasting: base.wegenbelasting,
+    onderhoud: base.onderhoud,
+    brandstof: brandstofKosten,
+    totaal: 0,
+  }
+  result.totaal = result.verzekering + result.wegenbelasting + result.onderhoud + result.brandstof
+  return result
 }
 
 /** Union of all typed metadata interfaces per event_type key. */
@@ -502,19 +544,22 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     icon: 'Globe',
     group: 'vrije_tijd',
     impactRange: '€25K–€60K totaal',
-    defaultCost: 15000,
-    defaultMonthlyCost: 2000,
+    defaultCost: 4000,
+    defaultMonthlyCost: 1200,
     defaultMonthlyIncome: -3000,
     defaultDuration: 12,
     description: 'Langdurige reis rond de wereld',
-    tip: 'Budget per persoon: backpacking €1.500–€2.000/mnd, comfort €2.500–€3.500/mnd, luxe €4.000+/mnd. Inclusief vluchten, verblijf en dagelijkse kosten.',
+    tip: 'Budget per persoon: Budget €1.200/mnd, Gemiddeld €2.000/mnd, Comfort €3.000/mnd. Inclusief verblijf, eten en dagelijkse kosten.',
     fields: [
-      { key: 'aantalPersonen', label: 'Aantal reizigers', fieldType: 'number', default: 1, tip: 'Kosten worden vermenigvuldigd per persoon. Twee samen is ca. 1,6× één persoon.' },
-      { key: 'reistype', label: 'Reistype', fieldType: 'select', default: 'backpacking', options: [
-        { value: 'backpacking', label: 'Backpacking (budget)' },
-        { value: 'comfort', label: 'Comfort (middenklasse)' },
-        { value: 'luxe', label: 'Luxe' },
+      { key: 'reisstijl', label: 'Reisstijl', fieldType: 'select', default: 'budget', options: [
+        { value: 'budget', label: 'Budget — €1.200/mnd' },
+        { value: 'gemiddeld', label: 'Gemiddeld — €2.000/mnd' },
+        { value: 'comfort', label: 'Comfort — €3.000/mnd' },
       ]},
+      { key: 'aantalPersonen', label: 'Aantal reizigers', fieldType: 'number', default: 1, tip: 'Kosten worden vermenigvuldigd per persoon. Twee samen is ca. 1,6× één persoon.' },
+      { key: 'vasteLastenThuis', label: 'Vaste lasten thuis aanhouden', fieldType: 'toggle', default: true, tip: 'Huur/hypotheek, verzekeringen, abonnementen die doorlopen tijdens je reis. Opzeggen bespaart, maar je moet bij terugkomst alles opnieuw regelen.' },
+      { key: 'vasteLastenBedrag', label: 'Vaste lasten per maand', fieldType: 'number', default: 800, suffix: '/mnd', tip: 'Schat je doorlopende vaste lasten: huur/hypotheek, verzekeringen, abonnementen. Gemiddeld €600–€1.200/mnd.' },
+      { key: 'vertrekkosten', label: 'Vertrekkosten (vluchten, gear, visa)', fieldType: 'number', default: 4000, tip: 'Eenmalige kosten: retourvluchten €1.500–€3.000, reisuitrusting €500–€1.000, visa en vaccinaties €200–€500.' },
       { key: 'woningVerhuren', label: 'Woning verhuren tijdens reis', fieldType: 'toggle', default: false, tip: 'Tijdelijke verhuur kan €800–€1.500/mnd opleveren. Check je hypotheekvoorwaarden en gemeentelijke regels.' },
     ],
   },
@@ -745,6 +790,8 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
         { value: 'tweedehands', label: 'Tweedehands' },
       ]},
       { key: 'jaarlijkseKm', label: 'Geschatte jaarkilometers', fieldType: 'number', default: 15000, tip: 'NL gemiddelde: 12.000–15.000 km/jaar. Brandstofkosten benzine bij 15.000 km: ca. €1.800/jaar.' },
+      { key: 'vervangtHuidigeAuto', label: 'Vervangt huidige auto?', fieldType: 'toggle', default: false, tip: 'Indien ja, wordt het verschil in maandkosten berekend ten opzichte van je huidige auto.' },
+      { key: 'huidigeAutoKosten', label: 'Huidige maandkosten auto', fieldType: 'number', default: 300, tip: 'Huidige totale maandkosten (verzekering + wegenbelasting + onderhoud + brandstof). Gemiddeld €300–€500/mnd.' },
     ],
   },
   inheritance: {
@@ -818,24 +865,27 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     impactRange: '+€200–€2.000/mnd bruto',
     defaultCost: 0,
     defaultMonthlyCost: 0,
-    defaultMonthlyIncome: 0,
+    defaultMonthlyIncome: 675,
     defaultDuration: 0,
     description: 'Aanvullend bedrijfspensioen of privépensioen',
-    tip: 'Check mijnpensioenoverzicht.nl voor je verwachte pensioenuitkering. Gemiddeld aanvullend pensioen NL: ca. €800–€1.200/mnd bruto. Nieuwe pensioenwet (Wtp) sinds 2025: premieregeling i.p.v. eindloon/middelloon.',
+    tip: 'Check mijnpensioenoverzicht.nl voor je verwachte pensioenuitkering. Gemiddeld aanvullend pensioen NL: ca. €675/mnd bruto. Nieuwe pensioenwet (Wtp) sinds 2025: premieregeling i.p.v. eindloon/middelloon.',
     fields: [
+      { key: 'brutoBedrag', label: 'Verwacht bruto bedrag per maand', fieldType: 'number', default: 675, suffix: '/mnd', tip: 'Check mijnpensioenoverzicht.nl voor je verwachte pensioenuitkering.' },
       { key: 'pensioenType', label: 'Type pensioen', fieldType: 'select', default: 'bedrijf', options: [
         { value: 'bedrijf', label: 'Bedrijfspensioen' },
-        { value: 'lijfrente', label: 'Lijfrente / banksparen' },
-        { value: 'privaat', label: 'Privé pensioensparen' },
+        { value: 'lijfrente', label: 'Lijfrente' },
+        { value: 'banksparen', label: 'Banksparen' },
       ]},
-      { key: 'ingangLeeftijd', label: 'Ingangsdatum (leeftijd)', fieldType: 'number', default: 68, tip: 'Pensioenrichtleeftijd: 68 jaar (2026). Eerder kan, maar met actuariële korting (ca. 6–7% per jaar eerder). Check je UPO op mijnpensioenoverzicht.nl.' },
+      { key: 'ingangLeeftijd', label: 'Ingangsdatum (leeftijd)', fieldType: 'number', default: 67, tip: 'AOW-leeftijd: 67 jaar (2026). Pensioenrichtleeftijd: 68 jaar. Eerder kan, maar met actuariële korting (ca. 6–7% per jaar eerder). Check je UPO op mijnpensioenoverzicht.nl.' },
       { key: 'uitkeringsduur', label: 'Uitkeringsduur', fieldType: 'select', default: 'levenslang', options: [
         { value: 'levenslang', label: 'Levenslang' },
         { value: '20', label: '20 jaar' },
         { value: '10', label: '10 jaar' },
         { value: '5', label: '5 jaar' },
       ]},
+      { key: 'isGeindexeerd', label: 'Wordt geïndexeerd', fieldType: 'toggle', default: false, tip: 'Bedrijfspensioenen worden niet altijd geïndexeerd. Lijfrente/banksparen is doorgaans niet geïndexeerd.' },
     ],
+    defaultAge: 67,
   },
   overlijden_partner: {
     label: 'Overlijden partner',
