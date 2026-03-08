@@ -1,3 +1,33 @@
+## Session 2026-03-08 - Features #593, #594, #595
+
+### Feature #593: Wereldreis reisstijl presets en vaste-lasten-thuis toggle - PASSING
+- Added WERELDREIS_STIJL_PRESETS: Budget €1.200, Gemiddeld €2.000, Comfort €3.000/mnd
+- Updated world_trip catalog: reisstijl select, vasteLastenThuis toggle, vasteLastenBedrag number, vertrekkosten
+- Conditional field: vasteLastenBedrag hidden when vasteLastenThuis is false
+- Save handler: reisbudget (scaled by person factor) + vaste lasten + inkomensverlies
+- Kostenopbouw summary card with full breakdown
+- Commit: 2e7fd7f
+
+### Feature #594: Verbouwing type selectie met waardevermeerdering berekening - PASSING
+- Added VERBOUWING_TYPE_KOSTEN: keuken 15K, badkamer 12K, uitbouw 50K, dakkapel 14K, energetisch 20K, totaal 80K
+- Auto-update cost and waardevermeerdering% when renovation type changes
+- Netto impact summary card: kosten - waardevermeerdering met percentage
+- Tip: vergeet niet woningwaarde bij te werken na de verbouwing
+- Commit: 0cde082
+
+### Feature #595: Studie type opleiding met verwacht rendement na afronding - PASSING
+- Added STUDIE_TYPE_KOSTEN: cursus 1K, MBO 3K, Bachelor 7.5K, Master 5K, MBA 30K, Promotie 2K
+- Updated study catalog with collegegeld field (auto-set from type, manually adjustable)
+- Salarisstijging changed from percentage to absolute €/mnd (creates positive income change)
+- Save handler: collegegeld as one-time cost + salary increase as continuous income
+- Rendement summary card: studiekosten, studieduur, terugverdientijd, extra vrijheidstijd/jaar
+- STAP-budget en scholingsaftrek tip
+
+### Current Status
+- 3 features completed this session (#593, #594, #595)
+- Zero TypeScript errors
+- Could not verify via browser (Supabase auth rate limiting - 429)
+
 ## Session 2026-03-08 - Features #538, #549, #550
 
 ### Feature #538: Privacy-standaard is Totalen voor nieuwe huishoudens - PASSING
