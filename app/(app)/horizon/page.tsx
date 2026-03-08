@@ -699,6 +699,33 @@ export default function HorizonPage() {
       }
     }
 
+    // Special handling for overlijden_partner: net income impact + cost reduction
+    if (formType === 'overlijden_partner') {
+      const partnerInkomen = Number(formMetadata.nettoInkomenPartner) || 2500
+      const nabestaanden = Number(formMetadata.nabestaandenpensioen) || 0
+      const anwType = String(formMetadata.anwUitkering ?? 'kinderen')
+      const anwBedrag = anwType === 'geen' ? 0 : (Number(formMetadata.anwBedrag) || 1380)
+      // Anw bruto → netto approximation (~75%)
+      const anwNetto = Math.round(anwBedrag * 0.75)
+      const verzekering = Number(formMetadata.levensverzekering) || 0
+      const kostendalingPct = Number(formMetadata.kostendalingPct) || 30
+      // Monthly expenses from effective input
+      const maandlasten = effectiveInput?.monthlyExpenses ?? 0
+      const kostendaling = Math.round(maandlasten * (kostendalingPct / 100))
+      // Netto maandelijkse impact: -partnerinkomen +nabestaanden +anw +kostendaling
+      const nettoMaandImpact = -partnerInkomen + nabestaanden + anwNetto + kostendaling
+      if (nettoMaandImpact < 0) {
+        monthlyIncomeChange = nettoMaandImpact // negative = loss
+      } else {
+        monthlyIncomeChange = nettoMaandImpact
+      }
+      monthlyCostChange = 0
+      // Levensverzekering as one-time income (negative cost)
+      oneTimeCost = verzekering > 0 ? -verzekering : 0
+      // Continuous impact (no fixed duration)
+      durMonths = 0
+    }
+
     const payload = {
       user_id: user.id,
       name: formName,
@@ -941,6 +968,7 @@ export default function HorizonPage() {
                   targetEndPortfolio={simResult.targetEndPortfolio}
                   scenarioOverlays={scenarioOverlays}
                   monteCarloOverlay={monteCarloOverlay}
+                  dailyExpenseRate={(effectiveInput?.yearlyMustExpenses ?? 0) / 365}
                 />
                 {/* Events timeline aligned to same age axis */}
                 {events.length > 0 && (
@@ -1924,12 +1952,12 @@ export default function HorizonPage() {
                                 setFormDirection('income')
                                 setFormDurationType('one_time')
                               }
-                              // Auto-update AOW amount based on jarenInNL
-                              if (formType === 'aow' && field.key === 'jarenInNL') {
+                              // Auto-update AOW amount based on jarenBuitenNL
+                              if (formType === 'aow' && field.key === 'jarenBuitenNL') {
                                 const leefsituatie = String(updated.leefsituatie ?? 'alleenstaand')
                                 const baseAmount = leefsituatie === 'samenwonend' ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY
-                                const jarenInNL = Math.min(50, Math.max(0, Number(val) || 0))
-                                const factor = jarenInNL / 50
+                                const jarenBuiten = Math.min(50, Math.max(0, Number(val) || 0))
+                                const factor = (50 - jarenBuiten) / 50
                                 setFormAmount(Math.round(baseAmount * factor))
                               }
                               // Auto-calculate vermogensverlies + totale kosten for scheiding
@@ -1961,8 +1989,8 @@ export default function HorizonPage() {
                             // Auto-update AOW amount based on leefsituatie
                             if (formType === 'aow' && field.key === 'leefsituatie') {
                               const baseAmount = val === 'samenwonend' ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY
-                              const jarenInNL = Number(formMetadata.jarenInNL ?? 50)
-                              const factor = Math.min(1, Math.max(0, jarenInNL / 50))
+                              const jarenBuiten = Number(formMetadata.jarenBuitenNL ?? 0)
+                              const factor = Math.min(1, Math.max(0, (50 - jarenBuiten) / 50))
                               setFormAmount(Math.round(baseAmount * factor))
                             }
                             if (formType === 'schenking' && field.key === 'eenmaligOfJaarlijks') {
@@ -2144,6 +2172,88 @@ export default function HorizonPage() {
                               <p className="text-[10px] text-[var(--ink-4)]">
                                 Jaarlijkse schenking verlaagt je Box 3 vermogen en daarmee je belasting
                               </p>
+                            )}
+                          </div>
+                        )
+                      })()}
+                      {formType === 'overlijden_partner' && field.key === 'kostendalingPct' && (() => {
+                        const partnerInkomen = Number(formMetadata.nettoInkomenPartner ?? 2500)
+                        const nabestaanden = Number(formMetadata.nabestaandenpensioen ?? 0)
+                        const anwType = String(formMetadata.anwUitkering ?? 'kinderen')
+                        const anwBedrag = anwType === 'geen' ? 0 : (Number(formMetadata.anwBedrag ?? 1380))
+                        const anwNetto = Math.round(anwBedrag * 0.75)
+                        const verzekering = Number(formMetadata.levensverzekering ?? 0)
+                        const kostendalingPct = Number(formMetadata.kostendalingPct ?? 30)
+                        const maandlasten = effectiveInput?.monthlyExpenses ?? 0
+                        const kostendaling = Math.round(maandlasten * (kostendalingPct / 100))
+                        const nettoMaandImpact = -partnerInkomen + nabestaanden + anwNetto + kostendaling
+                        return (
+                          <div className="mt-2 space-y-3">
+                            {/* Reference: current shared monthly costs */}
+                            {maandlasten > 0 && (
+                              <div className="rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Huidige gedeelde maandlasten</p>
+                                <div className="flex justify-between text-xs text-[var(--ink-2)]">
+                                  <span>Totale maanduitgaven huishouden</span>
+                                  <span className="font-mono tabular-nums">{formatCurrency(maandlasten)}/mnd</span>
+                                </div>
+                                <div className="flex justify-between text-xs text-[var(--ink-2)]">
+                                  <span>Verwachte daling ({kostendalingPct}%)</span>
+                                  <span className="font-mono tabular-nums text-emerald-600">-{formatCurrency(kostendaling)}/mnd</span>
+                                </div>
+                              </div>
+                            )}
+                            {/* Netto impact breakdown */}
+                            <div className="rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                              <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Netto maandelijkse impact</p>
+                              <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                                <div className="flex justify-between">
+                                  <span>Wegvallend partnerinkomen</span>
+                                  <span className="font-mono tabular-nums text-red-600">-{formatCurrency(partnerInkomen)}/mnd</span>
+                                </div>
+                                {nabestaanden > 0 && (
+                                  <div className="flex justify-between">
+                                    <span>Nabestaandenpensioen</span>
+                                    <span className="font-mono tabular-nums text-emerald-600">+{formatCurrency(nabestaanden)}/mnd</span>
+                                  </div>
+                                )}
+                                {anwNetto > 0 && (
+                                  <div className="flex justify-between">
+                                    <span>Anw-uitkering (netto)</span>
+                                    <span className="font-mono tabular-nums text-emerald-600">+{formatCurrency(anwNetto)}/mnd</span>
+                                  </div>
+                                )}
+                                {kostendaling > 0 && (
+                                  <div className="flex justify-between">
+                                    <span>Kostendaling ({kostendalingPct}%)</span>
+                                    <span className="font-mono tabular-nums text-emerald-600">+{formatCurrency(kostendaling)}/mnd</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
+                                  <span>Netto impact per maand</span>
+                                  <span className={`font-mono tabular-nums ${nettoMaandImpact < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                    {nettoMaandImpact < 0 ? '-' : '+'}{formatCurrency(Math.abs(nettoMaandImpact))}/mnd
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            {/* Levensverzekering one-time */}
+                            {verzekering > 0 && (
+                              <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
+                                <div className="flex justify-between text-xs text-[var(--ink-2)]">
+                                  <span className="font-semibold">Eenmalige uitkering levensverzekering</span>
+                                  <span className="font-mono tabular-nums text-emerald-600 font-semibold">+{formatCurrency(verzekering)}</span>
+                                </div>
+                              </div>
+                            )}
+                            {/* ORV tip */}
+                            {nettoMaandImpact < -500 && (
+                              <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                                <Info className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                                <p className="text-xs text-amber-800">
+                                  Het inkomensverlies is aanzienlijk ({formatCurrency(Math.abs(nettoMaandImpact))}/mnd). Overweeg een overlijdensrisicoverzekering (ORV) als buffer. Een ORV van {formatCurrency(Math.abs(nettoMaandImpact) * 120)} dekt 10 jaar inkomensverlies.
+                                </p>
+                              </div>
                             )}
                           </div>
                         )

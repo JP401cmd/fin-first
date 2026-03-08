@@ -561,6 +561,7 @@ export default function WhatIfPage() {
             targetEndPortfolio={simResult.targetEndPortfolio}
             baselineRows={baselineSim?.result.rows}
             baselineFireAge={baselineFireAge}
+            dailyExpenseRate={whatIfInput ? whatIfInput.monthlyExpenses / 30 : undefined}
           />
           {/* Events timeline aligned to same age axis */}
           {events.length > 0 && (
