@@ -392,6 +392,15 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultSize: 'half',
     minLevel: -2,
   },
+  {
+    id: 'huishouden_activiteit',
+    name: 'Huishouden Activiteit',
+    description: 'Recente gedeelde transacties van het huishouden',
+    module: 'kern',
+    sizes: ['half', 'full'],
+    defaultSize: 'half',
+    minLevel: -2,
+  },
 ]
 
 export const DEFAULT_WIDGET_PREFS: WidgetPrefs = {
@@ -443,6 +452,7 @@ export const WIDGET_HREFS: Record<string, string> = {
   agenda:                   '/core/cash',
   noodfonds:                '/core',
   huishouden_vergelijking:  '/core',
+  huishouden_activiteit:   '/core/cash',
 }
 
 // ── Widget → Feature-phase mapping ───────────────────────────

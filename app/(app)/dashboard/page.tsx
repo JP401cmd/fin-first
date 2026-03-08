@@ -16,7 +16,7 @@ import {
   ArrowRight, Zap, Compass, TrendingUp, Settings2, Info,
 } from 'lucide-react'
 import { mergeWidgetPrefs, type WidgetPref, type WidgetSize } from '@/lib/widget-catalog'
-import type { DashboardData, TopAction, TopGoal, TopRecurringTransaction, TopRecommendation, TopLifeEvent, Notification, StreakData, AiInsight, NextStep, UpcomingEvent } from '@/components/widgets/widget-renderer'
+import type { DashboardData, TopAction, TopGoal, TopRecurringTransaction, TopRecommendation, TopLifeEvent, Notification, StreakData, AiInsight, NextStep, UpcomingEvent, HouseholdActivityItem } from '@/components/widgets/widget-renderer'
 import { DraggableWidgetGrid } from '@/components/widgets/draggable-widget-grid'
 import { MonthlyCheckinCard } from '@/components/dashboard/monthly-checkin-card'
 
@@ -778,8 +778,9 @@ export default async function DashboardPage() {
     isComplete: emergencyMonthsCovered >= TARGET_EMERGENCY_MONTHS,
   }
 
-  // ── Household perspective overrides ──────────────────────────
+  // ── Household & partner perspective overrides ──────────────────────────
   let householdOverrides: DashboardData['householdOverrides'] = null
+  let partnerOverrides: DashboardData['partnerOverrides'] = null
   try {
     // Check if user has a household
     const { data: { user } } = await supabase.auth.getUser()
@@ -798,6 +799,9 @@ export default async function DashboardPage() {
         if (pt) {
           const partnerAssets = Number(pt.partner_total_assets) || 0
           const partnerDebts = Number(pt.partner_total_debts) || 0
+          const partnerNetWorth = partnerAssets - partnerDebts
+          const partnerMonthlyIncome = Number(pt.partner_monthly_income) || 0
+          const partnerMonthlyExpenses = Number(pt.partner_monthly_expenses) || 0
 
           // Household net worth = user's totals + partner's personal totals
           // (shared items are already included in user's totals)
@@ -810,12 +814,132 @@ export default async function DashboardPage() {
             monthlyExpenses,
             monthlyIncome,
           }
+
+          // Partner-only perspective: show partner's individual data
+          partnerOverrides = {
+            netWorth: partnerNetWorth,
+            totalAssets: partnerAssets,
+            totalDebts: partnerDebts,
+            // Use partner's tracked income/expenses if available, otherwise approximate
+            monthlyExpenses: partnerMonthlyExpenses > 0 ? partnerMonthlyExpenses : monthlyExpenses,
+            monthlyIncome: partnerMonthlyIncome > 0 ? partnerMonthlyIncome : monthlyIncome,
+          }
         }
       }
     }
   } catch {
     // Household data not available — gracefully degrade
     householdOverrides = null
+    partnerOverrides = null
+  }
+
+  // ── Household activity feed — recent shared transactions from both partners ──
+  let householdActivity: HouseholdActivityItem[] = []
+  try {
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    if (currentUser && householdOverrides) {
+      const { data: myMembership } = await supabase
+        .from('household_members')
+        .select('household_id')
+        .eq('user_id', currentUser.id)
+        .maybeSingle()
+
+      if (myMembership) {
+        // Get all household members
+        const { data: allMembers } = await supabase
+          .from('household_members')
+          .select('user_id')
+          .eq('household_id', myMembership.household_id)
+
+        const memberIds = (allMembers ?? []).map(m => m.user_id)
+
+        if (memberIds.length > 1) {
+          // Get partner's profile name
+          const partnerId = memberIds.find(id => id !== currentUser.id)
+          let partnerDisplayName = 'Partner'
+          if (partnerId) {
+            const { data: partnerProfile } = await supabase
+              .from('profiles')
+              .select('first_name')
+              .eq('id', partnerId)
+              .maybeSingle()
+            if (partnerProfile?.first_name) {
+              partnerDisplayName = partnerProfile.first_name
+            }
+          }
+
+          // Get current user's name
+          const { data: myProfile } = await supabase
+            .from('profiles')
+            .select('first_name')
+            .eq('id', currentUser.id)
+            .maybeSingle()
+          const myDisplayName = myProfile?.first_name || 'Jij'
+
+          // Fetch recent shared transactions from all household members (last 30 days)
+          const thirtyDaysAgo = new Date()
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+          const cutoffStr = thirtyDaysAgo.toISOString().split('T')[0]
+
+          const { data: sharedTxs } = await supabase
+            .from('transactions')
+            .select('id, description, amount, date, budget_id, user_id, ownership')
+            .in('user_id', memberIds)
+            .gte('date', cutoffStr)
+            .order('date', { ascending: false })
+            .limit(30)
+
+          if (sharedTxs && sharedTxs.length > 0) {
+            // Get budget names
+            const budgetIds = [...new Set(sharedTxs.map(t => t.budget_id).filter(Boolean))]
+            let budgetMap: Record<string, string> = {}
+            if (budgetIds.length > 0) {
+              const { data: budgets } = await supabase
+                .from('budgets')
+                .select('id, name')
+                .in('id', budgetIds)
+              if (budgets) {
+                budgetMap = Object.fromEntries(budgets.map(b => [b.id, b.name]))
+              }
+            }
+
+            // Check partner's privacy settings for transactions
+            let partnerTxPrivacy = 'totalen'  // default
+            if (partnerId) {
+              const partnerMem = (allMembers ?? []).find(m => m.user_id === partnerId)
+              const privSettings = (partnerMem as { privacy_settings?: Record<string, string> })?.privacy_settings
+              if (privSettings) {
+                partnerTxPrivacy = privSettings.transactions || privSettings.transacties || 'totalen'
+              }
+            }
+
+            householdActivity = sharedTxs
+              .filter(tx => {
+                const isMe = tx.user_id === currentUser.id
+                const isShared = tx.ownership === 'shared'
+                // If partner's privacy is 'verborgen'/'hidden', don't show partner's personal transactions
+                if (!isMe && !isShared && (partnerTxPrivacy === 'verborgen' || partnerTxPrivacy === 'hidden')) {
+                  return false
+                }
+                return true
+              })
+              .map(tx => ({
+                id: tx.id,
+                description: tx.description || 'Transactie',
+                amount: Number(tx.amount),
+                date: tx.date,
+                category: tx.budget_id ? budgetMap[tx.budget_id] ?? null : null,
+                partnerName: tx.user_id === currentUser.id ? myDisplayName : partnerDisplayName,
+                isCurrentUser: tx.user_id === currentUser.id,
+                ownership: tx.ownership || 'personal',
+              }))
+              .slice(0, 15)
+          }
+        }
+      }
+    }
+  } catch {
+    // Household activity feed not available — leave empty
   }
 
   // DashboardData bundle for widgets
@@ -889,6 +1013,8 @@ export default async function DashboardPage() {
     topLifeEvents,
     budgetingActive,
     householdOverrides,
+    partnerOverrides,
+    householdActivity,
   }
 
   return (

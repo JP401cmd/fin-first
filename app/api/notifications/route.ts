@@ -12,6 +12,7 @@ export type NotificationType =
   | 'insight'
   | 'badge'
   | 'levelup'
+  | 'partner_transaction'
 
 export type Notification = {
   id: string
@@ -63,6 +64,7 @@ export async function GET(request: NextRequest) {
     const defaultPrefs: Record<string, boolean> = {
       budget: true, streak: true, sync: true,
       recommendation: true, insight: true, badge: true, levelup: true,
+      partner_transaction: true,
     }
     const prefs: Record<string, boolean> = prefsRes.data?.value
       ? { ...defaultPrefs, ...JSON.parse(prefsRes.data.value) }
@@ -327,6 +329,140 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // ── 6. Partner transaction notifications ─────────────────────────
+    // Check if user is in a household and has partner transaction notification prefs
+
+    try {
+      const { data: myMembership } = await supabase
+        .from('household_members')
+        .select('household_id, user_id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (myMembership) {
+        // Find partner in same household
+        const { data: partnerMember } = await supabase
+          .from('household_members')
+          .select('user_id')
+          .eq('household_id', myMembership.household_id)
+          .neq('user_id', user.id)
+          .maybeSingle()
+
+        if (partnerMember) {
+          // Load partner notification preferences
+          const { data: partnerNotifData } = await supabase
+            .from('app_settings')
+            .select('value')
+            .eq('key', `partner_notif_prefs_${user.id}`)
+            .maybeSingle()
+
+          type PartnerNotifMode = 'all_shared' | 'threshold' | 'categories' | 'disabled'
+          const partnerNotifPrefs: { mode: PartnerNotifMode; threshold: number; categories: string[] } = partnerNotifData?.value
+            ? JSON.parse(partnerNotifData.value)
+            : { mode: 'all_shared', threshold: 100, categories: [] }
+
+          if (partnerNotifPrefs.mode !== 'disabled') {
+            // Fetch recent partner transactions (last 7 days, shared or owned by partner)
+            const { data: partnerTxs } = await supabase
+              .from('transactions')
+              .select('id, description, amount, date, budget_id, ownership')
+              .eq('user_id', partnerMember.user_id)
+              .gte('date', cutoffDate.toISOString().split('T')[0])
+              .order('date', { ascending: false })
+              .limit(50)
+
+            // Also get shared transactions by current user's partner
+            const { data: sharedTxs } = await supabase
+              .from('transactions')
+              .select('id, description, amount, date, budget_id, ownership')
+              .eq('ownership', 'shared')
+              .eq('user_id', partnerMember.user_id)
+              .gte('date', cutoffDate.toISOString().split('T')[0])
+              .order('date', { ascending: false })
+              .limit(50)
+
+            // Merge and deduplicate
+            const allPartnerTxs = [...(partnerTxs || []), ...(sharedTxs || [])]
+            const seenTxIds = new Set<string>()
+            const uniquePartnerTxs = allPartnerTxs.filter(tx => {
+              if (seenTxIds.has(tx.id)) return false
+              seenTxIds.add(tx.id)
+              return true
+            })
+
+            // Load budget names for category display
+            const budgetIds = [...new Set(uniquePartnerTxs.map(tx => tx.budget_id).filter(Boolean))]
+            let budgetNameMap: Record<string, string> = {}
+            if (budgetIds.length > 0) {
+              const { data: budgets } = await supabase
+                .from('budgets')
+                .select('id, name')
+                .in('id', budgetIds)
+              if (budgets) {
+                budgetNameMap = Object.fromEntries(budgets.map(b => [b.id, b.name]))
+              }
+            }
+
+            // Compute daily expenses for freedom time calculation
+            const dailyExpenses = monthEnd && monthStart
+              ? (() => {
+                  const totalExpenses = (txRes.data ?? [])
+                    .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
+                  const daysInMonth = Math.ceil((monthEnd.getTime() - monthStart.getTime()) / 86_400_000)
+                  return totalExpenses / Math.max(daysInMonth, 1)
+                })()
+              : 0
+
+            for (const tx of uniquePartnerTxs) {
+              const amount = Math.abs(Number(tx.amount))
+              const isShared = tx.ownership === 'shared'
+              const budgetName = tx.budget_id ? budgetNameMap[tx.budget_id] : null
+
+              // Apply notification filters based on mode
+              let shouldNotify = false
+
+              if (partnerNotifPrefs.mode === 'all_shared') {
+                shouldNotify = isShared
+              } else if (partnerNotifPrefs.mode === 'threshold') {
+                shouldNotify = amount >= partnerNotifPrefs.threshold
+              } else if (partnerNotifPrefs.mode === 'categories') {
+                shouldNotify = tx.budget_id != null && partnerNotifPrefs.categories.includes(tx.budget_id)
+              }
+
+              if (!shouldNotify) continue
+
+              // Calculate freedom days impact
+              const freedomDays = dailyExpenses > 0
+                ? Math.round((amount / dailyExpenses) * 10) / 10
+                : 0
+
+              const id = `partner_tx_${tx.id}`
+              const categoryLabel = budgetName ? ` · ${budgetName}` : ''
+              const freedomLabel = freedomDays > 0 ? ` · ${freedomDays} ${freedomDays === 1 ? 'vrijheidsdag' : 'vrijheidsdagen'}` : ''
+
+              notifications.push({
+                id,
+                type: 'partner_transaction',
+                priority: 3,
+                title: `Partner transactie: €${amount.toLocaleString('nl-NL', { minimumFractionDigits: 2 })}`,
+                description: `${tx.description || 'Transactie'}${categoryLabel}${freedomLabel}`,
+                icon: 'HandCoins',
+                color: 'teal',
+                createdAt: tx.date ? new Date(tx.date).toISOString() : now,
+                read: readIds.includes(id),
+                actionUrl: '/core/cash',
+                aiContext: `Mijn partner heeft een transactie gedaan van €${amount.toFixed(2)}${budgetName ? ` in categorie ${budgetName}` : ''}. Wat is de impact op ons huishoudbudget?`,
+                metadata: { amount, category: budgetName, freedomDays, isShared },
+              })
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Partner transaction notification error:', err)
+      // Non-critical — continue without partner notifications
+    }
+
     // Sort by priority (lower = higher priority)
     notifications.sort((a, b) => a.priority - b.priority)
 
@@ -486,7 +622,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const validTypes = ['budget', 'streak', 'sync', 'recommendation', 'insight', 'badge', 'levelup']
+    const validTypes = ['budget', 'streak', 'sync', 'recommendation', 'insight', 'badge', 'levelup', 'partner_transaction']
     const sanitized: Record<string, boolean> = {}
     for (const key of validTypes) {
       sanitized[key] = preferences[key] !== false

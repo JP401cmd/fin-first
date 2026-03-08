@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { NOTIFICATION_TYPES } from '@/lib/identity-constants'
-import { Lock, GripVertical, ChevronDown, Shield, Eye, EyeOff, Server, FileText, Users, CalendarCheck } from 'lucide-react'
+import { Lock, GripVertical, ChevronDown, Shield, Eye, EyeOff, Server, FileText, Users, CalendarCheck, HandCoins, BellRing } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -249,6 +249,16 @@ export default function InstellingenPage() {
   const [notifSaving, setNotifSaving] = useState(false)
   const [notifMessage, setNotifMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
+  // ─ Partner transaction notification preferences ─
+  type PartnerNotifMode = 'all_shared' | 'threshold' | 'categories' | 'disabled'
+  const [partnerNotifMode, setPartnerNotifMode] = useState<PartnerNotifMode>('all_shared')
+  const [partnerNotifThreshold, setPartnerNotifThreshold] = useState<string>('100')
+  const [partnerNotifCategories, setPartnerNotifCategories] = useState<string[]>([])
+  const [partnerNotifSaving, setPartnerNotifSaving] = useState(false)
+  const [partnerNotifMessage, setPartnerNotifMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [partnerNotifSaved, setPartnerNotifSaved] = useState<{ mode: PartnerNotifMode; threshold: string; categories: string[] }>({ mode: 'all_shared', threshold: '100', categories: [] })
+  const [userBudgetCategories, setUserBudgetCategories] = useState<{ id: string; name: string }[]>([])
+
   // ─ Monthly check-in toggle ─
   const [checkinEnabled, setCheckinEnabled] = useState(true)
   const [checkinSaving, setCheckinSaving] = useState(false)
@@ -435,7 +445,7 @@ export default function InstellingenPage() {
       setPrefs(merged.widgets)
       setWidgetsLoading(false)
 
-      // Household privacy settings
+      // Household privacy settings + partner notification prefs
       try {
         const privacyRes = await fetch('/api/household/privacy')
         if (privacyRes.ok) {
@@ -443,6 +453,30 @@ export default function InstellingenPage() {
           setHasHousehold(true)
           setHouseholdPrivacy(privacyData.privacySettings)
           setHouseholdPrivacySaved(privacyData.privacySettings)
+
+          // Load partner notification preferences
+          try {
+            const pnRes = await fetch('/api/partner-notifications')
+            if (pnRes.ok) {
+              const pnData = await pnRes.json()
+              setPartnerNotifMode(pnData.mode || 'all_shared')
+              setPartnerNotifThreshold(String(pnData.threshold ?? 100))
+              setPartnerNotifCategories(pnData.categories || [])
+              setPartnerNotifSaved({ mode: pnData.mode || 'all_shared', threshold: String(pnData.threshold ?? 100), categories: pnData.categories || [] })
+            }
+          } catch { /* defaults are fine */ }
+
+          // Load budget categories for partner notification category picker
+          const { data: budgets } = await supabase
+            .from('budgets')
+            .select('id, name, parent_id, budget_type')
+            .eq('user_id', user.id)
+            .in('budget_type', ['expense', 'savings', 'debt'])
+            .is('parent_id', null)
+            .order('name')
+          if (budgets) {
+            setUserBudgetCategories(budgets.map(b => ({ id: b.id, name: b.name })))
+          }
         } else if (privacyRes.status === 404) {
           setHasHousehold(false)
         }
@@ -477,6 +511,39 @@ export default function InstellingenPage() {
     }
     setNotifSaving(false)
   }, [notifPrefs])
+
+  const savePartnerNotifPrefs = useCallback(async () => {
+    setPartnerNotifSaving(true)
+    setPartnerNotifMessage(null)
+    try {
+      const res = await fetch('/api/partner-notifications', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: partnerNotifMode,
+          threshold: Number(partnerNotifThreshold) || 100,
+          categories: partnerNotifCategories,
+        }),
+      })
+      if (!res.ok) throw new Error('Save failed')
+      setPartnerNotifSaved({ mode: partnerNotifMode, threshold: partnerNotifThreshold, categories: [...partnerNotifCategories] })
+      setPartnerNotifMessage({ type: 'success', text: 'Partner-notificaties opgeslagen!' })
+      setTimeout(() => setPartnerNotifMessage(null), 3000)
+    } catch {
+      setPartnerNotifMessage({ type: 'error', text: 'Opslaan mislukt. Probeer opnieuw.' })
+    }
+    setPartnerNotifSaving(false)
+  }, [partnerNotifMode, partnerNotifThreshold, partnerNotifCategories])
+
+  const partnerNotifChanged = partnerNotifMode !== partnerNotifSaved.mode
+    || partnerNotifThreshold !== partnerNotifSaved.threshold
+    || JSON.stringify(partnerNotifCategories) !== JSON.stringify(partnerNotifSaved.categories)
+
+  const togglePartnerCategory = useCallback((catId: string) => {
+    setPartnerNotifCategories(prev =>
+      prev.includes(catId) ? prev.filter(c => c !== catId) : [...prev, catId]
+    )
+  }, [])
 
   const toggleCheckin = useCallback(async () => {
     const newVal = !checkinEnabled
@@ -838,6 +905,132 @@ export default function InstellingenPage() {
                     </button>
                   </div>
                 </div>
+
+                {/* Partner transacties — only when user has a household */}
+                {hasHousehold && (
+                  <div className="mt-5 rounded-xl border border-[var(--border-ed)] overflow-hidden">
+                    <div className="flex items-center gap-3 px-4 py-3 bg-[var(--subtle)] border-b border-[var(--border-ed)]">
+                      <HandCoins className="h-4 w-4 shrink-0 text-teal-600" />
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--ink)]">Partner transacties</p>
+                        <p className="text-xs text-[var(--ink-3)]">Meldingen over transacties van je partner</p>
+                      </div>
+                    </div>
+                    <div className="px-4 py-4 space-y-4">
+                      {/* Mode selector */}
+                      <div className="space-y-2">
+                        {([
+                          { mode: 'all_shared' as PartnerNotifMode, label: 'Alle gedeelde transacties', desc: 'Ontvang een melding bij elke gedeelde transactie' },
+                          { mode: 'threshold' as PartnerNotifMode, label: 'Boven drempelbedrag', desc: 'Alleen transacties boven een bepaald bedrag' },
+                          { mode: 'categories' as PartnerNotifMode, label: 'Geselecteerde categorieën', desc: 'Alleen transacties in bepaalde budgetcategorieën' },
+                          { mode: 'disabled' as PartnerNotifMode, label: 'Uitgeschakeld', desc: 'Geen meldingen over partner transacties' },
+                        ]).map(opt => (
+                          <button
+                            key={opt.mode}
+                            type="button"
+                            onClick={() => setPartnerNotifMode(opt.mode)}
+                            className={`flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                              partnerNotifMode === opt.mode
+                                ? 'bg-teal-50 border border-teal-300'
+                                : 'border border-[var(--border-ed)] hover:bg-[var(--subtle)]'
+                            }`}
+                          >
+                            <div className={`mt-0.5 h-4 w-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
+                              partnerNotifMode === opt.mode ? 'border-teal-600' : 'border-[var(--border-md)]'
+                            }`}>
+                              {partnerNotifMode === opt.mode && (
+                                <div className="h-2 w-2 rounded-full bg-teal-600" />
+                              )}
+                            </div>
+                            <div>
+                              <p className={`text-sm font-medium ${partnerNotifMode === opt.mode ? 'text-teal-800' : 'text-[var(--ink-2)]'}`}>{opt.label}</p>
+                              <p className="text-xs text-[var(--ink-3)]">{opt.desc}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Threshold amount input */}
+                      {partnerNotifMode === 'threshold' && (
+                        <div className="rounded-lg border border-[var(--border-ed)] p-3 bg-[var(--subtle)]">
+                          <label className="block text-xs font-medium text-[var(--ink-2)] mb-1.5">
+                            Drempelbedrag
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-[var(--ink-3)]">€</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="10"
+                              value={partnerNotifThreshold}
+                              onChange={e => setPartnerNotifThreshold(e.target.value)}
+                              className="w-28 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 text-sm font-mono tabular-nums text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-teal-400"
+                            />
+                            <span className="text-xs text-[var(--ink-3)]">of hoger</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Category selection */}
+                      {partnerNotifMode === 'categories' && (
+                        <div className="rounded-lg border border-[var(--border-ed)] p-3 bg-[var(--subtle)]">
+                          <label className="block text-xs font-medium text-[var(--ink-2)] mb-2">
+                            Selecteer categorieën
+                          </label>
+                          {userBudgetCategories.length > 0 ? (
+                            <div className="space-y-1.5">
+                              {userBudgetCategories.map(cat => {
+                                const checked = partnerNotifCategories.includes(cat.id)
+                                return (
+                                  <button
+                                    key={cat.id}
+                                    type="button"
+                                    onClick={() => togglePartnerCategory(cat.id)}
+                                    className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors ${
+                                      checked ? 'bg-teal-50 border border-teal-200' : 'border border-transparent hover:bg-[var(--paper)]'
+                                    }`}
+                                  >
+                                    <div className={`h-4 w-4 rounded border shrink-0 flex items-center justify-center ${
+                                      checked ? 'bg-teal-600 border-teal-600' : 'border-[var(--border-md)] bg-[var(--paper)]'
+                                    }`}>
+                                      {checked && (
+                                        <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none">
+                                          <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                      )}
+                                    </div>
+                                    <span className={`text-sm ${checked ? 'text-teal-800 font-medium' : 'text-[var(--ink-2)]'}`}>{cat.name}</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-[var(--ink-3)] italic">Geen budgetcategorieën gevonden. Maak eerst budgetten aan.</p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Save button for partner notification prefs */}
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={savePartnerNotifPrefs}
+                          disabled={partnerNotifSaving || !partnerNotifChanged}
+                          className="rounded-lg bg-teal-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-700 disabled:opacity-50"
+                        >
+                          {partnerNotifSaving ? 'Opslaan...' : 'Opslaan'}
+                        </button>
+                        {partnerNotifMessage && (
+                          <span className={`text-sm ${partnerNotifMessage.type === 'success' ? 'text-teal-600' : 'text-red-600'}`}>
+                            {partnerNotifMessage.text}
+                          </span>
+                        )}
+                        {partnerNotifChanged && !partnerNotifMessage && (
+                          <span className="text-xs text-amber-600">Niet-opgeslagen wijzigingen</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="mt-4 flex items-center gap-3">
                   <button

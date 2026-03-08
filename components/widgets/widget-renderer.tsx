@@ -34,6 +34,7 @@ import { MaandoverzichtWidget } from './maandoverzicht-widget'
 import { AgendaWidget } from './agenda-widget'
 import { NoodfondsWidget } from './noodfonds-widget'
 import { HuishoudenVergelijkingWidget } from './huishouden-vergelijking-widget'
+import { HuishoudenActiviteitWidget } from './huishouden-activiteit-widget'
 import { getWidgetDef, WIDGET_HREFS, WIDGET_FEATURE_MAP } from '@/lib/widget-catalog'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { FireProjection, FireRange, FireCountdown } from '@/lib/horizon-data'
@@ -266,6 +267,27 @@ export interface DashboardData {
     monthlyExpenses: number
     monthlyIncome: number
   } | null
+  // Partner perspective overrides (null if no household)
+  partnerOverrides: {
+    netWorth: number
+    totalAssets: number
+    totalDebts: number
+    monthlyExpenses: number
+    monthlyIncome: number
+  } | null
+  // Household activity feed — recent shared transactions from both partners
+  householdActivity: HouseholdActivityItem[]
+}
+
+export interface HouseholdActivityItem {
+  id: string
+  description: string
+  amount: number
+  date: string
+  category: string | null
+  partnerName: string
+  isCurrentUser: boolean
+  ownership: string
 }
 
 interface WidgetRendererProps {
@@ -366,6 +388,8 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
       return <NoodfondsWidget size={size} data={data} href={href} />
     case 'huishouden_vergelijking':
       return <HuishoudenVergelijkingWidget size={size} data={data} href={href} />
+    case 'huishouden_activiteit':
+      return <HuishoudenActiviteitWidget size={size} data={data} href={href} />
     default:
       return null
   }
