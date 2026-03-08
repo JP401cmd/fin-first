@@ -1,3 +1,35 @@
+## Session 2026-03-08 - Features #601, #607, #572
+
+### Feature #601: Event formulier: verbeterde opmaak met secties en visuele hierarchie - PASSING
+- Form restructured into 3 sections: Basis (naam, leeftijd, type), Details (bedrag, duur, indexering, context fields), Financiele impact (summary card)
+- Section headers: uppercase tracking labels matching editorial design
+- Subtle h-px dividers between sections using var(--border-ed)
+- Summary card shows: eenmalige/maandelijkse impact, totale impact, vrijheidstijd-equivalent
+- Uses calculateFreedomTime + formatFreedomTimeString with Hourglass icon
+- font-mono tabular-nums for all amounts, color-coded red/emerald for expense/income
+- Continuous events show 10-year estimate with disclaimer
+- Commit: 1a6cf26
+
+### Feature #607: Backward compatibility: bestaande events zonder metadata blijven werken - PASSING
+- Already fully implemented in existing code:
+  - LifeEvent.metadata is optional (metadata?: Record<string,unknown>)
+  - DB migration has NOT NULL DEFAULT '{}' so old rows get empty object
+  - openEditForm merges defaults with (ev.metadata ?? {})
+  - lifeEventsToCashflows doesn't use metadata at all
+  - Form fields fall back to catalog defaults when metadata is empty
+  - Saving adds metadata to old events via formMetadata state
+
+### Feature #572: Huishouden-features consistent met Editorial Finance design - PASSING
+- huishouden-activiteit-widget: teal-100/700 → wil-100/700, teal-600 → wil-600
+- household-fire-section: teal-600 → wil-600 (Target icon), added font-mono tabular-nums to all money amounts (FinancialCard, hero values, partner cards, financial details), replaced bg-zinc-* with var(--border-ed)/var(--border-md)
+- identity/instellingen: all teal-* → wil-*, all purple-* → horizon-*, privacy section fully uses semantic module colors
+- Zero TypeScript errors, build succeeds
+- Commit: 777c8d4
+
+### Current Status
+- 3 features completed this session (#601, #607, #572)
+- Zero TypeScript errors in production code
+
 ## Session 2026-03-08 - Feature #571
 
 ### Feature #571: Huishouden-instellingen bereikbaar vanuit Identity - PASSING
