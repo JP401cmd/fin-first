@@ -6,7 +6,6 @@ import { PostponeForm } from '@/components/app/postpone-form'
 import { ActionEditModal } from '@/components/app/action-edit-modal'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import {
-  getActionStatusColor,
   getSourceBadgeClasses,
   ACTION_SOURCE_LABELS,
 } from '@/lib/recommendation-data'
@@ -36,7 +35,6 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
   const isAssigned = action.assigned_to != null
   const assignedByName = action.assigned_by_name ?? action.assigned_by ?? null
 
-  const statusBorder = getActionStatusColor(action.status)
   const sourceBadge = getSourceBadgeClasses(action.source)
 
   async function handleStatus(status: ActionStatus, data?: Record<string, unknown>) {
@@ -53,16 +51,37 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
   return (
     <>
       <div
-        className={`rounded-lg border ${isPartnerAssigned ? 'border-wil-200 bg-wil-50/30' : 'border-[var(--border-ed)] bg-[var(--paper)]'} border-l-4 ${statusBorder} px-3 py-2.5 transition-all hover:shadow-[var(--s0)] cursor-pointer`}
+        className={`rounded-lg border ${isPartnerAssigned ? 'border-wil-200 bg-wil-50/30' : 'border-[var(--border-ed)] bg-[var(--paper)]'} px-3 py-1.5 transition-all duration-150 ease-in-out hover:border-[var(--border-md)] cursor-pointer`}
         onClick={() => {
           if (!showPostpone && !showReject && onUpdate) setShowEdit(true)
         }}
       >
-        <div className="flex items-center justify-between gap-2">
-          {/* Left: title + badges */}
+        <div className="flex h-[28px] items-center gap-2.5">
+          {/* Checkbox circle */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              if (action.status === 'open') handleStatus('completed')
+              else if (action.status === 'completed') handleStatus('open')
+            }}
+            disabled={isLoading}
+            title={action.status === 'completed' ? 'Heropenen' : 'Afronden'}
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors disabled:opacity-50"
+            style={{
+              borderColor: action.status === 'completed' ? 'var(--color-emerald-500)' : action.status === 'postponed' ? 'var(--color-amber-400)' : 'var(--border-md)',
+              backgroundColor: action.status === 'completed' ? 'var(--color-emerald-500)' : 'transparent',
+            }}
+          >
+            {action.status === 'completed' && <Check className="h-3 w-3 text-white" />}
+            {action.status === 'postponed' && <Clock className="h-2.5 w-2.5 text-amber-500" />}
+            {action.status === 'rejected' && <X className="h-2.5 w-2.5 text-[var(--ink-3)]" />}
+          </button>
+
+          {/* Title */}
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <h4 className="truncate text-sm font-medium text-[var(--ink)]">{action.title}</h4>
-            <span className={`shrink-0 rounded-full px-1.5 py-px text-xs font-medium ${sourceBadge}`}>
+            <h4 className={`truncate text-sm font-medium ${action.status === 'completed' ? 'text-[var(--ink-3)] line-through' : 'text-[var(--ink)]'}`}>{action.title}</h4>
+            <span className={`hidden sm:inline-flex shrink-0 rounded-full px-1.5 py-px text-[10px] font-medium ${sourceBadge}`}>
               {ACTION_SOURCE_LABELS[action.source]}
             </span>
             {/* Partner assignment badge — outgoing (I assigned to partner) */}
@@ -90,7 +109,7 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
           <div className="flex shrink-0 items-center gap-2">
             {/* Compact meta */}
             {action.freedom_days_impact != null && action.freedom_days_impact > 0 && (
-              <span className="hidden sm:inline-flex rounded-full bg-wil-50 px-2 py-px text-xs font-medium text-wil-700">
+              <span className="inline-flex rounded-full bg-wil-50 px-2 py-px text-xs font-mono tabular-nums font-medium text-wil-700">
                 {Math.round(action.freedom_days_impact)}d
               </span>
             )}
@@ -111,10 +130,9 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
               </span>
             )}
 
-            {/* Quick action buttons */}
+            {/* Quick action buttons (compact) */}
             {action.status === 'open' && !showPostpone && !showReject && (
               <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
-                {/* Assign to partner button */}
                 {partnerInfo && onAssign && (
                   <button
                     type="button"
@@ -137,15 +155,6 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
                     {isAssigned ? <UserCheck className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />}
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => handleStatus('completed')}
-                  disabled={isLoading}
-                  title="Afronden"
-                  className="touch-target rounded text-emerald-500 transition-colors hover:bg-emerald-50 disabled:opacity-50"
-                >
-                  <Check className="h-3.5 w-3.5" />
-                </button>
                 <button
                   type="button"
                   onClick={() => setShowPostpone(true)}
@@ -178,12 +187,6 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                 </button>
-              </div>
-            )}
-
-            {action.status === 'completed' && (
-              <div className="rounded-full bg-emerald-100 p-1">
-                <Check className="h-3 w-3 text-emerald-600" />
               </div>
             )}
           </div>

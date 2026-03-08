@@ -24,7 +24,7 @@ export function RecommendationCard({ recommendation, onClick }: RecommendationCa
     <button
       type="button"
       onClick={onClick}
-      className={`relative w-full cursor-pointer overflow-hidden rounded-[var(--r-lg)] border ${colors.border} bg-gradient-to-br from-wil-50 via-white to-kern-50/30 px-4 py-3 text-left transition-all hover:shadow-md`}
+      className={`relative w-full cursor-pointer overflow-hidden rounded-[var(--r-lg)] border ${colors.border} bg-gradient-to-br from-wil-50 via-white to-kern-50/30 px-4 py-3 text-left transition-all duration-150 ease-in-out hover:border-[var(--border-md)] hover:-translate-y-px`}
     >
       <div className="flex items-center gap-3">
         {/* Type icon */}
@@ -54,8 +54,9 @@ export function RecommendationCard({ recommendation, onClick }: RecommendationCa
         {/* Freedom days */}
         {recommendation.freedom_days_per_year != null && recommendation.freedom_days_per_year > 0 && (
           <div className="shrink-0 text-right">
-            <div className="text-sm font-bold text-wil-600">
-              {Math.round(recommendation.freedom_days_per_year)} dagen
+            <div className="text-sm">
+              <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">{Math.round(recommendation.freedom_days_per_year)}</span>{' '}
+              <span className="font-serif italic text-[var(--ink-3)]">dagen</span>
             </div>
           </div>
         )}
