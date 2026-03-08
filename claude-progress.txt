@@ -1,3 +1,83 @@
+## Session 2026-03-08 - Features #533, #534, #535
+
+### Feature #533: Privacy-instellingen UI in huishouden-settings - PASSING
+- Added Huishouden accordion section (G) to /identity/instellingen
+- 5 categories: Vermogen, Schulden, Budgetten, Transacties, Inkomen
+- 3 privacy levels per category: Volledig (Eye icon, teal), Totalen (Shield, amber), Verborgen (EyeOff, red)
+- Default for new households: Totalen
+- Save button with unsaved-changes indicator and success message
+- Section only visible when user has a household (hasHousehold state)
+- Created /api/household/privacy (GET/PATCH) with app_settings fallback
+- Test page: /test-household-privacy
+- Commit: 20d6686
+
+### Feature #534: Privacy-niveaus database schema voor huishouden - PASSING
+- Migration: supabase/migrations/20260308000001_add_household_privacy_settings.sql
+- Adds privacy_settings JSONB column to household_members table
+- DB schema uses English keys: assets, debts, budgets, transactions, income
+- Levels: full, totals, hidden (default: all totals)
+- RLS policy: "Users can update own privacy settings"
+- Helper function: get_partner_privacy_level(household_id, partner_user_id, category)
+- API updated to support bilingual keys (Dutch UI ↔ English DB)
+- Commit: d51b619
+
+### Feature #535: Partner-view respecteert privacy: alleen totalen tonen - PASSING
+- Added applyPrivacyFilter() to lib/household-data.ts
+  - full: all individual items returned
+  - totals: items aggregated into single summary with _aggregated flag
+  - hidden: items removed entirely (empty array)
+- Added normalisePrivacySettings() for Dutch↔English conversion
+- Updated /api/household/data to fetch partner's privacy settings in household perspective
+- Net worth computed from privacy-filtered items (correct totals)
+- privacyApplied metadata in response for UI privacy badges
+- 12/12 privacy filter unit tests passing
+- Test page: /test-household-privacy-filter
+- Zero TypeScript errors, zero console errors
+- Commit: 77a9efa
+
+### Current Status
+- 3 features completed this session (#533, #534, #535)
+- Zero TypeScript errors in changed files
+- Zero console errors
+
+## Session 2026-03-08 - Features #527, #547, #528
+
+### Feature #527: Gecombineerde huishouden FIRE-leeftijd berekening - PASSING
+- Updated /api/household/fire-projections to use computeSharePct() instead of hardcoded 50% split
+- Supports all 4 split modes: equal, income_ratio, custom, one_carries_all
+- API returns splitMode and customSplitPct in response
+- HouseholdFireSection made perspective-aware via usePerspective()
+- Personal perspective: shows individual FIRE projection with split-mode share info
+- Household perspective: shows combined FIRE projection with split label
+- Settings2 icon + info bar explains active split mode
+- Commit: 5fd8c2b
+
+### Feature #547: Horizon toont huishouden FIRE-projectie - PASSING
+- Added usePerspective() to horizon/page.tsx
+- New HouseholdHeroData interface for combined FIRE data
+- Fetches /api/household/fire-projections when perspective is 'household'
+- Hero stats (fire age, target, countdown) show combined household values
+- Progress bar uses household freedom percentage and target
+- Kicker text changes to "Huishouden — Gezamenlijke horizon"
+- Subtitle explains "Gecombineerde financiën van het huishouden"
+- Title tooltips on all hero stats explain gezamenlijke berekening
+- Commit: 2ded6ce
+
+### Feature #528: Partner FIRE-leeftijd vergelijking op Horizon - PASSING
+- New FireAgeComparison component in household-fire-section.tsx
+- 3-column grid showing Partner 1, Partner 2, and Combined FIRE ages
+- Earliest FIRE date visually marked with ring-2 ring-emerald-200 + "✦ Vroegst" badge
+- Difference displayed as "+Xj Ymnd t.o.v. vroegste" for non-earliest entries
+- Visual progress bars showing relative FIRE age positions
+- Module-colored cards (horizon for P1, wil for P2, emerald for combined)
+- Tooltip on combined card explains calculation methodology
+- Commit: cd0aa84
+
+### Current Status
+- 3 features completed this session (#527, #547, #528)
+- Zero TypeScript errors in changed files
+- Pre-existing TS errors in app/api/goals/route.ts (not related)
+
 ## Session 2026-03-07 - Features #516, #517, #520
 
 ### Feature #516: Widget grid formaten aanpassen: half=2col/1row, full=2col/2row - PASSING
