@@ -248,7 +248,7 @@ export default function TestDebtTrajectoryPage() {
     draagkrachtmeting_date: null,
     ownership: 'personal',
     household_id: null,
-    net_worth_inclusion_pct: 100, partner_split_pct: null,
+    net_worth_inclusion_pct: 100, partner_split_pct: null, tax_year: null, has_payment_plan: false,
   }), [])
 
   // Create simulated valuation history
@@ -290,7 +290,7 @@ export default function TestDebtTrajectoryPage() {
     draagkrachtmeting_date: null,
     ownership: 'personal',
     household_id: null,
-    net_worth_inclusion_pct: 100, partner_split_pct: null,
+    net_worth_inclusion_pct: 100, partner_split_pct: null, tax_year: null, has_payment_plan: false,
   }), [])
 
   // Linear debt test
@@ -322,7 +322,7 @@ export default function TestDebtTrajectoryPage() {
     draagkrachtmeting_date: null,
     ownership: 'personal',
     household_id: null,
-    net_worth_inclusion_pct: 100, partner_split_pct: null,
+    net_worth_inclusion_pct: 100, partner_split_pct: null, tax_year: null, has_payment_plan: false,
   }), [])
 
   useEffect(() => {

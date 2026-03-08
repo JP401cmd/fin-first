@@ -14,6 +14,8 @@ export type DebtType =
   | 'revolving_credit'
   | 'payment_plan'
   | 'belastingschuld'
+  | 'familielening'
+  | 'dga_schuld'
   | 'other'
 
 export type RepaymentType = 'aflossingsvrij' | 'annuiteit' | 'lineair'
@@ -25,6 +27,7 @@ export type CreditCardSubtype = 'regulier' | 'charge_card'
 export type RevolvingCreditSubtype = 'doorlopend_krediet' | 'roodstand'
 
 export type BelastingschuldSubtype = 'inkomstenbelasting' | 'voorlopige_aanslag' | 'box3_nabetaling' | 'btw' | 'overig_belasting'
+export type FamilieleningSubtype = 'ouders' | 'familie' | 'vrienden' | 'overig_onderhand'
 
 export type DebtSubtype =
   | MortgageSubtype
@@ -33,6 +36,7 @@ export type DebtSubtype =
   | CreditCardSubtype
   | RevolvingCreditSubtype
   | BelastingschuldSubtype
+  | FamilieleningSubtype
 
 export interface Debt {
   id: string
@@ -61,6 +65,9 @@ export interface Debt {
   credit_limit: number | null
   repayment_type: RepaymentType | null
   draagkrachtmeting_date: string | null
+  // Belastingschuld fields
+  tax_year: number | null
+  has_payment_plan: boolean
   // Household fields
   ownership: 'personal' | 'shared'
   household_id: string | null
@@ -78,6 +85,8 @@ export const DEBT_TYPE_LABELS: Record<DebtType, string> = {
   revolving_credit: 'Doorlopend krediet',
   payment_plan: 'Afbetalingsregeling',
   belastingschuld: 'Belastingschuld',
+  familielening: 'Familielening',
+  dga_schuld: 'DGA-schuld aan eigen BV',
   other: 'Overig',
 }
 
@@ -90,6 +99,8 @@ export const DEBT_TYPE_ICONS: Record<DebtType, string> = {
   revolving_credit: 'RefreshCw',
   payment_plan: 'CalendarCheck',
   belastingschuld: 'Receipt',
+  familielening: 'Heart',
+  dga_schuld: 'Building2',
   other: 'CircleDot',
 }
 
@@ -127,6 +138,12 @@ export const DEBT_SUBTYPE_LABELS: Partial<Record<DebtType, Record<string, string
     btw: 'BTW-schuld',
     overig_belasting: 'Overige belastingschuld',
   },
+  familielening: {
+    ouders: 'Lening van ouders',
+    familie: 'Lening van overige familie',
+    vrienden: 'Lening van vrienden',
+    overig_onderhand: 'Overige onderhandse lening',
+  },
 }
 
 export const REPAYMENT_TYPE_LABELS: Record<RepaymentType, string> = {
@@ -156,7 +173,9 @@ export const DEBT_TYPE_FIELDS: Record<DebtType, string[]> = {
   revolving_credit: ['subtype', 'credit_limit'],
   car_loan: [],
   payment_plan: [],
-  belastingschuld: ['subtype'],
+  belastingschuld: ['subtype', 'tax_year', 'has_payment_plan'],
+  familielening: ['subtype'],
+  dga_schuld: ['linked_asset_id'],
   other: [],
 }
 
