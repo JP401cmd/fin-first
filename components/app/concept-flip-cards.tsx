@@ -115,7 +115,7 @@ function FlipCard({ concept, personalData }: { concept: ConceptCard; personalDat
   return (
     <div
       className="perspective-[600px] cursor-pointer"
-      style={{ minHeight: '160px' }}
+      style={{ minHeight: '140px' }}
     >
       <div
         role="button"
@@ -125,7 +125,7 @@ function FlipCard({ concept, personalData }: { concept: ConceptCard; personalDat
         style={{
           transformStyle: 'preserve-3d',
           transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-          minHeight: '160px',
+          minHeight: '140px',
         }}
         onClick={() => setFlipped(!flipped)}
         onKeyDown={(e) => {
@@ -168,7 +168,7 @@ function FlipCard({ concept, personalData }: { concept: ConceptCard; personalDat
           </div>
           {personal && (
             <div
-              className="mt-2 rounded-[var(--r-sm)] px-2.5 py-1.5 text-[11px] font-medium"
+              className="mt-2 rounded-[var(--r-sm)] px-2.5 py-1.5 text-[11px] font-medium font-mono tabular-nums"
               style={{
                 backgroundColor: concept.color,
                 color: concept.colorAccent,
@@ -209,7 +209,7 @@ export default function ConceptFlipCards() {
         <BookOpen className="h-4 w-4 text-[var(--ink-3)]" />
         <p className="label-editorial text-[var(--ink-3)]">Kernconcepten</p>
       </div>
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
         {CONCEPTS.map((concept) => (
           <FlipCard
             key={concept.id}

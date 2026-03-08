@@ -80,7 +80,7 @@ function ReisStapCard({
       style={{ borderColor }}
     >
       {/* Header */}
-      <div className="flex items-center gap-3 p-4 pb-3">
+      <div className="flex items-center gap-3 p-3 pb-2.5 sm:p-4 sm:pb-3">
         <div
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)]"
           style={{ backgroundColor: bg, color }}
@@ -99,7 +99,7 @@ function ReisStapCard({
       </div>
 
       {/* Hoe-stappen */}
-      <div className="px-4 pb-3">
+      <div className="px-3 pb-2.5 sm:px-4 sm:pb-3">
         <p className="label-editorial text-[var(--ink-4)] mb-2">Hoe</p>
         <div className="space-y-2">
           {howSteps.map((step, i) => {
@@ -120,25 +120,29 @@ function ReisStapCard({
       </div>
 
       {/* Jouw status */}
-      <div className="mx-4 mb-3 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 p-3">
+      <div className="mx-3 mb-2.5 sm:mx-4 sm:mb-3 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 p-2.5 sm:p-3">
         <p className="label-editorial text-[var(--ink-4)] mb-1.5">Jouw status</p>
         {statusLines.map((line, i) => (
-          <p key={i} className="text-[12px] leading-relaxed text-[var(--ink-2)]">{line}</p>
+          <p key={i} className="text-[12px] leading-relaxed text-[var(--ink-2)]">
+            {line.split(/(\d[\d.,]*)/g).map((part, j) =>
+              /^\d/.test(part) ? <span key={j} className="font-mono tabular-nums">{part}</span> : part
+            )}
+          </p>
         ))}
       </div>
 
       {/* Waarde */}
-      <div className="px-4 pb-3">
+      <div className="px-3 pb-2.5 sm:px-4 sm:pb-3">
         <p className="font-serif italic text-[12px] leading-relaxed text-[var(--ink-3)]">
           {valueSentence}
         </p>
       </div>
 
       {/* CTA */}
-      <div className="px-4 pb-4">
+      <div className="px-3 pb-3 sm:px-4 sm:pb-4">
         <Link
           href={ctaHref}
-          className="inline-flex items-center gap-1.5 rounded-[var(--r-sm)] px-4 py-2 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
+          className="inline-flex items-center gap-1.5 rounded-[var(--r-sm)] px-4 py-2.5 min-h-[44px] sm:py-2 sm:min-h-0 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
           style={{ backgroundColor: color }}
         >
           {ctaLabel}
@@ -175,7 +179,7 @@ function GuideAccordion({
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-[var(--subtle)]/60"
+        className="flex w-full items-center gap-3 p-3 min-h-[44px] text-left transition-colors hover:bg-[var(--subtle)]/60"
       >
         <div
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r-sm)]"
@@ -300,7 +304,7 @@ export default function GidsPage() {
                 const el = document.getElementById(`guide-${mod.id}`)
                 el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
               }}
-              className="card-editorial p-4 text-left transition-all hover:shadow-md group"
+              className="card-editorial p-4 text-left transition-all hover:shadow-md group min-h-[44px]"
             >
               <div
                 className="mb-2 flex h-9 w-9 items-center justify-center rounded-[var(--r)]"

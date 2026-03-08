@@ -54,10 +54,10 @@ export default function GuideProTips() {
         <p className="label-editorial text-[var(--ink-3)]">Tips</p>
       </div>
 
-      {/* Horizontal scroll container with snap */}
+      {/* Mobile: horizontal scroll with snap | Desktop: grid */}
       <div className="relative">
         <div
-          className="flex gap-2.5 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide"
+          className="flex gap-2.5 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0"
           style={{
             scrollbarWidth: 'none',
             msOverflowStyle: 'none',
@@ -69,15 +69,15 @@ export default function GuideProTips() {
             return (
               <div
                 key={i}
-                className="snap-start shrink-0 w-[200px] sm:w-[220px] rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 flex flex-col gap-2"
+                className="snap-start shrink-0 w-[200px] sm:w-[220px] lg:w-auto lg:shrink rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 flex flex-col gap-2"
               >
                 <div className="flex items-center gap-2">
                   <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--subtle)] text-[var(--ink-3)]">
-                    <span className="text-[10px] font-bold">{i + 1}</span>
+                    <span className="text-[10px] font-bold font-mono tabular-nums">{i + 1}</span>
                   </div>
                   <Icon className="h-3.5 w-3.5 text-[var(--ink-3)]" />
                 </div>
-                <p className="text-[11px] leading-relaxed text-[var(--ink-2)] line-clamp-3">
+                <p className="text-[11px] leading-relaxed text-[var(--ink-2)] line-clamp-3 lg:line-clamp-none">
                   {tip.text}
                 </p>
               </div>
@@ -85,8 +85,8 @@ export default function GuideProTips() {
           })}
         </div>
 
-        {/* Fade edge indicators */}
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[var(--paper)] to-transparent sm:hidden" />
+        {/* Fade edge indicators — only on mobile */}
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[var(--paper)] to-transparent lg:hidden" />
       </div>
     </div>
   )

@@ -77,7 +77,7 @@ function FaqAccordionItem({
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center gap-3 py-3 px-1 text-left transition-colors hover:bg-[var(--subtle)]/40"
+        className="flex w-full items-center gap-3 py-3 px-1 min-h-[44px] text-left transition-colors hover:bg-[var(--subtle)]/40"
         aria-expanded={open}
       >
         <span className="flex-1 text-[12px] font-semibold text-[var(--ink)]">

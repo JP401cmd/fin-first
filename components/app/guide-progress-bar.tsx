@@ -95,11 +95,11 @@ export function GuideProgressBar() {
   const total = REIS_STAPPEN.length
 
   return (
-    <div className="mb-6">
+    <div className="mb-6 sticky top-[57px] z-10 -mx-4 px-4 py-2 bg-[var(--paper)]/95 backdrop-blur-sm sm:-mx-6 sm:px-6">
       {/* Label */}
       <div className="mb-2.5 flex items-center justify-between">
         <p className="text-[12px] font-semibold text-[var(--ink-2)]">
-          {completedCount} van {total} stappen doorlopen
+          <span className="font-mono tabular-nums">{completedCount}</span> van <span className="font-mono tabular-nums">{total}</span> stappen doorlopen
         </p>
         {completedCount === total && (
           <span className="text-[11px] font-medium text-emerald-600">
