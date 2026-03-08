@@ -308,7 +308,9 @@ export interface ScheidingMetadata {
 }
 
 export interface WerkloosheidMetadata {
+  huidigBruto?: number
   huidigNetto?: number
+  dienstjaren?: number
   wwDuur?: number
   transitievergoeding?: number
   zoektijd?: number
@@ -853,26 +855,29 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     ],
   },
   werkloosheid: {
-    label: 'Werkloosheid',
-    icon: 'UserX',
+    label: 'Werkloosheid / Ontslag',
+    icon: 'UserMinus',
     group: 'werk',
     impactRange: '€2.000–€3.500/mnd inkomensverlies',
-    defaultCost: 0,
+    defaultCost: -5000,
     defaultMonthlyCost: 0,
     defaultMonthlyIncome: -1500,
     defaultDuration: 12,
-    description: 'Onvrijwillig verlies van baan',
+    description: 'Onvrijwillig verlies van baan met WW-uitkering en transitievergoeding',
     tip: 'WW-uitkering: 75% dagloon eerste 2 maanden, daarna 70%. Maximaal 24 maanden (afhankelijk van arbeidsverleden). Max dagloon 2026: ca. €274/dag bruto (UWV).',
     fields: [
-      { key: 'huidigNetto', label: 'Huidig netto maandinkomen', fieldType: 'number', default: 3000, tip: 'Je netto maandsalaris vóór werkloosheid. WW-uitkering is ca. 70% van je bruto dagloon.' },
-      { key: 'wwDuur', label: 'Verwachte WW-duur', fieldType: 'select', default: 12, options: [
+      { key: 'huidigBruto', label: 'Huidig bruto maandsalaris', fieldType: 'number', default: 4000, tip: 'Je bruto maandsalaris. Nodig voor berekening WW-uitkering en transitievergoeding.' },
+      { key: 'huidigNetto', label: 'Huidig netto maandinkomen', fieldType: 'number', default: 3000, tip: 'Je netto maandsalaris. Het verschil met WW bepaalt je maandelijkse inkomensgat.' },
+      { key: 'dienstjaren', label: 'Dienstjaren bij werkgever', fieldType: 'number', default: 5, tip: 'Nodig voor berekening transitievergoeding: ~1/3 bruto maandsalaris per dienstjaar.' },
+      { key: 'transitievergoeding', label: 'Transitievergoeding (berekend)', fieldType: 'number', default: 6667, tip: 'Automatisch berekend: ~1/3 bruto maandsalaris × dienstjaren. Handmatig aanpasbaar.' },
+      { key: 'wwDuur', label: 'WW-duur', fieldType: 'select', default: 12, options: [
         { value: 3, label: '3 maanden (basisrecht)' },
         { value: 6, label: '6 maanden' },
         { value: 12, label: '12 maanden' },
+        { value: 18, label: '18 maanden' },
         { value: 24, label: '24 maanden (maximaal)' },
       ], tip: 'Basisrecht: 3 mnd. Per jaar arbeidsverleden +1 mnd. Max 24 mnd bij 38+ jaar arbeidsverleden (UWV).' },
-      { key: 'transitievergoeding', label: 'Transitievergoeding', fieldType: 'number', default: 5000, tip: '1/3 maandsalaris per dienstjaar. Bij 10 jaar en €4.000/mnd bruto: ca. €13.300 bruto.' },
-      { key: 'zoektijd', label: 'Verwachte zoektijd na WW', fieldType: 'number', default: 0, tip: 'Extra maanden zonder inkomen ná WW-periode. Gemiddelde zoektijd 45+: 6–12 maanden.', suffix: 'maanden' },
+      { key: 'zoektijd', label: 'Verwachte werkloosheidsduur', fieldType: 'number', default: 6, tip: 'Totale periode zonder werk (incl. WW). Na afloop WW eventueel bijstand.', suffix: 'maanden' },
     ],
   },
   schenking: {

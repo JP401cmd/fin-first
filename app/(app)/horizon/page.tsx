@@ -460,6 +460,17 @@ export default function HorizonPage() {
       setFormDurationType('one_time')
       setFormDirection('expense')
     }
+    // Auto-calculate initial transitievergoeding for werkloosheid
+    if (type === 'werkloosheid') {
+      const bruto = Number(metaDefaults.huidigBruto ?? 4000)
+      const jaren = Number(metaDefaults.dienstjaren ?? 5)
+      const transitie = Math.round(bruto / 3 * jaren)
+      metaDefaults.transitievergoeding = transitie
+      setFormMetadata({ ...metaDefaults })
+      setFormAmount(transitie)
+      setFormDurationType('one_time')
+      setFormDirection('income')
+    }
     setEditingEvent(null)
     setShowForm(true)
   }
@@ -622,6 +633,26 @@ export default function HorizonPage() {
         60 // extra woonlasten default 5 years
       )
       if (maxDuur > 0) durMonths = maxDuur
+    }
+
+    // Special handling for werkloosheid: transitievergoeding + income gap
+    if (formType === 'werkloosheid') {
+      const netto = Number(formMetadata.huidigNetto) || 3000
+      const bruto = Number(formMetadata.huidigBruto) || 4000
+      const transitie = Number(formMetadata.transitievergoeding) || 0
+      const wwDuur = Number(formMetadata.wwDuur) || 12
+      const zoektijd = Number(formMetadata.zoektijd) || 6
+      // WW calculation: 75% first 2 mnd, 70% after, max dagloon €274/dag
+      const maxDagloon = 274
+      const dagloon = Math.min(bruto * 12 / 261, maxDagloon)
+      const wwMaand70 = Math.round(dagloon * 21.75 * 0.70)
+      // Transitievergoeding as one-time income (negative cost)
+      oneTimeCost = -transitie
+      // Monthly income change: WW replaces salary → net loss = netto - WW
+      const inkomensgat = Math.max(0, netto - wwMaand70)
+      monthlyIncomeChange = -inkomensgat // negative = loss of income
+      // Duration = total unemployment period
+      durMonths = Math.max(wwDuur, zoektijd)
     }
 
     const payload = {
@@ -1830,6 +1861,17 @@ export default function HorizonPage() {
                                 setFormDirection(netto >= 0 ? 'income' : 'expense')
                                 setFormDurationType('one_time')
                               }
+                              // Auto-calculate transitievergoeding for werkloosheid
+                              if (formType === 'werkloosheid' && ['huidigBruto', 'dienstjaren'].includes(field.key)) {
+                                const bruto = Number(updated.huidigBruto ?? 4000)
+                                const jaren = Number(updated.dienstjaren ?? 5)
+                                const transitie = Math.round(bruto / 3 * jaren)
+                                setFormMetadata(prev => ({ ...prev, transitievergoeding: transitie }))
+                                // Transitievergoeding as one-time income (negative cost)
+                                setFormAmount(transitie)
+                                setFormDirection('income')
+                                setFormDurationType('one_time')
+                              }
                               // Auto-calculate vermogensverlies + totale kosten for scheiding
                               if (formType === 'scheiding' && ['vermogensBehoudPct', 'advocaatKosten'].includes(field.key)) {
                                 const behoudPct = Number(updated.vermogensBehoudPct ?? 50)
@@ -1924,6 +1966,59 @@ export default function HorizonPage() {
                                 {verschil > 0 ? 'Je bespaart ' : 'Je betaalt '}{formatCurrency(Math.abs(verschil))}/mnd {verschil > 0 ? 'aan woonlasten' : 'meer aan woonlasten'}
                               </p>
                             )}
+                          </div>
+                        )
+                      })()}
+                      {formType === 'werkloosheid' && field.key === 'zoektijd' && (() => {
+                        const bruto = Number(formMetadata.huidigBruto ?? 4000)
+                        const netto = Number(formMetadata.huidigNetto ?? 3000)
+                        const wwDuur = Number(formMetadata.wwDuur ?? 12)
+                        const transitie = Number(formMetadata.transitievergoeding ?? 6667)
+                        const zoektijd = Number(formMetadata.zoektijd ?? 6)
+                        // WW calculation: 75% first 2 months, 70% thereafter, max dagloon €274/dag
+                        const maxDagloon = 274
+                        const dagloon = Math.min(bruto * 12 / 261, maxDagloon) // 261 werkdagen/jaar
+                        const wwMaand75 = Math.round(dagloon * 21.75 * 0.75) // 21.75 werkdagen/mnd
+                        const wwMaand70 = Math.round(dagloon * 21.75 * 0.70)
+                        const gemWW = wwDuur <= 2 ? wwMaand75 : Math.round((wwMaand75 * 2 + wwMaand70 * (wwDuur - 2)) / wwDuur)
+                        const inkomensgat = Math.max(0, netto - gemWW)
+                        const totaleDuur = Math.max(wwDuur, zoektijd)
+                        const totaalInkomensVerlies = Math.round(inkomensgat * totaleDuur)
+                        return (
+                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Financieel overzicht werkloosheid</p>
+                            <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                              <div className="flex justify-between">
+                                <span>Transitievergoeding</span>
+                                <span className="font-mono tabular-nums text-emerald-600">+{formatCurrency(transitie)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>WW-uitkering (gem.)</span>
+                                <span className="font-mono tabular-nums">{formatCurrency(gemWW)}/mnd</span>
+                              </div>
+                              <div className="flex justify-between text-[var(--ink-4)]">
+                                <span className="pl-3">Eerste 2 mnd (75%)</span>
+                                <span className="font-mono tabular-nums">{formatCurrency(wwMaand75)}/mnd</span>
+                              </div>
+                              <div className="flex justify-between text-[var(--ink-4)]">
+                                <span className="pl-3">Daarna (70%)</span>
+                                <span className="font-mono tabular-nums">{formatCurrency(wwMaand70)}/mnd</span>
+                              </div>
+                              <div className="h-px bg-horizon-200 my-1" />
+                              <div className="flex justify-between">
+                                <span>Inkomensgat per maand</span>
+                                <span className="font-mono tabular-nums text-red-600">-{formatCurrency(inkomensgat)}/mnd</span>
+                              </div>
+                              <div className="flex justify-between font-semibold">
+                                <span>Totaal inkomensverlies ({totaleDuur} mnd)</span>
+                                <span className="font-mono tabular-nums text-red-600">-{formatCurrency(totaalInkomensVerlies)}</span>
+                              </div>
+                              {transitie >= totaalInkomensVerlies && (
+                                <p className="text-[10px] text-emerald-600 mt-1">
+                                  ✓ Transitievergoeding dekt het geschatte inkomensverlies
+                                </p>
+                              )}
+                            </div>
                           </div>
                         )
                       })()}
