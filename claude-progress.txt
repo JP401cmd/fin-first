@@ -11878,3 +11878,73 @@ For Feature #51 (Transaction Import):
 ### Feature #659: Gids hero met filosofie en drie module-pijlers - PASSING
 - Philosophy quote + three module pillar cards with smooth scroll to sections
 - Commit: 7ab56c9
+
+## Session 2026-03-08 - Features #669, #670, #671
+
+### Feature #669: Concepten-glossarium met flip-cards en eigen data - PASSING
+- Created ConceptFlipCards component (components/app/concept-flip-cards.tsx)
+- 5 interactive flip-cards: Vrijheidstijd, Kassabon, FIRE, Soevereiniteit, Will
+- Front: emoji + concept name + colored background
+- Back: 2-3 sentence explanation + personal data where available
+- Personal data from /api/guide-progress: freedom days, FIRE age, sovereignty level
+- CSS rotateY flip animation with 500ms transition
+- Accessible: aria-label, tabIndex, Enter/Space key handlers
+- Responsive grid: 5-col desktop, 2-col mobile
+- Replaced static Kernbegrippen section on gids page
+- Commit: cfc85df
+
+### Feature #670: FAQ-sectie met inklapbare vragen - PASSING
+- Created GuideFaq component (components/app/guide-faq.tsx)
+- 8 FAQ items covering all required topics
+- Accordion pattern: one-at-a-time open via openId state
+- Height animation via grid-template-rows CSS transition
+- Optional "Meer lezen →" links to relevant pages
+- Placed between Jouw reis section and Pro tips
+- Commit: 6012d30
+
+### Feature #671: Pro-tips carrousel - PASSING
+- Created GuideProTips component (components/app/guide-pro-tips.tsx)
+- 8 tip cards (kassabon, vrijheidstijd, widgets, features, Will, check-in, scenarios, partner)
+- Horizontal snap-scroll carousel with shrink-0 cards
+- Number badge + Lucide icon per card
+- Fade-edge gradient indicator on mobile (sm:hidden)
+- card-editorial styling with border and paper background
+- Replaced static numbered tips list
+- Commit: a87ea63
+
+### Current Status
+- 3 features completed this session (#669, #670, #671)
+- Zero TypeScript errors
+- Could not verify via browser (Supabase auth rate limiting 429)
+
+## Session 2026-03-08 - Features #665, #666, #673
+
+### Feature #665: Reis-stap 4: Kijk vooruit (De Horizon) - PASSING
+- Added ReisStapCard for step 4 in the "Je reis" section on gids page
+- Compass icon, horizon-kleur accent (paars), border horizon-200
+- 3 how-steps: Bekijk FIRE-prognose, Voeg levensgebeurtenissen toe, Vergelijk scenario's
+- Live data from guide-progress API: FIRE-leeftijd + levensgebeurtenissen count
+- Fallback text: "Bereken wanneer werken optioneel wordt"
+- Value sentence: "Zie wanneer werken optioneel wordt"
+- CTA: "Bekijk je prognose" → /horizon
+- isComplete when hasFireData && hasLifeEvents
+
+### Feature #666: Reis-stap 5: Droom en plan (What-If + Will) - PASSING
+- Added ReisStapCard for step 5 in the "Je reis" section on gids page
+- MessageSquare icon, horizon-kleur accent (paars)
+- 3 how-steps: Open What-If scenario, Beschrijf je droom aan Will, Vraag om reality-check
+- Example chat prompt: "Ik wil over 5 jaar een huis kopen..."
+- Value sentence: "Vertaal je dromen naar een concreet plan"
+- CTA: "Start een scenario" → /horizon/whatif
+
+### Feature #673: Verwijder Zo werkt TriFinity sectie uit identity/page.tsx - PASSING
+- Already cleaned up by previous session (no GuideAccordion/GuideFeature in identity/page.tsx)
+- Compact link card already present: BookOpen + "Hoe werkt TriFinity?" + ChevronRight
+- Updated link text from "Bekijk de gids" to "Bekijk de interactieve gids"
+- Zero broken imports
+
+### Current Status
+- 3 features completed this session (#665, #666, #673)
+- Zero TypeScript errors
+- Could not verify via browser (Supabase email rate limiting)
+- Commit: 237e051
