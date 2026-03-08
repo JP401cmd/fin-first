@@ -147,10 +147,10 @@ export async function GET() {
       .from('assets')
       .select('current_value, monthly_contribution, user_id, ownership, is_active')
       .eq('is_active', true),
-    // Active debts for all members
+    // Active debts for all members (include partner_split_pct for per-debt overrides)
     supabase
       .from('debts')
-      .select('current_balance, user_id, ownership, is_active')
+      .select('current_balance, user_id, ownership, is_active, partner_split_pct, debt_type')
       .eq('is_active', true),
     // Essential budgets (for yearly must-expenses)
     supabase
@@ -224,14 +224,24 @@ export async function GET() {
     const sharedAssetsValue = sharedAssets * shareFraction
     const totalAssets = personalAssets + sharedAssetsValue
 
-    // Personal debts + split-mode share of shared debts
+    // Personal debts + split-mode share of shared debts (respecting per-debt overrides)
     const personalDebts = allDebts
       .filter(d => d.ownership === 'personal' && d.user_id === memberId)
       .reduce((sum, d) => sum + Number(d.current_balance), 0)
-    const sharedDebts = allDebts
+    // For shared debts, use per-debt partner_split_pct if available, otherwise household default
+    const sharedDebtsValue = allDebts
       .filter(d => d.ownership === 'shared')
-      .reduce((sum, d) => sum + Number(d.current_balance), 0)
-    const sharedDebtsValue = sharedDebts * shareFraction
+      .reduce((sum, d) => {
+        const balance = Number(d.current_balance)
+        if (d.partner_split_pct != null) {
+          // Per-debt override: partner_split_pct is the primary member's share
+          // Determine if current member is the debt owner (primary) or partner
+          const debtOwnerFraction = d.partner_split_pct / 100
+          const myFraction = d.user_id === memberId ? debtOwnerFraction : (1 - debtOwnerFraction)
+          return sum + balance * myFraction
+        }
+        return sum + balance * shareFraction
+      }, 0)
     const totalDebts = personalDebts + sharedDebtsValue
 
     // Monthly contributions
