@@ -306,6 +306,8 @@ export interface CareerChangeMetadata {
 export interface PartTimeMetadata {
   huidigUren?: number
   nieuwUren?: number
+  nettoInkomen?: number
+  isPermanent?: boolean
   behoudtPensioen?: boolean
 }
 
@@ -725,6 +727,8 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     fields: [
       { key: 'huidigUren', label: 'Huidige werkuren per week', fieldType: 'number', default: 40 },
       { key: 'nieuwUren', label: 'Nieuwe werkuren per week', fieldType: 'number', default: 32, tip: 'Populairste opties: 32 uur (4 dagen) of 36 uur (4,5 dagen). Het inkomensverschil wordt automatisch berekend.' },
+      { key: 'nettoInkomen', label: 'Huidig netto maandinkomen', fieldType: 'number', default: 3000, suffix: '/mnd', tip: 'Je netto maandinkomen bij voltijd. Het inkomensverlies wordt berekend op basis van de verhouding oude/nieuwe uren.' },
+      { key: 'isPermanent', label: 'Permanent (geen einddatum)', fieldType: 'toggle', default: false, tip: 'Kies permanent als je structureel minder wilt werken. Bij tijdelijk kun je een duur opgeven.' },
       { key: 'behoudtPensioen', label: 'Pensioenopbouw volledig', fieldType: 'toggle', default: false, tip: 'Bij sommige cao\'s kun je pensioen over voltijdsalaris opbouwen. Check je pensioenreglement of UPO (mijnpensioenoverzicht.nl).' },
     ],
   },

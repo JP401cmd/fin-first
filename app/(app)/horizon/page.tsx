@@ -585,6 +585,29 @@ export default function HorizonPage() {
       setFormDirection('expense')
       setFormDuration(catalog?.defaultDuration ?? 12)
     }
+    // Renovation: set cost from type preset
+    if (type === 'renovation') {
+      const verbouwType = String(metaDefaults.type ?? 'keuken')
+      const preset = VERBOUWING_TYPE_KOSTEN[verbouwType]
+      if (preset) {
+        setFormAmount(preset.bedrag)
+        setFormDurationType('one_time')
+        setFormDirection('expense')
+      }
+    }
+    // Part-time: auto-calculate income loss from hours ratio
+    if (type === 'part_time') {
+      const huidigUren = Number(metaDefaults.huidigUren ?? 40)
+      const nieuwUren = Number(metaDefaults.nieuwUren ?? 32)
+      const nettoInkomen = Number(metaDefaults.nettoInkomen ?? 3000)
+      const reductie = 1 - (nieuwUren / huidigUren)
+      const inkomensVerlies = Math.round(nettoInkomen * reductie)
+      setFormAmount(inkomensVerlies)
+      setFormDirection('expense')
+      const isPermanent = Boolean(metaDefaults.isPermanent ?? false)
+      setFormDurationType(isPermanent ? 'continuous' : 'period')
+      if (!isPermanent) setFormDuration(catalog?.defaultDuration ?? 60)
+    }
     setEditingEvent(null)
     setShowForm(true)
   }
@@ -851,6 +874,19 @@ export default function HorizonPage() {
         monthlyCostChange = Math.round((bedrag + totaleBelasting) / 12)
         oneTimeCost = 0
       }
+    }
+
+    // Special handling for side_hustle: brutoOmzet - kosten = netto + opstartkosten
+    if (formType === 'side_hustle') {
+      const brutoOmzet = Number(formMetadata.brutoOmzet ?? 1500)
+      const kosten = Number(formMetadata.kostenPerMaand ?? 300)
+      const opstartkosten = Number(formMetadata.opstartkosten ?? 1000)
+      const nettoPM = Math.max(0, brutoOmzet - kosten)
+      const isDoorlopend = formMetadata.doorlopend !== undefined ? Boolean(formMetadata.doorlopend) : true
+      oneTimeCost = opstartkosten
+      monthlyIncomeChange = nettoPM
+      monthlyCostChange = 0
+      durMonths = isDoorlopend ? 0 : (Number(formDuration) || 36)
     }
 
     // Special handling for world_trip: vertrekkosten + reisbudget + vaste lasten
@@ -2746,6 +2782,47 @@ export default function HorizonPage() {
                           </div>
                         )
                       })()}
+                      {formType === 'career_change' && field.key === 'omscholingskosten' && (() => {
+                        const ccHuidig = Number(formMetadata.huidigNettoSalaris) || 3000
+                        const ccNieuw = Number(formMetadata.verwachtNieuwNettoSalaris) || 3000
+                        const ccGapMnd = Number(formMetadata.periodeZonderInkomen) || 3
+                        const ccOvergangMnd = Number(formMetadata.overgangsperiodeMaanden) || 12
+                        const ccOmscholing = Number(formMetadata.omscholingskosten) || 0
+                        const ccOvergangSalaris = Math.round((ccHuidig + ccNieuw) / 2)
+                        const ccVerliesFase1 = ccHuidig * ccGapMnd
+                        const ccVerliesFase2 = (ccHuidig - ccOvergangSalaris) * ccOvergangMnd
+                        const ccTotaalVerlies = ccVerliesFase1 + ccVerliesFase2
+                        const ccTotaalKosten = ccTotaalVerlies + ccOmscholing
+                        const ccDelta = ccNieuw - ccHuidig
+                        return (
+                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Financieel overzicht carrière switch</p>
+                            <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                              <p className="text-[10px] font-semibold text-horizon-500 mb-1">Fase 1 — Geen inkomen ({ccGapMnd} mnd)</p>
+                              <div className="flex justify-between"><span>Inkomensverlies</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(ccVerliesFase1)}</span></div>
+                              <p className="text-[10px] font-semibold text-horizon-500 mt-2 mb-1">Fase 2 — Overgangsperiode ({ccOvergangMnd} mnd)</p>
+                              <div className="flex justify-between"><span>Salaris tijdens overgang</span><span className="font-mono tabular-nums">{formatCurrency(ccOvergangSalaris)}/mnd</span></div>
+                              <div className="flex justify-between"><span>Inkomensverlies t.o.v. huidig</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(ccVerliesFase2)}</span></div>
+                              <p className="text-[10px] font-semibold text-horizon-500 mt-2 mb-1">Fase 3 — Nieuw normaal</p>
+                              <div className="flex justify-between"><span>Nieuw netto salaris</span><span className="font-mono tabular-nums">{formatCurrency(ccNieuw)}/mnd</span></div>
+                              {ccDelta !== 0 && (
+                                <div className="flex justify-between"><span>Salarisverschil</span><span className={`font-mono tabular-nums ${ccDelta > 0 ? 'text-emerald-600' : 'text-red-600'}`}>{ccDelta > 0 ? '+' : ''}{formatCurrency(ccDelta)}/mnd</span></div>
+                              )}
+                              <div className="h-px bg-horizon-200 my-1" />
+                              {ccOmscholing > 0 && (
+                                <div className="flex justify-between"><span>Omscholingskosten (eenmalig)</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(ccOmscholing)}</span></div>
+                              )}
+                              <div className="flex justify-between font-semibold"><span>Totale kosten overgangsperiode</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(ccTotaalKosten)}</span></div>
+                            </div>
+                            {ccDelta > 0 && ccTotaalKosten > 0 && (
+                              <p className="text-[10px] text-emerald-600 mt-1">✓ Na de overgang verdien je {formatCurrency(ccDelta)}/mnd meer — terugverdiend in {Math.ceil(ccTotaalKosten / ccDelta)} maanden</p>
+                            )}
+                            {ccDelta < 0 && (
+                              <p className="text-[10px] text-[var(--ink-4)] mt-1">Let op: je nieuwe salaris is {formatCurrency(Math.abs(ccDelta))}/mnd lager dan je huidige inkomen</p>
+                            )}
+                          </div>
+                        )
+                      })()}
                       {formType === 'schenking' && field.key === 'eenmaligOfJaarlijks' && (() => {
                         const bedrag = Number(formAmount) || 10000
                         const aantalOntvangers = Math.max(1, Number(formMetadata.aantalOntvangers) || 1)
@@ -2856,6 +2933,39 @@ export default function HorizonPage() {
                           </div>
                         )
                       })()}
+                      {formType === 'renovation' && field.key === 'waardevermeerdering' && (() => {
+                        const verbouwType = String(formMetadata.type ?? 'keuken')
+                        const preset = VERBOUWING_TYPE_KOSTEN[verbouwType]
+                        const kosten = Number(formAmount) || preset?.bedrag || 15000
+                        const waardePct = Number(formMetadata.waardevermeerdering ?? preset?.waardePct ?? 50)
+                        const waardevermeerdering = Math.round(kosten * waardePct / 100)
+                        const nettoImpact = kosten - waardevermeerdering
+                        return (
+                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Netto impact verbouwing</p>
+                            <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                              <div className="flex justify-between">
+                                <span>Verbouwingskosten ({preset?.label ?? 'Keuken'})</span>
+                                <span className="font-mono tabular-nums text-red-600">{formatCurrency(kosten)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Geschatte waardevermeerdering ({waardePct}%)</span>
+                                <span className="font-mono tabular-nums text-emerald-600">+{formatCurrency(waardevermeerdering)}</span>
+                              </div>
+                              <div className="h-px bg-horizon-200 my-1" />
+                              <div className="flex justify-between font-semibold">
+                                <span>Netto impact</span>
+                                <span className={`font-mono tabular-nums ${nettoImpact > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                  {nettoImpact > 0 ? '' : '+'}{formatCurrency(Math.abs(nettoImpact))}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-[10px] text-[var(--ink-4)] mt-1">
+                              Vergeet niet je woningwaarde bij te werken na de verbouwing
+                            </p>
+                          </div>
+                        )
+                      })()}
                       {formType === 'overlijden_partner' && field.key === 'kostendalingPct' && (() => {
                         const partnerInkomen = Number(formMetadata.nettoInkomenPartner ?? 2500)
                         const nabestaanden = Number(formMetadata.nabestaandenpensioen ?? 0)
@@ -2933,6 +3043,82 @@ export default function HorizonPage() {
                                 <p className="text-xs text-amber-800">
                                   Het inkomensverlies is aanzienlijk ({formatCurrency(Math.abs(nettoMaandImpact))}/mnd). Overweeg een overlijdensrisicoverzekering (ORV) als buffer. Een ORV van {formatCurrency(Math.abs(nettoMaandImpact) * 120)} dekt 10 jaar inkomensverlies.
                                 </p>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
+                      {formType === 'side_hustle' && field.key === 'doorlopend' && (() => {
+                        const brutoOmzet = Number(formMetadata.brutoOmzet ?? 1500)
+                        const kosten = Number(formMetadata.kostenPerMaand ?? 300)
+                        const opstartkosten = Number(formMetadata.opstartkosten ?? 1000)
+                        const opbouwMaanden = Number(formMetadata.opbouwperiode ?? 0)
+                        const opbouwPct = Number(formMetadata.opbouwOmzetPct ?? 30)
+                        const nettoPM = Math.max(0, brutoOmzet - kosten)
+                        const jaarResultaat = nettoPM * 12
+                        const marginaalTarief = jaarResultaat > 75518 ? 49.5 : 37.07
+                        const geschatteBelasting = Math.round(nettoPM * marginaalTarief / 100)
+                        const nettoNaBelasting = nettoPM - geschatteBelasting
+                        const opbouwNetto = opbouwMaanden > 0 ? Math.max(0, Math.round(brutoOmzet * opbouwPct / 100) - kosten) : 0
+                        return (
+                          <div className="mt-2 space-y-3">
+                            <div className="rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                              <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Netto berekening bijverdienste</p>
+                              <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                                <div className="flex justify-between">
+                                  <span>Bruto omzet per maand</span>
+                                  <span className="font-mono tabular-nums">{formatCurrency(brutoOmzet)}/mnd</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Kosten per maand</span>
+                                  <span className="font-mono tabular-nums text-red-600">-{formatCurrency(kosten)}/mnd</span>
+                                </div>
+                                <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
+                                  <span>Netto verdienste per maand</span>
+                                  <span className="font-mono tabular-nums text-emerald-600">+{formatCurrency(nettoPM)}/mnd</span>
+                                </div>
+                                <div className="flex justify-between text-[var(--ink-4)]">
+                                  <span className="pl-3">Geschat jaarresultaat</span>
+                                  <span className="font-mono tabular-nums">{formatCurrency(jaarResultaat)}/jaar</span>
+                                </div>
+                                {opstartkosten > 0 && (
+                                  <div className="flex justify-between">
+                                    <span>Eenmalige opstartkosten</span>
+                                    <span className="font-mono tabular-nums text-red-600">-{formatCurrency(opstartkosten)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                              <Info className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                              <div className="text-xs text-amber-800 space-y-1">
+                                <p className="font-semibold">Let op: extra inkomen wordt belast tegen je marginale tarief ({marginaalTarief}%)</p>
+                                <p>Na belasting blijft ca. {formatCurrency(nettoNaBelasting)}/mnd over van je netto verdienste van {formatCurrency(nettoPM)}/mnd.</p>
+                                {jaarResultaat > 7500 && (
+                                  <p>Boven &#8364;7.500/jaar resultaat geldt Box 1-heffing. Zelfstandigenaftrek 2026: ca. &#8364;2.470.</p>
+                                )}
+                              </div>
+                            </div>
+                            {opbouwMaanden > 0 && (
+                              <div className="rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Opbouwperiode ({opbouwMaanden} maanden)</p>
+                                <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                                  <div className="flex justify-between">
+                                    <span>Omzet tijdens opbouw ({opbouwPct}%)</span>
+                                    <span className="font-mono tabular-nums">{formatCurrency(Math.round(brutoOmzet * opbouwPct / 100))}/mnd</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Netto tijdens opbouw</span>
+                                    <span className={`font-mono tabular-nums ${opbouwNetto > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                      {opbouwNetto > 0 ? '+' : ''}{formatCurrency(opbouwNetto)}/mnd
+                                    </span>
+                                  </div>
+                                  {opbouwNetto <= 0 && (
+                                    <p className="text-[10px] text-amber-600 mt-1">
+                                      Tijdens de opbouw zijn de kosten hoger dan de omzet. Zorg voor een buffer.
+                                    </p>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </div>
