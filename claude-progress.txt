@@ -1,3 +1,39 @@
+## Session 2026-03-08 - Features #602, #603, #615
+
+### Feature #602: Event catalogus: verbeterde knoppen met beschrijving en geschatte impact - PASSING
+- Added `group` and `impactRange` fields to LifeEventCatalogEntry type
+- Created LIFE_EVENT_GROUPS with ordered group definitions
+- Updated all catalog entries with group assignments and impact ranges
+- Horizon page catalog UI now shows grouped buttons with section headers
+- Each button displays: icon, label, description, and estimated impact range
+- Impact range shown in font-mono tabular-nums text-horizon-600
+- Editorial design: uppercase group headers, space-y-5 between groups
+- Grid: 1 col mobile, 2 cols sm, 3 cols lg
+
+### Feature #603: Event-specifieke tips en contextuele hulpteksten in formulier - PASSING
+- Enhanced all catalog entry tips with concrete Dutch financial figures
+- Added NIBUD references for children (€463-€1.000/mnd), car costs (€350-€600/mnd)
+- Added Belastingdienst references for erfbelasting vrijstellingen (€25.187 kind, €795.156 partner)
+- Added SVB references for AOW (€1.380/mnd alleenstaand, €948/mnd samenwonend)
+- Added mijnpensioenoverzicht.nl references for pensioen
+- Updated field-level tips with ranges, sources, and practical guidance
+- Tip display updated to editorial style: text-sm italic text-[var(--ink-3)]
+
+### Feature #615: Catalogus-groepering inclusief nieuwe events - PASSING
+- Reorganized groups: Leven & Relatie, Wonen, Werk & Inkomen, Pensioen & Uitkering, Vermogen, Vrije tijd, Anders
+- Reassigned entries: early_retirement/aow/pension → pensioen, inheritance/car_purchase → vermogen, side_hustle → werk, study → vrije_tijd
+- Added new event: werkloosheid (Werk group) with WW-uitkering fields and UWV references
+- Added new event: schenking (Vermogen group) with vrijstellingsbedragen and Belastingdienst references
+- Added WerkloosheidMetadata and SchenkingMetadata interfaces
+- Added UserX, Landmark, PiggyBank icons to EVENT_ICONS
+- Updated suggest-life-event AI tool with new event types
+- Zero TypeScript errors in changed files
+
+### Current Status
+- 3 features completed this session (#602, #603, #615)
+- Zero TypeScript errors in changed files
+- Commits: d62acf9, 0169ac9, 6c283cf
+
 ## Session 2026-03-08 - Features #631, #632, #633
 
 ### Feature #631: Asset type 'levensverzekering' toegevoegd aan ASSET_TYPES - PASSING
