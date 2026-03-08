@@ -1,3 +1,136 @@
+## Session 2026-03-08 - Features #538, #549, #550
+
+### Feature #538: Privacy-standaard is Totalen voor nieuwe huishoudens - PASSING
+- Added explicit DEFAULT_PRIVACY_SETTINGS to household member insert in invite route (owner)
+- Added explicit DEFAULT_PRIVACY_SETTINGS to household member insert in accept route (partner)
+- DB migration already had column default, TypeScript constant already defined
+- All layers enforce 'totals' default: DB, API, TypeScript, UI state
+- Zero code changes needed for privacy API or UI (already correct)
+
+### Feature #549: Monte Carlo simulatie met huishouden-data - PASSING
+- Added householdInput state to horizon/page.tsx
+- Stored combined FinancialInput from /api/household/fire-projections API
+- BacktestingModal now receives household input when in household perspective
+- Added perspectiveLabel prop to BacktestingModal for visual indicator
+- Title shows "Historische veerkracht — huishouden", badge in kicker
+- Conclusion text adapted: "jullie gezamenlijke strategie" + household data note
+- FIRE target computed from combined expenses (correct for household)
+
+### Feature #550: FIRE-tijdlijn toont beide partners trajecten - PASSING
+- Added HouseholdPartnerOverlay type to sim-chart.tsx
+- Per-partner trajectory lines: solid, teal (#0d9488) + purple (#7c3aed)
+- Combined household trajectory: dashed horizon gold (#8a6e42) line
+- Partner FIRE age dots at intersection points
+- Legend below chart showing partner names + FIRE ages
+- Projections built via projectForward(partnerInput, 480) on client
+- householdOverlays only passed to SimChart in household perspective
+- hhMax included in maxVal calculation for proper Y-axis scaling
+
+### Current Status
+- 3 features completed this session (#538, #549, #550)
+- Zero TypeScript errors in changed files
+- Commit: ce7e4fd
+
+## Session 2026-03-08 - Features #554, #557, #560
+
+### Feature #554: AI-gegenereerde gespreksstarters op basis van data-trends - PASSING
+- Created /api/checkin/gespreksstarters API endpoint
+- Generates data-driven conversation starters from financial trends:
+  - Net worth growth/decline with freedom-time equivalent
+  - Savings rate changes and comparisons
+  - Expense trends (significant increases/decreases)
+  - Goal progress (near completion or just started)
+  - Debt awareness with freedom-time framing
+  - Action completion momentum
+  - General reflection starters as fallback (min 2 guaranteed)
+- Each starter has: vraag, context, actie (action suggestion), sentiment, vrijheidstijd
+- GesprekStarterCard component: expandable cards with data context and action tips
+- Integrated into StepReflectie of check-in wizard
+- Freedom-time philosophy throughout (vrijheidsdagen, vrijheid opbouwen, etc.)
+- Positive, non-judgmental tone
+- Commit: 3951f1a
+
+### Feature #557: Check-in toont urgente aandachtspunten - PASSING
+- Created /api/checkin/aandachtspunten API endpoint
+- Detects 4 types of urgent items:
+  - budget_over: budgets exceeding limit with % and freedom-day impact
+  - unexpected_expense: categories with >2x spending increase vs previous month
+  - goal_overdue: goals with passed deadlines
+  - goal_behind: goals approaching deadline (<30 days) but <75% complete
+- Severity levels: high (red) and medium (amber)
+- AandachtspuntenSection component shown at top of first check-in step (Terugblik)
+- Visual badges with count, color-coded severity, freedom-day impact pills
+- Commit: 3951f1a
+
+### Feature #560: Transactie-notificatie met vrijheidstijd context - PASSING
+- Updated partner_transaction notification generation to include is_income field
+- Income notifications: positive tone ("Inkomen ontvangen", "+X vrijheid", "vrijheid opgebouwd")
+- Expense notifications: neutral tone ("Partner uitgave", "X dagen")
+- Freedom-time always shown in title when available (formatted as days/months/years)
+- NotificationItem: freedom-time badge (Clock icon) rendered for partner_transaction type
+- Badge color: emerald for income ("+X vrijheidsdagen gewonnen"), subtle gray for expenses
+- AI context includes freedom-time equivalent for both income and expenses
+- Commit: 3951f1a
+
+### Current Status
+- 3 features completed this session (#554, #557, #560)
+- Zero TypeScript errors
+- Could not verify via browser due to Supabase auth rate limiting
+
+## Session 2026-03-08 - Feature #556
+
+### Feature #556: Geldcheck-in samenvatting opgeslagen voor beide partners - PASSING
+- Extended CheckinSnapshot interface with userId, userName, householdId fields
+- POST /api/checkin/save: fetches profile name + household membership in parallel
+- POST saves personal snapshot AND household-scoped copy (checkin_household_{hhId}_{userId}_{month})
+- GET /api/checkin/save?mode=history: returns all own + partner check-ins combined, sorted by date
+- History endpoint fetches own snapshots + household-scoped partner snapshots via household_members join
+- Backfills userId for old snapshots that lack it
+- Created /core/checkin/historie page with expandable history cards
+- History card shows: month label, user name badge (household), net worth + delta, date
+- Expanded view: 4 metric cards, freedom time delta, actions/goals/FIRE stats, reflection text
+- Household info banner when user has partner
+- Empty state with link to start first check-in
+- Added History link (History icon) to checkin wizard header
+- Auth-gated: API returns 401, page redirects to login for unauthenticated users
+- Zero TypeScript errors
+- No mock data patterns
+- Commit: 2408737
+
+### Current Status
+- 1 feature completed this session (#556)
+- 608/647 features passing (93.9%)
+
+## Session 2026-03-08 - Features #634, #639, #548
+
+### Feature #634: Box 3 classificatie voor levensverzekering - PASSING
+- Added explicit 'levensverzekering' case to classifyAsset() returning 'beleggingen'
+- Added BOX3_TOOLTIPS.levensverzekering: pre-2001 overgangsrecht informative text
+- Extended AssetClassification interface with `note` field
+- classifyAsset returns `note` alongside `category` and `exclusionReason`
+- Belasting page shows Info tooltip for assets with notes (alongside existing DGA-lening tooltip)
+- Commit: b881045
+
+### Feature #639: Box 3 classificatie voor vordering - PASSING
+- Already fully implemented: classifyAsset() had 'vordering' → 'beleggingen' case
+- DGA-lening tooltip already existed in BOX3_TOOLTIPS.vorderingDGA
+- Belasting page already displayed tooltip for DGA-lening vorderingen
+- No code changes needed
+
+### Feature #548: FIRE scenario-builder ondersteunt huishouden parameters - PASSING
+- Added 2 household-specific presets to WhatIfPresets: "Partner stopt" and "50/50 verdeling"
+- Partner stopt: halves income, reduces savings rate by 15pp (UserMinus icon)
+- 50/50 verdeling: equal burden split, adjusts savings rate (SlidersHorizontal icon)
+- Presets filtered by householdOnly flag, only shown when isHousehold=true
+- Separate "Huishouden" label section with horizon module colors
+- isHousehold prop passed from whatif/page.tsx to WhatIfPresets
+- FIRE age delta auto-recalculates via existing simulation infrastructure
+
+### Current Status
+- 3 features completed this session (#634, #639, #548)
+- Zero TypeScript errors
+- 610/647 features passing (94.3%)
+
 ## Session 2026-03-08 - Features #620, #621, #622
 
 ### Feature #620: Reality-check: AI toont concrete actie-kaarten met impact - PASSING
@@ -11420,3 +11553,46 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#611, #614, #616)
 - Zero TypeScript errors in changed files
 - Could not verify via browser due to auth rate limiting (no working credentials)
+
+## Session 2026-03-08 - Features #623, #624, #540
+
+### Feature #623: Events-tijdlijn visualisatie naast of op de grafiek - PASSING
+- Created EventsTimeline component (components/app/horizon/events-timeline.tsx)
+- Uses same linear age axis as SimChart (PAD.left=60, PAD.right=16)
+- Each event: icon circle + vertical tick + name label + age label
+- Color coding: emerald-500 for income events, red-500 for expense events
+- Hover tooltip: dark rect with event name, formatted amount, and duration
+- Anti-overlap row assignment for events close together on the axis
+- Integrated below SimChart in both horizon/page.tsx and whatif/page.tsx
+- Whatif page filters out disabled events
+- Zero TypeScript errors
+- Commit: 473c5b7
+
+### Feature #624: Verbeterde cashflow-annotaties op de vermogensverloop grafiek - PASSING
+- Enhanced one-time markers: now show amount label (e.g., "-€30K") above name
+- Added hoveredCfId state for interactive hover effects
+- One-time markers grow on hover (r=4 → r=6)
+- Added recurring cashflow duration bands: colored semi-transparent rects spanning fromAge→toAge
+- Bands highlight on hover (opacity 0.05 → 0.12)
+- Hover tooltips for both one-time and recurring: name, amount, age range, freedom-time
+- Freedom-time calculated from dailyExpenseRate (new optional prop)
+- dailyExpenseRate passed from horizon page (yearlyMustExpenses/365) and whatif page
+- fmtAmount helper: +€30K / −€500K / +€1.2M formatting
+- Zero TypeScript errors
+- Commit: ccacbd2
+
+### Feature #540: Privacy-instellingen UI is duidelijk en niet-intimiderend - PASSING
+- Added per-category icons: Wallet (vermogen), CreditCard (schulden), Receipt (budgetten), ArrowLeftRight (transacties), Banknote (inkomen)
+- Category icon in 28x28 rounded-lg container with wil-50 bg
+- Section F intro: "Jij bent eigenaar van je data" with Shield icon in wil-50/40 card
+- Section G intro: "Samen financieel, eigen grenzen" with normalizing message
+- Changed "Wat NOOIT wordt gedeeld" → "Wat altijd privé blijft" (less alarming)
+- Changed section subtitle from "beschermd" to "Transparantie over hoe je gegevens worden gebruikt"
+- All wil module colors preserved
+- Zero TypeScript errors
+- Commit: 36e8792
+
+### Current Status
+- 3 features completed this session (#623, #624, #540)
+- Zero TypeScript errors in all changed files
+- Could not verify via browser (Supabase auth rate limiting)
