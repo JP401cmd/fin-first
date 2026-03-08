@@ -11797,3 +11797,84 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#582, #588, #589)
 - Zero TypeScript errors
 - Could not verify via browser due to Supabase auth rate limiting
+
+## Session 2026-03-08 - Features #635, #640, #644
+
+### Feature #635: Levensverzekering weergave op assets-pagina - PASSING
+- Card subtitle: shows verzekeraar (institution) + resterende looptijd (e.g., 'Nog 8 jaar en 3 mnd')
+- Card extra metric: shows Premie p/m in purple when monthly_contribution > 0
+- Detail modal: "Afkoopwaarde" label, "Maandelijkse premie" label
+- Detail modal type-specific details: Einddatum polis with remaining time + Begunstigde
+- Zero TypeScript errors
+
+### Feature #640: Vordering weergave op assets-pagina - PASSING
+- Card subtitle: shows debiteur (institution) + resterende looptijd from lock_end_date
+- Card extra metric: shows Rente % p.j. and Aflossing p/m in sky blue
+- DGA-lening card: shows "DGA-lening bij [deelneming naam]" via linked_asset_id lookup
+- Detail modal: "Uitstaand bedrag" label, "Einddatum lening" with remaining time
+- Detail modal: linked deelneming section for DGA-leningen (teal card with name + value + belang%)
+- Added allAssets prop to AssetDetailModal for cross-reference
+- Zero TypeScript errors
+
+### Feature #644: Wet excessief lenen waarschuwing op belasting-pagina - PASSING
+- lib/box2-data.ts: Added DGA_LENING_DREMPEL (€500k), dgaLeningenTotal/Excess/ExcessTax to Box2Input/Result
+- calculateBox2: computes excess tax by re-applying bracket rates on combined income + fictief voordeel
+- API: fetches vordering assets with subtype=dga_lening, calculates per-perspective totals
+- Belasting page: warning banner (red > 500k, amber > 400k, green otherwise)
+- Calculation breakdown: shows total DGA-leningen, drempel, excess, extra belasting + freedom days
+- Box 2 hero headline: shows totalTaxInclDga with "incl. wet excessief lenen" note
+- Berekeningsstappen: extra rows for fictief voordeel and total including DGA excess
+- CombinedTaxSummary: uses totalTaxInclDga for box2 contribution
+- Commit: af8b773
+
+### Current Status
+- 3 features completed this session (#635, #640, #644)
+- Zero TypeScript errors in changed files
+- Could not verify via browser (Supabase auth rate limiting)
+
+## Session 2026-03-08 - Features #649, #657, #536
+
+### Feature #649: Belastingschuld Box 3 classificatie en weergave - PASSING
+- classifyDebt already correctly returns inBox3: true for belastingschuld
+- Receipt icon already configured in DEBT_TYPE_ICONS
+- Debts page: enriched subtitle with tax year + subtype (e.g., "Belastingschuld • Inkomstenbelasting 2025")
+- Emerald betalingsregeling badge when has_payment_plan=true
+- Box 3 classification: enriched with subtype/year label and betalingsregeling badge
+- Excluded creditor display for belastingschuld (always Belastingdienst, redundant)
+
+### Feature #657: Familielening Box 3 classificatie en weergave - PASSING
+- classifyDebt already correctly returns inBox3: true for familielening
+- Heart icon already configured in DEBT_TYPE_ICONS
+- Debts page: amber "Geen overeenkomst" warning badge when has_written_agreement=false
+- Blue "0% rente" info badge when interest_rate=0
+- Box 3 classification: enriched with subtype + creditor, warning badges
+- Creditor shown as subtitle via existing code path
+
+### Feature #536: Partner-view respecteert privacy: trends zonder bedragen - PASSING
+- Added usePartnerPrivacy hook to CashAccountView
+- When partner transactions privacy = 'totals': filters out individual partner transactions
+- Shows partner category summary section with Shield icon
+- Income/expense totals with TrendingUp/TrendingDown trend indicators
+- Per-category breakdown with transaction count, amounts, and percentage bars
+- When privacy = 'hidden': shows PrivacyHiddenNotice component
+- Shared transactions remain visible in all modes
+
+### Current Status
+- 3 features completed this session (#649, #657, #536)
+- Zero TypeScript errors in changed files
+- Commit: 2ef4832
+
+## Session 2026-03-08 - Features #658, #661, #659
+
+### Feature #658: Gids-pagina route en identity-nav tab - PASSING
+- Created app/(app)/identity/gids/page.tsx as 'use client' page with guide content
+- Added 'Gids' tab to identityNav (between Profiel and Instellingen)
+- Removed GuideAccordion section from identity/page.tsx, replaced with link card
+
+### Feature #661: API endpoint voor gids-voortgang - PASSING
+- Created GET /api/guide-progress with auth check and parallel queries
+- Returns counts, financial data, sovereignty level, freedom days, FIRE age, step booleans
+
+### Feature #659: Gids hero met filosofie en drie module-pijlers - PASSING
+- Philosophy quote + three module pillar cards with smooth scroll to sections
+- Commit: 7ab56c9
