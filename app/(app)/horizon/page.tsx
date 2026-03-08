@@ -451,6 +451,15 @@ export default function HorizonPage() {
       }
     }
     setFormMetadata(metaDefaults)
+    // Auto-calculate initial vermogensverlies for scheiding
+    if (type === 'scheiding') {
+      const behoudPct = Number(metaDefaults.vermogensBehoudPct ?? 50)
+      const advocaat = Number(metaDefaults.advocaatKosten ?? 7500)
+      const vermogensverlies = Math.round(effectiveNetWorth * (1 - behoudPct / 100))
+      setFormAmount(Math.max(0, vermogensverlies + advocaat))
+      setFormDurationType('one_time')
+      setFormDirection('expense')
+    }
     setEditingEvent(null)
     setShowForm(true)
   }
@@ -564,7 +573,7 @@ export default function HorizonPage() {
 
     const icon = LIFE_EVENT_CATALOG[formType]?.icon ?? 'Calendar'
     const amount = Number(formAmount) || 0
-    const durMonths = formDurationType === 'period' ? Number(formDuration) || 0 : 0
+    let durMonths = formDurationType === 'period' ? Number(formDuration) || 0 : 0
 
     let oneTimeCost = 0
     let monthlyCostChange = 0
@@ -590,6 +599,29 @@ export default function HorizonPage() {
         // New costs are higher → monthly expense increase
         monthlyCostChange = Math.abs(verschil)
       }
+    }
+
+    // Special handling for scheiding: combine all monthly costs
+    if (formType === 'scheiding') {
+      const alimentatiePartner = Number(formMetadata.partneralimentatieBedrag) || 0
+      const alimentatieKinderen = Number(formMetadata.kinderalimentatieBedrag) || 0
+      const extraWoon = Number(formMetadata.extraWoonlasten) || 0
+      const richting = formMetadata.partneralimentatieRichting ?? 'betalen'
+      // Alimentatie: betalen = cost, ontvangen = income
+      if (richting === 'betalen') {
+        monthlyCostChange = alimentatiePartner + alimentatieKinderen + extraWoon
+      } else {
+        // Ontvangen partner alimentatie, but still pay kinderalimentatie + extra woonlasten
+        monthlyIncomeChange = alimentatiePartner
+        monthlyCostChange = alimentatieKinderen + extraWoon
+      }
+      // Use longest duration among alimentatie and extra woonlasten
+      const maxDuur = Math.max(
+        Number(formMetadata.partneralimentatieDuur) || 0,
+        Number(formMetadata.kinderalimentatieDuur) || 0,
+        60 // extra woonlasten default 5 years
+      )
+      if (maxDuur > 0) durMonths = maxDuur
     }
 
     const payload = {
@@ -1639,8 +1671,8 @@ export default function HorizonPage() {
           <div className="space-y-5 p-6">
             {/* Template tip */}
             {LIFE_EVENT_CATALOG[formType]?.tip && !editingEvent && (
-              <div className="rounded-[var(--r)] bg-horizon-50 p-3 text-xs text-horizon-700">
-                <span className="font-medium">Tip:</span> {LIFE_EVENT_CATALOG[formType].tip}
+              <div className="rounded-[var(--r)] border border-horizon-100 bg-horizon-50/50 p-3 text-sm italic text-[var(--ink-3)]">
+                <span className="not-italic font-medium text-horizon-700">Tip:</span> {LIFE_EVENT_CATALOG[formType].tip}
               </div>
             )}
 
@@ -1798,6 +1830,15 @@ export default function HorizonPage() {
                                 setFormDirection(netto >= 0 ? 'income' : 'expense')
                                 setFormDurationType('one_time')
                               }
+                              // Auto-calculate vermogensverlies + totale kosten for scheiding
+                              if (formType === 'scheiding' && ['vermogensBehoudPct', 'advocaatKosten'].includes(field.key)) {
+                                const behoudPct = Number(updated.vermogensBehoudPct ?? 50)
+                                const advocaat = Number(updated.advocaatKosten ?? 7500)
+                                const vermogensverlies = Math.round(effectiveNetWorth * (1 - behoudPct / 100))
+                                setFormAmount(Math.max(0, vermogensverlies + advocaat))
+                                setFormDirection('expense')
+                                setFormDurationType('one_time')
+                              }
                             }}
                             className="min-w-0 flex-1 rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
                           />
@@ -1883,6 +1924,26 @@ export default function HorizonPage() {
                                 {verschil > 0 ? 'Je bespaart ' : 'Je betaalt '}{formatCurrency(Math.abs(verschil))}/mnd {verschil > 0 ? 'aan woonlasten' : 'meer aan woonlasten'}
                               </p>
                             )}
+                          </div>
+                        )
+                      })()}
+                      {formType === 'scheiding' && field.key === 'vermogensBehoudPct' && (() => {
+                        const behoudPct = Number(formMetadata.vermogensBehoudPct ?? 50)
+                        const vermogensverlies = Math.round(effectiveNetWorth * (1 - behoudPct / 100))
+                        const advocaat = Number(formMetadata.advocaatKosten ?? 7500)
+                        return (
+                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Geschat vermogensverlies</p>
+                            <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                              <div className="flex justify-between"><span>Huidig netto vermogen</span><span className="font-mono tabular-nums">{formatCurrency(effectiveNetWorth)}</span></div>
+                              <div className="flex justify-between"><span>Je behoudt {behoudPct}%</span><span className="font-mono tabular-nums">{formatCurrency(Math.round(effectiveNetWorth * behoudPct / 100))}</span></div>
+                              <div className="flex justify-between"><span>Vermogensverlies</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(vermogensverlies)}</span></div>
+                              <div className="flex justify-between"><span>Advocaat/mediation</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(advocaat)}</span></div>
+                              <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
+                                <span>Totale eenmalige klap</span>
+                                <span className="font-mono tabular-nums text-red-600">-{formatCurrency(vermogensverlies + advocaat)}</span>
+                              </div>
+                            </div>
                           </div>
                         )
                       })()}
