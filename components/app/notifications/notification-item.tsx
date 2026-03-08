@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Lightbulb } from 'lucide-react'
+import { Lightbulb, Clock } from 'lucide-react'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import { LevelUpCelebration } from '@/components/app/level-up-celebration'
 import type { Notification, NotificationType } from '@/app/api/notifications/route'
@@ -177,6 +177,19 @@ export function NotificationItem({ notification, onRead, onClose }: Props) {
         <p className="mt-0.5 line-clamp-2 font-[family-name:var(--font-source-serif)] text-[13px] leading-snug text-[var(--ink-3)]">
           {notification.description}
         </p>
+
+        {/* Freedom-time badge for partner transactions */}
+        {notification.type === 'partner_transaction' && notification.metadata?.freedomDays != null && Number(notification.metadata.freedomDays) > 0 && (
+          <div className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+            notification.metadata?.isIncome
+              ? 'bg-emerald-50 text-emerald-700'
+              : 'bg-[var(--subtle)] text-[var(--ink-3)]'
+          }`}>
+            <Clock className="h-2.5 w-2.5" />
+            {notification.metadata?.isIncome ? '+' : ''}{Number(notification.metadata.freedomDays)} {Number(notification.metadata.freedomDays) === 1 ? 'vrijheidsdag' : 'vrijheidsdagen'}
+            {notification.metadata?.isIncome ? ' gewonnen' : ''}
+          </div>
+        )}
 
         {/* AI action button */}
         {notification.aiContext && (

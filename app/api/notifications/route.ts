@@ -365,7 +365,7 @@ export async function GET(request: NextRequest) {
             // Fetch recent partner transactions (last 7 days, shared or owned by partner)
             const { data: partnerTxs } = await supabase
               .from('transactions')
-              .select('id, description, amount, date, budget_id, ownership')
+              .select('id, description, amount, date, budget_id, ownership, is_income')
               .eq('user_id', partnerMember.user_id)
               .gte('date', cutoffDate.toISOString().split('T')[0])
               .order('date', { ascending: false })
@@ -374,7 +374,7 @@ export async function GET(request: NextRequest) {
             // Also get shared transactions by current user's partner
             const { data: sharedTxs } = await supabase
               .from('transactions')
-              .select('id, description, amount, date, budget_id, ownership')
+              .select('id, description, amount, date, budget_id, ownership, is_income')
               .eq('ownership', 'shared')
               .eq('user_id', partnerMember.user_id)
               .gte('date', cutoffDate.toISOString().split('T')[0])
@@ -437,22 +437,50 @@ export async function GET(request: NextRequest) {
                 : 0
 
               const id = `partner_tx_${tx.id}`
+              const isIncome = tx.is_income === true
               const categoryLabel = budgetName ? ` · ${budgetName}` : ''
-              const freedomLabel = freedomDays > 0 ? ` · ${freedomDays} ${freedomDays === 1 ? 'vrijheidsdag' : 'vrijheidsdagen'}` : ''
+
+              // Freedom-time formatting
+              const freedomDaysRounded = Math.round(freedomDays * 10) / 10
+              let freedomLabel = ''
+              if (freedomDaysRounded > 0) {
+                if (freedomDaysRounded >= 365) {
+                  const years = Math.floor(freedomDaysRounded / 365)
+                  const months = Math.round((freedomDaysRounded % 365) / 30)
+                  freedomLabel = months > 0 ? `${years}j ${months}m` : `${years}j`
+                } else if (freedomDaysRounded >= 30) {
+                  const months = Math.floor(freedomDaysRounded / 30)
+                  const days = Math.round(freedomDaysRounded % 30)
+                  freedomLabel = days > 0 ? `${months}m ${days}d` : `${months}m`
+                } else {
+                  freedomLabel = `${freedomDaysRounded} ${freedomDaysRounded === 1 ? 'dag' : 'dagen'}`
+                }
+              }
+
+              // Positive tone for income, neutral for expenses
+              const title = isIncome
+                ? `Inkomen ontvangen: €${amount.toLocaleString('nl-NL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}${freedomLabel ? ` (+${freedomLabel} vrijheid)` : ''}`
+                : `Partner uitgave: €${amount.toLocaleString('nl-NL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}${freedomLabel ? ` (${freedomLabel})` : ''}`
+
+              const description = isIncome
+                ? `${tx.description || 'Inkomen'}${categoryLabel} — vrijheid opgebouwd`
+                : `${tx.description || 'Uitgave'}${categoryLabel}`
 
               notifications.push({
                 id,
                 type: 'partner_transaction',
                 priority: 3,
-                title: `Partner transactie: €${amount.toLocaleString('nl-NL', { minimumFractionDigits: 2 })}`,
-                description: `${tx.description || 'Transactie'}${categoryLabel}${freedomLabel}`,
-                icon: 'HandCoins',
-                color: 'teal',
+                title,
+                description,
+                icon: isIncome ? 'TrendingUp' : 'HandCoins',
+                color: isIncome ? 'emerald' : 'teal',
                 createdAt: tx.date ? new Date(tx.date).toISOString() : now,
                 read: readIds.includes(id),
                 actionUrl: '/core/cash',
-                aiContext: `Mijn partner heeft een transactie gedaan van €${amount.toFixed(2)}${budgetName ? ` in categorie ${budgetName}` : ''}. Wat is de impact op ons huishoudbudget?`,
-                metadata: { amount, category: budgetName, freedomDays, isShared },
+                aiContext: isIncome
+                  ? `Mijn partner heeft €${amount.toFixed(2)} inkomen ontvangen${budgetName ? ` in categorie ${budgetName}` : ''}${freedomLabel ? `, dat is ${freedomLabel} aan vrijheidstijd` : ''}. Hoe draagt dit bij aan onze financiele vrijheid?`
+                  : `Mijn partner heeft €${amount.toFixed(2)} uitgegeven${budgetName ? ` in categorie ${budgetName}` : ''}${freedomLabel ? `, dat is ${freedomLabel} aan vrijheidstijd` : ''}. Wat is de impact op ons huishoudbudget?`,
+                metadata: { amount, category: budgetName, freedomDays: freedomDaysRounded, isShared, isIncome },
               })
             }
           }
