@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Check, Clock, X, RotateCcw, UserPlus, UserCheck } from 'lucide-react'
 import { PostponeForm } from '@/components/app/postpone-form'
 import { ActionEditModal } from '@/components/app/action-edit-modal'
@@ -31,6 +31,8 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
   const [rejectReason, setRejectReason] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [assigning, setAssigning] = useState(false)
+  const [justCompleted, setJustCompleted] = useState(false)
+  const animTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const isAssigned = action.assigned_to != null
   const assignedByName = action.assigned_by_name ?? action.assigned_by ?? null
@@ -51,7 +53,7 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
   return (
     <>
       <div
-        className={`rounded-lg border ${isPartnerAssigned ? 'border-wil-200 bg-wil-50/30' : 'border-[var(--border-ed)] bg-[var(--paper)]'} px-3 py-1.5 transition-all duration-150 ease-in-out hover:border-[var(--border-md)] cursor-pointer`}
+        className={`group rounded-lg border ${isPartnerAssigned ? 'border-wil-200 bg-wil-50/30' : 'border-[var(--border-ed)] bg-[var(--paper)]'} px-3 py-1.5 transition-all duration-150 ease-in-out hover:border-[var(--border-md)] cursor-pointer`}
         onClick={() => {
           if (!showPostpone && !showReject && onUpdate) setShowEdit(true)
         }}
@@ -62,18 +64,26 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
             type="button"
             onClick={(e) => {
               e.stopPropagation()
-              if (action.status === 'open') handleStatus('completed')
-              else if (action.status === 'completed') handleStatus('open')
+              if (action.status === 'open') {
+                setJustCompleted(true)
+                if (animTimeout.current) clearTimeout(animTimeout.current)
+                animTimeout.current = setTimeout(() => setJustCompleted(false), 500)
+                handleStatus('completed')
+              } else if (action.status === 'completed') {
+                handleStatus('open')
+              }
             }}
             disabled={isLoading}
             title={action.status === 'completed' ? 'Heropenen' : 'Afronden'}
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors disabled:opacity-50"
+            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-300 disabled:opacity-50 ${justCompleted ? 'scale-125' : ''}`}
             style={{
               borderColor: action.status === 'completed' ? 'var(--color-emerald-500)' : action.status === 'postponed' ? 'var(--color-amber-400)' : 'var(--border-md)',
               backgroundColor: action.status === 'completed' ? 'var(--color-emerald-500)' : 'transparent',
             }}
           >
-            {action.status === 'completed' && <Check className="h-3 w-3 text-white" />}
+            {action.status === 'completed' && (
+              <Check className={`h-3 w-3 text-white ${justCompleted ? 'animate-[checkPop_300ms_ease-out]' : ''}`} />
+            )}
             {action.status === 'postponed' && <Clock className="h-2.5 w-2.5 text-amber-500" />}
             {action.status === 'rejected' && <X className="h-2.5 w-2.5 text-[var(--ink-3)]" />}
           </button>
@@ -203,9 +213,9 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
           </div>
         )}
 
-        {/* Cancellation shortcut */}
+        {/* Cancellation shortcut — hidden by default, visible on hover/tap */}
         {action.metadata?.type === 'subscription_cancellation' && onCancellationOpen && (
-          <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
+          <div className="mt-1.5 hidden group-hover:block group-focus-within:block" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
               onClick={() => onCancellationOpen(action.metadata as CancellationMetadata)}
