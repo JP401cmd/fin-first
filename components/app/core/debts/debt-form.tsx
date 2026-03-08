@@ -55,6 +55,9 @@ export function DebtForm({
   // Household ownership
   const [ownership, setOwnership] = useState<OwnershipType>(debt?.ownership ?? 'personal')
   const { hasHousehold, householdId } = useHouseholdStatus()
+  // Per-debt partner split override
+  const [useCustomSplit, setUseCustomSplit] = useState(debt?.partner_split_pct != null)
+  const [partnerSplitPct, setPartnerSplitPct] = useState(debt?.partner_split_pct ?? 50)
 
   const subtypeOptions = DEBT_SUBTYPE_LABELS[debtType]
   const visibleFields = DEBT_TYPE_FIELDS[debtType]
@@ -143,6 +146,7 @@ export function DebtForm({
       // Household fields
       ownership: ownership,
       household_id: ownership === 'shared' ? householdId : null,
+      partner_split_pct: ownership === 'shared' && useCustomSplit ? partnerSplitPct : null,
       // Net worth inclusion
       net_worth_inclusion_pct: netWorthInclusionPct,
     }
@@ -225,6 +229,44 @@ export function DebtForm({
             onChange={setOwnership}
             hasHousehold={hasHousehold}
           />
+
+          {/* Per-debt partner split override (only for shared debts) */}
+          {ownership === 'shared' && hasHousehold && (
+            <div className="space-y-2 rounded-[var(--r)] border border-kern-100 bg-kern-50/30 p-3">
+              <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
+                <input
+                  type="checkbox"
+                  checked={useCustomSplit}
+                  onChange={(e) => setUseCustomSplit(e.target.checked)}
+                  className="rounded border-[var(--border-md)]"
+                />
+                Eigen verdeling (afwijkend van huishouden)
+              </label>
+              {useCustomSplit && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Jouw aandeel</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range" min={0} max={100} step={5}
+                      value={partnerSplitPct}
+                      onChange={(e) => setPartnerSplitPct(Number(e.target.value))}
+                      className="flex-1 accent-kern-600"
+                    />
+                    <input
+                      type="number" min={0} max={100}
+                      value={partnerSplitPct}
+                      onChange={(e) => setPartnerSplitPct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                      className="w-16 rounded-[var(--r)] border border-[var(--border-ed)] px-2 py-1.5 text-sm text-center tabular-nums"
+                    />
+                    <span className="text-sm text-[var(--ink-3)]">%</span>
+                  </div>
+                  <p className="mt-1 text-[10px] text-[var(--ink-3)]">
+                    Jij: {partnerSplitPct}% · Partner: {100 - partnerSplitPct}%
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Subtype dropdown (conditional) */}
           {subtypeOptions && (

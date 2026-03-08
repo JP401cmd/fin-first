@@ -250,7 +250,7 @@ export default function TestDebtPayoffTrajectoryPage() {
       is_tax_deductible: null, fixed_rate_end_date: null, nhg: null,
       linked_asset_id: null, credit_limit: 5000, repayment_type: null,
       draagkrachtmeting_date: null,
-      ownership: 'personal', household_id: null, net_worth_inclusion_pct: 100,
+      ownership: 'personal', household_id: null, net_worth_inclusion_pct: 100, partner_split_pct: null,
     },
     {
       id: 'test-pl', user_id: 'test', name: 'Persoonlijke lening',
@@ -262,7 +262,7 @@ export default function TestDebtPayoffTrajectoryPage() {
       is_tax_deductible: null, fixed_rate_end_date: null, nhg: null,
       linked_asset_id: null, credit_limit: null, repayment_type: null,
       draagkrachtmeting_date: null,
-      ownership: 'personal', household_id: null, net_worth_inclusion_pct: 100,
+      ownership: 'personal', household_id: null, net_worth_inclusion_pct: 100, partner_split_pct: null,
     },
     {
       id: 'test-sl', user_id: 'test', name: 'Studielening DUO',
@@ -274,7 +274,7 @@ export default function TestDebtPayoffTrajectoryPage() {
       is_tax_deductible: null, fixed_rate_end_date: null, nhg: null,
       linked_asset_id: null, credit_limit: null, repayment_type: null,
       draagkrachtmeting_date: null,
-      ownership: 'personal', household_id: null, net_worth_inclusion_pct: 100,
+      ownership: 'personal', household_id: null, net_worth_inclusion_pct: 100, partner_split_pct: null,
     },
   ], [])
 

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { X, Edit3, RefreshCw, Trash2, AlertTriangle } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X, Edit3, RefreshCw, Trash2, AlertTriangle, Users } from 'lucide-react'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import {
@@ -13,6 +13,9 @@ import {
   debtProjection,
 } from '@/lib/debt-data'
 import type { Asset } from '@/lib/asset-data'
+import { computeSharePct, SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
+import { createClient } from '@/lib/supabase/client'
+import { usePerspective } from '@/components/app/perspective-provider'
 import type { Valuation } from './debt-types'
 import { DebtTrajectoryChart } from './debt-trajectory-chart'
 
@@ -36,6 +39,55 @@ export function DebtDetailModal({
   onDelete: () => void
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const { perspective } = usePerspective()
+  const [partnerSplit, setPartnerSplit] = useState<{
+    splitMode: SplitMode; mySharePct: number; myName: string; partnerName: string
+  } | null>(null)
+
+  // Load partner split for shared debts
+  useEffect(() => {
+    if (debt.ownership !== 'shared') { setPartnerSplit(null); return }
+    async function loadSplit() {
+      try {
+        const [statusRes, settingsRes] = await Promise.all([
+          fetch('/api/household/status'),
+          fetch('/api/household/settings'),
+        ])
+        if (!statusRes.ok || !settingsRes.ok) return
+        const status = await statusRes.json()
+        const settings = await settingsRes.json()
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+
+        // Use per-debt override if set, otherwise use household default
+        let mySharePct: number
+        let splitMode: SplitMode
+        if (debt.partner_split_pct != null) {
+          mySharePct = debt.partner_split_pct
+          splitMode = 'custom'
+        } else {
+          splitMode = settings.split_mode || 'equal'
+          mySharePct = computeSharePct(
+            { splitMode, customSplitPct: settings.custom_split_pct ?? null, primaryPayerId: settings.primary_payer_id ?? null },
+            user?.id ?? '',
+          )
+        }
+
+        const myMember = (status.members ?? []).find((m: { is_current_user: boolean }) => m.is_current_user)
+        const partnerMember = (status.members ?? []).find((m: { is_current_user: boolean }) => !m.is_current_user)
+        setPartnerSplit({
+          splitMode,
+          mySharePct,
+          myName: myMember?.full_name || 'Jij',
+          partnerName: partnerMember?.full_name || 'Partner',
+        })
+      } catch {
+        // Non-critical
+      }
+    }
+    loadSplit()
+  }, [debt.ownership, debt.partner_split_pct])
+
   const balance = Number(debt.current_balance)
   const original = Number(debt.original_amount)
   const pct = original > 0 ? ((original - balance) / original) * 100 : 0
@@ -97,6 +149,67 @@ export function DebtDetailModal({
             )}
           </div>
         </div>
+
+        {/* Per-partner split breakdown for shared debts */}
+        {partnerSplit && (
+          <div className="border-b border-[var(--border-ed)] px-6 py-3" data-testid="debt-partner-breakdown">
+            <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
+              <div className="flex items-center gap-1.5 mb-2">
+                <Users className="h-3.5 w-3.5 text-kern-500" />
+                <p className="text-xs font-semibold text-[var(--ink-2)]">Verdeling per partner</p>
+                <span className="ml-auto text-[10px] text-[var(--ink-4)]">
+                  {debt.partner_split_pct != null ? 'Eigen verdeling' : SPLIT_MODE_LABELS[partnerSplit.splitMode]}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-center">
+                <div>
+                  <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase truncate">{partnerSplit.myName}</p>
+                  <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
+                    {formatCurrency(balance * partnerSplit.mySharePct / 100)}
+                  </p>
+                  {dailyExpenses > 0 && balance * partnerSplit.mySharePct / 100 >= 100 && (
+                    <p className="text-[10px] text-kern-600/70">
+                      {formatFreedomTimeString(calculateFreedomTime(balance * partnerSplit.mySharePct / 100, dailyExpenses), 'short')} terug te winnen
+                    </p>
+                  )}
+                  <p className="text-[9px] text-[var(--ink-4)]">{partnerSplit.mySharePct}%</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase truncate">{partnerSplit.partnerName}</p>
+                  <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
+                    {formatCurrency(balance * (100 - partnerSplit.mySharePct) / 100)}
+                  </p>
+                  {dailyExpenses > 0 && balance * (100 - partnerSplit.mySharePct) / 100 >= 100 && (
+                    <p className="text-[10px] text-kern-600/70">
+                      {formatFreedomTimeString(calculateFreedomTime(balance * (100 - partnerSplit.mySharePct) / 100, dailyExpenses), 'short')} terug te winnen
+                    </p>
+                  )}
+                  <p className="text-[9px] text-[var(--ink-4)]">{100 - partnerSplit.mySharePct}%</p>
+                </div>
+              </div>
+              {/* Monthly payment split */}
+              {Number(debt.monthly_payment) > 0 && (
+                <div className="mt-2 pt-2 border-t border-[var(--border-ed)]">
+                  <p className="text-[10px] font-medium text-[var(--ink-3)] mb-1">Maandlast verdeling</p>
+                  <div className="grid grid-cols-2 gap-3 text-center">
+                    <div>
+                      <p className="font-mono text-xs font-semibold tabular-nums text-[var(--ink)]">
+                        {formatCurrency(Number(debt.monthly_payment) * partnerSplit.mySharePct / 100)}
+                      </p>
+                      <p className="text-[9px] text-[var(--ink-4)]">p/m</p>
+                    </div>
+                    <div>
+                      <p className="font-mono text-xs font-semibold tabular-nums text-[var(--ink)]">
+                        {formatCurrency(Number(debt.monthly_payment) * (100 - partnerSplit.mySharePct) / 100)}
+                      </p>
+                      <p className="text-[9px] text-[var(--ink-4)]">p/m</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Details grid */}
         <div className="space-y-4 px-6 py-4">

@@ -60,6 +60,7 @@ export interface Debt {
   // Household fields
   ownership: 'personal' | 'shared'
   household_id: string | null
+  partner_split_pct: number | null // 0–100, per-debt split override (null = use household default)
   // Net worth inclusion
   net_worth_inclusion_pct: number // 0–100, default 100
 }

@@ -110,7 +110,7 @@ export function filterByPerspective<T extends { ownership: OwnershipType; user_i
  */
 export function computePerspectiveNetWorth(
   assets: Array<{ current_value: number; ownership: OwnershipType; user_id?: string; is_active?: boolean }>,
-  debts: Array<{ current_balance: number; ownership: OwnershipType; user_id?: string; is_active?: boolean }>,
+  debts: Array<{ current_balance: number; ownership: OwnershipType; user_id?: string; is_active?: boolean; partner_split_pct?: number | null }>,
   perspective: 'personal' | 'household',
   mySharePct: number,
   userId?: string,
@@ -146,6 +146,13 @@ export function computePerspectiveNetWorth(
 
   const shareFraction = mySharePct / 100
 
+  // Per-debt split override: debts with partner_split_pct use their own split
+  const sharedDebtItems = activeDebts.filter((d) => d.ownership === 'shared')
+  const myShareOfSharedDebts = sharedDebtItems.reduce((sum, d) => {
+    const debtShareFraction = d.partner_split_pct != null ? d.partner_split_pct / 100 : shareFraction
+    return sum + d.current_balance * debtShareFraction
+  }, 0)
+
   if (perspective === 'household') {
     // Household view: full totals
     return {
@@ -157,24 +164,23 @@ export function computePerspectiveNetWorth(
       sharedAssets,
       sharedDebts,
       myShareOfSharedAssets: sharedAssets * shareFraction,
-      myShareOfSharedDebts: sharedDebts * shareFraction,
+      myShareOfSharedDebts: myShareOfSharedDebts,
     }
   }
 
   // Personal perspective: personal items + user's share of shared items
   const mySharedAssets = sharedAssets * shareFraction
-  const mySharedDebts = sharedDebts * shareFraction
 
   return {
     totalAssets: personalAssets + mySharedAssets,
-    totalDebts: personalDebts + mySharedDebts,
-    netWorth: (personalAssets + mySharedAssets) - (personalDebts + mySharedDebts),
+    totalDebts: personalDebts + myShareOfSharedDebts,
+    netWorth: (personalAssets + mySharedAssets) - (personalDebts + myShareOfSharedDebts),
     personalAssets,
     personalDebts,
     sharedAssets,
     sharedDebts,
     myShareOfSharedAssets: mySharedAssets,
-    myShareOfSharedDebts: mySharedDebts,
+    myShareOfSharedDebts: myShareOfSharedDebts,
   }
 }
 
