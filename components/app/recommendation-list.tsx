@@ -157,14 +157,14 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
       {isGenerating && (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse rounded-[var(--r-lg)] border border-wil-100 bg-wil-50/30 px-4 py-3">
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-lg bg-wil-100" />
-                <div className="flex-1">
-                  <div className="mb-1 h-4 w-3/4 rounded bg-zinc-200" />
-                  <div className="h-3 w-1/2 rounded bg-zinc-100" />
+            <div key={i} className="animate-pulse rounded-[var(--r-lg)] border border-[var(--border-ed)] border-l-4 border-l-wil-200 bg-[var(--paper)] px-3 py-2.5">
+              <div className="flex items-center gap-2.5">
+                <div className="h-7 w-7 shrink-0 rounded-full bg-wil-100" />
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <div className="h-3.5 w-2/5 rounded bg-zinc-200" />
+                  <div className="h-3 w-16 rounded bg-zinc-100" />
                 </div>
-                <div className="h-4 w-16 rounded bg-wil-100" />
+                <div className="h-3.5 w-14 rounded bg-wil-100/60" />
               </div>
             </div>
           ))}

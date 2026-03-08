@@ -173,18 +173,9 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
 
   return (
     <div className="space-y-6">
-      {/* New action button / form */}
-      {showForm ? (
+      {/* New action form (shown inline when active) */}
+      {showForm && (
         <ActionForm onSubmit={handleCreateAction} onCancel={() => setShowForm(false)} />
-      ) : (
-        <button
-          type="button"
-          onClick={() => setShowForm(true)}
-          className="flex w-full items-center justify-center gap-2 rounded-[var(--r-lg)] border-2 border-dashed border-wil-200 px-4 py-3 text-sm font-medium text-wil-600 transition-colors hover:border-wil-300 hover:bg-wil-50"
-        >
-          <Plus className="h-4 w-4" />
-          Nieuwe actie
-        </button>
       )}
 
       {/* Partner-assigned actions — "Van je partner" section */}
@@ -268,9 +259,30 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
               {openActions.map((action) => (
                 <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} onCancellationOpen={onCancellationOpen} partnerInfo={partnerInfo} onAssign={handleAssign} />
               ))}
+              {/* Compact new action link */}
+              {!showForm && (
+                <button
+                  type="button"
+                  onClick={() => setShowForm(true)}
+                  className="mt-1 text-sm text-wil-600 transition-colors hover:underline"
+                >
+                  + Nieuwe actie
+                </button>
+              )}
             </div>
           )}
         </div>
+      )}
+
+      {/* Compact new action link when no open actions */}
+      {openActions.length === 0 && !showForm && (
+        <button
+          type="button"
+          onClick={() => setShowForm(true)}
+          className="text-sm text-wil-600 transition-colors hover:underline"
+        >
+          + Nieuwe actie
+        </button>
       )}
 
       {/* Postponed actions */}
