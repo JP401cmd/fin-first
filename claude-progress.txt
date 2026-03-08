@@ -11113,3 +11113,76 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#625, #641, #626)
 - Zero TypeScript errors
 - Could not login to browser for UI testing (Supabase rate limiting)
+
+## Session 2026-03-08 - Features #617, #618, #619
+
+### Feature #617: What-if scenario opslaan en later laden - PASSING
+- Created /api/scenarios API endpoint (GET/POST/DELETE) using app_settings table
+- Key format: whatif_scenarios:{userId} stores array of SavedScenario objects
+- Max 5 scenarios enforced server-side (400 error) and client-side (error message)
+- Created WhatIfScenarios component with:
+  - "Opslaan" button opens inline save dialog with name input
+  - "Laden" dropdown shows saved scenarios with name, FIRE age, event count, date
+  - Click scenario to load (restores overrides + events, simulation auto-recalculates)
+  - Delete button per scenario with loading state
+  - Success/error messages with auto-clear
+- Integrated into whatif/page.tsx between presets and sliders sections
+- handleLoadScenario callback updates overrides + events state
+- Zero TypeScript errors, no mock data
+- Commit: 6da76f0
+
+### Feature #618: What-if events inline bewerkbaar zonder paginaverlating - PASSING
+- Added Pencil edit icon button to each event row in whatif-events.tsx
+- openFormForEdit() pre-populates EventFormSheet with existing event values
+- Edit mode uses different BottomSheet title ("... bewerken") and button text ("Wijzigingen toepassen")
+- DB events (non-whatif- prefixed) use copy mechanism: creates whatif-copy- event, replaces original
+- What-if events updated in-place via onEditEvent callback
+- Info notice for DB events: "Wijzigingen worden alleen in dit scenario toegepast"
+- Back button shows "Annuleren" in edit mode instead of "Terug"
+- handleEditEvent in page.tsx maps over events array replacing the edited event
+- Zero TypeScript errors
+- Commit: a257cb0
+
+### Feature #619: Reality-check modus: AI schakelt van droomgids naar planner bij actievragen - PASSING
+- Updated WHATIF_PROMPT in lib/ai/dna/wil.ts with PLANNER-MODUS section
+- AI auto-detects action/feasibility questions and switches from dream guide to planner
+- Planner mode: honest reality check, concrete steps, uses suggestAction tool
+- Auto-switches back to dream guide when user resumes dreaming
+- Added suggestAction tool to what-if chat context in lib/ai/tools/index.ts
+- Created ActionSuggestionCard component in whatif-chat.tsx (wil-colored, shows impact)
+- Renders suggestAction tool invocations alongside suggestLifeEvent
+- Header dynamically shows "Droomgids" or "Planner" based on last AI response
+- hasContent check updated to include suggestAction tool invocations
+- Zero TypeScript errors
+- Commit: defabc0
+
+### Current Status
+- 3 features completed this session (#617, #618, #619)
+- Zero TypeScript errors in changed files
+- Could not verify via browser due to auth (no working credentials)
+
+## Session 2026-03-08 - Features #608, #609, #610
+
+### Feature #608: Scheiding levensgebeurtenis - PASSING
+- Added scheiding catalog entry with HeartCrack icon, group leven
+- Fields: advocaatKosten, vermogensBehoudPct, partneralimentatie, kinderalimentatie, extraWoonlasten
+- Auto-calculates vermogensverlies from net worth
+- Summary card shows breakdown of eenmalige klap
+- saveEvent combines monthly costs with correct direction
+
+### Feature #609: Scheiding huishouden-impact - PASSING
+- Household section shows gezamenlijk netto vermogen and per-partner split
+- Displays shared debt allocation per partner
+- Shows FIRE-impact estimate with adjusted monthly savings
+- Tip about shared items becoming personal
+
+### Feature #610: Werkloosheid levensgebeurtenis - PASSING
+- Extended werkloosheid with huidigBruto and dienstjaren fields
+- Auto-calculates transitievergoeding: bruto/3 x dienstjaren
+- Summary card shows WW breakdown with income gap calculation
+- saveEvent models: transitie as one-time income plus income gap
+- UserMinus icon added to EVENT_ICONS
+
+### Current Status
+- 3 features completed this session (#608, #609, #610)
+- Zero TypeScript errors in changed files
