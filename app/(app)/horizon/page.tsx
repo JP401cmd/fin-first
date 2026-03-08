@@ -1953,6 +1953,103 @@ export default function HorizonPage() {
               )}
             </div>
 
+            {/* ── SECTIE: Scheiding huishouden-impact ── */}
+            {formType === 'scheiding' && isHouseholdView && (() => {
+              const behoudPct = Number(formMetadata.vermogensBehoudPct ?? 50)
+              const partnerPct = 100 - behoudPct
+              const totalAssets = effectiveInput?.totalAssets ?? 0
+              const totalDebts = effectiveInput?.totalDebts ?? 0
+              const combinedNetWorth = totalAssets - totalDebts
+              const myShare = Math.round(combinedNetWorth * behoudPct / 100)
+              const partnerShare = Math.round(combinedNetWorth * partnerPct / 100)
+              const myDebts = Math.round(totalDebts * behoudPct / 100)
+              const partnerDebts = Math.round(totalDebts * partnerPct / 100)
+              return (
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-2">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
+                      Huishouden — vermogensverdeling
+                    </p>
+                    <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                      <div className="flex justify-between">
+                        <span>Gezamenlijk netto vermogen</span>
+                        <span className="font-mono tabular-nums">{formatCurrency(combinedNetWorth)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Gezamenlijke schulden</span>
+                        <span className="font-mono tabular-nums text-red-600">{formatCurrency(totalDebts)}</span>
+                      </div>
+                      <div className="h-px bg-horizon-200 my-1" />
+                      <div className="flex justify-between font-semibold">
+                        <span>Jouw deel ({behoudPct}%)</span>
+                        <span className="font-mono tabular-nums">{formatCurrency(myShare)}</span>
+                      </div>
+                      <div className="flex justify-between text-[var(--ink-3)]">
+                        <span className="pl-3">— waarvan schulden</span>
+                        <span className="font-mono tabular-nums text-red-600">{formatCurrency(myDebts)}</span>
+                      </div>
+                      <div className="flex justify-between font-semibold">
+                        <span>{partnerName || 'Partner'} ({partnerPct}%)</span>
+                        <span className="font-mono tabular-nums">{formatCurrency(partnerShare)}</span>
+                      </div>
+                      <div className="flex justify-between text-[var(--ink-3)]">
+                        <span className="pl-3">— waarvan schulden</span>
+                        <span className="font-mono tabular-nums text-red-600">{formatCurrency(partnerDebts)}</span>
+                      </div>
+                    </div>
+                    {/* Per-partner FIRE age estimate */}
+                    {fire && (() => {
+                      const currentFireAge = fire.fireAge
+                      // Rough estimate: after scheiding, net worth drops by (1-behoudPct/100), monthly costs change
+                      const alimentatiePartner = Number(formMetadata.partneralimentatieBedrag) || 0
+                      const extraWoon = Number(formMetadata.extraWoonlasten) || 0
+                      const richting = formMetadata.partneralimentatieRichting ?? 'betalen'
+                      const monthlyImpact = richting === 'betalen'
+                        ? -(alimentatiePartner + extraWoon)
+                        : (alimentatiePartner - extraWoon)
+                      // Simple estimate: extra monthly cost delays FIRE by ~months
+                      const monthlySavings = effectiveInput?.monthlyIncome && effectiveInput?.monthlyExpenses
+                        ? effectiveInput.monthlyIncome - effectiveInput.monthlyExpenses
+                        : 0
+                      const adjustedSavings = Math.max(0, monthlySavings + monthlyImpact)
+                      const delayYears = monthlySavings > 0 && adjustedSavings > 0
+                        ? (myShare > 0 ? 0 : 0) // Net worth loss impact is in the one-time cost
+                        : 0
+                      return currentFireAge != null ? (
+                        <div className="mt-2 pt-2 border-t border-horizon-200 space-y-1">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
+                            Geschatte FIRE-impact
+                          </p>
+                          <div className="flex justify-between text-xs">
+                            <span>Jouw FIRE-leeftijd nu</span>
+                            <span className="font-mono tabular-nums">{formatFireAge(currentFireAge)}</span>
+                          </div>
+                          {monthlySavings > 0 && (
+                            <div className="flex justify-between text-xs">
+                              <span>Maandelijkse spaarkracht na scheiding</span>
+                              <span className={`font-mono tabular-nums ${adjustedSavings < monthlySavings ? 'text-red-600' : ''}`}>
+                                {formatCurrency(adjustedSavings)}/mnd
+                              </span>
+                            </div>
+                          )}
+                          <p className="text-[10px] text-[var(--ink-4)] italic mt-1">
+                            De exacte impact op je FIRE-leeftijd wordt berekend na opslaan via de simulatie.
+                          </p>
+                        </div>
+                      ) : null
+                    })()}
+                  </div>
+                  {/* Tip about shared items */}
+                  <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                    <Info className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                    <p className="text-xs text-amber-800">
+                      Bij scheiding worden gedeelde items persoonlijk. Pas daarna je profiel aan: verwijder gedeelde rekeningen, pas schulden aan, en update je vermogen naar je individuele deel.
+                    </p>
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* Divider */}
             <div className="h-px bg-[var(--border-ed)]" />
 
