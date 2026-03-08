@@ -291,6 +291,7 @@ export async function POST(req: Request) {
       is_active: true,
       icon: 'Landmark',
       sort_order: 0,
+      metadata: { leefsituatie: 'alleenstaand', jarenBuitenNL: 0 },
     })
 
     return Response.json({ success: true })

@@ -473,6 +473,21 @@ export default function HorizonPage() {
       setFormDurationType('one_time')
       setFormDirection('income')
     }
+    // Auto-calculate initial kosten koper for house_purchase
+    if (type === 'house_purchase') {
+      const prijs = Number(metaDefaults.aankoopprijs ?? 350000)
+      const isStarter = Boolean(metaDefaults.eersteWoning ?? true)
+      const hasNHG = Boolean(metaDefaults.nhg ?? false)
+      const overdracht = (isStarter && prijs <= 510000) ? 0 : Math.round(prijs * 0.02)
+      const notaris = 1200
+      const taxatie = 500
+      const bankgarantie = Math.round(prijs * 0.001)
+      const nhgKosten = (hasNHG && prijs <= 435000) ? Math.round(prijs * 0.006) : 0
+      const totaal = overdracht + notaris + taxatie + bankgarantie + nhgKosten
+      setFormAmount(totaal)
+      setFormDurationType('one_time')
+      setFormDirection('expense')
+    }
     // Pre-fill house_sale from active mortgage debts
     if (type === 'house_sale' && debts.length > 0) {
       const mortgages = debts.filter(d => d.debt_type === 'mortgage' && d.is_active)
@@ -631,6 +646,19 @@ export default function HorizonPage() {
       } else if (verschil < 0) {
         // New costs are higher → monthly expense increase
         monthlyCostChange = Math.abs(verschil)
+      }
+    }
+
+    // Special handling for house_purchase: kosten koper + monthly cost change (mortgage - rent)
+    if (formType === 'house_purchase') {
+      const huidigeHuur = Number(formMetadata.huidigeHuur) || 0
+      const defaultMonthlyCost = Number(LIFE_EVENT_CATALOG.house_purchase?.defaultMonthlyCost) || 300
+      const hypotheekMaand = defaultMonthlyCost // simplified estimate
+      // If current rent > 0, the net monthly change is mortgage - rent savings
+      if (huidigeHuur > 0 && hypotheekMaand > huidigeHuur) {
+        monthlyCostChange = hypotheekMaand - huidigeHuur
+      } else if (huidigeHuur > 0 && hypotheekMaand <= huidigeHuur) {
+        monthlyIncomeChange = huidigeHuur - hypotheekMaand // saving money
       }
     }
 
