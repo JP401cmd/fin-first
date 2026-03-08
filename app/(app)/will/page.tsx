@@ -75,6 +75,7 @@ export default function WillPage() {
   const [detectingAI, setDetectingAI] = useState(false)
   const { dailyExpenseRate } = useDailyExpenseRate()
   const [partnerInfo, setPartnerInfo] = useState<{ partnerId: string; partnerName: string } | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   // Deep-link: open modal via ?modal= URL param (from dashboard widgets)
   const searchParams = useSearchParams()
@@ -186,6 +187,7 @@ export default function WillPage() {
 
     // Get household_id for shared goal filtering
     const { data: { user: authUser } } = await supabase.auth.getUser()
+    if (authUser) setCurrentUserId(authUser.id)
     let householdFilter = ''
     if (authUser) {
       const { data: membership } = await supabase
@@ -317,7 +319,30 @@ export default function WillPage() {
     })
 
     setRecommendations((recsForListRes.data as Recommendation[]) ?? [])
-    setActions((actionsForBoardRes.data as Action[]) ?? [])
+
+    // Enrich actions with assigner display names for partner-assigned actions
+    let enrichedActions = (actionsForBoardRes.data as Action[]) ?? []
+    const assignerIds = [...new Set(
+      enrichedActions
+        .filter(a => a.assigned_by && a.assigned_by !== authUser?.id)
+        .map(a => a.assigned_by as string)
+    )]
+    if (assignerIds.length > 0) {
+      const { data: assignerProfiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', assignerIds)
+      if (assignerProfiles) {
+        const nameMap = Object.fromEntries(assignerProfiles.map(p => [p.id, p.full_name]))
+        enrichedActions = enrichedActions.map(a =>
+          a.assigned_by && nameMap[a.assigned_by]
+            ? { ...a, assigned_by_name: nameMap[a.assigned_by] }
+            : a
+        )
+      }
+    }
+    setActions(enrichedActions)
+
     setGoalAssets(loadedAssets)
     setGoalDebts(loadedDebts)
     setLoading(false)
@@ -679,6 +704,7 @@ export default function WillPage() {
         <ActionBoard
           initialActions={actions}
           partnerInfo={partnerInfo}
+          currentUserId={currentUserId}
           onCancellationOpen={(metadata) => {
             setOpzegInitialMetadata(metadata)
             setOpzegModalSub({

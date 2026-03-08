@@ -21,9 +21,11 @@ type ActionCardProps = {
   partnerInfo?: { partnerId: string; partnerName: string } | null
   /** Callback when action is assigned/unassigned to partner */
   onAssign?: (actionId: string, partnerId: string | null) => Promise<void>
+  /** Whether this action was assigned by a partner to the current user */
+  isPartnerAssigned?: boolean
 }
 
-export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpen, partnerInfo, onAssign }: ActionCardProps) {
+export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpen, partnerInfo, onAssign, isPartnerAssigned }: ActionCardProps) {
   const [showPostpone, setShowPostpone] = useState(false)
   const [showReject, setShowReject] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
@@ -51,7 +53,7 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
   return (
     <>
       <div
-        className={`rounded-lg border border-[var(--border-ed)] border-l-4 ${statusBorder} bg-[var(--paper)] px-3 py-2.5 transition-all hover:shadow-[var(--s0)] cursor-pointer`}
+        className={`rounded-lg border ${isPartnerAssigned ? 'border-wil-200 bg-wil-50/30' : 'border-[var(--border-ed)] bg-[var(--paper)]'} border-l-4 ${statusBorder} px-3 py-2.5 transition-all hover:shadow-[var(--s0)] cursor-pointer`}
         onClick={() => {
           if (!showPostpone && !showReject && onUpdate) setShowEdit(true)
         }}
@@ -63,14 +65,21 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
             <span className={`shrink-0 rounded-full px-1.5 py-px text-xs font-medium ${sourceBadge}`}>
               {ACTION_SOURCE_LABELS[action.source]}
             </span>
-            {/* Partner assignment badge */}
-            {isAssigned && (
+            {/* Partner assignment badge — outgoing (I assigned to partner) */}
+            {isAssigned && !isPartnerAssigned && (
               <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-wil-50 px-1.5 py-px text-[10px] font-medium text-wil-700">
                 <UserCheck className="h-2.5 w-2.5" />
                 {action.assigned_to_name ?? 'Partner'}
               </span>
             )}
-            {assignedByName && (
+            {/* Partner assignment badge — incoming (partner assigned to me) */}
+            {isPartnerAssigned && assignedByName && (
+              <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-wil-100 px-1.5 py-px text-[10px] font-medium text-wil-700">
+                <UserCheck className="h-2.5 w-2.5" />
+                Toegewezen door {assignedByName}
+              </span>
+            )}
+            {!isPartnerAssigned && assignedByName && (
               <span className="hidden sm:inline shrink-0 text-[10px] text-[var(--ink-4)]">
                 Toegewezen door {assignedByName}
               </span>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, ChevronDown, ChevronRight, Sparkles } from 'lucide-react'
+import { Plus, ChevronDown, ChevronRight, Sparkles, UserCheck, Users } from 'lucide-react'
 import { ActionCard } from '@/components/app/action-card'
 import { ActionForm } from '@/components/app/action-form'
 import { useFreedomDaysAnimation } from '@/components/app/freedom-days-animation'
@@ -13,13 +13,16 @@ type ActionBoardProps = {
   onCancellationOpen?: (metadata: CancellationMetadata) => void
   /** Partner info for assignment — null if no household */
   partnerInfo?: { partnerId: string; partnerName: string } | null
+  /** Current user ID for distinguishing own vs partner-assigned actions */
+  currentUserId?: string | null
 }
 
-export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo }: ActionBoardProps) {
+export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, currentUserId }: ActionBoardProps) {
   const [actions, setActions] = useState<Action[]>(initialActions)
   const [showForm, setShowForm] = useState(false)
   const [showPostponed, setShowPostponed] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
+  const [showPartnerCompleted, setShowPartnerCompleted] = useState(false)
   const { triggerAnimation } = useFreedomDaysAnimation()
 
   async function handleAssign(actionId: string, partnerId: string | null) {
@@ -45,16 +48,29 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo }:
     )
   }
 
-  const openActions = actions
+  // Separate own actions from partner-assigned actions
+  const isPartnerAssigned = (a: Action) =>
+    currentUserId && a.assigned_to === currentUserId && a.user_id !== currentUserId
+
+  const ownActions = actions.filter((a) => !isPartnerAssigned(a))
+  const partnerAssignedActions = actions.filter((a) => isPartnerAssigned(a))
+
+  const openActions = ownActions
     .filter((a) => a.status === 'open')
     .sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0) || a.sort_order - b.sort_order)
 
-  const postponedActions = actions.filter((a) => a.status === 'postponed')
-  const completedActions = actions.filter((a) => a.status === 'completed')
-  const rejectedActions = actions.filter((a) => a.status === 'rejected')
+  const postponedActions = ownActions.filter((a) => a.status === 'postponed')
+  const completedActions = ownActions.filter((a) => a.status === 'completed')
+  const rejectedActions = ownActions.filter((a) => a.status === 'rejected')
+
+  const partnerOpenActions = partnerAssignedActions
+    .filter((a) => a.status === 'open')
+    .sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0) || a.sort_order - b.sort_order)
+  const partnerCompletedActions = partnerAssignedActions.filter((a) => a.status === 'completed')
 
   const totalOpenDays = openActions.reduce((sum, a) => sum + (a.freedom_days_impact || 0), 0)
   const totalCompletedDays = completedActions.reduce((sum, a) => sum + (a.freedom_days_impact || 0), 0)
+  const partnerOpenDays = partnerOpenActions.reduce((sum, a) => sum + (a.freedom_days_impact || 0), 0)
 
   async function handleStatusChange(id: string, status: ActionStatus, data?: Record<string, unknown>) {
     const res = await fetch(`/api/ai/actions/${id}`, {
@@ -131,7 +147,7 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo }:
     setShowForm(false)
   }
 
-  if (actions.length === 0 && !showForm) {
+  if (ownActions.length === 0 && partnerAssignedActions.length === 0 && !showForm) {
     return (
       <div className="rounded-[var(--r-lg)] border border-wil-200 bg-wil-50 p-8 text-center">
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-wil-100">
@@ -167,6 +183,68 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo }:
           <Plus className="h-4 w-4" />
           Nieuwe actie
         </button>
+      )}
+
+      {/* Partner-assigned actions — "Van je partner" section */}
+      {partnerAssignedActions.length > 0 && (
+        <div className="rounded-[var(--r-lg)] border border-wil-200 bg-wil-50/40 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-wil-100">
+              <Users className="h-3.5 w-3.5 text-wil-600" />
+            </div>
+            <h3 className="text-sm font-semibold text-wil-700">
+              Van je partner
+            </h3>
+            {partnerOpenDays > 0 && (
+              <span className="rounded-full bg-wil-100 px-2 py-0.5 text-xs font-medium text-wil-700">
+                {Math.round(partnerOpenDays)} dagen potentieel
+              </span>
+            )}
+          </div>
+
+          {/* Open partner-assigned actions */}
+          {partnerOpenActions.length > 0 && (
+            <div className="space-y-2">
+              {partnerOpenActions.map((action) => (
+                <ActionCard
+                  key={action.id}
+                  action={action}
+                  onStatusChange={handleStatusChange}
+                  onUpdate={handleUpdateAction}
+                  onCancellationOpen={onCancellationOpen}
+                  isPartnerAssigned
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Completed partner-assigned actions */}
+          {partnerCompletedActions.length > 0 && (
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => setShowPartnerCompleted(!showPartnerCompleted)}
+                className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-emerald-600"
+              >
+                {showPartnerCompleted ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                Afgerond ({partnerCompletedActions.length})
+              </button>
+              {showPartnerCompleted && (
+                <div className="space-y-2">
+                  {partnerCompletedActions.map((action) => (
+                    <ActionCard
+                      key={action.id}
+                      action={action}
+                      onStatusChange={handleStatusChange}
+                      onUpdate={handleUpdateAction}
+                      isPartnerAssigned
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Open actions */}

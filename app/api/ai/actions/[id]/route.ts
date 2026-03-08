@@ -100,6 +100,54 @@ export async function PATCH(
       })
     }
 
+    // Notify assigner when an assigned action is completed
+    const assignedBy = (action as Record<string, unknown>).assigned_by as string | null
+    if (assignedBy && assignedBy !== user.id) {
+      try {
+        // Get completer's name
+        const { data: completerProfile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single()
+        const completerName = completerProfile?.full_name ?? 'Je partner'
+        const freedomDays = action.freedom_days_impact ? Math.round(Number(action.freedom_days_impact)) : 0
+        const freedomLabel = freedomDays > 0 ? ` — ${freedomDays} ${freedomDays === 1 ? 'vrijheidsdag' : 'vrijheidsdagen'} gewonnen` : ''
+
+        // Store notification for the assigner
+        const notifKey = `notifications_history_${assignedBy}`
+        const { data: existing } = await supabase
+          .from('app_settings')
+          .select('value')
+          .eq('key', notifKey)
+          .maybeSingle()
+
+        const history = existing?.value ? JSON.parse(existing.value) : []
+        history.unshift({
+          id: `action_completed_${id}_${now}`,
+          type: 'recommendation',
+          priority: 2,
+          title: `${completerName} heeft actie afgerond`,
+          description: `"${action.title}" is voltooid${freedomLabel}`,
+          icon: 'CheckCircle',
+          color: 'emerald',
+          createdAt: now,
+          read: false,
+          actionUrl: '/will',
+          aiContext: `Mijn partner ${completerName} heeft de actie "${action.title}" afgerond${freedomLabel}. Wat betekent dit voor onze financiële vrijheid?`,
+        })
+
+        // Keep max 100 entries
+        if (history.length > 100) history.length = 100
+
+        await supabase
+          .from('app_settings')
+          .upsert({ key: notifKey, value: JSON.stringify(history) }, { onConflict: 'key' })
+      } catch {
+        // Non-critical — continue without notification
+      }
+    }
+
     return Response.json({ status: 'completed' })
   }
 
