@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { NOTIFICATION_TYPES } from '@/lib/identity-constants'
-import { Lock, GripVertical, ChevronDown, Shield, Eye, EyeOff, Server, FileText } from 'lucide-react'
+import { Lock, GripVertical, ChevronDown, Shield, Eye, EyeOff, Server, FileText, Users, CalendarCheck } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -222,6 +222,24 @@ export default function InstellingenPage() {
   const [aiSaving, setAiSaving] = useState(false)
   const [privacyModalOpen, setPrivacyModalOpen] = useState(false)
 
+  // ─ Section G: Huishouden Privacy ─
+  type PrivacyLevel = 'volledig' | 'totalen' | 'verborgen'
+  type PrivacySettings = Record<string, PrivacyLevel>
+  const DEFAULT_HOUSEHOLD_PRIVACY: PrivacySettings = {
+    vermogen: 'totalen',
+    schulden: 'totalen',
+    budgetten: 'totalen',
+    transacties: 'totalen',
+    inkomen: 'totalen',
+  }
+  const [huishoudenOpen, setHuishoudenOpen] = useState(false)
+  const [hasHousehold, setHasHousehold] = useState(false)
+  const [householdPrivacy, setHouseholdPrivacy] = useState<PrivacySettings>(DEFAULT_HOUSEHOLD_PRIVACY)
+  const [householdPrivacySaved, setHouseholdPrivacySaved] = useState<PrivacySettings>(DEFAULT_HOUSEHOLD_PRIVACY)
+  const [householdPrivacyLoading, setHouseholdPrivacyLoading] = useState(true)
+  const [householdPrivacySaving, setHouseholdPrivacySaving] = useState(false)
+  const [householdPrivacyMessage, setHouseholdPrivacyMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
   // ─ Section A: Notificaties ─
   const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>({
     budget: true, sync: true,
@@ -230,6 +248,10 @@ export default function InstellingenPage() {
   const [notifLoading, setNotifLoading] = useState(true)
   const [notifSaving, setNotifSaving] = useState(false)
   const [notifMessage, setNotifMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // ─ Monthly check-in toggle ─
+  const [checkinEnabled, setCheckinEnabled] = useState(true)
+  const [checkinSaving, setCheckinSaving] = useState(false)
 
   // ─ Section B: Dashboard Widgets ─
   const { dashboardType, setDashboardType } = useDashboardType()
@@ -309,6 +331,15 @@ export default function InstellingenPage() {
         } catch { /* ignore */ }
       }
       setNotifLoading(false)
+
+      // Monthly check-in preference
+      try {
+        const checkinRes = await fetch('/api/monthly-checkin')
+        if (checkinRes.ok) {
+          const checkinData = await checkinRes.json()
+          setCheckinEnabled(checkinData.enabled !== false)
+        }
+      } catch { /* ignore */ }
 
       // Briefing content preferences (DB → localStorage fallback)
       if (briefingPrefsData.data?.value) {
@@ -403,6 +434,22 @@ export default function InstellingenPage() {
       const merged = mergeWidgetPrefs(saved)
       setPrefs(merged.widgets)
       setWidgetsLoading(false)
+
+      // Household privacy settings
+      try {
+        const privacyRes = await fetch('/api/household/privacy')
+        if (privacyRes.ok) {
+          const privacyData = await privacyRes.json()
+          setHasHousehold(true)
+          setHouseholdPrivacy(privacyData.privacySettings)
+          setHouseholdPrivacySaved(privacyData.privacySettings)
+        } else if (privacyRes.status === 404) {
+          setHasHousehold(false)
+        }
+      } catch {
+        // No household or error — leave hidden
+      }
+      setHouseholdPrivacyLoading(false)
     }
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -430,6 +477,22 @@ export default function InstellingenPage() {
     }
     setNotifSaving(false)
   }, [notifPrefs])
+
+  const toggleCheckin = useCallback(async () => {
+    const newVal = !checkinEnabled
+    setCheckinEnabled(newVal)
+    setCheckinSaving(true)
+    try {
+      await fetch('/api/monthly-checkin', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: newVal }),
+      })
+    } catch {
+      setCheckinEnabled(!newVal) // revert
+    }
+    setCheckinSaving(false)
+  }, [checkinEnabled])
 
   // ─ Section B handlers ────────────────────────────────────────────────────
   const isWidgetLocked = useCallback((def: WidgetDef): boolean => {
@@ -570,6 +633,26 @@ export default function InstellingenPage() {
     }
     setAiSaving(false)
   }, [supabase])
+
+  // ─ Section G: Huishouden Privacy handler ─────────────────────────────────
+  const saveHouseholdPrivacy = useCallback(async () => {
+    setHouseholdPrivacySaving(true)
+    setHouseholdPrivacyMessage(null)
+    try {
+      const res = await fetch('/api/household/privacy', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ privacySettings: householdPrivacy }),
+      })
+      if (!res.ok) throw new Error('Save failed')
+      setHouseholdPrivacySaved({ ...householdPrivacy })
+      setHouseholdPrivacyMessage({ type: 'success', text: 'Privacy-instellingen opgeslagen!' })
+      setTimeout(() => setHouseholdPrivacyMessage(null), 3000)
+    } catch {
+      setHouseholdPrivacyMessage({ type: 'error', text: 'Opslaan mislukt. Probeer opnieuw.' })
+    }
+    setHouseholdPrivacySaving(false)
+  }, [householdPrivacy])
 
   // ─ Section D handlers ────────────────────────────────────────────────────
   const saveTypography = useCallback(async () => {
@@ -729,6 +812,33 @@ export default function InstellingenPage() {
                     )
                   })}
                 </div>
+
+                {/* Monthly check-in toggle */}
+                <div className="mt-4 rounded-xl border border-[var(--border-ed)]">
+                  <div className="flex items-center justify-between gap-4 px-4 py-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <CalendarCheck className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-[var(--ink-2)]">Maandelijkse geldcheck-in</p>
+                        <p className="text-xs text-[var(--ink-3)]">Herinnering om elke maand je financi&euml;n te checken</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={toggleCheckin}
+                      disabled={checkinSaving}
+                      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                        checkinEnabled ? 'bg-zinc-900' : 'bg-zinc-300'
+                      } ${checkinSaving ? 'opacity-50' : ''}`}
+                      aria-label={checkinEnabled ? 'Schakel geldcheck-in uit' : 'Schakel geldcheck-in in'}
+                    >
+                      <span className={`inline-block h-3.5 w-3.5 rounded-full bg-[var(--paper)] transition-transform ${
+                        checkinEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                      }`} />
+                    </button>
+                  </div>
+                </div>
+
                 <div className="mt-4 flex items-center gap-3">
                   <button
                     onClick={saveNotifPrefs}
@@ -1565,6 +1675,121 @@ export default function InstellingenPage() {
           </div>
         )}
       </section>
+
+      {/* ── G: Huishouden Privacy ──────────────────────────────────── */}
+      {hasHousehold && (
+        <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setHuishoudenOpen(o => !o)}
+            className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
+          >
+            <div>
+              <h2 className="label-editorial text-[var(--ink-2)]">Huishouden</h2>
+              {!huishoudenOpen && (
+                <p className="mt-0.5 text-xs text-[var(--ink-3)]">Bepaal welke financiële data je partner kan zien</p>
+              )}
+            </div>
+            <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${huishoudenOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {huishoudenOpen && (
+            <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 pb-6 pt-4 space-y-5">
+              <div className="flex items-start gap-3">
+                <Users className="mt-0.5 h-5 w-5 text-[var(--ink-3)] shrink-0" />
+                <p className="text-sm text-[var(--ink-2)] leading-relaxed">
+                  Stel per categorie in welke financiële gegevens je partner kan zien.
+                  Dit geldt alleen voor hoe jouw data wordt getoond aan je partner.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-4 rounded-lg border border-[var(--border-ed)] p-3 bg-[var(--subtle)]">
+                <div className="flex items-center gap-1.5">
+                  <Eye className="h-3.5 w-3.5 text-teal-600" />
+                  <span className="text-xs text-[var(--ink-2)]"><strong>Volledig</strong> — alle details zichtbaar</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Shield className="h-3.5 w-3.5 text-amber-600" />
+                  <span className="text-xs text-[var(--ink-2)]"><strong>Totalen</strong> — alleen totaalbedragen</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <EyeOff className="h-3.5 w-3.5 text-red-500" />
+                  <span className="text-xs text-[var(--ink-2)]"><strong>Verborgen</strong> — volledig afgeschermd</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {([
+                  { key: 'vermogen', label: 'Vermogen', description: 'Bezittingen en beleggingen' },
+                  { key: 'schulden', label: 'Schulden', description: 'Leningen en schulden' },
+                  { key: 'budgetten', label: 'Budgetten', description: 'Maandbudgetten en bestedingen' },
+                  { key: 'transacties', label: 'Transacties', description: 'Individuele transacties' },
+                  { key: 'inkomen', label: 'Inkomen', description: 'Salaris en overig inkomen' },
+                ] as const).map(cat => {
+                  const currentLevel = householdPrivacy[cat.key] || 'totalen'
+                  return (
+                    <div key={cat.key} className="rounded-xl border border-[var(--border-ed)] p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <h3 className="text-sm font-semibold text-[var(--ink)]">{cat.label}</h3>
+                          <p className="text-xs text-[var(--ink-3)]">{cat.description}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        {([
+                          { level: 'volledig' as PrivacyLevel, label: 'Volledig', icon: Eye, color: 'teal' },
+                          { level: 'totalen' as PrivacyLevel, label: 'Totalen', icon: Shield, color: 'amber' },
+                          { level: 'verborgen' as PrivacyLevel, label: 'Verborgen', icon: EyeOff, color: 'red' },
+                        ]).map(opt => {
+                          const isActive = currentLevel === opt.level
+                          const Icon = opt.icon
+                          return (
+                            <button
+                              key={opt.level}
+                              type="button"
+                              onClick={() => setHouseholdPrivacy(prev => ({ ...prev, [cat.key]: opt.level }))}
+                              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                                isActive
+                                  ? opt.color === 'teal'
+                                    ? 'bg-teal-50 text-teal-700 border border-teal-300'
+                                    : opt.color === 'amber'
+                                    ? 'bg-amber-50 text-amber-700 border border-amber-300'
+                                    : 'bg-red-50 text-red-700 border border-red-300'
+                                  : 'border border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
+                              }`}
+                            >
+                              <Icon className="h-3.5 w-3.5" />
+                              <span className="hidden sm:inline">{opt.label}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="flex items-center gap-4 pt-2">
+                <button
+                  onClick={saveHouseholdPrivacy}
+                  disabled={householdPrivacySaving || JSON.stringify(householdPrivacy) === JSON.stringify(householdPrivacySaved)}
+                  className="rounded-lg bg-teal-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-700 disabled:opacity-50"
+                >
+                  {householdPrivacySaving ? 'Opslaan...' : 'Opslaan'}
+                </button>
+                {householdPrivacyMessage && (
+                  <p className={`text-sm ${householdPrivacyMessage.type === 'success' ? 'text-teal-600' : 'text-red-600'}`}>
+                    {householdPrivacyMessage.text}
+                  </p>
+                )}
+                {JSON.stringify(householdPrivacy) !== JSON.stringify(householdPrivacySaved) && !householdPrivacyMessage && (
+                  <p className="text-xs text-amber-600">Niet-opgeslagen wijzigingen</p>
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Reset confirmation dialog */}
       {showResetDialog && (
