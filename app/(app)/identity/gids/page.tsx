@@ -9,6 +9,8 @@ import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { DISCOVER_ITEMS, getVisitedFeaturesLocal, markFeatureVisitedLocal, type DiscoverItem } from '@/components/app/discover-carousel'
 import { FEATURES, DEFAULT_MATRIX, PHASES, levelToPhaseId } from '@/lib/feature-phases'
 import ConceptFlipCards from '@/components/app/concept-flip-cards'
+import { OntdekkenSection } from '@/components/app/ontdekken-section'
+import GuideFaq from '@/components/app/guide-faq'
 
 /* ── Types ─────────────────────── */
 
@@ -589,6 +591,12 @@ export default function GidsPage() {
           </div>
         </GuideAccordion>
       </div>
+
+      {/* Veelgestelde vragen */}
+      <GuideFaq />
+
+      {/* Ontdekken sectie */}
+      <OntdekkenSection />
 
       {/* Pro tips */}
       <div className="mt-5 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/50 p-4">
