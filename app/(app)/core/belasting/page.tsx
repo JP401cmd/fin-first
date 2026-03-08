@@ -4,11 +4,12 @@ import { useEffect, useState, useCallback } from 'react'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
 import { formatCurrency } from '@/lib/format'
 import { BOX3_PARAMS, BOX3_TOOLTIPS, type Box3Result, type TaxYear, type PartnerAllocation } from '@/lib/box3-data'
+import { BOX2_TOOLTIPS, type Box2Result } from '@/lib/box2-data'
 import {
   Calculator, Users, User, ArrowLeftRight, Info,
   TrendingDown, Wallet, PiggyBank, BarChart3,
   Clock, ChevronDown, ChevronUp, Lightbulb, ArrowLeft,
-  Sparkles, SlidersHorizontal, Shield,
+  Sparkles, SlidersHorizontal, Shield, Building2,
 } from 'lucide-react'
 import { Box3PartnerModal } from '@/components/app/core/box3-partner-modal'
 import Link from 'next/link'
@@ -32,6 +33,26 @@ interface Box3ApiResponse {
   partners?: PartnerBox3[]
   combined?: Box3Result
   optimalAllocation?: PartnerAllocation
+}
+
+interface Box2ApiDeelneming {
+  name: string
+  annual_dividend: number
+  disposal_gain: number
+  assetId?: string
+  currentValue?: number
+  ownershipPct?: number
+}
+
+interface Box2ApiResponse {
+  hasHousehold: boolean
+  year: TaxYear
+  dailyExpenses: number
+  currentUserName: string
+  personal?: Box2Result
+  deelnemingen?: Box2ApiDeelneming[]
+  partners?: { userId: string; fullName: string; isCurrentUser: boolean; result: Box2Result }[]
+  combined?: Box2Result
 }
 
 type ViewMode = 'personal' | 'partner1' | 'partner2' | 'combined'
@@ -69,22 +90,33 @@ export default function BelastingPage() {
   const { perspective, isHousehold } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
   const [data, setData] = useState<Box3ApiResponse | null>(null)
+  const [box2Data, setBox2Data] = useState<Box2ApiResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [year, setYear] = useState<TaxYear>(2026)
   const [viewMode, setViewMode] = useState<ViewMode>('personal')
   const [showDetails, setShowDetails] = useState(false)
+  const [showBox2Details, setShowBox2Details] = useState(false)
   const [showPartnerModal, setShowPartnerModal] = useState(false)
 
   const loadData = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/household/box3?year=${year}`, { signal })
+      const [box3Res, box2Res] = await Promise.all([
+        fetch(`/api/household/box3?year=${year}`, { signal }),
+        fetch(`/api/household/box2?year=${year}`, { signal }),
+      ])
       if (signal?.aborted) return
-      if (!res.ok) throw new Error('Fout bij ophalen gegevens')
-      const json = await res.json()
+      if (!box3Res.ok) throw new Error('Fout bij ophalen gegevens')
+      const json = await box3Res.json()
       setData(json)
+
+      // Box 2 data (non-critical — might have no deelnemingen)
+      if (box2Res.ok) {
+        const box2Json = await box2Res.json()
+        setBox2Data(box2Json)
+      }
 
       // Auto-select view mode based on perspective
       if (json.hasHousehold && perspective === 'household') {
@@ -160,6 +192,26 @@ export default function BelastingPage() {
         <ArrowLeft className="h-4 w-4" />
         De Kern
       </Link>
+
+      {/* === Combined Tax Summary === */}
+      {activeResult && (
+        <CombinedTaxSummary
+          box3Tax={activeResult.tax}
+          box3FreedomDays={activeResult.freedomDays}
+          box2Result={box2Data?.personal?.totalIncome ? (
+            (() => {
+              // Select Box 2 result matching current view mode
+              if (!box2Data) return null
+              if (!box2Data.hasHousehold || viewMode === 'personal') return box2Data.personal ?? null
+              if (viewMode === 'partner1') return box2Data.partners?.[0]?.result ?? null
+              if (viewMode === 'partner2') return box2Data.partners?.[1]?.result ?? null
+              if (viewMode === 'combined') return box2Data.combined ?? null
+              return null
+            })()
+          ) : null}
+          dailyExpenses={data.dailyExpenses}
+        />
+      )}
 
       {/* === Hero === */}
       <section className="card-editorial overflow-hidden mb-6">
@@ -639,7 +691,375 @@ export default function BelastingPage() {
           </section>
         </>
       )}
+
+      {/* ═══ Box 2 Section ═══ */}
+      {box2Data && box2Data.personal && box2Data.personal.totalIncome > 0 && (
+        <Box2Section
+          box2Data={box2Data}
+          viewMode={viewMode}
+          showBox2Details={showBox2Details}
+          setShowBox2Details={setShowBox2Details}
+          year={year}
+        />
+      )}
     </div>
+  )
+}
+
+// ── Box 2 Section Component ─────────────────────────────────
+
+function Box2Section({
+  box2Data,
+  viewMode,
+  showBox2Details,
+  setShowBox2Details,
+  year,
+}: {
+  box2Data: Box2ApiResponse
+  viewMode: ViewMode
+  showBox2Details: boolean
+  setShowBox2Details: (v: boolean) => void
+  year: TaxYear
+}) {
+  // Select active Box 2 result based on view mode
+  const getActiveBox2 = (): Box2Result | null => {
+    if (!box2Data) return null
+    if (!box2Data.hasHousehold || viewMode === 'personal') {
+      return box2Data.personal ?? box2Data.partners?.[0]?.result ?? null
+    }
+    if (viewMode === 'partner1') return box2Data.partners?.[0]?.result ?? null
+    if (viewMode === 'partner2') return box2Data.partners?.[1]?.result ?? null
+    if (viewMode === 'combined') return box2Data.combined ?? null
+    return null
+  }
+
+  const result = getActiveBox2()
+  if (!result || result.totalIncome === 0) return null
+
+  const deelnemingen = box2Data.deelnemingen ?? []
+
+  return (
+    <>
+      {/* Box 2 Hero */}
+      <section className="card-editorial overflow-hidden mb-6 mt-8">
+        <div className="h-1.5 bg-teal-500" />
+        <div className="p-4 sm:p-6 md:p-8">
+          <div className="mb-3 sm:mb-4 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-teal-100">
+              <Building2 className="h-5 w-5 text-teal-600" />
+            </div>
+            <div>
+              <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-[var(--ink)]">
+                Box 2 Belasting
+              </h2>
+              <p className="text-xs text-[var(--ink-3)]">
+                Aanmerkelijk belang {year}
+                <InfoTooltip text={BOX2_TOOLTIPS.box2} />
+              </p>
+            </div>
+          </div>
+
+          {/* Main tax headline */}
+          <div className="flex flex-col sm:flex-row sm:items-end gap-2 sm:gap-6">
+            <div>
+              <p className="text-xs font-medium text-[var(--ink-3)] mb-1">
+                {viewMode === 'combined' ? 'Gecombineerde belasting' : 'Jouw belasting'}
+              </p>
+              <span className="font-display text-[36px] sm:text-[44px] font-bold tracking-tight text-[var(--ink)] font-mono tabular-nums">
+                {formatCurrency(result.totalTax)}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 pb-1 sm:pb-2">
+              <Clock className="h-4 w-4 text-teal-500" />
+              <span className="text-sm text-[var(--ink-2)]">
+                {result.freedomDays} vrijheidsdagen
+              </span>
+              <InfoTooltip text="Het aantal dagen vrijheid dat deze Box 2 belasting kost, op basis van je dagelijkse uitgaven." />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Box 2 KPI Cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 mb-6">
+        <KpiCard
+          label="Box 2 inkomen"
+          value={formatCurrency(result.totalIncome)}
+          icon={<Wallet className="h-4 w-4 text-teal-500" />}
+          tooltip={BOX2_TOOLTIPS.aanmerkelijkBelang}
+        />
+        <KpiCard
+          label="Totaal dividend"
+          value={formatCurrency(result.totalDividend)}
+          icon={<PiggyBank className="h-4 w-4 text-teal-500" />}
+          tooltip={BOX2_TOOLTIPS.dividend}
+        />
+        <KpiCard
+          label="Vervreemdingswinst"
+          value={formatCurrency(result.totalDisposalGain)}
+          icon={<BarChart3 className="h-4 w-4 text-teal-500" />}
+          tooltip={BOX2_TOOLTIPS.vervreemdingswinst}
+        />
+        <KpiCard
+          label="Effectief tarief"
+          value={result.totalIncome > 0 ? formatPct(result.effectiveRate) : '0%'}
+          sub={`Laag: ${formatPct(result.params.tariefLaag)} · Hoog: ${formatPct(result.params.tariefHoog)}`}
+          icon={<TrendingDown className="h-4 w-4 text-teal-500" />}
+          tooltip={BOX2_TOOLTIPS.tariefStaffel}
+        />
+      </div>
+
+      {/* Box 2 Calculation Breakdown */}
+      <section className="card-editorial overflow-hidden mb-6">
+        <button
+          onClick={() => setShowBox2Details(!showBox2Details)}
+          className="flex w-full items-center justify-between p-4 sm:p-5 hover:bg-[var(--subtle)] transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Calculator className="h-4 w-4 text-teal-500" />
+            <span className="text-sm font-semibold text-[var(--ink)]">Berekeningsstappen Box 2</span>
+          </div>
+          {showBox2Details ? <ChevronUp className="h-4 w-4 text-[var(--ink-3)]" /> : <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" />}
+        </button>
+
+        {showBox2Details && (
+          <div className="border-t border-[var(--border-ed)] px-4 py-4 sm:px-5">
+            <div className="space-y-3">
+              <CalcRow label="Totaal dividend" value={result.totalDividend} />
+              <CalcRow label="Totaal vervreemdingswinst" value={result.totalDisposalGain} />
+              <div className="h-px bg-[var(--border-ed)]" />
+              <CalcRow label="Totaal Box 2 inkomen" value={result.totalIncome} bold />
+              <div className="h-px bg-[var(--border-ed)]" />
+              <CalcRow
+                label={`Grens laag tarief (${result.hasPartner ? 'partner' : 'single'})`}
+                value={result.hasPartner ? result.params.grensPartner : result.params.grens}
+                muted
+                tooltip={BOX2_TOOLTIPS.fiscaalPartner}
+              />
+              <CalcRow
+                label={`Belast tegen ${formatPct(result.params.tariefLaag)}`}
+                value={result.taxLow}
+              />
+              <CalcRow
+                label={`Belast tegen ${formatPct(result.params.tariefHoog)}`}
+                value={result.taxHigh}
+              />
+              <div className="h-px bg-[var(--border-ed)]" />
+              <CalcRow label="Box 2 belasting" value={result.totalTax} bold highlight />
+              <div className="flex items-center gap-2 pt-1">
+                <Clock className="h-3.5 w-3.5 text-teal-500" />
+                <span className="text-xs text-[var(--ink-2)]">
+                  = {result.freedomDays} vrijheidsdagen (bij {formatCurrency(result.dailyExpenses)}/dag)
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Per-deelneming breakdown */}
+      {deelnemingen.length > 0 && (
+        <section className="card-editorial overflow-hidden mb-6">
+          <div className="p-4 sm:p-5">
+            <h3 className="text-sm font-semibold text-[var(--ink)] mb-3">
+              Deelnemingen
+            </h3>
+            <div className="space-y-1.5">
+              {result.perDeelneming.map((pd, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between py-1.5 text-xs"
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-teal-400" />
+                    <span className="truncate text-[var(--ink-2)]">{pd.name}</span>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {pd.dividend > 0 && (
+                      <span className="text-[10px] text-[var(--ink-3)]">
+                        div. {formatCurrency(pd.dividend)}
+                      </span>
+                    )}
+                    {pd.disposalGain !== 0 && (
+                      <span className="text-[10px] text-[var(--ink-3)]">
+                        verv. {formatCurrency(pd.disposalGain)}
+                      </span>
+                    )}
+                    <span className="font-mono tabular-nums text-[var(--ink)] font-medium">
+                      {formatCurrency(pd.totalIncome)}
+                    </span>
+                    {result.totalIncome > 0 && (
+                      <span className="text-[10px] text-[var(--ink-3)] w-10 text-right">
+                        {(pd.shareOfTotal * 100).toFixed(0)}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Asset values if available */}
+            {deelnemingen.some(d => d.currentValue) && (
+              <>
+                <div className="h-px bg-[var(--border-ed)] my-3" />
+                <h4 className="text-xs font-semibold text-[var(--ink-3)] mb-2">Waarde deelnemingen</h4>
+                <div className="space-y-1.5">
+                  {deelnemingen.filter(d => d.currentValue).map((d, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between py-1 text-xs"
+                    >
+                      <span className="text-[var(--ink-2)]">{d.name}</span>
+                      <div className="flex items-center gap-3">
+                        {d.ownershipPct !== undefined && d.ownershipPct < 100 && (
+                          <span className="text-[10px] text-[var(--ink-3)]">
+                            {d.ownershipPct}% belang
+                          </span>
+                        )}
+                        <span className="font-mono tabular-nums text-[var(--ink)]">
+                          {formatCurrency(d.currentValue!)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </section>
+      )}
+    </>
+  )
+}
+
+// ── Combined Tax Summary ─────────────────────────────────────
+
+function CombinedTaxSummary({
+  box3Tax,
+  box3FreedomDays,
+  box2Result,
+  dailyExpenses,
+}: {
+  box3Tax: number
+  box3FreedomDays: number
+  box2Result: Box2Result | null
+  dailyExpenses: number
+}) {
+  const box2Tax = box2Result?.totalTax ?? 0
+  const box2FreedomDays = box2Result?.freedomDays ?? 0
+  const hasBox2 = box2Tax > 0
+
+  // Box 1 is informational only (eigenwoningforfait etc.)
+  const totalTax = box3Tax + box2Tax
+  const totalFreedomDays = box3FreedomDays + box2FreedomDays
+
+  // Only show summary if there are multiple boxes or meaningful totals
+  if (!hasBox2 && box3Tax === 0) return null
+
+  // Stacked bar widths
+  const maxTax = Math.max(totalTax, 1)
+  const box3Pct = (box3Tax / maxTax) * 100
+  const box2Pct = (box2Tax / maxTax) * 100
+
+  return (
+    <section className="card-editorial overflow-hidden mb-6">
+      <div className="p-4 sm:p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Calculator className="h-4 w-4 text-[var(--ink-3)]" />
+          <h2 className="text-sm font-semibold text-[var(--ink)]">
+            Totaal belastingoverzicht
+          </h2>
+        </div>
+
+        {/* Total headline */}
+        <div className="flex flex-col sm:flex-row sm:items-end gap-2 sm:gap-6 mb-5">
+          <div>
+            <p className="text-[10px] font-semibold text-[var(--ink-3)] uppercase tracking-wider mb-1">Totale belastingdruk</p>
+            <span className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-[var(--ink)] font-mono tabular-nums">
+              {formatCurrency(totalTax)}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 pb-0.5 sm:pb-1">
+            <Clock className="h-4 w-4 text-[var(--ink-3)]" />
+            <span className="text-sm text-[var(--ink-2)]">
+              {totalFreedomDays} vrijheidsdagen
+            </span>
+          </div>
+        </div>
+
+        {/* Stacked bar */}
+        <div className="mb-4">
+          <div className="flex h-5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+            {box3Pct > 0 && (
+              <div
+                className="h-full bg-kern-400 transition-all duration-500"
+                style={{ width: `${Math.max(box3Pct, 2)}%` }}
+              />
+            )}
+            {box2Pct > 0 && (
+              <div
+                className="h-full bg-teal-400 transition-all duration-500"
+                style={{ width: `${Math.max(box2Pct, 2)}%` }}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Box breakdown rows */}
+        <div className="space-y-2">
+          {/* Box 1 — informational */}
+          <div className="flex items-center justify-between text-xs py-1.5">
+            <div className="flex items-center gap-2">
+              <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-gray-300" />
+              <span className="text-[var(--ink-2)]">Box 1</span>
+              <span className="text-[10px] text-[var(--ink-4)] italic">informatief</span>
+              <InfoTooltip text="Box 1 belast inkomen uit werk en woning. Eigenwoningforfait en hypotheekrenteaftrek worden hier niet berekend maar via je inkomstenbelasting aangifte." />
+            </div>
+            <span className="font-mono tabular-nums text-[var(--ink-3)] text-[11px]">
+              via IB-aangifte
+            </span>
+          </div>
+
+          {/* Box 2 */}
+          <div className="flex items-center justify-between text-xs py-1.5">
+            <div className="flex items-center gap-2">
+              <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-teal-400" />
+              <span className={`${hasBox2 ? 'text-[var(--ink)]' : 'text-[var(--ink-3)]'}`}>Box 2</span>
+              <span className="text-[10px] text-[var(--ink-4)]">aanmerkelijk belang</span>
+            </div>
+            <div className="flex items-center gap-3">
+              {hasBox2 ? (
+                <>
+                  <span className="font-mono tabular-nums text-[var(--ink)] font-medium">
+                    {formatCurrency(box2Tax)}
+                  </span>
+                  <span className="text-[10px] text-[var(--ink-3)]">{box2FreedomDays} dgn</span>
+                </>
+              ) : (
+                <span className="font-mono tabular-nums text-[var(--ink-3)] text-[11px]">
+                  n.v.t.
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Box 3 */}
+          <div className="flex items-center justify-between text-xs py-1.5">
+            <div className="flex items-center gap-2">
+              <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-kern-400" />
+              <span className="text-[var(--ink)]">Box 3</span>
+              <span className="text-[10px] text-[var(--ink-4)]">vermogensrendement</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="font-mono tabular-nums text-[var(--ink)] font-medium">
+                {formatCurrency(box3Tax)}
+              </span>
+              <span className="text-[10px] text-[var(--ink-3)]">{box3FreedomDays} dgn</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   )
 }
 
