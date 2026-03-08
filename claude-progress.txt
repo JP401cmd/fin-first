@@ -11596,3 +11596,30 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#623, #624, #540)
 - Zero TypeScript errors in all changed files
 - Could not verify via browser (Supabase auth rate limiting)
+
+## Session 2026-03-08 - Features #545, #570, #628
+
+### Feature #545: Partner ziet toegewezen acties in eigen De Wil overzicht - PASSING
+- ActionBoard separates own vs partner-assigned actions (isPartnerAssigned helper)
+- New "Van je partner" section with Users icon, wil-50/40 bg, wil-200 border
+- Partner-assigned actions: wil-50/30 bg, "Toegewezen door [naam]" badge (wil-100)
+- Completed partner-assigned actions in collapsible sub-section
+- Will page enriches actions with assigner profile names via profiles query
+- PATCH endpoint notifies assigner when assigned action completed (notifications_history)
+- Commit: bf54a4d
+
+### Feature #570: Studieschuld impact op huishouden FIRE - PASSING
+- student_loan type already existed with subtypes and ownership toggle
+- Fixed: household FIRE endpoint now fetches partner_split_pct per debt
+- Per-debt split override correctly used in per-partner FIRE calculations
+- Commit: f04fcdb
+
+### Feature #628: Box 2 classificatie voor deelneming in classifyAsset - PASSING
+- classifyAsset() already had deelneming case returning null + Box 2 exclusion reason
+- Updated belasting page label: "Uitgesloten (Box 1)" to "Uitgesloten (Box 1/2)"
+- Classification list shows "Uitgesloten (Box 2)" for deelneming assets
+- Commit: 3d9e57c
+
+### Current Status
+- 3 features completed this session (#545, #570, #628)
+- Zero TypeScript errors in changed files
