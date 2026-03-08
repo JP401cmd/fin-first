@@ -10,6 +10,7 @@ import { DISCOVER_ITEMS, getVisitedFeaturesLocal, markFeatureVisitedLocal, type 
 import { FEATURES, DEFAULT_MATRIX, PHASES, levelToPhaseId } from '@/lib/feature-phases'
 import ConceptFlipCards from '@/components/app/concept-flip-cards'
 import { OntdekkenSection } from '@/components/app/ontdekken-section'
+import { GuideProgressBar } from '@/components/app/guide-progress-bar'
 import GuideFaq from '@/components/app/guide-faq'
 import GuideProTips from '@/components/app/guide-pro-tips'
 
@@ -269,6 +270,9 @@ export default function GidsPage() {
           </div>
         </div>
       </div>
+
+      {/* Voortgangsbalk */}
+      <GuideProgressBar />
 
       {/* Filosofie */}
       <div className="mb-6 rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4">
