@@ -11623,3 +11623,42 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 3 features completed this session (#545, #570, #628)
 - Zero TypeScript errors in changed files
+
+## Session 2026-03-08 - Features #582, #588, #589
+
+### Feature #582: Aanvullend pensioen volledig formulier - PASSING
+- Catalog entry already existed with all required fields (brutoBedrag, ingangLeeftijd, pensioenType, isGeindexeerd, uitkeringsduur)
+- Updated default age from 68 to 67 (AOW-leeftijd) per feature spec
+- Split "Lijfrente / banksparen" into separate options: Lijfrente + Banksparen
+- Updated PensionMetadata type to include 'banksparen' option
+- Reference text (€675/mnd average NL pension) already present
+- Simulation correctly applies brutoBedrag from ingangLeeftijd
+- Commit: 3f23249
+
+### Feature #588: Vervroegd pensioen AOW-gat berekening en visualisatie - PASSING
+- Updated early_retirement default pensioenLeeftijd from 60 to 62
+- Added vroegpensioenUitkering and vroegpensioenVanafLeeftijd fields to catalog
+- Form initialization: auto-sets age from pensioenLeeftijd, calculates AOW gap
+- AOW-gap visualization: shows gap in years/months, estimated bridging costs
+- Two-phase cost calculation: phase 1 (no vroegpensioen) and phase 2 (with vroegpensioen)
+- Warning when AOW gap > 5 years (red) or bridging costs > 50% of net worth (amber)
+- Auto-update when pensioenLeeftijd changes (recalculates gap and duration)
+- Save handler: sets income loss, duration = AOW gap months
+- Commit: fbe3b4d
+
+### Feature #589: Part-time werken uren-gebaseerde berekening met pensioenimpact - PASSING
+- Added nettoInkomen (3000 default) and isPermanent toggle to catalog fields
+- Updated PartTimeMetadata type with nettoInkomen and isPermanent
+- Form initialization: auto-calculates income loss from hours ratio
+- Auto-update: recalculates when huidigUren, nieuwUren, or nettoInkomen changes
+- isPermanent toggle: switches between continuous (permanent) and period (tijdelijk, 60 months default)
+- Income visualization: shows current/new hours, percentage, and income loss
+- Pension franchise warning: explains disproportional pension impact (~1.65x multiplier)
+- Warning disappears when behoudtPensioen toggle is enabled
+- Save handler: monthly_income_change = -(nettoInkomen × reduction ratio)
+- Commit: 08e10e0
+
+### Current Status
+- 3 features completed this session (#582, #588, #589)
+- Zero TypeScript errors
+- Could not verify via browser due to Supabase auth rate limiting
