@@ -1,3 +1,33 @@
+## Session 2026-03-08 - Features #531, #532, #544
+
+### Feature #531: Vrijheidstijd herberekent bij perspectief-wissel - PASSING
+- Added partnerOverrides to DashboardData type and dashboard server code
+- Updated netto-vermogen-widget for personal/household/partner views with badges and labels
+- Core page: partner perspective with partner-specific freedom time, net worth, and asset/debt breakdown
+- Horizon page: unified perspectiveHero for household AND partner FIRE data (age, target, countdown, progress)
+- All mock data objects updated (test pages, daishboard, mock-dashboard-data.ts)
+- Zero TypeScript errors
+- Commit: fd0e8d3
+
+### Feature #532: Huishouden netto vermogen met vrijheidsjaren op alle modules - PASSING
+- Already fully implemented by #531: Dashboard (netto-vermogen widget), Core (hero), Horizon (perspectiveHero)
+- All module overview pages use consistent household data from household_partner_totals RPC
+- Freedom time recalculates immediately on perspective switch via React state
+
+### Feature #544: Actie toewijzen aan partner in De Wil - PASSING
+- Migration: added assigned_to/assigned_by UUID columns to actions table with index + updated RLS policies
+- Created POST /api/ai/actions/[id]/assign endpoint with household membership validation
+- Updated PATCH /api/ai/actions/[id] to allow assigned partners to update/complete actions
+- ActionCard: UserPlus assign button + UserCheck badge with partner name + "Toegewezen door [name]" label
+- ActionBoard: handleAssign function, passes partnerInfo to all ActionCards
+- Will page: fetches partner info from household_members + profiles, passes to ActionBoard
+- Zero TypeScript errors
+- Commit: 7747d29
+
+### Current Status
+- 3 features completed this session (#531, #532, #544)
+- 530+ features passing
+
 ## Session 2026-03-08 - Features #567, #568, #612
 
 ### Feature #567: Box 3 berekening per partner en gecombineerd - PASSING
