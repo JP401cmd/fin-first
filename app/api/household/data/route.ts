@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { computePerspectiveNetWorth, computeSharePct, type SplitMode } from '@/lib/household-data'
+import {
+  computePerspectiveNetWorth,
+  computeSharePct,
+  normalisePrivacySettings,
+  applyPrivacyFilter,
+  type SplitMode,
+  type PrivacySettings,
+} from '@/lib/household-data'
 
 /**
  * GET /api/household/data?perspective=personal|household
@@ -8,6 +15,11 @@ import { computePerspectiveNetWorth, computeSharePct, type SplitMode } from '@/l
  * Returns financial data from the user's perspective:
  * - personal: user's own items + their share of shared items
  * - household: all items (personal from both partners + shared)
+ *
+ * When perspective=household, partner's privacy settings are respected:
+ * - full: all individual items visible
+ * - totals: partner's personal items aggregated into a single total
+ * - hidden: partner's personal items removed entirely
  *
  * Includes cost splitting calculation and net worth breakdown.
  */
@@ -21,13 +33,32 @@ export async function GET(request: NextRequest) {
 
   const perspective = (request.nextUrl.searchParams.get('perspective') ?? 'personal') as 'personal' | 'household'
 
-  // Fetch household info
+  // Fetch household info (including privacy_settings)
   const { data: members } = await supabase
     .from('household_members')
-    .select('user_id, role')
+    .select('user_id, role, privacy_settings')
 
   const hasHousehold = members && members.length > 0
-  const partnerId = members?.find(m => m.user_id !== user.id)?.user_id
+  const partnerMember = members?.find(m => m.user_id !== user.id)
+  const partnerId = partnerMember?.user_id
+
+  // Get partner's privacy settings (what the partner allows us to see)
+  let partnerPrivacy: PrivacySettings | null = null
+  if (partnerId && perspective === 'household') {
+    // First try household_members.privacy_settings column
+    const rawPrivacy = partnerMember?.privacy_settings as Record<string, string> | null
+    if (rawPrivacy) {
+      partnerPrivacy = normalisePrivacySettings(rawPrivacy)
+    } else {
+      // Fallback: try app_settings
+      const { data: appSetting } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', `household_privacy:${partnerId}`)
+        .single()
+      partnerPrivacy = normalisePrivacySettings(appSetting?.value ?? null)
+    }
+  }
 
   // Fetch household settings
   let splitMode: SplitMode = 'equal'
@@ -59,12 +90,10 @@ export async function GET(request: NextRequest) {
   }
 
   // Calculate share percentage
-  // For income_ratio mode, we'd need income data from budgets
   let myIncome = 0
   let partnerIncome = 0
 
   if (splitMode === 'income_ratio') {
-    // Try to get income from income budgets
     const { data: incomeBudgets } = await supabase
       .from('budgets')
       .select('user_id, default_limit')
@@ -89,7 +118,7 @@ export async function GET(request: NextRequest) {
     partnerIncome,
   )
 
-  // Fetch assets and debts (RLS filters to user's own + household shared)
+  // Fetch assets, debts, and budgets (RLS filters to user's own + household shared)
   const [assetsRes, debtsRes, budgetsRes] = await Promise.all([
     supabase.from('assets').select('id, name, asset_type, current_value, ownership, user_id, is_active, household_id').eq('is_active', true),
     supabase.from('debts').select('id, name, debt_type, current_balance, ownership, user_id, is_active, household_id').eq('is_active', true),
@@ -100,22 +129,101 @@ export async function GET(request: NextRequest) {
   const debts = debtsRes.data ?? []
   const budgets = budgetsRes.data ?? []
 
+  // Separate items by ownership and user
+  const myPersonalAssets = assets.filter(a => a.ownership === 'personal' && a.user_id === user.id)
+  const partnerPersonalAssets = assets.filter(a => a.ownership === 'personal' && a.user_id === partnerId)
+  const sharedAssets = assets.filter(a => a.ownership === 'shared')
+
+  const myPersonalDebts = debts.filter(d => d.ownership === 'personal' && d.user_id === user.id)
+  const partnerPersonalDebts = debts.filter(d => d.ownership === 'personal' && d.user_id === partnerId)
+  const sharedDebts = debts.filter(d => d.ownership === 'shared')
+
+  const myPersonalBudgets = budgets.filter(b => b.ownership === 'personal' && b.user_id === user.id)
+  const partnerPersonalBudgets = budgets.filter(b => b.ownership === 'personal' && b.user_id === partnerId)
+  const sharedBudgets = budgets.filter(b => b.ownership === 'shared')
+
+  // Apply privacy filtering for household perspective
+  let visiblePartnerAssets = partnerPersonalAssets
+  let visiblePartnerDebts = partnerPersonalDebts
+  let visiblePartnerBudgets = partnerPersonalBudgets
+  let privacyApplied: Record<string, { level: string; aggregated: boolean }> = {}
+
+  if (perspective === 'household' && partnerPrivacy) {
+    // Assets privacy
+    const assetResult = applyPrivacyFilter(
+      partnerPersonalAssets,
+      partnerPrivacy.assets,
+      'Partner vermogen (totaal)',
+      'current_value',
+    )
+    visiblePartnerAssets = assetResult.items
+    privacyApplied.assets = {
+      level: partnerPrivacy.assets,
+      aggregated: assetResult.isAggregated,
+    }
+
+    // Debts privacy
+    const debtResult = applyPrivacyFilter(
+      partnerPersonalDebts,
+      partnerPrivacy.debts,
+      'Partner schulden (totaal)',
+      'current_balance',
+    )
+    visiblePartnerDebts = debtResult.items
+    privacyApplied.debts = {
+      level: partnerPrivacy.debts,
+      aggregated: debtResult.isAggregated,
+    }
+
+    // Budgets privacy
+    const budgetResult = applyPrivacyFilter(
+      partnerPersonalBudgets,
+      partnerPrivacy.budgets,
+      'Partner budget (totaal)',
+      'default_limit',
+    )
+    visiblePartnerBudgets = budgetResult.items
+    privacyApplied.budgets = {
+      level: partnerPrivacy.budgets,
+      aggregated: budgetResult.isAggregated,
+    }
+  }
+
+  // Build the response based on perspective
+  let responseAssets, responseDebts, responseBudgets
+
+  if (perspective === 'household') {
+    responseAssets = [...myPersonalAssets, ...visiblePartnerAssets, ...sharedAssets]
+    responseDebts = [...myPersonalDebts, ...visiblePartnerDebts, ...sharedDebts]
+    responseBudgets = [...myPersonalBudgets, ...visiblePartnerBudgets, ...sharedBudgets]
+  } else {
+    responseAssets = [...myPersonalAssets, ...sharedAssets]
+    responseDebts = [...myPersonalDebts, ...sharedDebts]
+    responseBudgets = [...myPersonalBudgets, ...sharedBudgets]
+  }
+
   // Compute perspective-aware net worth
+  // For net worth computation, use the privacy-filtered items to get correct totals
+  const netWorthAssets = responseAssets.map(a => ({
+    current_value: a.current_value,
+    ownership: (a.ownership ?? 'personal') as 'personal' | 'shared',
+    user_id: a.user_id,
+    is_active: a.is_active,
+  }))
+  const netWorthDebts = responseDebts.map(d => ({
+    current_balance: d.current_balance,
+    ownership: (d.ownership ?? 'personal') as 'personal' | 'shared',
+    user_id: d.user_id,
+    is_active: d.is_active,
+  }))
+
   const netWorthData = computePerspectiveNetWorth(
-    assets.map(a => ({ current_value: a.current_value, ownership: a.ownership ?? 'personal', user_id: a.user_id, is_active: a.is_active })),
-    debts.map(d => ({ current_balance: d.current_balance, ownership: d.ownership ?? 'personal', user_id: d.user_id, is_active: d.is_active })),
+    netWorthAssets,
+    netWorthDebts,
     perspective,
     mySharePct,
     user.id,
   )
-
-  // Separate assets/debts/budgets by ownership for the response
-  const personalAssets = assets.filter(a => a.ownership === 'personal' && a.user_id === user.id)
-  const sharedAssets = assets.filter(a => a.ownership === 'shared')
-  const personalDebts = debts.filter(d => d.ownership === 'personal' && d.user_id === user.id)
-  const sharedDebts = debts.filter(d => d.ownership === 'shared')
-  const personalBudgets = budgets.filter(b => b.ownership === 'personal' && b.user_id === user.id)
-  const sharedBudgets = budgets.filter(b => b.ownership === 'shared')
 
   return NextResponse.json({
     perspective,
@@ -127,15 +235,17 @@ export async function GET(request: NextRequest) {
     partnerIncome,
     netWorth: netWorthData,
     counts: {
-      personalAssets: personalAssets.length,
+      personalAssets: myPersonalAssets.length,
       sharedAssets: sharedAssets.length,
-      personalDebts: personalDebts.length,
+      personalDebts: myPersonalDebts.length,
       sharedDebts: sharedDebts.length,
-      personalBudgets: personalBudgets.length,
+      personalBudgets: myPersonalBudgets.length,
       sharedBudgets: sharedBudgets.length,
     },
-    assets: perspective === 'household' ? assets : [...personalAssets, ...sharedAssets],
-    debts: perspective === 'household' ? debts : [...personalDebts, ...sharedDebts],
-    budgets: perspective === 'household' ? budgets : [...personalBudgets, ...sharedBudgets],
+    assets: responseAssets,
+    debts: responseDebts,
+    budgets: responseBudgets,
+    // Privacy metadata — allows the UI to show "totalen" badges or "verborgen" notices
+    ...(perspective === 'household' && partnerPrivacy ? { privacyApplied } : {}),
   })
 }

@@ -184,3 +184,110 @@ export function computePerspectiveNetWorth(
 export function perspectiveLabel(perspective: 'personal' | 'household'): string {
   return perspective === 'household' ? 'Huishouden' : 'Persoonlijk'
 }
+
+// ── Household Privacy ────────────────────────────────────────────────────
+
+export type PrivacyLevel = 'full' | 'totals' | 'hidden'
+
+export interface PrivacySettings {
+  assets: PrivacyLevel
+  debts: PrivacyLevel
+  budgets: PrivacyLevel
+  transactions: PrivacyLevel
+  income: PrivacyLevel
+}
+
+export const DEFAULT_PRIVACY_SETTINGS: PrivacySettings = {
+  assets: 'totals',
+  debts: 'totals',
+  budgets: 'totals',
+  transactions: 'totals',
+  income: 'totals',
+}
+
+// Map Dutch keys from UI to English DB keys
+const DUTCH_TO_ENGLISH: Record<string, keyof PrivacySettings> = {
+  vermogen: 'assets',
+  schulden: 'debts',
+  budgetten: 'budgets',
+  transacties: 'transactions',
+  inkomen: 'income',
+}
+const DUTCH_LEVELS: Record<string, PrivacyLevel> = {
+  volledig: 'full',
+  totalen: 'totals',
+  verborgen: 'hidden',
+}
+
+/**
+ * Normalise privacy settings from either Dutch or English format to English.
+ */
+export function normalisePrivacySettings(raw: Record<string, string> | null | undefined): PrivacySettings {
+  if (!raw) return { ...DEFAULT_PRIVACY_SETTINGS }
+
+  const result = { ...DEFAULT_PRIVACY_SETTINGS }
+  for (const [k, v] of Object.entries(raw)) {
+    // English key
+    if (k in result) {
+      const level = (DUTCH_LEVELS[v] ?? v) as PrivacyLevel
+      if (['full', 'totals', 'hidden'].includes(level)) {
+        result[k as keyof PrivacySettings] = level
+      }
+    }
+    // Dutch key
+    const enKey = DUTCH_TO_ENGLISH[k]
+    if (enKey) {
+      const level = (DUTCH_LEVELS[v] ?? v) as PrivacyLevel
+      if (['full', 'totals', 'hidden'].includes(level)) {
+        result[enKey] = level
+      }
+    }
+  }
+  return result
+}
+
+/**
+ * Apply privacy filtering to a partner's items based on their privacy settings.
+ *
+ * - 'full': all individual items returned as-is
+ * - 'totals': items replaced with a single aggregated summary item
+ * - 'hidden': items removed entirely (empty array)
+ *
+ * @param items Partner's personal items
+ * @param privacyLevel The privacy level the partner has set for this category
+ * @param aggregateLabel Label for the aggregated total item (e.g., "Partner's vermogen")
+ * @param valueKey The key containing the numeric value (e.g., 'current_value' or 'current_balance')
+ */
+export function applyPrivacyFilter<T extends Record<string, unknown>>(
+  items: T[],
+  privacyLevel: PrivacyLevel,
+  aggregateLabel: string,
+  valueKey: string,
+): { items: T[]; aggregatedTotal: number | null; isAggregated: boolean } {
+  if (privacyLevel === 'full') {
+    return { items, aggregatedTotal: null, isAggregated: false }
+  }
+
+  if (privacyLevel === 'hidden') {
+    return { items: [], aggregatedTotal: null, isAggregated: false }
+  }
+
+  // 'totals' — aggregate into a single summary
+  const total = items.reduce((sum, item) => sum + (Number(item[valueKey]) || 0), 0)
+
+  if (items.length === 0) {
+    return { items: [], aggregatedTotal: 0, isAggregated: true }
+  }
+
+  // Create a single aggregated item based on the first item's structure
+  const aggregated = {
+    ...items[0],
+    id: `aggregated_partner`,
+    name: aggregateLabel,
+    [valueKey]: total,
+    _aggregated: true,
+    _aggregatedCount: items.length,
+  } as T
+
+  return { items: [aggregated], aggregatedTotal: total, isAggregated: true }
+}
