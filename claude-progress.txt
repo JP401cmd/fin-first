@@ -11070,3 +11070,46 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#529, #569, #604)
 - Zero TypeScript errors
 - Could not verify via browser due to email rate limiting on signup
+
+## Session 2026-03-08 - Features #625, #641, #626
+
+### Feature #625: Asset type 'deelneming' toegevoegd aan ASSET_TYPES - PASSING
+- Added 'deelneming' to AssetType union type
+- Label: 'Deelneming / Aanmerkelijk belang'
+- Icon: Building2 (already in budget-shared iconMap)
+- Color: #0d9488 (teal)
+- Subtypes: holding_bv, familie_bv, startup, overig_belang with Dutch labels
+- TYPICAL_RETURNS: 0 (intrinsic value, manual valuation)
+- ASSET_SUBTYPE_DEFAULTS: all subtypes risk_profile 'hoog', is_liquid false
+- Updated projectPortfolio byType initializer
+- Also fixed levensverzekering entries added by parallel agent
+- Zero TypeScript errors
+- Commit: 129af9c
+
+### Feature #641: Box 2 berekeningsengine in lib/box2-data.ts - PASSING
+- Created lib/box2-data.ts with complete Box 2 tax calculation engine
+- Box2Params: tariefLaag 0.245, tariefHoog 0.33, grens 67804 (single), 135608 (partner)
+- Box2Input: deelnemingen array with name, annual_dividend, disposal_gain
+- Box2Result: totalIncome, taxLow, taxHigh, totalTax, effectiveRate, perDeelneming[], freedomDays
+- calculateBox2: sums all dividends + disposal gains, applies bracket tax
+- Verified: 50k -> 12250 (24.5%), 100k -> 27236.66 (24.5% + 33%), partner doubles bracket
+- Exports: BOX2_PARAMS, BOX2_TOOLTIPS, Box2* types, calculateBox2
+- Zero TypeScript errors
+- Commit: 22f4ca7
+
+### Feature #626: Deelneming formuliervelden in MiniAssetForm - PASSING
+- ASSET_TYPE_FIELDS for deelneming: subtype, institution, kvk_number, ownership_percentage, annual_dividend, risk_profile
+- Added kvk_number, ownership_percentage, annual_dividend to AssetEntry type + EMPTY defaults
+- Institution field shown with label 'Naam vennootschap' for deelneming
+- Current value labeled 'Intrinsieke waarde' for deelneming
+- Belang (%) field with % suffix, 0-100 range
+- Jaarlijks dividend field with EUR prefix
+- KvK-nummer text field
+- All fields reset on type change
+- Zero TypeScript errors
+- Commit: a2292dd
+
+### Current Status
+- 3 features completed this session (#625, #641, #626)
+- Zero TypeScript errors
+- Could not login to browser for UI testing (Supabase rate limiting)
