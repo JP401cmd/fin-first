@@ -6,6 +6,7 @@ import type { Action } from '@/lib/recommendation-data'
 import {
   Calendar, Globe, Baby, Hammer, GraduationCap, Briefcase,
   Clock, Sunset, Home, Heart, HeartHandshake, HeartCrack, Truck, Car, Gift, Zap, HandCoins,
+  Landmark, PiggyBank, UserX,
 } from 'lucide-react'
 
 export const EVENT_ICONS: Record<string, React.ReactNode> = {
@@ -27,6 +28,9 @@ export const EVENT_ICONS: Record<string, React.ReactNode> = {
   Zap: <Zap className="h-4 w-4" />,
   HeartHandshake: <HeartHandshake className="h-4 w-4" />,
   HandCoins: <HandCoins className="h-4 w-4" />,
+  Landmark: <Landmark className="h-4 w-4" />,
+  PiggyBank: <PiggyBank className="h-4 w-4" />,
+  UserX: <UserX className="h-4 w-4" />,
 }
 
 // Logarithmic position: maps months-from-now to 0..1 range

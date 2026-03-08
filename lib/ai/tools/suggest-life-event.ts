@@ -13,7 +13,7 @@ export const suggestLifeEventTool = tool({
     'Het event wordt getoond als een klikbare kaart. De gebruiker kan het dan toevoegen aan de simulatie.',
   inputSchema: z.object({
     event_type: z.string().describe(
-      'Type uit LIFE_EVENT_CATALOG: sabbatical, world_trip, children, renovation, study, career_change, part_time, early_retirement, house_purchase, wedding, move, car_purchase, inheritance, side_hustle, overlijden_partner, custom'
+      'Type uit LIFE_EVENT_CATALOG: sabbatical, world_trip, children, renovation, study, career_change, part_time, early_retirement, house_purchase, house_sale, wedding, move, car_purchase, inheritance, side_hustle, werkloosheid, schenking, overlijden_partner, scheiding, custom'
     ),
     name: z.string().describe('Beschrijvende naam voor het event (bijv. "Eerste kind", "Verbouwing keuken")'),
     target_age: z.number().nullable().describe('Leeftijd waarop het event plaatsvindt'),

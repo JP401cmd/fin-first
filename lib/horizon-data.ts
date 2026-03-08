@@ -307,6 +307,19 @@ export interface ScheidingMetadata {
   extraWoonlasten?: number
 }
 
+export interface WerkloosheidMetadata {
+  huidigNetto?: number
+  wwDuur?: number
+  transitievergoeding?: number
+  zoektijd?: number
+}
+
+export interface SchenkingMetadata {
+  relatieOntvanger?: 'kind' | 'kleinkind' | 'overig'
+  eenmaligOfJaarlijks?: 'eenmalig' | 'jaarlijks'
+  doelBestemming?: 'vrij' | 'studie' | 'woning' | 'onderneming'
+}
+
 /** Union of all typed metadata interfaces per event_type key. */
 export type LifeEventMetadataMap = {
   children: ChildrenMetadata
@@ -327,6 +340,8 @@ export type LifeEventMetadataMap = {
   move: MoveMetadata
   side_hustle: SideHustleMetadata
   scheiding: ScheidingMetadata
+  werkloosheid: WerkloosheidMetadata
+  schenking: SchenkingMetadata
   custom: Record<string, unknown>
 }
 
@@ -524,7 +539,7 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   study: {
     label: 'Studie',
     icon: 'GraduationCap',
-    group: 'werk',
+    group: 'vrije_tijd',
     impactRange: '€5K–€30K totaal',
     defaultCost: 8000,
     defaultMonthlyCost: 0,
@@ -676,7 +691,7 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   car_purchase: {
     label: 'Auto kopen',
     icon: 'Car',
-    group: 'vrije_tijd',
+    group: 'vermogen',
     impactRange: '€15K–€50K + €350/mnd',
     defaultCost: 20000,
     defaultMonthlyCost: 350,
@@ -701,7 +716,7 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   inheritance: {
     label: 'Erfenis ontvangen',
     icon: 'Gift',
-    group: 'inkomen',
+    group: 'vermogen',
     impactRange: '€10K–€500K+ ontvangst',
     defaultCost: -50000,
     defaultMonthlyCost: 0,
@@ -722,7 +737,7 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   side_hustle: {
     label: 'Bijverdienste starten',
     icon: 'Zap',
-    group: 'inkomen',
+    group: 'werk',
     impactRange: '+€300–€1.500/mnd extra',
     defaultCost: 1000,
     defaultMonthlyCost: 0,
@@ -745,7 +760,7 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   aow: {
     label: 'AOW',
     icon: 'Landmark',
-    group: 'inkomen',
+    group: 'pensioen',
     impactRange: '+€950–€1.380/mnd bruto',
     defaultCost: 0,
     defaultMonthlyCost: 0,
@@ -765,7 +780,7 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   pension: {
     label: 'Aanvullend pensioen',
     icon: 'PiggyBank',
-    group: 'inkomen',
+    group: 'pensioen',
     impactRange: '+€200–€2.000/mnd bruto',
     defaultCost: 0,
     defaultMonthlyCost: 0,
@@ -835,6 +850,58 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
       { key: 'kinderalimentatieBedrag', label: 'Kinderalimentatie bedrag', fieldType: 'number', default: 0, tip: 'Maandbedrag per kind, afhankelijk van inkomen en zorgverdeling. Vul 0 in als er geen kinderen zijn.', suffix: '/mnd' },
       { key: 'kinderalimentatieDuur', label: 'Kinderalimentatie duur', fieldType: 'number', default: 0, tip: 'Tot het kind 21 wordt. Vul het aantal resterende maanden in.', suffix: 'maanden' },
       { key: 'extraWoonlasten', label: 'Extra woonlasten (dubbele huishouding)', fieldType: 'number', default: 500, tip: 'Het verschil met je huidige situatie: extra huur, inrichting, vaste lasten', suffix: '/mnd' },
+    ],
+  },
+  werkloosheid: {
+    label: 'Werkloosheid',
+    icon: 'UserX',
+    group: 'werk',
+    impactRange: '€2.000–€3.500/mnd inkomensverlies',
+    defaultCost: 0,
+    defaultMonthlyCost: 0,
+    defaultMonthlyIncome: -1500,
+    defaultDuration: 12,
+    description: 'Onvrijwillig verlies van baan',
+    tip: 'WW-uitkering: 75% dagloon eerste 2 maanden, daarna 70%. Maximaal 24 maanden (afhankelijk van arbeidsverleden). Max dagloon 2026: ca. €274/dag bruto (UWV).',
+    fields: [
+      { key: 'huidigNetto', label: 'Huidig netto maandinkomen', fieldType: 'number', default: 3000, tip: 'Je netto maandsalaris vóór werkloosheid. WW-uitkering is ca. 70% van je bruto dagloon.' },
+      { key: 'wwDuur', label: 'Verwachte WW-duur', fieldType: 'select', default: 12, options: [
+        { value: 3, label: '3 maanden (basisrecht)' },
+        { value: 6, label: '6 maanden' },
+        { value: 12, label: '12 maanden' },
+        { value: 24, label: '24 maanden (maximaal)' },
+      ], tip: 'Basisrecht: 3 mnd. Per jaar arbeidsverleden +1 mnd. Max 24 mnd bij 38+ jaar arbeidsverleden (UWV).' },
+      { key: 'transitievergoeding', label: 'Transitievergoeding', fieldType: 'number', default: 5000, tip: '1/3 maandsalaris per dienstjaar. Bij 10 jaar en €4.000/mnd bruto: ca. €13.300 bruto.' },
+      { key: 'zoektijd', label: 'Verwachte zoektijd na WW', fieldType: 'number', default: 0, tip: 'Extra maanden zonder inkomen ná WW-periode. Gemiddelde zoektijd 45+: 6–12 maanden.', suffix: 'maanden' },
+    ],
+  },
+  schenking: {
+    label: 'Schenking doen',
+    icon: 'HandCoins',
+    group: 'vermogen',
+    impactRange: '€1K–€200K+ weggeschonken',
+    defaultCost: 10000,
+    defaultMonthlyCost: 0,
+    defaultMonthlyIncome: 0,
+    defaultDuration: 0,
+    description: 'Vermogen schenken aan kinderen of anderen',
+    tip: 'Jaarlijkse schenkingsvrijstelling 2026: ca. €6.633 (kind), €2.658 (overig). Belastingtarief boven vrijstelling: 10–20% (kind) of 30–40% (overig). Schenken verlaagt je Box 3-vermogen.',
+    fields: [
+      { key: 'relatieOntvanger', label: 'Relatie tot ontvanger', fieldType: 'select', default: 'kind', options: [
+        { value: 'kind', label: 'Kind (vrijstelling ~€6.633/jr)' },
+        { value: 'kleinkind', label: 'Kleinkind (vrijstelling ~€2.658/jr)' },
+        { value: 'overig', label: 'Overig (vrijstelling ~€2.658/jr)' },
+      ], tip: 'Vrijstellingsbedragen 2026 (Belastingdienst). Bij hogere bedragen geldt schenkbelasting.' },
+      { key: 'eenmaligOfJaarlijks', label: 'Frequentie', fieldType: 'select', default: 'eenmalig', options: [
+        { value: 'eenmalig', label: 'Eenmalig' },
+        { value: 'jaarlijks', label: 'Jaarlijks (binnen vrijstelling)' },
+      ], tip: 'Jaarlijks schenken binnen de vrijstelling is belastingvrij en verlaagt je Box 3-grondslag structureel.' },
+      { key: 'doelBestemming', label: 'Doel van schenking', fieldType: 'select', default: 'vrij', options: [
+        { value: 'vrij', label: 'Vrij besteedbaar' },
+        { value: 'studie', label: 'Studie' },
+        { value: 'woning', label: 'Woning (jubelton afgeschaft)' },
+        { value: 'onderneming', label: 'Onderneming' },
+      ], tip: 'De jubelton (eenmalige verhoogde vrijstelling voor woning) is afgeschaft per 2024. Andere doelen hebben geen extra fiscaal voordeel.' },
     ],
   },
   custom: {
