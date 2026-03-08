@@ -1,0 +1,124 @@
+'use client'
+
+import { WidgetShell } from './widget-shell'
+import { WidgetEmpty } from './widget-empty'
+import type { WidgetSize } from '@/lib/widget-catalog'
+import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import type { DashboardData } from './widget-renderer'
+import { Users, User } from 'lucide-react'
+import { usePerspective } from '@/components/app/perspective-provider'
+
+interface Props {
+  size: WidgetSize
+  data: DashboardData
+  href?: string
+}
+
+export function HuishoudenVergelijkingWidget({ size, data, href }: Props) {
+  const { perspective, partnerName } = usePerspective()
+
+  const dailyExp = data.monthlyExpenses / 30
+  const ho = data.householdOverrides
+
+  // Only visible in household perspective with overrides
+  if (perspective !== 'household' || !ho) {
+    return (
+      <WidgetShell module="kern" size={size} kicker="Huishouden Vergelijking" href={href}>
+        <WidgetEmpty
+          icon={Users}
+          message="Schakel naar het huishouden-perspectief om de vergelijking te zien."
+        />
+      </WidgetShell>
+    )
+  }
+
+  // Compute per-partner values
+  const myNetWorth = data.netWorth
+  const partnerNetWorth = ho.netWorth - myNetWorth
+
+  const myFreedom = dailyExp > 0 ? calculateFreedomTime(Math.abs(myNetWorth), dailyExp) : null
+  const partnerFreedom = dailyExp > 0 ? calculateFreedomTime(Math.abs(partnerNetWorth), dailyExp) : null
+  const combinedFreedom = dailyExp > 0 ? calculateFreedomTime(Math.abs(ho.netWorth), dailyExp) : null
+
+  const myFreedomStr = myFreedom ? formatFreedomTimeString(myFreedom, 'short') : '—'
+  const partnerFreedomStr = partnerFreedom ? formatFreedomTimeString(partnerFreedom, 'short') : '—'
+  const combinedFreedomStr = combinedFreedom ? formatFreedomTimeString(combinedFreedom, 'short') : '—'
+
+  // Bar widths (relative to combined)
+  const totalAbs = Math.abs(myNetWorth) + Math.abs(partnerNetWorth)
+  const myBarPct = totalAbs > 0 ? (Math.abs(myNetWorth) / totalAbs) * 100 : 50
+  const partnerBarPct = totalAbs > 0 ? (Math.abs(partnerNetWorth) / totalAbs) * 100 : 50
+
+  return (
+    <WidgetShell module="kern" size={size} kicker="Huishouden Vergelijking" href={href}>
+      <div className="space-y-3">
+        {/* Two-column comparison */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Partner 1: Me */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5">
+              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-kern-100">
+                <User className="h-3 w-3 text-kern-600" />
+              </div>
+              <span className="text-[11px] font-medium text-[var(--ink-2)]">Jij</span>
+            </div>
+            <p className="font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
+              {formatCurrency(myNetWorth)}
+            </p>
+            <p className="font-serif italic text-[11px] text-[var(--ink-3)]">
+              ≈ {myFreedomStr}
+            </p>
+          </div>
+
+          {/* Partner 2 */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5">
+              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-wil-100">
+                <User className="h-3 w-3 text-wil-600" />
+              </div>
+              <span className="text-[11px] font-medium text-[var(--ink-2)]">{partnerName ?? 'Partner'}</span>
+            </div>
+            <p className="font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
+              {formatCurrency(partnerNetWorth)}
+            </p>
+            <p className="font-serif italic text-[11px] text-[var(--ink-3)]">
+              ≈ {partnerFreedomStr}
+            </p>
+          </div>
+        </div>
+
+        {/* Comparison bar */}
+        <div className="flex h-2 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+          <div
+            className="h-full bg-kern-400 transition-all duration-500"
+            style={{ width: `${myBarPct}%` }}
+          />
+          <div
+            className="h-full bg-wil-400 transition-all duration-500"
+            style={{ width: `${partnerBarPct}%` }}
+          />
+        </div>
+
+        {/* Combined total */}
+        {size === 'full' && (
+          <div className="border-t border-[var(--border-ed)] pt-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5 text-[var(--ink-3)]" />
+                <span className="text-[11px] text-[var(--ink-3)]">Gecombineerd</span>
+              </div>
+              <div className="text-right">
+                <span className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
+                  {formatCurrency(ho.netWorth)}
+                </span>
+                <span className="ml-1.5 font-serif italic text-[11px] text-[var(--ink-3)]">
+                  ≈ {combinedFreedomStr}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </WidgetShell>
+  )
+}

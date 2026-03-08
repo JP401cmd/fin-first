@@ -33,6 +33,7 @@ import { VolgendeStapWidget } from './volgende-stap-widget'
 import { MaandoverzichtWidget } from './maandoverzicht-widget'
 import { AgendaWidget } from './agenda-widget'
 import { NoodfondsWidget } from './noodfonds-widget'
+import { HuishoudenVergelijkingWidget } from './huishouden-vergelijking-widget'
 import { getWidgetDef, WIDGET_HREFS, WIDGET_FEATURE_MAP } from '@/lib/widget-catalog'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { FireProjection, FireRange, FireCountdown } from '@/lib/horizon-data'
@@ -363,6 +364,8 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
       return <AgendaWidget size={size} data={data} href={href} />
     case 'noodfonds':
       return <NoodfondsWidget size={size} data={data} href={href} />
+    case 'huishouden_vergelijking':
+      return <HuishoudenVergelijkingWidget size={size} data={data} href={href} />
     default:
       return null
   }
