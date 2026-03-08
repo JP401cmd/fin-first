@@ -270,7 +270,7 @@ export function DebtDetailModal({
             const details: { label: string; value: string }[] = []
             if (debt.fixed_rate_end_date) details.push({ label: 'Rentevast tot', value: new Date(debt.fixed_rate_end_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' }) })
             if (debt.credit_limit) details.push({ label: 'Kredietlimiet', value: formatCurrency(Number(debt.credit_limit)) })
-            if (linkedAsset) details.push({ label: 'Gekoppelde woning', value: linkedAsset.name })
+            if (linkedAsset) details.push({ label: debt.debt_type === 'dga_schuld' ? 'Gekoppelde deelneming' : 'Gekoppelde woning', value: linkedAsset.name })
             if (debt.draagkrachtmeting_date) details.push({ label: 'Draagkrachtmeting', value: new Date(debt.draagkrachtmeting_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' }) })
             if (details.length === 0) return null
             return (

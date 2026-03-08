@@ -10,7 +10,7 @@ import { formatCurrency } from '@/lib/format'
 import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
 import { renderMarkdown, findToolInvocation, TOOL_LOADING_STATES, TOOL_OUTPUT_STATES, type MessagePart } from '@/components/app/chat/markdown-helpers'
 import {
-  Send, Loader2, Check, Calendar, Target, Clock,
+  Send, Loader2, Check, Calendar, Target, Clock, Plus,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -34,8 +34,31 @@ type SuggestActionResult = {
   priority_score: number
 }
 
+export interface WhatIfScenarioContext {
+  sliders: {
+    inkomensWijziging: number
+    werkdagenWijziging: number
+    spaarquoteWijziging: number
+    rendementWijziging: number
+    extraInleg: number
+  }
+  baselineFireAge: number | null
+  scenarioFireAge: number | null
+  fireDeltaMonths: number | null
+  activeEvents: Array<{
+    name: string
+    event_type: string
+    target_age: number | null
+    one_time_cost: number
+    monthly_cost_change: number
+    monthly_income_change: number
+    duration_months: number
+  }>
+}
+
 interface WhatIfChatProps {
   onAddEvent: (event: WhatIfEvent) => void
+  scenarioContext?: WhatIfScenarioContext
 }
 
 // ── Life Event Suggestion Card ──────────────────────────────────────────────
@@ -102,18 +125,47 @@ function LifeEventSuggestionCard({
 
 // ── Action Suggestion Card (planner mode) ──────────────────────────────────
 
-function ActionSuggestionCard({ data }: { data: SuggestActionResult }) {
+function ActionSuggestionCard({
+  data,
+  added,
+  loading,
+  onClick,
+}: {
+  data: SuggestActionResult
+  added: boolean
+  loading: boolean
+  onClick: () => void
+}) {
   return (
-    <div className="mt-2 w-full rounded-[var(--r-lg)] border border-wil-200 bg-wil-50/40 text-left">
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={added || loading}
+      className={`mt-2 w-full rounded-[var(--r-lg)] border text-left transition-all ${
+        added
+          ? 'border-emerald-200 bg-emerald-50'
+          : 'border-wil-200 bg-wil-50/40 hover:border-wil-400 hover:shadow-[var(--s0)] active:scale-[0.98]'
+      }`}
+    >
       <div className="px-3 py-2.5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-1.5">
-            <Target className="h-3.5 w-3.5 text-wil-600" />
+            <Target className={`h-3.5 w-3.5 ${added ? 'text-emerald-500' : 'text-wil-600'}`} />
             <span className="text-xs font-semibold text-[var(--ink)]">{data.title}</span>
           </div>
-          <span className="shrink-0 rounded-full bg-wil-100 px-1.5 py-0.5 text-[10px] font-medium text-wil-700">
-            Actie
-          </span>
+          {added ? (
+            <span className="flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-700">
+              <Check className="h-3 w-3" /> Toegevoegd
+            </span>
+          ) : loading ? (
+            <span className="flex items-center gap-0.5 rounded-full bg-wil-100 px-1.5 py-0.5 text-xs font-medium text-wil-700">
+              <Loader2 className="h-3 w-3 animate-spin" /> Toevoegen...
+            </span>
+          ) : (
+            <span className="flex items-center gap-0.5 rounded-full bg-wil-100 px-1.5 py-0.5 text-xs font-medium text-wil-700">
+              <Plus className="h-3 w-3" /> Voeg toe aan De Wil
+            </span>
+          )}
         </div>
         {data.description && (
           <p className="mt-1 text-xs leading-snug text-[var(--ink-3)]">{data.description}</p>
@@ -130,22 +182,34 @@ function ActionSuggestionCard({ data }: { data: SuggestActionResult }) {
           )}
         </div>
       </div>
-    </div>
+    </button>
   )
 }
 
 // ── WhatIfChat ──────────────────────────────────────────────────────────────
 
-export function WhatIfChat({ onAddEvent }: WhatIfChatProps) {
+export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [input, setInput] = useState('')
   const [addedEvents, setAddedEvents] = useState<Set<string>>(new Set())
+  const [addedActions, setAddedActions] = useState<Set<string>>(new Set())
+  const [loadingActions, setLoadingActions] = useState<Set<string>>(new Set())
   const [userHasScrolled, setUserHasScrolled] = useState(false)
 
+  // Serialize scenarioContext to a stable string for memoization
+  const scenarioJSON = useMemo(() => scenarioContext ? JSON.stringify(scenarioContext) : '', [scenarioContext])
+
   const transport = useMemo(
-    () => new DefaultChatTransport({ api: '/api/ai/chat', body: { domain: 'wil', context: 'whatif' } }),
-    [],
+    () => new DefaultChatTransport({
+      api: '/api/ai/chat',
+      body: {
+        domain: 'wil',
+        context: 'whatif',
+        ...(scenarioJSON ? { scenarioContext: JSON.parse(scenarioJSON) } : {}),
+      },
+    }),
+    [scenarioJSON],
   )
 
   const { messages, sendMessage, status } = useChat({
@@ -229,6 +293,40 @@ export function WhatIfChat({ onAddEvent }: WhatIfChatProps) {
     setAddedEvents(prev => new Set(prev).add(toolCallId))
   }, [addedEvents, onAddEvent])
 
+  // Handle adding an action to De Wil from AI suggestion
+  const handleAddAction = useCallback(async (toolCallId: string, data: SuggestActionResult) => {
+    if (addedActions.has(toolCallId) || loadingActions.has(toolCallId)) return
+
+    setLoadingActions(prev => new Set(prev).add(toolCallId))
+
+    try {
+      const res = await fetch('/api/ai/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: data.title,
+          description: data.description,
+          freedom_days_impact: data.freedom_days_impact,
+          euro_impact_monthly: data.euro_impact_monthly,
+          priority_score: data.priority_score,
+          source: 'chat',
+        }),
+      })
+
+      if (res.ok) {
+        setAddedActions(prev => new Set(prev).add(toolCallId))
+      }
+    } catch {
+      // Silently fail — user can retry by clicking again
+    } finally {
+      setLoadingActions(prev => {
+        const next = new Set(prev)
+        next.delete(toolCallId)
+        return next
+      })
+    }
+  }, [addedActions, loadingActions])
+
   function renderAssistantMessage(parts: MessagePart[]) {
     const elements: React.ReactNode[] = []
 
@@ -294,6 +392,9 @@ export function WhatIfChat({ onAddEvent }: WhatIfChatProps) {
             <ActionSuggestionCard
               key={`action-${action.toolCallId}`}
               data={action.output as SuggestActionResult}
+              added={addedActions.has(action.toolCallId)}
+              loading={loadingActions.has(action.toolCallId)}
+              onClick={() => handleAddAction(action.toolCallId, action.output as SuggestActionResult)}
             />
           )
         }

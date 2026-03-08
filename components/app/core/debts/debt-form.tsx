@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X } from 'lucide-react'
+import { X, AlertTriangle, Building2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/components/app/budget-shared'
 import {
@@ -19,11 +19,13 @@ import { OwnershipToggle, useHouseholdStatus, type OwnershipType } from '@/compo
 export function DebtForm({
   debt,
   userAssets,
+  allDebts,
   onClose,
   onSaved,
 }: {
   debt?: Debt
   userAssets: Asset[]
+  allDebts?: Debt[]
   onClose: () => void
   onSaved: () => void
 }) {
@@ -79,6 +81,11 @@ export function DebtForm({
         setHasPaymentPlan(false)
         setTaxYear('')
       }
+      // Default for dga_schuld
+      if (type === 'dga_schuld') {
+        setCreditor('Eigen BV')
+        setLinkedAssetId('')
+      }
     }
   }
 
@@ -122,6 +129,12 @@ export function DebtForm({
     }
     if (monthlyPayment && numMonthlyPayment < 0) {
       setValidationError('Werkelijke betaling mag niet negatief zijn.')
+      return
+    }
+
+    // DGA-schuld requires linked deelneming
+    if (debtType === 'dga_schuld' && !linkedAssetId) {
+      setValidationError('Selecteer de deelneming waaraan deze DGA-schuld gekoppeld is.')
       return
     }
 
@@ -436,17 +449,31 @@ export function DebtForm({
                 )}
                 {visibleFields.includes('linked_asset_id') && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Gekoppelde woning</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+                      {debtType === 'dga_schuld' ? 'Gekoppelde deelneming' : 'Gekoppelde woning'}
+                      {debtType === 'dga_schuld' && <span className="text-red-500 ml-0.5">*</span>}
+                    </label>
                     <select
                       value={linkedAssetId}
                       onChange={(e) => setLinkedAssetId(e.target.value)}
                       className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
                     >
-                      <option value="">-</option>
-                      {userAssets.filter((a) => a.asset_type === 'eigen_huis' || a.asset_type === 'real_estate').map((a) => (
-                        <option key={a.id} value={a.id}>{a.name}</option>
-                      ))}
+                      <option value="">{debtType === 'dga_schuld' ? 'Selecteer deelneming...' : '-'}</option>
+                      {userAssets
+                        .filter((a) =>
+                          debtType === 'dga_schuld'
+                            ? a.asset_type === 'deelneming'
+                            : a.asset_type === 'eigen_huis' || a.asset_type === 'real_estate'
+                        )
+                        .map((a) => (
+                          <option key={a.id} value={a.id}>{a.name}</option>
+                        ))}
                     </select>
+                    {debtType === 'dga_schuld' && userAssets.filter((a) => a.asset_type === 'deelneming').length === 0 && (
+                      <p className="mt-1 text-[10px] text-[var(--ink-3)]">
+                        Voeg eerst een deelneming toe bij <a href="/core/assets" className="underline text-teal-600">Bezittingen</a>.
+                      </p>
+                    )}
                   </div>
                 )}
                 {visibleFields.includes('credit_limit') && (
@@ -524,6 +551,65 @@ export function DebtForm({
               )}
             </div>
           )}
+
+          {/* Wet excessief lenen warning for DGA-schuld */}
+          {debtType === 'dga_schuld' && (() => {
+            const otherDgaTotal = (allDebts ?? [])
+              .filter((d) => d.debt_type === 'dga_schuld' && d.is_active && d.id !== debt?.id)
+              .reduce((sum, d) => sum + Number(d.current_balance), 0)
+            const thisDgaBalance = Number(currentBalance) || 0
+            const totalDga = otherDgaTotal + thisDgaBalance
+            const drempel = 500_000
+            const bovenmatig = totalDga - drempel
+
+            if (totalDga >= drempel) {
+              return (
+                <div className="rounded-[var(--r)] border border-red-300 bg-red-50 p-3 space-y-1">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-red-700">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    Wet excessief lenen drempel overschreden
+                  </div>
+                  <p className="text-xs text-red-600">
+                    Totaal DGA-schulden: {formatCurrency(totalDga)} — bovenmatig deel: {formatCurrency(bovenmatig)}.
+                    Dit bovenmatige deel wordt als fictief regulier voordeel belast in Box 2.
+                  </p>
+                  <a
+                    href="https://www.belastingdienst.nl/wps/wcm/connect/nl/box-2/content/wet-excessief-lenen"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block text-[11px] text-red-600 underline hover:text-red-800"
+                  >
+                    Meer over Wet excessief lenen →
+                  </a>
+                </div>
+              )
+            }
+
+            if (totalDga >= 400_000) {
+              return (
+                <div className="rounded-[var(--r)] border border-orange-300 bg-orange-50 p-3 space-y-1">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-orange-700">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    Nadert Wet excessief lenen drempel
+                  </div>
+                  <p className="text-xs text-orange-600">
+                    Totaal DGA-schulden: {formatCurrency(totalDga)} (drempel: {formatCurrency(drempel)}).
+                    Houd rekening met Box 2-heffing bij overschrijding.
+                  </p>
+                  <a
+                    href="https://www.belastingdienst.nl/wps/wcm/connect/nl/box-2/content/wet-excessief-lenen"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block text-[11px] text-orange-600 underline hover:text-orange-800"
+                  >
+                    Meer over Wet excessief lenen →
+                  </a>
+                </div>
+              )
+            }
+
+            return null
+          })()}
 
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">

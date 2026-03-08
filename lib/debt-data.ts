@@ -68,6 +68,8 @@ export interface Debt {
   // Belastingschuld fields
   tax_year: number | null
   has_payment_plan: boolean
+  // Familielening fields
+  has_written_agreement: boolean
   // Household fields
   ownership: 'personal' | 'shared'
   household_id: string | null
@@ -174,8 +176,8 @@ export const DEBT_TYPE_FIELDS: Record<DebtType, string[]> = {
   car_loan: [],
   payment_plan: [],
   belastingschuld: ['subtype', 'tax_year', 'has_payment_plan'],
-  familielening: ['subtype'],
-  dga_schuld: ['linked_asset_id'],
+  familielening: ['subtype', 'has_written_agreement'],
+  dga_schuld: ['linked_asset_id', 'repayment_type'],
   other: [],
 }
 

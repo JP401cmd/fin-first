@@ -19,10 +19,25 @@ export async function POST(req: Request) {
     return new Response('Unauthorized', { status: 401 })
   }
 
-  const { messages, domain = 'wil', context: chatContext } = await req.json() as {
+  const { messages, domain = 'wil', context: chatContext, scenarioContext } = await req.json() as {
     messages: UIMessage[]
     domain?: AIDomain
     context?: ChatContext
+    scenarioContext?: {
+      sliders: Record<string, number>
+      baselineFireAge: number | null
+      scenarioFireAge: number | null
+      fireDeltaMonths: number | null
+      activeEvents: Array<{
+        name: string
+        event_type: string
+        target_age: number | null
+        one_time_cost: number
+        monthly_cost_change: number
+        monthly_income_change: number
+        duration_months: number
+      }>
+    }
   }
 
   const validDomains: AIDomain[] = ['kern', 'wil', 'horizon']
@@ -45,6 +60,60 @@ export async function POST(req: Request) {
     if (chatContext === 'whatif') {
       // What-if mode uses a dedicated prompt — skip the DB-backed prompt builder
       systemPrompt = WHATIF_PROMPT
+
+      // Append scenario context if provided
+      if (scenarioContext) {
+        const { sliders, baselineFireAge, scenarioFireAge, fireDeltaMonths, activeEvents } = scenarioContext
+        const lines: string[] = ['\n\n--- HUIDIG SCENARIO ---']
+
+        // Slider overrides
+        const sliderLabels: Record<string, string> = {
+          inkomensWijziging: 'Inkomen wijziging',
+          werkdagenWijziging: 'Werkdagen wijziging',
+          spaarquoteWijziging: 'Spaarquote wijziging',
+          rendementWijziging: 'Rendement wijziging',
+          extraInleg: 'Extra maandelijkse inleg',
+        }
+        const activeSliders = Object.entries(sliders || {}).filter(([, v]) => v !== 0)
+        if (activeSliders.length > 0) {
+          lines.push('Slider-waarden (wijzigingen t.o.v. baseline):')
+          for (const [key, value] of activeSliders) {
+            const label = sliderLabels[key] || key
+            const prefix = value > 0 ? '+' : ''
+            const suffix = key === 'extraInleg' ? ' EUR/mnd' : key.includes('Wijziging') ? '%' : ''
+            lines.push(`  ${label}: ${prefix}${value}${suffix}`)
+          }
+        }
+
+        // FIRE ages
+        if (baselineFireAge != null) lines.push(`Baseline FIRE-leeftijd: ${baselineFireAge} jaar`)
+        if (scenarioFireAge != null) lines.push(`Scenario FIRE-leeftijd: ${scenarioFireAge} jaar`)
+        if (fireDeltaMonths != null) {
+          const sign = fireDeltaMonths > 0 ? '+' : ''
+          const years = Math.abs(fireDeltaMonths) >= 12 ? `${Math.round(Math.abs(fireDeltaMonths) / 12)} jaar` : `${Math.abs(fireDeltaMonths)} maanden`
+          lines.push(`FIRE delta: ${sign}${fireDeltaMonths} maanden (${fireDeltaMonths > 0 ? 'later' : years + ' eerder'})`)
+        }
+
+        // Active events
+        if (activeEvents && activeEvents.length > 0) {
+          lines.push(`\nActieve levensgebeurtenissen (${activeEvents.length}):`)
+          for (const ev of activeEvents) {
+            const parts = [`  - ${ev.name} (${ev.event_type})`]
+            if (ev.target_age != null) parts.push(`leeftijd ${ev.target_age}`)
+            if (ev.one_time_cost !== 0) parts.push(`eenmalig €${Math.abs(ev.one_time_cost)}`)
+            if (ev.monthly_cost_change !== 0) parts.push(`€${ev.monthly_cost_change}/mnd kosten`)
+            if (ev.monthly_income_change !== 0) parts.push(`€${ev.monthly_income_change}/mnd inkomen`)
+            if (ev.duration_months > 0) parts.push(`${ev.duration_months} maanden`)
+            lines.push(parts.join(', '))
+          }
+        } else {
+          lines.push('\nGeen levensgebeurtenissen actief in dit scenario.')
+        }
+
+        lines.push('--- EINDE SCENARIO ---')
+        systemPrompt += lines.join('\n')
+      }
+
       financialContext = await buildContext(supabase)
     } else {
       ;[systemPrompt, financialContext] = await Promise.all([

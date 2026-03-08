@@ -28,7 +28,7 @@ import { WhatIfEventsPanel, type WhatIfEvent } from '@/components/app/horizon/wh
 import { usePerspective } from '@/components/app/perspective-provider'
 import { WhatIfActions } from '@/components/app/horizon/whatif-actions'
 import { WhatIfPresets } from '@/components/app/horizon/whatif-presets'
-import { WhatIfChat } from '@/components/app/horizon/whatif-chat'
+import { WhatIfChat, type WhatIfScenarioContext } from '@/components/app/horizon/whatif-chat'
 import { WhatIfScenarios } from '@/components/app/horizon/whatif-scenarios'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -427,6 +427,32 @@ export default function WhatIfPage() {
     baselineAnnualSavings, whatIfAnnualSavings,
   ])
 
+  // ── Scenario context for WhatIfChat ──────────────────────
+  const chatScenarioContext = useMemo<WhatIfScenarioContext | undefined>(() => {
+    if (!overrides || !baseline) return undefined
+    return {
+      sliders: {
+        inkomensWijziging: Math.round(overrides.monthlyIncome - baseline.monthlyIncome),
+        werkdagenWijziging: Math.round((overrides.workDaysPerWeek - baseline.workDaysPerWeek) * 10) / 10,
+        spaarquoteWijziging: Math.round((overrides.savingsRate - baseline.savingsRate) * 10) / 10,
+        rendementWijziging: Math.round((overrides.expectedReturn - baseline.expectedReturn) * 10) / 10,
+        extraInleg: overrides.extraContribution,
+      },
+      baselineFireAge: baselineFireAge != null ? Math.round(baselineFireAge * 10) / 10 : null,
+      scenarioFireAge: whatIfFireAge != null ? Math.round(whatIfFireAge * 10) / 10 : null,
+      fireDeltaMonths: fireAgeDelta != null ? Math.round(fireAgeDelta * 12) : null,
+      activeEvents: activeEvents.map(ev => ({
+        name: ev.name,
+        event_type: ev.event_type,
+        target_age: ev.target_age ?? null,
+        one_time_cost: Number(ev.one_time_cost) || 0,
+        monthly_cost_change: Number(ev.monthly_cost_change) || 0,
+        monthly_income_change: Number(ev.monthly_income_change) || 0,
+        duration_months: Number(ev.duration_months) || 0,
+      })),
+    }
+  }, [overrides, baseline, baselineFireAge, whatIfFireAge, fireAgeDelta, activeEvents])
+
   // Class for the dimension wrapper — skip own veil when arriving via dream gate
   const dimensionClass = viaDreamgate.current
     ? 'whatif-dimension whatif-dimension--no-veil min-h-screen'
@@ -646,6 +672,7 @@ export default function WhatIfPage() {
             {/* Chat */}
             <WhatIfChat
               onAddEvent={handleAddEvent}
+              scenarioContext={chatScenarioContext}
             />
 
             {/* Footer */}

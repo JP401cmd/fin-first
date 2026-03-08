@@ -603,7 +603,9 @@ export default function DebtsPage() {
                       {debt.subtype && DEBT_SUBTYPE_LABELS[debt.debt_type]?.[debt.subtype]
                         ? ` \u2022 ${DEBT_SUBTYPE_LABELS[debt.debt_type]![debt.subtype]}`
                         : ''}
-                      {debt.creditor ? ` \u2022 ${debt.creditor}` : ''}
+                      {debt.debt_type === 'dga_schuld' && debt.linked_asset_id
+                        ? ` \u2022 ${userAssets.find((a) => a.id === debt.linked_asset_id)?.name ?? 'Deelneming'}`
+                        : debt.creditor ? ` \u2022 ${debt.creditor}` : ''}
                     </p>
                     {(debt.net_worth_inclusion_pct ?? 100) < 100 && (
                       <span className="mt-0.5 inline-block rounded bg-kern-50 border border-kern-200 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-kern-600">
@@ -691,6 +693,7 @@ export default function DebtsPage() {
         <DebtForm
           debt={selectedDebt}
           userAssets={userAssets}
+          allDebts={debts}
           onClose={() => setModalStep('detail')}
           onSaved={() => {
             setModalStep('detail')
@@ -730,6 +733,7 @@ export default function DebtsPage() {
         <DebtForm
           debt={editDebt ?? undefined}
           userAssets={userAssets}
+          allDebts={debts}
           onClose={() => { setShowForm(false); setEditDebt(null) }}
           onSaved={() => {
             setShowForm(false)
