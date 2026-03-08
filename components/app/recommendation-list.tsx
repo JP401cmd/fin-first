@@ -113,14 +113,14 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
     <div className="space-y-6">
       {/* Summary bar */}
       {totalFreedomDays > 0 && (
-        <div className="rounded-[var(--r-lg)] bg-gradient-to-r from-wil-500 to-wil-600 p-4 text-white">
+        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] border-l-3 border-l-wil-500 bg-[var(--paper)] p-4">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-wil-100">Potentieel te winnen</div>
-              <div className="text-2xl font-bold">{Math.round(totalFreedomDays)} vrijheidsdagen/jaar</div>
+              <div className="font-serif text-sm italic text-[var(--ink-3)]">Potentieel te winnen</div>
+              <div className="text-2xl font-bold text-[var(--ink)]"><span className="font-mono tabular-nums">{Math.round(totalFreedomDays)}</span> vrijheidsdagen/jaar</div>
             </div>
-            <div className="text-right text-sm text-wil-100">
-              {pending.length} {pending.length === 1 ? 'voorstel' : 'voorstellen'} open
+            <div className="text-right text-sm text-[var(--ink-3)]">
+              <span className="font-mono tabular-nums">{pending.length}</span> {pending.length === 1 ? 'voorstel' : 'voorstellen'} open
             </div>
           </div>
         </div>
@@ -128,19 +128,24 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
 
       {/* Generate button */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-[var(--ink)]">Voorstellen</h2>
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--ink)]">
+          Voorstellen
+          <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-wil-100 px-1.5 text-xs font-bold text-wil-700 font-mono tabular-nums">
+            {pending.length}
+          </span>
+        </h2>
         <button
           type="button"
           onClick={generateRecommendations}
           disabled={isGenerating}
-          className="inline-flex items-center gap-2 rounded-lg border border-wil-200 px-4 py-2 text-sm font-medium text-wil-600 transition-colors hover:bg-wil-50 disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-wil-200 p-2 sm:px-4 sm:py-2 text-sm font-medium text-wil-600 transition-colors hover:bg-wil-50 disabled:opacity-50"
         >
           {isGenerating ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Sparkles className="h-4 w-4" />
           )}
-          {isGenerating ? 'Analyseren...' : 'Nieuwe suggesties'}
+          <span className="hidden sm:inline">{isGenerating ? 'Analyseren...' : 'Nieuwe suggesties'}</span>
         </button>
       </div>
 
