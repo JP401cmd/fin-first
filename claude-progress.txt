@@ -1,3 +1,33 @@
+## Session 2026-03-08 - Features #631, #632, #633
+
+### Feature #631: Asset type 'levensverzekering' toegevoegd aan ASSET_TYPES - PASSING
+- Added 'levensverzekering' to AssetType union type
+- Label: 'Levensverzekering', Icon: Shield, Color: #7c3aed (purple)
+- Subtypes: kapitaalverzekering, uitvaartverzekering, gemengde_polis, overig_verzekering
+- TYPICAL_RETURNS: 1.5% (conservative)
+- ASSET_TYPE_FIELDS: subtype, risk_profile, is_liquid, expiry_date, beneficiary
+- ASSET_SUBTYPE_DEFAULTS with risk profiles and returns per subtype
+- Updated projectPortfolio byType initialization
+
+### Feature #632: Levensverzekering formuliervelden in MiniAssetForm - PASSING
+- Added expiry_date and beneficiary to AssetEntry and EMPTY
+- Added levensverzekering to ALL_TYPES in MiniAssetForm
+- Custom labels: Afkoopwaarde (current_value), Verzekeraar (institution), Maandelijkse premie (monthly_contribution)
+- Added Einddatum polis (date) and Begunstigde (text) form fields
+- Updated assets page AssetForm with same fields and labels
+- Fixed test-portfolio-projection mock data for new Asset fields
+
+### Feature #633: Database migratie voor levensverzekering-specifieke kolommen - PASSING
+- Created migration 20260308000005_add_asset_levensverzekering_fields.sql
+- ALTER TABLE assets ADD COLUMN expiry_date DATE + beneficiary TEXT
+- COMMENT ON COLUMN for both columns
+- Migration awaits Supabase MCP permission to apply
+
+### Current Status
+- 3 features completed this session (#631, #632, #633)
+- Zero TypeScript errors
+- Commit: 7e0affd
+
 ## Session 2026-03-08 - Features #601, #607, #572
 
 ### Feature #601: Event formulier: verbeterde opmaak met secties en visuele hierarchie - PASSING
