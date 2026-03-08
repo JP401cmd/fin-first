@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { NOTIFICATION_TYPES } from '@/lib/identity-constants'
-import { Lock, GripVertical, ChevronDown, Shield, Eye, EyeOff, Server, FileText, Users, CalendarCheck, HandCoins, BellRing } from 'lucide-react'
+import { Lock, GripVertical, ChevronDown, ChevronRight, Shield, Eye, EyeOff, Server, FileText, Users, CalendarCheck, HandCoins, BellRing, SplitSquareVertical, Bell, UserPlus } from 'lucide-react'
+import Link from 'next/link'
 import {
   DndContext,
   closestCenter,
@@ -233,6 +234,7 @@ export default function InstellingenPage() {
     inkomen: 'totalen',
   }
   const [huishoudenOpen, setHuishoudenOpen] = useState(false)
+  const [huishoudenPrivacySubOpen, setHuishoudenPrivacySubOpen] = useState(false)
   const [hasHousehold, setHasHousehold] = useState(false)
   const [householdPrivacy, setHouseholdPrivacy] = useState<PrivacySettings>(DEFAULT_HOUSEHOLD_PRIVACY)
   const [householdPrivacySaved, setHouseholdPrivacySaved] = useState<PrivacySettings>(DEFAULT_HOUSEHOLD_PRIVACY)
@@ -822,7 +824,7 @@ export default function InstellingenPage() {
           Instellingen
         </h1>
         <p className="mt-1 font-serif italic text-[13px] text-[var(--ink-3)]">
-          Notificaties, widgets, berekeningen, weergave, privacy en gegevensbeheer.
+          Notificaties, widgets, berekeningen, weergave, huishouden en gegevensbeheer.
         </p>
       </div>
 
@@ -908,9 +910,9 @@ export default function InstellingenPage() {
 
                 {/* Partner transacties — only when user has a household */}
                 {hasHousehold && (
-                  <div className="mt-5 rounded-xl border border-[var(--border-ed)] overflow-hidden">
+                  <div id="partner-transacties" className="mt-5 rounded-xl border border-[var(--border-ed)] overflow-hidden scroll-mt-4">
                     <div className="flex items-center gap-3 px-4 py-3 bg-[var(--subtle)] border-b border-[var(--border-ed)]">
-                      <HandCoins className="h-4 w-4 shrink-0 text-teal-600" />
+                      <HandCoins className="h-4 w-4 shrink-0 text-wil-600" />
                       <div>
                         <p className="text-sm font-semibold text-[var(--ink)]">Partner transacties</p>
                         <p className="text-xs text-[var(--ink-3)]">Meldingen over transacties van je partner</p>
@@ -931,19 +933,19 @@ export default function InstellingenPage() {
                             onClick={() => setPartnerNotifMode(opt.mode)}
                             className={`flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
                               partnerNotifMode === opt.mode
-                                ? 'bg-teal-50 border border-teal-300'
+                                ? 'bg-wil-50 border border-wil-300'
                                 : 'border border-[var(--border-ed)] hover:bg-[var(--subtle)]'
                             }`}
                           >
                             <div className={`mt-0.5 h-4 w-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
-                              partnerNotifMode === opt.mode ? 'border-teal-600' : 'border-[var(--border-md)]'
+                              partnerNotifMode === opt.mode ? 'border-wil-600' : 'border-[var(--border-md)]'
                             }`}>
                               {partnerNotifMode === opt.mode && (
-                                <div className="h-2 w-2 rounded-full bg-teal-600" />
+                                <div className="h-2 w-2 rounded-full bg-wil-600" />
                               )}
                             </div>
                             <div>
-                              <p className={`text-sm font-medium ${partnerNotifMode === opt.mode ? 'text-teal-800' : 'text-[var(--ink-2)]'}`}>{opt.label}</p>
+                              <p className={`text-sm font-medium ${partnerNotifMode === opt.mode ? 'text-wil-800' : 'text-[var(--ink-2)]'}`}>{opt.label}</p>
                               <p className="text-xs text-[var(--ink-3)]">{opt.desc}</p>
                             </div>
                           </button>
@@ -964,7 +966,7 @@ export default function InstellingenPage() {
                               step="10"
                               value={partnerNotifThreshold}
                               onChange={e => setPartnerNotifThreshold(e.target.value)}
-                              className="w-28 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 text-sm font-mono tabular-nums text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-teal-400"
+                              className="w-28 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 text-sm font-mono tabular-nums text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-wil-400"
                             />
                             <span className="text-xs text-[var(--ink-3)]">of hoger</span>
                           </div>
@@ -987,11 +989,11 @@ export default function InstellingenPage() {
                                     type="button"
                                     onClick={() => togglePartnerCategory(cat.id)}
                                     className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors ${
-                                      checked ? 'bg-teal-50 border border-teal-200' : 'border border-transparent hover:bg-[var(--paper)]'
+                                      checked ? 'bg-wil-50 border border-wil-200' : 'border border-transparent hover:bg-[var(--paper)]'
                                     }`}
                                   >
                                     <div className={`h-4 w-4 rounded border shrink-0 flex items-center justify-center ${
-                                      checked ? 'bg-teal-600 border-teal-600' : 'border-[var(--border-md)] bg-[var(--paper)]'
+                                      checked ? 'bg-wil-600 border-wil-600' : 'border-[var(--border-md)] bg-[var(--paper)]'
                                     }`}>
                                       {checked && (
                                         <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none">
@@ -999,7 +1001,7 @@ export default function InstellingenPage() {
                                         </svg>
                                       )}
                                     </div>
-                                    <span className={`text-sm ${checked ? 'text-teal-800 font-medium' : 'text-[var(--ink-2)]'}`}>{cat.name}</span>
+                                    <span className={`text-sm ${checked ? 'text-wil-800 font-medium' : 'text-[var(--ink-2)]'}`}>{cat.name}</span>
                                   </button>
                                 )
                               })}
@@ -1015,12 +1017,12 @@ export default function InstellingenPage() {
                         <button
                           onClick={savePartnerNotifPrefs}
                           disabled={partnerNotifSaving || !partnerNotifChanged}
-                          className="rounded-lg bg-teal-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-700 disabled:opacity-50"
+                          className="rounded-lg bg-wil-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-700 disabled:opacity-50"
                         >
                           {partnerNotifSaving ? 'Opslaan...' : 'Opslaan'}
                         </button>
                         {partnerNotifMessage && (
-                          <span className={`text-sm ${partnerNotifMessage.type === 'success' ? 'text-teal-600' : 'text-red-600'}`}>
+                          <span className={`text-sm ${partnerNotifMessage.type === 'success' ? 'text-wil-600' : 'text-red-600'}`}>
                             {partnerNotifMessage.text}
                           </span>
                         )}
@@ -1707,7 +1709,7 @@ export default function InstellingenPage() {
                 aria-checked={aiEnabled}
                 disabled={aiSaving}
                 onClick={() => toggleAiEnabled(!aiEnabled)}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 ${aiEnabled ? 'bg-teal-500' : 'bg-zinc-300'}`}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-wil-500 disabled:opacity-50 ${aiEnabled ? 'bg-wil-500' : 'bg-zinc-300'}`}
               >
                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${aiEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
@@ -1721,30 +1723,30 @@ export default function InstellingenPage() {
             {/* Wat WEL wordt gedeeld */}
             <div className="rounded-xl border border-[var(--border-ed)] p-4">
               <div className="flex items-center gap-2 mb-3">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-50">
-                  <Eye className="h-4 w-4 text-teal-600" />
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-wil-50">
+                  <Eye className="h-4 w-4 text-wil-600" />
                 </div>
                 <h3 className="text-sm font-semibold text-[var(--ink)]">Wat wordt gedeeld</h3>
               </div>
               <ul className="space-y-2 text-sm text-[var(--ink-2)]">
                 <li className="flex items-start gap-2">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-wil-400" />
                   <span>Geaggregeerde bedragen (netto vermogen, totale inkomsten/uitgaven)</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-wil-400" />
                   <span>Percentages en ratio&apos;s (spaarquote, vrijheidspercentage, SWR)</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-wil-400" />
                   <span>Budgetcategorieën en bijbehorende bedragen</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-wil-400" />
                   <span>Leeftijd (niet je geboortedatum)</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-wil-400" />
                   <span>Huishoudtype en temporal balance level</span>
                 </li>
               </ul>
@@ -1789,26 +1791,26 @@ export default function InstellingenPage() {
             {/* Dataverwerking */}
             <div className="rounded-xl border border-[var(--border-ed)] p-4">
               <div className="flex items-center gap-2 mb-3">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-50">
-                  <Server className="h-4 w-4 text-purple-600" />
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-horizon-50">
+                  <Server className="h-4 w-4 text-horizon-600" />
                 </div>
                 <h3 className="text-sm font-semibold text-[var(--ink)]">Hoe je data wordt verwerkt</h3>
               </div>
               <ul className="space-y-2 text-sm text-[var(--ink-2)]">
                 <li className="flex items-start gap-2">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-purple-400" />
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-horizon-400" />
                   <span><strong>Zero-retention:</strong> AI-providers (Anthropic, OpenAI) bewaren je data niet na verwerking</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-purple-400" />
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-horizon-400" />
                   <span><strong>Geen training:</strong> je gegevens worden niet gebruikt om AI-modellen te trainen</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-purple-400" />
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-horizon-400" />
                   <span><strong>Data minimalisatie:</strong> alleen de noodzakelijke context wordt verstuurd via automatische sanitisatie</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-purple-400" />
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-horizon-400" />
                   <span><strong>Versleuteld:</strong> alle communicatie verloopt via HTTPS/TLS</span>
                 </li>
               </ul>
@@ -1816,7 +1818,7 @@ export default function InstellingenPage() {
 
             {/* Shield badge */}
             <div className="flex items-center gap-2 rounded-lg bg-[var(--subtle)] px-4 py-3">
-              <Shield className="h-4 w-4 shrink-0 text-teal-600" />
+              <Shield className="h-4 w-4 shrink-0 text-wil-600" />
               <p className="text-xs text-[var(--ink-3)]">
                 Alle data wordt automatisch gesanitiseerd voordat het naar een AI-provider wordt verstuurd.
               </p>
@@ -1826,7 +1828,7 @@ export default function InstellingenPage() {
             <button
               type="button"
               onClick={() => setPrivacyModalOpen(true)}
-              className="flex items-center gap-2 text-sm font-medium text-teal-600 hover:text-teal-700 transition-colors"
+              className="flex items-center gap-2 text-sm font-medium text-wil-600 hover:text-wil-700 transition-colors"
             >
               <FileText className="h-4 w-4" />
               Volledige privacyverklaring
@@ -1869,7 +1871,7 @@ export default function InstellingenPage() {
         )}
       </section>
 
-      {/* ── G: Huishouden Privacy ──────────────────────────────────── */}
+      {/* ── G: Huishouden ──────────────────────────────────────────── */}
       {hasHousehold && (
         <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
           <button
@@ -1880,105 +1882,184 @@ export default function InstellingenPage() {
             <div>
               <h2 className="label-editorial text-[var(--ink-2)]">Huishouden</h2>
               {!huishoudenOpen && (
-                <p className="mt-0.5 text-xs text-[var(--ink-3)]">Bepaal welke financiële data je partner kan zien</p>
+                <p className="mt-0.5 text-xs text-[var(--ink-3)]">Privacy, verdeling, notificaties en leden</p>
               )}
             </div>
             <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${huishoudenOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {huishoudenOpen && (
-            <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 pb-6 pt-4 space-y-5">
-              <div className="flex items-start gap-3">
-                <Users className="mt-0.5 h-5 w-5 text-[var(--ink-3)] shrink-0" />
-                <p className="text-sm text-[var(--ink-2)] leading-relaxed">
-                  Stel per categorie in welke financiële gegevens je partner kan zien.
-                  Dit geldt alleen voor hoe jouw data wordt getoond aan je partner.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-4 rounded-lg border border-[var(--border-ed)] p-3 bg-[var(--subtle)]">
-                <div className="flex items-center gap-1.5">
-                  <Eye className="h-3.5 w-3.5 text-teal-600" />
-                  <span className="text-xs text-[var(--ink-2)]"><strong>Volledig</strong> — alle details zichtbaar</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Shield className="h-3.5 w-3.5 text-amber-600" />
-                  <span className="text-xs text-[var(--ink-2)]"><strong>Totalen</strong> — alleen totaalbedragen</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <EyeOff className="h-3.5 w-3.5 text-red-500" />
-                  <span className="text-xs text-[var(--ink-2)]"><strong>Verborgen</strong> — volledig afgeschermd</span>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {([
-                  { key: 'vermogen', label: 'Vermogen', description: 'Bezittingen en beleggingen' },
-                  { key: 'schulden', label: 'Schulden', description: 'Leningen en schulden' },
-                  { key: 'budgetten', label: 'Budgetten', description: 'Maandbudgetten en bestedingen' },
-                  { key: 'transacties', label: 'Transacties', description: 'Individuele transacties' },
-                  { key: 'inkomen', label: 'Inkomen', description: 'Salaris en overig inkomen' },
-                ] as const).map(cat => {
-                  const currentLevel = householdPrivacy[cat.key] || 'totalen'
-                  return (
-                    <div key={cat.key} className="rounded-xl border border-[var(--border-ed)] p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <h3 className="text-sm font-semibold text-[var(--ink)]">{cat.label}</h3>
-                          <p className="text-xs text-[var(--ink-3)]">{cat.description}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        {([
-                          { level: 'volledig' as PrivacyLevel, label: 'Volledig', icon: Eye, color: 'teal' },
-                          { level: 'totalen' as PrivacyLevel, label: 'Totalen', icon: Shield, color: 'amber' },
-                          { level: 'verborgen' as PrivacyLevel, label: 'Verborgen', icon: EyeOff, color: 'red' },
-                        ]).map(opt => {
-                          const isActive = currentLevel === opt.level
-                          const Icon = opt.icon
-                          return (
-                            <button
-                              key={opt.level}
-                              type="button"
-                              onClick={() => setHouseholdPrivacy(prev => ({ ...prev, [cat.key]: opt.level }))}
-                              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
-                                isActive
-                                  ? opt.color === 'teal'
-                                    ? 'bg-teal-50 text-teal-700 border border-teal-300'
-                                    : opt.color === 'amber'
-                                    ? 'bg-amber-50 text-amber-700 border border-amber-300'
-                                    : 'bg-red-50 text-red-700 border border-red-300'
-                                  : 'border border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
-                              }`}
-                            >
-                              <Icon className="h-3.5 w-3.5" />
-                              <span className="hidden sm:inline">{opt.label}</span>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div className="flex items-center gap-4 pt-2">
+            <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 pb-6 pt-4 space-y-4">
+              {/* Quick-link cards grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Privacy card — expands inline */}
                 <button
-                  onClick={saveHouseholdPrivacy}
-                  disabled={householdPrivacySaving || JSON.stringify(householdPrivacy) === JSON.stringify(householdPrivacySaved)}
-                  className="rounded-lg bg-teal-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-700 disabled:opacity-50"
+                  type="button"
+                  onClick={() => setHuishoudenPrivacySubOpen(o => !o)}
+                  className={`flex items-center gap-3 rounded-xl border p-4 text-left transition-colors ${
+                    huishoudenPrivacySubOpen
+                      ? 'border-wil-300 bg-wil-50/50'
+                      : 'border-[var(--border-ed)] hover:bg-[var(--subtle)]'
+                  }`}
                 >
-                  {householdPrivacySaving ? 'Opslaan...' : 'Opslaan'}
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-wil-100 text-wil-700">
+                    <Shield className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-[var(--ink)]">Privacy</p>
+                    <p className="text-xs text-[var(--ink-3)] truncate">Wat je partner kan zien</p>
+                  </div>
+                  <ChevronRight className={`h-4 w-4 shrink-0 text-[var(--ink-4)] transition-transform duration-200 ${huishoudenPrivacySubOpen ? 'rotate-90' : ''}`} />
                 </button>
-                {householdPrivacyMessage && (
-                  <p className={`text-sm ${householdPrivacyMessage.type === 'success' ? 'text-teal-600' : 'text-red-600'}`}>
-                    {householdPrivacyMessage.text}
-                  </p>
-                )}
-                {JSON.stringify(householdPrivacy) !== JSON.stringify(householdPrivacySaved) && !householdPrivacyMessage && (
-                  <p className="text-xs text-amber-600">Niet-opgeslagen wijzigingen</p>
-                )}
+
+                {/* Split-modus card — links to profiel */}
+                <Link
+                  href="/identity/profiel#huishouden"
+                  className="flex items-center gap-3 rounded-xl border border-[var(--border-ed)] p-4 text-left transition-colors hover:bg-[var(--subtle)]"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                    <SplitSquareVertical className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-[var(--ink)]">Split-modus</p>
+                    <p className="text-xs text-[var(--ink-3)] truncate">Kostenverdeling instellen</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-4)]" />
+                </Link>
+
+                {/* Notificaties card — scrolls to partner notifications in Section A */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNotifOpen(true)
+                    setTimeout(() => {
+                      document.getElementById('partner-transacties')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }, 100)
+                  }}
+                  className="flex items-center gap-3 rounded-xl border border-[var(--border-ed)] p-4 text-left transition-colors hover:bg-[var(--subtle)]"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-horizon-100 text-horizon-700">
+                    <Bell className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-[var(--ink)]">Notificaties</p>
+                    <p className="text-xs text-[var(--ink-3)] truncate">Partner transactie-meldingen</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-4)]" />
+                </button>
+
+                {/* Leden card — links to profiel */}
+                <Link
+                  href="/identity/profiel#huishouden"
+                  className="flex items-center gap-3 rounded-xl border border-[var(--border-ed)] p-4 text-left transition-colors hover:bg-[var(--subtle)]"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700">
+                    <UserPlus className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-[var(--ink)]">Leden</p>
+                    <p className="text-xs text-[var(--ink-3)] truncate">Leden beheren en uitnodigen</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-4)]" />
+                </Link>
               </div>
+
+              {/* Privacy sub-section — expands inline when Privacy card is clicked */}
+              {huishoudenPrivacySubOpen && (
+                <div className="rounded-xl border border-wil-200 bg-wil-50/30 p-4 sm:p-5 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <Shield className="mt-0.5 h-5 w-5 text-wil-600 shrink-0" />
+                    <p className="text-sm text-[var(--ink-2)] leading-relaxed">
+                      Stel per categorie in welke financiële gegevens je partner kan zien.
+                      Dit geldt alleen voor hoe jouw data wordt getoond aan je partner.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-4 rounded-lg border border-[var(--border-ed)] p-3 bg-[var(--paper)]">
+                    <div className="flex items-center gap-1.5">
+                      <Eye className="h-3.5 w-3.5 text-wil-600" />
+                      <span className="text-xs text-[var(--ink-2)]"><strong>Volledig</strong> — alle details zichtbaar</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Shield className="h-3.5 w-3.5 text-amber-600" />
+                      <span className="text-xs text-[var(--ink-2)]"><strong>Totalen</strong> — alleen totaalbedragen</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <EyeOff className="h-3.5 w-3.5 text-red-500" />
+                      <span className="text-xs text-[var(--ink-2)]"><strong>Verborgen</strong> — volledig afgeschermd</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {([
+                      { key: 'vermogen', label: 'Vermogen', description: 'Bezittingen en beleggingen' },
+                      { key: 'schulden', label: 'Schulden', description: 'Leningen en schulden' },
+                      { key: 'budgetten', label: 'Budgetten', description: 'Maandbudgetten en bestedingen' },
+                      { key: 'transacties', label: 'Transacties', description: 'Individuele transacties' },
+                      { key: 'inkomen', label: 'Inkomen', description: 'Salaris en overig inkomen' },
+                    ] as const).map(cat => {
+                      const currentLevel = householdPrivacy[cat.key] || 'totalen'
+                      return (
+                        <div key={cat.key} className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <h3 className="text-sm font-semibold text-[var(--ink)]">{cat.label}</h3>
+                              <p className="text-xs text-[var(--ink-3)]">{cat.description}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            {([
+                              { level: 'volledig' as PrivacyLevel, label: 'Volledig', icon: Eye, color: 'wil' },
+                              { level: 'totalen' as PrivacyLevel, label: 'Totalen', icon: Shield, color: 'amber' },
+                              { level: 'verborgen' as PrivacyLevel, label: 'Verborgen', icon: EyeOff, color: 'red' },
+                            ]).map(opt => {
+                              const isActive = currentLevel === opt.level
+                              const Icon = opt.icon
+                              return (
+                                <button
+                                  key={opt.level}
+                                  type="button"
+                                  onClick={() => setHouseholdPrivacy(prev => ({ ...prev, [cat.key]: opt.level }))}
+                                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                                    isActive
+                                      ? opt.color === 'wil'
+                                        ? 'bg-wil-50 text-wil-700 border border-wil-300'
+                                        : opt.color === 'amber'
+                                        ? 'bg-amber-50 text-amber-700 border border-amber-300'
+                                        : 'bg-red-50 text-red-700 border border-red-300'
+                                      : 'border border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
+                                  }`}
+                                >
+                                  <Icon className="h-3.5 w-3.5" />
+                                  <span className="hidden sm:inline">{opt.label}</span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="flex items-center gap-4 pt-2">
+                    <button
+                      onClick={saveHouseholdPrivacy}
+                      disabled={householdPrivacySaving || JSON.stringify(householdPrivacy) === JSON.stringify(householdPrivacySaved)}
+                      className="rounded-lg bg-wil-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-700 disabled:opacity-50"
+                    >
+                      {householdPrivacySaving ? 'Opslaan...' : 'Opslaan'}
+                    </button>
+                    {householdPrivacyMessage && (
+                      <p className={`text-sm ${householdPrivacyMessage.type === 'success' ? 'text-wil-600' : 'text-red-600'}`}>
+                        {householdPrivacyMessage.text}
+                      </p>
+                    )}
+                    {JSON.stringify(householdPrivacy) !== JSON.stringify(householdPrivacySaved) && !householdPrivacyMessage && (
+                      <p className="text-xs text-amber-600">Niet-opgeslagen wijzigingen</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </section>
@@ -2039,19 +2120,19 @@ export default function InstellingenPage() {
             <h3 className="mb-2 text-sm font-semibold text-[var(--ink)]">1. Welke gegevens verzamelen we</h3>
             <ul className="space-y-1.5 text-sm text-[var(--ink-2)]">
               <li className="flex items-start gap-2">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-wil-400" />
                 <span><strong>Accountgegevens:</strong> e-mailadres en versleuteld wachtwoord</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-wil-400" />
                 <span><strong>Profielgegevens:</strong> naam, geboortedatum, huishoudtype</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-wil-400" />
                 <span><strong>Financiële gegevens:</strong> bankrekeningen, transacties, budgetten, bezittingen, schulden, doelen</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-wil-400" />
                 <span><strong>Voorkeuren:</strong> widget-instellingen, kleurconfiguratie, FIRE-parameters</span>
               </li>
             </ul>
@@ -2062,15 +2143,15 @@ export default function InstellingenPage() {
             <h3 className="mb-2 text-sm font-semibold text-[var(--ink)]">2. Waar worden je gegevens opgeslagen</h3>
             <ul className="space-y-1.5 text-sm text-[var(--ink-2)]">
               <li className="flex items-start gap-2">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-purple-400" />
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-horizon-400" />
                 <span><strong>Database:</strong> Supabase (PostgreSQL) met row-level security — alleen jij hebt toegang tot jouw data</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-purple-400" />
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-horizon-400" />
                 <span><strong>AI-providers:</strong> Anthropic of OpenAI ontvangen alleen geanonimiseerde, geaggregeerde financiële data</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-purple-400" />
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-horizon-400" />
                 <span><strong>Lokaal:</strong> sommige voorkeuren worden opgeslagen in je browser (localStorage)</span>
               </li>
             </ul>
@@ -2101,23 +2182,23 @@ export default function InstellingenPage() {
             <p className="mb-2 text-sm text-[var(--ink-2)]">Op grond van de AVG heb je de volgende rechten:</p>
             <ul className="space-y-1.5 text-sm text-[var(--ink-2)]">
               <li className="flex items-start gap-2">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-wil-400" />
                 <span><strong>Inzage:</strong> je kunt al je opgeslagen data bekijken in de app</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-wil-400" />
                 <span><strong>Correctie:</strong> je kunt je gegevens op elk moment aanpassen via Profiel</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-wil-400" />
                 <span><strong>Verwijdering:</strong> je kunt alle data wissen via Instellingen &gt; Gegevens Resetten</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-wil-400" />
                 <span><strong>Bezwaar:</strong> je kunt AI-verwerking uitschakelen via de AI-toggle hierboven</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-400" />
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-wil-400" />
                 <span><strong>Overdraagbaarheid:</strong> je kunt je data exporteren (neem contact op)</span>
               </li>
             </ul>
@@ -2128,7 +2209,7 @@ export default function InstellingenPage() {
             <h3 className="mb-2 text-sm font-semibold text-[var(--ink)]">5. Contact</h3>
             <p className="text-sm text-[var(--ink-2)] leading-relaxed">
               Heb je vragen over je privacy of wil je een van je rechten uitoefenen? Neem contact op via{' '}
-              <a href="mailto:privacy@trifinity.nl" className="font-medium text-teal-600 hover:text-teal-700 underline underline-offset-2">
+              <a href="mailto:privacy@trifinity.nl" className="font-medium text-wil-600 hover:text-wil-700 underline underline-offset-2">
                 privacy@trifinity.nl
               </a>
             </p>

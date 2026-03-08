@@ -195,13 +195,13 @@ export function HouseholdFireSection() {
               </div>
               <div>
                 <p className="text-[10px] font-medium text-horizon-600/50 uppercase">FIRE-doel</p>
-                <p className="text-lg font-bold text-horizon-700" data-testid="personal-fire-target">
+                <p className="font-mono tabular-nums text-lg font-bold text-horizon-700" data-testid="personal-fire-target">
                   {formatCurrency(currentUserPartner.projection.fireTarget)}
                 </p>
               </div>
               <div>
                 <p className="text-[10px] font-medium text-horizon-600/50 uppercase">Vrijheidstijd</p>
-                <p className="text-lg font-bold text-horizon-700" data-testid="personal-freedom-time">
+                <p className="font-mono tabular-nums text-lg font-bold text-horizon-700" data-testid="personal-freedom-time">
                   {currentUserPartner.projection.freedomYears}j {currentUserPartner.projection.freedomMonths}mnd
                 </p>
               </div>
@@ -285,7 +285,7 @@ export function HouseholdFireSection() {
           {/* Combined FIRE Target */}
           <div>
             <p className="text-[10px] font-medium text-horizon-600/50 uppercase">FIRE-doel</p>
-            <p className="text-lg font-bold text-horizon-700" data-testid="combined-fire-target">
+            <p className="font-mono tabular-nums text-lg font-bold text-horizon-700" data-testid="combined-fire-target">
               {formatCurrency(combined.projection.fireTarget)}
             </p>
           </div>
@@ -293,7 +293,7 @@ export function HouseholdFireSection() {
           {/* Combined Freedom Time */}
           <div>
             <p className="text-[10px] font-medium text-horizon-600/50 uppercase">Vrijheidstijd</p>
-            <p className="text-lg font-bold text-horizon-700" data-testid="combined-freedom-time">
+            <p className="font-mono tabular-nums text-lg font-bold text-horizon-700" data-testid="combined-freedom-time">
               {combined.projection.freedomYears}j {combined.projection.freedomMonths}mnd
             </p>
           </div>
@@ -342,7 +342,7 @@ export function HouseholdFireSection() {
           testId="combined-expenses"
         />
         <FinancialCard
-          icon={<Target className="h-4 w-4 text-teal-600" />}
+          icon={<Target className="h-4 w-4 text-wil-600" />}
           label="Gecomb. sparen"
           value={formatCurrency(comparison.combinedMonthlySavings)}
           suffix="/mnd"
@@ -585,9 +585,9 @@ function FireAgeComparison({
 
               {/* Visual bar representing relative fire age */}
               {maxAge !== null && earliestAge !== null && entry.fireAge !== null && maxAge > earliestAge && (
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--border-ed)]">
                   <div
-                    className={`h-full rounded-full ${isEarliest ? 'bg-emerald-400' : 'bg-zinc-300'}`}
+                    className={`h-full rounded-full ${isEarliest ? 'bg-emerald-400' : 'bg-[var(--border-md)]'}`}
                     style={{
                       width: hasEntered
                         ? `${Math.max(100 - ((entry.fireAge - earliestAge) / (maxAge - earliestAge)) * 100, 5)}%`
@@ -622,7 +622,7 @@ function FinancialCard({
         </div>
         <p className="text-[10px] font-medium text-[var(--ink-3)]">{label}</p>
       </div>
-      <p className="text-sm font-bold text-[var(--ink)]">
+      <p className="font-mono tabular-nums text-sm font-bold text-[var(--ink)]">
         {value}{suffix && <span className="text-xs font-normal text-[var(--ink-3)]">{suffix}</span>}
       </p>
     </div>
@@ -679,13 +679,13 @@ function PartnerCard({
         </div>
         <div>
           <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">FIRE-doel</p>
-          <p className="text-sm font-semibold text-[var(--ink-2)]">
+          <p className="font-mono tabular-nums text-sm font-semibold text-[var(--ink-2)]">
             {formatCurrency(partner.projection.fireTarget)}
           </p>
         </div>
         <div>
           <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Spaarquote</p>
-          <p className="text-sm font-semibold text-[var(--ink-2)]">
+          <p className="font-mono tabular-nums text-sm font-semibold text-[var(--ink-2)]">
             {partner.projection.savingsRate.toFixed(1)}%
           </p>
         </div>
@@ -693,7 +693,7 @@ function PartnerCard({
 
       {/* Mini progress bar */}
       <div className="mt-3">
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-200/50">
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--border-ed)]">
           <div
             className={`h-full rounded-full bg-gradient-to-r ${colors.bar}`}
             style={{
@@ -714,20 +714,20 @@ function PartnerCard({
       <div className="mt-3 space-y-1.5 text-xs text-[var(--ink-2)]">
         <div className="flex justify-between">
           <span>Netto vermogen</span>
-          <span className="font-medium">{formatCurrency(partner.financials.netWorth)}</span>
+          <span className="font-mono tabular-nums font-medium">{formatCurrency(partner.financials.netWorth)}</span>
         </div>
         <div className="flex justify-between">
           <span>Inkomen/mnd</span>
-          <span className="font-medium">{formatCurrency(partner.financials.monthlyIncome)}</span>
+          <span className="font-mono tabular-nums font-medium">{formatCurrency(partner.financials.monthlyIncome)}</span>
         </div>
         <div className="flex justify-between">
           <span>Uitgaven/mnd</span>
-          <span className="font-medium">{formatCurrency(partner.financials.monthlyExpenses)}</span>
+          <span className="font-mono tabular-nums font-medium">{formatCurrency(partner.financials.monthlyExpenses)}</span>
         </div>
         {partner.financials.sharedAssetsValue > 0 && (
           <div className="flex justify-between text-horizon-600/70">
             <span>Gedeeld vermogen (aandeel)</span>
-            <span className="font-medium">{formatCurrency(partner.financials.sharedAssetsValue)}</span>
+            <span className="font-mono tabular-nums font-medium">{formatCurrency(partner.financials.sharedAssetsValue)}</span>
           </div>
         )}
       </div>
@@ -764,7 +764,7 @@ function ComparisonBar({
           return (
             <div key={v.name} className="flex items-center gap-2">
               <span className="w-16 shrink-0 text-xs text-[var(--ink-3)] truncate">{v.name}</span>
-              <div className="h-5 flex-1 overflow-hidden rounded-full bg-zinc-100">
+              <div className="h-5 flex-1 overflow-hidden rounded-full bg-[var(--border-ed)]">
                 <div
                   className={`h-full rounded-full ${barColor}`}
                   style={{

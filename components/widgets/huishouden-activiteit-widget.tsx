@@ -60,7 +60,7 @@ export function HuishoudenActiviteitWidget({ size, data, href }: Props) {
                 <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold shrink-0 ${
                   item.isCurrentUser
                     ? 'bg-kern-100 text-kern-700'
-                    : 'bg-teal-100 text-teal-700'
+                    : 'bg-wil-100 text-wil-700'
                 }`}>
                   {item.partnerName.charAt(0).toUpperCase()}
                 </span>
@@ -79,7 +79,7 @@ export function HuishoudenActiviteitWidget({ size, data, href }: Props) {
                 {item.ownership === 'shared' && (
                   <>
                     <span className="text-[10px] text-[var(--ink-4)]">&middot;</span>
-                    <span className="text-[10px] text-teal-600 font-medium">gedeeld</span>
+                    <span className="text-[10px] text-wil-600 font-medium">gedeeld</span>
                   </>
                 )}
               </div>
