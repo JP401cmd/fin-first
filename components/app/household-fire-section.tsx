@@ -378,6 +378,13 @@ export function HouseholdFireSection() {
             ))}
           </div>
 
+          {/* 3-way FIRE Age Comparison */}
+          <FireAgeComparison
+            combined={combined}
+            partners={partners}
+            hasEntered={hasEntered}
+          />
+
           {/* Side-by-side comparison bars */}
           <div className="mt-4 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5" data-testid="comparison-bars">
             <h4 className="mb-4 text-xs font-semibold text-[var(--ink-3)] uppercase">Vergelijking</h4>
@@ -485,6 +492,118 @@ export function HouseholdFireSection() {
 }
 
 // ── Helper Components ────────────────────────────────────
+
+function FireAgeComparison({
+  combined,
+  partners,
+  hasEntered,
+}: {
+  combined: { projection: FireProjectionData }
+  partners: PartnerProjection[]
+  hasEntered: boolean
+}) {
+  // Build entries: each partner + combined
+  type Entry = { label: string; fireAge: number | null; fireDate: string; color: string; isCombined?: boolean }
+  const entries: Entry[] = [
+    ...partners.map((p, i) => ({
+      label: p.fullName ?? (p.isCurrentUser ? 'Jij' : 'Partner'),
+      fireAge: p.projection.fireAge,
+      fireDate: p.projection.fireDate,
+      color: i === 0 ? 'horizon' : 'wil',
+    })),
+    {
+      label: 'Gezamenlijk',
+      fireAge: combined.projection.fireAge,
+      fireDate: combined.projection.fireDate,
+      color: 'emerald',
+      isCombined: true,
+    },
+  ]
+
+  // Find the earliest FIRE age (best)
+  const validAges = entries.filter(e => e.fireAge !== null).map(e => e.fireAge as number)
+  const earliestAge = validAges.length > 0 ? Math.min(...validAges) : null
+  const maxAge = validAges.length > 0 ? Math.max(...validAges) : null
+
+  const colorMap: Record<string, { bg: string; border: string; text: string; badge: string }> = {
+    horizon: { bg: 'bg-horizon-50', border: 'border-horizon-300', text: 'text-horizon-700', badge: 'bg-horizon-100 text-horizon-700' },
+    wil: { bg: 'bg-wil-50', border: 'border-wil-300', text: 'text-wil-700', badge: 'bg-wil-100 text-wil-700' },
+    emerald: { bg: 'bg-emerald-50', border: 'border-emerald-300', text: 'text-emerald-700', badge: 'bg-emerald-100 text-emerald-700' },
+  }
+
+  return (
+    <div className="mt-4 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5" data-testid="fire-age-comparison">
+      <div className="mb-4 flex items-center gap-2">
+        <Clock className="h-3.5 w-3.5 text-[var(--ink-3)]" />
+        <h4 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
+          FIRE-leeftijd vergelijking
+        </h4>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {entries.map((entry) => {
+          const colors = colorMap[entry.color] ?? colorMap.horizon
+          const isEarliest = entry.fireAge !== null && earliestAge !== null && Math.round(entry.fireAge) === Math.round(earliestAge)
+          const diffMonths = entry.fireAge !== null && earliestAge !== null
+            ? Math.round((entry.fireAge - earliestAge) * 12)
+            : null
+
+          return (
+            <div
+              key={entry.label}
+              className={`relative rounded-[var(--r-lg)] border-2 p-4 transition-all ${
+                isEarliest ? `${colors.border} ${colors.bg} ring-2 ring-offset-1 ring-emerald-200` : 'border-[var(--border-ed)] bg-[var(--subtle)]/20'
+              }`}
+              data-testid={`fire-age-entry-${entry.isCombined ? 'combined' : entry.label.toLowerCase()}`}
+              title={entry.isCombined ? 'Berekend op basis van gecombineerd vermogen, inkomsten en uitgaven van het huishouden' : undefined}
+            >
+              {/* Earliest badge */}
+              {isEarliest && (
+                <span className={`absolute -top-2.5 right-3 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${colors.badge}`}>
+                  ✦ Vroegst
+                </span>
+              )}
+
+              <p className="mb-1 text-[10px] font-medium text-[var(--ink-3)] uppercase">{entry.label}</p>
+
+              <p className={`font-mono text-3xl font-bold tabular-nums ${isEarliest ? colors.text : 'text-[var(--ink)]'}`}>
+                {entry.fireAge !== null ? Math.round(entry.fireAge) : '-'}
+              </p>
+              <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
+                {entry.fireAge !== null ? 'jaar' : 'niet haalbaar'}
+              </p>
+
+              {/* Difference from earliest */}
+              {diffMonths !== null && diffMonths > 0 && (
+                <p className="mt-2 text-[10px] text-[var(--ink-4)]">
+                  +{Math.floor(diffMonths / 12)}j {diffMonths % 12}mnd t.o.v. vroegste
+                </p>
+              )}
+
+              {/* FIRE date */}
+              <p className="mt-1 text-[10px] text-[var(--ink-4)]">{entry.fireDate}</p>
+
+              {/* Visual bar representing relative fire age */}
+              {maxAge !== null && earliestAge !== null && entry.fireAge !== null && maxAge > earliestAge && (
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+                  <div
+                    className={`h-full rounded-full ${isEarliest ? 'bg-emerald-400' : 'bg-zinc-300'}`}
+                    style={{
+                      width: hasEntered
+                        ? `${Math.max(100 - ((entry.fireAge - earliestAge) / (maxAge - earliestAge)) * 100, 5)}%`
+                        : '0%',
+                      transition: hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1)' : 'none',
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 function FinancialCard({
   icon, label, value, suffix, testId,
