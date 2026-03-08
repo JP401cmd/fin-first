@@ -143,6 +143,8 @@ export default function HorizonPage() {
   const [formDurationType, setFormDurationType] = useState<'one_time' | 'period' | 'continuous'>('one_time')
   const [formAmount, setFormAmount] = useState<number | ''>(0)
   const [formMetadata, setFormMetadata] = useState<Record<string, unknown>>({})
+  const [formErrors, setFormErrors] = useState<string[]>([])
+  const [formWarnings, setFormWarnings] = useState<string[]>([])
 
   // Simulatie-engine met echte app-data (fractionele FIRE-leeftijd + kasstromen)
   const { result: simResult, cashflows: simCashflows } = useHorizonFireSim(
@@ -493,7 +495,68 @@ export default function HorizonPage() {
     setShowForm(true)
   }
 
+  /** Validate event form — returns true if valid, false if errors found */
+  function validateEventForm(): boolean {
+    const errors: string[] = []
+    const warnings: string[] = []
+
+    // Required: naam
+    if (!formName.trim()) {
+      errors.push('Vul een naam in voor dit evenement.')
+    }
+
+    // Amount validation: no negative amounts
+    const amt = Number(formAmount)
+    if (typeof formAmount === 'number' && amt < 0) {
+      errors.push('Bedrag mag niet negatief zijn. Gebruik de keuze Inkomen/Kosten voor de richting.')
+    }
+
+    // Duration validation for period type
+    if (formDurationType === 'period') {
+      const dur = Number(formDuration)
+      if (!dur || dur <= 0) {
+        errors.push('Vul een geldige duur in (minimaal 1 maand).')
+      } else if (dur > 600) {
+        warnings.push('Een duur van meer dan 50 jaar is ongebruikelijk. Controleer of dit klopt.')
+      }
+    }
+
+    // Age validation
+    if (formAge !== '' && typeof formAge === 'number') {
+      if (formAge < 0) {
+        errors.push('Leeftijd kan niet negatief zijn.')
+      } else if (formAge > 120) {
+        errors.push('Leeftijd mag niet hoger zijn dan 120 jaar.')
+      }
+    }
+
+    // AOW-specific: warn if age < 60
+    if (formType === 'aow' && typeof formAge === 'number' && formAge < 60) {
+      warnings.push('Let op: de AOW start wettelijk op leeftijd 67. Een eerdere leeftijd is onrealistisch.')
+    }
+
+    // Children-specific: validate aantalKinderen
+    if (formType === 'children') {
+      const aantalKinderen = Number(formMetadata.aantalKinderen ?? 0)
+      if (aantalKinderen <= 0) {
+        errors.push('Selecteer minimaal 1 kind bij het Kinderen-evenement.')
+      }
+    }
+
+    // Early retirement: warn if retirement age < 40
+    if (formType === 'early_retirement' && typeof formAge === 'number' && formAge < 40) {
+      warnings.push('Vervroegd pensioen voor je 40e is zeer ongebruikelijk. Controleer de leeftijd.')
+    }
+
+    setFormErrors(errors)
+    setFormWarnings(warnings)
+    return errors.length === 0
+  }
+
   async function saveEvent() {
+    // Run validation — block save on errors (warnings are advisory)
+    if (!validateEventForm()) return
+
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -538,6 +601,8 @@ export default function HorizonPage() {
 
     setShowForm(false)
     setEditingEvent(null)
+    setFormErrors([])
+    setFormWarnings([])
     setLoading(true)
     loadData()
   }
@@ -1360,16 +1425,31 @@ export default function HorizonPage() {
                           )}
                         </div>
 
-                        {impact && (
-                          <div className="mt-3 rounded-lg bg-[var(--subtle)] p-3">
-                            <p className="text-xs text-[var(--ink-2)]">
-                              <span className="font-medium">Impact:</span>{' '}
-                              Vrijheid {impact.fireDelayMonths > 0 ? `+${impact.fireDelayMonths} maanden later` : 'geen vertraging'}{' '}
-                              {'\u00B7'} totale kosten {formatCurrency(impact.totalCost)}{' '}
-                              {'\u00B7'} {impact.freedomDaysLost} vrijheidsdagen
-                            </p>
-                          </div>
-                        )}
+                        {impact && (() => {
+                          const evDailyExp = effectiveInput ? effectiveInput.monthlyExpenses / 30 : 0
+                          const isPositiveImpact = impact.totalCost < 0
+                          const absCost = Math.abs(impact.totalCost)
+                          const freedomBd = evDailyExp > 0 && absCost >= 100
+                            ? calculateFreedomTime(absCost, evDailyExp)
+                            : null
+                          const freedomTimeStr = freedomBd
+                            ? formatFreedomTimeString(freedomBd, 'long')
+                            : null
+                          return (
+                            <div className="mt-3 rounded-lg bg-[var(--subtle)] p-3">
+                              <p className="text-xs text-[var(--ink-2)]">
+                                <span className="font-medium">Impact:</span>{' '}
+                                Vrijheid {impact.fireDelayMonths > 0 ? `+${impact.fireDelayMonths} maanden later` : 'geen vertraging'}{' '}
+                                {'\u00B7'} {isPositiveImpact ? 'opbrengst' : 'totale kosten'} {formatCurrency(absCost)}
+                              </p>
+                              {freedomTimeStr && (
+                                <p className={`mt-1 text-xs font-medium ${isPositiveImpact ? 'text-emerald-600' : 'text-red-600'}`}>
+                                  ≈ {freedomTimeStr} {isPositiveImpact ? 'gewonnen vrijheid' : 'aan vrijheidstijd'}
+                                </p>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -1511,7 +1591,7 @@ export default function HorizonPage() {
         const hasCatalogFields = LIFE_EVENT_CATALOG[formType]?.fields && LIFE_EVENT_CATALOG[formType].fields!.length > 0
 
         return (
-        <BottomSheet open={true} onClose={() => { setShowForm(false); setEditingEvent(null) }} title={editingEvent ? 'Evenement bewerken' : 'Nieuw evenement'}>
+        <BottomSheet open={true} onClose={() => { setShowForm(false); setEditingEvent(null); setFormErrors([]); setFormWarnings([]) }} title={editingEvent ? 'Evenement bewerken' : 'Nieuw evenement'}>
           <div className="space-y-5 p-6">
             {/* Template tip */}
             {LIFE_EVENT_CATALOG[formType]?.tip && !editingEvent && (
@@ -1528,8 +1608,8 @@ export default function HorizonPage() {
               <div>
                 <label className="text-xs font-medium text-[var(--ink-3)]">Naam</label>
                 <input
-                  type="text" value={formName} onChange={e => setFormName(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                  type="text" value={formName} onChange={e => { setFormName(e.target.value); setFormErrors([]) }}
+                  className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${formErrors.some(e => e.includes('naam')) ? 'border-red-400 bg-red-50/30' : 'border-[var(--border-ed)]'}`}
                 />
               </div>
 
@@ -1537,8 +1617,8 @@ export default function HorizonPage() {
               <div>
                 <label className="text-xs font-medium text-[var(--ink-3)]">Vanaf welke leeftijd?</label>
                 <input
-                  type="number" value={formAge} onChange={e => setFormAge(e.target.value ? Number(e.target.value) : '')}
-                  className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                  type="number" value={formAge} onChange={e => { setFormAge(e.target.value ? Number(e.target.value) : ''); setFormErrors([]); setFormWarnings([]) }}
+                  className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${(formErrors.some(e => e.includes('eeftijd')) || formWarnings.some(w => w.includes('AOW'))) ? 'border-amber-400 bg-amber-50/30' : 'border-[var(--border-ed)]'}`}
                   placeholder="bijv. 45"
                 />
               </div>
@@ -1606,8 +1686,8 @@ export default function HorizonPage() {
                     type="number"
                     min="0"
                     value={formAmount}
-                    onChange={e => setFormAmount(e.target.value ? Number(e.target.value) : '')}
-                    className="min-w-0 flex-1 rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                    onChange={e => { setFormAmount(e.target.value ? Number(e.target.value) : ''); setFormErrors([]) }}
+                    className={`min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${formErrors.some(e => e.includes('edrag')) ? 'border-red-400 bg-red-50/30' : 'border-[var(--border-ed)]'}`}
                     placeholder="0"
                   />
                 </div>
@@ -1620,8 +1700,8 @@ export default function HorizonPage() {
                   <input
                     type="number"
                     value={formDuration}
-                    onChange={e => setFormDuration(e.target.value ? Number(e.target.value) : '')}
-                    className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                    onChange={e => { setFormDuration(e.target.value ? Number(e.target.value) : ''); setFormErrors([]) }}
+                    className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${formErrors.some(e => e.includes('duur')) ? 'border-red-400 bg-red-50/30' : 'border-[var(--border-ed)]'}`}
                     placeholder="bijv. 12"
                   />
                 </div>
@@ -1771,9 +1851,32 @@ export default function HorizonPage() {
               )}
             </div>
 
+            {/* Validation errors */}
+            {formErrors.length > 0 && (
+              <div className="rounded-[var(--r)] border border-red-200 bg-red-50 p-3 space-y-1">
+                {formErrors.map((err, i) => (
+                  <p key={i} className="text-xs text-red-700 flex items-start gap-2">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    <span>{err}</span>
+                  </p>
+                ))}
+              </div>
+            )}
+
+            {/* Validation warnings (advisory — don't block save) */}
+            {formWarnings.length > 0 && formErrors.length === 0 && (
+              <div className="rounded-[var(--r)] border border-amber-200 bg-amber-50 p-3 space-y-1">
+                {formWarnings.map((warn, i) => (
+                  <p key={i} className="text-xs text-amber-700 flex items-start gap-2">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    <span>{warn}</span>
+                  </p>
+                ))}
+              </div>
+            )}
+
             <button
               onClick={saveEvent}
-              disabled={!formName}
               className="w-full rounded-[var(--r)] bg-horizon-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-horizon-700 disabled:opacity-50"
             >
               {editingEvent ? 'Opslaan' : 'Toevoegen'}
