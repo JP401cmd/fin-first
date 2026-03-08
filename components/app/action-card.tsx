@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Check, Clock, X, RotateCcw, UserPlus, UserCheck } from 'lucide-react'
 import { PostponeForm } from '@/components/app/postpone-form'
 import { ActionEditModal } from '@/components/app/action-edit-modal'
@@ -32,9 +32,34 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
   const [isLoading, setIsLoading] = useState(false)
   const [assigning, setAssigning] = useState(false)
   const [justCompleted, setJustCompleted] = useState(false)
+  const [showLongPressMenu, setShowLongPressMenu] = useState(false)
   const animTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const isAssigned = action.assigned_to != null
+
+  // Long-press handlers for mobile
+  const handleTouchStart = useCallback(() => {
+    if (action.status !== 'open' || showPostpone || showReject) return
+    longPressTimer.current = setTimeout(() => {
+      setShowLongPressMenu(true)
+    }, 500)
+  }, [action.status, showPostpone, showReject])
+
+  const handleTouchEnd = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }, [])
+
+  // Close long-press menu on outside click
+  useEffect(() => {
+    if (!showLongPressMenu) return
+    function close() { setShowLongPressMenu(false) }
+    document.addEventListener('click', close, { once: true })
+    return () => document.removeEventListener('click', close)
+  }, [showLongPressMenu])
   const assignedByName = action.assigned_by_name ?? action.assigned_by ?? null
 
   const sourceBadge = getSourceBadgeClasses(action.source)
@@ -53,10 +78,14 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
   return (
     <>
       <div
-        className={`group rounded-lg border ${isPartnerAssigned ? 'border-wil-200 bg-wil-50/30' : 'border-[var(--border-ed)] bg-[var(--paper)]'} px-3 py-1.5 transition-all duration-150 ease-in-out hover:border-[var(--border-md)] cursor-pointer`}
+        className={`group relative rounded-lg border ${isPartnerAssigned ? 'border-wil-200 bg-wil-50/30' : 'border-[var(--border-ed)] bg-[var(--paper)]'} px-3 py-1.5 transition-all duration-150 ease-in-out hover:border-[var(--border-md)] cursor-pointer`}
         onClick={() => {
+          if (showLongPressMenu) return
           if (!showPostpone && !showReject && onUpdate) setShowEdit(true)
         }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
       >
         <div className="flex h-[28px] items-center gap-2.5">
           {/* Checkbox circle */}
@@ -84,13 +113,22 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
             {action.status === 'completed' && (
               <Check className={`h-3 w-3 text-white ${justCompleted ? 'animate-[checkPop_300ms_ease-out]' : ''}`} />
             )}
-            {action.status === 'postponed' && <Clock className="h-2.5 w-2.5 text-amber-500" />}
             {action.status === 'rejected' && <X className="h-2.5 w-2.5 text-[var(--ink-3)]" />}
           </button>
 
+          {/* Amber clock icon next to checkbox for postponed */}
+          {action.status === 'postponed' && (
+            <Clock className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+          )}
+
           {/* Title */}
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <h4 className={`truncate text-sm font-medium ${action.status === 'completed' ? 'text-[var(--ink-3)] line-through' : 'text-[var(--ink)]'}`}>{action.title}</h4>
+            <h4 className={`truncate text-sm font-medium ${action.status === 'completed' ? 'text-[var(--ink-4)] line-through' : 'text-[var(--ink)]'}`}>{action.title}</h4>
+            {action.status === 'postponed' && action.postponed_until && (
+              <span className="shrink-0 text-xs text-amber-600">
+                tot {new Date(action.postponed_until).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+              </span>
+            )}
             <span className={`hidden sm:inline-flex shrink-0 rounded-full px-1.5 py-px text-[10px] font-medium ${sourceBadge}`}>
               {ACTION_SOURCE_LABELS[action.source]}
             </span>
@@ -126,12 +164,6 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
             {action.due_date && action.status === 'open' && (
               <span className="hidden sm:inline text-xs text-[var(--ink-3)]">
                 {new Date(action.due_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
-              </span>
-            )}
-            {action.status === 'postponed' && action.postponed_until && (
-              <span className="hidden sm:inline-flex items-center text-xs text-amber-600">
-                <Clock className="mr-0.5 h-3 w-3" />
-                {new Date(action.postponed_until).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
               </span>
             )}
             {action.recommendation?.title && (

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, ChevronDown, ChevronRight, Sparkles, UserCheck, Users } from 'lucide-react'
+import { Plus, ChevronDown, Sparkles, Users } from 'lucide-react'
 import { ActionCard } from '@/components/app/action-card'
 import { ActionForm } from '@/components/app/action-form'
 import { useFreedomDaysAnimation } from '@/components/app/freedom-days-animation'
@@ -20,6 +20,7 @@ type ActionBoardProps = {
 export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, currentUserId }: ActionBoardProps) {
   const [actions, setActions] = useState<Action[]>(initialActions)
   const [showForm, setShowForm] = useState(false)
+  const [showOpen, setShowOpen] = useState(true)
   const [showPostponed, setShowPostponed] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
   const [showPartnerCompleted, setShowPartnerCompleted] = useState(false)
@@ -69,6 +70,7 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
   const partnerCompletedActions = partnerAssignedActions.filter((a) => a.status === 'completed')
 
   const totalOpenDays = openActions.reduce((sum, a) => sum + (a.freedom_days_impact || 0), 0)
+  const totalPostponedDays = postponedActions.reduce((sum, a) => sum + (a.freedom_days_impact || 0), 0)
   const totalCompletedDays = completedActions.reduce((sum, a) => sum + (a.freedom_days_impact || 0), 0)
   const partnerOpenDays = partnerOpenActions.reduce((sum, a) => sum + (a.freedom_days_impact || 0), 0)
 
@@ -187,16 +189,14 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
 
       {/* Partner-assigned actions — "Van je partner" section */}
       {partnerAssignedActions.length > 0 && (
-        <div className="rounded-[var(--r-lg)] border border-wil-200 bg-wil-50/40 p-4">
+        <div>
           <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-wil-100">
-              <Users className="h-3.5 w-3.5 text-wil-600" />
-            </div>
-            <h3 className="text-sm font-semibold text-wil-700">
-              Van je partner
+            <Users className="h-4 w-4 text-wil-600" />
+            <h3 className="text-sm font-semibold text-[var(--ink)]">
+              Van {partnerInfo?.partnerName ?? 'je partner'} ({partnerOpenActions.length})
             </h3>
             {partnerOpenDays > 0 && (
-              <span className="rounded-full bg-wil-100 px-2 py-0.5 text-xs font-medium text-wil-700">
+              <span className="rounded-full bg-wil-100 px-2.5 py-0.5 text-xs font-medium text-wil-700">
                 {Math.round(partnerOpenDays)} dagen potentieel
               </span>
             )}
@@ -224,9 +224,9 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
               <button
                 type="button"
                 onClick={() => setShowPartnerCompleted(!showPartnerCompleted)}
-                className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-emerald-600"
+                className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]"
               >
-                {showPartnerCompleted ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${showPartnerCompleted ? 'rotate-0' : '-rotate-90'}`} />
                 Afgerond ({partnerCompletedActions.length})
               </button>
               {showPartnerCompleted && (
@@ -250,21 +250,26 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
       {/* Open actions */}
       {openActions.length > 0 && (
         <div>
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-[var(--ink)]">
-              Open ({openActions.length})
-            </h3>
+          <button
+            type="button"
+            onClick={() => setShowOpen(!showOpen)}
+            className="mb-2 flex w-full items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]"
+          >
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${showOpen ? 'rotate-0' : '-rotate-90'}`} />
+            Open ({openActions.length})
             {totalOpenDays > 0 && (
-              <span className="rounded-full bg-wil-100 px-2.5 py-0.5 text-xs font-medium text-wil-700">
-                {Math.round(totalOpenDays)} dagen potentieel
+              <span className="ml-auto font-mono tabular-nums text-[10px] font-medium normal-case tracking-normal text-wil-700">
+                {Math.round(totalOpenDays)}d potentieel
               </span>
             )}
-          </div>
-          <div className="space-y-2">
-            {openActions.map((action) => (
-              <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} onCancellationOpen={onCancellationOpen} partnerInfo={partnerInfo} onAssign={handleAssign} />
-            ))}
-          </div>
+          </button>
+          {showOpen && (
+            <div className="space-y-2">
+              {openActions.map((action) => (
+                <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} onCancellationOpen={onCancellationOpen} partnerInfo={partnerInfo} onAssign={handleAssign} />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -274,10 +279,15 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
           <button
             type="button"
             onClick={() => setShowPostponed(!showPostponed)}
-            className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-amber-600"
+            className="mb-2 flex w-full items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]"
           >
-            {showPostponed ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${showPostponed ? 'rotate-0' : '-rotate-90'}`} />
             Uitgesteld ({postponedActions.length})
+            {totalPostponedDays > 0 && (
+              <span className="ml-auto font-mono tabular-nums text-[10px] font-medium normal-case tracking-normal text-amber-600">
+                {Math.round(totalPostponedDays)}d uitgesteld
+              </span>
+            )}
           </button>
           {showPostponed && (
             <div className="space-y-2">
@@ -295,13 +305,13 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
           <button
             type="button"
             onClick={() => setShowCompleted(!showCompleted)}
-            className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-emerald-600"
+            className="mb-2 flex w-full items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]"
           >
-            {showCompleted ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${showCompleted ? 'rotate-0' : '-rotate-90'}`} />
             Afgerond ({completedActions.length})
             {totalCompletedDays > 0 && (
-              <span className="ml-1 font-normal text-emerald-500">
-                — {Math.round(totalCompletedDays)} dagen gewonnen
+              <span className="ml-auto font-mono tabular-nums text-[10px] font-medium normal-case tracking-normal text-emerald-600">
+                {Math.round(totalCompletedDays)}d gewonnen
               </span>
             )}
           </button>
