@@ -82,14 +82,14 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
 
   if (pending.length === 0 && !isGenerating) {
     return (
-      <div className="rounded-[var(--r-lg)] border border-wil-200 bg-wil-50 p-8 text-center">
+      <div className="border border-[var(--border-ed)] bg-[var(--paper)] p-8 text-center">
         <div className="mx-auto mb-4 flex justify-center">
-          <FinnAvatar size={64} />
+          <FinnAvatar size={48} />
         </div>
-        <h2 className="mb-2 text-xl font-bold text-[var(--ink)]">
+        <h2 className="mb-2 font-serif text-xl font-bold text-[var(--ink)]">
           Klaar voor optimalisatie?
         </h2>
-        <p className="mb-6 text-[var(--ink-3)]">
+        <p className="mb-6 font-serif text-[var(--ink-3)]">
           Will analyseert je financieel profiel en ontdekt verborgen vrijheidsdagen.
           Laat de AI kansen vinden die je misschien over het hoofd ziet.
         </p>
@@ -100,7 +100,7 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
           type="button"
           onClick={generateRecommendations}
           disabled={isGenerating}
-          className="inline-flex items-center gap-2 rounded-lg bg-wil-500 px-6 py-3 font-medium text-white transition-colors hover:bg-wil-600 disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-lg border border-wil-500 bg-transparent px-6 py-3 font-medium text-wil-600 transition-colors hover:bg-wil-50 disabled:opacity-50"
         >
           <Sparkles className="h-5 w-5" />
           Genereer suggesties

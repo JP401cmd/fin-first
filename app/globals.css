@@ -363,6 +363,11 @@
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
+@keyframes checkPop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
 /* Feature spotlight tooltip animation */
 @keyframes spotlight-fade-in {
   from { opacity: 0; }

@@ -37,6 +37,7 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const isAssigned = action.assigned_to != null
+  const assignedByName = action.assigned_by_name ?? action.assigned_by ?? null
 
   // Long-press handlers for mobile
   const handleTouchStart = useCallback(() => {
@@ -57,15 +58,23 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
   useEffect(() => {
     if (!showLongPressMenu) return
     function close() { setShowLongPressMenu(false) }
-    document.addEventListener('click', close, { once: true })
-    return () => document.removeEventListener('click', close)
+    // Delay to avoid immediate close from the same touch event
+    const t = setTimeout(() => {
+      document.addEventListener('click', close, { once: true })
+      document.addEventListener('touchstart', close, { once: true })
+    }, 50)
+    return () => {
+      clearTimeout(t)
+      document.removeEventListener('click', close)
+      document.removeEventListener('touchstart', close)
+    }
   }, [showLongPressMenu])
-  const assignedByName = action.assigned_by_name ?? action.assigned_by ?? null
 
   const sourceBadge = getSourceBadgeClasses(action.source)
 
   async function handleStatus(status: ActionStatus, data?: Record<string, unknown>) {
     setIsLoading(true)
+    setShowLongPressMenu(false)
     try {
       await onStatusChange(action.id, status, data)
       setShowPostpone(false)
@@ -166,15 +175,21 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
                 {new Date(action.due_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
               </span>
             )}
+            {action.status === 'postponed' && action.postponed_until && (
+              <span className="hidden sm:inline-flex items-center text-xs text-amber-600">
+                <Clock className="mr-0.5 h-3 w-3" />
+                {new Date(action.postponed_until).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+              </span>
+            )}
             {action.recommendation?.title && (
               <span className="hidden md:inline truncate max-w-[120px] text-[11px] text-[var(--ink-3)]">
                 {action.recommendation.title}
               </span>
             )}
 
-            {/* Quick action buttons (compact) */}
+            {/* Quick action buttons — desktop: hidden by default, visible on hover, 24px targets */}
             {action.status === 'open' && !showPostpone && !showReject && (
-              <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
+              <div className="hidden sm:flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150" onClick={(e) => e.stopPropagation()}>
                 {partnerInfo && onAssign && (
                   <button
                     type="button"
@@ -188,7 +203,7 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
                     }}
                     disabled={assigning || isLoading}
                     title={isAssigned ? 'Toewijzing intrekken' : `Toewijzen aan ${partnerInfo.partnerName}`}
-                    className={`touch-target rounded transition-colors disabled:opacity-50 ${
+                    className={`flex h-6 w-6 items-center justify-center rounded transition-colors disabled:opacity-50 ${
                       isAssigned
                         ? 'text-wil-600 hover:bg-wil-50'
                         : 'text-[var(--ink-3)] hover:bg-wil-50 hover:text-wil-600'
@@ -202,7 +217,7 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
                   onClick={() => setShowPostpone(true)}
                   disabled={isLoading}
                   title="Uitstellen"
-                  className="touch-target rounded text-amber-500 transition-colors hover:bg-amber-50 disabled:opacity-50"
+                  className="flex h-6 w-6 items-center justify-center rounded text-amber-500 transition-colors hover:bg-amber-50 disabled:opacity-50"
                 >
                   <Clock className="h-3.5 w-3.5" />
                 </button>
@@ -211,7 +226,7 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
                   onClick={() => setShowReject(true)}
                   disabled={isLoading}
                   title="Afwijzen"
-                  className="touch-target rounded text-[var(--ink-3)] transition-colors hover:bg-zinc-100 hover:text-red-500 disabled:opacity-50"
+                  className="flex h-6 w-6 items-center justify-center rounded text-[var(--ink-3)] transition-colors hover:bg-zinc-100 hover:text-red-500 disabled:opacity-50"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -225,7 +240,7 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
                   onClick={() => handleStatus('open')}
                   disabled={isLoading}
                   title="Heropenen"
-                  className="touch-target rounded text-wil-500 transition-colors hover:bg-wil-50 disabled:opacity-50"
+                  className="flex h-6 w-6 items-center justify-center rounded text-wil-500 transition-colors hover:bg-wil-50 disabled:opacity-50"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                 </button>
@@ -233,6 +248,59 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
             )}
           </div>
         </div>
+
+        {/* Mobile long-press action menu */}
+        {showLongPressMenu && action.status === 'open' && (
+          <div
+            className="absolute right-2 top-full z-20 mt-1 flex gap-1 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-1.5 shadow-lg sm:hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {partnerInfo && onAssign && (
+              <button
+                type="button"
+                onClick={async () => {
+                  setAssigning(true)
+                  try {
+                    await onAssign(action.id, isAssigned ? null : partnerInfo.partnerId)
+                  } finally {
+                    setAssigning(false)
+                    setShowLongPressMenu(false)
+                  }
+                }}
+                disabled={assigning || isLoading}
+                className={`flex h-9 w-9 items-center justify-center rounded-md transition-colors disabled:opacity-50 ${
+                  isAssigned
+                    ? 'text-wil-600 bg-wil-50'
+                    : 'text-[var(--ink-3)] hover:bg-wil-50 hover:text-wil-600'
+                }`}
+              >
+                {isAssigned ? <UserCheck className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setShowLongPressMenu(false)
+                setShowPostpone(true)
+              }}
+              disabled={isLoading}
+              className="flex h-9 w-9 items-center justify-center rounded-md text-amber-500 transition-colors hover:bg-amber-50 disabled:opacity-50"
+            >
+              <Clock className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowLongPressMenu(false)
+                setShowReject(true)
+              }}
+              disabled={isLoading}
+              className="flex h-9 w-9 items-center justify-center rounded-md text-[var(--ink-3)] transition-colors hover:bg-zinc-100 hover:text-red-500 disabled:opacity-50"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
         {/* Inline postpone/reject forms */}
         {showPostpone && (
