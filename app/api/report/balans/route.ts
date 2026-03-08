@@ -83,6 +83,7 @@ const DEBT_TYPE_LABELS: Record<string, string> = {
   credit_card: 'Creditcard',
   revolving_credit: 'Doorlopend krediet',
   payment_plan: 'Afbetalingsregeling',
+  belastingschuld: 'Belastingschuld',
   other: 'Overig',
 }
 

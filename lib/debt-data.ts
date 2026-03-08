@@ -13,6 +13,7 @@ export type DebtType =
   | 'credit_card'
   | 'revolving_credit'
   | 'payment_plan'
+  | 'belastingschuld'
   | 'other'
 
 export type RepaymentType = 'aflossingsvrij' | 'annuiteit' | 'lineair'
@@ -23,12 +24,15 @@ export type PersonalLoanSubtype = 'aflopend' | 'doorlopend'
 export type CreditCardSubtype = 'regulier' | 'charge_card'
 export type RevolvingCreditSubtype = 'doorlopend_krediet' | 'roodstand'
 
+export type BelastingschuldSubtype = 'inkomstenbelasting' | 'voorlopige_aanslag' | 'box3_nabetaling' | 'btw' | 'overig_belasting'
+
 export type DebtSubtype =
   | MortgageSubtype
   | StudentLoanSubtype
   | PersonalLoanSubtype
   | CreditCardSubtype
   | RevolvingCreditSubtype
+  | BelastingschuldSubtype
 
 export interface Debt {
   id: string
@@ -73,6 +77,7 @@ export const DEBT_TYPE_LABELS: Record<DebtType, string> = {
   credit_card: 'Creditcard',
   revolving_credit: 'Doorlopend krediet',
   payment_plan: 'Afbetalingsregeling',
+  belastingschuld: 'Belastingschuld',
   other: 'Overig',
 }
 
@@ -84,6 +89,7 @@ export const DEBT_TYPE_ICONS: Record<DebtType, string> = {
   credit_card: 'CreditCard',
   revolving_credit: 'RefreshCw',
   payment_plan: 'CalendarCheck',
+  belastingschuld: 'Receipt',
   other: 'CircleDot',
 }
 
@@ -114,6 +120,13 @@ export const DEBT_SUBTYPE_LABELS: Partial<Record<DebtType, Record<string, string
     doorlopend_krediet: 'Doorlopend krediet',
     roodstand: 'Roodstand',
   },
+  belastingschuld: {
+    inkomstenbelasting: 'Inkomstenbelasting aanslag',
+    voorlopige_aanslag: 'Voorlopige aanslag',
+    box3_nabetaling: 'Box 3 nabetaling',
+    btw: 'BTW-schuld',
+    overig_belasting: 'Overige belastingschuld',
+  },
 }
 
 export const REPAYMENT_TYPE_LABELS: Record<RepaymentType, string> = {
@@ -143,6 +156,7 @@ export const DEBT_TYPE_FIELDS: Record<DebtType, string[]> = {
   revolving_credit: ['subtype', 'credit_limit'],
   car_loan: [],
   payment_plan: [],
+  belastingschuld: ['subtype'],
   other: [],
 }
 
