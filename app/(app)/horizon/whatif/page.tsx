@@ -29,6 +29,7 @@ import { usePerspective } from '@/components/app/perspective-provider'
 import { WhatIfActions } from '@/components/app/horizon/whatif-actions'
 import { WhatIfPresets } from '@/components/app/horizon/whatif-presets'
 import { WhatIfChat } from '@/components/app/horizon/whatif-chat'
+import { WhatIfScenarios } from '@/components/app/horizon/whatif-scenarios'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { useChatContext } from '@/components/app/chat/chat-provider'
@@ -176,6 +177,12 @@ export default function WhatIfPage() {
 
   const handleRemoveEvent = useCallback((id: string) => {
     setEvents(prev => prev.filter(e => e.id !== id))
+  }, [])
+
+  // ── Load saved scenario ────────────────────────────────────
+  const handleLoadScenario = useCallback((loadedOverrides: WhatIfOverrides, loadedEvents: WhatIfEvent[]) => {
+    setOverrides(loadedOverrides)
+    setEvents(loadedEvents)
   }, [])
 
   // ── Active events (for simulation) ────────────────────────
@@ -588,6 +595,14 @@ export default function WhatIfPage() {
                 />
               </div>
             </div>
+
+            {/* Saved scenarios */}
+            <WhatIfScenarios
+              overrides={overrides}
+              events={events}
+              fireAge={whatIfFireAge}
+              onLoadScenario={handleLoadScenario}
+            />
 
             {/* Sliders */}
             <WhatIfSliders
