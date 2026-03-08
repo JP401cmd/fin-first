@@ -7,10 +7,22 @@ import {
   type Goal, type GoalType, GOAL_TYPE_LABELS,
   computeGoalProgress, getGoalColorClasses,
 } from '@/lib/goal-data'
+import { computeSharePct, SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { GoalForm } from '@/components/app/goal-form'
 import { GoalProgressTimeline, buildGoalHistory } from '@/components/app/will/goal-progress-timeline'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+
+type HouseholdInfo = {
+  householdId: string
+  splitMode: SplitMode
+  customSplitPct: number | null
+  primaryPayerId: string | null
+  myUserId: string
+  myName: string
+  partnerName: string
+  mySharePct: number
+}
 
 type Asset = { id: string; name: string; current_value: number }
 type Debt = { id: string; name: string; current_balance: number }
@@ -33,6 +45,7 @@ export function GoalDetailModal({
   const [showCompleted, setShowCompleted] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [goalFilter, setGoalFilter] = useState<'all' | 'personal' | 'shared'>('all')
+  const [householdInfo, setHouseholdInfo] = useState<HouseholdInfo | null>(null)
 
   const loadData = useCallback(async () => {
     const supabase = createClient()
@@ -62,6 +75,43 @@ export function GoalDetailModal({
 
     if (assetsRes.data) setAssets(assetsRes.data as Asset[])
     if (debtsRes.data) setDebts(debtsRes.data as Debt[])
+
+    // Fetch household info for per-partner breakdown on shared goals
+    const hasAnyShared = updatedGoals.some(g => g.ownership === 'shared')
+    if (hasAnyShared) {
+      try {
+        const statusRes = await fetch('/api/household/status')
+        if (statusRes.ok) {
+          const status = await statusRes.json()
+          if (status.has_household && status.household) {
+            const settingsRes = await fetch('/api/household/settings')
+            const settings = settingsRes.ok ? await settingsRes.json() : {}
+            const supabase2 = createClient()
+            const { data: { user: me } } = await supabase2.auth.getUser()
+            const myMember = (status.members ?? []).find((m: { is_current_user: boolean }) => m.is_current_user)
+            const partnerMember = (status.members ?? []).find((m: { is_current_user: boolean }) => !m.is_current_user)
+            const splitMode: SplitMode = settings.split_mode || 'equal'
+            const mySharePct = computeSharePct(
+              { splitMode, customSplitPct: settings.custom_split_pct ?? null, primaryPayerId: settings.primary_payer_id ?? null },
+              me?.id ?? '',
+            )
+            setHouseholdInfo({
+              householdId: status.household.id,
+              splitMode,
+              customSplitPct: settings.custom_split_pct ?? null,
+              primaryPayerId: settings.primary_payer_id ?? null,
+              myUserId: me?.id ?? '',
+              myName: myMember?.full_name || 'Jij',
+              partnerName: partnerMember?.full_name || 'Partner',
+              mySharePct,
+            })
+          }
+        }
+      } catch {
+        // Non-critical — proceed without household info
+      }
+    }
+
     setLoading(false)
   }, [])
 
@@ -198,6 +248,7 @@ export function GoalDetailModal({
                         isConfirmingDelete={confirmDelete === goal.id}
                         onCancelDelete={() => setConfirmDelete(null)}
                         onContributionAdded={() => { loadData(); onGoalsChanged() }}
+                        householdInfo={householdInfo}
                       />
                     ))}
                   </div>
@@ -232,6 +283,7 @@ export function GoalDetailModal({
                           isConfirmingDelete={confirmDelete === goal.id}
                           onCancelDelete={() => setConfirmDelete(null)}
                           onContributionAdded={() => { loadData(); onGoalsChanged() }}
+                          householdInfo={householdInfo}
                         />
                       ))}
                     </div>
@@ -279,6 +331,7 @@ function GoalCard({
   isConfirmingDelete,
   onCancelDelete,
   onContributionAdded,
+  householdInfo,
 }: {
   goal: Goal
   onEdit: () => void
@@ -287,6 +340,7 @@ function GoalCard({
   isConfirmingDelete: boolean
   onCancelDelete: () => void
   onContributionAdded: () => void
+  householdInfo: HouseholdInfo | null
 }) {
   const { current, target, pct, onTrack, eta } = computeGoalProgress(goal)
   const colors = getGoalColorClasses(goal.color)
@@ -444,6 +498,56 @@ function GoalCard({
               />
             </div>
           </div>
+
+          {/* Per-partner contribution breakdown for shared goals */}
+          {goal.ownership === 'shared' && householdInfo && !goal.is_completed && (
+            <div className="mt-2.5 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/50 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+                  Bijdrage per partner
+                </span>
+                <span className="text-[10px] text-[var(--ink-4)]">
+                  {SPLIT_MODE_LABELS[householdInfo.splitMode]}
+                </span>
+              </div>
+              {/* My contribution */}
+              <div className="space-y-1.5">
+                <div>
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="font-medium text-wil-600">{householdInfo.myName}</span>
+                    <span className="text-[var(--ink-3)]">
+                      {isFreedm
+                        ? `${Math.round(target * householdInfo.mySharePct / 100)} dgn verwacht`
+                        : `${formatCurrency(target * householdInfo.mySharePct / 100)} verwacht`}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+                    <div
+                      className="h-full rounded-full bg-wil-400 transition-all duration-500"
+                      style={{ width: `${Math.min(100, target > 0 ? ((current * householdInfo.mySharePct / 100) / (target * householdInfo.mySharePct / 100)) * 100 : 0)}%` }}
+                    />
+                  </div>
+                </div>
+                {/* Partner contribution */}
+                <div>
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="font-medium text-horizon-600">{householdInfo.partnerName}</span>
+                    <span className="text-[var(--ink-3)]">
+                      {isFreedm
+                        ? `${Math.round(target * (100 - householdInfo.mySharePct) / 100)} dgn verwacht`
+                        : `${formatCurrency(target * (100 - householdInfo.mySharePct) / 100)} verwacht`}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+                    <div
+                      className="h-full rounded-full bg-horizon-400 transition-all duration-500"
+                      style={{ width: `${Math.min(100, target > 0 ? ((current * (100 - householdInfo.mySharePct) / 100) / (target * (100 - householdInfo.mySharePct) / 100)) * 100 : 0)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Linked entity info */}
           {isLinked && (
