@@ -11256,3 +11256,38 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#627, #629, #630)
 - Zero TypeScript errors
 - All data from real Supabase queries, no mock data
+
+## Session 2026-03-08 - Features #646, #648, #647
+
+### Feature #646: Schuldentype 'belastingschuld' toegevoegd aan DEBT_TYPES - PASSING
+- Added 'belastingschuld' to DebtType union type
+- Label: 'Belastingschuld', Icon: 'Receipt'
+- BelastingschuldSubtype: inkomstenbelasting, voorlopige_aanslag, box3_nabetaling, btw, overig_belasting
+- All subtypes in DEBT_SUBTYPE_LABELS with Dutch labels
+- DEBT_TYPE_FIELDS: ['subtype', 'tax_year', 'has_payment_plan']
+- Updated balans report local DEBT_TYPE_LABELS copy
+- Commit: b71ca67
+
+### Feature #648: Database migratie voor belastingschuld-specifieke kolommen - PASSING
+- Migration 20260308100003_add_debt_belastingschuld_fields.sql
+- ALTER TABLE debts ADD COLUMN tax_year integer
+- ALTER TABLE debts ADD COLUMN has_payment_plan boolean DEFAULT false
+- Comments added on both columns (Dutch)
+- Extended Debt TypeScript interface with tax_year and has_payment_plan
+- Updated 4 test files with default values for new fields
+- Commit: f480068
+
+### Feature #647: Belastingschuld formuliervelden in debt-form - PASSING
+- Added taxYear and hasPaymentPlan state variables
+- Belastingjaar number input (2000-2099 range, current year placeholder)
+- Betalingsregeling toggle checkbox
+- When enabled: shows monthly payment + end date in styled sub-section
+- Creditor defaults to 'Belastingdienst' on type change
+- Interest rate defaults to 4% on type change
+- All fields saved to database row (tax_year, has_payment_plan)
+- Commit: included in 5a1796b (parallel agent commit)
+
+### Current Status
+- 3 features completed this session (#646, #648, #647)
+- Zero TypeScript errors
+- Could not verify via browser (no test credentials available)
