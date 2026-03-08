@@ -10,7 +10,7 @@ import { formatCurrency } from '@/lib/format'
 import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
 import { renderMarkdown, findToolInvocation, TOOL_LOADING_STATES, TOOL_OUTPUT_STATES, type MessagePart } from '@/components/app/chat/markdown-helpers'
 import {
-  Send, Loader2, Check, Calendar,
+  Send, Loader2, Check, Calendar, Target, Clock,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -24,6 +24,14 @@ type SuggestLifeEventResult = {
   monthly_income_change: number
   duration_months: number
   explanation: string
+}
+
+type SuggestActionResult = {
+  title: string
+  description: string | null
+  freedom_days_impact: number
+  euro_impact_monthly: number | null
+  priority_score: number
 }
 
 interface WhatIfChatProps {
@@ -92,6 +100,40 @@ function LifeEventSuggestionCard({
   )
 }
 
+// ── Action Suggestion Card (planner mode) ──────────────────────────────────
+
+function ActionSuggestionCard({ data }: { data: SuggestActionResult }) {
+  return (
+    <div className="mt-2 w-full rounded-[var(--r-lg)] border border-wil-200 bg-wil-50/40 text-left">
+      <div className="px-3 py-2.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <Target className="h-3.5 w-3.5 text-wil-600" />
+            <span className="text-xs font-semibold text-[var(--ink)]">{data.title}</span>
+          </div>
+          <span className="shrink-0 rounded-full bg-wil-100 px-1.5 py-0.5 text-[10px] font-medium text-wil-700">
+            Actie
+          </span>
+        </div>
+        {data.description && (
+          <p className="mt-1 text-xs leading-snug text-[var(--ink-3)]">{data.description}</p>
+        )}
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[10px] tabular-nums text-[var(--ink-3)]">
+          {data.freedom_days_impact > 0 && (
+            <span className="flex items-center gap-0.5">
+              <Clock className="h-2.5 w-2.5" />
+              {data.freedom_days_impact} vrijheidsdagen
+            </span>
+          )}
+          {data.euro_impact_monthly != null && data.euro_impact_monthly !== 0 && (
+            <span>{formatCurrency(data.euro_impact_monthly)}/mnd</span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── WhatIfChat ──────────────────────────────────────────────────────────────
 
 export function WhatIfChat({ onAddEvent }: WhatIfChatProps) {
@@ -112,6 +154,14 @@ export function WhatIfChat({ onAddEvent }: WhatIfChatProps) {
   })
 
   const isStreaming = status === 'streaming' || status === 'submitted'
+
+  // Detect if last AI message used suggestAction → planner mode active
+  const isPlannerMode = useMemo(() => {
+    const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant')
+    if (!lastAssistant) return false
+    const parts = lastAssistant.parts as MessagePart[]
+    return parts.some((p) => findToolInvocation(p as Record<string, unknown>, 'suggestAction') !== null)
+  }, [messages])
 
   // Only auto-scroll within the chat container, and only when user hasn't scrolled up
   useEffect(() => {
@@ -221,6 +271,33 @@ export function WhatIfChat({ onAddEvent }: WhatIfChatProps) {
           )
         }
       }
+
+      // ── suggestAction (planner mode) ──
+      const action = findToolInvocation(part, 'suggestAction')
+      if (action) {
+        const isLoading = TOOL_LOADING_STATES.includes(action.state)
+        const hasOutput = TOOL_OUTPUT_STATES.includes(action.state) && action.output
+
+        if (isLoading) {
+          elements.push(
+            <div key={`action-loading-${action.toolCallId}`} className="mt-2 w-full rounded-[var(--r-lg)] border border-wil-100 bg-[var(--paper)] px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-wil-400" />
+                <span className="text-xs text-[var(--ink-3)]">Actie wordt voorbereid...</span>
+              </div>
+            </div>
+          )
+        }
+
+        if (hasOutput) {
+          elements.push(
+            <ActionSuggestionCard
+              key={`action-${action.toolCallId}`}
+              data={action.output as SuggestActionResult}
+            />
+          )
+        }
+      }
     }
 
     return elements
@@ -236,7 +313,9 @@ export function WhatIfChat({ onAddEvent }: WhatIfChatProps) {
         <FinnAvatar size={28} />
         <div>
           <span className="text-sm font-semibold text-wil-600">Will</span>
-          <span className="ml-1 text-[11px] text-[var(--ink-3)]">Droomgids</span>
+          <span className={`ml-1 text-[11px] transition-colors ${isPlannerMode ? 'text-wil-600 font-medium' : 'text-[var(--ink-3)]'}`}>
+            {isPlannerMode ? 'Planner' : 'Droomgids'}
+          </span>
         </div>
       </div>
 
@@ -275,7 +354,8 @@ export function WhatIfChat({ onAddEvent }: WhatIfChatProps) {
 
           const hasContent =
             parts.some((p) => p.type === 'text' && 'text' in p && p.text) ||
-            parts.some((p) => findToolInvocation(p as Record<string, unknown>, 'suggestLifeEvent') !== null)
+            parts.some((p) => findToolInvocation(p as Record<string, unknown>, 'suggestLifeEvent') !== null) ||
+            parts.some((p) => findToolInvocation(p as Record<string, unknown>, 'suggestAction') !== null)
 
           if (!hasContent) return null
 

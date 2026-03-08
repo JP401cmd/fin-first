@@ -18,7 +18,7 @@ export function getTools(_domain: AIDomain, supabase: SupabaseClient, context?: 
   }
 
   if (context === 'whatif') {
-    return { ...base, suggestLifeEvent: suggestLifeEventTool }
+    return { ...base, suggestLifeEvent: suggestLifeEventTool, suggestAction: suggestActionTool }
   }
 
   return { ...base, suggestAction: suggestActionTool }
