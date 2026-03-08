@@ -1,3 +1,34 @@
+## Session 2026-03-08 - Features #573, #574, #575
+
+### Feature #573: Huishouden-features graceful bij solo-gebruiker - PASSING
+- HuishoudenVergelijkingWidget: returns null when !isHousehold (was showing empty state)
+- HuishoudenActiviteitWidget: returns null when !isHousehold (was showing empty state)
+- Checkin page: changed "jullie gedeelde doelen" to "je doelen" (solo-friendly)
+- Verified: perspective switcher already hidden, privacy settings already gated, FIRE section already returns null
+- Zero TypeScript errors
+
+### Feature #574: Partner verlaat huishouden: graceful degradatie - PASSING
+- Leave API: added goals to dataTables (shared goals revert to personal)
+- Leave API: resets household_type to 'solo' and selected_perspective to 'personal'
+- Leave API: dissolves household when only 1 partner remains (both partners reverted to solo)
+- Badges and streaks explicitly NOT touched (preserved)
+- Net worth snapshots preserved (ownership updated, not deleted)
+- Updated API doc comment with full degradation behavior
+
+### Feature #575: Uitnodiging verloopt na 7 dagen - PASSING
+- Database: expires_at already defaults to now() + 7 days
+- Accept endpoint: already checks expiry and returns "Uitnodiging is verlopen"
+- Status API: now auto-expires stale pending invitations, returns expired invitations
+- Invite GET API: auto-expires stale invitations, filters expired from received list
+- Frontend: expired invitations show "Verlopen" + "Opnieuw uitnodigen" button
+- Invite form visible when only expired invitations exist (no active pending)
+- Commit: a37282d
+
+### Current Status
+- 3 features completed this session (#573, #574, #575)
+- Zero TypeScript errors
+- All changes to existing patterns, no new files
+
 ## Session 2026-03-08 - Features #531, #532, #544
 
 ### Feature #531: Vrijheidstijd herberekent bij perspectief-wissel - PASSING
