@@ -12,27 +12,33 @@ export interface DiscoverItem {
   href: string
   teaser: string
   module: 'kern' | 'wil' | 'horizon'
+  /** Minimum sovereignty level required (-2..6). Default 0 = always visible. */
+  minLevel: number
 }
 
-/** All discoverable features mapped to pages */
+/** All discoverable features mapped to pages — at least 15 items across modules */
 export const DISCOVER_ITEMS: DiscoverItem[] = [
-  // Kern
-  { id: 'vermogensverloop',      label: 'Vermogensverloop',       description: 'Net worth snapshots en grafiek', href: '/core', teaser: 'Wist je dat je je vermogen over tijd kunt volgen?',              module: 'kern' },
-  { id: 'snapshot_vergelijking', label: 'Snapshot Vergelijking',  description: 'Vergelijk twee periodes',       href: '/core', teaser: 'Wist je dat je snapshots naast elkaar kunt vergelijken?',       module: 'kern' },
-  { id: 'box3_belasting',       label: 'Box 3 Belasting',        description: 'Vermogensbelasting berekening',  href: '/core/debts', teaser: 'Wist je dat je je Box 3 belasting kunt berekenen?',   module: 'kern' },
-  { id: 'cashflow_sankey',      label: 'Cashflow Diagram',       description: 'Sankey inkomen-flow visualisatie', href: '/core/budgets', teaser: 'Wist je dat je je geldstromen visueel kunt volgen?',  module: 'kern' },
-  { id: 'data_export',          label: 'Data Export',             description: 'CSV export van al je data',      href: '/core', teaser: 'Wist je dat je al je data kunt exporteren als CSV?',          module: 'kern' },
-  // Wil
-  { id: 'nibud_benchmark',      label: 'NIBUD Benchmark',        description: 'Vergelijking met richtlijnen',   href: '/will', teaser: 'Wist je dat je je budget kunt vergelijken met NIBUD?',        module: 'wil' },
-  { id: 'doelen_systeem',       label: 'Doelen Systeem',         description: 'Financiele doelen instellen',     href: '/will', teaser: 'Wist je dat je financiele doelen kunt instellen en volgen?',  module: 'wil' },
-  { id: 'beslissingspatronen',  label: 'Beslissingspatronen',    description: 'Vrijheidsdagen per actie-type',   href: '/will', teaser: 'Wist je dat je kunt zien welke acties de meeste impact hebben?', module: 'wil' },
-  // Horizon
-  { id: 'fire_projecties',      label: 'FIRE Projecties',        description: 'Pad naar financiele vrijheid',    href: '/horizon', teaser: 'Wist je dat je je pad naar FIRE kunt simuleren?',         module: 'horizon' },
-  { id: 'fire_scenario_analyse', label: 'Scenario Analyse',      description: 'Drie paden naar vrijheid',        href: '/horizon', teaser: 'Wist je dat je drie scenario\'s kunt vergelijken?',       module: 'horizon' },
-  { id: 'monte_carlo',          label: 'Monte Carlo Simulaties', description: '1.000 simulaties draaien',        href: '/horizon', teaser: 'Wist je dat je Monte Carlo simulaties kunt draaien?',     module: 'horizon' },
-  { id: 'levensgebeurtenissen', label: 'Levensgebeurtenissen',   description: 'Plan life events en zie impact',  href: '/horizon', teaser: 'Wist je dat je levensgebeurtenissen kunt plannen?',       module: 'horizon' },
-  { id: 'withdrawal_strategie', label: 'Opnamestrategie',        description: 'Hoe je vermogen opneemt',         href: '/horizon', teaser: 'Wist je dat je verschillende opnamestrategieen kunt vergelijken?', module: 'horizon' },
-  { id: 'veerkracht_score',     label: 'Veerkracht Analyse',     description: 'Resilience score 0-100',          href: '/horizon', teaser: 'Wist je dat je een veerkrachtscore hebt?',               module: 'horizon' },
+  // ── Kern ──────────────────────────
+  { id: 'vermogensverloop',      label: 'Vermogensverloop',       description: 'Net worth snapshots en grafiek',        href: '/core',         teaser: 'Wist je dat je je vermogen over tijd kunt volgen?',              module: 'kern',    minLevel: 1 },
+  { id: 'snapshot_vergelijking', label: 'Snapshot Vergelijking',  description: 'Vergelijk twee periodes',               href: '/core',         teaser: 'Wist je dat je snapshots naast elkaar kunt vergelijken?',       module: 'kern',    minLevel: 3 },
+  { id: 'box3_belasting',       label: 'Box 3 Belasting',        description: 'Vermogensbelasting berekening',          href: '/core/belasting', teaser: 'Wist je dat je je Box 3 belasting kunt berekenen?',           module: 'kern',    minLevel: 1 },
+  { id: 'cashflow_sankey',      label: 'Cashflow Diagram',       description: 'Sankey inkomen-flow visualisatie',       href: '/core/budgets', teaser: 'Wist je dat je je geldstromen visueel kunt volgen?',           module: 'kern',    minLevel: 1 },
+  { id: 'data_export',          label: 'Data Export',             description: 'CSV export van al je data',              href: '/core',         teaser: 'Wist je dat je al je data kunt exporteren als CSV?',          module: 'kern',    minLevel: 3 },
+  { id: 'budget_optimalisatie', label: 'Budget Optimalisatie',    description: 'Slimmer omgaan met je uitgaven',         href: '/core/budgets', teaser: 'Wist je dat je je budget automatisch kunt optimaliseren?',     module: 'kern',    minLevel: -2 },
+  { id: 'schulden_aflosplan',   label: 'Aflosstrategie',         description: 'Sneeuwbal vs. lawine vergelijking',      href: '/core/debts',   teaser: 'Wist je dat je aflossingsstrategieen kunt vergelijken?',      module: 'kern',    minLevel: -2 },
+  // ── Wil ───────────────────────────
+  { id: 'nibud_benchmark',      label: 'NIBUD Benchmark',        description: 'Vergelijking met richtlijnen',           href: '/will',         teaser: 'Wist je dat je je budget kunt vergelijken met NIBUD?',        module: 'wil',     minLevel: -2 },
+  { id: 'doelen_systeem',       label: 'Doelen Systeem',         description: 'Financiele doelen instellen en volgen',   href: '/will',         teaser: 'Wist je dat je financiele doelen kunt instellen en volgen?',  module: 'wil',     minLevel: 1 },
+  { id: 'beslissingspatronen',  label: 'Beslissingspatronen',    description: 'Vrijheidsdagen per actie-type',           href: '/will',         teaser: 'Wist je dat je kunt zien welke acties de meeste impact hebben?', module: 'wil',  minLevel: 3 },
+  { id: 'spending_patterns',    label: 'Uitgavenpatronen',       description: 'Seizoenspatronen en trendanalyse',        href: '/core/budgets', teaser: 'Wist je dat je seizoenspatronen in je uitgaven kunt ontdekken?', module: 'wil',  minLevel: 1 },
+  // ── Horizon ───────────────────────
+  { id: 'fire_projecties',      label: 'FIRE Projecties',        description: 'Pad naar financiele vrijheid',            href: '/horizon',      teaser: 'Wist je dat je je pad naar FIRE kunt simuleren?',             module: 'horizon', minLevel: 1 },
+  { id: 'fire_scenario_analyse', label: 'Scenario Analyse',      description: 'Drie paden naar vrijheid',                href: '/horizon',      teaser: 'Wist je dat je drie scenario\'s kunt vergelijken?',           module: 'horizon', minLevel: 3 },
+  { id: 'monte_carlo',          label: 'Monte Carlo Simulaties', description: '1.000 simulaties draaien',                href: '/horizon',      teaser: 'Wist je dat je Monte Carlo simulaties kunt draaien?',         module: 'horizon', minLevel: 3 },
+  { id: 'levensgebeurtenissen', label: 'Levensgebeurtenissen',   description: 'Plan life events en zie impact',          href: '/horizon',      teaser: 'Wist je dat je levensgebeurtenissen kunt plannen?',           module: 'horizon', minLevel: 1 },
+  { id: 'withdrawal_strategie', label: 'Opnamestrategie',        description: 'Hoe je vermogen opneemt bij FIRE',        href: '/horizon',      teaser: 'Wist je dat je verschillende opnamestrategieen kunt vergelijken?', module: 'horizon', minLevel: 5 },
+  { id: 'veerkracht_score',     label: 'Veerkracht Analyse',     description: 'Resilience score 0-100',                  href: '/horizon',      teaser: 'Wist je dat je een veerkrachtscore hebt?',                    module: 'horizon', minLevel: 1 },
+  { id: 'vermogensprojectie_chart', label: 'Vermogensprojectie', description: '30-jaar netto vermogensgroei grafiek',    href: '/horizon',      teaser: 'Wist je dat je je vermogensgroei 30 jaar vooruit kunt zien?', module: 'horizon', minLevel: 1 },
 ]
 
 const MODULE_COLORS: Record<string, { bg: string; border: string; text: string; dot: string }> = {
@@ -96,7 +102,7 @@ interface DiscoverCarouselProps {
 }
 
 export function DiscoverCarousel({ module }: DiscoverCarouselProps) {
-  const { features } = useFeatureAccess()
+  const { features, level } = useFeatureAccess()
   const [visited, setVisited] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -141,6 +147,8 @@ export function DiscoverCarousel({ module }: DiscoverCarouselProps) {
   // Filter items: only show accessible features, optionally filtered by module
   // Exclude the current module's features that are already visible on the page
   const items = DISCOVER_ITEMS.filter(item => {
+    // Only show features at or below user's sovereignty level
+    if (item.minLevel > level) return false
     // Only show features that are accessible (not explicitly false)
     if (features[item.id] === false) return false
     // Filter by module if specified

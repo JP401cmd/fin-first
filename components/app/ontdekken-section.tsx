@@ -36,7 +36,7 @@ function getUnlockPhase(featureId: string): string | null {
 /* ── Component ─────────────────────── */
 
 export function OntdekkenSection() {
-  const { features, phase } = useFeatureAccess()
+  const { features, phase, level } = useFeatureAccess()
   const [visited, setVisited] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
 
@@ -49,21 +49,34 @@ export function OntdekkenSection() {
 
   const currentPhaseIndex = PHASES.findIndex(p => p.id === phase)
 
-  // Available but unvisited features
-  const availableItems = DISCOVER_ITEMS.filter(item => {
-    if (features[item.id] === false) return false
-    if (visited.has(item.id)) return false
-    return true
-  })
+  // Available but unvisited features — filtered by minLevel
+  const availableItems = DISCOVER_ITEMS
+    .filter(item => {
+      if (item.minLevel > level) return false
+      if (features[item.id] === false) return false
+      if (visited.has(item.id)) return false
+      return true
+    })
+    // Sort: newly unlocked first (items where minLevel == current level), then by module order
+    .sort((a, b) => {
+      const aNewlyUnlocked = a.minLevel === level ? 0 : 1
+      const bNewlyUnlocked = b.minLevel === level ? 0 : 1
+      if (aNewlyUnlocked !== bNewlyUnlocked) return aNewlyUnlocked - bNewlyUnlocked
+      const moduleOrder = { kern: 0, wil: 1, horizon: 2 }
+      return (moduleOrder[a.module] ?? 0) - (moduleOrder[b.module] ?? 0)
+    })
 
-  // Almost-unlocked: features in the next phase that are not currently available
+  // Almost-unlocked: features just above the current level (coming soon)
   const nextPhase = currentPhaseIndex < PHASES.length - 1 ? PHASES[currentPhaseIndex + 1] : null
   const comingSoonItems: (DiscoverItem & { unlockPhaseLabel: string })[] = nextPhase
     ? DISCOVER_ITEMS
         .filter(item => {
-          if (features[item.id] !== false) return false // already accessible
+          // Must be above current level but within reach (next 2 levels)
+          if (item.minLevel <= level) return false // already available
+          if (item.minLevel > level + 2) return false // too far away
+          if (features[item.id] !== false) return false // already accessible via feature-gate
           const unlockPhase = getUnlockPhase(item.id)
-          return unlockPhase === nextPhase.id
+          return unlockPhase === nextPhase.id || item.minLevel === level + 1
         })
         .map(item => ({ ...item, unlockPhaseLabel: nextPhase.label }))
     : []
