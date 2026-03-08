@@ -1,3 +1,66 @@
+## Session 2026-03-08 - Features #620, #621, #622
+
+### Feature #620: Reality-check: AI toont concrete actie-kaarten met impact - PASSING
+- ActionSuggestionCard upgraded from static display to interactive button
+- "Voeg toe aan De Wil" button POSTs to /api/ai/actions with source='chat'
+- Loading state with spinner + "Toevoegen..." text
+- "Toegevoegd" state with emerald green styling (matches LifeEventSuggestionCard pattern)
+- Card disabled after adding (prevents double-add)
+- Plus icon imported from lucide-react, addedActions + loadingActions state tracking
+
+### Feature #621: Rendement en inflatie laden uit gebruikersprofiel in what-if - PASSING
+- Added resolveFireParams import from lib/fire-params.ts
+- Profile query extended with expected_return and inflation_rate fields
+- userGrossReturn and userInflation state initialized from resolveFireParams()
+- Slider initialization uses fireParams.grossReturn instead of DEFAULT_RETURN
+- Baseline overrides use userGrossReturn instead of DEFAULT_RETURN
+- All simulation calls (baseline, what-if, per-event impact) use user values
+- DEFAULT_RETURN and INFLATION only used as initial state fallbacks
+
+### Feature #622: Meerdere events van hetzelfde type toestaan in what-if - PASSING
+- Removed alreadyAdded check that blocked duplicate event types in catalog
+- Catalog items always enabled (no more disabled/opacity-40)
+- Count badge (e.g., "1×") shown on catalog items with existing events
+- Auto-naming for duplicates: "Kinderen" → "Kinderen (2)", "Kinderen (3)"
+- Each event has unique ID via Date.now() suffix (already existed)
+- Events independently toggleable/removable, simulation handles stacked cashflows
+
+### Current Status
+- 3 features completed this session (#620, #621, #622)
+- Zero TypeScript errors
+- Commit: 81a3ef0
+
+## Session 2026-03-08 - Features #654, #656, #655
+
+### Feature #654: Schuldentype 'familielening' toegevoegd aan DEBT_TYPES - PASSING
+- Added 'familielening' to DebtType union type
+- Label: 'Familielening', Icon: Heart
+- FamilieleningSubtype: ouders, familie, vrienden, overig_onderhand
+- Subtypes in DEBT_SUBTYPE_LABELS with Dutch labels
+- DEBT_TYPE_FIELDS: ['subtype', 'repayment_type', 'has_written_agreement']
+- Heart icon added to budget-shared.tsx iconMap
+
+### Feature #656: Database migratie voor familielening-specifieke kolom - PASSING
+- Migration: 20260308100004_add_debt_has_written_agreement.sql
+- ALTER TABLE debts ADD COLUMN has_written_agreement boolean DEFAULT false
+- COMMENT on column for documentation
+- Debt interface updated with has_written_agreement: boolean
+- Test files updated (4 files) with new field default
+
+### Feature #655: Familielening formuliervelden in debt-form - PASSING
+- Creditor field shows 'Naam uitlener' label for familielening
+- Placeholder: 'Bijv. ouders, oom Jan...'
+- Default 2% interest rate and lineair repayment on type selection
+- 0% interest warning: 'Bij 0% rente kan de Belastingdienst dit als schenking aanmerken'
+- Written agreement checkbox with tip when unchecked
+- DEBT_SUBTYPE_DEFAULTS: all familielening subtypes get repayment_type: 'lineair'
+- Zero TypeScript errors
+- Commit: c305978
+
+### Current Status
+- 3 features completed this session (#654, #656, #655)
+- 588/647 features passing (90.9%)
+
 ## Session 2026-03-08 - Features #650, #651, #652
 
 ### Feature #650: Schuldentype 'dga_schuld' toegevoegd aan DEBT_TYPES - PASSING
