@@ -1,3 +1,38 @@
+## Session 2026-03-08 - Features #567, #568, #612
+
+### Feature #567: Box 3 berekening per partner en gecombineerd - PASSING
+- Already fully implemented: API at /api/household/box3 returns per-partner and combined calculations
+- Page shows ViewTab components for partner1, partner2, combined views
+- ComparisonCard and FreedomBar show per-partner tax and freedom days comparison
+- Optimal allocation hint with savings amount
+- Verified Box 3 calculation engine: 11/11 tests passing via /api/verify-box3-optimization
+
+### Feature #568: Fiscale partnerverdeling optimalisatie suggestie - PASSING
+- Added comprehensive "Optimaliseer verdeling" section to belasting page
+- Fiscal partnership explanation card with Shield icon
+- Current vs optimal distribution comparison (side-by-side grid)
+- Savings shown in euros and freedom days
+- Heffingsvrij vermogen per partner display grid
+- "Verdeling aanpassen" button opens Box3PartnerModal with sliders
+- Wired up Box3PartnerModal import and state management
+
+### Feature #612: Nieuwe levensgebeurtenis: Overlijden partner - PASSING
+- Added overlijden_partner to LIFE_EVENT_CATALOG with HeartHandshake icon
+- Fields: nettoInkomenPartner, nabestaandenpensioen, anwUitkering (select), anwBedrag, levensverzekering
+- householdOnly: true flag on catalog entry + interface extension
+- Horizon page filters householdOnly events when not in household view
+- WhatIfEventsPanel accepts isHousehold prop, filters catalog accordingly
+- whatif/page.tsx now uses usePerspective() to pass isHousehold
+- HeartHandshake icon added to EVENT_ICONS in log-timeline.tsx
+- AI suggest-life-event tool updated with complete event type list
+- Duration=0 models permanent income loss (correct for this scenario)
+- Commit: 5e13939
+
+### Current Status
+- 3 features completed this session (#567, #568, #612)
+- Zero TypeScript errors
+- Browser testing limited by Supabase auth (no working credentials)
+
 ## Session 2026-03-08 - Features #558, #559, #561
 
 ### Feature #558: Partner-notificatie instellingen configureren - PASSING
@@ -10764,3 +10799,35 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#541, #546, #542)
 - Zero TypeScript errors in changed files
 - All data from real Supabase queries, no mock data
+
+## Session 2026-03-08 - Features #578, #579, #583
+
+### Feature #578: LifeEvent type uitbreiden met metadata JSON veld - PASSING
+- LifeEvent interface already had metadata?: Record<string, unknown> (added by previous agent)
+- Migration 20260308000002_add_life_events_metadata.sql adds JSONB column with default '{}'
+- 15 typed metadata interfaces (ChildrenMetadata, AOWMetadata, etc.) already existed
+- LifeEventMetadataMap union type already defined
+- lifeEventsToCashflows() works correctly with/without metadata (ignores it)
+- Zero TypeScript errors
+
+### Feature #579: Dynamisch formulier: toont contextspecifieke velden per event type - PASSING
+- Added formMetadata state to horizon/page.tsx
+- Catalog fields render dynamically based on formType: number, percentage, select, toggle
+- Metadata initialized from catalog defaults on add, from event data on edit
+- Metadata saved in payload to life_events table
+- Tip icons (ⓘ) with tooltip, suffix support (%, /mnd), proper styling
+- Generic fields (naam, leeftijd, type, bedrag, duur) always visible
+- Custom event shows no extra fields (no fields in catalog)
+
+### Feature #583: Kinderen: aantal kinderen met geschaalde kosten - PASSING
+- Changed aantalKinderen from number to select with options 1-4
+- Added NIBUD_CHILDREN_MONTHLY_COST constant: {1: 500, 2: 830, 3: 1100, 4: 1320}
+- Added nibudChildrenCost() helper function
+- Auto-updates formAmount when aantalKinderen changes in children event
+- Explanation text about non-linear NIBUD scaling shown below selector
+- Amount remains manually adjustable after auto-calculation
+
+### Current Status
+- 3 features completed this session (#578, #579, #583)
+- Zero TypeScript errors
+- Commit: 71d2896
