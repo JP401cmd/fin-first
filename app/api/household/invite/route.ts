@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { DEFAULT_PRIVACY_SETTINGS } from '@/lib/household-data'
 
 /**
  * Household Invite API
@@ -96,7 +97,7 @@ export async function POST(request: Request) {
 
     householdId = newHousehold.id
 
-    // Add current user as owner
+    // Add current user as owner with default privacy settings (Totalen for all categories)
     const { error: memberError } = await supabase
       .from('household_members')
       .insert({
@@ -104,6 +105,7 @@ export async function POST(request: Request) {
         user_id: user.id,
         role: 'owner',
         sort_order: 0,
+        privacy_settings: DEFAULT_PRIVACY_SETTINGS,
       })
 
     if (memberError) {

@@ -17,9 +17,11 @@ type Props = {
   swr: number   // user-selected SWR: 0.04 (classic) or NL_SWR (~0.02883)
   open: boolean
   onClose: () => void
+  /** When set (e.g. 'huishouden'), indicates the simulation uses combined household data */
+  perspectiveLabel?: string
 }
 
-export function BacktestingModal({ input, swr, open, onClose }: Props) {
+export function BacktestingModal({ input, swr, open, onClose, perspectiveLabel }: Props) {
   const result = useMemo(() => {
     if (!open) return null
     return runBacktest(input, 30, swr)
@@ -38,12 +40,17 @@ export function BacktestingModal({ input, swr, open, onClose }: Props) {
 
   return (
     <>
-      <BottomSheet open={true} onClose={onClose} title="Historische veerkracht">
+      <BottomSheet open={true} onClose={onClose} title={perspectiveLabel ? `Historische veerkracht — ${perspectiveLabel}` : 'Historische veerkracht'}>
         <div className="space-y-6 px-6 py-6">
 
           {/* Kicker */}
           <p className="label-editorial text-horizon-600">
             HISTORISCH BEWIJS — 1970 TOT 2024
+            {perspectiveLabel && (
+              <span className="ml-2 rounded-full bg-horizon-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-horizon-700">
+                {perspectiveLabel}
+              </span>
+            )}
           </p>
 
           {/* Metric band */}
@@ -144,8 +151,11 @@ export function BacktestingModal({ input, swr, open, onClose }: Props) {
               <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">1970–2024 · {result.allPaths.length} historische periodes</p>
             </div>
             <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-              Historische veerkracht toont hoe jouw strategie standhield in {result.allPaths.length} verschillende startpunten —
+              Historische veerkracht toont hoe {perspectiveLabel ? 'jullie gezamenlijke' : 'jouw'} strategie standhield in {result.allPaths.length} verschillende startpunten —
               inclusief echte crashes die een normaalverdeling onderschat.
+              {perspectiveLabel && (
+                <> Op basis van gecombineerd vermogen, inkomen en uitgaven van het huishouden.</>
+              )}
             </div>
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Succesvolle periodes</span>

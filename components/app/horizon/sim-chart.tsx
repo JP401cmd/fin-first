@@ -15,6 +15,15 @@ export type ScenarioOverlay = {
   points: [number, number][]  // [age, netWorth]
 }
 
+export type HouseholdPartnerOverlay = {
+  name: string
+  color: string
+  points: [number, number][]  // [age, netWorth]
+  fireAge: number | null
+  /** If true, renders as dashed line (used for combined household line) */
+  isDashed?: boolean
+}
+
 export type MonteCarloOverlay = {
   /** Percentile bands indexed by year offset (0 = current age) */
   p10: number[]
@@ -43,6 +52,7 @@ export function SimChart({
   monteCarloOverlay,
   baselineFireAge,
   dailyExpenseRate,
+  householdOverlays,
 }: {
   rows: SimRow[]
   fireAge: number | null
@@ -62,6 +72,8 @@ export function SimChart({
   baselineFireAge?: number | null
   /** Daily expense rate for freedom-time tooltip (optional) */
   dailyExpenseRate?: number
+  /** Optional partner trajectories for household perspective */
+  householdOverlays?: HouseholdPartnerOverlay[]
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
   const [hoveredCfId, setHoveredCfId] = useState<string | null>(null)
@@ -117,9 +129,12 @@ export function SimChart({
         return age >= currentAge && age <= endAge
       }))
     : 0
+  const hhMax = householdOverlays?.length
+    ? Math.max(...householdOverlays.flatMap(o => o.points.map(([, v]) => v)))
+    : 0
   const rawMax = allPts.length > 0
-    ? Math.max(...allPts.map(([, v]) => v), fireTarget ?? 0, baselineMax, overlayMax, mcMax)
-    : Math.max(1, overlayMax, mcMax)
+    ? Math.max(...allPts.map(([, v]) => v), fireTarget ?? 0, baselineMax, overlayMax, mcMax, hhMax)
+    : Math.max(1, overlayMax, mcMax, hhMax)
   const maxVal = Math.max(rawMax, 1) * 1.08
 
   const xScale = (age: number) =>
@@ -442,6 +457,43 @@ export function SimChart({
           )
         )}
 
+        {/* Household partner overlay paths */}
+        {householdOverlays?.map((overlay, i) =>
+          overlay.points.length > 1 && (
+            <g key={`hh-${overlay.name}`}>
+              <path
+                d={pointsToPath(overlay.points)}
+                fill="none"
+                stroke={overlay.color}
+                strokeWidth={overlay.isDashed ? 2 : 1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeDasharray={overlay.isDashed ? '6 4' : 'none'}
+                opacity={overlay.isDashed ? 0.7 : 0.55}
+                pathLength={1}
+                style={{
+                  strokeDashoffset: hasEntered ? 0 : (overlay.isDashed ? 0 : 1),
+                  transition: hasEntered ? `stroke-dashoffset 1s cubic-bezier(.22,1,.36,1) ${0.2 + i * 0.15}s` : 'none',
+                  ...(overlay.isDashed ? {} : { strokeDasharray: '1', strokeDashoffset: hasEntered ? 0 : 1 }),
+                }}
+              />
+              {/* Partner FIRE age dot */}
+              {overlay.fireAge !== null && overlay.fireAge >= currentAge && overlay.fireAge <= endAge && (
+                <circle
+                  cx={PAD.left + xScale(overlay.fireAge)}
+                  cy={PAD.top + yScale(
+                    overlay.points.find(([a]) => Math.abs(a - overlay.fireAge!) < 1)?.[1] ?? 0
+                  )}
+                  r={3}
+                  fill={overlay.color}
+                  opacity={hasEntered ? 0.8 : 0}
+                  style={{ transition: 'opacity 0.4s ease 1s' }}
+                />
+              )}
+            </g>
+          )
+        )}
+
         {/* Accumulation path — horizon goud */}
         {accPts.length > 1 && (
           <path
@@ -667,6 +719,33 @@ export function SimChart({
           )
         })}
       </svg>
+
+      {/* Household partner legend */}
+      {householdOverlays && householdOverlays.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4">
+          {householdOverlays.map(overlay => (
+            <div key={overlay.name} className="flex items-center gap-1.5">
+              <svg width="20" height="8" className="shrink-0">
+                <line
+                  x1="0" y1="4" x2="20" y2="4"
+                  stroke={overlay.color}
+                  strokeWidth={overlay.isDashed ? 2 : 1.8}
+                  strokeDasharray={overlay.isDashed ? '4 3' : 'none'}
+                  opacity={overlay.isDashed ? 0.7 : 0.55}
+                />
+              </svg>
+              <span className="text-[10px] font-medium text-[var(--ink-3)]">
+                {overlay.name}
+                {overlay.fireAge !== null && (
+                  <span className="ml-1 font-mono text-[var(--ink-4)]">
+                    ({Math.round(overlay.fireAge)}j)
+                  </span>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

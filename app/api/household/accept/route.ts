@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { DEFAULT_PRIVACY_SETTINGS } from '@/lib/household-data'
 
 /**
  * Household Accept/Decline API
@@ -97,7 +98,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Je bent al lid van een huishouden. Verlaat eerst je huidige huishouden.' }, { status: 400 })
   }
 
-  // Add user as member of the household
+  // Add user as member of the household with default privacy settings (Totalen for all categories)
   const { error: memberError } = await supabase
     .from('household_members')
     .insert({
@@ -105,6 +106,7 @@ export async function POST(request: Request) {
       user_id: user.id,
       role: 'member',
       sort_order: 1,
+      privacy_settings: DEFAULT_PRIVACY_SETTINGS,
     })
 
   if (memberError) {

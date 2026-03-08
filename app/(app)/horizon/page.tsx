@@ -13,7 +13,7 @@ import {
   computeResilienceScore, formatFireAge, formatCountdown,
   computeLifeEventImpact, ageAtDate, deriveCountdown,
   runMonteCarlo,
-  LIFE_EVENT_CATALOG, LIFE_EVENT_GROUPS, nibudChildrenCost, berekenSchenkbelasting,
+  LIFE_EVENT_CATALOG, LIFE_EVENT_GROUPS, nibudChildrenCost, berekenSchenkbelasting, berekenAutoMaandkosten, WERELDREIS_STIJL_PRESETS,
   type LifeEventGroup,
   type FinancialInput, type FireProjection, type FireRange,
   type ProjectionMonth, type ResilienceScore,
@@ -46,7 +46,7 @@ import { FeatureGate } from '@/components/app/feature-gate'
 import { HouseholdFireSection } from '@/components/app/household-fire-section'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { SimChartModal } from '@/components/app/horizon/sim-chart-widget'
-import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverlay, type MonteCarloOverlay } from '@/components/app/horizon/sim-chart'
+import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverlay, type MonteCarloOverlay, type HouseholdPartnerOverlay } from '@/components/app/horizon/sim-chart'
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { parseFireStrategy, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
 
@@ -81,6 +81,8 @@ export default function HorizonPage() {
   const isPartnerView = perspective === 'partner'
   const [householdHero, setHouseholdHero] = useState<HouseholdHeroData | null>(null)
   const [partnerHero, setPartnerHero] = useState<HouseholdHeroData | null>(null)
+  const [householdInput, setHouseholdInput] = useState<FinancialInput | null>(null)
+  const [householdOverlays, setHouseholdOverlays] = useState<HouseholdPartnerOverlay[] | null>(null)
   const [fireParams, setFireParams] = useState<FireParams>(resolveFireParams({}))
   const fireSwr = fireParams.effectiveSwr
   const [input, setInput] = useState<FinancialInput | null>(null)
@@ -295,6 +297,8 @@ export default function HorizonPage() {
     if (!isHouseholdView && !isPartnerView) {
       setHouseholdHero(null)
       setPartnerHero(null)
+      setHouseholdInput(null)
+      setHouseholdOverlays(null)
       return
     }
     async function loadHouseholdData() {
@@ -317,6 +321,49 @@ export default function HorizonPage() {
             freedomMonths: cp.freedomMonths,
             savingsRate: cp.savingsRate,
           })
+          // Store combined household FinancialInput for Monte Carlo / backtest
+          if (data.combined.input) {
+            setHouseholdInput(data.combined.input as FinancialInput)
+          }
+          // Build household overlays: per-partner + combined trajectory lines
+          const PARTNER_COLORS = ['#0d9488', '#7c3aed'] // teal, purple
+          const overlays: HouseholdPartnerOverlay[] = []
+          if (data.partners && Array.isArray(data.partners)) {
+            for (let i = 0; i < data.partners.length; i++) {
+              const p = data.partners[i]
+              if (!p.input) continue
+              const partnerInput = p.input as FinancialInput
+              const proj = projectForward(partnerInput, 480) // 40 years
+              const pts: [number, number][] = proj
+                .filter((m: ProjectionMonth) => m.age !== null)
+                .map((m: ProjectionMonth) => [m.age as number, m.netWorth] as [number, number])
+                .filter((_: [number, number], idx: number) => idx % 12 === 0)
+              overlays.push({
+                name: p.fullName ?? `Partner ${i + 1}`,
+                color: PARTNER_COLORS[i] ?? PARTNER_COLORS[0],
+                points: pts,
+                fireAge: p.projection?.fireAge ?? null,
+              })
+            }
+          }
+          // Combined household trajectory (dashed line)
+          if (data.combined?.input) {
+            const combinedInput = data.combined.input as FinancialInput
+            const proj = projectForward(combinedInput, 480)
+            const pts: [number, number][] = proj
+              .filter((m: ProjectionMonth) => m.age !== null)
+              .map((m: ProjectionMonth) => [m.age as number, m.netWorth] as [number, number])
+              .filter((_: [number, number], idx: number) => idx % 12 === 0)
+            overlays.push({
+              name: 'Gezamenlijk',
+              color: '#8a6e42', // horizon gold
+              points: pts,
+              fireAge: cp.fireAge,
+              isDashed: true,
+            })
+          }
+          setHouseholdOverlays(overlays.length > 0 ? overlays : null)
+
           setPartnerHero(null)
         } else if (isPartnerView && data.partner2) {
           const pp = data.partner2.projection
@@ -332,6 +379,7 @@ export default function HorizonPage() {
             savingsRate: pp.savingsRate,
           })
           setHouseholdHero(null)
+          setHouseholdOverlays(null)
         }
       } catch {
         // Non-critical — fallback to personal data
@@ -508,6 +556,15 @@ export default function HorizonPage() {
         setFormDurationType('one_time')
       }
     }
+    // Pension: set amount from brutoBedrag, age from ingangLeeftijd, isIndexed from toggle
+    if (type === 'pension') {
+      const brutoBedrag = Number(metaDefaults.brutoBedrag ?? 675)
+      setFormAmount(brutoBedrag)
+      setFormDurationType('continuous')
+      setFormDirection('income')
+      setFormAge(Number(metaDefaults.ingangLeeftijd ?? 67))
+      setFormIsIndexed(Boolean(metaDefaults.isGeindexeerd ?? false))
+    }
     setEditingEvent(null)
     setShowForm(true)
   }
@@ -548,7 +605,24 @@ export default function HorizonPage() {
         metaDefaults[f.key] = f.default
       }
     }
-    setFormMetadata({ ...metaDefaults, ...(ev.metadata ?? {}) })
+    const merged = { ...metaDefaults, ...(ev.metadata ?? {}) }
+    setFormMetadata(merged)
+    // Pension: derive form state from metadata fields
+    if (ev.event_type === 'pension') {
+      const brutoBedrag = Number(merged.brutoBedrag ?? ev.monthly_income_change ?? 675)
+      setFormAmount(brutoBedrag)
+      setFormDurationType('continuous')
+      setFormDirection('income')
+      if (merged.ingangLeeftijd !== undefined) {
+        setFormAge(Number(merged.ingangLeeftijd))
+      }
+      setFormIsIndexed(Boolean(merged.isGeindexeerd ?? ev.is_indexed ?? false))
+      // Ensure brutoBedrag is in metadata (for older events without it)
+      if (merged.brutoBedrag === undefined) {
+        merged.brutoBedrag = brutoBedrag
+        setFormMetadata({ ...merged })
+      }
+    }
     setEditingEvent(ev)
     setShowForm(true)
   }
@@ -727,6 +801,28 @@ export default function HorizonPage() {
       }
     }
 
+    // Special handling for world_trip: vertrekkosten + reisbudget + vaste lasten
+    if (formType === 'world_trip') {
+      const reisstijl = String(formMetadata.reisstijl ?? 'budget')
+      const preset = WERELDREIS_STIJL_PRESETS[reisstijl]
+      const reisbudgetPerPersoon = preset?.bedrag ?? 1200
+      const aantalPersonen = Math.max(1, Number(formMetadata.aantalPersonen) || 1)
+      // Scale for multiple travelers: 2 people ≈ 1.6× one person
+      const personFactor = aantalPersonen === 1 ? 1 : 1 + (aantalPersonen - 1) * 0.6
+      const reisbudget = Math.round(reisbudgetPerPersoon * personFactor)
+      const vertrekkosten = Number(formMetadata.vertrekkosten ?? 4000)
+      const vasteLastenThuis = Boolean(formMetadata.vasteLastenThuis ?? true)
+      const vasteLastenBedrag = vasteLastenThuis ? (Number(formMetadata.vasteLastenBedrag) || 800) : 0
+      // One-time cost = vertrekkosten
+      oneTimeCost = vertrekkosten
+      // Monthly cost = reisbudget + vaste lasten thuis
+      monthlyCostChange = reisbudget + vasteLastenBedrag
+      // Income loss during trip (default from catalog)
+      monthlyIncomeChange = LIFE_EVENT_CATALOG.world_trip?.defaultMonthlyIncome ?? -3000
+      // Duration
+      durMonths = Number(formDuration) || LIFE_EVENT_CATALOG.world_trip?.defaultDuration || 12
+    }
+
     // Special handling for overlijden_partner: net income impact + cost reduction
     if (formType === 'overlijden_partner') {
       const partnerInkomen = Number(formMetadata.nettoInkomenPartner) || 2500
@@ -752,6 +848,37 @@ export default function HorizonPage() {
       oneTimeCost = verzekering > 0 ? -verzekering : 0
       // Continuous impact (no fixed duration)
       durMonths = 0
+    }
+
+    // Special handling for pension: brutoBedrag → monthlyIncomeChange, uitkeringsduur → duration
+    if (formType === 'pension') {
+      const brutoBedrag = Number(formMetadata.brutoBedrag ?? 675)
+      monthlyIncomeChange = brutoBedrag
+      monthlyCostChange = 0
+      oneTimeCost = 0
+      const uitkeringsduur = String(formMetadata.uitkeringsduur ?? 'levenslang')
+      if (uitkeringsduur === 'levenslang') {
+        durMonths = 0
+      } else {
+        durMonths = Number(uitkeringsduur) * 12
+      }
+    }
+
+    // Special handling for car_purchase: compute monthly costs from breakdown
+    if (formType === 'car_purchase') {
+      const brandstof = String(formMetadata.brandstof ?? 'benzine')
+      const jaarlijkseKm = Number(formMetadata.jaarlijkseKm ?? 15000)
+      const breakdown = berekenAutoMaandkosten(brandstof, jaarlijkseKm)
+      const vervangt = Boolean(formMetadata.vervangtHuidigeAuto)
+      const huidigeKosten = vervangt ? Number(formMetadata.huidigeAutoKosten ?? 300) : 0
+      const nettoMaand = breakdown.totaal - huidigeKosten
+      if (nettoMaand > 0) {
+        monthlyCostChange = nettoMaand
+        monthlyIncomeChange = 0
+      } else {
+        monthlyCostChange = 0
+        monthlyIncomeChange = Math.abs(nettoMaand) // saving money
+      }
     }
 
     const payload = {
@@ -997,6 +1124,7 @@ export default function HorizonPage() {
                   scenarioOverlays={scenarioOverlays}
                   monteCarloOverlay={monteCarloOverlay}
                   dailyExpenseRate={(effectiveInput?.yearlyMustExpenses ?? 0) / 365}
+                  householdOverlays={isHouseholdView ? householdOverlays ?? undefined : undefined}
                 />
                 {/* Events timeline aligned to same age axis */}
                 {events.length > 0 && (
@@ -1941,7 +2069,12 @@ export default function HorizonPage() {
                   <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
                     Specifieke instellingen
                   </p>
-                  {LIFE_EVENT_CATALOG[formType].fields!.map((field: CatalogField) => (
+                  {LIFE_EVENT_CATALOG[formType].fields!.map((field: CatalogField) => {
+                    // Conditionally hide huidigeAutoKosten when vervangtHuidigeAuto is false
+                    if (formType === 'car_purchase' && field.key === 'huidigeAutoKosten' && !formMetadata.vervangtHuidigeAuto) {
+                      return null
+                    }
+                    return (
                     <div key={field.key}>
                       <label className="text-xs font-medium text-[var(--ink-3)]">
                         {field.label}
@@ -2012,6 +2145,33 @@ export default function HorizonPage() {
                                 setFormDirection('expense')
                                 setFormDurationType('one_time')
                               }
+                              // Pension: auto-update amount from brutoBedrag, age from ingangLeeftijd
+                              if (formType === 'pension' && field.key === 'brutoBedrag') {
+                                setFormAmount(Number(val) || 0)
+                              }
+                              if (formType === 'pension' && field.key === 'ingangLeeftijd') {
+                                setFormAge(Number(val) || 68)
+                              }
+                              // Auto-update car monthly costs when km changes
+                              if (formType === 'car_purchase' && field.key === 'jaarlijkseKm') {
+                                const brandstof = String(updated.brandstof ?? 'benzine')
+                                const km = Number(val) || 15000
+                                const breakdown = berekenAutoMaandkosten(brandstof, km)
+                                setFormAmount(breakdown.totaal)
+                                setFormDirection('expense')
+                                setFormDurationType('period')
+                              }
+                              // Auto-update car monthly costs when huidigeAutoKosten changes
+                              if (formType === 'car_purchase' && field.key === 'huidigeAutoKosten') {
+                                // Just update metadata, the breakdown card will show the difference
+                              }
+                              // World trip: auto-update vertrekkosten as one-time cost
+                              if (formType === 'world_trip' && field.key === 'vertrekkosten') {
+                                const vertrek = Number(val) || 4000
+                                setFormAmount(vertrek)
+                                setFormDirection('expense')
+                                setFormDurationType('one_time')
+                              }
                             }}
                             className="min-w-0 flex-1 rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
                           />
@@ -2029,12 +2189,31 @@ export default function HorizonPage() {
                             if (formType === 'children' && field.key === 'aantalKinderen') {
                               setFormAmount(nibudChildrenCost(Number(val)))
                             }
+                            // Auto-update car monthly costs when brandstof changes
+                            if (formType === 'car_purchase' && field.key === 'brandstof') {
+                              const km = Number(formMetadata.jaarlijkseKm ?? 15000)
+                              const breakdown = berekenAutoMaandkosten(val, km)
+                              setFormAmount(breakdown.totaal)
+                              setFormDirection('expense')
+                              setFormDurationType('period')
+                            }
                             // Auto-update AOW amount based on leefsituatie
                             if (formType === 'aow' && field.key === 'leefsituatie') {
                               const baseAmount = val === 'samenwonend' ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY
                               const jarenBuiten = Number(formMetadata.jarenBuitenNL ?? 0)
                               const factor = Math.min(1, Math.max(0, (50 - jarenBuiten) / 50))
                               setFormAmount(Math.round(baseAmount * factor))
+                            }
+                            // World trip: auto-update monthly cost based on reisstijl preset
+                            if (formType === 'world_trip' && field.key === 'reisstijl') {
+                              const preset = WERELDREIS_STIJL_PRESETS[val]
+                              if (preset) {
+                                // Update the vertrekkosten as one-time cost, monthly cost handled in save
+                                const vertrek = Number(formMetadata.vertrekkosten ?? 4000)
+                                setFormAmount(vertrek)
+                                setFormDirection('expense')
+                                setFormDurationType('one_time')
+                              }
                             }
                             if (formType === 'schenking' && field.key === 'eenmaligOfJaarlijks') {
                               if (val === 'jaarlijks') {
@@ -2076,6 +2255,10 @@ export default function HorizonPage() {
                                   setFormAmount(totaal)
                                   setFormDirection('expense')
                                   setFormDurationType('one_time')
+                                }
+                                // Pension: sync isGeindexeerd toggle with formIsIndexed
+                                if (formType === 'pension' && field.key === 'isGeindexeerd') {
+                                  setFormIsIndexed(checked)
                                 }
                                 return updated
                               })
@@ -2165,6 +2348,68 @@ export default function HorizonPage() {
                           Kosten schalen niet lineair (NIBUD): 1 kind ~&#8364;500/mnd, 2 kinderen ~&#8364;830/mnd, 3 ~&#8364;1.100/mnd, 4 ~&#8364;1.320/mnd. Het bedrag hierboven is automatisch aangepast, maar blijft handmatig aanpasbaar.
                         </p>
                       )}
+                      {formType === 'pension' && field.key === 'brutoBedrag' && (
+                        <p className="mt-1 text-[10px] leading-relaxed text-[var(--ink-4)]">
+                          Gemiddeld aanvullend pensioen Nederland: ca. &#8364;675/mnd bruto. Check <span className="underline">mijnpensioenoverzicht.nl</span> voor je persoonlijke verwachte uitkering.
+                        </p>
+                      )}
+                      {formType === 'car_purchase' && field.key === 'jaarlijkseKm' && (() => {
+                        const brandstof = String(formMetadata.brandstof ?? 'benzine')
+                        const km = Number(formMetadata.jaarlijkseKm ?? 15000)
+                        const breakdown = berekenAutoMaandkosten(brandstof, km)
+                        const vervangt = Boolean(formMetadata.vervangtHuidigeAuto)
+                        const huidigeKosten = vervangt ? Number(formMetadata.huidigeAutoKosten ?? 300) : 0
+                        const netto = breakdown.totaal - huidigeKosten
+                        const brandstofLabel: Record<string, string> = { benzine: 'Benzine', diesel: 'Diesel', elektrisch: 'Laden (thuis)', hybride: 'Brandstof/laden' }
+                        return (
+                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Maandkosten breakdown (NIBUD/ANWB)</p>
+                            <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                              <div className="flex justify-between">
+                                <span>Verzekering</span>
+                                <span className="font-mono tabular-nums">{formatCurrency(breakdown.verzekering)}/mnd</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Wegenbelasting</span>
+                                <span className={`font-mono tabular-nums ${breakdown.wegenbelasting === 0 ? 'text-emerald-600' : ''}`}>
+                                  {breakdown.wegenbelasting === 0 ? 'Vrijgesteld (EV)' : `${formatCurrency(breakdown.wegenbelasting)}/mnd`}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Onderhoud</span>
+                                <span className="font-mono tabular-nums">{formatCurrency(breakdown.onderhoud)}/mnd</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>{brandstofLabel[brandstof] ?? 'Brandstof'} ({km.toLocaleString('nl-NL')} km/jr)</span>
+                                <span className="font-mono tabular-nums">{formatCurrency(breakdown.brandstof)}/mnd</span>
+                              </div>
+                              <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
+                                <span>Totaal nieuwe auto</span>
+                                <span className="font-mono tabular-nums">{formatCurrency(breakdown.totaal)}/mnd</span>
+                              </div>
+                              {vervangt && (
+                                <>
+                                  <div className="flex justify-between text-emerald-600">
+                                    <span>Huidige autokosten</span>
+                                    <span className="font-mono tabular-nums">-{formatCurrency(huidigeKosten)}/mnd</span>
+                                  </div>
+                                  <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
+                                    <span>Netto verschil</span>
+                                    <span className={`font-mono tabular-nums ${netto <= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                      {netto <= 0 ? '-' : '+'}{formatCurrency(Math.abs(netto))}/mnd
+                                    </span>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                            {brandstof === 'elektrisch' && (
+                              <p className="text-[10px] text-emerald-700">
+                                Elektrisch rijden: vrijstelling wegenbelasting t/m 2025, daarna gereduceerd tarief. Laadkosten thuis ca. &#8364;0,05/km.
+                              </p>
+                            )}
+                          </div>
+                        )
+                      })()}
                       {formType === 'house_sale' && field.key === 'makelaarskosten' && (() => {
                         const vp = Number(formMetadata.verkoopprijs) || 0
                         const rh = Number(formMetadata.resterendeHypotheek) || 0
@@ -2418,7 +2663,8 @@ export default function HorizonPage() {
                         )
                       })()}
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -3120,7 +3366,13 @@ export default function HorizonPage() {
             }
           />
           <WithdrawalModal input={effectiveInput} open={activeModal === 'withdrawal'} onClose={() => setActiveModal(null)} />
-          <BacktestingModal input={effectiveInput} swr={fireSwr} open={activeModal === 'backtesting'} onClose={() => setActiveModal(null)} />
+          <BacktestingModal
+            input={isHouseholdView && householdInput ? householdInput : effectiveInput}
+            swr={fireSwr}
+            open={activeModal === 'backtesting'}
+            onClose={() => setActiveModal(null)}
+            perspectiveLabel={isHouseholdView && householdInput ? 'huishouden' : undefined}
+          />
         </>
       )}
     </div>
