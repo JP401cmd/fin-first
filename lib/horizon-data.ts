@@ -184,10 +184,129 @@ export interface LifeEvent {
   is_active: boolean
   sort_order: number
   is_indexed: boolean
+  /** Event-type-specific details (stored as JSONB in life_events table) */
+  metadata?: Record<string, unknown>
 }
 
 /** LifeEvent with camelCase keys (frontend representation). */
 export type LifeEventFe = CamelCaseKeys<LifeEvent>
+
+// ── Per-event-type metadata interfaces (type-safe access) ────────────
+
+export interface ChildrenMetadata {
+  aantalKinderen?: number
+  kinderopvangDagen?: number
+  kinderbijslag?: boolean
+}
+
+export interface AOWMetadata {
+  leefsituatie?: 'alleenstaand' | 'samenwonend'
+  jarenInNL?: number
+}
+
+export interface PensionMetadata {
+  pensioenType?: 'bedrijf' | 'lijfrente' | 'privaat'
+  ingangLeeftijd?: number
+  uitkeringsduur?: 'levenslang' | '20' | '10' | '5'
+}
+
+export interface CarPurchaseMetadata {
+  brandstof?: 'benzine' | 'diesel' | 'elektrisch' | 'hybride'
+  nieuwOfTweedehands?: 'nieuw' | 'tweedehands'
+  jaarlijkseKm?: number
+}
+
+export interface HousePurchaseMetadata {
+  aankoopprijs?: number
+  hypotheekRente?: number
+  eersteWoning?: boolean
+  huidigeHuur?: number
+}
+
+export interface InheritanceMetadata {
+  brutoBedrag?: number
+  erfbelastingSchijf?: 'ouder' | 'partner' | 'overig'
+  bevatWoning?: boolean
+}
+
+export interface SabbaticalMetadata {
+  reiskosten?: number
+  bestemming?: 'nederland' | 'europa' | 'wereldwijd'
+  behoudtZorgverzekering?: boolean
+}
+
+export interface WorldTripMetadata {
+  aantalPersonen?: number
+  reistype?: 'backpacking' | 'comfort' | 'luxe'
+  woningVerhuren?: boolean
+}
+
+export interface RenovationMetadata {
+  type?: 'keuken' | 'badkamer' | 'uitbouw' | 'dakkapel' | 'energetisch' | 'totaal'
+  waardevermeerdering?: number
+}
+
+export interface StudyMetadata {
+  studieType?: 'cursus' | 'bachelor' | 'master' | 'promotie'
+  parttime?: boolean
+  salarisstijging?: number
+}
+
+export interface CareerChangeMetadata {
+  tussenperiode?: number
+  omscholing?: number
+  salarisstijging?: number
+}
+
+export interface PartTimeMetadata {
+  huidigUren?: number
+  nieuwUren?: number
+  behoudtPensioen?: boolean
+}
+
+export interface EarlyRetirementMetadata {
+  pensioenLeeftijd?: number
+  heeftPensioenregeling?: boolean
+  overbruggingsUitkering?: number
+}
+
+export interface WeddingMetadata {
+  aantalGasten?: number
+  huwelijksreis?: number
+  huwelijksvoorwaarden?: boolean
+}
+
+export interface MoveMetadata {
+  afstand?: 'lokaal' | 'regionaal' | 'internationaal'
+  huurverschil?: number
+}
+
+export interface SideHustleMetadata {
+  type?: 'freelance' | 'verhuur' | 'ecommerce' | 'content' | 'overig'
+  opstartkosten?: number
+  groeipercentage?: number
+}
+
+/** Union of all typed metadata interfaces per event_type key. */
+export type LifeEventMetadataMap = {
+  children: ChildrenMetadata
+  aow: AOWMetadata
+  pension: PensionMetadata
+  car_purchase: CarPurchaseMetadata
+  house_purchase: HousePurchaseMetadata
+  inheritance: InheritanceMetadata
+  sabbatical: SabbaticalMetadata
+  world_trip: WorldTripMetadata
+  renovation: RenovationMetadata
+  study: StudyMetadata
+  career_change: CareerChangeMetadata
+  part_time: PartTimeMetadata
+  early_retirement: EarlyRetirementMetadata
+  wedding: WeddingMetadata
+  move: MoveMetadata
+  side_hustle: SideHustleMetadata
+  custom: Record<string, unknown>
+}
 
 export interface LifeEventImpact {
   event: LifeEvent
@@ -211,7 +330,32 @@ export interface ResilienceScore {
 
 // ── Life Event Catalog ───────────────────────────────────────
 
-export const LIFE_EVENT_CATALOG: Record<string, {
+/** Field type definitions for context-specific life event fields. */
+export type CatalogFieldType = 'number' | 'select' | 'toggle' | 'percentage'
+
+export interface CatalogFieldOption {
+  value: string | number
+  label: string
+}
+
+export interface CatalogField {
+  /** Unique key — maps to metadata[key] on the LifeEvent */
+  key: string
+  /** Display label (Dutch) */
+  label: string
+  /** Input type */
+  fieldType: CatalogFieldType
+  /** Default value */
+  default: string | number | boolean
+  /** Help text / tooltip */
+  tip?: string
+  /** Options for 'select' type fields */
+  options?: CatalogFieldOption[]
+  /** Optional suffix shown after the input (e.g. "maanden", "%") */
+  suffix?: string
+}
+
+export interface LifeEventCatalogEntry {
   label: string
   icon: string
   defaultCost: number
@@ -221,7 +365,31 @@ export const LIFE_EVENT_CATALOG: Record<string, {
   defaultAge?: number
   description: string
   tip?: string
-}> = {
+  /** Context-specific fields for this event type */
+  fields?: CatalogField[]
+  /** If true, this event is only available in household mode */
+  householdOnly?: boolean
+}
+
+/**
+ * NIBUD-gebaseerde maandelijkse kosten per aantal kinderen.
+ * Kosten schalen niet lineair: elk extra kind kost minder dan het vorige.
+ * Bron: NIBUD "Wat kost een kind?" — modaal inkomen, gemiddeld over leeftijd.
+ */
+export const NIBUD_CHILDREN_MONTHLY_COST: Record<number, number> = {
+  1: 500,
+  2: 830,
+  3: 1100,
+  4: 1320,
+}
+
+/** Get NIBUD-based monthly cost for given number of children */
+export function nibudChildrenCost(count: number): number {
+  if (count <= 0) return 0
+  return NIBUD_CHILDREN_MONTHLY_COST[Math.min(count, 4)] ?? NIBUD_CHILDREN_MONTHLY_COST[4]!
+}
+
+export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   sabbatical: {
     label: 'Sabbatical',
     icon: 'Palmtree',
@@ -231,6 +399,15 @@ export const LIFE_EVENT_CATALOG: Record<string, {
     defaultDuration: 6,
     description: 'Onbetaald verlof van het werk',
     tip: 'Vul je netto maandinkomen als negatieve inkomenswijziging in',
+    fields: [
+      { key: 'reiskosten', label: 'Reiskosten (eenmalig)', fieldType: 'number', default: 2000, tip: 'Vluchten, visa, vaccinaties etc.' },
+      { key: 'bestemming', label: 'Bestemming', fieldType: 'select', default: 'europa', options: [
+        { value: 'nederland', label: 'Nederland' },
+        { value: 'europa', label: 'Europa' },
+        { value: 'wereldwijd', label: 'Wereldwijd' },
+      ]},
+      { key: 'behoudtZorgverzekering', label: 'Zorgverzekering doorlopend', fieldType: 'toggle', default: true, tip: 'Houd je je zorgverzekering aan tijdens sabbatical?' },
+    ],
   },
   world_trip: {
     label: 'Wereldreis',
@@ -241,6 +418,15 @@ export const LIFE_EVENT_CATALOG: Record<string, {
     defaultDuration: 12,
     description: 'Langdurige reis rond de wereld',
     tip: 'Inclusief vluchten, verblijf en dagelijkse kosten',
+    fields: [
+      { key: 'aantalPersonen', label: 'Aantal reizigers', fieldType: 'number', default: 1, tip: 'Kosten worden vermenigvuldigd per persoon' },
+      { key: 'reistype', label: 'Reistype', fieldType: 'select', default: 'backpacking', options: [
+        { value: 'backpacking', label: 'Backpacking (budget)' },
+        { value: 'comfort', label: 'Comfort (middenklasse)' },
+        { value: 'luxe', label: 'Luxe' },
+      ]},
+      { key: 'woningVerhuren', label: 'Woning verhuren tijdens reis', fieldType: 'toggle', default: false, tip: 'Verhuurinkomsten compenseren een deel van de reiskosten' },
+    ],
   },
   children: {
     label: 'Kinderen',
@@ -251,6 +437,22 @@ export const LIFE_EVENT_CATALOG: Record<string, {
     defaultDuration: 216,
     description: 'Opvoedkosten per kind',
     tip: 'Gemiddeld ca. 500/mnd. Kinderbijslag en kinderopvangtoeslag verlagen de netto kosten',
+    fields: [
+      { key: 'aantalKinderen', label: 'Aantal kinderen', fieldType: 'select', default: 1, options: [
+        { value: 1, label: '1 kind' },
+        { value: 2, label: '2 kinderen' },
+        { value: 3, label: '3 kinderen' },
+        { value: 4, label: '4 kinderen' },
+      ], tip: 'Kosten schalen niet lineair (NIBUD): 2e kind kost minder dan het 1e' },
+      { key: 'kinderopvangDagen', label: 'Kinderopvang (dagen/week)', fieldType: 'select', default: 0, options: [
+        { value: 0, label: 'Geen opvang' },
+        { value: 2, label: '2 dagen/week' },
+        { value: 3, label: '3 dagen/week' },
+        { value: 4, label: '4 dagen/week' },
+        { value: 5, label: '5 dagen/week' },
+      ], tip: 'Ca. €8-10/uur, deels vergoed door kinderopvangtoeslag' },
+      { key: 'kinderbijslag', label: 'Kinderbijslag meenemen', fieldType: 'toggle', default: true, tip: 'Ca. €260/kwartaal per kind (0-5 jaar)' },
+    ],
   },
   renovation: {
     label: 'Verbouwing',
@@ -261,6 +463,17 @@ export const LIFE_EVENT_CATALOG: Record<string, {
     defaultDuration: 0,
     description: 'Grote verbouwing of renovatie',
     tip: 'Kan de waarde van je woning verhogen (update je asset daarna)',
+    fields: [
+      { key: 'type', label: 'Type verbouwing', fieldType: 'select', default: 'keuken', options: [
+        { value: 'keuken', label: 'Keuken' },
+        { value: 'badkamer', label: 'Badkamer' },
+        { value: 'uitbouw', label: 'Uitbouw / aanbouw' },
+        { value: 'dakkapel', label: 'Dakkapel' },
+        { value: 'energetisch', label: 'Energetisch (isolatie, zonnepanelen)' },
+        { value: 'totaal', label: 'Totale renovatie' },
+      ]},
+      { key: 'waardevermeerdering', label: 'Geschatte waardevermeerdering', fieldType: 'percentage', default: 50, tip: 'Hoeveel % van de investering komt terug als woningwaarde?', suffix: '%' },
+    ],
   },
   study: {
     label: 'Studie',
@@ -271,6 +484,16 @@ export const LIFE_EVENT_CATALOG: Record<string, {
     defaultDuration: 24,
     description: 'Opleiding of cursus',
     tip: 'Studiekosten zijn soms fiscaal aftrekbaar',
+    fields: [
+      { key: 'studieType', label: 'Type studie', fieldType: 'select', default: 'master', options: [
+        { value: 'cursus', label: 'Korte cursus / certificering' },
+        { value: 'bachelor', label: 'Bachelor' },
+        { value: 'master', label: 'Master / MBA' },
+        { value: 'promotie', label: 'Promotietraject' },
+      ]},
+      { key: 'parttime', label: 'Parttime studie (naast werk)', fieldType: 'toggle', default: false, tip: 'Bij fulltime studie valt je inkomen (deels) weg' },
+      { key: 'salarisstijging', label: 'Verwachte salarisstijging na afronding', fieldType: 'percentage', default: 15, tip: 'Hoeveel % verwacht je meer te verdienen?', suffix: '%' },
+    ],
   },
   career_change: {
     label: 'Carriere switch',
@@ -281,6 +504,11 @@ export const LIFE_EVENT_CATALOG: Record<string, {
     defaultDuration: 6,
     description: 'Overgang naar ander werk',
     tip: 'Pas inkomenswijziging aan als je salaris verandert',
+    fields: [
+      { key: 'tussenperiode', label: 'Tussenperiode zonder inkomen', fieldType: 'number', default: 3, tip: 'Aantal maanden zonder salaris tussen banen', suffix: 'maanden' },
+      { key: 'omscholing', label: 'Omscholingskosten', fieldType: 'number', default: 2000, tip: 'Kosten voor cursussen, certificeringen, coaching' },
+      { key: 'salarisstijging', label: 'Verwachte salarisstijging', fieldType: 'percentage', default: 0, tip: 'Positief bij stap omhoog, negatief bij bewuste downshift', suffix: '%' },
+    ],
   },
   part_time: {
     label: 'Part-time werken',
@@ -291,6 +519,11 @@ export const LIFE_EVENT_CATALOG: Record<string, {
     defaultDuration: 60,
     description: 'Minder uren werken',
     tip: 'Vul het verschil met je huidige inkomen in als negatieve inkomenswijziging',
+    fields: [
+      { key: 'huidigUren', label: 'Huidige werkuren per week', fieldType: 'number', default: 40 },
+      { key: 'nieuwUren', label: 'Nieuwe werkuren per week', fieldType: 'number', default: 32, tip: 'Het inkomensverschil wordt automatisch berekend' },
+      { key: 'behoudtPensioen', label: 'Pensioenopbouw volledig', fieldType: 'toggle', default: false, tip: 'Sommige werkgevers bieden volledige opbouw bij parttime' },
+    ],
   },
   early_retirement: {
     label: 'Vervroegd pensioen',
@@ -301,6 +534,11 @@ export const LIFE_EVENT_CATALOG: Record<string, {
     defaultDuration: 0,
     description: 'Eerder stoppen met werken',
     tip: 'Let op: AOW gaat pas in bij de wettelijke pensioenleeftijd',
+    fields: [
+      { key: 'pensioenLeeftijd', label: 'Gewenste pensioenleeftijd', fieldType: 'number', default: 60 },
+      { key: 'heeftPensioenregeling', label: 'Aanvullende pensioenregeling', fieldType: 'toggle', default: false, tip: 'Heb je een bedrijfspensioen dat eerder ingaat?' },
+      { key: 'overbruggingsUitkering', label: 'Verwachte overbruggingsuitkering', fieldType: 'number', default: 0, tip: 'Maandelijks bedrag tot AOW-leeftijd' },
+    ],
   },
   house_purchase: {
     label: 'Huis kopen',
@@ -311,6 +549,12 @@ export const LIFE_EVENT_CATALOG: Record<string, {
     defaultDuration: 0,
     description: 'Eerste woning of overstap',
     tip: 'Kosten koper ca. 5-6% van aankoopprijs. Maandlasten = hypotheek min huidige huur',
+    fields: [
+      { key: 'aankoopprijs', label: 'Aankoopprijs', fieldType: 'number', default: 350000, tip: 'De totale koopprijs van de woning' },
+      { key: 'hypotheekRente', label: 'Hypotheekrente', fieldType: 'percentage', default: 4.0, tip: 'Huidige marktrente voor 10-jarig vast', suffix: '%' },
+      { key: 'eersteWoning', label: 'Eerste woning (starter)', fieldType: 'toggle', default: true, tip: 'Starters betalen geen overdrachtsbelasting (2%)' },
+      { key: 'huidigeHuur', label: 'Huidige maandhuur', fieldType: 'number', default: 1000, tip: 'Dit bedrag bespaar je — verschil met hypotheek is de netto maandlast' },
+    ],
   },
   move: {
     label: 'Verhuizing',
@@ -320,6 +564,14 @@ export const LIFE_EVENT_CATALOG: Record<string, {
     defaultMonthlyIncome: 0,
     defaultDuration: 0,
     description: 'Verhuizen naar ander huis of stad',
+    fields: [
+      { key: 'afstand', label: 'Verhuisafstand', fieldType: 'select', default: 'regionaal', options: [
+        { value: 'lokaal', label: 'Lokaal (zelfde stad)' },
+        { value: 'regionaal', label: 'Regionaal (andere stad)' },
+        { value: 'internationaal', label: 'Internationaal' },
+      ]},
+      { key: 'huurverschil', label: 'Maandelijks huurverschil', fieldType: 'number', default: 0, tip: 'Positief als nieuwe woning duurder is, negatief als goedkoper' },
+    ],
   },
   wedding: {
     label: 'Trouwerij',
@@ -330,6 +582,11 @@ export const LIFE_EVENT_CATALOG: Record<string, {
     defaultDuration: 0,
     description: 'Bruiloft en huwelijk',
     tip: 'Gemiddelde bruiloft in NL kost 15.000-25.000',
+    fields: [
+      { key: 'aantalGasten', label: 'Aantal gasten', fieldType: 'number', default: 80, tip: 'Meer gasten = hogere locatie- en cateringkosten' },
+      { key: 'huwelijksreis', label: 'Budget huwelijksreis', fieldType: 'number', default: 3000 },
+      { key: 'huwelijksvoorwaarden', label: 'Huwelijkse voorwaarden', fieldType: 'toggle', default: false, tip: 'Kosten notaris ca. €800-1.500' },
+    ],
   },
   car_purchase: {
     label: 'Auto kopen',
@@ -340,6 +597,19 @@ export const LIFE_EVENT_CATALOG: Record<string, {
     defaultDuration: 72,
     description: 'Nieuwe of tweedehands auto',
     tip: 'Maandelijkse kosten: verzekering, wegenbelasting, onderhoud, brandstof',
+    fields: [
+      { key: 'brandstof', label: 'Brandstoftype', fieldType: 'select', default: 'benzine', options: [
+        { value: 'benzine', label: 'Benzine' },
+        { value: 'diesel', label: 'Diesel' },
+        { value: 'elektrisch', label: 'Elektrisch' },
+        { value: 'hybride', label: 'Hybride' },
+      ], tip: 'Elektrisch: lagere brandstofkosten maar hogere aanschaf' },
+      { key: 'nieuwOfTweedehands', label: 'Staat', fieldType: 'select', default: 'tweedehands', options: [
+        { value: 'nieuw', label: 'Nieuw' },
+        { value: 'tweedehands', label: 'Tweedehands' },
+      ]},
+      { key: 'jaarlijkseKm', label: 'Geschatte jaarkilometers', fieldType: 'number', default: 15000, tip: 'Beïnvloedt brandstof- en onderhoudskosten' },
+    ],
   },
   inheritance: {
     label: 'Erfenis ontvangen',
@@ -350,6 +620,15 @@ export const LIFE_EVENT_CATALOG: Record<string, {
     defaultDuration: 0,
     description: 'Vermogen ontvangen uit erfenis',
     tip: 'Negatieve kosten = je ontvangt geld. Let op erfbelasting',
+    fields: [
+      { key: 'brutoBedrag', label: 'Bruto erfenis', fieldType: 'number', default: 50000, tip: 'Het totale bedrag vóór erfbelasting' },
+      { key: 'erfbelastingSchijf', label: 'Relatie tot erflater', fieldType: 'select', default: 'ouder', options: [
+        { value: 'ouder', label: 'Ouder (vrijstelling ~€25.000)' },
+        { value: 'partner', label: 'Partner (vrijstelling ~€795.000)' },
+        { value: 'overig', label: 'Overig familielid / derde' },
+      ], tip: 'De vrijstelling en het tarief hangen af van de relatie' },
+      { key: 'bevatWoning', label: 'Bevat onroerend goed', fieldType: 'toggle', default: false, tip: 'Woning moet mogelijk verkocht worden om de erfenis liquide te maken' },
+    ],
   },
   side_hustle: {
     label: 'Bijverdienste starten',
@@ -360,6 +639,17 @@ export const LIFE_EVENT_CATALOG: Record<string, {
     defaultDuration: 36,
     description: 'Extra inkomstenbron naast je baan',
     tip: 'Positieve inkomenswijziging versnelt je FIRE-datum',
+    fields: [
+      { key: 'type', label: 'Type bijverdienste', fieldType: 'select', default: 'freelance', options: [
+        { value: 'freelance', label: 'Freelance / ZZP' },
+        { value: 'verhuur', label: 'Verhuur (kamer, parkeerplaats)' },
+        { value: 'ecommerce', label: 'Webshop / e-commerce' },
+        { value: 'content', label: 'Content creatie' },
+        { value: 'overig', label: 'Overig' },
+      ]},
+      { key: 'opstartkosten', label: 'Opstartkosten', fieldType: 'number', default: 1000, tip: 'Eenmalige investering om te beginnen' },
+      { key: 'groeipercentage', label: 'Jaarlijkse inkomstengroei', fieldType: 'percentage', default: 10, tip: 'Verwachte groei van het extra inkomen per jaar', suffix: '%' },
+    ],
   },
   aow: {
     label: 'AOW',
@@ -371,6 +661,13 @@ export const LIFE_EVENT_CATALOG: Record<string, {
     defaultAge: 67,
     description: 'AOW staatspension (alleenstaand, 2025)',
     tip: 'AOW start op leeftijd 67 en wordt jaarlijks geïndexeerd. Het bedrag is bruto.',
+    fields: [
+      { key: 'leefsituatie', label: 'Leefsituatie bij AOW-leeftijd', fieldType: 'select', default: 'alleenstaand', options: [
+        { value: 'alleenstaand', label: 'Alleenstaand (€1.380/mnd bruto)' },
+        { value: 'samenwonend', label: 'Samenwonend/gehuwd (€948/mnd bruto)' },
+      ], tip: 'Het AOW-bedrag verschilt per leefsituatie' },
+      { key: 'jarenInNL', label: 'Aantal opbouwjaren in NL', fieldType: 'number', default: 50, tip: '50 jaar = volledige AOW. Per gemist jaar 2% korting.' },
+    ],
   },
   pension: {
     label: 'Aanvullend pensioen',
@@ -380,6 +677,42 @@ export const LIFE_EVENT_CATALOG: Record<string, {
     defaultMonthlyIncome: 0,
     defaultDuration: 0,
     description: 'Aanvullend bedrijfspensioen of privépensioen',
+    fields: [
+      { key: 'pensioenType', label: 'Type pensioen', fieldType: 'select', default: 'bedrijf', options: [
+        { value: 'bedrijf', label: 'Bedrijfspensioen' },
+        { value: 'lijfrente', label: 'Lijfrente / banksparen' },
+        { value: 'privaat', label: 'Privé pensioensparen' },
+      ]},
+      { key: 'ingangLeeftijd', label: 'Ingangsdatum (leeftijd)', fieldType: 'number', default: 68, tip: 'Leeftijd waarop de uitkering start' },
+      { key: 'uitkeringsduur', label: 'Uitkeringsduur', fieldType: 'select', default: 'levenslang', options: [
+        { value: 'levenslang', label: 'Levenslang' },
+        { value: '20', label: '20 jaar' },
+        { value: '10', label: '10 jaar' },
+        { value: '5', label: '5 jaar' },
+      ]},
+    ],
+  },
+  overlijden_partner: {
+    label: 'Overlijden partner',
+    icon: 'HeartHandshake',
+    defaultCost: -10000,
+    defaultMonthlyCost: 0,
+    defaultMonthlyIncome: -2500,
+    defaultDuration: 0,
+    description: 'Wegvallen partnerinkomen en nabestaandenvoorzieningen',
+    tip: 'Modelleert het verlies van partnerinkomen, nabestaandenpensioen, Anw-uitkering en eventuele levensverzekering. Cruciaal voor risicoplanning.',
+    householdOnly: true,
+    fields: [
+      { key: 'nettoInkomenPartner', label: 'Netto maandinkomen partner', fieldType: 'number', default: 2500, tip: 'Het netto maandinkomen dat wegvalt bij overlijden' },
+      { key: 'nabestaandenpensioen', label: 'Nabestaandenpensioen', fieldType: 'number', default: 0, tip: 'Check je pensioenoverzicht of UPO (Uniform Pensioenoverzicht) voor het exacte bedrag' },
+      { key: 'anwUitkering', label: 'Anw-uitkering', fieldType: 'select', default: 'kinderen', options: [
+        { value: 'geen', label: 'Geen Anw-recht' },
+        { value: 'kinderen', label: 'Met kinderen <18 (~\u20AC1.380/mnd bruto)' },
+        { value: 'beperkt', label: 'Beperkt recht (zonder kinderen <18)' },
+      ], tip: 'De Anw (Algemene nabestaandenwet) biedt een uitkering als je partner overlijdt. De halfwezenuitkering (~\u20AC1.380/mnd bruto) geldt bij kinderen onder 18.' },
+      { key: 'anwBedrag', label: 'Anw-bedrag per maand (bruto)', fieldType: 'number', default: 1380, tip: 'Ca. \u20AC1.380/mnd bruto bij kinderen <18, anders beperkt of nihil', suffix: '/mnd' },
+      { key: 'levensverzekering', label: 'Levensverzekering uitkering', fieldType: 'number', default: 0, tip: 'Eenmalig bedrag uit levensverzekering of overlijdensrisicoverzekering (ORV)' },
+    ],
   },
   custom: {
     label: 'Anders',

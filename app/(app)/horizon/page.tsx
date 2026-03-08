@@ -12,7 +12,7 @@ import {
   computeResilienceScore, formatFireAge, formatCountdown,
   computeLifeEventImpact, ageAtDate, deriveCountdown,
   runMonteCarlo,
-  LIFE_EVENT_CATALOG,
+  LIFE_EVENT_CATALOG, nibudChildrenCost,
   type FinancialInput, type FireProjection, type FireRange,
   type ProjectionMonth, type ResilienceScore,
   type LifeEvent, type LifeEventImpact,
@@ -1392,7 +1392,9 @@ export default function HorizonPage() {
             Evenement toevoegen
           </h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {Object.entries(LIFE_EVENT_CATALOG).map(([key, val]) => (
+            {Object.entries(LIFE_EVENT_CATALOG)
+              .filter(([, val]) => !val.householdOnly || isHouseholdView)
+              .map(([key, val]) => (
               <button
                 key={key}
                 onClick={() => openCatalogForm(key)}
@@ -1636,7 +1638,16 @@ export default function HorizonPage() {
                     ) : field.fieldType === 'select' ? (
                       <select
                         value={String(formMetadata[field.key] ?? field.default)}
-                        onChange={e => setFormMetadata(prev => ({ ...prev, [field.key]: e.target.value }))}
+                        onChange={e => {
+                          const val = e.target.value
+                          // For numeric option values (e.g. aantalKinderen), store as number
+                          const numVal = field.options?.some(o => typeof o.value === 'number') ? Number(val) : val
+                          setFormMetadata(prev => ({ ...prev, [field.key]: numVal }))
+                          // Auto-scale costs for children event based on NIBUD
+                          if (formType === 'children' && field.key === 'aantalKinderen') {
+                            setFormAmount(nibudChildrenCost(Number(val)))
+                          }
+                        }}
                         className="mt-1 w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
                       >
                         {field.options?.map(opt => (
@@ -1654,6 +1665,12 @@ export default function HorizonPage() {
                         <span className="text-xs text-[var(--ink-2)]">{field.tip ?? ''}</span>
                       </label>
                     ) : null}
+                    {/* NIBUD scaling explanation for children */}
+                    {formType === 'children' && field.key === 'aantalKinderen' && (
+                      <p className="mt-1 text-[10px] leading-relaxed text-[var(--ink-4)]">
+                        Kosten schalen niet lineair (NIBUD): 1 kind ~&#8364;500/mnd, 2 kinderen ~&#8364;830/mnd, 3 ~&#8364;1.100/mnd, 4 ~&#8364;1.320/mnd. Het bedrag hierboven is automatisch aangepast, maar blijft handmatig aanpasbaar.
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
