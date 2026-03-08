@@ -88,6 +88,13 @@ export function DebtForm({
         setCreditor('Eigen BV')
         setLinkedAssetId('')
       }
+      // Default for familielening
+      if (type === 'familielening') {
+        setCreditor('')
+        setInterestRate('2')
+        setRepaymentType('lineair')
+        setHasWrittenAgreement(false)
+      }
     }
   }
 
@@ -341,10 +348,16 @@ export function DebtForm({
               <input
                 type="number"
                 step="0.1"
+                min="0"
                 value={interestRate}
                 onChange={(e) => setInterestRate(e.target.value)}
                 className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
               />
+              {debtType === 'familielening' && interestRate === '0' && (
+                <p className="mt-1 text-[11px] leading-tight text-amber-600">
+                  ⚠ Bij 0% rente kan de Belastingdienst dit als schenking aanmerken.
+                </p>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Min. betaling p/m</label>
@@ -388,12 +401,14 @@ export function DebtForm({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Kredietverstrekker</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+              {debtType === 'familielening' ? 'Naam uitlener' : 'Kredietverstrekker'}
+            </label>
             <input
               value={creditor}
               onChange={(e) => setCreditor(e.target.value)}
               className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
-              placeholder="ABN AMRO, ING, DUO..."
+              placeholder={debtType === 'familielening' ? 'Bijv. ouders, oom Jan...' : 'ABN AMRO, ING, DUO...'}
             />
           </div>
 
@@ -527,15 +542,22 @@ export function DebtForm({
                   </label>
                 )}
                 {visibleFields.includes('has_written_agreement') && (
-                  <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
-                    <input
-                      type="checkbox"
-                      checked={hasWrittenAgreement}
-                      onChange={(e) => setHasWrittenAgreement(e.target.checked)}
-                      className="rounded border-[var(--border-md)]"
-                    />
-                    Schriftelijke overeenkomst
-                  </label>
+                  <div>
+                    <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
+                      <input
+                        type="checkbox"
+                        checked={hasWrittenAgreement}
+                        onChange={(e) => setHasWrittenAgreement(e.target.checked)}
+                        className="rounded border-[var(--border-md)]"
+                      />
+                      Schriftelijke overeenkomst
+                    </label>
+                    {!hasWrittenAgreement && (
+                      <p className="mt-1 ml-6 text-[11px] leading-tight text-amber-600">
+                        💡 Een schriftelijke overeenkomst is aan te raden voor fiscale zekerheid.
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
               {visibleFields.includes('has_payment_plan') && hasPaymentPlan && (
