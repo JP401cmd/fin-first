@@ -241,7 +241,7 @@ export interface HouseSaleMetadata {
 
 export interface InheritanceMetadata {
   brutoBedrag?: number
-  erfbelastingSchijf?: 'ouder' | 'partner' | 'overig'
+  erfbelastingSchijf?: 'kind' | 'partner' | 'kleinkind' | 'overig'
   bevatWoning?: boolean
 }
 
@@ -821,11 +821,12 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     tip: 'Negatieve kosten = je ontvangt geld. Erfbelasting 2026: 10–20% (kinderen), 30–40% (overig). Vrijstellingen: kind €25.187, partner €795.156 (Belastingdienst).',
     fields: [
       { key: 'brutoBedrag', label: 'Bruto erfenis', fieldType: 'number', default: 50000, tip: 'Gemiddelde erfenis NL: ca. €50.000–€100.000. Vul het totale bedrag vóór erfbelasting in.' },
-      { key: 'erfbelastingSchijf', label: 'Relatie tot erflater', fieldType: 'select', default: 'ouder', options: [
-        { value: 'ouder', label: 'Ouder (vrijstelling ~€25.000)' },
-        { value: 'partner', label: 'Partner (vrijstelling ~€795.000)' },
-        { value: 'overig', label: 'Overig familielid / derde' },
-      ], tip: 'Kind: vrijstelling €25.187, tarief 10–20%. Partner: vrijstelling €795.156, tarief 10–20%. Overig: vrijstelling €2.658, tarief 30–40% (Belastingdienst, 2026).' },
+      { key: 'erfbelastingSchijf', label: 'Relatie tot erflater', fieldType: 'select', default: 'kind', options: [
+        { value: 'kind', label: 'Kind (vrijstelling €25.490)' },
+        { value: 'partner', label: 'Partner (vrijstelling €804.698)' },
+        { value: 'kleinkind', label: 'Kleinkind (vrijstelling €25.490)' },
+        { value: 'overig', label: 'Overig familielid / geen familie' },
+      ], tip: 'Kind/kleinkind: vrijstelling €25.490, tarief 10–20%. Partner: vrijstelling €804.698, tarief 10–20%. Overig: vrijstelling €2.658, tarief 30–40% (Belastingdienst, 2026).' },
       { key: 'bevatWoning', label: 'Bevat onroerend goed', fieldType: 'toggle', default: false, tip: 'Woning wordt gewaardeerd op WOZ-waarde. Mogelijk recht op bedrijfsopvolgingsregeling (BOR) bij verhuurde panden.' },
     ],
   },

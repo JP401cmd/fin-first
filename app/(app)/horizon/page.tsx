@@ -2174,6 +2174,16 @@ export default function HorizonPage() {
                                 setFormDirection(netto >= 0 ? 'income' : 'expense')
                                 setFormDurationType('one_time')
                               }
+                              // Auto-calculate netto bijverdienste for side_hustle
+                              if (formType === 'side_hustle' && ['brutoOmzet', 'kostenPerMaand'].includes(field.key)) {
+                                const brutoOmzet = Number(updated.brutoOmzet ?? 1500)
+                                const kosten = Number(updated.kostenPerMaand ?? 300)
+                                const netto = Math.max(0, brutoOmzet - kosten)
+                                setFormAmount(netto)
+                                setFormDirection('income')
+                                const isDoorlopend = updated.doorlopend !== undefined ? Boolean(updated.doorlopend) : true
+                                setFormDurationType(isDoorlopend ? 'continuous' : 'period')
+                              }
                               // Auto-calculate transitievergoeding for werkloosheid
                               if (formType === 'werkloosheid' && ['huidigBruto', 'dienstjaren'].includes(field.key)) {
                                 const bruto = Number(updated.huidigBruto ?? 4000)
@@ -2223,6 +2233,13 @@ export default function HorizonPage() {
                               }
                               if (formType === 'pension' && field.key === 'ingangLeeftijd') {
                                 setFormAge(Number(val) || 68)
+                              }
+                              // Early retirement: auto-update AOW gap when pensioenLeeftijd changes
+                              if (formType === 'early_retirement' && field.key === 'pensioenLeeftijd') {
+                                const leeftijd = Number(val) || 62
+                                const aowGapMaanden = Math.max(0, (67 - leeftijd) * 12)
+                                setFormAge(leeftijd)
+                                setFormDuration(aowGapMaanden)
                               }
                               // Auto-update car monthly costs when km changes
                               if (formType === 'car_purchase' && field.key === 'jaarlijkseKm') {
@@ -2331,6 +2348,16 @@ export default function HorizonPage() {
                                 // Pension: sync isGeindexeerd toggle with formIsIndexed
                                 if (formType === 'pension' && field.key === 'isGeindexeerd') {
                                   setFormIsIndexed(checked)
+                                }
+                                // Side hustle: toggle doorlopend ↔ tijdelijk project
+                                if (formType === 'side_hustle' && field.key === 'doorlopend') {
+                                  if (checked) {
+                                    setFormDurationType('continuous')
+                                    setFormDuration(0)
+                                  } else {
+                                    setFormDurationType('period')
+                                    setFormDuration(36)
+                                  }
                                 }
                                 return updated
                               })
