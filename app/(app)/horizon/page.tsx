@@ -1500,8 +1500,6 @@ export default function HorizonPage() {
         const isPeriod = formDurationType === 'period'
         const isExpense = formDirection === 'expense'
         const sign = isExpense ? -1 : 1
-        const oneTimeCost = isOneTime ? amt * sign : 0
-        const monthlyCost = !isOneTime ? amt * sign : 0
         const totalImpact = isOneTime
           ? amt * sign
           : isPeriod && dur > 0
