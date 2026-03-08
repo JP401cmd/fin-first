@@ -1,3 +1,25 @@
+## Session 2026-03-08 - Features #662, #663, #664
+
+### Feature #662: Reis-stap 1: Weet waar je staat (De Kern) - PASSING
+- ReisStapCard component with module-color accent, icon, 3 hoe-stappen, live status, waarde-zin, CTA
+- Landmark icon, kern-amber accent, steps: bankrekeningen, bezittingen/schulden, budgetten
+- Live data: asset count, debt count, netto vermogen
+- Green badge when hasAssets && hasBudgets
+
+### Feature #663: Reis-stap 2: Begrijp je patronen (De Kern) - PASSING
+- Receipt icon, kern-amber accent, steps: importeer transacties, terugkerende kosten, abonnementen
+- Live data: transaction count; dynamic CTA based on hasTransactions
+
+### Feature #664: Reis-stap 3: Onderneem actie (De Wil) - PASSING
+- Zap icon, wil-teal accent, steps: aanbevelingen, acties, doelen
+- Live data: wonFreedomDays, completedActions, pendingRecommendations
+- Guide-progress API extended with pendingRecommendations and wonFreedomDays
+
+### Current Status
+- 3 features completed (#662, #663, #664)
+- Zero TypeScript errors
+- Commit: a7edb5c
+
 ## Session 2026-03-08 - Features #596, #597, #598
 
 ### Feature #596: Carriereswitch salarisverschil en overgangsperiode modellering - PASSING
