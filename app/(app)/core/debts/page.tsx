@@ -21,6 +21,7 @@ import type { Asset } from '@/lib/asset-data'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { OwnershipBadge, useHouseholdStatus } from '@/components/app/ownership-toggle'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
+import { usePartnerPrivacy, PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
 import { computeSharePct, SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { FhinAvatar } from '@/components/app/avatars'
@@ -54,6 +55,7 @@ export default function DebtsPage() {
   const seedingRef = useRef(false)
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
+  const { partnerPrivacy, hiddenCategories } = usePartnerPrivacy()
   const { ref: debtListRef, hasEntered: debtListEntered } = useInViewAnimation({ duration: 800 })
   const { hasHousehold, householdId } = useHouseholdStatus()
   const [householdSplit, setHouseholdSplit] = useState<{ splitMode: SplitMode; mySharePct: number; myName: string; partnerName: string } | null>(null)
@@ -155,7 +157,26 @@ export default function DebtsPage() {
         return
       }
 
-      setDebts(data as Debt[])
+      // Apply privacy filtering in household mode (Feature #537)
+      let filteredData = data as Debt[]
+      if (perspective === 'household') {
+        try {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (signal?.aborted) return
+          if (user) {
+            const ppRes = await fetch('/api/household/partner-privacy')
+            if (ppRes.ok) {
+              const ppData = await ppRes.json()
+              if (ppData.partnerPrivacy?.debts === 'hidden') {
+                filteredData = filteredData.filter(
+                  d => d.user_id === user.id || d.ownership === 'shared'
+                )
+              }
+            }
+          }
+        } catch { /* non-critical */ }
+      }
+      setDebts(filteredData)
     } catch (err) {
       console.error('Error loading debts:', err)
       if (!signal?.aborted) setError('Kon schulden niet laden. Probeer het opnieuw.')
@@ -563,6 +584,9 @@ export default function DebtsPage() {
           <div className="flex items-center gap-2">
             <div className="h-5 w-1 rounded-full bg-kern-500" />
             <h2 className="label-editorial text-[var(--ink-2)]">Jouw Schulden</h2>
+            {perspective === 'household' && hiddenCategories.includes('debts') && (
+              <PrivacyHiddenNotice hiddenCategories={hiddenCategories} forCategories={['debts']} />
+            )}
           </div>
           <button
             onClick={() => { setEditDebt(null); setShowForm(true) }}
@@ -600,13 +624,32 @@ export default function DebtsPage() {
                     </p>
                     <p className="truncate text-xs text-[var(--ink-3)]">
                       {DEBT_TYPE_LABELS[debt.debt_type]}
-                      {debt.subtype && DEBT_SUBTYPE_LABELS[debt.debt_type]?.[debt.subtype]
-                        ? ` \u2022 ${DEBT_SUBTYPE_LABELS[debt.debt_type]![debt.subtype]}`
-                        : ''}
+                      {debt.debt_type === 'belastingschuld' && debt.subtype && DEBT_SUBTYPE_LABELS[debt.debt_type]?.[debt.subtype]
+                        ? ` \u2022 ${debt.tax_year ? `${DEBT_SUBTYPE_LABELS[debt.debt_type]![debt.subtype].replace(' aanslag', '')} ${debt.tax_year}` : DEBT_SUBTYPE_LABELS[debt.debt_type]![debt.subtype]}`
+                        : debt.debt_type === 'belastingschuld' && debt.tax_year
+                          ? ` \u2022 ${debt.tax_year}`
+                          : debt.subtype && DEBT_SUBTYPE_LABELS[debt.debt_type]?.[debt.subtype]
+                            ? ` \u2022 ${DEBT_SUBTYPE_LABELS[debt.debt_type]![debt.subtype]}`
+                            : ''}
                       {debt.debt_type === 'dga_schuld' && debt.linked_asset_id
                         ? ` \u2022 ${userAssets.find((a) => a.id === debt.linked_asset_id)?.name ?? 'Deelneming'}`
-                        : debt.creditor ? ` \u2022 ${debt.creditor}` : ''}
+                        : debt.debt_type !== 'belastingschuld' && debt.creditor ? ` \u2022 ${debt.creditor}` : ''}
                     </p>
+                    {debt.debt_type === 'belastingschuld' && debt.has_payment_plan && (
+                      <span className="mt-0.5 inline-block rounded bg-emerald-50 border border-emerald-200 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-emerald-700">
+                        Betalingsregeling
+                      </span>
+                    )}
+                    {debt.debt_type === 'familielening' && !debt.has_written_agreement && (
+                      <span className="mt-0.5 inline-block rounded bg-amber-50 border border-amber-200 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-amber-700">
+                        Geen overeenkomst
+                      </span>
+                    )}
+                    {debt.debt_type === 'familielening' && Number(debt.interest_rate) === 0 && (
+                      <span className="mt-0.5 inline-block rounded bg-blue-50 border border-blue-200 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-blue-600">
+                        0% rente
+                      </span>
+                    )}
                     {(debt.net_worth_inclusion_pct ?? 100) < 100 && (
                       <span className="mt-0.5 inline-block rounded bg-kern-50 border border-kern-200 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-kern-600">
                         {debt.net_worth_inclusion_pct}% meegeteld

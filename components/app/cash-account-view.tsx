@@ -29,7 +29,8 @@ import { CategoryRulesSheet } from '@/components/app/category-rules-sheet'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
 import { useHouseholdStatus } from '@/components/app/ownership-toggle'
 import { computeSharePct, SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
-import { Users } from 'lucide-react'
+import { usePartnerPrivacy, PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
+import { Users, TrendingUp, TrendingDown, Minus, Shield } from 'lucide-react'
 import { SettlementOverview } from '@/components/app/settlement-overview'
 import { UncategorizedTransactionsBanner } from '@/components/app/uncategorized-transactions-banner'
 import { AICategorizeSheet } from '@/components/app/ai-categorize-sheet'
@@ -159,6 +160,7 @@ export function CashAccountView({
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
   const { hasHousehold, householdId } = useHouseholdStatus()
+  const { partnerPrivacy, hiddenCategories } = usePartnerPrivacy()
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [householdMembers, setHouseholdMembers] = useState<{ userId: string; name: string }[]>([])
   const [householdSplit, setHouseholdSplit] = useState<{
@@ -483,9 +485,49 @@ export function CashAccountView({
     }
   }, [householdSplit, perspective, dailyExpenses, nonTransferTx])
 
-  // Apply filters
+  // Privacy-aware transaction filtering for household perspective
+  const partnerTxPrivacy = perspective === 'household' ? (partnerPrivacy?.transactions ?? 'full') : 'full'
+  const isPartnerTxTotals = partnerTxPrivacy === 'totals'
+  const isPartnerTxHidden = partnerTxPrivacy === 'hidden'
+
+  // Partner's transactions summary for 'totals' privacy mode
+  const partnerCategorySummary = useMemo(() => {
+    if (!isPartnerTxTotals || !currentUserId) return null
+
+    const partnerTxs = transactions.filter(
+      (tx) => tx.user_id !== currentUserId && tx.ownership !== 'shared' && tx.transaction_type !== 'transfer'
+    )
+    if (partnerTxs.length === 0) return null
+
+    // Group by budget category
+    const byCategory: Record<string, { name: string; total: number; count: number }> = {}
+    for (const tx of partnerTxs) {
+      const budget = getBudgetForId(tx.budget_id)
+      const key = budget?.id ?? '_uncategorized'
+      if (!byCategory[key]) {
+        byCategory[key] = { name: budget?.name ?? 'Niet gecategoriseerd', total: 0, count: 0 }
+      }
+      byCategory[key].total += Number(tx.amount)
+      byCategory[key].count++
+    }
+
+    const totalExpenses = partnerTxs.filter(t => Number(t.amount) < 0).reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
+    const totalIncome = partnerTxs.filter(t => Number(t.amount) > 0).reduce((s, t) => s + Number(t.amount), 0)
+    const categories = Object.values(byCategory).sort((a, b) => a.total - b.total) // most negative first
+
+    return { totalExpenses, totalIncome, categories, transactionCount: partnerTxs.length }
+  }, [isPartnerTxTotals, currentUserId, transactions])
+
+  // Apply filters (with privacy filtering for partner transactions)
   const filteredTransactions = useMemo(() => {
     let result = transactions
+
+    // Filter out partner's personal transactions when privacy = 'totals' or 'hidden'
+    if ((isPartnerTxTotals || isPartnerTxHidden) && currentUserId) {
+      result = result.filter(
+        (tx) => tx.user_id === currentUserId || tx.ownership === 'shared'
+      )
+    }
 
     if (filterSearch.trim()) {
       const searchLower = filterSearch.trim().toLowerCase()
@@ -513,7 +555,7 @@ export function CashAccountView({
     }
 
     return result
-  }, [transactions, filterSearch, filterType, filterBudgetId])
+  }, [transactions, filterSearch, filterType, filterBudgetId, isPartnerTxTotals, isPartnerTxHidden, currentUserId])
 
   const transactionsByDate = filteredTransactions.reduce<Record<string, Transaction[]>>((groups, tx) => {
     const date = tx.date
@@ -1225,6 +1267,98 @@ export function CashAccountView({
       </section>
 
       {/* Transaction list */}
+      {/* Partner privacy notice + category totals for 'totals' mode */}
+      {perspective === 'household' && isPartnerTxTotals && partnerCategorySummary && (
+        <section className="mt-3 sm:mt-6" data-testid="partner-tx-privacy-summary">
+          <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <Shield className="h-4 w-4 text-[var(--ink-3)]" />
+              <h3 className="text-sm font-semibold text-[var(--ink-2)]">Partner transacties — Totalen</h3>
+              <span className="ml-auto text-[10px] text-[var(--ink-4)]">{partnerCategorySummary.transactionCount} transacties</span>
+            </div>
+            <p className="mb-3 text-xs text-[var(--ink-3)]">
+              Je partner deelt alleen totalen. Individuele transacties zijn niet zichtbaar.
+            </p>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="rounded-[var(--r)] border border-emerald-200 bg-emerald-50 px-3 py-2">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-emerald-600">Inkomsten</p>
+                <p className="text-sm font-semibold text-emerald-700 font-mono tabular-nums">
+                  {partnerCategorySummary.totalIncome > 0 ? (
+                    <span className="flex items-center gap-1">
+                      <TrendingUp className="h-3.5 w-3.5" />
+                      +{formatCurrencyShort(partnerCategorySummary.totalIncome)}
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-[var(--ink-3)]">
+                      <Minus className="h-3.5 w-3.5" />
+                      Geen
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div className="rounded-[var(--r)] border border-red-200 bg-red-50 px-3 py-2">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-red-600">Uitgaven</p>
+                <p className="text-sm font-semibold text-red-700 font-mono tabular-nums">
+                  {partnerCategorySummary.totalExpenses > 0 ? (
+                    <span className="flex items-center gap-1">
+                      <TrendingDown className="h-3.5 w-3.5" />
+                      −{formatCurrencyShort(partnerCategorySummary.totalExpenses)}
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-[var(--ink-3)]">
+                      <Minus className="h-3.5 w-3.5" />
+                      Geen
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+            {/* Category totals */}
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-4)]">Per categorie</p>
+              {partnerCategorySummary.categories.map((cat) => {
+                const pct = partnerCategorySummary.totalExpenses > 0
+                  ? Math.round((Math.abs(cat.total) / partnerCategorySummary.totalExpenses) * 100)
+                  : 0
+                const isNeg = cat.total < 0
+                return (
+                  <div key={cat.name} className="flex items-center justify-between rounded-lg bg-[var(--subtle)] px-3 py-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs text-[var(--ink-2)] truncate">{cat.name}</span>
+                      <span className="text-[10px] text-[var(--ink-4)]">{cat.count}×</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {isNeg && pct > 0 && (
+                        <div className="h-1 rounded-full bg-red-200" style={{ width: `${Math.max(pct * 0.6, 4)}px` }} />
+                      )}
+                      <span className={`text-xs font-medium font-mono tabular-nums ${isNeg ? 'text-red-600' : 'text-emerald-600'}`}>
+                        {isNeg ? '−' : '+'}{formatCurrencyShort(Math.abs(cat.total))}
+                      </span>
+                      {isNeg && pct > 0 && (
+                        <span className="text-[10px] text-[var(--ink-4)]">{pct}%</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Partner privacy hidden notice */}
+      {perspective === 'household' && isPartnerTxHidden && (
+        <section className="mt-3 sm:mt-6">
+          <PrivacyHiddenNotice hiddenCategories={hiddenCategories} forCategories={['transactions']} />
+        </section>
+      )}
+
+      {/* Privacy notice for hidden transaction data (Feature #537) */}
+      {isPartnerTxHidden && (
+        <div className="mt-3 sm:mt-4">
+          <PrivacyHiddenNotice hiddenCategories={hiddenCategories} forCategories={['transactions']} />
+        </div>
+      )}
       <section className="mt-3 sm:mt-6" data-testid="transaction-list">
         {sortedDates.length === 0 ? (
           <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-8 text-center" data-testid="no-transactions">

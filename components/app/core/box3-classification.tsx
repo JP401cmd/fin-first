@@ -4,7 +4,7 @@ import { Info, PiggyBank, TrendingUp, Ban } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { AssetClassification, DebtClassification } from '@/lib/box3-data'
 import { ASSET_TYPE_LABELS, ASSET_TYPE_COLORS } from '@/lib/asset-data'
-import { DEBT_TYPE_LABELS } from '@/lib/debt-data'
+import { DEBT_TYPE_LABELS, DEBT_SUBTYPE_LABELS } from '@/lib/debt-data'
 
 function Tooltip({ text }: { text: string }) {
   return (
@@ -130,19 +130,51 @@ export function Box3Classification({
                   </span>
                 </div>
                 <div className="space-y-1.5">
-                  {box3Schulden.map(dc => (
+                  {box3Schulden.map(dc => {
+                    const isBelasting = dc.debt.debt_type === 'belastingschuld'
+                    const isFamilie = dc.debt.debt_type === 'familielening'
+                    const subtypeLabel = isBelasting && dc.debt.subtype && DEBT_SUBTYPE_LABELS.belastingschuld?.[dc.debt.subtype]
+                      ? dc.debt.tax_year
+                        ? `${DEBT_SUBTYPE_LABELS.belastingschuld[dc.debt.subtype].replace(' aanslag', '')} ${dc.debt.tax_year}`
+                        : DEBT_SUBTYPE_LABELS.belastingschuld[dc.debt.subtype]
+                      : isBelasting && dc.debt.tax_year
+                        ? `${dc.debt.tax_year}`
+                        : isFamilie && dc.debt.subtype && DEBT_SUBTYPE_LABELS.familielening?.[dc.debt.subtype]
+                          ? dc.debt.creditor
+                            ? `${DEBT_SUBTYPE_LABELS.familielening[dc.debt.subtype]} · ${dc.debt.creditor}`
+                            : DEBT_SUBTYPE_LABELS.familielening[dc.debt.subtype]
+                          : isFamilie && dc.debt.creditor
+                            ? dc.debt.creditor
+                            : null
+                    return (
                     <div key={dc.debt.id} className="flex items-center justify-between rounded-lg bg-[var(--paper)]/60 px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-[var(--ink-2)]">{dc.debt.name}</span>
-                        <span className="text-[10px] text-[var(--ink-3)]">
-                          {DEBT_TYPE_LABELS[dc.debt.debt_type]}
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="text-sm text-[var(--ink-2)] truncate">{dc.debt.name}</span>
+                        <span className="text-[10px] text-[var(--ink-3)] shrink-0">
+                          {subtypeLabel ?? DEBT_TYPE_LABELS[dc.debt.debt_type]}
                         </span>
+                        {isBelasting && dc.debt.has_payment_plan && (
+                          <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700 shrink-0">
+                            Betalingsregeling
+                          </span>
+                        )}
+                        {isFamilie && !dc.debt.has_written_agreement && (
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-700 shrink-0">
+                            Geen overeenkomst
+                          </span>
+                        )}
+                        {isFamilie && Number(dc.debt.interest_rate) === 0 && (
+                          <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-medium text-blue-600 shrink-0">
+                            0% rente
+                          </span>
+                        )}
                       </div>
-                      <span className="text-sm font-medium text-red-600">
+                      <span className="text-sm font-medium text-red-600 shrink-0 ml-2">
                         {formatCurrency(Number(dc.debt.current_balance))}
                       </span>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}
