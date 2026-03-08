@@ -100,6 +100,8 @@ const mockData: DashboardData = {
   topLifeEvents: [],
   budgetingActive: true,
   householdOverrides: null,
+  partnerOverrides: null,
+  householdActivity: [],
 }
 
 const makePrefs = (ids: string[], sizes: ('half' | 'full')[] = []): WidgetPref[] =>

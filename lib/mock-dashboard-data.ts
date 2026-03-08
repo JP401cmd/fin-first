@@ -217,4 +217,6 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   ],
   budgetingActive: true,
   householdOverrides: null,
+  partnerOverrides: null,
+  householdActivity: [],
 }

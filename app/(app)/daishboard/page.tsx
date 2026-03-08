@@ -768,6 +768,8 @@ export default async function DAIshboardPage() {
     topLifeEvents,
     budgetingActive: true,
     householdOverrides: null,
+    partnerOverrides: null,
+    householdActivity: [],
   }
 
   // ── Build temporal context ────────────────────────────────

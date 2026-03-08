@@ -16,7 +16,7 @@ import {
   type FinancialInput, type FireProjection, type FireRange,
   type ProjectionMonth, type ResilienceScore,
   type LifeEvent, type LifeEventImpact,
-  type MonteCarloResult,
+  type MonteCarloResult, type CatalogField,
 } from '@/lib/horizon-data'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
@@ -72,9 +72,11 @@ interface HouseholdHeroData {
 
 export default function HorizonPage() {
   const { triggerDream, phase } = useDreamTransition()
-  const { perspective } = usePerspective()
+  const { perspective, partnerName } = usePerspective()
   const isHouseholdView = perspective === 'household'
+  const isPartnerView = perspective === 'partner'
   const [householdHero, setHouseholdHero] = useState<HouseholdHeroData | null>(null)
+  const [partnerHero, setPartnerHero] = useState<HouseholdHeroData | null>(null)
   const [fireParams, setFireParams] = useState<FireParams>(resolveFireParams({}))
   const fireSwr = fireParams.effectiveSwr
   const [input, setInput] = useState<FinancialInput | null>(null)
@@ -139,6 +141,7 @@ export default function HorizonPage() {
   const [formDirection, setFormDirection] = useState<'income' | 'expense'>('expense')
   const [formDurationType, setFormDurationType] = useState<'one_time' | 'period' | 'continuous'>('one_time')
   const [formAmount, setFormAmount] = useState<number | ''>(0)
+  const [formMetadata, setFormMetadata] = useState<Record<string, unknown>>({})
 
   // Simulatie-engine met echte app-data (fractionele FIRE-leeftijd + kasstromen)
   const { result: simResult, cashflows: simCashflows } = useHorizonFireSim(
@@ -281,36 +284,55 @@ export default function HorizonPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Fetch household FIRE data when in household perspective
+  // Fetch household/partner FIRE data when perspective changes
   useEffect(() => {
-    if (!isHouseholdView) {
+    if (!isHouseholdView && !isPartnerView) {
       setHouseholdHero(null)
+      setPartnerHero(null)
       return
     }
-    async function loadHousehold() {
+    async function loadHouseholdData() {
       try {
         const res = await fetch('/api/household/fire-projections')
         if (!res.ok) return
         const data = await res.json()
         if (!data.hasHousehold) return
-        const cp = data.combined.projection
-        setHouseholdHero({
-          householdName: data.householdName,
-          fireAge: cp.fireAge,
-          fireTarget: cp.fireTarget,
-          freedomPercentage: cp.freedomPercentage,
-          countdownDays: cp.countdownDays,
-          fireDate: cp.fireDate,
-          freedomYears: cp.freedomYears,
-          freedomMonths: cp.freedomMonths,
-          savingsRate: cp.savingsRate,
-        })
+
+        if (isHouseholdView) {
+          const cp = data.combined.projection
+          setHouseholdHero({
+            householdName: data.householdName,
+            fireAge: cp.fireAge,
+            fireTarget: cp.fireTarget,
+            freedomPercentage: cp.freedomPercentage,
+            countdownDays: cp.countdownDays,
+            fireDate: cp.fireDate,
+            freedomYears: cp.freedomYears,
+            freedomMonths: cp.freedomMonths,
+            savingsRate: cp.savingsRate,
+          })
+          setPartnerHero(null)
+        } else if (isPartnerView && data.partner2) {
+          const pp = data.partner2.projection
+          setPartnerHero({
+            householdName: data.partner2.name ?? 'Partner',
+            fireAge: pp.fireAge,
+            fireTarget: pp.fireTarget,
+            freedomPercentage: pp.freedomPercentage,
+            countdownDays: pp.countdownDays,
+            fireDate: pp.fireDate,
+            freedomYears: pp.freedomYears,
+            freedomMonths: pp.freedomMonths,
+            savingsRate: pp.savingsRate,
+          })
+          setHouseholdHero(null)
+        }
       } catch {
         // Non-critical — fallback to personal data
       }
     }
-    loadHousehold()
-  }, [isHouseholdView])
+    loadHouseholdData()
+  }, [isHouseholdView, isPartnerView])
 
   // Compute effective input: base data from DB, with optional income override
   const effectiveInput: FinancialInput | null = input
@@ -417,6 +439,14 @@ export default function HorizonPage() {
       setFormDirection('expense')
       setFormAmount(0)
     }
+    // Initialize metadata from catalog field defaults
+    const metaDefaults: Record<string, unknown> = {}
+    if (catalog?.fields) {
+      for (const f of catalog.fields) {
+        metaDefaults[f.key] = f.default
+      }
+    }
+    setFormMetadata(metaDefaults)
     setEditingEvent(null)
     setShowForm(true)
   }
@@ -449,6 +479,15 @@ export default function HorizonPage() {
       setFormDirection('expense')
       setFormAmount(0)
     }
+    // Load existing metadata or initialize from catalog defaults
+    const catalog = LIFE_EVENT_CATALOG[ev.event_type]
+    const metaDefaults: Record<string, unknown> = {}
+    if (catalog?.fields) {
+      for (const f of catalog.fields) {
+        metaDefaults[f.key] = f.default
+      }
+    }
+    setFormMetadata({ ...metaDefaults, ...(ev.metadata ?? {}) })
     setEditingEvent(ev)
     setShowForm(true)
   }
@@ -487,6 +526,7 @@ export default function HorizonPage() {
       icon,
       sort_order: events.length,
       is_active: true,
+      metadata: formMetadata,
     }
 
     if (editingEvent) {
@@ -531,6 +571,10 @@ export default function HorizonPage() {
     )
   }
 
+  // Unified perspective hero: household or partner override
+  const perspectiveHero = isHouseholdView ? householdHero : isPartnerView ? partnerHero : null
+  const hasPerspectiveHero = perspectiveHero != null
+
   const hasNoDob = !effectiveInput?.dateOfBirth
   const fireNotReachable = effectiveCountdown.fireDate === 'Niet haalbaar'
   const hasDebt = (effectiveInput?.totalDebts ?? 0) > 0
@@ -548,13 +592,17 @@ export default function HorizonPage() {
               <FfinAvatar size={40} />
               <div>
                 <p className="label-editorial text-horizon-600">
-                  {isHouseholdView && householdHero
-                    ? `${householdHero.householdName} — Gezamenlijke horizon`
+                  {hasPerspectiveHero
+                    ? isPartnerView
+                      ? `${perspectiveHero!.householdName} — Horizon`
+                      : `${perspectiveHero!.householdName} — Gezamenlijke horizon`
                     : 'Jouw horizon naar vrijheid'}
                 </p>
-                {isHouseholdView && householdHero && (
-                  <p className="mt-0.5 text-[11px] text-[var(--ink-3)]" title="Deze projectie is gebaseerd op gecombineerd vermogen, gecombineerde inkomsten en gedeelde uitgaven van het huishouden.">
-                    Gecombineerde financiën van het huishouden
+                {hasPerspectiveHero && (
+                  <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
+                    {isPartnerView
+                      ? `FIRE-projectie van ${perspectiveHero!.householdName}`
+                      : 'Gecombineerde financiën van het huishouden'}
                   </p>
                 )}
               </div>
@@ -579,21 +627,21 @@ export default function HorizonPage() {
               onClick={() => setShowFireAgeReceipt(true)}
               className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3 text-left transition-all hover:border-horizon-300 hover:shadow-sm"
               data-testid="hero-stat-fire-age"
-              title={isHouseholdView && householdHero ? 'Gezamenlijke FIRE-leeftijd op basis van gecombineerd vermogen en gedeelde uitgaven' : undefined}
+              title={hasPerspectiveHero ? (isPartnerView ? `FIRE-leeftijd van ${perspectiveHero!.householdName}` : 'Gezamenlijke FIRE-leeftijd op basis van gecombineerd vermogen en gedeelde uitgaven') : undefined}
             >
               <div className="mb-1.5 flex items-center gap-1.5">
                 <Hourglass className="h-3.5 w-3.5 text-horizon-500" />
                 <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Vrijheidsleeftijd</span>
               </div>
               <p className="font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">
-                {isHouseholdView && householdHero
-                  ? (householdHero.fireAge !== null ? Math.round(householdHero.fireAge) : '-')
+                {hasPerspectiveHero
+                  ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '-')
                   : simResult?.fireAgeFractional != null
                     ? simResult.fireAgeFractional.toFixed(1)
                     : fire.fireAge !== null ? Math.round(fire.fireAge) : '-'}
               </p>
               <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">
-                {isHouseholdView && householdHero ? 'jaar (huishouden)' : 'jaar'}
+                {hasPerspectiveHero ? (isPartnerView ? `jaar (${perspectiveHero!.householdName})` : 'jaar (huishouden)') : 'jaar'}
               </p>
             </button>
 
@@ -603,15 +651,15 @@ export default function HorizonPage() {
               onClick={() => setShowFireTargetReceipt(true)}
               className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3 text-left transition-all hover:border-horizon-300 hover:shadow-sm"
               data-testid="hero-stat-fire-target"
-              title={isHouseholdView && householdHero ? 'Gezamenlijk FIRE-doelbedrag op basis van gedeelde uitgaven' : undefined}
+              title={hasPerspectiveHero ? (isPartnerView ? `FIRE-doelbedrag van ${perspectiveHero!.householdName}` : 'Gezamenlijk FIRE-doelbedrag op basis van gedeelde uitgaven') : undefined}
             >
               <div className="mb-1.5 flex items-center gap-1.5">
                 <Target className="h-3.5 w-3.5 text-horizon-500" />
                 <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Doelbedrag</span>
               </div>
               <p className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
-                {isHouseholdView && householdHero
-                  ? formatCurrency(householdHero.fireTarget)
+                {hasPerspectiveHero
+                  ? formatCurrency(perspectiveHero!.fireTarget)
                   : formatCurrency(simResult?.requiredFirePortfolio ?? fire.fireTarget)}
               </p>
               <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">benodigd</p>
@@ -644,15 +692,15 @@ export default function HorizonPage() {
               onClick={() => setShowCountdownReceipt(true)}
               className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3 text-left transition-all hover:border-horizon-300 hover:shadow-sm"
               data-testid="hero-stat-countdown"
-              title={isHouseholdView && householdHero ? 'Aftellen tot gezamenlijke FIRE-datum' : undefined}
+              title={hasPerspectiveHero ? (isPartnerView ? `Aftellen tot FIRE-datum van ${perspectiveHero!.householdName}` : 'Aftellen tot gezamenlijke FIRE-datum') : undefined}
             >
               <div className="mb-1.5 flex items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5 text-horizon-500" />
                 <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Aftellen</span>
               </div>
               <p className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
-                {isHouseholdView && householdHero
-                  ? (householdHero.countdownDays > 0 ? householdHero.countdownDays.toLocaleString('nl-NL') : '0')
+                {hasPerspectiveHero
+                  ? (perspectiveHero!.countdownDays > 0 ? perspectiveHero!.countdownDays.toLocaleString('nl-NL') : '0')
                   : effectiveCountdown.countdownDays > 0 ? effectiveCountdown.countdownDays.toLocaleString('nl-NL') : '0'}
               </p>
               <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">dagen</p>
@@ -664,14 +712,14 @@ export default function HorizonPage() {
             <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-horizon-600 via-horizon-400 to-horizon-300 transition-all duration-1000"
-                style={{ width: `${isHouseholdView && householdHero ? Math.max(Math.min(householdHero.freedomPercentage, 100), 0) : effectiveFreedomPct}%` }}
+                style={{ width: `${hasPerspectiveHero ? Math.max(Math.min(perspectiveHero!.freedomPercentage, 100), 0) : effectiveFreedomPct}%` }}
               />
             </div>
             <div className="mt-2 flex justify-between text-xs text-[var(--ink-4)]">
               <span>0%</span>
               <span className="font-mono">
-                {isHouseholdView && householdHero
-                  ? `${formatCurrency(householdHero.fireTarget)} — gezamenlijke vrijheid`
+                {hasPerspectiveHero
+                  ? `${formatCurrency(perspectiveHero!.fireTarget)} — ${isPartnerView ? `${perspectiveHero!.householdName}'s vrijheid` : 'gezamenlijke vrijheid'}`
                   : `${formatCurrency(simResult?.requiredFirePortfolio ?? fire.fireTarget)} — volledige vrijheid`}
               </span>
               <span>100%</span>
@@ -1557,6 +1605,58 @@ export default function HorizonPage() {
                 />
                 <span className="text-sm text-[var(--ink-2)]">Bedrag groeit mee met inflatie (~2%/jaar)</span>
               </label>
+            )}
+
+            {/* ── Context-specifieke velden ── */}
+            {LIFE_EVENT_CATALOG[formType]?.fields && LIFE_EVENT_CATALOG[formType].fields!.length > 0 && (
+              <div className="space-y-3 rounded-[var(--r)] border border-dashed border-horizon-200 bg-horizon-50/30 p-4">
+                <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
+                  Details
+                </p>
+                {LIFE_EVENT_CATALOG[formType].fields!.map((field: CatalogField) => (
+                  <div key={field.key}>
+                    <label className="text-xs font-medium text-[var(--ink-3)]">
+                      {field.label}
+                      {field.tip && (
+                        <span className="ml-1 font-normal text-[var(--ink-4)]" title={field.tip}>ⓘ</span>
+                      )}
+                    </label>
+                    {field.fieldType === 'number' || field.fieldType === 'percentage' ? (
+                      <div className="mt-1 flex items-center gap-2">
+                        <input
+                          type="number"
+                          value={formMetadata[field.key] !== undefined ? String(formMetadata[field.key]) : String(field.default)}
+                          onChange={e => setFormMetadata(prev => ({ ...prev, [field.key]: e.target.value ? Number(e.target.value) : '' }))}
+                          className="min-w-0 flex-1 rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                        />
+                        {field.suffix && (
+                          <span className="shrink-0 text-xs text-[var(--ink-3)]">{field.suffix}</span>
+                        )}
+                      </div>
+                    ) : field.fieldType === 'select' ? (
+                      <select
+                        value={String(formMetadata[field.key] ?? field.default)}
+                        onChange={e => setFormMetadata(prev => ({ ...prev, [field.key]: e.target.value }))}
+                        className="mt-1 w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                      >
+                        {field.options?.map(opt => (
+                          <option key={String(opt.value)} value={String(opt.value)}>{opt.label}</option>
+                        ))}
+                      </select>
+                    ) : field.fieldType === 'toggle' ? (
+                      <label className="mt-1 flex cursor-pointer items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={formMetadata[field.key] !== undefined ? Boolean(formMetadata[field.key]) : Boolean(field.default)}
+                          onChange={e => setFormMetadata(prev => ({ ...prev, [field.key]: e.target.checked }))}
+                          className="h-4 w-4 rounded border-[var(--border-md)] accent-horizon-600"
+                        />
+                        <span className="text-xs text-[var(--ink-2)]">{field.tip ?? ''}</span>
+                      </label>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
             )}
 
             <button

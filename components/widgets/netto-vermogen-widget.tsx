@@ -7,7 +7,7 @@ import type { WidgetSize } from '@/lib/widget-catalog'
 import { formatCurrency, formatFreedomTimeString, calculateFreedomTime } from '@/lib/format'
 import type { DashboardData } from './widget-renderer'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { Wallet, Users } from 'lucide-react'
+import { Wallet, Users, UserCheck } from 'lucide-react'
 import { usePerspective } from '@/components/app/perspective-provider'
 
 interface Props {
@@ -19,15 +19,17 @@ interface Props {
 const SVG_W = 200
 
 export function NettoVermogenWidget({ size, data, href }: Props) {
-  const { perspective } = usePerspective()
+  const { perspective, partnerName } = usePerspective()
   const isHouseholdView = perspective === 'household' && data.householdOverrides != null
+  const isPartnerView = perspective === 'partner' && data.partnerOverrides != null
 
-  // Use household overrides when in household perspective
-  const netWorth = isHouseholdView ? data.householdOverrides!.netWorth : data.netWorth
-  const monthlyExpenses = isHouseholdView ? data.householdOverrides!.monthlyExpenses : data.monthlyExpenses
-  const monthlyIncome = isHouseholdView ? data.householdOverrides!.monthlyIncome : data.monthlyIncome
-  const totalAssets = isHouseholdView ? data.householdOverrides!.totalAssets : data.totalAssets
-  const totalDebts = isHouseholdView ? data.householdOverrides!.totalDebts : data.totalDebts
+  // Use perspective-appropriate data overrides
+  const overrides = isHouseholdView ? data.householdOverrides! : isPartnerView ? data.partnerOverrides! : null
+  const netWorth = overrides ? overrides.netWorth : data.netWorth
+  const monthlyExpenses = overrides ? overrides.monthlyExpenses : data.monthlyExpenses
+  const monthlyIncome = overrides ? overrides.monthlyIncome : data.monthlyIncome
+  const totalAssets = overrides ? overrides.totalAssets : data.totalAssets
+  const totalDebts = overrides ? overrides.totalDebts : data.totalDebts
   const { monthlyContributions, netWorthHistory } = data
 
   // Empty state: no assets or income data at all
@@ -130,7 +132,11 @@ export function NettoVermogenWidget({ size, data, href }: Props) {
     return { assetPct, debtPct }
   }, [totalAssets, totalDebts])
 
-  const kickerLabel = isHouseholdView ? 'Netto Vermogen — Huishouden' : 'Netto Vermogen'
+  const kickerLabel = isHouseholdView
+    ? 'Netto Vermogen — Huishouden'
+    : isPartnerView
+      ? `Netto Vermogen — ${partnerName ?? 'Partner'}`
+      : 'Netto Vermogen'
 
   if (isEmpty) {
     return (
@@ -145,9 +151,10 @@ export function NettoVermogenWidget({ size, data, href }: Props) {
     return (
       <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
         <div>
-          {isHouseholdView && (
+          {(isHouseholdView || isPartnerView) && (
             <div className="mb-1 flex items-center gap-1 text-[10px] text-kern-600">
-              <Users className="h-3 w-3" /> Huishouden
+              {isPartnerView ? <UserCheck className="h-3 w-3" /> : <Users className="h-3 w-3" />}
+              {isPartnerView ? (partnerName ?? 'Partner') : 'Huishouden'}
             </div>
           )}
           <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
@@ -158,7 +165,7 @@ export function NettoVermogenWidget({ size, data, href }: Props) {
               ≈ {freedomStr} vrijheid
             </p>
           )}
-          {momDelta && !isHouseholdView && (
+          {momDelta && !isHouseholdView && !isPartnerView && (
             <p className={`mt-1 font-mono text-[11px] tabular-nums font-medium ${
               momDelta.delta >= 0 ? 'text-emerald-600' : 'text-red-500'
             }`}>
@@ -174,16 +181,17 @@ export function NettoVermogenWidget({ size, data, href }: Props) {
   return (
     <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
       <div ref={ref}>
-        {isHouseholdView && (
+        {(isHouseholdView || isPartnerView) && (
           <div className="mb-1.5 flex items-center gap-1 text-[11px] text-kern-600">
-            <Users className="h-3.5 w-3.5" /> Gecombineerd huishouden
+            {isPartnerView ? <UserCheck className="h-3.5 w-3.5" /> : <Users className="h-3.5 w-3.5" />}
+            {isPartnerView ? (partnerName ?? 'Partner') : 'Gecombineerd huishouden'}
           </div>
         )}
         <div className="flex items-baseline gap-2">
           <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
             {formatCurrency(netWorth)}
           </p>
-          {momDelta && !isHouseholdView && (
+          {momDelta && !isHouseholdView && !isPartnerView && (
             <span className={`font-mono text-sm tabular-nums font-medium ${
               momDelta.delta >= 0 ? 'text-emerald-600' : 'text-red-500'
             }`}>

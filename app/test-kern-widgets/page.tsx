@@ -158,6 +158,8 @@ const MOCK_DATA: DashboardData = {
   topLifeEvents: [],
   budgetingActive: true,
   householdOverrides: null,
+  partnerOverrides: null,
+  householdActivity: [],
 }
 
 const KERN_WIDGETS = [

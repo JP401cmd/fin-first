@@ -110,9 +110,12 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   const [retirementMethodUsed, setRetirementMethodUsed] = useState<RetirementExpenseMethod>('essential_budgets')
   // Balance history (per-entity snapshots)
   const [balanceHistory, setBalanceHistory] = useState<EntityBalanceHistory[]>([])
-  // Household perspective
-  const { perspective } = usePerspective()
+  // Household & partner perspective
+  const { perspective, partnerName } = usePerspective()
   const [householdOverrides, setHouseholdOverrides] = useState<{
+    netWorth: number; totalAssets: number; totalDebts: number
+  } | null>(null)
+  const [partnerOverrides, setPartnerOverrides] = useState<{
     netWorth: number; totalAssets: number; totalDebts: number
   } | null>(null)
 
@@ -292,7 +295,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       const netWorth = totalAssets - totalDebts
       const monthlySavings = monthlyIncome - monthlyExpenses
 
-      // Household perspective: fetch partner totals if in a household
+      // Household & partner perspective: fetch partner totals if in a household
       try {
         const { data: membership } = await supabase
           .from('household_members')
@@ -308,6 +311,11 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
               netWorth: netWorth + partnerAssets - partnerDebts,
               totalAssets: totalAssets + partnerAssets,
               totalDebts: totalDebts + partnerDebts,
+            })
+            setPartnerOverrides({
+              netWorth: partnerAssets - partnerDebts,
+              totalAssets: partnerAssets,
+              totalDebts: partnerDebts,
             })
           }
         }
@@ -622,15 +630,17 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       .catch(() => {})
   }, [data])
 
-  // Household perspective: derive effective display values
+  // Perspective-aware display values
   const isHouseholdView = perspective === 'household' && householdOverrides != null
-  const effectiveNetWorth = isHouseholdView ? householdOverrides.netWorth : data?.netWorth ?? 0
-  const effectiveTotalAssets = isHouseholdView ? householdOverrides.totalAssets : rawFinancials?.totalAssets ?? 0
-  const effectiveTotalDebts = isHouseholdView ? householdOverrides.totalDebts : rawFinancials?.totalDebts ?? 0
-  // Recompute freedom time for household perspective
+  const isPartnerView = perspective === 'partner' && partnerOverrides != null
+  const activeOverrides = isHouseholdView ? householdOverrides : isPartnerView ? partnerOverrides : null
+  const effectiveNetWorth = activeOverrides ? activeOverrides.netWorth : data?.netWorth ?? 0
+  const effectiveTotalAssets = activeOverrides ? activeOverrides.totalAssets : rawFinancials?.totalAssets ?? 0
+  const effectiveTotalDebts = activeOverrides ? activeOverrides.totalDebts : rawFinancials?.totalDebts ?? 0
+  // Recompute freedom time for non-personal perspectives
   const effectiveFreedomYears = (() => {
     if (!data) return 0
-    if (!isHouseholdView) return data.freedomYears
+    if (!activeOverrides) return data.freedomYears
     const yearlyExp = rawFinancials?.yearlyRetirementExpenses ?? rawFinancials?.yearlyMustExpenses ?? (rawFinancials?.monthlyExpenses ?? 0) * 12
     if (yearlyExp <= 0) return 0
     const totalMonths = (effectiveNetWorth / yearlyExp) * 12
@@ -638,7 +648,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   })()
   const effectiveFreedomMonths = (() => {
     if (!data) return 0
-    if (!isHouseholdView) return data.freedomMonths
+    if (!activeOverrides) return data.freedomMonths
     const yearlyExp = rawFinancials?.yearlyRetirementExpenses ?? rawFinancials?.yearlyMustExpenses ?? (rawFinancials?.monthlyExpenses ?? 0) * 12
     if (yearlyExp <= 0) return 0
     const totalMonths = (effectiveNetWorth / yearlyExp) * 12
@@ -703,11 +713,11 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           <div className="mb-3 sm:mb-6 flex items-center gap-3">
             <FhinAvatar size={40} />
             <p className="label-editorial text-kern-600">
-              {isHouseholdView ? 'Jullie tijdlijn naar vrijheid' : 'Jouw tijdlijn naar vrijheid'}
+              {isHouseholdView ? 'Jullie tijdlijn naar vrijheid' : isPartnerView ? `${partnerName ?? 'Partner'}'s tijdlijn` : 'Jouw tijdlijn naar vrijheid'}
             </p>
-            {isHouseholdView && (
+            {(isHouseholdView || isPartnerView) && (
               <span className="inline-flex items-center gap-1 rounded-full bg-kern-50 px-2 py-0.5 text-[10px] font-medium text-kern-700">
-                <Users className="h-3 w-3" /> Huishouden
+                <Users className="h-3 w-3" /> {isPartnerView ? (partnerName ?? 'Partner') : 'Huishouden'}
               </span>
             )}
           </div>
@@ -741,7 +751,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 className="w-full cursor-pointer text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px rounded-[var(--r)] focus-visible:ring-2 focus-visible:ring-kern-300 focus-visible:outline-none"
               >
                 <p className="label-editorial text-[var(--ink-3)]">
-                  {isHouseholdView ? 'Netto vermogen — Huishouden' : 'Netto vermogen'}
+                  {isHouseholdView ? 'Netto vermogen — Huishouden' : isPartnerView ? `Netto vermogen — ${partnerName ?? 'Partner'}` : 'Netto vermogen'}
                 </p>
                 <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]">{formatCurrency(effectiveNetWorth)}</p>
                 <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]" data-testid="net-worth-freedom-subtitle">
@@ -750,6 +760,11 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 {isHouseholdView && (
                   <p className="mt-1 text-[10px] text-[var(--ink-4)]">
                     Persoonlijk: {formatCurrency(data.netWorth)} · Partner: {formatCurrency(effectiveNetWorth - data.netWorth)}
+                  </p>
+                )}
+                {isPartnerView && (
+                  <p className="mt-1 text-[10px] text-[var(--ink-4)]">
+                    Bezittingen: {formatCurrency(effectiveTotalAssets)} · Schulden: {formatCurrency(effectiveTotalDebts)}
                   </p>
                 )}
               </button>

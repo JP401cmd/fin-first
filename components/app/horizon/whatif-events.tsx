@@ -1,14 +1,15 @@
 'use client'
 
-import { useState } from 'react'
-import { formatCurrency } from '@/lib/format'
-import { LIFE_EVENT_CATALOG, type LifeEvent } from '@/lib/horizon-data'
+import { useState, useMemo } from 'react'
+import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { LIFE_EVENT_CATALOG, type LifeEvent, type CatalogField } from '@/lib/horizon-data'
 import type { SimResult } from '@/lib/fire-simulation'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { EVENT_ICONS } from '@/components/app/horizon/log-timeline'
 import {
-  Calendar, Plus, ChevronDown, ChevronUp, Eye, EyeOff, Info,
+  Calendar, Plus, ChevronDown, ChevronUp, Eye, EyeOff, Info, Clock,
+  ArrowLeft, Check,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -26,6 +27,18 @@ interface EventImpact {
   totalCost: number
 }
 
+/** Form state for creating/editing a life event */
+interface EventFormState {
+  eventType: string
+  name: string
+  targetAge: number | null
+  oneTimeCost: number
+  monthlyCostChange: number
+  monthlyIncomeChange: number
+  durationMonths: number
+  metadata: Record<string, unknown>
+}
+
 // ── WhatIfEventsPanel ────────────────────────────────────────────────────────
 
 export function WhatIfEventsPanel({
@@ -35,6 +48,7 @@ export function WhatIfEventsPanel({
   onRemoveEvent,
   baselineFireAge,
   computeImpact,
+  dailyExpenses,
 }: {
   events: WhatIfEvent[]
   onToggleEvent: (id: string) => void
@@ -42,13 +56,66 @@ export function WhatIfEventsPanel({
   onRemoveEvent: (id: string) => void
   baselineFireAge: number | null
   computeImpact: (eventId: string) => EventImpact | null
+  /** Daily expenses for freedom-time calc (optional — hides freedom time if missing) */
+  dailyExpenses?: number
 }) {
   const [expanded, setExpanded] = useState(true)
   const [showCatalog, setShowCatalog] = useState(false)
   const [selectedImpact, setSelectedImpact] = useState<EventImpact | null>(null)
+  const [formState, setFormState] = useState<EventFormState | null>(null)
 
   const activeCount = events.filter(e => !e.whatIfDisabled).length
   const totalCount = events.length
+
+  /** Open the event form for a catalog entry */
+  function openFormForCatalog(key: string) {
+    const cat = LIFE_EVENT_CATALOG[key]
+    if (!cat) return
+
+    // Build initial metadata from field defaults
+    const initialMeta: Record<string, unknown> = {}
+    for (const field of cat.fields ?? []) {
+      initialMeta[field.key] = field.default
+    }
+
+    setFormState({
+      eventType: key,
+      name: cat.label,
+      targetAge: cat.defaultAge ?? null,
+      oneTimeCost: cat.defaultCost,
+      monthlyCostChange: cat.defaultMonthlyCost,
+      monthlyIncomeChange: cat.defaultMonthlyIncome,
+      durationMonths: cat.defaultDuration,
+      metadata: initialMeta,
+    })
+    setShowCatalog(false)
+  }
+
+  /** Submit the form and create the event */
+  function handleFormSubmit() {
+    if (!formState) return
+    const cat = LIFE_EVENT_CATALOG[formState.eventType]
+    if (!cat) return
+
+    const newEvent: WhatIfEvent = {
+      id: `whatif-${formState.eventType}-${Date.now()}`,
+      name: formState.name,
+      event_type: formState.eventType,
+      target_age: formState.targetAge,
+      target_date: null,
+      one_time_cost: formState.oneTimeCost,
+      monthly_cost_change: formState.monthlyCostChange,
+      monthly_income_change: formState.monthlyIncomeChange,
+      duration_months: formState.durationMonths,
+      icon: cat.icon,
+      is_active: true,
+      sort_order: events.length,
+      is_indexed: true,
+      metadata: formState.metadata,
+    }
+    onAddEvent(newEvent)
+    setFormState(null)
+  }
 
   return (
     <>
@@ -181,25 +248,7 @@ export function WhatIfEventsPanel({
                   key={key}
                   type="button"
                   disabled={alreadyAdded}
-                  onClick={() => {
-                    const newEvent: WhatIfEvent = {
-                      id: `whatif-${key}-${Date.now()}`,
-                      name: cat.label,
-                      event_type: key,
-                      target_age: cat.defaultAge ?? null,
-                      target_date: null,
-                      one_time_cost: cat.defaultCost,
-                      monthly_cost_change: cat.defaultMonthlyCost,
-                      monthly_income_change: cat.defaultMonthlyIncome,
-                      duration_months: cat.defaultDuration,
-                      icon: cat.icon,
-                      is_active: true,
-                      sort_order: events.length,
-                      is_indexed: true,
-                    }
-                    onAddEvent(newEvent)
-                    setShowCatalog(false)
-                  }}
+                  onClick={() => openFormForCatalog(key)}
                   className={`flex w-full items-center gap-3 rounded-[var(--r)] px-3 py-2.5 text-left transition-colors ${
                     alreadyAdded
                       ? 'opacity-40 cursor-not-allowed'
@@ -223,8 +272,25 @@ export function WhatIfEventsPanel({
             })}
         </div>
         <p className="mt-4 text-center font-sans text-[10px] text-[var(--ink-4)]">
-          Bedragen zijn standaardwaarden — pas ze aan op de Horizon pagina.
+          Kies een gebeurtenis om het formulier in te vullen.
         </p>
+      </BottomSheet>
+
+      {/* ── Event Form BottomSheet ──────────────────────── */}
+      <BottomSheet
+        open={formState !== null}
+        onClose={() => setFormState(null)}
+        title={formState ? LIFE_EVENT_CATALOG[formState.eventType]?.label ?? 'Gebeurtenis' : 'Gebeurtenis'}
+      >
+        {formState && (
+          <EventFormSheet
+            form={formState}
+            onChange={setFormState}
+            onSubmit={handleFormSubmit}
+            onBack={() => { setFormState(null); setShowCatalog(true) }}
+            dailyExpenses={dailyExpenses}
+          />
+        )}
       </BottomSheet>
 
       {/* ── Impact Kassabon BottomSheet ──────────────────── */}
@@ -238,6 +304,381 @@ export function WhatIfEventsPanel({
         )}
       </BottomSheet>
     </>
+  )
+}
+
+// ── Section Header ──────────────────────────────────────────────────────────
+
+function SectionHeader({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-2 pb-2 pt-1">
+      <h3 className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+        {label}
+      </h3>
+      <div className="h-px flex-1 bg-[var(--border-ed)]" />
+    </div>
+  )
+}
+
+// ── EventFormSheet ──────────────────────────────────────────────────────────
+
+function EventFormSheet({
+  form,
+  onChange,
+  onSubmit,
+  onBack,
+  dailyExpenses,
+}: {
+  form: EventFormState
+  onChange: (f: EventFormState) => void
+  onSubmit: () => void
+  onBack: () => void
+  dailyExpenses?: number
+}) {
+  const catalog = LIFE_EVENT_CATALOG[form.eventType]
+  if (!catalog) return null
+
+  const fields = catalog.fields ?? []
+
+  // Compute summary values
+  const totalImpact = useMemo(() => {
+    const oneTime = Math.abs(form.oneTimeCost)
+    const monthlyNet = form.monthlyCostChange + Math.abs(form.monthlyIncomeChange < 0 ? form.monthlyIncomeChange : 0)
+    const durationTotal = form.durationMonths > 0 ? monthlyNet * form.durationMonths : 0
+    return oneTime + durationTotal
+  }, [form.oneTimeCost, form.monthlyCostChange, form.monthlyIncomeChange, form.durationMonths])
+
+  const freedomTimeStr = useMemo(() => {
+    if (!dailyExpenses || dailyExpenses <= 0 || totalImpact <= 0) return null
+    const breakdown = calculateFreedomTime(totalImpact, dailyExpenses)
+    return formatFreedomTimeString(breakdown, 'long', true)
+  }, [totalImpact, dailyExpenses])
+
+  function updateField<K extends keyof EventFormState>(key: K, value: EventFormState[K]) {
+    onChange({ ...form, [key]: value })
+  }
+
+  function updateMeta(key: string, value: unknown) {
+    onChange({ ...form, metadata: { ...form.metadata, [key]: value } })
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Description / tip */}
+      {catalog.tip && (
+        <div className="flex items-start gap-2 rounded-[var(--r-sm)] bg-horizon-50/50 px-3 py-2.5">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-horizon-600" />
+          <p className="font-sans text-[11px] leading-relaxed text-horizon-700">
+            {catalog.tip}
+          </p>
+        </div>
+      )}
+
+      {/* ── Sectie: Basis ──────────────────────────────── */}
+      <div>
+        <SectionHeader label="Basis" />
+        <div className="space-y-3">
+          {/* Naam */}
+          <div>
+            <label className="mb-1 block font-sans text-[11px] font-medium text-[var(--ink-2)]">
+              Naam
+            </label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={e => updateField('name', e.target.value)}
+              className="w-full rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-sans text-sm text-[var(--ink)] placeholder:text-[var(--ink-4)] focus:border-horizon-400 focus:outline-none focus:ring-1 focus:ring-horizon-400"
+              placeholder={catalog.label}
+            />
+          </div>
+
+          {/* Leeftijd */}
+          <div>
+            <label className="mb-1 block font-sans text-[11px] font-medium text-[var(--ink-2)]">
+              Op welke leeftijd?
+            </label>
+            <input
+              type="number"
+              value={form.targetAge ?? ''}
+              onChange={e => updateField('targetAge', e.target.value ? Number(e.target.value) : null)}
+              className="w-full rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-mono text-sm tabular-nums text-[var(--ink)] placeholder:text-[var(--ink-4)] focus:border-horizon-400 focus:outline-none focus:ring-1 focus:ring-horizon-400"
+              placeholder="bijv. 35"
+              min={18}
+              max={100}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Sectie: Details (event-specific fields) ──── */}
+      {fields.length > 0 && (
+        <div>
+          <SectionHeader label="Details" />
+          <div className="space-y-3">
+            {fields.map(field => (
+              <CatalogFieldInput
+                key={field.key}
+                field={field}
+                value={form.metadata[field.key] ?? field.default}
+                onChange={val => updateMeta(field.key, val)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Sectie: Financiële impact ──────────────── */}
+      <div>
+        <SectionHeader label="Financiële impact" />
+        <div className="space-y-3">
+          {/* Eenmalige kosten */}
+          <div>
+            <label className="mb-1 block font-sans text-[11px] font-medium text-[var(--ink-2)]">
+              Eenmalige kosten
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-sans text-sm text-[var(--ink-3)]">€</span>
+              <input
+                type="number"
+                value={form.oneTimeCost}
+                onChange={e => updateField('oneTimeCost', Number(e.target.value) || 0)}
+                className="w-full rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] py-2 pl-8 pr-3 font-mono text-sm tabular-nums text-[var(--ink)] focus:border-horizon-400 focus:outline-none focus:ring-1 focus:ring-horizon-400"
+              />
+            </div>
+          </div>
+
+          {/* Maandelijkse kosten */}
+          <div>
+            <label className="mb-1 block font-sans text-[11px] font-medium text-[var(--ink-2)]">
+              Maandelijkse kosten
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-sans text-sm text-[var(--ink-3)]">€</span>
+              <input
+                type="number"
+                value={form.monthlyCostChange}
+                onChange={e => updateField('monthlyCostChange', Number(e.target.value) || 0)}
+                className="w-full rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] py-2 pl-8 pr-3 font-mono text-sm tabular-nums text-[var(--ink)] focus:border-horizon-400 focus:outline-none focus:ring-1 focus:ring-horizon-400"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 font-sans text-[11px] text-[var(--ink-4)]">/mnd</span>
+            </div>
+          </div>
+
+          {/* Inkomenswijziging */}
+          <div>
+            <label className="mb-1 block font-sans text-[11px] font-medium text-[var(--ink-2)]">
+              Inkomenswijziging
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-sans text-sm text-[var(--ink-3)]">€</span>
+              <input
+                type="number"
+                value={form.monthlyIncomeChange}
+                onChange={e => updateField('monthlyIncomeChange', Number(e.target.value) || 0)}
+                className="w-full rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] py-2 pl-8 pr-3 font-mono text-sm tabular-nums text-[var(--ink)] focus:border-horizon-400 focus:outline-none focus:ring-1 focus:ring-horizon-400"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 font-sans text-[11px] text-[var(--ink-4)]">/mnd</span>
+            </div>
+          </div>
+
+          {/* Duur */}
+          <div>
+            <label className="mb-1 block font-sans text-[11px] font-medium text-[var(--ink-2)]">
+              Duur
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                value={form.durationMonths}
+                onChange={e => updateField('durationMonths', Number(e.target.value) || 0)}
+                className="w-full rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-mono text-sm tabular-nums text-[var(--ink)] focus:border-horizon-400 focus:outline-none focus:ring-1 focus:ring-horizon-400"
+                min={0}
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 font-sans text-[11px] text-[var(--ink-4)]">maanden</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Samenvattingskaart ──────────────────────── */}
+      <div className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+        <p className="mb-3 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+          Samenvatting
+        </p>
+
+        <div className="space-y-1.5">
+          {form.oneTimeCost !== 0 && (
+            <div className="flex justify-between">
+              <span className="font-sans text-[11px] text-[var(--ink-2)]">Eenmalige kosten</span>
+              <span className="font-mono text-[11px] tabular-nums text-[var(--ink)]">
+                {formatCurrency(form.oneTimeCost)}
+              </span>
+            </div>
+          )}
+          {form.monthlyCostChange !== 0 && (
+            <div className="flex justify-between">
+              <span className="font-sans text-[11px] text-[var(--ink-2)]">Maandelijkse impact</span>
+              <span className="font-mono text-[11px] tabular-nums text-[var(--ink)]">
+                {formatCurrency(form.monthlyCostChange)}/mnd
+              </span>
+            </div>
+          )}
+          {form.monthlyIncomeChange !== 0 && (
+            <div className="flex justify-between">
+              <span className="font-sans text-[11px] text-[var(--ink-2)]">Inkomenswijziging</span>
+              <span className="font-mono text-[11px] tabular-nums text-[var(--ink)]">
+                {formatCurrency(form.monthlyIncomeChange)}/mnd
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className="my-2.5 border-t border-dashed border-[var(--border-md)]" />
+
+        {/* Total */}
+        <div className="flex justify-between">
+          <span className="font-sans text-xs font-semibold text-[var(--ink)]">Totale impact</span>
+          <span className="font-mono text-xs font-semibold tabular-nums text-[var(--ink)]">
+            {formatCurrency(totalImpact)}
+          </span>
+        </div>
+
+        {/* Freedom time */}
+        {freedomTimeStr && (
+          <div className="mt-2 flex items-center justify-between rounded-[var(--r-sm)] bg-horizon-50/80 px-3 py-2">
+            <div className="flex items-center gap-1.5">
+              <Clock className="h-3 w-3 text-horizon-600" />
+              <span className="font-sans text-[11px] font-medium text-horizon-700">Vrijheidstijd</span>
+            </div>
+            <span className="font-mono text-[11px] font-semibold tabular-nums text-horizon-700">
+              {freedomTimeStr}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Actions ────────────────────────────────── */}
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex items-center gap-1 rounded-[var(--r)] px-4 py-2.5 font-sans text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)]"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Terug
+        </button>
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={!form.name.trim()}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-[var(--r)] bg-horizon-600 px-4 py-2.5 font-sans text-[11px] font-medium text-white transition-colors hover:bg-horizon-700 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <Check className="h-3.5 w-3.5" />
+          Toevoegen aan scenario
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── CatalogFieldInput ───────────────────────────────────────────────────────
+
+function CatalogFieldInput({
+  field,
+  value,
+  onChange,
+}: {
+  field: CatalogField
+  value: unknown
+  onChange: (val: unknown) => void
+}) {
+  const { key, label, fieldType, tip, options, suffix } = field
+
+  return (
+    <div>
+      <div className="mb-1 flex items-center gap-1.5">
+        <label className="font-sans text-[11px] font-medium text-[var(--ink-2)]">
+          {label}
+        </label>
+        {tip && (
+          <span className="group relative">
+            <Info className="h-3 w-3 cursor-help text-[var(--ink-4)]" />
+            <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-normal rounded-[var(--r-sm)] bg-[var(--ink)] px-2.5 py-1.5 font-sans text-[10px] leading-snug text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 max-w-[200px] sm:max-w-[260px]">
+              {tip}
+            </span>
+          </span>
+        )}
+      </div>
+
+      {fieldType === 'number' && (
+        <div className="relative">
+          <input
+            type="number"
+            value={value as number}
+            onChange={e => onChange(Number(e.target.value) || 0)}
+            className="w-full rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-mono text-sm tabular-nums text-[var(--ink)] focus:border-horizon-400 focus:outline-none focus:ring-1 focus:ring-horizon-400"
+          />
+          {suffix && (
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 font-sans text-[11px] text-[var(--ink-4)]">
+              {suffix}
+            </span>
+          )}
+        </div>
+      )}
+
+      {fieldType === 'percentage' && (
+        <div className="relative">
+          <input
+            type="number"
+            value={value as number}
+            onChange={e => onChange(Number(e.target.value) || 0)}
+            step={0.1}
+            className="w-full rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-mono text-sm tabular-nums text-[var(--ink)] focus:border-horizon-400 focus:outline-none focus:ring-1 focus:ring-horizon-400"
+          />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 font-sans text-[11px] text-[var(--ink-4)]">
+            {suffix ?? '%'}
+          </span>
+        </div>
+      )}
+
+      {fieldType === 'select' && options && (
+        <select
+          value={String(value)}
+          onChange={e => {
+            // Preserve number type if the option value is numeric
+            const opt = options.find(o => String(o.value) === e.target.value)
+            onChange(opt ? opt.value : e.target.value)
+          }}
+          className="w-full rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-sans text-sm text-[var(--ink)] focus:border-horizon-400 focus:outline-none focus:ring-1 focus:ring-horizon-400"
+        >
+          {options.map(opt => (
+            <option key={String(opt.value)} value={String(opt.value)}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      )}
+
+      {fieldType === 'toggle' && (
+        <button
+          type="button"
+          onClick={() => onChange(!value)}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+            value ? 'bg-horizon-600' : 'bg-[var(--border-md)]'
+          }`}
+          role="switch"
+          aria-checked={Boolean(value)}
+          aria-label={label}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition-transform ${
+              value ? 'translate-x-5' : 'translate-x-0'
+            }`}
+          />
+        </button>
+      )}
+    </div>
   )
 }
 
