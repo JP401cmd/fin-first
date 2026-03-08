@@ -16,6 +16,12 @@ import {
   Check,
   Loader2,
   ChevronRight,
+  History,
+  Sparkles,
+  Lightbulb,
+  Clock,
+  AlertTriangle,
+  AlertCircle,
 } from 'lucide-react'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 
@@ -82,6 +88,24 @@ interface UpcomingItem {
   date: string
 }
 
+interface Aandachtspunt {
+  id: string
+  type: 'budget_over' | 'unexpected_expense' | 'goal_overdue' | 'goal_behind'
+  title: string
+  description: string
+  freedomDays?: number
+  severity: 'high' | 'medium'
+}
+
+interface GesprekStarterData {
+  id: string
+  vraag: string
+  context: string
+  actie: string
+  sentiment: 'positive' | 'neutral' | 'alert'
+  vrijheidstijd?: string
+}
+
 const MONTH_NAMES = [
   'januari', 'februari', 'maart', 'april', 'mei', 'juni',
   'juli', 'augustus', 'september', 'oktober', 'november', 'december',
@@ -101,6 +125,8 @@ export default function CheckinPage() {
   const [upcoming, setUpcoming] = useState<UpcomingItem[]>([])
   const [reflection, setReflection] = useState('')
   const [previous, setPrevious] = useState<PreviousSnapshot | null>(null)
+  const [gespreksstarters, setGespreksstarters] = useState<GesprekStarterData[]>([])
+  const [aandachtspunten, setAandachtspunten] = useState<Aandachtspunt[]>([])
 
   const currentIdx = STEPS.findIndex(s => s.key === step)
 
@@ -108,12 +134,14 @@ export default function CheckinPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [overviewRes, goalsRes, budgetsRes, upcomingRes, previousRes] = await Promise.all([
+        const [overviewRes, goalsRes, budgetsRes, upcomingRes, previousRes, startersRes, aandachtspuntenRes] = await Promise.all([
           fetch('/api/checkin/overview'),
           fetch('/api/goals'),
           fetch('/api/checkin/budgets'),
           fetch('/api/checkin/upcoming'),
           fetch('/api/checkin/save'),
+          fetch('/api/checkin/gespreksstarters'),
+          fetch('/api/checkin/aandachtspunten'),
         ])
 
         if (overviewRes.ok) {
@@ -136,6 +164,18 @@ export default function CheckinPage() {
           const data = await previousRes.json()
           if (data.hasPrevious && data.previous?.metrics) {
             setPrevious(data.previous)
+          }
+        }
+        if (startersRes.ok) {
+          const data = await startersRes.json()
+          if (data.starters && Array.isArray(data.starters)) {
+            setGespreksstarters(data.starters)
+          }
+        }
+        if (aandachtspuntenRes.ok) {
+          const data = await aandachtspuntenRes.json()
+          if (data.aandachtspunten && Array.isArray(data.aandachtspunten)) {
+            setAandachtspunten(data.aandachtspunten)
           }
         }
       } catch {
@@ -223,10 +263,23 @@ export default function CheckinPage() {
             {overview?.monthLabel ? `Check-in ${overview.monthLabel}` : 'Maandelijkse check-in'}
           </h1>
         </div>
+        <Link
+          href="/core/checkin/historie"
+          className="ml-auto flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-[var(--ink-3)] hover:text-[var(--ink)] hover:bg-[var(--subtle)] transition-colors"
+          title="Vorige check-ins bekijken"
+        >
+          <History className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Historie</span>
+        </Link>
       </div>
 
       {/* ── Step Progress ──────────────────────────────────────────── */}
       <CheckinStepProgress current={step} />
+
+      {/* ── Aandachtspunten (shown at top of first step) ────────── */}
+      {step === 'terugblik' && aandachtspunten.length > 0 && (
+        <AandachtspuntenSection aandachtspunten={aandachtspunten} />
+      )}
 
       {/* ── Step Content ───────────────────────────────────────────── */}
       <div className="mt-6">
@@ -242,6 +295,7 @@ export default function CheckinPage() {
             goals={goals}
             budgets={budgets}
             previous={previous}
+            gespreksstarters={gespreksstarters}
           />
         )}
       </div>
@@ -641,6 +695,7 @@ function StepReflectie({
   goals,
   budgets,
   previous,
+  gespreksstarters,
 }: {
   reflection: string
   setReflection: (v: string) => void
@@ -648,6 +703,7 @@ function StepReflectie({
   goals: GoalSummary[]
   budgets: BudgetSummary[]
   previous: PreviousSnapshot | null
+  gespreksstarters: GesprekStarterData[]
 }) {
   const overBudgetCount = budgets.filter(b => b.budget_type === 'expense' && b.limit > 0 && b.spent > b.limit).length
   const activeGoalCount = goals.filter(g => !g.is_completed).length
@@ -713,6 +769,28 @@ function StepReflectie({
         </div>
       </div>
 
+      {/* Gespreksstarters */}
+      {gespreksstarters.length > 0 && (
+        <div className="card-editorial p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-wil-50">
+              <Sparkles className="h-3.5 w-3.5 text-wil-600" />
+            </div>
+            <p className="text-xs font-medium text-wil-600 uppercase tracking-wider">
+              Gespreksstarters
+            </p>
+          </div>
+          <p className="text-xs text-[var(--ink-3)] leading-relaxed mb-3">
+            Op basis van jullie financi&euml;le trends — bespreek samen:
+          </p>
+          <div className="space-y-3">
+            {gespreksstarters.map(starter => (
+              <GesprekStarterCard key={starter.id} starter={starter} />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Open question */}
       <div>
         <label htmlFor="reflection" className="block text-sm font-medium text-[var(--ink-2)] mb-2">
@@ -730,6 +808,111 @@ function StepReflectie({
           Je reflectie wordt priv&eacute; opgeslagen bij deze check-in.
         </p>
       </div>
+    </div>
+  )
+}
+
+/* ── Shared: AandachtspuntenSection ──────────────────────────────────── */
+function AandachtspuntenSection({ aandachtspunten }: { aandachtspunten: Aandachtspunt[] }) {
+  return (
+    <div className="mt-6 mb-2">
+      <div className="card-editorial border-l-3 border-l-amber-400 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-50">
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+          </div>
+          <p className="text-xs font-medium text-amber-700 uppercase tracking-wider">
+            Aandachtspunten
+          </p>
+          <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 text-[10px] font-bold text-amber-700">
+            {aandachtspunten.length}
+          </span>
+        </div>
+        <div className="space-y-2.5">
+          {aandachtspunten.map(punt => (
+            <div
+              key={punt.id}
+              className={`rounded-lg p-3 ${
+                punt.severity === 'high'
+                  ? 'bg-red-50/60 border border-red-200/60'
+                  : 'bg-amber-50/60 border border-amber-200/60'
+              }`}
+            >
+              <div className="flex items-start gap-2">
+                {punt.severity === 'high' ? (
+                  <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className={`text-sm font-medium ${
+                    punt.severity === 'high' ? 'text-red-800' : 'text-amber-800'
+                  }`}>
+                    {punt.title}
+                  </p>
+                  <p className="text-xs text-[var(--ink-3)] mt-0.5 leading-relaxed">
+                    {punt.description}
+                  </p>
+                  {punt.freedomDays != null && punt.freedomDays > 0 && (
+                    <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                      <Clock className="h-2.5 w-2.5" />
+                      {punt.freedomDays} {punt.freedomDays === 1 ? 'vrijheidsdag' : 'vrijheidsdagen'} impact
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Shared: GesprekStarterCard ──────────────────────────────────────── */
+function GesprekStarterCard({ starter }: { starter: GesprekStarterData }) {
+  const [expanded, setExpanded] = useState(false)
+
+  const sentimentColor = {
+    positive: 'border-l-emerald-400',
+    neutral: 'border-l-wil-400',
+    alert: 'border-l-amber-400',
+  }[starter.sentiment]
+
+  const sentimentBg = {
+    positive: 'bg-emerald-50/50',
+    neutral: 'bg-wil-50/50',
+    alert: 'bg-amber-50/50',
+  }[starter.sentiment]
+
+  return (
+    <div
+      className={`rounded-lg border border-[var(--border-ed)] border-l-3 ${sentimentColor} ${sentimentBg} p-3 cursor-pointer transition-colors hover:bg-[var(--subtle)]`}
+      onClick={() => setExpanded(v => !v)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => e.key === 'Enter' && setExpanded(v => !v)}
+    >
+      <p className="text-sm text-[var(--ink)] leading-relaxed">{starter.vraag}</p>
+      {starter.vrijheidstijd && (
+        <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-white/60 px-2 py-0.5 text-[10px] font-medium text-wil-700">
+          <Clock className="h-2.5 w-2.5" />
+          {starter.vrijheidstijd}
+        </div>
+      )}
+      {expanded && (
+        <div className="mt-2.5 space-y-2 border-t border-[var(--border-ed)] pt-2.5">
+          <p className="text-[11px] text-[var(--ink-3)] leading-relaxed">
+            <span className="font-medium text-[var(--ink-2)]">Data:</span> {starter.context}
+          </p>
+          <div className="flex items-start gap-1.5">
+            <Lightbulb className="h-3 w-3 text-wil-500 mt-0.5 shrink-0" />
+            <p className="text-[11px] text-wil-700 leading-relaxed font-medium">
+              {starter.actie}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
