@@ -33,6 +33,8 @@ import { buildSegments, typeColors, childTypeColors } from '@/components/app/bud
 import type { BudgetWithChildren } from '@/lib/budget-data'
 import { FullScreenModal } from '@/components/app/full-screen-modal'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { usePerspective } from '@/components/app/perspective-provider'
+import { Users } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 const DynBudgetsPage = dynamic(() => import('@/app/(app)/core/budgets/page'), {
@@ -108,6 +110,11 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   const [retirementMethodUsed, setRetirementMethodUsed] = useState<RetirementExpenseMethod>('essential_budgets')
   // Balance history (per-entity snapshots)
   const [balanceHistory, setBalanceHistory] = useState<EntityBalanceHistory[]>([])
+  // Household perspective
+  const { perspective } = usePerspective()
+  const [householdOverrides, setHouseholdOverrides] = useState<{
+    netWorth: number; totalAssets: number; totalDebts: number
+  } | null>(null)
 
   const loadData = useCallback(async () => {
     try {
@@ -284,6 +291,29 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
 
       const netWorth = totalAssets - totalDebts
       const monthlySavings = monthlyIncome - monthlyExpenses
+
+      // Household perspective: fetch partner totals if in a household
+      try {
+        const { data: membership } = await supabase
+          .from('household_members')
+          .select('household_id')
+          .maybeSingle()
+        if (membership?.household_id) {
+          const { data: partnerTotals } = await supabase.rpc('household_partner_totals')
+          const pt = partnerTotals?.[0] ?? null
+          if (pt) {
+            const partnerAssets = Number(pt.partner_total_assets) || 0
+            const partnerDebts = Number(pt.partner_total_debts) || 0
+            setHouseholdOverrides({
+              netWorth: netWorth + partnerAssets - partnerDebts,
+              totalAssets: totalAssets + partnerAssets,
+              totalDebts: totalDebts + partnerDebts,
+            })
+          }
+        }
+      } catch {
+        // Household data not available — ignore
+      }
 
       // Set next step data
       setHasTransactions((txResult.data?.length ?? 0) > 0)
@@ -592,6 +622,29 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       .catch(() => {})
   }, [data])
 
+  // Household perspective: derive effective display values
+  const isHouseholdView = perspective === 'household' && householdOverrides != null
+  const effectiveNetWorth = isHouseholdView ? householdOverrides.netWorth : data?.netWorth ?? 0
+  const effectiveTotalAssets = isHouseholdView ? householdOverrides.totalAssets : rawFinancials?.totalAssets ?? 0
+  const effectiveTotalDebts = isHouseholdView ? householdOverrides.totalDebts : rawFinancials?.totalDebts ?? 0
+  // Recompute freedom time for household perspective
+  const effectiveFreedomYears = (() => {
+    if (!data) return 0
+    if (!isHouseholdView) return data.freedomYears
+    const yearlyExp = rawFinancials?.yearlyRetirementExpenses ?? rawFinancials?.yearlyMustExpenses ?? (rawFinancials?.monthlyExpenses ?? 0) * 12
+    if (yearlyExp <= 0) return 0
+    const totalMonths = (effectiveNetWorth / yearlyExp) * 12
+    return Math.floor(Math.max(0, totalMonths) / 12)
+  })()
+  const effectiveFreedomMonths = (() => {
+    if (!data) return 0
+    if (!isHouseholdView) return data.freedomMonths
+    const yearlyExp = rawFinancials?.yearlyRetirementExpenses ?? rawFinancials?.yearlyMustExpenses ?? (rawFinancials?.monthlyExpenses ?? 0) * 12
+    if (yearlyExp <= 0) return 0
+    const totalMonths = (effectiveNetWorth / yearlyExp) * 12
+    return Math.floor(Math.max(0, totalMonths) % 12)
+  })()
+
   if (loading || !data) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
@@ -650,13 +703,18 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           <div className="mb-3 sm:mb-6 flex items-center gap-3">
             <FhinAvatar size={40} />
             <p className="label-editorial text-kern-600">
-              Jouw tijdlijn naar vrijheid
+              {isHouseholdView ? 'Jullie tijdlijn naar vrijheid' : 'Jouw tijdlijn naar vrijheid'}
             </p>
+            {isHouseholdView && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-kern-50 px-2 py-0.5 text-[10px] font-medium text-kern-700">
+                <Users className="h-3 w-3" /> Huishouden
+              </span>
+            )}
           </div>
 
           <div className="mb-3 sm:mb-5">
             <span className="font-display text-[36px] sm:text-[44px] md:text-[52px] font-bold tracking-tight text-[var(--ink)]">
-              {((data.netWorth / (coreSimTarget ?? data.fireTarget)) * 100).toFixed(1)}%
+              {((effectiveNetWorth / (coreSimTarget ?? data.fireTarget)) * 100).toFixed(1)}%
             </span>
             <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">vrijheid bereikt</span>
           </div>
@@ -665,7 +723,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-kern-600 via-kern-400 to-kern-300 transition-all duration-1000"
-                style={{ width: `${Math.max(Math.min((data.netWorth / (coreSimTarget ?? data.fireTarget)) * 100, 100), 0)}%` }}
+                style={{ width: `${Math.max(Math.min((effectiveNetWorth / (coreSimTarget ?? data.fireTarget)) * 100, 100), 0)}%` }}
               />
             </div>
             <div className="mt-2 flex justify-between text-xs text-[var(--ink-4)]">
@@ -682,11 +740,18 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 onClick={() => setShowNetWorthReceipt(true)}
                 className="w-full cursor-pointer text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px rounded-[var(--r)] focus-visible:ring-2 focus-visible:ring-kern-300 focus-visible:outline-none"
               >
-                <p className="label-editorial text-[var(--ink-3)]">Netto vermogen</p>
-                <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]">{formatCurrency(data.netWorth)}</p>
-                <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]" data-testid="net-worth-freedom-subtitle">
-                  dat is {data.freedomYears > 0 ? `${data.freedomYears} jaar en ` : ''}{data.freedomMonths} maanden vrijheid
+                <p className="label-editorial text-[var(--ink-3)]">
+                  {isHouseholdView ? 'Netto vermogen — Huishouden' : 'Netto vermogen'}
                 </p>
+                <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]">{formatCurrency(effectiveNetWorth)}</p>
+                <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]" data-testid="net-worth-freedom-subtitle">
+                  dat is {effectiveFreedomYears > 0 ? `${effectiveFreedomYears} jaar en ` : ''}{effectiveFreedomMonths} maanden vrijheid
+                </p>
+                {isHouseholdView && (
+                  <p className="mt-1 text-[10px] text-[var(--ink-4)]">
+                    Persoonlijk: {formatCurrency(data.netWorth)} · Partner: {formatCurrency(effectiveNetWorth - data.netWorth)}
+                  </p>
+                )}
               </button>
               <button
                 type="button"
