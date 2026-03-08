@@ -74,6 +74,7 @@ export interface TopGoal {
   target_date: string | null
   color: string
   icon: string
+  custom_unit?: string | null
 }
 
 export interface TopRecurringTransaction {

@@ -14,7 +14,8 @@ import {
   type Recommendation,
   type Action,
 } from '@/lib/recommendation-data'
-import { computeGoalProgress, getGoalColorClasses, type Goal } from '@/lib/goal-data'
+import { computeGoalProgress, getGoalColorClasses, GOAL_TYPE_META, formatGoalValue, type Goal, type GoalType } from '@/lib/goal-data'
+import { BudgetIcon } from '@/components/app/budget-shared'
 
 type GoalWithBudget = Goal & {
   budgets?: { id: string; name: string } | null
@@ -681,12 +682,20 @@ export default function WillPage() {
 
         {/* --- Column 2: Acties --- */}
         <div id="section-acties" className="scroll-mt-8 flex flex-col rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--ink)]">
-            Acties
-          </h2>
-          <p className="mt-1 mb-4 text-sm text-[var(--ink-3)]">
-            Concrete stappen die je vrijheid laten groeien
-          </p>
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 shrink-0 text-wil-500" />
+                <h2 className="text-sm font-semibold text-[var(--ink)]">Acties</h2>
+                <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--subtle)] px-1.5 font-mono text-[10px] font-bold tabular-nums text-[var(--ink-3)]">
+                  {actions.filter(a => a.status === 'open').length}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-[var(--ink-3)]">
+                Concrete stappen die je vrijheid laten groeien
+              </p>
+            </div>
+          </div>
           <div className="flex-1">
             <ActionBoard
               initialActions={actions}
@@ -714,82 +723,60 @@ export default function WillPage() {
         {/* --- Column 3: Doelen --- */}
         <FeatureGate featureId="doelen_systeem" fallback="hidden">
         <div id="section-doelen" className="scroll-mt-8 flex flex-col rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-[var(--ink)]">
-              Doelen
-            </h2>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowGoalForm(true)}
-                className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-wil-200 px-3 py-1.5 text-sm font-medium text-wil-600 hover:bg-wil-50"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Nieuw doel
-              </button>
-              {goals.length > 0 && (
-                <button
-                  onClick={() => setShowGoalModal(true)}
-                  className="rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-1.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-                >
-                  Alles
-                </button>
-              )}
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <Target className="h-4 w-4 shrink-0 text-wil-500" />
+                <h2 className="text-sm font-semibold text-[var(--ink)]">Doelen</h2>
+                <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--subtle)] px-1.5 font-mono text-[10px] font-bold tabular-nums text-[var(--ink-3)]">
+                  {filteredGoals.length}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-[var(--ink-3)]">
+                Financiele mijlpalen op weg naar volledige vrijheid
+              </p>
             </div>
+            <button
+              onClick={() => setShowGoalForm(true)}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-transparent px-2.5 py-1.5 text-xs font-medium text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] hover:bg-[var(--subtle)]"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Nieuw doel</span>
+            </button>
           </div>
-          <p className="mt-1 mb-4 text-sm text-[var(--ink-3)]">
-            Je actieve financiele doelen
-          </p>
-
-          {/* Goal filter tabs — only show when there are shared goals */}
-          {hasSharedGoals && goals.length > 0 && (
-            <div className="mb-3 flex gap-1 rounded-lg bg-[var(--subtle)] p-1">
-              {([
-                { key: 'all' as const, label: 'Alle' },
-                { key: 'personal' as const, label: 'Persoonlijk' },
-                { key: 'shared' as const, label: 'Gedeeld' },
-              ]).map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setGoalFilter(key)}
-                  className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                    goalFilter === key
-                      ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
-                      : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
 
           <div className="flex-1">
             {filteredGoals.length > 0 ? (
-              <div className="overflow-hidden rounded-[var(--r)] border border-[var(--border-ed)]">
-                <div className="divide-y divide-zinc-100">
-                  {filteredGoals.map((goal, i) => (
-                    <GoalSummaryRow
-                      key={goal.id}
-                      goal={goal}
-                      progress={filteredGoalProgresses[i]}
-                      onClick={() => setShowGoalModal(true)}
-                      dailyExpenses={dailyExpenseRate}
-                    />
-                  ))}
-                </div>
+              <div className="space-y-3">
+                {filteredGoals.slice(0, 3).map((goal, i) => (
+                  <GoalSummaryRow
+                    key={goal.id}
+                    goal={goal}
+                    progress={filteredGoalProgresses[i]}
+                    onClick={() => setShowGoalModal(true)}
+                    dailyExpenses={dailyExpenseRate}
+                  />
+                ))}
               </div>
             ) : (
               <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-6 text-center">
                 <p className="text-sm text-[var(--ink-3)]">
-                  {goalFilter === 'all'
-                    ? 'Nog geen doelen. Klik op "Nieuw doel" om te starten.'
-                    : goalFilter === 'shared'
-                      ? 'Geen gedeelde doelen.'
-                      : 'Geen persoonlijke doelen in dit filter.'}
+                  Nog geen doelen. Klik op &ldquo;Nieuw doel&rdquo; om te starten.
                 </p>
               </div>
             )}
           </div>
+
+          {/* Always show modal button */}
+          <button
+            type="button"
+            onClick={() => setShowGoalModal(true)}
+            className="mt-4 w-full rounded-[var(--r)] py-2 text-center text-xs font-medium text-wil-600 transition-colors hover:bg-wil-50"
+          >
+            {filteredGoals.length > 3
+              ? `Bekijk alle ${filteredGoals.length} doelen`
+              : 'Alle doelen bekijken'}
+          </button>
         </div>
         </FeatureGate>
       </section>
@@ -1349,11 +1336,12 @@ function GoalSummaryRow({
   dailyExpenses?: number
 }) {
   const colors = getGoalColorClasses(goal.color)
-  const isFreedm = goal.goal_type === 'freedom_days'
+  const goalType = goal.goal_type as GoalType
+  const meta = GOAL_TYPE_META[goalType] ?? GOAL_TYPE_META.custom
 
-  // Freedom-time framing for non-freedom_days goals with target > 100
+  // Freedom-time framing only for types where it's relevant
   let freedomTimeStr: string | null = null
-  if (!isFreedm && dailyExpenses && dailyExpenses > 0 && progress.target > 100) {
+  if (meta.freedomTimeRelevant && dailyExpenses && dailyExpenses > 0 && progress.target > 100) {
     const totalDays = Math.round(progress.target / dailyExpenses)
     if (totalDays >= 365) {
       const y = Math.floor(totalDays / 365)
@@ -1369,40 +1357,22 @@ function GoalSummaryRow({
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-[var(--subtle)]"
+      className="flex w-full items-center gap-3 rounded-[var(--r)] px-3 py-3 text-left transition-colors hover:bg-[var(--subtle)]"
     >
       <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r)] ${colors.bgLight}`}>
-        <span className="text-sm">{goal.icon}</span>
+        <BudgetIcon name={goal.icon} className={`h-4 w-4 ${colors.text}`} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0">
-            <p className="truncate text-sm font-medium text-[var(--ink)]">{goal.name}</p>
-            {goal.ownership === 'shared' && (
-              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-wil-50 px-1.5 py-0.5 text-[9px] font-semibold text-wil-600">
-                <Users className="h-2.5 w-2.5" /> Gedeeld
-              </span>
-            )}
-            {goal.budgets?.name && (
-              <span className="inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] bg-kern-50 text-kern-600 border border-kern-200">
-                via {goal.budgets.name}
-              </span>
-            )}
-          </div>
-          <div className="ml-3 flex items-center gap-2">
-            <span className="text-sm font-bold text-[var(--ink-2)]">{progress.pct}%</span>
-            {freedomTimeStr && (
-              <span className="text-[10px] text-[var(--ink-3)]">{freedomTimeStr}</span>
-            )}
-            {progress.eta && (
-              <span className="text-xs text-[var(--ink-3)]">{progress.eta}</span>
-            )}
+          <p className="truncate text-sm font-medium text-[var(--ink)]">{goal.name}</p>
+          <div className="ml-3 flex shrink-0 items-center gap-1.5">
+            <span className="font-mono text-xs tabular-nums font-semibold text-[var(--ink-2)]">{progress.pct}%</span>
             {!progress.onTrack && goal.target_date && (
               <span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-600">achter</span>
             )}
           </div>
         </div>
-        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+        <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[var(--subtle)]">
           <div
             className={`h-full rounded-full ${colors.bar} transition-all duration-500`}
             style={{ width: `${progress.pct}%` }}

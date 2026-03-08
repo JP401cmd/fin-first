@@ -4,8 +4,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { X, Plus, Check, ChevronDown, ChevronUp, Trash2, BarChart3, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  type Goal, type GoalType, GOAL_TYPE_LABELS,
-  computeGoalProgress, getGoalColorClasses,
+  type Goal, type GoalType, GOAL_TYPE_LABELS, GOAL_TYPE_META,
+  computeGoalProgress, getGoalColorClasses, formatGoalValue,
 } from '@/lib/goal-data'
 import { computeSharePct, SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
@@ -346,11 +346,12 @@ function GoalCard({
   const { current, target, pct, onTrack, eta } = computeGoalProgress(goal)
   const colors = getGoalColorClasses(goal.color)
   const typeLabel = GOAL_TYPE_LABELS[goal.goal_type as GoalType] ?? goal.goal_type
-  const isFreedm = goal.goal_type === 'freedom_days'
+  const goalType = goal.goal_type as GoalType
+  const meta = GOAL_TYPE_META[goalType] ?? GOAL_TYPE_META.custom
   const isLinked = !!(goal.linked_asset_id || goal.linked_debt_id)
   const { ref: inViewRef, hasEntered } = useInViewAnimation({ threshold: 0.1, duration: 600, triggerDelay: 300 })
   const { dailyExpenseRate, source } = useDailyExpenseRate()
-  const hasFreedomData = !isFreedm && source === 'transactions' && dailyExpenseRate > 0
+  const hasFreedomData = meta.freedomTimeRelevant && source === 'transactions' && dailyExpenseRate > 0
   const targetFreedom = hasFreedomData && target >= 100 ? eurToFreedomTime(target, dailyExpenseRate) : null
   const currentFreedom = hasFreedomData && current >= 100 ? eurToFreedomTime(current, dailyExpenseRate) : null
   const remainingFreedom = hasFreedomData && (target - current) >= 100 ? eurToFreedomTime(target - current, dailyExpenseRate) : null
@@ -483,9 +484,7 @@ function GoalCard({
           <div className="mt-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium text-[var(--ink-2)]">
-                {isFreedm
-                  ? `${Math.round(current)} / ${Math.round(target)} dagen`
-                  : `${formatCurrency(current)} / ${formatCurrency(target)}`}
+                {`${formatGoalValue(current, goalType, goal.custom_unit)} / ${formatGoalValue(target, goalType, goal.custom_unit)}`}
                 {targetFreedom && (
                   <span className="ml-1.5 font-normal italic text-[var(--ink-3)]">
                     ≈ {currentFreedom ? currentFreedom.formatted : '0d'} / {targetFreedom.formatted} vrijheid
@@ -540,9 +539,7 @@ function GoalCard({
                         <div className="flex items-center justify-between text-[10px]">
                           <span className="font-medium text-wil-600">{householdInfo.myName}</span>
                           <span className="text-[var(--ink-3)]">
-                            {isFreedm
-                              ? `${Math.round(myExpected)} dgn verwacht`
-                              : `${formatCurrency(myExpected)} verwacht`}
+                            {formatGoalValue(myExpected, goalType, goal.custom_unit)} verwacht
                             {myFreedom && (
                               <span className="ml-1 italic">≈ {myFreedom.formatted}</span>
                             )}
@@ -560,9 +557,7 @@ function GoalCard({
                         <div className="flex items-center justify-between text-[10px]">
                           <span className="font-medium text-horizon-600">{householdInfo.partnerName}</span>
                           <span className="text-[var(--ink-3)]">
-                            {isFreedm
-                              ? `${Math.round(partnerExpected)} dgn verwacht`
-                              : `${formatCurrency(partnerExpected)} verwacht`}
+                            {formatGoalValue(partnerExpected, goalType, goal.custom_unit)} verwacht
                             {partnerFreedom && (
                               <span className="ml-1 italic">≈ {partnerFreedom.formatted}</span>
                             )}
@@ -667,7 +662,7 @@ function GoalCard({
               <div className="flex gap-2">
                 <input
                   type="number"
-                  placeholder="Bedrag"
+                  placeholder={meta.unit === 'EUR' || meta.unit === 'EUR/mnd' ? 'Bedrag' : 'Waarde'}
                   value={contribAmount}
                   onChange={(e) => setContribAmount(e.target.value)}
                   className="w-28 rounded-lg border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-wil-500"

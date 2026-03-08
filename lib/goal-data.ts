@@ -2,7 +2,17 @@
  * Goal types, labels, and progress helpers for the Will module.
  */
 
-export type GoalType = 'savings' | 'debt_payoff' | 'net_worth' | 'freedom_days'
+export type GoalType =
+  | 'savings'
+  | 'debt_payoff'
+  | 'net_worth'
+  | 'freedom_days'
+  | 'savings_rate'
+  | 'invested_assets'
+  | 'passive_income'
+  | 'emergency_fund'
+  | 'salary'
+  | 'custom'
 
 export type GoalOwnership = 'personal' | 'shared'
 
@@ -18,6 +28,7 @@ export type Goal = {
   linked_asset_id: string | null
   linked_debt_id: string | null
   budget_id?: string | null
+  custom_unit?: string | null
   icon: string
   color: string
   is_completed: boolean
@@ -34,6 +45,12 @@ export const GOAL_TYPE_LABELS: Record<GoalType, string> = {
   debt_payoff: 'Schuld aflossen',
   net_worth: 'Netto vermogen',
   freedom_days: 'Vrijheidsdagen',
+  savings_rate: 'Spaarquote',
+  invested_assets: 'Belegd vermogen',
+  passive_income: 'Passief inkomen',
+  emergency_fund: 'Noodfonds',
+  salary: 'Salaris',
+  custom: 'Vrij doel',
 }
 
 export const GOAL_TYPE_ICONS: Record<GoalType, string> = {
@@ -41,6 +58,86 @@ export const GOAL_TYPE_ICONS: Record<GoalType, string> = {
   debt_payoff: 'CreditCard',
   net_worth: 'TrendingUp',
   freedom_days: 'Sun',
+  savings_rate: 'Activity',
+  invested_assets: 'LineChart',
+  passive_income: 'Banknote',
+  emergency_fund: 'ShieldCheck',
+  salary: 'Briefcase',
+  custom: 'Target',
+}
+
+export type GoalTypeMeta = {
+  unit: string
+  group: 'Financieel' | 'Persoonlijk'
+  step: string
+  min?: number
+  max?: number
+  supportsAssetLink: boolean
+  supportsDebtLink: boolean
+  freedomTimeRelevant: boolean
+}
+
+export const GOAL_TYPE_META: Record<GoalType, GoalTypeMeta> = {
+  savings:         { unit: 'EUR', group: 'Financieel', step: '0.01', supportsAssetLink: true,  supportsDebtLink: false, freedomTimeRelevant: true },
+  debt_payoff:     { unit: 'EUR', group: 'Financieel', step: '0.01', supportsAssetLink: false, supportsDebtLink: true,  freedomTimeRelevant: true },
+  net_worth:       { unit: 'EUR', group: 'Financieel', step: '0.01', supportsAssetLink: true,  supportsDebtLink: false, freedomTimeRelevant: true },
+  freedom_days:    { unit: 'dagen', group: 'Financieel', step: '1',  supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: false },
+  savings_rate:    { unit: '%',  group: 'Financieel', step: '0.1', min: 0, max: 100, supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: false },
+  invested_assets: { unit: 'EUR', group: 'Financieel', step: '0.01', supportsAssetLink: true,  supportsDebtLink: false, freedomTimeRelevant: true },
+  passive_income:  { unit: 'EUR/mnd', group: 'Financieel', step: '0.01', supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: false },
+  emergency_fund:  { unit: 'maanden', group: 'Financieel', step: '0.5', min: 0, supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: false },
+  salary:          { unit: 'EUR', group: 'Financieel', step: '0.01', supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: true },
+  custom:          { unit: 'custom', group: 'Persoonlijk', step: '1',  supportsAssetLink: false, supportsDebtLink: false, freedomTimeRelevant: false },
+}
+
+/**
+ * Format a goal value with the appropriate unit suffix/prefix.
+ */
+export function formatGoalValue(value: number, goalType: GoalType, customUnit?: string | null): string {
+  const meta = GOAL_TYPE_META[goalType]
+  switch (meta.unit) {
+    case 'EUR':
+      return `€${value.toLocaleString('nl-NL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+    case 'EUR/mnd':
+      return `€${value.toLocaleString('nl-NL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/mnd`
+    case '%':
+      return `${value.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
+    case 'dagen':
+      return `${Math.round(value)} dagen`
+    case 'maanden':
+      return `${value.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} maanden`
+    case 'custom':
+      return customUnit ? `${value.toLocaleString('nl-NL')} ${customUnit}` : value.toLocaleString('nl-NL')
+    default:
+      return value.toLocaleString('nl-NL')
+  }
+}
+
+/**
+ * Get form labels for target/current fields based on goal type.
+ */
+export function goalValueLabels(goalType: GoalType): { target: string; current: string } {
+  switch (goalType) {
+    case 'savings':
+    case 'net_worth':
+    case 'invested_assets':
+    case 'salary':
+      return { target: 'Doelbedrag (€)', current: 'Huidige waarde (€)' }
+    case 'debt_payoff':
+      return { target: 'Totale schuld (€)', current: 'Afgelost (€)' }
+    case 'passive_income':
+      return { target: 'Doel (€/mnd)', current: 'Huidig (€/mnd)' }
+    case 'freedom_days':
+      return { target: 'Doeldagen', current: 'Huidige dagen' }
+    case 'savings_rate':
+      return { target: 'Doelpercentage (%)', current: 'Huidige spaarquote (%)' }
+    case 'emergency_fund':
+      return { target: 'Doelmaanden', current: 'Huidige maanden' }
+    case 'custom':
+      return { target: 'Doelwaarde', current: 'Huidige waarde' }
+    default:
+      return { target: 'Doelwaarde', current: 'Huidige waarde' }
+  }
 }
 
 export const GOAL_COLORS = [

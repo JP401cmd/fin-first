@@ -79,7 +79,7 @@ export async function GET(req: Request) {
         // Try to match existing bank account by IBAN
         const { data: existing } = await supabase
           .from('bank_accounts')
-          .select('id')
+          .select('id, linked_asset_id')
           .eq('user_id', user.id)
           .eq('iban', iban)
           .eq('is_active', true)
@@ -88,6 +88,39 @@ export async function GET(req: Request) {
 
         if (existing) {
           bankAccountId = existing.id
+
+          // Ensure cash asset exists for legacy bank accounts (cash-as-asset backfill)
+          if (!existing.linked_asset_id) {
+            const accountName = `${reqRow.institution_name} ${iban.slice(-4)}`
+            const { data: backfillAsset } = await supabase
+              .from('assets')
+              .insert({
+                user_id: user.id,
+                name: accountName,
+                asset_type: 'cash',
+                current_value: 0,
+                purchase_value: 0,
+                expected_return: 0,
+                monthly_contribution: 0,
+                institution: reqRow.institution_name,
+                account_number: iban,
+                is_liquid: true,
+                subtype: 'checking',
+                has_budget_tracking: true,
+                ownership: 'personal',
+                net_worth_inclusion_pct: 100,
+                is_active: true,
+              })
+              .select('id')
+              .single()
+
+            if (backfillAsset) {
+              await supabase
+                .from('bank_accounts')
+                .update({ linked_asset_id: backfillAsset.id })
+                .eq('id', existing.id)
+            }
+          }
         }
       }
 

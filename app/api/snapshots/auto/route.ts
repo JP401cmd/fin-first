@@ -48,6 +48,7 @@ export async function GET() {
 
   // Fetch all required data in parallel
   const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split('T')[0]
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString().split('T')[0]
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
 
   const [assetsResult, debtsResult, expensesResult, incomeResult, profileResult, budgetsResult] = await Promise.all([
@@ -73,7 +74,7 @@ export async function GET() {
       .select('amount')
       .eq('user_id', user.id)
       .gt('amount', 0)
-      .gte('date', monthStart)
+      .gte('date', sixMonthsAgo)
       .lt('date', monthEnd),
     supabase
       .from('profiles')
@@ -106,7 +107,7 @@ export async function GET() {
 
   const yearlyExpenses = Math.abs(expenses.reduce((s, t) => s + Number(t.amount), 0))
   const monthlyExpenses = yearlyExpenses / 12
-  const monthlyIncome = income.reduce((s, t) => s + Number(t.amount), 0)
+  const monthlyIncome = income.reduce((s, t) => s + Number(t.amount), 0) / 6
   const monthlyContributions = assets.reduce((s, a) => s + Number(a.monthly_contribution || 0), 0)
 
   const yearlyMustExpenses = (budgetsResult.data ?? []).reduce((s, b) => {

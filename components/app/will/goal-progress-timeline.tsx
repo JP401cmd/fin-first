@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { type Goal, computeGoalProgress, getGoalColorClasses } from '@/lib/goal-data'
+import { type Goal, type GoalType, GOAL_TYPE_META, computeGoalProgress, getGoalColorClasses, formatGoalValue } from '@/lib/goal-data'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { TrendingUp, TrendingDown, Minus, Flag, AlertTriangle, Clock } from 'lucide-react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
@@ -31,7 +31,8 @@ export function GoalProgressTimeline({ goal, history }: GoalProgressTimelineProp
   const { ref, hasEntered } = useInViewAnimation({ duration: 700 })
   const colors = getGoalColorClasses(goal.color)
   const { pct, onTrack } = computeGoalProgress(goal)
-  const isFreedm = goal.goal_type === 'freedom_days'
+  const goalType = goal.goal_type as GoalType
+  const meta = GOAL_TYPE_META[goalType] ?? GOAL_TYPE_META.custom
   const target = Number(goal.target_value)
 
   // Sort history chronologically
@@ -62,9 +63,7 @@ export function GoalProgressTimeline({ goal, history }: GoalProgressTimelineProp
           {sorted.length === 1 ? (
             <>
               <p className="text-xs text-[var(--ink-3)]">
-                {isFreedm
-                  ? `${Math.round(Number(sorted[0].value))} dagen`
-                  : formatCurrency(Number(sorted[0].value))}
+                {formatGoalValue(Number(sorted[0].value), goalType, goal.custom_unit)}
                 {' op '}
                 {new Date(sorted[0].date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}
               </p>
@@ -172,11 +171,7 @@ export function GoalProgressTimeline({ goal, history }: GoalProgressTimelineProp
                 strokeWidth="0.5"
               />
               <text x={PAD.left - 6} y={yPos(val) + 3} textAnchor="end" fontSize="7" fill="#a1a1aa">
-                {isFreedm
-                  ? `${Math.round(val)}d`
-                  : val >= 1000
-                    ? `€${(val / 1000).toFixed(0)}k`
-                    : `€${val.toFixed(0)}`}
+                {formatYTick(val, goalType, goal.custom_unit)}
               </text>
             </g>
           ))}
@@ -200,7 +195,7 @@ export function GoalProgressTimeline({ goal, history }: GoalProgressTimelineProp
             fill="#a855f7"
             fontWeight="600"
           >
-            Doel: {isFreedm ? `${Math.round(target)}d` : formatCurrency(target)}
+            Doel: {formatYTick(target, goalType, goal.custom_unit)}
           </text>
 
           {/* Deadline marker (vertical dashed line) */}
@@ -492,10 +487,28 @@ function computePaceMessage(goal: Goal, sortedHistory: HistoryPoint[]): PaceResu
 }
 
 function formatValue(value: number, goal: Goal): string {
-  if (goal.goal_type === 'freedom_days') {
-    return `${Math.round(value)} dagen`
+  const goalType = goal.goal_type as GoalType
+  return formatGoalValue(value, goalType, goal.custom_unit)
+}
+
+function formatYTick(val: number, goalType: GoalType, customUnit?: string | null): string {
+  const meta = GOAL_TYPE_META[goalType] ?? GOAL_TYPE_META.custom
+  switch (meta.unit) {
+    case 'EUR':
+      return val >= 1000 ? `€${(val / 1000).toFixed(0)}k` : `€${val.toFixed(0)}`
+    case 'EUR/mnd':
+      return val >= 1000 ? `€${(val / 1000).toFixed(0)}k` : `€${val.toFixed(0)}`
+    case '%':
+      return `${val.toFixed(0)}%`
+    case 'dagen':
+      return `${Math.round(val)}d`
+    case 'maanden':
+      return `${val.toFixed(1)}m`
+    case 'custom':
+      return customUnit ? `${Math.round(val)} ${customUnit}` : `${Math.round(val)}`
+    default:
+      return `${Math.round(val)}`
   }
-  return formatCurrency(value)
 }
 
 /**

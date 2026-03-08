@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { X, Save, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  GOAL_TYPE_LABELS, GOAL_COLORS, type Goal, type GoalType,
+  GOAL_TYPE_LABELS, GOAL_COLORS, GOAL_TYPE_META, GOAL_TYPE_ICONS,
+  goalValueLabels, type Goal, type GoalType,
 } from '@/lib/goal-data'
 import { BudgetIcon, iconOptions } from '@/components/app/budget-shared'
 
@@ -65,6 +66,7 @@ export function GoalForm({
     linked_debt_id: goal?.linked_debt_id ?? '',
     icon: goal?.icon ?? 'Target',
     color: goal?.color ?? 'teal',
+    custom_unit: goal?.custom_unit ?? '',
   })
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
@@ -127,6 +129,7 @@ export function GoalForm({
       linked_debt_id: form.linked_debt_id || null,
       icon: form.icon,
       color: form.color,
+      custom_unit: form.goal_type === 'custom' ? (form.custom_unit.trim() || null) : null,
       ownership: isShared ? 'shared' : 'personal',
       household_id: isShared ? householdId : null,
     }
@@ -241,52 +244,92 @@ export function GoalForm({
                 <select
                   id="goal-type"
                   value={form.goal_type}
-                  onChange={(e) => update('goal_type', e.target.value as GoalType)}
+                  onChange={(e) => {
+                    const newType = e.target.value as GoalType
+                    update('goal_type', newType)
+                    update('icon', GOAL_TYPE_ICONS[newType])
+                  }}
                   className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
                 >
-                  {(Object.keys(GOAL_TYPE_LABELS) as GoalType[]).map((type) => (
-                    <option key={type} value={type}>{GOAL_TYPE_LABELS[type]}</option>
-                  ))}
+                  <optgroup label="Financieel">
+                    {(Object.keys(GOAL_TYPE_META) as GoalType[])
+                      .filter((t) => GOAL_TYPE_META[t].group === 'Financieel')
+                      .map((type) => (
+                        <option key={type} value={type}>{GOAL_TYPE_LABELS[type]}</option>
+                      ))}
+                  </optgroup>
+                  <optgroup label="Persoonlijk">
+                    {(Object.keys(GOAL_TYPE_META) as GoalType[])
+                      .filter((t) => GOAL_TYPE_META[t].group === 'Persoonlijk')
+                      .map((type) => (
+                        <option key={type} value={type}>{GOAL_TYPE_LABELS[type]}</option>
+                      ))}
+                  </optgroup>
                 </select>
               </div>
             )}
 
-            {/* Target + Current */}
-            <div className={`grid gap-4 ${lockedToSavings ? 'grid-cols-1' : 'grid-cols-2'}`}>
+            {/* Custom unit field */}
+            {form.goal_type === 'custom' && (
               <div>
-                <label htmlFor="goal-target" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
-                  {form.goal_type === 'freedom_days' ? 'Doeldagen' : 'Doelbedrag (€)'}
+                <label htmlFor="goal-custom-unit" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
+                  Eenheid
                 </label>
                 <input
-                  id="goal-target"
-                  type="number"
-                  min="1"
-                  step={form.goal_type === 'freedom_days' ? '1' : '0.01'}
-                  value={form.target_value}
-                  onChange={(e) => update('target_value', e.target.value)}
+                  id="goal-custom-unit"
+                  type="text"
+                  value={form.custom_unit}
+                  onChange={(e) => update('custom_unit', e.target.value)}
                   className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
-                  placeholder="0"
-                  required
+                  placeholder="bijv. boeken, km, uren"
                 />
               </div>
-              {!lockedToSavings && (
-                <div>
-                  <label htmlFor="goal-current" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
-                    {form.goal_type === 'freedom_days' ? 'Huidige dagen' : 'Huidige waarde (€)'}
-                  </label>
-                  <input
-                    id="goal-current"
-                    type="number"
-                    min="0"
-                    step={form.goal_type === 'freedom_days' ? '1' : '0.01'}
-                    value={form.current_value}
-                    onChange={(e) => update('current_value', e.target.value)}
-                    className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
-                    placeholder="0"
-                  />
+            )}
+
+            {/* Target + Current */}
+            {(() => {
+              const labels = goalValueLabels(form.goal_type)
+              const meta = GOAL_TYPE_META[form.goal_type]
+              return (
+                <div className={`grid gap-4 ${lockedToSavings ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                  <div>
+                    <label htmlFor="goal-target" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
+                      {labels.target}
+                    </label>
+                    <input
+                      id="goal-target"
+                      type="number"
+                      min={meta.min ?? 1}
+                      max={meta.max}
+                      step={meta.step}
+                      value={form.target_value}
+                      onChange={(e) => update('target_value', e.target.value)}
+                      className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                      placeholder="0"
+                      required
+                    />
+                  </div>
+                  {!lockedToSavings && (
+                    <div>
+                      <label htmlFor="goal-current" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
+                        {labels.current}
+                      </label>
+                      <input
+                        id="goal-current"
+                        type="number"
+                        min={meta.min ?? 0}
+                        max={meta.max}
+                        step={meta.step}
+                        value={form.current_value}
+                        onChange={(e) => update('current_value', e.target.value)}
+                        className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                        placeholder="0"
+                      />
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              )
+            })()}
 
             {/* Deadline */}
             <div>
@@ -302,8 +345,8 @@ export function GoalForm({
               />
             </div>
 
-            {/* Link to asset (for savings/net_worth) */}
-            {!lockedToSavings && (form.goal_type === 'savings' || form.goal_type === 'net_worth') && assets.length > 0 && (
+            {/* Link to asset (for types that support it) */}
+            {!lockedToSavings && GOAL_TYPE_META[form.goal_type].supportsAssetLink && assets.length > 0 && (
               <div>
                 <label htmlFor="goal-asset" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                   Koppel aan asset (optioneel)
@@ -322,8 +365,8 @@ export function GoalForm({
               </div>
             )}
 
-            {/* Link to debt (for debt_payoff) */}
-            {!lockedToSavings && form.goal_type === 'debt_payoff' && debts.length > 0 && (
+            {/* Link to debt (for types that support it) */}
+            {!lockedToSavings && GOAL_TYPE_META[form.goal_type].supportsDebtLink && debts.length > 0 && (
               <div>
                 <label htmlFor="goal-debt" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
                   Koppel aan schuld

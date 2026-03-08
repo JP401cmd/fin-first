@@ -405,19 +405,19 @@ export function SimChart({
             stroke={COLOR_OPBOUW} strokeWidth={1.5} strokeDasharray="4 2" opacity={0.85} />
         )}
 
-        {/* Baseline ghost-line (what-if mode) */}
+        {/* Baseline ghost-line (what-if mode) — solid gray reference */}
         {baselinePts.length > 1 && (
           <path
             d={pointsToPath(baselinePts)}
             fill="none"
             stroke="var(--ink-4, #bbb8b0)"
-            strokeWidth={1.5}
+            strokeWidth={2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
             pathLength={1}
             strokeDasharray="1"
             strokeDashoffset={hasEntered ? 0 : 1}
-            opacity={0.45}
+            opacity={0.55}
             style={{ transition: hasEntered ? 'stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1)' : 'none' }}
           />
         )}
@@ -759,9 +759,13 @@ export const SCENARIO_VARIANTS = [
 ] as const
 
 /**
- * Build scenario overlay paths by replaying the main simulation's cash pattern
- * (savings, withdrawals, life-event cashflows) with variant return rates.
- * This keeps the same FIRE-age transition and withdrawal timing — only growth differs.
+ * Build scenario overlay paths that stay symmetric around the main simulation.
+ *
+ * Instead of compounding the delta on the variant's own (diverged) portfolio,
+ * we track an "extra" divergence that compounds at the BASE return rate and
+ * accumulates delta applied to the MAIN sim's portfolio each year.
+ * This keeps optimist and pessimist equidistant from the main line
+ * (main is always the exact midpoint).
  */
 export function buildScenarioVariants(
   rows: SimRow[],
@@ -770,19 +774,18 @@ export function buildScenarioVariants(
   if (rows.length === 0) return []
 
   return SCENARIO_VARIANTS.map(({ name, label, color, delta }) => {
-    const variantReturn = baseReturn + delta
-    let portfolio = rows[0].startPortfolio
-    const points: [number, number][] = [[rows[0].age, portfolio]]
+    let extra = 0
+    const points: [number, number][] = [[rows[0].age, rows[0].startPortfolio]]
 
     for (const row of rows) {
-      // Same net cash pattern as main sim (savings/withdrawal + life events)
-      const netCash = row.savings - row.withdrawal + row.cashflowNet
-      // Growth at variant return rate, scaled proportionally to portfolio
-      const growth = row.startPortfolio > 0
-        ? (portfolio / row.startPortfolio) * row.growth * (variantReturn / baseReturn)
+      // Derive base net-of-tax return from the main sim row
+      const baseNetReturn = row.startPortfolio > 0
+        ? row.growth / row.startPortfolio
         : 0
-
-      portfolio = portfolio + netCash + growth
+      // Extra divergence: existing extra grows at base rate,
+      // plus delta applied to main sim's portfolio this year
+      extra = extra * (1 + baseNetReturn) + row.startPortfolio * delta
+      const portfolio = row.endPortfolio + extra
       points.push([row.age + 1, Math.max(portfolio, 0)])
       if (portfolio <= 0) break
     }
@@ -842,25 +845,25 @@ export function buildScenarioPathsFromSim(
     }
   }
 
-  // Variant paths (same logic as buildScenarioVariants, with FIRE detection + richer output)
+  // Variant paths (symmetric around main, with FIRE detection + richer output)
   function buildVariant(name: string, label: string, color: string, delta: number): ScenarioPath {
-    const variantReturn = baseReturn + delta
-    let portfolio = rows[0].startPortfolio
+    let extra = 0
     const pts: { age: number; netWorth: number; contributions: number; growth: number }[] = [
-      { age: startAge, netWorth: portfolio, contributions: 0, growth: 0 },
+      { age: startAge, netWorth: rows[0].startPortfolio, contributions: 0, growth: 0 },
     ]
     let varFireAge: number | null = null
     let varFireMonth: number | null = null
 
     for (const row of rows) {
-      const netCash = row.savings - row.withdrawal + row.cashflowNet
-      const growth = (row.startPortfolio > 0 && baseReturn !== 0)
-        ? (portfolio / row.startPortfolio) * row.growth * (variantReturn / baseReturn)
-        : portfolio * delta
-
-      portfolio = portfolio + netCash + growth
+      const baseNetReturn = row.startPortfolio > 0
+        ? row.growth / row.startPortfolio
+        : 0
+      // Symmetric divergence: extra compounds at base rate + delta on main portfolio
+      extra = extra * (1 + baseNetReturn) + row.startPortfolio * delta
+      const portfolio = row.endPortfolio + extra
       const clamped = Math.max(portfolio, 0)
-      pts.push({ age: row.age + 1, netWorth: clamped, contributions: row.savings, growth: Math.round(growth) })
+      const extraGrowth = Math.round(extra * baseNetReturn + row.startPortfolio * delta)
+      pts.push({ age: row.age + 1, netWorth: clamped, contributions: row.savings, growth: extraGrowth })
 
       if (varFireAge === null && clamped >= fireTarget && fireTarget > 0) {
         varFireAge = row.age + 1

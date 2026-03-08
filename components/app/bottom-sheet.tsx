@@ -8,9 +8,18 @@ type BottomSheetProps = {
   onClose: () => void
   title?: string
   children: ReactNode
+  /** Desktop max-width: 'sm' (448px) | 'md' (512px, default) | 'lg' (640px) | 'xl' (768px) */
+  size?: 'sm' | 'md' | 'lg' | 'xl'
 }
 
-export function BottomSheet({ open, onClose, title, children }: BottomSheetProps) {
+const sizeClasses = {
+  sm: 'md:max-w-sm',
+  md: 'md:max-w-lg',
+  lg: 'md:max-w-xl',
+  xl: 'md:max-w-3xl',
+} as const
+
+export function BottomSheet({ open, onClose, title, children, size = 'md' }: BottomSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<Element | null>(null)
   const titleId = useId()
@@ -89,7 +98,7 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
-        className="w-full max-h-[92vh] overflow-y-auto bg-[var(--paper)] rounded-t-[var(--r-lg)] shadow-[var(--s2)] md:mx-4 md:max-w-lg md:rounded-[var(--r-lg)] safe-bottom animate-sheet-enter"
+        className={`w-full max-h-[92vh] overflow-y-auto bg-[var(--paper)] rounded-t-[var(--r-lg)] shadow-[var(--s2)] md:mx-4 ${sizeClasses[size]} md:rounded-[var(--r-lg)] safe-bottom animate-sheet-enter`}
       >
         {/* Drag handle — mobile only */}
         <div className="flex justify-center pt-3 md:hidden">

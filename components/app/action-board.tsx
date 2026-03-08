@@ -1,12 +1,15 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, ChevronDown, Users } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus, ChevronDown, Users, CheckCircle } from 'lucide-react'
 import { ActionCard } from '@/components/app/action-card'
 import { ActionForm } from '@/components/app/action-form'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import { useFreedomDaysAnimation } from '@/components/app/freedom-days-animation'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
+
+const MAX_VISIBLE = 5
 
 type ActionBoardProps = {
   initialActions: Action[]
@@ -19,11 +22,11 @@ type ActionBoardProps = {
 
 export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, currentUserId }: ActionBoardProps) {
   const [actions, setActions] = useState<Action[]>(initialActions)
+  useEffect(() => { setActions(initialActions) }, [initialActions])
   const [showForm, setShowForm] = useState(false)
-  const [showOpen, setShowOpen] = useState(true)
-  const [showPostponed, setShowPostponed] = useState(false)
-  const [showCompleted, setShowCompleted] = useState(false)
-  const [showPartnerCompleted, setShowPartnerCompleted] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+  const [showModalCompleted, setShowModalCompleted] = useState(false)
+  const [showModalRejected, setShowModalRejected] = useState(false)
   const { triggerAnimation } = useFreedomDaysAnimation()
 
   async function handleAssign(actionId: string, partnerId: string | null) {
@@ -67,12 +70,18 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
   const partnerOpenActions = partnerAssignedActions
     .filter((a) => a.status === 'open')
     .sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0) || a.sort_order - b.sort_order)
-  const partnerCompletedActions = partnerAssignedActions.filter((a) => a.status === 'completed')
 
   const totalOpenDays = openActions.reduce((sum, a) => sum + (a.freedom_days_impact || 0), 0)
-  const totalPostponedDays = postponedActions.reduce((sum, a) => sum + (a.freedom_days_impact || 0), 0)
   const totalCompletedDays = completedActions.reduce((sum, a) => sum + (a.freedom_days_impact || 0), 0)
-  const partnerOpenDays = partnerOpenActions.reduce((sum, a) => sum + (a.freedom_days_impact || 0), 0)
+
+  // All open (own + partner) sorted by impact for the modal
+  const allOpenByImpact = [...openActions, ...postponedActions, ...partnerOpenActions]
+    .sort((a, b) => (b.freedom_days_impact || 0) - (a.freedom_days_impact || 0))
+
+  // Block view: open + postponed own actions, max 5
+  const activeActions = [...openActions, ...postponedActions]
+  const visibleOpen = activeActions.slice(0, MAX_VISIBLE)
+  const totalOpen = openActions.length + postponedActions.length + partnerOpenActions.length
 
   async function handleStatusChange(id: string, status: ActionStatus, data?: Record<string, unknown>) {
     let res: Response
@@ -159,196 +168,201 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
     setShowForm(false)
   }
 
-  if (ownActions.length === 0 && partnerAssignedActions.length === 0 && !showForm) {
+  const cardProps = {
+    onStatusChange: handleStatusChange,
+    onUpdate: handleUpdateAction,
+    onCancellationOpen,
+    partnerInfo,
+    onAssign: handleAssign,
+  }
+
+  const hasAnyActions = actions.length > 0
+
+  // --- Empty state (no actions at all) ---
+  if (!hasAnyActions && !showForm) {
     return (
-      <div>
-        <p className="text-sm font-serif italic text-[var(--ink-3)]">
-          Nog geen acties — maak er een aan of accepteer een voorstel
-        </p>
-        <button
-          type="button"
-          onClick={() => setShowForm(true)}
-          className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-wil-600 transition-colors hover:text-wil-700"
-        >
-          <Plus className="h-4 w-4" />
-          Nieuwe actie
-        </button>
+      <div className="space-y-4">
+        <div className="py-6 text-center">
+          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-wil-50">
+            <CheckCircle className="h-5 w-5 text-wil-400" />
+          </div>
+          <p className="mb-4 font-serif text-sm text-[var(--ink-3)]">
+            Nog geen acties — maak er een aan of accepteer een voorstel.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-xs font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] hover:bg-[var(--subtle)]"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nieuwe actie
+          </button>
+        </div>
       </div>
     )
   }
 
+  // --- Filled state (block view) ---
   return (
-    <div className="space-y-6">
-      {/* New action form (shown inline when active) */}
+    <div className="space-y-4">
+      {/* Inline form */}
       {showForm && (
         <ActionForm onSubmit={handleCreateAction} onCancel={() => setShowForm(false)} />
       )}
 
-      {/* Partner-assigned actions — "Van je partner" section */}
-      {partnerAssignedActions.length > 0 && (
-        <div>
-          <div className="mb-3 flex items-center gap-2">
-            <Users className="h-4 w-4 text-wil-600" />
-            <h3 className="text-sm font-semibold text-[var(--ink)]">
-              Van {partnerInfo?.partnerName ?? 'je partner'} ({partnerOpenActions.length})
-            </h3>
-            {partnerOpenDays > 0 && (
-              <span className="rounded-full bg-wil-100 px-2.5 py-0.5 text-xs font-medium text-wil-700">
-                {Math.round(partnerOpenDays)} dagen potentieel
+      {/* Compact action list (max 5 open + postponed) */}
+      {visibleOpen.length > 0 ? (
+        <div className="space-y-2">
+          {visibleOpen.map((action) => (
+            <ActionCard key={action.id} action={action} {...cardProps} compact />
+          ))}
+        </div>
+      ) : (
+        <p className="py-2 text-center text-xs text-[var(--ink-3)]">
+          Geen openstaande acties{completedActions.length > 0 ? ` — ${completedActions.length} afgerond` : ''}
+        </p>
+      )}
+
+      {/* Partner-assigned preview */}
+      {partnerOpenActions.length > 0 && visibleOpen.length < MAX_VISIBLE && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-3)]">
+            <Users className="h-3 w-3" />
+            Van {partnerInfo?.partnerName ?? 'partner'}
+          </div>
+          {partnerOpenActions.slice(0, MAX_VISIBLE - visibleOpen.length).map((action) => (
+            <ActionCard key={action.id} action={action} {...cardProps} isPartnerAssigned compact />
+          ))}
+        </div>
+      )}
+
+      {/* "Bekijk alle acties" — always visible */}
+      <button
+        type="button"
+        onClick={() => setShowAll(true)}
+        className="w-full rounded-[var(--r)] py-2 text-center text-xs font-medium text-wil-600 transition-colors hover:bg-wil-50"
+      >
+        {totalOpen > MAX_VISIBLE
+          ? `Bekijk alle ${totalOpen} openstaande acties`
+          : 'Alle acties bekijken'}
+      </button>
+
+      {/* ============ Modal ============ */}
+      <BottomSheet
+        open={showAll}
+        onClose={() => { setShowAll(false); setShowModalCompleted(false); setShowModalRejected(false) }}
+        title="Alle acties"
+        size="lg"
+      >
+        <div className="px-5 pb-6 pt-2">
+          {/* Summary strip */}
+          <div className="mb-5 flex items-center gap-4 text-xs text-[var(--ink-3)]">
+            <span><span className="font-mono tabular-nums font-semibold text-[var(--ink)]">{allOpenByImpact.length}</span> openstaand</span>
+            {totalOpenDays > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-wil-50 px-2 py-0.5 font-mono tabular-nums text-[10px] font-medium text-wil-700">
+                {Math.round(totalOpenDays)}d potentieel
               </span>
+            )}
+            {completedActions.length > 0 && (
+              <span><span className="font-mono tabular-nums font-semibold text-emerald-600">{completedActions.length}</span> afgerond</span>
+            )}
+            {rejectedActions.length > 0 && (
+              <span><span className="font-mono tabular-nums font-semibold text-[var(--ink-3)]">{rejectedActions.length}</span> afgewezen</span>
             )}
           </div>
 
-          {/* Open partner-assigned actions */}
-          {partnerOpenActions.length > 0 && (
+          {/* New action button */}
+          {!showForm && (
+            <button
+              type="button"
+              onClick={() => setShowForm(true)}
+              className="mb-4 inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] hover:bg-[var(--subtle)]"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Nieuwe actie
+            </button>
+          )}
+
+          {showForm && (
+            <div className="mb-4">
+              <ActionForm onSubmit={handleCreateAction} onCancel={() => setShowForm(false)} />
+            </div>
+          )}
+
+          {/* Open actions — sorted by impact */}
+          {allOpenByImpact.length > 0 && (
             <div className="space-y-2">
-              {partnerOpenActions.map((action) => (
+              {allOpenByImpact.map((action) => (
                 <ActionCard
                   key={action.id}
                   action={action}
-                  onStatusChange={handleStatusChange}
-                  onUpdate={handleUpdateAction}
-                  onCancellationOpen={onCancellationOpen}
-                  isPartnerAssigned
+                  {...cardProps}
+                  isPartnerAssigned={isPartnerAssigned(action) as boolean}
                 />
               ))}
             </div>
           )}
 
-          {/* Completed partner-assigned actions */}
-          {partnerCompletedActions.length > 0 && (
-            <div className="mt-3">
+          {allOpenByImpact.length === 0 && (
+            <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-6 text-center">
+              <p className="text-sm text-[var(--ink-3)]">Geen openstaande acties</p>
+            </div>
+          )}
+
+          {/* Completed actions — collapsible */}
+          {completedActions.length > 0 && (
+            <div className="mt-6 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)]/30">
               <button
                 type="button"
-                onClick={() => setShowPartnerCompleted(!showPartnerCompleted)}
-                className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]"
+                onClick={() => setShowModalCompleted(!showModalCompleted)}
+                className="flex w-full items-center gap-2 px-4 py-3 text-left"
               >
-                <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${showPartnerCompleted ? 'rotate-0' : '-rotate-90'}`} />
-                Afgerond ({partnerCompletedActions.length})
+                <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${showModalCompleted ? 'rotate-0' : '-rotate-90'}`} />
+                <span className="text-xs font-semibold text-[var(--ink-2)]">Afgerond</span>
+                <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-emerald-50 px-1.5 font-mono text-[10px] font-bold tabular-nums text-emerald-700">
+                  {completedActions.length}
+                </span>
+                {totalCompletedDays > 0 && (
+                  <span className="ml-auto font-mono text-[10px] tabular-nums font-medium text-emerald-600">
+                    {Math.round(totalCompletedDays)}d gewonnen
+                  </span>
+                )}
               </button>
-              {showPartnerCompleted && (
-                <div className="space-y-2">
-                  {partnerCompletedActions.map((action) => (
-                    <ActionCard
-                      key={action.id}
-                      action={action}
-                      onStatusChange={handleStatusChange}
-                      onUpdate={handleUpdateAction}
-                      isPartnerAssigned
-                    />
+              {showModalCompleted && (
+                <div className="space-y-2 px-4 pb-4">
+                  {completedActions.map((action) => (
+                    <ActionCard key={action.id} action={action} {...cardProps} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Rejected actions — collapsible */}
+          {rejectedActions.length > 0 && (
+            <div className="mt-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)]/30">
+              <button
+                type="button"
+                onClick={() => setShowModalRejected(!showModalRejected)}
+                className="flex w-full items-center gap-2 px-4 py-3 text-left"
+              >
+                <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${showModalRejected ? 'rotate-0' : '-rotate-90'}`} />
+                <span className="text-xs font-semibold text-[var(--ink-2)]">Afgewezen</span>
+                <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-zinc-100 px-1.5 font-mono text-[10px] font-bold tabular-nums text-[var(--ink-3)]">
+                  {rejectedActions.length}
+                </span>
+              </button>
+              {showModalRejected && (
+                <div className="space-y-2 px-4 pb-4">
+                  {rejectedActions.map((action) => (
+                    <ActionCard key={action.id} action={action} {...cardProps} />
                   ))}
                 </div>
               )}
             </div>
           )}
         </div>
-      )}
-
-      {/* Open actions */}
-      {openActions.length > 0 && (
-        <div>
-          <button
-            type="button"
-            onClick={() => setShowOpen(!showOpen)}
-            className="mb-2 flex w-full items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]"
-          >
-            <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${showOpen ? 'rotate-0' : '-rotate-90'}`} />
-            Open ({openActions.length})
-            {totalOpenDays > 0 && (
-              <span className="ml-auto font-mono tabular-nums text-[10px] font-medium normal-case tracking-normal text-wil-700">
-                {Math.round(totalOpenDays)}d potentieel
-              </span>
-            )}
-          </button>
-          {showOpen && (
-            <div className="space-y-2">
-              {openActions.map((action) => (
-                <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} onCancellationOpen={onCancellationOpen} partnerInfo={partnerInfo} onAssign={handleAssign} />
-              ))}
-              {/* Compact new action link */}
-              {!showForm && (
-                <button
-                  type="button"
-                  onClick={() => setShowForm(true)}
-                  className="mt-1 text-sm text-wil-600 transition-colors hover:underline"
-                >
-                  + Nieuwe actie
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Compact new action link when no open actions */}
-      {openActions.length === 0 && !showForm && (
-        <button
-          type="button"
-          onClick={() => setShowForm(true)}
-          className="text-sm text-wil-600 transition-colors hover:underline"
-        >
-          + Nieuwe actie
-        </button>
-      )}
-
-      {/* Postponed actions */}
-      {postponedActions.length > 0 && (
-        <div>
-          <button
-            type="button"
-            onClick={() => setShowPostponed(!showPostponed)}
-            className="mb-2 flex w-full items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]"
-          >
-            <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${showPostponed ? 'rotate-0' : '-rotate-90'}`} />
-            Uitgesteld ({postponedActions.length})
-            {totalPostponedDays > 0 && (
-              <span className="ml-auto font-mono tabular-nums text-[10px] font-medium normal-case tracking-normal text-amber-600">
-                {Math.round(totalPostponedDays)}d uitgesteld
-              </span>
-            )}
-          </button>
-          {showPostponed && (
-            <div className="space-y-2">
-              {postponedActions.map((action) => (
-                <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} onCancellationOpen={onCancellationOpen} partnerInfo={partnerInfo} onAssign={handleAssign} />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Completed actions */}
-      {completedActions.length > 0 && (
-        <div>
-          <button
-            type="button"
-            onClick={() => setShowCompleted(!showCompleted)}
-            className="mb-2 flex w-full items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]"
-          >
-            <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${showCompleted ? 'rotate-0' : '-rotate-90'}`} />
-            Afgerond ({completedActions.length})
-            {totalCompletedDays > 0 && (
-              <span className="ml-auto font-mono tabular-nums text-[10px] font-medium normal-case tracking-normal text-emerald-600">
-                {Math.round(totalCompletedDays)}d gewonnen
-              </span>
-            )}
-          </button>
-          {showCompleted && (
-            <div className="space-y-2">
-              {completedActions.map((action) => (
-                <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} onCancellationOpen={onCancellationOpen} partnerInfo={partnerInfo} onAssign={handleAssign} />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Rejected actions (always collapsed, subtle) */}
-      {rejectedActions.length > 0 && (
-        <div className="text-xs text-[var(--ink-3)]">
-          {rejectedActions.length} {rejectedActions.length === 1 ? 'actie' : 'acties'} geweigerd
-        </div>
-      )}
+      </BottomSheet>
     </div>
   )
 }

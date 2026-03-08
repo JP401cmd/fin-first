@@ -109,6 +109,7 @@ export async function POST(request: Request) {
     budget_id: body.budget_id || null,
     icon: body.icon || 'Target',
     color: body.color || 'teal',
+    custom_unit: body.custom_unit || null,
     ownership,
     household_id: goalHouseholdId,
   }

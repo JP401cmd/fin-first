@@ -98,7 +98,9 @@
       "Bash(npx jest:*)",
       "Bash(git stash:*)",
       "Bash(npx vitest:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(npx playwright-cli:*)",
+      "Bash(npx next:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

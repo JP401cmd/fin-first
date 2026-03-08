@@ -499,118 +499,6 @@ export default function WhatIfPage() {
   const simResult = whatIfSim?.result ?? null
   const simCashflows = whatIfSim?.cashflows ?? []
 
-  // ── Shared chart + KPI blocks (rendered in both mobile & desktop positions) ──
-
-  const heroKpiStrip = simResult && baselineSim && (
-    <button
-      type="button"
-      onClick={() => setComparisonOpen(true)}
-      className="card-editorial w-full overflow-hidden text-left transition-all hover:border-wil-300 hover:shadow-sm"
-    >
-      <div className="flex h-[3px]">
-        <div className="flex-1 bg-[var(--ink-3)]" />
-        <div className="flex-1 bg-wil-500" />
-      </div>
-      <div className="flex items-center justify-between px-4 py-3">
-        <div>
-          <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
-            FIRE leeftijd
-          </span>
-          <p className="font-display text-2xl font-bold tabular-nums text-[var(--ink)]">
-            {formatFireAgeShort(whatIfFireAge)}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {fireAgeDelta !== null && Math.abs(fireAgeDelta) > 0.1 && (
-            <span className={`rounded-full px-2.5 py-1 font-mono text-sm font-semibold ${
-              fireAgeDelta < 0 ? 'bg-horizon-50 text-horizon-700' : 'bg-kern-50 text-kern-700'
-            }`}>
-              {formatFireAgeDelta(fireAgeDelta)}
-            </span>
-          )}
-          <ChevronRight className="h-4 w-4 text-[var(--ink-4)]" />
-        </div>
-      </div>
-    </button>
-  )
-
-  const simChartBlock = simResult && (
-    <section className="card-editorial overflow-hidden">
-      <div className="h-1.5 bg-horizon-500" />
-      <div className="p-4 sm:p-6">
-        {!simResult.fireReachable && (
-          <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-orange-300 bg-orange-50/60 px-3 py-2.5">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
-            <p className="font-sans text-[12px] text-orange-700">
-              FIRE niet bereikbaar voor leeftijd {simResult.displayEndAge} — pas je scenario aan.
-            </p>
-          </div>
-        )}
-
-        <div className="-mx-4 sm:-mx-6 min-h-[220px] overflow-hidden">
-          <SimChart
-            key={scenarioKey}
-            rows={simResult.rows}
-            fireAge={simResult.fireAge}
-            fireAgeFractional={simResult.fireAgeFractional}
-            currentAge={currentAge ?? 30}
-            endAge={simResult.displayEndAge}
-            cashflows={simCashflows}
-            fireTarget={simResult.requiredFirePortfolio}
-            strategy={simResult.strategy}
-            targetEndPortfolio={simResult.targetEndPortfolio}
-            baselineRows={baselineSim?.result.rows}
-            baselineFireAge={baselineFireAge}
-            dailyExpenseRate={whatIfInput ? whatIfInput.monthlyExpenses / 30 : undefined}
-          />
-          {/* Events timeline aligned to same age axis */}
-          {events.length > 0 && (
-            <EventsTimeline
-              events={events.filter(e => !e.whatIfDisabled)}
-              currentAge={currentAge ?? 30}
-              endAge={simResult.displayEndAge}
-            />
-          )}
-        </div>
-
-        {/* Cashflow pills */}
-        {simCashflows.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {simCashflows.map(cf => (
-              <span
-                key={cf.id}
-                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-sans text-[10px] font-medium ${
-                  cf.direction === 'income'
-                    ? 'border-horizon-200 bg-horizon-50 text-horizon-700'
-                    : 'border-kern-200 bg-kern-50/60 text-kern-700'
-                }`}
-              >
-                {cf.direction === 'income' ? '↑' : '↓'}{' '}
-                {cf.name} (leeftijd {cf.fromAge})
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Legend */}
-        <div className="mt-3 flex items-center gap-4 font-sans text-[10px] text-[var(--ink-4)]">
-          <span className="flex items-center gap-1.5">
-            <svg width="20" height="2" aria-hidden="true">
-              <line x1="0" y1="1" x2="20" y2="1" stroke="var(--ink-4)" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.5" />
-            </svg>
-            Huidige realiteit
-          </span>
-          <span className="flex items-center gap-1.5">
-            <svg width="20" height="2" aria-hidden="true">
-              <line x1="0" y1="1" x2="20" y2="1" stroke="var(--hor-t, #8a6e42)" strokeWidth="2.5" />
-            </svg>
-            Wat-als scenario
-          </span>
-        </div>
-      </div>
-    </section>
-  )
-
   return (
     <div className={dimensionClass}>
       <div className="whatif-world mx-auto max-w-5xl px-4 py-6 sm:px-6 md:px-8">
@@ -618,18 +506,138 @@ export default function WhatIfPage() {
         {/* ── Header ────────────────────────────────────────── */}
         <WhatIfHeader />
 
-        {/* ── Hero KPI strip — mobile only ───────────────────── */}
-        <div className="lg:hidden">
-          {heroKpiStrip}
-        </div>
+        {/* ── KPI strip (full width) ─────────────────────────── */}
+        {simResult && baselineSim && (
+          <button
+            type="button"
+            onClick={() => setComparisonOpen(true)}
+            className="mt-4 card-editorial w-full overflow-hidden text-left transition-all hover:border-wil-300 hover:shadow-sm"
+          >
+            <div className="flex h-[3px]">
+              <div className="flex-1 bg-[var(--ink-3)]" />
+              <div className="flex-1 bg-wil-500" />
+            </div>
+            <div className="flex items-center justify-between px-4 py-3">
+              <div>
+                <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+                  FIRE leeftijd
+                </span>
+                <p className="font-display text-2xl font-bold tabular-nums text-[var(--ink)]">
+                  {formatFireAgeShort(whatIfFireAge)}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {fireAgeDelta !== null && Math.abs(fireAgeDelta) > 0.1 && (
+                  <span className={`rounded-full px-2.5 py-1 font-mono text-sm font-semibold ${
+                    fireAgeDelta < 0 ? 'bg-horizon-50 text-horizon-700' : 'bg-kern-50 text-kern-700'
+                  }`}>
+                    {formatFireAgeDelta(fireAgeDelta)}
+                  </span>
+                )}
+                <ChevronRight className="h-4 w-4 text-[var(--ink-4)]" />
+              </div>
+            </div>
+          </button>
+        )}
 
-        {/* ── Two-column layout on desktop ────────────────────── */}
-        <div className="mt-4 lg:grid lg:grid-cols-[1fr_480px] lg:gap-6">
+        {/* ── Full-width chart (like horizon page) ─────────────── */}
+        {simResult && (
+          <section className="mt-4">
+            {!simResult.fireReachable && (
+              <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-orange-300 bg-orange-50/60 px-3 py-2.5">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+                <p className="font-sans text-[12px] text-orange-700">
+                  FIRE niet bereikbaar voor leeftijd {simResult.displayEndAge} — pas je scenario aan.
+                </p>
+              </div>
+            )}
 
-          {/* ── Left column: controls ──────────────────────────── */}
+            <div className="-mx-4 sm:-mx-6 md:-mx-8 overflow-hidden">
+              <SimChart
+                key={scenarioKey}
+                rows={simResult.rows}
+                fireAge={simResult.fireAge}
+                fireAgeFractional={simResult.fireAgeFractional}
+                currentAge={currentAge ?? 30}
+                endAge={simResult.displayEndAge}
+                cashflows={simCashflows}
+                fireTarget={simResult.requiredFirePortfolio}
+                strategy={simResult.strategy}
+                targetEndPortfolio={simResult.targetEndPortfolio}
+                baselineRows={baselineSim?.result.rows}
+                baselineFireAge={baselineFireAge}
+                dailyExpenseRate={whatIfInput ? whatIfInput.monthlyExpenses / 30 : undefined}
+              />
+              {events.length > 0 && (
+                <EventsTimeline
+                  events={events.filter(e => !e.whatIfDisabled)}
+                  currentAge={currentAge ?? 30}
+                  endAge={simResult.displayEndAge}
+                />
+              )}
+            </div>
+
+            {/* Legenda + cashflow pills */}
+            <div className="mt-2 flex flex-wrap items-center gap-4 font-sans text-[10px] text-[var(--ink-4)]">
+              <span className="flex items-center gap-1.5">
+                <svg width="20" height="3" aria-hidden="true">
+                  <line x1="0" y1="1.5" x2="20" y2="1.5" stroke="var(--ink-4)" strokeWidth="2.5" opacity="0.55" />
+                </svg>
+                Huidige realiteit
+              </span>
+              <span className="flex items-center gap-1.5">
+                <svg width="20" height="2" aria-hidden="true">
+                  <line x1="0" y1="1" x2="20" y2="1" stroke="var(--hor-t, #8a6e42)" strokeWidth="2.5" />
+                </svg>
+                Wat-als scenario
+              </span>
+              {simCashflows.length > 0 && simCashflows.map(cf => (
+                <span
+                  key={cf.id}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-sans text-[10px] font-medium ${
+                    cf.direction === 'income'
+                      ? 'border-horizon-200 bg-horizon-50 text-horizon-700'
+                      : 'border-kern-200 bg-kern-50/60 text-kern-700'
+                  }`}
+                >
+                  {cf.direction === 'income' ? '↑' : '↓'}{' '}
+                  {cf.name} (leeftijd {cf.fromAge})
+                </span>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── Divider ───────────────────────────────────────── */}
+        <div className="my-4 border-b border-dashed border-[var(--border-ed)]" />
+
+        {/* ── Two-column layout: controls ────────────────────── */}
+        <div className="lg:grid lg:grid-cols-2 lg:gap-6">
+
+          {/* ── Left column: sliders + events ──────────────────── */}
           <div className="min-w-0 space-y-4">
+            <WhatIfSliders
+              overrides={overrides}
+              baseline={baseline}
+              onChange={setOverrides}
+            />
 
-            {/* Presets in card-editorial */}
+            <WhatIfEventsPanel
+              events={events}
+              onToggleEvent={handleToggleEvent}
+              onAddEvent={handleAddEvent}
+              onRemoveEvent={handleRemoveEvent}
+              onEditEvent={handleEditEvent}
+              baselineFireAge={baselineFireAge}
+              computeImpact={computeImpact}
+              dailyExpenses={whatIfInput ? whatIfInput.monthlyExpenses / 30 : undefined}
+              isHousehold={isHousehold}
+            />
+          </div>
+
+          {/* ── Right column: presets + saved + actions + chat ── */}
+          <div className="mt-4 min-w-0 space-y-4 lg:mt-0">
+            {/* Presets */}
             <div className="card-editorial overflow-hidden">
               <div className="h-[3px] bg-wil-500" />
               <div className="px-4 py-3">
@@ -645,7 +653,6 @@ export default function WhatIfPage() {
               </div>
             </div>
 
-            {/* Saved scenarios */}
             <WhatIfScenarios
               overrides={overrides}
               events={events}
@@ -653,32 +660,6 @@ export default function WhatIfPage() {
               onLoadScenario={handleLoadScenario}
             />
 
-            {/* Sliders */}
-            <WhatIfSliders
-              overrides={overrides}
-              baseline={baseline}
-              onChange={setOverrides}
-            />
-
-            {/* SimChart — mobile only (between sliders and events) */}
-            <div className="lg:hidden">
-              {simChartBlock}
-            </div>
-
-            {/* Life Events */}
-            <WhatIfEventsPanel
-              events={events}
-              onToggleEvent={handleToggleEvent}
-              onAddEvent={handleAddEvent}
-              onRemoveEvent={handleRemoveEvent}
-              onEditEvent={handleEditEvent}
-              baselineFireAge={baselineFireAge}
-              computeImpact={computeImpact}
-              dailyExpenses={whatIfInput ? whatIfInput.monthlyExpenses / 30 : undefined}
-              isHousehold={isHousehold}
-            />
-
-            {/* Scenario Actions */}
             <WhatIfActions
               overrides={overrides}
               baseline={baseline}
@@ -688,26 +669,17 @@ export default function WhatIfPage() {
               baselineAnnualSavings={baselineAnnualSavings}
             />
 
-            {/* Chat */}
             <WhatIfChat
               onAddEvent={handleAddEvent}
               scenarioContext={chatScenarioContext}
             />
-
-            {/* Footer */}
-            <p className="pb-8 pt-2 text-center font-sans text-[10px] text-[var(--ink-4)]">
-              Dit is een simulatie — geen financieel advies. Werkelijke resultaten kunnen afwijken.
-            </p>
-          </div>
-
-          {/* ── Right column: sticky output (desktop only) ──────── */}
-          <div className="hidden lg:block">
-            <div className="sticky top-4 space-y-4">
-              {heroKpiStrip}
-              {simChartBlock}
-            </div>
           </div>
         </div>
+
+        {/* Footer */}
+        <p className="pb-8 pt-4 text-center font-sans text-[10px] text-[var(--ink-4)]">
+          Dit is een simulatie — geen financieel advies. Werkelijke resultaten kunnen afwijken.
+        </p>
 
         {/* ── BottomSheet: full comparison (kassabon) ────────── */}
         {simResult && baselineSim && (

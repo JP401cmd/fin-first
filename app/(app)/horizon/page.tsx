@@ -90,6 +90,8 @@ export default function HorizonPage() {
   const [range, setRange] = useState<FireRange | null>(null)
   const [projection, setProjection] = useState<ProjectionMonth[]>([])
   const [resilience, setResilience] = useState<ResilienceScore | null>(null)
+  const [avgIncome6m, setAvgIncome6m] = useState<number | null>(null)
+  const [avgExpenses6m, setAvgExpenses6m] = useState<number | null>(null)
   const [snapshotResilience, setSnapshotResilience] = useState<number | null>(null)
   const [resilienceSnapshots, setResilienceSnapshots] = useState<SnapshotForTrend[]>([])
   const [events, setEvents] = useState<LifeEvent[]>([])
@@ -104,11 +106,11 @@ export default function HorizonPage() {
   const [simModalOpen, setSimModalOpen] = useState(false)
 
   // Scenario overlay state
-  const [scenariosExpanded, setScenariosExpanded] = useState(true)
+  const [scenariosExpanded, setScenariosExpanded] = useState(false)
   const [scenarioData, setScenarioData] = useState<ScenarioOverlay[] | null>(null)
 
   // Monte Carlo overlay state
-  const [mcExpanded, setMcExpanded] = useState(true)
+  const [mcExpanded, setMcExpanded] = useState(false)
   const [mcData, setMcData] = useState<MonteCarloResult | null>(null)
 
   // Kassabon modal state
@@ -167,8 +169,9 @@ export default function HorizonPage() {
       const oneYearFromNow = new Date(Date.UTC(now.getFullYear() + 1, now.getMonth(), now.getDate())).toISOString().split('T')[0]
       const today = now.toISOString().split('T')[0]
       const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
+      const sixMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 5, 1)).toISOString().split('T')[0]
 
-      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, actionsResult, childBudgetsResult, fullDebtsResult, snapshotsResult, income12Result, earliestIncomeResult] = await Promise.all([
+      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, actionsResult, childBudgetsResult, fullDebtsResult, snapshotsResult, income12Result, earliestIncomeResult, tx6mResult] = await Promise.all([
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
@@ -191,6 +194,8 @@ export default function HorizonPage() {
           .order('snapshot_date', { ascending: true }),
         supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
         supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
+        // 6-month transactions for stable resilience calculation
+        supabase.from('transactions').select('amount').gte('date', sixMonthsAgo).lt('date', monthEnd),
       ])
 
       let monthlyIncome = 0
@@ -200,6 +205,19 @@ export default function HorizonPage() {
         if (amt > 0) monthlyIncome += amt
         else monthlyExpenses += Math.abs(amt)
       }
+
+      // 6-month average income/expenses for stable resilience calculation
+      let totalIncome6m = 0
+      let totalExpenses6m = 0
+      for (const tx of tx6mResult.data ?? []) {
+        const amt = Number(tx.amount)
+        if (amt > 0) totalIncome6m += amt
+        else totalExpenses6m += Math.abs(amt)
+      }
+      const avgInc6 = totalIncome6m / 6
+      const avgExp6 = totalExpenses6m / 6
+      setAvgIncome6m(avgInc6)
+      setAvgExpenses6m(avgExp6)
 
       const totalAssets = (assetsResult.data ?? []).reduce((s, a) =>
         s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
@@ -401,12 +419,16 @@ export default function HorizonPage() {
     setFire(computeFireProjection(effectiveInput, fireParams.grossReturn, fireSwr))
     setRange(computeFireRange(effectiveInput, fireSwr, undefined, fireParams.grossReturn))
     setProjection(projectForward(effectiveInput, 360))
-    setResilience(computeResilienceScore(effectiveInput))
+    // Resilience score: use 6-month averaged income/expenses for stability
+    const resilienceInput: FinancialInput = avgIncome6m !== null && avgExpenses6m !== null
+      ? { ...effectiveInput, monthlyIncome: avgIncome6m, monthlyExpenses: avgExpenses6m }
+      : effectiveInput
+    setResilience(computeResilienceScore(resilienceInput))
     if (events.length > 0) {
       setImpacts(computeCumulativeImpacts(effectiveInput, events))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [incomeOverride, input, fireSwr, fireParams])
+  }, [incomeOverride, input, fireSwr, fireParams, avgIncome6m, avgExpenses6m])
 
   // Lazy scenario computation — replay main sim with variant returns
   useEffect(() => {

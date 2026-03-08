@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -22,16 +22,35 @@ import {
   Clock,
   AlertTriangle,
   AlertCircle,
+  Landmark,
+  CreditCard,
+  Lock,
+  Link2,
 } from 'lucide-react'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { createClient } from '@/lib/supabase/client'
+import { BudgetIcon } from '@/components/app/budget-shared'
+import {
+  type Asset,
+  type AssetType,
+  ASSET_TYPE_LABELS,
+  ASSET_TYPE_ICONS,
+  ASSET_TYPE_COLORS,
+} from '@/lib/asset-data'
+import {
+  type Debt,
+  DEBT_TYPE_LABELS,
+} from '@/lib/debt-data'
 
 /* ── Step definitions ────────────────────────────────────────────────── */
 const STEPS = [
-  { key: 'terugblik',   label: 'Terugblik',   icon: Eye },
-  { key: 'doelen',      label: 'Doelen',       icon: Target },
-  { key: 'budget',      label: 'Budget',       icon: Wallet },
-  { key: 'vooruitblik', label: 'Vooruitblik',  icon: TrendingUp },
-  { key: 'reflectie',   label: 'Reflectie',    icon: MessageSquare },
+  { key: 'terugblik',    label: 'Terugblik',    icon: Eye },
+  { key: 'bezittingen',  label: 'Bezittingen',  icon: Landmark },
+  { key: 'schulden',     label: 'Schulden',     icon: CreditCard },
+  { key: 'doelen',       label: 'Doelen',       icon: Target },
+  { key: 'budget',       label: 'Budget',       icon: Wallet },
+  { key: 'vooruitblik',  label: 'Vooruitblik',  icon: TrendingUp },
+  { key: 'reflectie',    label: 'Reflectie',    icon: MessageSquare },
 ] as const
 
 type StepKey = (typeof STEPS)[number]['key']
@@ -72,6 +91,8 @@ interface GoalSummary {
   icon: string | null
   color: string | null
   is_completed: boolean
+  linked_asset_id: string | null
+  linked_debt_id: string | null
 }
 
 interface BudgetSummary {
@@ -128,13 +149,26 @@ export default function CheckinPage() {
   const [gespreksstarters, setGespreksstarters] = useState<GesprekStarterData[]>([])
   const [aandachtspunten, setAandachtspunten] = useState<Aandachtspunt[]>([])
 
+  // Revalue states
+  const [assets, setAssets] = useState<Asset[]>([])
+  const [debts, setDebts] = useState<Debt[]>([])
+  const [assetNewValues, setAssetNewValues] = useState<Record<string, string>>({})
+  const [debtNewValues, setDebtNewValues] = useState<Record<string, string>>({})
+  const [goalNewValues, setGoalNewValues] = useState<Record<string, string>>({})
+  const [holdingsMap, setHoldingsMap] = useState<Record<string, boolean>>({})
+  const [assetsSaved, setAssetsSaved] = useState(false)
+  const [debtsSaved, setDebtsSaved] = useState(false)
+  const [goalsSaved, setGoalsSaved] = useState(false)
+
   const currentIdx = STEPS.findIndex(s => s.key === step)
 
   // ── Fetch all data on mount ───────────────────────────────────────
   useEffect(() => {
     async function loadData() {
       try {
-        const [overviewRes, goalsRes, budgetsRes, upcomingRes, previousRes, startersRes, aandachtspuntenRes] = await Promise.all([
+        const supabase = createClient()
+
+        const [overviewRes, goalsRes, budgetsRes, upcomingRes, previousRes, startersRes, aandachtspuntenRes, assetsResult, debtsResult] = await Promise.all([
           fetch('/api/checkin/overview'),
           fetch('/api/goals'),
           fetch('/api/checkin/budgets'),
@@ -142,6 +176,8 @@ export default function CheckinPage() {
           fetch('/api/checkin/save'),
           fetch('/api/checkin/gespreksstarters'),
           fetch('/api/checkin/aandachtspunten'),
+          supabase.from('assets').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
+          supabase.from('debts').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         ])
 
         if (overviewRes.ok) {
@@ -151,6 +187,15 @@ export default function CheckinPage() {
         if (goalsRes.ok) {
           const data = await goalsRes.json()
           setGoals(Array.isArray(data) ? data : data.goals || [])
+          // Initialize goal new values
+          const goalData: GoalSummary[] = Array.isArray(data) ? data : data.goals || []
+          const gVals: Record<string, string> = {}
+          for (const g of goalData) {
+            if (!g.is_completed && !g.linked_asset_id && !g.linked_debt_id) {
+              gVals[g.id] = String(Number(g.current_value))
+            }
+          }
+          setGoalNewValues(gVals)
         }
         if (budgetsRes.ok) {
           const data = await budgetsRes.json()
@@ -177,6 +222,46 @@ export default function CheckinPage() {
           if (data.aandachtspunten && Array.isArray(data.aandachtspunten)) {
             setAandachtspunten(data.aandachtspunten)
           }
+        }
+
+        // Process assets
+        if (!assetsResult.error && assetsResult.data) {
+          const loadedAssets = assetsResult.data as Asset[]
+          setAssets(loadedAssets)
+          const aVals: Record<string, string> = {}
+          for (const a of loadedAssets) {
+            aVals[a.id] = String(Number(a.current_value))
+          }
+          setAssetNewValues(aVals)
+
+          // Check holdings for all assets
+          const holdingsChecks = await Promise.all(
+            loadedAssets.map(async (a) => {
+              try {
+                const res = await fetch(`/api/assets/has-holdings?asset_id=${a.id}`)
+                const data = await res.json()
+                return { id: a.id, hasHoldings: data.has_holdings === true }
+              } catch {
+                return { id: a.id, hasHoldings: false }
+              }
+            })
+          )
+          const hMap: Record<string, boolean> = {}
+          for (const h of holdingsChecks) {
+            hMap[h.id] = h.hasHoldings
+          }
+          setHoldingsMap(hMap)
+        }
+
+        // Process debts
+        if (!debtsResult.error && debtsResult.data) {
+          const loadedDebts = debtsResult.data as Debt[]
+          setDebts(loadedDebts)
+          const dVals: Record<string, string> = {}
+          for (const d of loadedDebts) {
+            dVals[d.id] = String(Number(d.current_balance))
+          }
+          setDebtNewValues(dVals)
         }
       } catch {
         // Gracefully handle errors — show empty states
@@ -284,7 +369,35 @@ export default function CheckinPage() {
       {/* ── Step Content ───────────────────────────────────────────── */}
       <div className="mt-6">
         {step === 'terugblik' && <StepTerugblik overview={overview} previous={previous} />}
-        {step === 'doelen' && <StepDoelen goals={goals} />}
+        {step === 'bezittingen' && (
+          <StepBezittingen
+            assets={assets}
+            newValues={assetNewValues}
+            setNewValues={setAssetNewValues}
+            holdingsMap={holdingsMap}
+            saved={assetsSaved}
+            setSaved={setAssetsSaved}
+          />
+        )}
+        {step === 'schulden' && (
+          <StepSchulden
+            debts={debts}
+            setDebts={setDebts}
+            newValues={debtNewValues}
+            setNewValues={setDebtNewValues}
+            saved={debtsSaved}
+            setSaved={setDebtsSaved}
+          />
+        )}
+        {step === 'doelen' && (
+          <StepDoelen
+            goals={goals}
+            newValues={goalNewValues}
+            setNewValues={setGoalNewValues}
+            saved={goalsSaved}
+            setSaved={setGoalsSaved}
+          />
+        )}
         {step === 'budget' && <StepBudget budgets={budgets} />}
         {step === 'vooruitblik' && <StepVooruitblik upcoming={upcoming} />}
         {step === 'reflectie' && (
@@ -509,19 +622,467 @@ function StepTerugblik({ overview, previous }: { overview: CheckinOverview | nul
   )
 }
 
-/* ── Step 2: Doelen ──────────────────────────────────────────────────── */
-function StepDoelen({ goals }: { goals: GoalSummary[] }) {
-  const activeGoals = goals.filter(g => !g.is_completed)
-  const completedGoals = goals.filter(g => g.is_completed)
+/* ── Step 2: Bezittingen ─────────────────────────────────────────────── */
+function StepBezittingen({
+  assets,
+  newValues,
+  setNewValues,
+  holdingsMap,
+  saved,
+  setSaved,
+}: {
+  assets: Asset[]
+  newValues: Record<string, string>
+  setNewValues: (v: Record<string, string>) => void
+  holdingsMap: Record<string, boolean>
+  saved: boolean
+  setSaved: (v: boolean) => void
+}) {
+  const [savingAssets, setSavingAssets] = useState(false)
+
+  // Group by asset_type
+  const byType = useMemo(() => {
+    const map: Partial<Record<AssetType, Asset[]>> = {}
+    for (const type of Object.keys(ASSET_TYPE_LABELS) as AssetType[]) {
+      const typeAssets = assets.filter(a => a.asset_type === type)
+      if (typeAssets.length > 0) map[type] = typeAssets
+    }
+    return map
+  }, [assets])
+
+  const changedCount = useMemo(() => {
+    let count = 0
+    for (const a of assets) {
+      if (holdingsMap[a.id]) continue
+      const current = Number(a.current_value)
+      const newVal = Number(newValues[a.id])
+      if (!isNaN(newVal) && Math.abs(newVal - current) >= 0.01) count++
+    }
+    return count
+  }, [assets, newValues, holdingsMap])
+
+  function handleValueChange(id: string, value: string) {
+    if (value !== '' && !/^-?\d*\.?\d*$/.test(value)) return
+    setNewValues({ ...newValues, [id]: value })
+  }
+
+  async function handleSave() {
+    if (changedCount === 0 || savingAssets) return
+    setSavingAssets(true)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Niet ingelogd')
+
+      const date = new Date().toISOString().split('T')[0]
+      const changes: { asset: Asset; newValue: number }[] = []
+      for (const asset of assets) {
+        if (holdingsMap[asset.id]) continue
+        const current = Number(asset.current_value)
+        const newVal = Number(newValues[asset.id])
+        if (isNaN(newVal) || Math.abs(newVal - current) < 0.01) continue
+        changes.push({ asset, newValue: newVal })
+      }
+
+      // Upsert valuations
+      const valuationRows = changes.map(({ asset, newValue }) => ({
+        user_id: user.id,
+        entity_type: 'asset' as const,
+        entity_id: asset.id,
+        valuation_date: date,
+        value: newValue,
+        notes: 'Check-in herwaardering',
+      }))
+      const { error: valError } = await supabase
+        .from('valuations')
+        .upsert(valuationRows, { onConflict: 'entity_id,valuation_date' })
+      if (valError) throw valError
+
+      // Update asset current_values
+      await Promise.all(
+        changes.map(({ asset, newValue }) =>
+          supabase.from('assets').update({ current_value: newValue }).eq('id', asset.id)
+        )
+      )
+
+      setSaved(true)
+    } catch {
+      // silent — user can retry
+    } finally {
+      setSavingAssets(false)
+    }
+  }
 
   return (
     <div className="space-y-4">
       <div className="card-editorial p-5">
-        <h2 className="text-base font-display font-semibold text-[var(--ink)]">
-          Doelen
-        </h2>
+        <h2 className="text-base font-display font-semibold text-[var(--ink)]">Bezittingen herwaarderen</h2>
         <p className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
-          Hoe staat het met je doelen?
+          Werk de huidige waarden van je bezittingen bij.
+        </p>
+      </div>
+
+      {assets.length === 0 ? (
+        <div className="card-editorial p-5">
+          <p className="text-sm text-[var(--ink-3)] font-serif italic">
+            Nog geen bezittingen.{' '}
+            <Link href="/core/assets" className="text-kern-600 hover:underline">Voeg bezittingen toe</Link>
+          </p>
+        </div>
+      ) : (
+        <>
+          {(Object.entries(byType) as [AssetType, Asset[]][]).map(([type, typeAssets]) => (
+            <div key={type}>
+              <div className="flex items-center gap-2 pt-2 pb-1.5">
+                <span style={{ color: ASSET_TYPE_COLORS[type] }}>
+                  <BudgetIcon name={ASSET_TYPE_ICONS[type]} className="h-3.5 w-3.5" />
+                </span>
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                  {ASSET_TYPE_LABELS[type]}
+                </h3>
+              </div>
+              <div className="space-y-2">
+                {typeAssets.map(asset => {
+                  const current = Number(asset.current_value)
+                  const locked = holdingsMap[asset.id]
+                  const newVal = Number(newValues[asset.id] || 0)
+                  const delta = locked ? 0 : (isNaN(newVal) ? 0 : newVal - current)
+                  const hasChanged = Math.abs(delta) >= 0.01
+
+                  return (
+                    <div
+                      key={asset.id}
+                      className={`card-editorial p-3 ${
+                        locked ? 'opacity-60' : hasChanged ? 'border-kern-300' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-[var(--ink)] truncate">{asset.name}</p>
+                          <p className="text-xs text-[var(--ink-3)] font-mono tabular-nums">
+                            {formatCurrency(current)}
+                          </p>
+                        </div>
+                        {locked ? (
+                          <div className="flex items-center gap-1.5 text-[var(--ink-4)]">
+                            <Lock className="h-3 w-3" />
+                            <span className="text-[10px]">Holdings</span>
+                          </div>
+                        ) : (
+                          <div className="w-28 shrink-0">
+                            <div className="relative">
+                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-[var(--ink-3)]">€</span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={newValues[asset.id] ?? ''}
+                                onChange={e => handleValueChange(asset.id, e.target.value)}
+                                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] pl-6 pr-2 py-1.5 text-sm font-mono tabular-nums text-[var(--ink)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
+                              />
+                            </div>
+                          </div>
+                        )}
+                        {!locked && hasChanged && (
+                          <span className={`text-xs font-mono tabular-nums font-medium shrink-0 ${
+                            delta > 0 ? 'text-emerald-600' : 'text-red-500'
+                          }`}>
+                            {delta > 0 ? '+' : ''}{formatCurrency(delta)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+
+          {/* Save button */}
+          <button
+            onClick={handleSave}
+            disabled={changedCount === 0 || savingAssets || saved}
+            className={`w-full inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+              saved
+                ? 'bg-emerald-600 text-white'
+                : changedCount === 0
+                  ? 'bg-[var(--subtle)] text-[var(--ink-4)] cursor-not-allowed'
+                  : 'bg-kern-600 text-white hover:bg-kern-700'
+            }`}
+          >
+            {savingAssets ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : saved ? (
+              <>
+                <Check className="h-4 w-4" />
+                Opgeslagen
+              </>
+            ) : (
+              changedCount > 0
+                ? `${changedCount} bezitting${changedCount !== 1 ? 'en' : ''} opslaan`
+                : 'Geen wijzigingen'
+            )}
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
+/* ── Step 3: Schulden ───────────────────────────────────────────────── */
+function StepSchulden({
+  debts,
+  setDebts,
+  newValues,
+  setNewValues,
+  saved,
+  setSaved,
+}: {
+  debts: Debt[]
+  setDebts: (v: Debt[]) => void
+  newValues: Record<string, string>
+  setNewValues: (v: Record<string, string>) => void
+  saved: boolean
+  setSaved: (v: boolean) => void
+}) {
+  const [savingDebts, setSavingDebts] = useState(false)
+
+  const changedCount = useMemo(() => {
+    let count = 0
+    for (const d of debts) {
+      const current = Number(d.current_balance)
+      const newVal = Number(newValues[d.id])
+      if (!isNaN(newVal) && Math.abs(newVal - current) >= 0.01) count++
+    }
+    return count
+  }, [debts, newValues])
+
+  function handleValueChange(id: string, value: string) {
+    if (value !== '' && !/^-?\d*\.?\d*$/.test(value)) return
+    setNewValues({ ...newValues, [id]: value })
+  }
+
+  async function handleSave() {
+    if (changedCount === 0 || savingDebts) return
+    setSavingDebts(true)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Niet ingelogd')
+
+      const date = new Date().toISOString().split('T')[0]
+      const changes: { debt: Debt; newValue: number }[] = []
+      for (const debt of debts) {
+        const current = Number(debt.current_balance)
+        const newVal = Number(newValues[debt.id])
+        if (isNaN(newVal) || Math.abs(newVal - current) < 0.01) continue
+        changes.push({ debt, newValue: newVal })
+      }
+
+      // Upsert valuations
+      const valuationRows = changes.map(({ debt, newValue }) => ({
+        user_id: user.id,
+        entity_type: 'debt' as const,
+        entity_id: debt.id,
+        valuation_date: date,
+        value: newValue,
+        notes: 'Check-in herwaardering',
+      }))
+      const { error: valError } = await supabase
+        .from('valuations')
+        .upsert(valuationRows, { onConflict: 'entity_id,valuation_date' })
+      if (valError) throw valError
+
+      // Update debt current_balances + auto-deactivate if ≤ 0
+      await Promise.all(
+        changes.map(({ debt, newValue }) => {
+          const updateData: Record<string, unknown> = { current_balance: newValue }
+          if (newValue <= 0) updateData.is_active = false
+          return supabase.from('debts').update(updateData).eq('id', debt.id)
+        })
+      )
+
+      // Remove deactivated debts from local state
+      const deactivated = new Set(changes.filter(c => c.newValue <= 0).map(c => c.debt.id))
+      if (deactivated.size > 0) {
+        setDebts(debts.filter(d => !deactivated.has(d.id)))
+      }
+
+      setSaved(true)
+    } catch {
+      // silent — user can retry
+    } finally {
+      setSavingDebts(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="card-editorial p-5">
+        <h2 className="text-base font-display font-semibold text-[var(--ink)]">Schulden bijwerken</h2>
+        <p className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+          Werk de actuele saldi van je schulden bij.
+        </p>
+      </div>
+
+      {debts.length === 0 ? (
+        <div className="card-editorial p-5">
+          <p className="text-sm text-[var(--ink-3)] font-serif italic">
+            Geen actieve schulden — goed bezig!
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="space-y-2">
+            {debts.map(debt => {
+              const current = Number(debt.current_balance)
+              const newVal = Number(newValues[debt.id] || 0)
+              const delta = isNaN(newVal) ? 0 : newVal - current
+              const hasChanged = Math.abs(delta) >= 0.01
+
+              return (
+                <div
+                  key={debt.id}
+                  className={`card-editorial p-3 ${hasChanged ? 'border-kern-300' : ''}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-[var(--ink)] truncate">
+                        {debt.name}
+                      </p>
+                      <p className="text-xs text-[var(--ink-3)]">
+                        <span className="font-mono tabular-nums">{formatCurrency(current)}</span>
+                        {' · '}
+                        {DEBT_TYPE_LABELS[debt.debt_type]}
+                      </p>
+                    </div>
+                    <div className="w-28 shrink-0">
+                      <div className="relative">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-[var(--ink-3)]">€</span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={newValues[debt.id] ?? ''}
+                          onChange={e => handleValueChange(debt.id, e.target.value)}
+                          className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] pl-6 pr-2 py-1.5 text-sm font-mono tabular-nums text-[var(--ink)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
+                        />
+                      </div>
+                    </div>
+                    {hasChanged && (
+                      <span className={`text-xs font-mono tabular-nums font-medium shrink-0 ${
+                        delta < 0 ? 'text-emerald-600' : 'text-red-500'
+                      }`}>
+                        {delta > 0 ? '+' : ''}{formatCurrency(delta)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Save button */}
+          <button
+            onClick={handleSave}
+            disabled={changedCount === 0 || savingDebts || saved}
+            className={`w-full inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+              saved
+                ? 'bg-emerald-600 text-white'
+                : changedCount === 0
+                  ? 'bg-[var(--subtle)] text-[var(--ink-4)] cursor-not-allowed'
+                  : 'bg-kern-600 text-white hover:bg-kern-700'
+            }`}
+          >
+            {savingDebts ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : saved ? (
+              <>
+                <Check className="h-4 w-4" />
+                Opgeslagen
+              </>
+            ) : (
+              changedCount > 0
+                ? `${changedCount} schuld${changedCount !== 1 ? 'en' : ''} opslaan`
+                : 'Geen wijzigingen'
+            )}
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
+/* ── Step 4: Doelen ─────────────────────────────────────────────────── */
+function StepDoelen({
+  goals,
+  newValues,
+  setNewValues,
+  saved,
+  setSaved,
+}: {
+  goals: GoalSummary[]
+  newValues: Record<string, string>
+  setNewValues: (v: Record<string, string>) => void
+  saved: boolean
+  setSaved: (v: boolean) => void
+}) {
+  const [savingGoals, setSavingGoals] = useState(false)
+  const activeGoals = goals.filter(g => !g.is_completed)
+  const completedGoals = goals.filter(g => g.is_completed)
+
+  const changedCount = useMemo(() => {
+    let count = 0
+    for (const g of activeGoals) {
+      if (g.linked_asset_id || g.linked_debt_id) continue
+      const current = Number(g.current_value)
+      const newVal = Number(newValues[g.id])
+      if (!isNaN(newVal) && Math.abs(newVal - current) >= 0.01) count++
+    }
+    return count
+  }, [activeGoals, newValues])
+
+  function handleValueChange(id: string, value: string) {
+    if (value !== '' && !/^-?\d*\.?\d*$/.test(value)) return
+    setNewValues({ ...newValues, [id]: value })
+  }
+
+  async function handleSave() {
+    if (changedCount === 0 || savingGoals) return
+    setSavingGoals(true)
+    try {
+      const changes: { id: string; current_value: number }[] = []
+      for (const g of activeGoals) {
+        if (g.linked_asset_id || g.linked_debt_id) continue
+        const current = Number(g.current_value)
+        const newVal = Number(newValues[g.id])
+        if (isNaN(newVal) || Math.abs(newVal - current) < 0.01) continue
+        changes.push({ id: g.id, current_value: newVal })
+      }
+
+      // PATCH each changed goal
+      await Promise.all(
+        changes.map(({ id, current_value }) =>
+          fetch('/api/goals', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, current_value }),
+          })
+        )
+      )
+
+      setSaved(true)
+    } catch {
+      // silent — user can retry
+    } finally {
+      setSavingGoals(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="card-editorial p-5">
+        <h2 className="text-base font-display font-semibold text-[var(--ink)]">Doelen bijwerken</h2>
+        <p className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
+          Werk de voortgang van je doelen bij.
         </p>
       </div>
 
@@ -535,10 +1096,15 @@ function StepDoelen({ goals }: { goals: GoalSummary[] }) {
       ) : (
         <>
           {activeGoals.map(goal => {
-            const pct = goal.target_value > 0 ? Math.min(100, (goal.current_value / goal.target_value) * 100) : 0
+            const isLinked = !!(goal.linked_asset_id || goal.linked_debt_id)
+            const currentVal = isLinked ? goal.current_value : Number(newValues[goal.id] ?? goal.current_value)
+            const pct = goal.target_value > 0 ? Math.min(100, (currentVal / goal.target_value) * 100) : 0
+            const delta = isLinked ? 0 : currentVal - Number(goal.current_value)
+            const hasChanged = Math.abs(delta) >= 0.01
+
             return (
-              <div key={goal.id} className="card-editorial p-4">
-                <div className="flex items-center justify-between gap-3">
+              <div key={goal.id} className={`card-editorial p-4 ${hasChanged ? 'border-kern-300' : ''}`}>
+                <div className="flex items-center gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-[var(--ink)] truncate">
                       {goal.icon && <span className="mr-1.5">{goal.icon}</span>}
@@ -548,7 +1114,26 @@ function StepDoelen({ goals }: { goals: GoalSummary[] }) {
                       {formatCurrency(goal.current_value)} / {formatCurrency(goal.target_value)}
                     </p>
                   </div>
-                  <span className="text-xs font-mono tabular-nums font-semibold text-[var(--ink-2)]">
+                  {isLinked ? (
+                    <div className="flex items-center gap-1.5 text-[var(--ink-4)]">
+                      <Link2 className="h-3 w-3" />
+                      <span className="text-[10px]">Auto-sync</span>
+                    </div>
+                  ) : (
+                    <div className="w-28 shrink-0">
+                      <div className="relative">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-[var(--ink-3)]">€</span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={newValues[goal.id] ?? ''}
+                          onChange={e => handleValueChange(goal.id, e.target.value)}
+                          className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] pl-6 pr-2 py-1.5 text-sm font-mono tabular-nums text-[var(--ink)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <span className="text-xs font-mono tabular-nums font-semibold text-[var(--ink-2)] shrink-0">
                     {Math.round(pct)}%
                   </span>
                 </div>
@@ -581,13 +1166,41 @@ function StepDoelen({ goals }: { goals: GoalSummary[] }) {
               ))}
             </div>
           )}
+
+          {/* Save button */}
+          {activeGoals.some(g => !g.linked_asset_id && !g.linked_debt_id) && (
+            <button
+              onClick={handleSave}
+              disabled={changedCount === 0 || savingGoals || saved}
+              className={`w-full inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+                saved
+                  ? 'bg-emerald-600 text-white'
+                  : changedCount === 0
+                    ? 'bg-[var(--subtle)] text-[var(--ink-4)] cursor-not-allowed'
+                    : 'bg-wil-600 text-white hover:bg-wil-700'
+              }`}
+            >
+              {savingGoals ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : saved ? (
+                <>
+                  <Check className="h-4 w-4" />
+                  Opgeslagen
+                </>
+              ) : (
+                changedCount > 0
+                  ? `${changedCount} doel${changedCount !== 1 ? 'en' : ''} opslaan`
+                  : 'Geen wijzigingen'
+              )}
+            </button>
+          )}
         </>
       )}
     </div>
   )
 }
 
-/* ── Step 3: Budget ──────────────────────────────────────────────────── */
+/* ── Step 5: Budget ──────────────────────────────────────────────────── */
 function StepBudget({ budgets }: { budgets: BudgetSummary[] }) {
   const expenseBudgets = budgets.filter(b => b.budget_type === 'expense')
   const overBudget = expenseBudgets.filter(b => b.limit > 0 && b.spent > b.limit)
@@ -642,7 +1255,7 @@ function StepBudget({ budgets }: { budgets: BudgetSummary[] }) {
   )
 }
 
-/* ── Step 4: Vooruitblik ─────────────────────────────────────────────── */
+/* ── Step 6: Vooruitblik ─────────────────────────────────────────────── */
 function StepVooruitblik({ upcoming }: { upcoming: UpcomingItem[] }) {
   return (
     <div className="space-y-4">
@@ -687,7 +1300,7 @@ function StepVooruitblik({ upcoming }: { upcoming: UpcomingItem[] }) {
   )
 }
 
-/* ── Step 5: Reflectie ───────────────────────────────────────────────── */
+/* ── Step 7: Reflectie ───────────────────────────────────────────────── */
 function StepReflectie({
   reflection,
   setReflection,

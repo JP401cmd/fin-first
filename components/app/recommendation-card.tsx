@@ -12,9 +12,11 @@ import {
 type RecommendationCardProps = {
   recommendation: Recommendation
   onClick: () => void
+  /** Show only icon + title (used in the column view) */
+  compact?: boolean
 }
 
-export function RecommendationCard({ recommendation, onClick }: RecommendationCardProps) {
+export function RecommendationCard({ recommendation, onClick, compact }: RecommendationCardProps) {
   const colors = getRecommendationTypeColor(recommendation.recommendation_type)
   const iconName = RECOMMENDATION_TYPE_ICONS[recommendation.recommendation_type]
   const typeLabel = RECOMMENDATION_TYPE_LABELS[recommendation.recommendation_type]
@@ -39,29 +41,35 @@ export function RecommendationCard({ recommendation, onClick }: RecommendationCa
         <div className="flex min-w-0 flex-1 items-center gap-2">
           {isPostponed && <Clock className="h-3.5 w-3.5 shrink-0 text-amber-500" />}
           <h3 className="truncate text-sm font-semibold text-[var(--ink)]">{recommendation.title}</h3>
-          <span className={`shrink-0 text-xs font-medium ${colors.text}`}>{typeLabel}</span>
         </div>
 
-        {/* Freedom days */}
-        {recommendation.freedom_days_per_year != null && recommendation.freedom_days_per_year > 0 && (
-          <div className="shrink-0 text-right">
-            <div className="text-sm">
-              <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">{Math.round(recommendation.freedom_days_per_year)}</span>{' '}
-              <span className="font-serif italic text-[var(--ink-3)]">dagen</span>
-            </div>
-          </div>
-        )}
+        {!compact && (
+          <>
+            {/* Type label */}
+            <span className={`shrink-0 text-xs font-medium ${colors.text}`}>{typeLabel}</span>
 
-        {/* Priority indicator: filled dot (high), outline dot (medium), nothing (low) */}
-        {recommendation.priority_score != null && recommendation.priority_score >= 2 && (
-          <div className="shrink-0" title="Hoge prioriteit">
-            <div className="h-2 w-2 rounded-full bg-wil-500" />
-          </div>
-        )}
-        {recommendation.priority_score != null && recommendation.priority_score === 1 && (
-          <div className="shrink-0" title="Medium prioriteit">
-            <div className="h-2 w-2 rounded-full border border-wil-400" />
-          </div>
+            {/* Freedom days */}
+            {recommendation.freedom_days_per_year != null && recommendation.freedom_days_per_year > 0 && (
+              <div className="shrink-0 text-right">
+                <div className="text-sm">
+                  <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">{Math.round(recommendation.freedom_days_per_year)}</span>{' '}
+                  <span className="font-serif italic text-[var(--ink-3)]">dagen</span>
+                </div>
+              </div>
+            )}
+
+            {/* Priority indicator: filled dot (high), outline dot (medium), nothing (low) */}
+            {recommendation.priority_score != null && recommendation.priority_score >= 2 && (
+              <div className="shrink-0" title="Hoge prioriteit">
+                <div className="h-2 w-2 rounded-full bg-wil-500" />
+              </div>
+            )}
+            {recommendation.priority_score != null && recommendation.priority_score === 1 && (
+              <div className="shrink-0" title="Medium prioriteit">
+                <div className="h-2 w-2 rounded-full border border-wil-400" />
+              </div>
+            )}
+          </>
         )}
       </div>
     </button>

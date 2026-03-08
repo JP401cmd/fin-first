@@ -1,11 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Sparkles, Loader2 } from 'lucide-react'
 import { FinnAvatar } from '@/components/app/avatars'
 import { RecommendationCard } from '@/components/app/recommendation-card'
 import { RecommendationModal } from '@/components/app/recommendation-modal'
-import type { Recommendation } from '@/lib/recommendation-data'
+import { BottomSheet } from '@/components/app/bottom-sheet'
+import { BudgetIcon } from '@/components/app/budget-shared'
+import type { Recommendation, RecommendationType } from '@/lib/recommendation-data'
+import {
+  RECOMMENDATION_TYPE_LABELS,
+  RECOMMENDATION_TYPE_ICONS,
+  getRecommendationTypeColor,
+} from '@/lib/recommendation-data'
+
+const MAX_VISIBLE = 5
 
 type RecommendationListProps = {
   initialRecommendations: Recommendation[]
@@ -13,9 +22,11 @@ type RecommendationListProps = {
 
 export function RecommendationList({ initialRecommendations }: RecommendationListProps) {
   const [recommendations, setRecommendations] = useState<Recommendation[]>(initialRecommendations)
+  useEffect(() => { setRecommendations(initialRecommendations) }, [initialRecommendations])
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null)
+  const [showAll, setShowAll] = useState(false)
 
   async function generateRecommendations() {
     setIsGenerating(true)
@@ -75,79 +86,75 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
       (r.status === 'postponed' && r.postponed_until && new Date(r.postponed_until) <= new Date())
   )
 
-  const totalFreedomDays = pending.reduce(
-    (sum, r) => sum + (r.freedom_days_per_year || 0),
-    0
+  const visible = pending.slice(0, MAX_VISIBLE)
+  const hasMore = pending.length > MAX_VISIBLE
+
+  // --- Header (shared between empty + filled state) ---
+  const header = (
+    <div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 shrink-0 text-wil-500" />
+          <h2 className="text-sm font-semibold text-[var(--ink)]">Voorstellen</h2>
+          <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--subtle)] px-1.5 font-mono text-[10px] font-bold tabular-nums text-[var(--ink-3)]">
+            {pending.length}
+          </span>
+        </div>
+        {pending.length > 0 && (
+          <button
+            type="button"
+            onClick={generateRecommendations}
+            disabled={isGenerating}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-transparent px-2.5 py-1.5 text-xs font-medium text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] hover:bg-[var(--subtle)] disabled:opacity-50"
+          >
+            {isGenerating ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5" />
+            )}
+            <span className="hidden sm:inline">{isGenerating ? 'Analyseren...' : 'Analyseren'}</span>
+          </button>
+        )}
+      </div>
+      <p className="mt-1.5 text-xs text-[var(--ink-3)]">
+        Persoonlijke aanbevelingen op basis van je financiele profiel
+      </p>
+    </div>
   )
 
+  // --- Empty state ---
   if (pending.length === 0 && !isGenerating) {
     return (
-      <div className="p-4 text-center">
-        <div className="mx-auto mb-4 flex justify-center">
-          <FinnAvatar size={48} />
+      <div className="space-y-4">
+        {header}
+        <div className="py-6 text-center">
+          <div className="mx-auto mb-3 flex justify-center">
+            <FinnAvatar size={40} />
+          </div>
+          <p className="mb-4 font-serif text-sm text-[var(--ink-3)]">
+            Will analyseert je profiel en ontdekt verborgen vrijheidsdagen.
+          </p>
+          {error && (
+            <p className="mb-3 text-xs text-red-600">{error}</p>
+          )}
+          <button
+            type="button"
+            onClick={generateRecommendations}
+            disabled={isGenerating}
+            className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-xs font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] hover:bg-[var(--subtle)] disabled:opacity-50"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Analyseren
+          </button>
         </div>
-        <h2 className="mb-2 font-serif text-xl font-bold text-[var(--ink)]">
-          Klaar voor optimalisatie?
-        </h2>
-        <p className="mb-6 font-serif text-[var(--ink-3)]">
-          Will analyseert je financieel profiel en ontdekt verborgen vrijheidsdagen.
-          Laat de AI kansen vinden die je misschien over het hoofd ziet.
-        </p>
-        {error && (
-          <p className="mb-4 text-sm text-red-600">{error}</p>
-        )}
-        <button
-          type="button"
-          onClick={generateRecommendations}
-          disabled={isGenerating}
-          className="inline-flex items-center gap-2 rounded-lg border border-wil-500 bg-transparent px-6 py-3 font-medium text-wil-600 transition-colors hover:bg-wil-50 disabled:opacity-50"
-        >
-          <Sparkles className="h-5 w-5" />
-          Genereer suggesties
-        </button>
       </div>
     )
   }
 
+  // --- Filled state ---
   return (
-    <div className="space-y-6">
-      {/* Summary bar */}
-      {totalFreedomDays > 0 && (
-        <div className="rounded-[var(--r)] border-l-3 border-l-wil-500 bg-[var(--subtle)] p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="font-serif text-sm italic text-[var(--ink-3)]">Potentieel te winnen</div>
-              <div className="text-2xl font-bold text-[var(--ink)]"><span className="font-mono tabular-nums">{Math.round(totalFreedomDays)}</span> vrijheidsdagen/jaar</div>
-            </div>
-            <div className="text-right text-sm text-[var(--ink-3)]">
-              <span className="font-mono tabular-nums">{pending.length}</span> {pending.length === 1 ? 'voorstel' : 'voorstellen'} open
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Generate button */}
-      <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--ink)]">
-          Voorstellen
-          <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-wil-100 px-1.5 text-xs font-bold text-wil-700 font-mono tabular-nums">
-            {pending.length}
-          </span>
-        </h2>
-        <button
-          type="button"
-          onClick={generateRecommendations}
-          disabled={isGenerating}
-          className="inline-flex items-center justify-center gap-2 rounded-lg border border-wil-200 p-2 sm:px-4 sm:py-2 text-sm font-medium text-wil-600 transition-colors hover:bg-wil-50 disabled:opacity-50"
-        >
-          {isGenerating ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Sparkles className="h-4 w-4" />
-          )}
-          <span className="hidden sm:inline">{isGenerating ? 'Analyseren...' : 'Nieuwe suggesties'}</span>
-        </button>
-      </div>
+    <div className="space-y-4">
+      {header}
 
       {error && (
         <p className="text-sm text-red-600">{error}</p>
@@ -171,18 +178,78 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
         </div>
       )}
 
-      {/* Recommendation cards */}
+      {/* Visible recommendation cards (max 5, compact) */}
       <div className="space-y-2">
-        {pending.map((rec) => (
+        {visible.map((rec) => (
           <RecommendationCard
             key={rec.id}
             recommendation={rec}
+            compact
             onClick={() => setSelectedRec(rec)}
           />
         ))}
       </div>
 
-      {/* Modal */}
+      {/* "Bekijk alle" link when more than 5 */}
+      {hasMore && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="w-full rounded-[var(--r)] py-2 text-center text-xs font-medium text-wil-600 transition-colors hover:bg-wil-50"
+        >
+          Bekijk alle {pending.length} voorstellen
+        </button>
+      )}
+
+      {/* BottomSheet with all recommendations, grouped by type */}
+      <BottomSheet
+        open={showAll}
+        onClose={() => setShowAll(false)}
+        title="Alle voorstellen"
+        size="lg"
+      >
+        <div className="px-5 pb-6 pt-2">
+          <p className="mb-5 text-sm text-[var(--ink-3)]">
+            {pending.length} openstaande {pending.length === 1 ? 'aanbeveling' : 'aanbevelingen'} op basis van je financiele profiel
+          </p>
+          <div className="space-y-6">
+            {(Object.keys(RECOMMENDATION_TYPE_LABELS) as RecommendationType[])
+              .map((type) => {
+                const group = pending.filter((r) => r.recommendation_type === type)
+                if (group.length === 0) return null
+                const colors = getRecommendationTypeColor(type)
+                const iconName = RECOMMENDATION_TYPE_ICONS[type]
+                return (
+                  <div key={type}>
+                    <div className="mb-2 flex items-center gap-2">
+                      <div className={`flex items-center justify-center rounded-md ${colors.bgLight} p-1`}>
+                        <BudgetIcon name={iconName} className={`h-3.5 w-3.5 ${colors.text}`} />
+                      </div>
+                      <h4 className="text-xs font-semibold text-[var(--ink-2)]">
+                        {RECOMMENDATION_TYPE_LABELS[type]}
+                      </h4>
+                      <span className="font-mono text-[10px] tabular-nums text-[var(--ink-3)]">
+                        {group.length}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {group.map((rec) => (
+                        <RecommendationCard
+                          key={rec.id}
+                          recommendation={rec}
+                          onClick={() => { setShowAll(false); setSelectedRec(rec) }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )
+              })
+              .filter(Boolean)}
+          </div>
+        </div>
+      </BottomSheet>
+
+      {/* Detail modal */}
       {selectedRec && (
         <RecommendationModal
           recommendation={selectedRec}

@@ -4,8 +4,7 @@ import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData, TopGoal } from './widget-renderer'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { getGoalColorClasses } from '@/lib/goal-data'
-import { formatCurrency } from '@/lib/format'
+import { getGoalColorClasses, formatGoalValue, type GoalType } from '@/lib/goal-data'
 import { Target } from 'lucide-react'
 
 interface Props {
@@ -135,7 +134,7 @@ function GoalCard({ goal, index, hasEntered }: { goal: TopGoal; index: number; h
       {/* Bedrag + deadline */}
       <div className="flex items-center justify-between gap-2">
         <p className="font-mono text-[11px] tabular-nums text-[var(--ink-3)] truncate">
-          {formatCurrency(goal.current_value)} / {formatCurrency(goal.target_value)}
+          {formatGoalValue(goal.current_value, goal.goal_type as GoalType, goal.custom_unit)} / {formatGoalValue(goal.target_value, goal.goal_type as GoalType, goal.custom_unit)}
         </p>
         {eta && (
           <p className={`shrink-0 font-mono text-[10px] tabular-nums ${overdue ? 'text-red-500' : 'text-[var(--ink-4)]'}`}>

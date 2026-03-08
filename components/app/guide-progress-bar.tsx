@@ -28,36 +28,36 @@ const REIS_STAPPEN: ReisStap[] = [
   {
     label: 'Bezittingen of schulden',
     icon: Landmark,
-    color: 'var(--kern-400, #b45309)',
-    bgColor: 'var(--kern-50, #fffbeb)',
+    color: 'var(--color-kern-400)',
+    bgColor: 'var(--color-kern-50)',
     check: (s) => s.hasAssets || s.hasDebts,
   },
   {
     label: 'Transacties importeren',
     icon: ArrowLeftRight,
-    color: 'var(--kern-400, #b45309)',
-    bgColor: 'var(--kern-50, #fffbeb)',
+    color: 'var(--color-kern-400)',
+    bgColor: 'var(--color-kern-50)',
     check: (s) => s.hasTransactions,
   },
   {
     label: 'Eerste actie afgerond',
     icon: Zap,
-    color: 'var(--wil-400, #2dd4bf)',
-    bgColor: 'var(--wil-50, #f0fdfa)',
+    color: 'var(--color-wil-400)',
+    bgColor: 'var(--color-wil-50)',
     check: (s) => s.hasCompletedActions,
   },
   {
     label: 'FIRE-projectie bekeken',
     icon: Compass,
-    color: 'var(--horizon-400, #a855f7)',
-    bgColor: 'var(--horizon-50, #faf5ff)',
+    color: 'var(--color-horizon-400)',
+    bgColor: 'var(--color-horizon-50)',
     check: (s) => s.hasFireData,
   },
   {
     label: 'Levensgebeurtenis gepland',
     icon: Sparkles,
-    color: 'var(--horizon-400, #a855f7)',
-    bgColor: 'var(--horizon-50, #faf5ff)',
+    color: 'var(--color-horizon-400)',
+    bgColor: 'var(--color-horizon-50)',
     check: (s) => s.hasLifeEvents,
   },
 ]
@@ -156,7 +156,7 @@ export function GuideProgressBar() {
                 )}
               </div>
               <span
-                className="text-center text-[9px] leading-tight"
+                className="text-center text-[10px] sm:text-[11px] leading-tight"
                 style={{
                   color: isDone ? 'var(--ink-2)' : 'var(--ink-4)',
                 }}

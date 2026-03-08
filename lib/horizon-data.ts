@@ -1822,21 +1822,21 @@ export function computeResilienceScore(input: FinancialInput): ResilienceScore {
   // Emergency fund: months of expenses covered by liquid assets (assume 30% is liquid)
   const liquidAssets = totalAssets * 0.3
   const emergencyMonths = monthlyExpenses > 0 ? liquidAssets / monthlyExpenses : 0
-  const emergency = Math.min(25, Math.round((emergencyMonths / 6) * 25))
+  const emergency = Math.max(0, Math.min(25, Math.round((emergencyMonths / 6) * 25)))
 
   // Diversification: simple heuristic (better with actual asset types, but works from totals)
   const assetToDebtRatio = totalDebts > 0 ? totalAssets / totalDebts : totalAssets > 0 ? 10 : 0
-  const diversification = Math.min(25, Math.round(Math.min(assetToDebtRatio / 3, 1) * 25))
+  const diversification = Math.max(0, Math.min(25, Math.round(Math.min(assetToDebtRatio / 3, 1) * 25)))
 
   // Debt ratio: debt as % of assets
   const debtPct = totalAssets > 0 ? totalDebts / totalAssets : 1
-  const debtScore = Math.min(25, Math.round((1 - Math.min(debtPct, 1)) * 25))
+  const debtScore = Math.max(0, Math.min(25, Math.round((1 - Math.min(debtPct, 1)) * 25)))
 
   // Savings rate
   const sr = monthlyIncome > 0 ? monthlySavings / monthlyIncome : 0
-  const savingsScore = Math.min(25, Math.round(Math.min(sr / 0.30, 1) * 25))
+  const savingsScore = Math.max(0, Math.min(25, Math.round(Math.min(sr / 0.30, 1) * 25)))
 
-  const total = emergency + diversification + debtScore + savingsScore
+  const total = Math.max(0, emergency + diversification + debtScore + savingsScore)
 
   let label: string
   if (total >= 80) label = 'Uitstekend'

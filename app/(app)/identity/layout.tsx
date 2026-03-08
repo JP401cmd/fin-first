@@ -6,7 +6,7 @@ export default function IdentityLayout({ children }: { children: React.ReactNode
   return (
     <>
       <ModuleNav config={identityNav} />
-      <div className="mx-auto max-w-4xl px-6">
+      <div className="mx-auto max-w-6xl px-6">
         <div className="pt-4">
           <Breadcrumb color="teal" />
         </div>

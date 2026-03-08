@@ -65,6 +65,7 @@ export async function GET(request: Request) {
   const today = now.toISOString().split('T')[0]
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
   const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split('T')[0]
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString().split('T')[0]
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
 
   // Get all users with completed onboarding
@@ -120,7 +121,7 @@ export async function GET(request: Request) {
           .select('amount')
           .eq('user_id', userId)
           .gt('amount', 0)
-          .gte('date', monthStart)
+          .gte('date', sixMonthsAgo)
           .lt('date', monthEnd),
         supabase
           .from('budgets')
@@ -147,7 +148,7 @@ export async function GET(request: Request) {
 
       const yearlyExpenses = Math.abs(expenses.reduce((s, t) => s + Number(t.amount), 0))
       const monthlyExpenses = yearlyExpenses / 12
-      const monthlyIncome = income.reduce((s, t) => s + Number(t.amount), 0)
+      const monthlyIncome = income.reduce((s, t) => s + Number(t.amount), 0) / 6
       const monthlyContributions = assets.reduce((s, a) => s + Number(a.monthly_contribution || 0), 0)
 
       const yearlyMustExpenses = (budgetsResult.data ?? []).reduce((s, b) => {

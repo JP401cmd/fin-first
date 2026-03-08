@@ -53,8 +53,6 @@ function ReisStapCard({
   icon: Icon,
   title,
   color,
-  bg,
-  borderColor,
   howSteps,
   statusLines,
   valueSentence,
@@ -65,8 +63,6 @@ function ReisStapCard({
   icon: LucideIcon
   title: string
   color: string
-  bg: string
-  borderColor: string
   howSteps: { icon: LucideIcon; text: string }[]
   statusLines: string[]
   valueSentence: string
@@ -75,15 +71,15 @@ function ReisStapCard({
   isComplete: boolean
 }) {
   return (
-    <div
-      className="rounded-[var(--r)] border bg-[var(--paper)] overflow-hidden"
-      style={{ borderColor }}
-    >
+    <div className="card-editorial overflow-hidden">
+      {/* Top accent bar */}
+      <div className="h-[3px]" style={{ backgroundColor: color }} />
+
       {/* Header */}
       <div className="flex items-center gap-3 p-3 pb-2.5 sm:p-4 sm:pb-3">
         <div
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)]"
-          style={{ backgroundColor: bg, color }}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]"
+          style={{ color }}
         >
           <Icon className="h-5 w-5" />
         </div>
@@ -102,20 +98,17 @@ function ReisStapCard({
       <div className="px-3 pb-2.5 sm:px-4 sm:pb-3">
         <p className="label-editorial text-[var(--ink-4)] mb-2">Hoe</p>
         <div className="space-y-2">
-          {howSteps.map((step, i) => {
-            const StepIcon = step.icon
-            return (
-              <div key={i} className="flex items-start gap-2.5">
-                <div
-                  className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold"
-                  style={{ backgroundColor: bg, color }}
-                >
-                  {i + 1}
-                </div>
-                <p className="text-[12px] leading-relaxed text-[var(--ink-2)]">{step.text}</p>
+          {howSteps.map((step, i) => (
+            <div key={i} className="flex items-start gap-2.5">
+              <div
+                className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white"
+                style={{ backgroundColor: color }}
+              >
+                {i + 1}
               </div>
-            )
-          })}
+              <p className="text-[12px] leading-relaxed text-[var(--ink-2)]">{step.text}</p>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -182,8 +175,8 @@ function GuideAccordion({
         className="flex w-full items-center gap-3 p-3 min-h-[44px] text-left transition-colors hover:bg-[var(--subtle)]/60"
       >
         <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r-sm)]"
-          style={{ backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`, color }}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r-sm)] bg-[var(--subtle)]"
+          style={{ color }}
         >
           {icon}
         </div>
@@ -257,66 +250,70 @@ export default function GidsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-10">
+    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       {/* Hero */}
-      <div className="mb-6 sm:mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] border border-[var(--border-ed)]">
-            <BookOpen className="h-5 w-5 text-[var(--ink-2)]" />
-          </div>
-          <div>
-            <h1 className="font-display text-2xl font-bold text-[var(--ink)]" style={{ letterSpacing: '-0.02em' }}>
-              Zo werkt TriFinity
-            </h1>
-            <p className="text-[12px] text-[var(--ink-3)]">
-              {fullName ? `Welkom, ${fullName.split(' ')[0]}` : 'Rondleiding door de app'}
-            </p>
-          </div>
+      <section className="card-editorial overflow-hidden mb-6 sm:mb-8">
+        <div className="flex h-1.5">
+          <div className="flex-1 bg-kern-500" />
+          <div className="flex-1 bg-wil-500" />
+          <div className="flex-1 bg-horizon-500" />
         </div>
-      </div>
+        <div className="p-4 sm:p-6 md:p-8">
+          <p className="label-editorial text-[var(--ink-3)] mb-1">Rondleiding</p>
+          <h1 className="font-display text-[28px] sm:text-[36px] font-bold text-[var(--ink)]" style={{ letterSpacing: '-0.02em' }}>
+            Zo werkt TriFinity
+          </h1>
+          <p className="mt-1 font-serif italic text-[13px] text-[var(--ink-3)]">
+            {fullName ? `Welkom, ${fullName.split(' ')[0]}` : 'Rondleiding door de app'}
+          </p>
+        </div>
+      </section>
 
       {/* Voortgangsbalk */}
       <GuideProgressBar />
 
-      {/* Filosofie */}
-      <div className="mb-6 rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4">
-        <p className="font-serif italic text-sm leading-relaxed text-[var(--ink-2)]">
-          &ldquo;Geld is opgeslagen tijd.&rdquo; Elke euro die je verdient, spaart of uitgeeft
-          vertegenwoordigt een stukje van je levenstijd. TriFinity vertaalt al je financiële
-          gegevens naar <strong className="font-semibold text-[var(--ink)]">vrijheidstijd</strong> —
-          dagen, maanden en jaren dat je niet hoeft te werken.
-        </p>
-      </div>
+      {/* Filosofie + module-pijlers */}
+      <div className="mb-6 sm:mb-8 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4 lg:gap-6">
+        {/* Filosofie-quote */}
+        <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4 max-w-prose self-start">
+          <p className="font-serif italic text-sm leading-relaxed text-[var(--ink-2)]">
+            &ldquo;Geld is opgeslagen tijd.&rdquo; Elke euro die je verdient, spaart of uitgeeft
+            vertegenwoordigt een stukje van je levenstijd. TriFinity vertaalt al je financiële
+            gegevens naar <strong className="font-semibold text-[var(--ink)]">vrijheidstijd</strong> —
+            dagen, maanden en jaren dat je niet hoeft te werken.
+          </p>
+        </div>
 
-      {/* Drie module-pijlers */}
-      <div className="mb-6 sm:mb-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {([
-          { id: 'kern', icon: Landmark, name: 'De Kern', tagline: 'Wat je hebt en uitgeeft', color: 'var(--kern-400, #b45309)', bg: 'var(--kern-50, #fffbeb)' },
-          { id: 'wil', icon: Zap, name: 'De Wil', tagline: 'Wat je nu kunt doen', color: 'var(--wil-400, #2dd4bf)', bg: 'var(--wil-50, #f0fdfa)' },
-          { id: 'horizon', icon: Compass, name: 'De Horizon', tagline: 'Waar je naartoe gaat', color: 'var(--horizon-400, #a855f7)', bg: 'var(--horizon-50, #faf5ff)' },
-        ] as { id: string; icon: LucideIcon; name: string; tagline: string; color: string; bg: string }[]).map((mod) => {
-          const Icon = mod.icon
-          return (
-            <button
-              key={mod.id}
-              type="button"
-              onClick={() => {
-                const el = document.getElementById(`guide-${mod.id}`)
-                el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-              }}
-              className="card-editorial p-4 text-left transition-all hover:shadow-md group min-h-[44px]"
-            >
-              <div
-                className="mb-2 flex h-9 w-9 items-center justify-center rounded-[var(--r)]"
-                style={{ backgroundColor: mod.bg, color: mod.color }}
+        {/* Module-pijlers stack */}
+        <div className="grid grid-cols-3 lg:grid-cols-1 lg:w-52 gap-3">
+          {([
+            { id: 'kern', icon: Landmark, name: 'De Kern', tagline: 'Wat je hebt en uitgeeft', color: 'var(--color-kern-400)' },
+            { id: 'wil', icon: Zap, name: 'De Wil', tagline: 'Wat je nu kunt doen', color: 'var(--color-wil-400)' },
+            { id: 'horizon', icon: Compass, name: 'De Horizon', tagline: 'Waar je naartoe gaat', color: 'var(--color-horizon-400)' },
+          ] as { id: string; icon: LucideIcon; name: string; tagline: string; color: string }[]).map((mod) => {
+            const Icon = mod.icon
+            return (
+              <button
+                key={mod.id}
+                type="button"
+                onClick={() => {
+                  const el = document.getElementById(`guide-${mod.id}`)
+                  el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }}
+                className="card-editorial p-4 text-left transition-all hover:shadow-md group min-h-[44px]"
               >
-                <Icon className="h-4.5 w-4.5" />
-              </div>
-              <p className="text-sm font-semibold text-[var(--ink)] group-hover:underline">{mod.name}</p>
-              <p className="text-[11px] text-[var(--ink-3)] mt-0.5">{mod.tagline}</p>
-            </button>
-          )
-        })}
+                <div
+                  className="mb-2 flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]"
+                  style={{ color: mod.color }}
+                >
+                  <Icon className="h-4.5 w-4.5" />
+                </div>
+                <p className="text-sm font-semibold text-[var(--ink)] group-hover:underline">{mod.name}</p>
+                <p className="text-[11px] text-[var(--ink-3)] mt-0.5">{mod.tagline}</p>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Kernconcepten — interactieve flip-cards */}
@@ -324,143 +321,165 @@ export default function GidsPage() {
 
       {/* ── Je reis — interactieve stappen ── */}
       <p className="label-editorial text-[var(--ink-3)] mb-3">Je reis</p>
-      <div className="mb-6 sm:mb-8 space-y-3">
-        {/* Stap 1: Weet waar je staat (De Kern) */}
-        <ReisStapCard
-          icon={Landmark}
-          title="Weet waar je staat"
-          color="var(--kern-400, #b45309)"
-          bg="var(--kern-50, #fffbeb)"
-          borderColor="var(--kern-200, #fde68a)"
-          howSteps={[
-            { icon: Wallet, text: 'Voeg je bankrekeningen toe' },
-            { icon: CreditCard, text: 'Registreer bezittingen en schulden' },
-            { icon: PieChart, text: 'Stel budgetten in' },
-          ]}
-          statusLines={
-            progress
-              ? progress.steps.hasAssets || progress.steps.hasDebts
-                ? [
-                    `Je hebt ${progress.counts.assets} bezitting${progress.counts.assets !== 1 ? 'en' : ''} en ${progress.counts.debts} schuld${progress.counts.debts !== 1 ? 'en' : ''} geregistreerd.`,
-                    progress.financial.netWorth !== 0
-                      ? `Netto vermogen: ${formatCurrency(progress.financial.netWorth)}`
-                      : '',
-                  ].filter(Boolean)
-                : ['Je hebt nog geen vermogen ingevoerd.']
-              : ['Laden...']
-          }
-          valueSentence="Je ziet voor het eerst je complete financiële plaatje in vrijheidstijd."
-          ctaLabel="Bekijk je vermogen"
-          ctaHref="/core"
-          isComplete={!!(progress?.steps.hasAssets && progress?.steps.hasBudgets)}
-        />
+      <div className="mb-6 sm:mb-8 space-y-6">
+        {/* ── De Kern ── */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="h-2 w-2 rounded-full bg-kern-500" />
+            <p className="label-editorial text-kern-600">De Kern</p>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {/* Stap 1: Weet waar je staat */}
+            <ReisStapCard
+              icon={Landmark}
+              title="Weet waar je staat"
+              color="var(--color-kern-400)"
 
-        {/* Stap 2: Begrijp je patronen (De Kern) */}
-        <ReisStapCard
-          icon={Receipt}
-          title="Begrijp je patronen"
-          color="var(--kern-400, #b45309)"
-          bg="var(--kern-50, #fffbeb)"
-          borderColor="var(--kern-200, #fde68a)"
-          howSteps={[
-            { icon: Upload, text: 'Importeer transacties (MT940/CSV)' },
-            { icon: RefreshCw, text: 'Bekijk terugkerende kosten' },
-            { icon: CreditCard, text: 'Ontdek je abonnementen' },
-          ]}
-          statusLines={
-            progress
-              ? progress.steps.hasTransactions
-                ? [
-                    `Je hebt ${progress.counts.transactions.toLocaleString('nl-NL')} transactie${progress.counts.transactions !== 1 ? 's' : ''} geïmporteerd.`,
-                  ]
-                : ['Importeer je eerste transacties.']
-              : ['Laden...']
-          }
-          valueSentence="Ontdek waar je tijd weglekt zonder dat je het doorhebt."
-          ctaLabel={progress?.steps.hasTransactions ? 'Bekijk je kas' : 'Importeer transacties'}
-          ctaHref={progress?.steps.hasTransactions ? '/core/cash' : '/core/cash/import'}
-          isComplete={!!progress?.steps.hasTransactions}
-        />
+              howSteps={[
+                { icon: Wallet, text: 'Voeg je bankrekeningen toe' },
+                { icon: CreditCard, text: 'Registreer bezittingen en schulden' },
+                { icon: PieChart, text: 'Stel budgetten in' },
+              ]}
+              statusLines={
+                progress
+                  ? progress.steps.hasAssets || progress.steps.hasDebts
+                    ? [
+                        `Je hebt ${progress.counts.assets} bezitting${progress.counts.assets !== 1 ? 'en' : ''} en ${progress.counts.debts} schuld${progress.counts.debts !== 1 ? 'en' : ''} geregistreerd.`,
+                        progress.financial.netWorth !== 0
+                          ? `Netto vermogen: ${formatCurrency(progress.financial.netWorth)}`
+                          : '',
+                      ].filter(Boolean)
+                    : ['Je hebt nog geen vermogen ingevoerd.']
+                  : ['Laden...']
+              }
+              valueSentence="Je ziet voor het eerst je complete financiële plaatje in vrijheidstijd."
+              ctaLabel="Bekijk je vermogen"
+              ctaHref="/core"
+              isComplete={!!(progress?.steps.hasAssets && progress?.steps.hasBudgets)}
+            />
 
-        {/* Stap 3: Onderneem actie (De Wil) */}
-        <ReisStapCard
-          icon={Zap}
-          title="Onderneem actie"
-          color="var(--wil-400, #2dd4bf)"
-          bg="var(--wil-50, #f0fdfa)"
-          borderColor="var(--wil-200, #99f6e4)"
-          howSteps={[
-            { icon: Sparkles, text: 'Bekijk je aanbevelingen' },
-            { icon: Zap, text: 'Accepteer en voer acties uit' },
-            { icon: Target, text: 'Stel financiële doelen' },
-          ]}
-          statusLines={
-            progress
-              ? progress.steps.hasCompletedActions
-                ? [
-                    `Je hebt ${progress.counts.wonFreedomDays} vrijheidsdag${progress.counts.wonFreedomDays !== 1 ? 'en' : ''} gewonnen door ${progress.counts.completedActions} actie${progress.counts.completedActions !== 1 ? 's' : ''}.`,
-                  ]
-                : progress.counts.pendingRecommendations > 0
-                  ? [`Er staan ${progress.counts.pendingRecommendations} aanbeveling${progress.counts.pendingRecommendations !== 1 ? 'en' : ''} voor je klaar.`]
-                  : ['Voeg eerst je financiële gegevens toe om aanbevelingen te ontvangen.']
-              : ['Laden...']
-          }
-          valueSentence="Elke afgeronde actie is een gewonnen vrijheidsdag."
-          ctaLabel="Bekijk aanbevelingen"
-          ctaHref="/will"
-          isComplete={!!progress?.steps.hasCompletedActions}
-        />
+            {/* Stap 2: Begrijp je patronen */}
+            <ReisStapCard
+              icon={Receipt}
+              title="Begrijp je patronen"
+              color="var(--color-kern-400)"
 
-        {/* Stap 4: Kijk vooruit (De Horizon) — #665 */}
-        <ReisStapCard
-          icon={Compass}
-          title="Kijk vooruit"
-          color="var(--horizon-400, #a855f7)"
-          bg="var(--horizon-50, #faf5ff)"
-          borderColor="var(--horizon-200, #e9d5ff)"
-          howSteps={[
-            { icon: Compass, text: 'Bekijk je FIRE-prognose' },
-            { icon: Compass, text: 'Voeg levensgebeurtenissen toe' },
-            { icon: Compass, text: 'Vergelijk scenario\u2019s' },
-          ]}
-          statusLines={
-            progress?.financial.fireAge != null
-              ? [
-                  `Je geschatte FIRE-leeftijd is ${progress.financial.fireAge}`,
-                  `${progress.counts.lifeEvents} levensgebeurtenis${progress.counts.lifeEvents !== 1 ? 'sen' : ''} toegevoegd`,
-                ]
-              : ['Bereken wanneer werken optioneel wordt']
-          }
-          valueSentence="Zie wanneer werken optioneel wordt"
-          ctaLabel="Bekijk je prognose"
-          ctaHref="/horizon"
-          isComplete={!!progress?.steps.hasFireData && !!progress?.steps.hasLifeEvents}
-        />
+              howSteps={[
+                { icon: Upload, text: 'Importeer transacties (MT940/CSV)' },
+                { icon: RefreshCw, text: 'Bekijk terugkerende kosten' },
+                { icon: CreditCard, text: 'Ontdek je abonnementen' },
+              ]}
+              statusLines={
+                progress
+                  ? progress.steps.hasTransactions
+                    ? [
+                        `Je hebt ${progress.counts.transactions.toLocaleString('nl-NL')} transactie${progress.counts.transactions !== 1 ? 's' : ''} geïmporteerd.`,
+                      ]
+                    : ['Importeer je eerste transacties.']
+                  : ['Laden...']
+              }
+              valueSentence="Ontdek waar je tijd weglekt zonder dat je het doorhebt."
+              ctaLabel={progress?.steps.hasTransactions ? 'Bekijk je kas' : 'Importeer transacties'}
+              ctaHref={progress?.steps.hasTransactions ? '/core/cash' : '/core/cash/import'}
+              isComplete={!!progress?.steps.hasTransactions}
+            />
+          </div>
+        </div>
 
-        {/* Stap 5: Droom en plan (What-If + Will) — #666 */}
-        <ReisStapCard
-          icon={MessageSquare}
-          title="Droom en plan"
-          color="var(--horizon-400, #a855f7)"
-          bg="var(--horizon-50, #faf5ff)"
-          borderColor="var(--horizon-200, #e9d5ff)"
-          howSteps={[
-            { icon: MessageSquare, text: 'Open een What-If scenario' },
-            { icon: MessageSquare, text: 'Beschrijf je droom aan Will' },
-            { icon: MessageSquare, text: 'Vraag om een reality-check' },
-          ]}
-          statusLines={['Probeer: \u201cIk wil over 5 jaar een huis kopen...\u201d']}
-          valueSentence="Vertaal je dromen naar een concreet plan"
-          ctaLabel="Start een scenario"
-          ctaHref="/horizon/whatif"
-          isComplete={false}
-        />
+        {/* ── De Wil ── */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="h-2 w-2 rounded-full bg-wil-500" />
+            <p className="label-editorial text-wil-600">De Wil</p>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {/* Stap 3: Onderneem actie */}
+            <ReisStapCard
+              icon={Zap}
+              title="Onderneem actie"
+              color="var(--color-wil-400)"
+
+              howSteps={[
+                { icon: Sparkles, text: 'Bekijk je aanbevelingen' },
+                { icon: Zap, text: 'Accepteer en voer acties uit' },
+                { icon: Target, text: 'Stel financiële doelen' },
+              ]}
+              statusLines={
+                progress
+                  ? progress.steps.hasCompletedActions
+                    ? [
+                        `Je hebt ${progress.counts.wonFreedomDays} vrijheidsdag${progress.counts.wonFreedomDays !== 1 ? 'en' : ''} gewonnen door ${progress.counts.completedActions} actie${progress.counts.completedActions !== 1 ? 's' : ''}.`,
+                      ]
+                    : progress.counts.pendingRecommendations > 0
+                      ? [`Er staan ${progress.counts.pendingRecommendations} aanbeveling${progress.counts.pendingRecommendations !== 1 ? 'en' : ''} voor je klaar.`]
+                      : ['Voeg eerst je financiële gegevens toe om aanbevelingen te ontvangen.']
+                  : ['Laden...']
+              }
+              valueSentence="Elke afgeronde actie is een gewonnen vrijheidsdag."
+              ctaLabel="Bekijk aanbevelingen"
+              ctaHref="/will"
+              isComplete={!!progress?.steps.hasCompletedActions}
+            />
+          </div>
+        </div>
+
+        {/* ── De Horizon ── */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="h-2 w-2 rounded-full bg-horizon-500" />
+            <p className="label-editorial text-horizon-600">De Horizon</p>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {/* Stap 4: Kijk vooruit */}
+            <ReisStapCard
+              icon={Compass}
+              title="Kijk vooruit"
+              color="var(--color-horizon-400)"
+
+              howSteps={[
+                { icon: Compass, text: 'Bekijk je FIRE-prognose' },
+                { icon: Compass, text: 'Voeg levensgebeurtenissen toe' },
+                { icon: Compass, text: 'Vergelijk scenario\u2019s' },
+              ]}
+              statusLines={
+                progress?.financial.fireAge != null
+                  ? [
+                      `Je geschatte FIRE-leeftijd is ${progress.financial.fireAge}`,
+                      `${progress.counts.lifeEvents} levensgebeurtenis${progress.counts.lifeEvents !== 1 ? 'sen' : ''} toegevoegd`,
+                    ]
+                  : ['Bereken wanneer werken optioneel wordt']
+              }
+              valueSentence="Zie wanneer werken optioneel wordt"
+              ctaLabel="Bekijk je prognose"
+              ctaHref="/horizon"
+              isComplete={!!progress?.steps.hasFireData && !!progress?.steps.hasLifeEvents}
+            />
+
+            {/* Stap 5: Droom en plan */}
+            <ReisStapCard
+              icon={MessageSquare}
+              title="Droom en plan"
+              color="var(--color-horizon-400)"
+
+              howSteps={[
+                { icon: MessageSquare, text: 'Open een What-If scenario' },
+                { icon: MessageSquare, text: 'Beschrijf je droom aan Will' },
+                { icon: MessageSquare, text: 'Vraag om een reality-check' },
+              ]}
+              statusLines={['Probeer: \u201cIk wil over 5 jaar een huis kopen...\u201d']}
+              valueSentence="Vertaal je dromen naar een concreet plan"
+              ctaLabel="Start een scenario"
+              ctaHref="/horizon/whatif"
+              isComplete={false}
+            />
+          </div>
+        </div>
       </div>
 
       <p className="label-editorial text-[var(--ink-3)] mb-3">De onderdelen</p>
 
-      {/* Onderdelen — accordion */}
-      <div className="space-y-2">
+      {/* Onderdelen — accordion 2-koloms grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
         {/* Dashboard */}
         <GuideAccordion
           id="dashboard"
@@ -493,7 +512,7 @@ export default function GidsPage() {
           icon={<Landmark className="h-4 w-4" />}
           title="De Kern"
           tagline="Je financiële fundament"
-          color="var(--kern-t, #58362d)"
+          color="var(--color-kern-700)"
           open={guideSection === 'kern'}
           onToggle={() => setGuideSection(guideSection === 'kern' ? null : 'kern')}
         >
@@ -522,7 +541,7 @@ export default function GidsPage() {
           icon={<Zap className="h-4 w-4" />}
           title="De Wil"
           tagline="Wat je nu kunt doen"
-          color="var(--will-t, #2e2437)"
+          color="var(--color-wil-700)"
           open={guideSection === 'wil'}
           onToggle={() => setGuideSection(guideSection === 'wil' ? null : 'wil')}
         >
@@ -551,7 +570,7 @@ export default function GidsPage() {
           icon={<Compass className="h-4 w-4" />}
           title="De Horizon"
           tagline="Je pad naar vrijheid"
-          color="var(--hor-t, #8a6e42)"
+          color="var(--color-horizon-700)"
           open={guideSection === 'horizon'}
           onToggle={() => setGuideSection(guideSection === 'horizon' ? null : 'horizon')}
         >
@@ -574,13 +593,13 @@ export default function GidsPage() {
           </div>
         </GuideAccordion>
 
-        {/* Will — AI assistent */}
+        {/* Will — AI assistent (full-width) */}
         <GuideAccordion
           id="will-assistent"
           icon={<MessageSquare className="h-4 w-4" />}
           title="Will"
           tagline="Je persoonlijke financiële assistent"
-          color="var(--will-t, #2e2437)"
+          color="var(--color-wil-700)"
           open={guideSection === 'will-assistent'}
           onToggle={() => setGuideSection(guideSection === 'will-assistent' ? null : 'will-assistent')}
         >

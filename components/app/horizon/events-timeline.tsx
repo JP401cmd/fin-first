@@ -7,7 +7,7 @@ import { EVENT_ICONS } from './log-timeline'
 
 // ── EventsTimeline ──────────────────────────────────────────────────────────
 // Compact timeline below SimChart showing life events on the same linear age axis.
-// Red = cost/expense events, green = income/positive events.
+// Kern = cost/expense events, Wil = income/positive events.
 
 export function EventsTimeline({
   events,
@@ -57,10 +57,21 @@ export function EventsTimeline({
     return totalPositive > totalNegative ? 'income' : 'expense'
   }
 
-  function eventTotalAmount(ev: LifeEvent): number {
-    return Math.abs(ev.one_time_cost)
-      + Math.abs(ev.monthly_cost_change) * ev.duration_months
-      + Math.abs(ev.monthly_income_change) * ev.duration_months
+  /** Build tooltip lines for each non-zero financial impact */
+  function eventAmountLines(ev: LifeEvent): { label: string; color: string }[] {
+    const lines: { label: string; color: string }[] = []
+    if (ev.one_time_cost > 0) {
+      lines.push({ label: `−${formatCurrency(ev.one_time_cost)} eenmalig`, color: '#ef4444' })
+    } else if (ev.one_time_cost < 0) {
+      lines.push({ label: `+${formatCurrency(Math.abs(ev.one_time_cost))} eenmalig`, color: '#10b981' })
+    }
+    if (ev.monthly_cost_change > 0) {
+      lines.push({ label: `−${formatCurrency(ev.monthly_cost_change)}/mnd · ${ev.duration_months} mnd`, color: '#ef4444' })
+    }
+    if (ev.monthly_income_change > 0) {
+      lines.push({ label: `+${formatCurrency(ev.monthly_income_change)}/mnd · ${ev.duration_months} mnd`, color: '#10b981' })
+    }
+    return lines
   }
 
   // Prevent overlapping labels: assign y-offset rows for close events
@@ -84,8 +95,9 @@ export function EventsTimeline({
   const maxRow = Math.max(0, ...rows)
   const totalH = H + maxRow * ROW_HEIGHT
 
-  const COLOR_INCOME = '#10b981' // emerald-500
-  const COLOR_EXPENSE = '#ef4444' // red-500
+  // Module-kleuren: Wil voor positief/inkomen, Kern voor negatief/uitgaven
+  const COLOR_INCOME = 'var(--color-wil, #3d3048)'
+  const COLOR_EXPENSE = 'var(--color-kern, #6b4339)'
 
   return (
     <div ref={containerRef} className="relative w-full overflow-x-auto">
@@ -163,37 +175,43 @@ export function EventsTimeline({
                 {age}j
               </text>
 
-              {/* Hover tooltip — amount and duration */}
-              {isHovered && (
-                <g>
-                  {/* Tooltip background */}
-                  <rect
-                    x={cx - 60} y={Y_LINE - 52}
-                    width={120} height={30}
-                    rx={4}
-                    fill="var(--ink)" opacity={0.92}
-                  />
-                  {/* Tooltip text: name */}
-                  <text
-                    x={cx} y={Y_LINE - 39}
-                    textAnchor="middle" fontSize={8} fontWeight={600}
-                    fill="var(--paper)"
-                    fontFamily="var(--font-inter, sans-serif)"
-                  >
-                    {ev.name}
-                  </text>
-                  {/* Tooltip text: amount + duration */}
-                  <text
-                    x={cx} y={Y_LINE - 28}
-                    textAnchor="middle" fontSize={7}
-                    fill="var(--paper)"
-                    fontFamily="var(--font-dm-mono, monospace)"
-                  >
-                    {formatCurrency(eventTotalAmount(ev))}
-                    {ev.duration_months > 0 ? ` · ${ev.duration_months} mnd` : ''}
-                  </text>
-                </g>
-              )}
+              {/* Hover tooltip — amount lines per financial impact */}
+              {isHovered && (() => {
+                const lines = eventAmountLines(ev)
+                const tooltipH = 14 + lines.length * 11
+                const tooltipW = 140
+                const tx = Math.max(PAD.left, Math.min(cx - tooltipW / 2, W - PAD.right - tooltipW))
+                const txCenter = Math.max(PAD.left + tooltipW / 2, Math.min(cx, W - PAD.right - tooltipW / 2))
+                return (
+                  <g>
+                    <rect
+                      x={tx} y={0}
+                      width={tooltipW} height={tooltipH}
+                      rx={4}
+                      fill="var(--ink)" opacity={0.92}
+                    />
+                    <text
+                      x={txCenter} y={11}
+                      textAnchor="middle" fontSize={8} fontWeight={600}
+                      fill="var(--paper)"
+                      fontFamily="var(--font-inter, sans-serif)"
+                    >
+                      {ev.name}
+                    </text>
+                    {lines.map((line, li) => (
+                      <text
+                        key={li}
+                        x={txCenter} y={22 + li * 11}
+                        textAnchor="middle" fontSize={7}
+                        fill={line.color}
+                        fontFamily="var(--font-dm-mono, monospace)"
+                      >
+                        {line.label}
+                      </text>
+                    ))}
+                  </g>
+                )
+              })()}
             </g>
           )
         })}

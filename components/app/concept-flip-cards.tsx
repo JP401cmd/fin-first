@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { BookOpen } from 'lucide-react'
+import { BookOpen, Hourglass, Receipt, Flame, Shield, MessageSquare, type LucideIcon } from 'lucide-react'
 
 /* ── Types ──────────────────────── */
 
@@ -13,7 +13,7 @@ interface GuideFinancial {
 
 interface ConceptCard {
   id: string
-  emoji: string
+  icon: LucideIcon
   name: string
   color: string        // bg color for front
   colorAccent: string  // text/border accent
@@ -40,10 +40,10 @@ function getSovereigntyPhase(level: number): string {
 const CONCEPTS: ConceptCard[] = [
   {
     id: 'vrijheidstijd',
-    emoji: '⏳',
+    icon: Hourglass,
     name: 'Vrijheidstijd',
-    color: 'var(--kern-50, #fffbeb)',
-    colorAccent: 'var(--kern-400, #b45309)',
+    color: 'var(--color-kern-50)',
+    colorAccent: 'var(--color-kern-400)',
     explanation:
       'Het aantal dagen, maanden of jaren dat je vermogen je levenskosten dekt — zonder te werken. Hoe meer vrijheidstijd, hoe dichter bij financiële onafhankelijkheid.',
     personalDataFn: (data) => {
@@ -58,7 +58,7 @@ const CONCEPTS: ConceptCard[] = [
   },
   {
     id: 'kassabon',
-    emoji: '🧾',
+    icon: Receipt,
     name: 'Kassabon',
     color: 'var(--subtle, #f8f8f7)',
     colorAccent: 'var(--ink-2, #555)',
@@ -68,10 +68,10 @@ const CONCEPTS: ConceptCard[] = [
   },
   {
     id: 'fire',
-    emoji: '🔥',
+    icon: Flame,
     name: 'FIRE',
-    color: 'var(--horizon-50, #faf5ff)',
-    colorAccent: 'var(--horizon-400, #a855f7)',
+    color: 'var(--color-horizon-50)',
+    colorAccent: 'var(--color-horizon-400)',
     explanation:
       'Financial Independence, Retire Early — het moment waarop je vermogen genoeg oplevert om je uitgaven te dekken. Werken wordt optioneel.',
     personalDataFn: (data) => {
@@ -81,10 +81,10 @@ const CONCEPTS: ConceptCard[] = [
   },
   {
     id: 'soevereiniteit',
-    emoji: '🛡️',
+    icon: Shield,
     name: 'Soevereiniteit',
-    color: 'var(--wil-50, #f0fdfa)',
-    colorAccent: 'var(--wil-400, #2dd4bf)',
+    color: 'var(--color-wil-50)',
+    colorAccent: 'var(--color-wil-400)',
     explanation:
       'Je financiële zelfredzaamheid, gemeten in niveaus van Herstel tot Meesterschap. Elk niveau ontgrendelt nieuwe functies in de app.',
     personalDataFn: (data) => {
@@ -96,10 +96,10 @@ const CONCEPTS: ConceptCard[] = [
   },
   {
     id: 'will',
-    emoji: '💬',
+    icon: MessageSquare,
     name: 'Will',
-    color: '#f5f0ff',
-    colorAccent: 'var(--horizon-400, #a855f7)',
+    color: 'var(--color-horizon-50)',
+    colorAccent: 'var(--color-horizon-400)',
     explanation:
       'Je persoonlijke financiële assistent. Will kent de context van elke pagina en vertaalt cijfers naar inzichten. Stel hem een vraag via de chatknop rechtsonder.',
     personalDataFn: () => null, // no personal data for Will
@@ -111,11 +111,12 @@ const CONCEPTS: ConceptCard[] = [
 function FlipCard({ concept, personalData }: { concept: ConceptCard; personalData: GuideFinancial | null }) {
   const [flipped, setFlipped] = useState(false)
   const personal = concept.personalDataFn(personalData)
+  const Icon = concept.icon
 
   return (
     <div
       className="perspective-[600px] cursor-pointer"
-      style={{ minHeight: '140px' }}
+      style={{ minHeight: '160px' }}
     >
       <div
         role="button"
@@ -125,7 +126,7 @@ function FlipCard({ concept, personalData }: { concept: ConceptCard; personalDat
         style={{
           transformStyle: 'preserve-3d',
           transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-          minHeight: '140px',
+          minHeight: '160px',
         }}
         onClick={() => setFlipped(!flipped)}
         onKeyDown={(e) => {
@@ -137,23 +138,31 @@ function FlipCard({ concept, personalData }: { concept: ConceptCard; personalDat
       >
         {/* Front */}
         <div
-          className="absolute inset-0 flex flex-col items-center justify-center rounded-[var(--r)] border border-[var(--border-ed)] p-4 text-center"
+          className="absolute inset-0 flex flex-col rounded-[var(--r-lg)] border border-[var(--border-ed)] overflow-hidden"
           style={{
             backfaceVisibility: 'hidden',
             WebkitBackfaceVisibility: 'hidden',
             backgroundColor: concept.color,
           }}
         >
-          <span className="text-3xl mb-2" aria-hidden="true">{concept.emoji}</span>
-          <p className="text-[13px] font-semibold" style={{ color: concept.colorAccent }}>
-            {concept.name}
-          </p>
-          <p className="mt-1 text-[10px] text-[var(--ink-4)]">Tik om te draaien</p>
+          <div className="h-[2px] w-full" style={{ backgroundColor: concept.colorAccent }} />
+          <div className="flex flex-1 flex-col items-center justify-center p-4 text-center">
+            <div
+              className="mb-2 flex h-9 w-9 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]"
+              style={{ color: concept.colorAccent }}
+            >
+              <Icon className="h-4.5 w-4.5" />
+            </div>
+            <p className="text-[13px] font-semibold" style={{ color: concept.colorAccent }}>
+              {concept.name}
+            </p>
+            <p className="mt-1 text-[10px] text-[var(--ink-4)]">Tik om te draaien</p>
+          </div>
         </div>
 
         {/* Back */}
         <div
-          className="absolute inset-0 flex flex-col justify-between rounded-[var(--r)] border p-3 overflow-y-auto"
+          className="absolute inset-0 flex flex-col rounded-[var(--r-lg)] border overflow-hidden"
           style={{
             backfaceVisibility: 'hidden',
             WebkitBackfaceVisibility: 'hidden',
@@ -162,21 +171,24 @@ function FlipCard({ concept, personalData }: { concept: ConceptCard; personalDat
             borderColor: concept.colorAccent,
           }}
         >
-          <div>
-            <p className="text-[11px] font-semibold text-[var(--ink)] mb-1.5">{concept.name}</p>
-            <p className="text-[11px] leading-relaxed text-[var(--ink-2)]">{concept.explanation}</p>
-          </div>
-          {personal && (
-            <div
-              className="mt-2 rounded-[var(--r-sm)] px-2.5 py-1.5 text-[11px] font-medium font-mono tabular-nums"
-              style={{
-                backgroundColor: concept.color,
-                color: concept.colorAccent,
-              }}
-            >
-              {personal}
+          <div className="h-[2px] w-full" style={{ backgroundColor: concept.colorAccent }} />
+          <div className="flex flex-1 flex-col justify-between p-3 overflow-y-auto">
+            <div>
+              <p className="text-[11px] font-semibold text-[var(--ink)] mb-1.5">{concept.name}</p>
+              <p className="text-[11px] leading-relaxed text-[var(--ink-2)]">{concept.explanation}</p>
             </div>
-          )}
+            {personal && (
+              <div
+                className="mt-2 rounded-[var(--r-sm)] px-2.5 py-1.5 text-[11px] font-medium font-mono tabular-nums"
+                style={{
+                  backgroundColor: concept.color,
+                  color: concept.colorAccent,
+                }}
+              >
+                {personal}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -204,12 +216,12 @@ export default function ConceptFlipCards() {
   }, [])
 
   return (
-    <div className="mb-6">
+    <div className="mb-6 sm:mb-8">
       <div className="flex items-center gap-2 mb-3">
         <BookOpen className="h-4 w-4 text-[var(--ink-3)]" />
         <p className="label-editorial text-[var(--ink-3)]">Kernconcepten</p>
       </div>
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {CONCEPTS.map((concept) => (
           <FlipCard
             key={concept.id}

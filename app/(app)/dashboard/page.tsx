@@ -999,6 +999,7 @@ export default async function DashboardPage() {
       target_date: (g as { target_date?: string | null }).target_date ?? null,
       color: (g as { color?: string }).color ?? 'teal',
       icon: (g as { icon?: string }).icon ?? 'Target',
+      custom_unit: (g as { custom_unit?: string | null }).custom_unit ?? null,
     })) satisfies TopGoal[],
     recurringTransactions: (recurringResult.data ?? []).length,
     lifeEvents: (eventsResult.data ?? []).length,

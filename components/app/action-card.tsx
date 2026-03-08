@@ -22,9 +22,11 @@ type ActionCardProps = {
   onAssign?: (actionId: string, partnerId: string | null) => Promise<void>
   /** Whether this action was assigned by a partner to the current user */
   isPartnerAssigned?: boolean
+  /** Show only checkbox + title (used in the column block view) */
+  compact?: boolean
 }
 
-export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpen, partnerInfo, onAssign, isPartnerAssigned }: ActionCardProps) {
+export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpen, partnerInfo, onAssign, isPartnerAssigned, compact }: ActionCardProps) {
   const [showPostpone, setShowPostpone] = useState(false)
   const [showReject, setShowReject] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
@@ -133,35 +135,41 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
           {/* Title */}
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <h4 className={`truncate text-sm font-medium ${action.status === 'completed' ? 'text-[var(--ink-4)] line-through' : 'text-[var(--ink)]'}`}>{action.title}</h4>
-            {action.status === 'postponed' && action.postponed_until && (
-              <span className="shrink-0 text-xs text-amber-600">
-                tot {new Date(action.postponed_until).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
-              </span>
-            )}
-            <span className={`hidden sm:inline-flex shrink-0 rounded-full px-1.5 py-px text-[10px] font-medium ${sourceBadge}`}>
-              {ACTION_SOURCE_LABELS[action.source]}
-            </span>
-            {/* Partner assignment badge — outgoing (I assigned to partner) */}
-            {isAssigned && !isPartnerAssigned && (
-              <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-wil-50 px-1.5 py-px text-[10px] font-medium text-wil-700">
-                <UserCheck className="h-2.5 w-2.5" />
-                {action.assigned_to_name ?? 'Partner'}
-              </span>
-            )}
-            {/* Partner assignment badge — incoming (partner assigned to me) */}
-            {isPartnerAssigned && assignedByName && (
-              <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-wil-100 px-1.5 py-px text-[10px] font-medium text-wil-700">
-                <UserCheck className="h-2.5 w-2.5" />
-                Toegewezen door {assignedByName}
-              </span>
-            )}
-            {!isPartnerAssigned && assignedByName && (
-              <span className="hidden sm:inline shrink-0 text-[10px] text-[var(--ink-4)]">
-                Toegewezen door {assignedByName}
-              </span>
+            {!compact && (
+              <>
+                {action.status === 'postponed' && action.postponed_until && (
+                  <span className="shrink-0 text-xs text-amber-600">
+                    tot {new Date(action.postponed_until).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                  </span>
+                )}
+                <span className={`hidden sm:inline-flex shrink-0 rounded-full px-1.5 py-px text-[10px] font-medium ${sourceBadge}`}>
+                  {ACTION_SOURCE_LABELS[action.source]}
+                </span>
+                {/* Partner assignment badge — outgoing (I assigned to partner) */}
+                {isAssigned && !isPartnerAssigned && (
+                  <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-wil-50 px-1.5 py-px text-[10px] font-medium text-wil-700">
+                    <UserCheck className="h-2.5 w-2.5" />
+                    {action.assigned_to_name ?? 'Partner'}
+                  </span>
+                )}
+                {/* Partner assignment badge — incoming (partner assigned to me) */}
+                {isPartnerAssigned && assignedByName && (
+                  <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-wil-100 px-1.5 py-px text-[10px] font-medium text-wil-700">
+                    <UserCheck className="h-2.5 w-2.5" />
+                    Toegewezen door {assignedByName}
+                  </span>
+                )}
+                {!isPartnerAssigned && assignedByName && (
+                  <span className="hidden sm:inline shrink-0 text-[10px] text-[var(--ink-4)]">
+                    Toegewezen door {assignedByName}
+                  </span>
+                )}
+              </>
             )}
           </div>
 
+          {!compact && (
+          <>
           {/* Right: meta + action buttons */}
           <div className="flex shrink-0 items-center gap-2">
             {/* Compact meta */}
@@ -247,6 +255,8 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
               </div>
             )}
           </div>
+          </>
+          )}
         </div>
 
         {/* Mobile long-press action menu */}
