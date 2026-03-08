@@ -11291,3 +11291,39 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#646, #648, #647)
 - Zero TypeScript errors
 - Could not verify via browser (no test credentials available)
+
+## Session 2026-03-08 - Features #611, #614, #616
+
+### Feature #611: Nieuwe levensgebeurtenis: Huis verkopen met overwaarde-vrijval - PASSING
+- house_sale catalog entry already existed with all required fields (icon, fields, tip)
+- Added mortgage pre-fill: resterendeHypotheek and oudeHypotheeklasten from active mortgage debts
+- Auto-calculation of netto overwaarde (verkoopprijs - hypotheek - makelaarskosten) already existed
+- Verschil maandlasten display (oude hypotheek vs nieuwe woonlasten) already existed
+- Simulation handles overwaarde as one-time + monthly cost difference already existed
+- Commit: ded1417
+
+### Feature #614: Schenking doen aan kinderen met belastingvrije bedragen - PASSING
+- Added aantalOntvangers and aantalJaren fields to schenking catalog entry
+- Created SCHENKING_VRIJSTELLING constants (kind: 6633, overig: 2658)
+- Created SCHENKING_TARIEVEN constants (10-20% kind, 18-36% kleinkind, 30-40% overig)
+- Created berekenSchenkbelasting() helper function
+- Auto-calculation display in form: vrijstelling, belastbaar bedrag, schenkbelasting per ontvanger
+- Multiple recipients multiply the vrijstelling (2 kinderen = 2x vrijstelling)
+- Jaarlijks frequency sets period duration for simulation
+- Special handling in form save: calculates total cost including belasting
+- Commit: 5a1796b
+
+### Feature #616: What-if chat ontvangt volledige scenario-context - PASSING
+- Created WhatIfScenarioContext type with sliders, FIRE ages, delta, active events
+- Built chatScenarioContext via useMemo from overrides, baseline, FIRE ages, events
+- Transport body includes scenarioContext, recreated via memoized JSON serialization
+- API route appends scenario context block to WHATIF_PROMPT system message
+- Formatted context: slider labels/values, baseline/scenario FIRE ages, delta, event list
+- AI can reference current slider values, FIRE-leeftijd delta, and active events
+- Context auto-updates when user changes sliders or events
+- Commit: d429c5d
+
+### Current Status
+- 3 features completed this session (#611, #614, #616)
+- Zero TypeScript errors in changed files
+- Could not verify via browser due to auth rate limiting (no working credentials)
