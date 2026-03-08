@@ -13,7 +13,7 @@ import {
   computeResilienceScore, formatFireAge, formatCountdown,
   computeLifeEventImpact, ageAtDate, deriveCountdown,
   runMonteCarlo,
-  LIFE_EVENT_CATALOG, LIFE_EVENT_GROUPS, nibudChildrenCost, berekenSchenkbelasting, berekenAutoMaandkosten, berekenErfbelasting, WERELDREIS_STIJL_PRESETS, VERBOUWING_TYPE_KOSTEN, STUDIE_TYPE_KOSTEN, BRUILOFT_BUDGET_PRESETS,
+  LIFE_EVENT_CATALOG, LIFE_EVENT_GROUPS, nibudChildrenCost, berekenSchenkbelasting, berekenAutoMaandkosten, berekenErfbelasting, berekenKinderopvangNetto, kinderbijslagPerMaand, WERELDREIS_STIJL_PRESETS, VERBOUWING_TYPE_KOSTEN, STUDIE_TYPE_KOSTEN, BRUILOFT_BUDGET_PRESETS,
   type LifeEventGroup,
   type FinancialInput, type FireProjection, type FireRange,
   type ProjectionMonth, type ResilienceScore,
@@ -2747,13 +2747,43 @@ export default function HorizonPage() {
                           Kosten schalen niet lineair (NIBUD): 1 kind ~&#8364;500/mnd, 2 kinderen ~&#8364;830/mnd, 3 ~&#8364;1.100/mnd, 4 ~&#8364;1.320/mnd. Het bedrag hierboven is automatisch aangepast, maar blijft handmatig aanpasbaar.
                         </p>
                       )}
+                      {formType === 'children' && field.key === 'kinderopvangDagen' && (() => {
+                        const opvangDagen = Number(formMetadata.kinderopvangDagen ?? 0)
+                        const aantalKinderen = Number(formMetadata.aantalKinderen ?? 1)
+                        if (opvangDagen <= 0) return null
+                        const nettoOpvang = berekenKinderopvangNetto(opvangDagen, aantalKinderen)
+                        const brutoOpvang = opvangDagen * 440 * aantalKinderen
+                        return (
+                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/30 p-2.5 space-y-1">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Geschatte opvangkosten</p>
+                            <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                              <div className="flex justify-between"><span>Bruto opvang ({opvangDagen} dgn × {aantalKinderen} {aantalKinderen === 1 ? 'kind' : 'kinderen'})</span><span className="font-mono tabular-nums">{formatCurrency(brutoOpvang)}/mnd</span></div>
+                              <div className="flex justify-between text-emerald-600"><span>Kinderopvangtoeslag (~70%)</span><span className="font-mono tabular-nums">-{formatCurrency(brutoOpvang - nettoOpvang)}/mnd</span></div>
+                              <div className="h-px bg-horizon-200 my-0.5" />
+                              <div className="flex justify-between font-semibold"><span>Netto eigen bijdrage</span><span className="font-mono tabular-nums text-red-600">+{formatCurrency(nettoOpvang)}/mnd</span></div>
+                            </div>
+                            <p className="text-[10px] text-[var(--ink-4)] leading-relaxed">
+                              Kinderopvangtoeslag dekt 33–96% afhankelijk van je inkomen. Hier is uitgegaan van ~70% dekking (modaal inkomen). Check <span className="underline">toeslagen.nl</span> voor je persoonlijke situatie.
+                            </p>
+                          </div>
+                        )
+                      })()}
                       {formType === 'children' && field.key === 'babyuitzet' && (() => {
                         const aantalKinderen = Number(formMetadata.aantalKinderen ?? 1)
-                        const maandkosten = Number(formAmount) || nibudChildrenCost(aantalKinderen)
+                        const basiskosten = Number(formAmount) || nibudChildrenCost(aantalKinderen)
                         const babyuitzet = Number(formMetadata.babyuitzet ?? 3000)
                         const duurMaanden = Number(formDuration) || 216
-                        const totaalMaandelijk = maandkosten * duurMaanden
-                        const totaal = totaalMaandelijk + babyuitzet
+                        const opvangDagen = Number(formMetadata.kinderopvangDagen ?? 0)
+                        const nettoOpvang = berekenKinderopvangNetto(opvangDagen, aantalKinderen)
+                        // Kinderopvang is typically 0-4 years (48 months)
+                        const opvangMaanden = Math.min(48, duurMaanden)
+                        const useKinderbijslag = formMetadata.kinderbijslag !== false
+                        const kbPerMaand = useKinderbijslag ? kinderbijslagPerMaand(aantalKinderen) : 0
+                        const nettoMaandkosten = basiskosten + nettoOpvang - kbPerMaand
+                        const totaalBasis = basiskosten * duurMaanden
+                        const totaalOpvang = nettoOpvang * opvangMaanden
+                        const totaalKb = kbPerMaand * duurMaanden
+                        const totaal = babyuitzet + totaalBasis + totaalOpvang - totaalKb
                         return (
                           <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Financieel overzicht kinderen</p>
@@ -2761,11 +2791,19 @@ export default function HorizonPage() {
                               <p className="text-[10px] font-semibold text-horizon-500 mb-1">Eenmalige kosten</p>
                               <div className="flex justify-between"><span>Babyuitzet &amp; kinderkamer</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(babyuitzet)}</span></div>
                               <div className="h-px bg-horizon-200 my-1" />
-                              <p className="text-[10px] font-semibold text-horizon-500 mb-1">Structurele kosten</p>
-                              <div className="flex justify-between"><span>Maandkosten ({aantalKinderen} {aantalKinderen === 1 ? 'kind' : 'kinderen'})</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(maandkosten)}/mnd</span></div>
+                              <p className="text-[10px] font-semibold text-horizon-500 mb-1">Netto maandkosten</p>
+                              <div className="flex justify-between"><span>Basiskosten ({aantalKinderen} {aantalKinderen === 1 ? 'kind' : 'kinderen'})</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(basiskosten)}/mnd</span></div>
+                              {opvangDagen > 0 && (
+                                <div className="flex justify-between"><span>Kinderopvang netto ({opvangDagen} dgn/wk, ~4 jr)</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(nettoOpvang)}/mnd</span></div>
+                              )}
+                              {useKinderbijslag && (
+                                <div className="flex justify-between text-emerald-600"><span>Kinderbijslag (~{formatCurrency(kbPerMaand * 3)}/kwt × {aantalKinderen})</span><span className="font-mono tabular-nums">+{formatCurrency(kbPerMaand)}/mnd</span></div>
+                              )}
+                              <div className="h-px bg-horizon-200 my-0.5" />
+                              <div className="flex justify-between font-semibold"><span>Netto maandkosten</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(Math.max(0, nettoMaandkosten))}/mnd</span></div>
                               <div className="flex justify-between text-[var(--ink-4)]"><span>Duur</span><span>{Math.round(duurMaanden / 12)} jaar ({duurMaanden} mnd)</span></div>
                               <div className="h-px bg-horizon-200 my-1" />
-                              <div className="flex justify-between font-semibold"><span>Totale geschatte kosten</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(totaal)}</span></div>
+                              <div className="flex justify-between font-semibold"><span>Totale geschatte kosten</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(Math.max(0, totaal))}</span></div>
                             </div>
                           </div>
                         )

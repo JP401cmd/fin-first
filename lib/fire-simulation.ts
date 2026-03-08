@@ -15,6 +15,8 @@ import {
   NL_AOW_MONTHLY,
   NL_AOW_MONTHLY_SAMENWONEND,
   berekenErfbelasting,
+  berekenKinderopvangNetto,
+  kinderbijslagPerMaand,
 } from '@/lib/horizon-data'
 import { type FireEndStrategy, type FireStrategyConfig, DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
 
@@ -358,7 +360,7 @@ export function lifeEventsToCashflows(events: LifeEvent[]): SimCashflow[] {
     let skipGenericMonthlyCost = false
     let skipGenericMonthlyIncome = false
 
-    // Children: phased costs by age period (NIBUD-based)
+    // Children: phased costs by age period (NIBUD-based) + kinderopvang + kinderbijslag
     if (ev.event_type === 'children' && meta.aantalKinderen) {
       const m = meta as ChildrenMetadata
       const count = Math.min(4, Math.max(1, Number(m.aantalKinderen) || 1))
@@ -382,6 +384,39 @@ export function lifeEventsToCashflows(events: LifeEvent[]): SimCashflow[] {
           indexed: true,
         })
       }
+
+      // Kinderopvang: netto kosten na toeslag, typisch 0-4 jaar
+      const opvangDagen = Number(m.kinderopvangDagen ?? 0)
+      if (opvangDagen > 0) {
+        const nettoOpvang = berekenKinderopvangNetto(opvangDagen, count)
+        flows.push({
+          id: `le-children-opvang-${ev.id}`,
+          name: `${ev.name} (kinderopvang)`,
+          type: 'recurring',
+          direction: 'expense',
+          amount: nettoOpvang,
+          fromAge: age,
+          toAge: age + 4, // Kinderopvang typically 0-4 years
+          indexed: true,
+        })
+      }
+
+      // Kinderbijslag: income over full 0-18 period
+      const useKinderbijslag = m.kinderbijslag !== false
+      if (useKinderbijslag) {
+        const kbPerMaand = kinderbijslagPerMaand(count)
+        flows.push({
+          id: `le-children-kb-${ev.id}`,
+          name: `${ev.name} (kinderbijslag)`,
+          type: 'recurring',
+          direction: 'income',
+          amount: kbPerMaand,
+          fromAge: age,
+          toAge: age + 18,
+          indexed: true,
+        })
+      }
+
       skipGenericMonthlyCost = true
       skipGenericMonthlyIncome = true
     }

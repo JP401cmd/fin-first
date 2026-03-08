@@ -608,6 +608,46 @@ export function nibudChildrenCost(count: number): number {
   return NIBUD_CHILDREN_MONTHLY_COST[Math.min(count, 4)] ?? NIBUD_CHILDREN_MONTHLY_COST[4]!
 }
 
+/**
+ * Kinderopvang bruto kosten per dag per maand (2026).
+ * Dagopvang: ca. 10,5 uur/dag × €9,65/uur = ~€101/dag → ~€440/mnd per dag/week.
+ * Bron: Rijksoverheid, max uurtarief kinderopvangtoeslag 2026.
+ */
+export const KINDEROPVANG_BRUTO_PER_DAG_PER_MAAND = 440
+
+/**
+ * Kinderopvangtoeslag: netto kosten als percentage van bruto, per inkomenscategorie.
+ * Toeslag dekt 33%–96%. We gebruiken een conservatief gemiddelde van 70% dekking
+ * (= 30% netto eigen bijdrage). Werkelijke toeslag is inkomensafhankelijk.
+ */
+export const KINDEROPVANG_TOESLAG_DEKKING_PCT = 0.70
+
+/** Bereken geschatte netto kinderopvangkosten per maand na toeslag */
+export function berekenKinderopvangNetto(dagenPerWeek: number, aantalKinderen: number): number {
+  if (dagenPerWeek <= 0 || aantalKinderen <= 0) return 0
+  const brutoPM = dagenPerWeek * KINDEROPVANG_BRUTO_PER_DAG_PER_MAAND * aantalKinderen
+  const nettoPM = Math.round(brutoPM * (1 - KINDEROPVANG_TOESLAG_DEKKING_PCT))
+  return nettoPM
+}
+
+/**
+ * Kinderbijslag bedragen per kwartaal per kind (SVB 2026).
+ * Gebaseerd op leeftijdscategorie — we nemen gemiddelde over 0-17 jaar.
+ */
+export const KINDERBIJSLAG_PER_KWARTAAL: Record<string, number> = {
+  '0-5': 279,
+  '6-11': 339,
+  '12-17': 399,
+}
+
+/** Gemiddelde kinderbijslag per maand per kind (gewogen over 18 jaar) */
+export function kinderbijslagPerMaand(aantalKinderen: number): number {
+  if (aantalKinderen <= 0) return 0
+  // Gewogen gemiddelde: 6 jr × €279 + 6 jr × €339 + 6 jr × €399 = gemiddeld €339/kwartaal
+  const gemiddeldPerKwartaal = (279 * 6 + 339 * 6 + 399 * 6) / 18
+  return Math.round((gemiddeldPerKwartaal / 3) * aantalKinderen)
+}
+
 export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   sabbatical: {
     label: 'Sabbatical',
