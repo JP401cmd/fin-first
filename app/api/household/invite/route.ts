@@ -196,11 +196,24 @@ export async function GET() {
       .eq('invited_by', user.id)
       .order('created_at', { ascending: false })
 
-    sentInvitations = data ?? []
+    // Auto-expire stale pending invitations (past expires_at)
+    const now = new Date()
+    const invitations = data ?? []
+    for (const invite of invitations) {
+      if (invite.status === 'pending' && new Date(invite.expires_at as string) < now) {
+        await supabase
+          .from('household_invitations')
+          .update({ status: 'expired', updated_at: now.toISOString() })
+          .eq('id', invite.id)
+        invite.status = 'expired'
+      }
+    }
+
+    sentInvitations = invitations
   }
 
   // Get received invitations (by user's email)
-  const { data: receivedInvitations } = await supabase
+  const { data: rawReceivedInvitations } = await supabase
     .from('household_invitations')
     .select(`
       id,
@@ -216,9 +229,24 @@ export async function GET() {
     .eq('status', 'pending')
     .order('created_at', { ascending: false })
 
+  // Auto-expire stale received invitations
+  const receivedInvitations: Array<Record<string, unknown>> = []
+  const nowReceived = new Date()
+  for (const invite of rawReceivedInvitations ?? []) {
+    if (new Date(invite.expires_at as string) < nowReceived) {
+      await supabase
+        .from('household_invitations')
+        .update({ status: 'expired', updated_at: nowReceived.toISOString() })
+        .eq('id', invite.id)
+      // Don't include expired invitations in received list
+    } else {
+      receivedInvitations.push(invite)
+    }
+  }
+
   return NextResponse.json({
     sent: sentInvitations,
-    received: receivedInvitations ?? [],
+    received: receivedInvitations,
     membership: membership ? { household_id: membership.household_id, role: membership.role } : null,
   })
 }

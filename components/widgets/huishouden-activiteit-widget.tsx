@@ -21,11 +21,14 @@ function formatDateShort(dateStr: string): string {
 }
 
 export function HuishoudenActiviteitWidget({ size, data, href }: Props) {
-  const { perspective } = usePerspective()
+  const { perspective, isHousehold } = usePerspective()
 
   const items = data.householdActivity ?? []
 
-  // Only meaningful in household perspective with actual data
+  // Solo users: hide widget completely (no empty state)
+  if (!isHousehold) return null
+
+  // Household user but not in household perspective or no data
   if (perspective !== 'household' || items.length === 0) {
     return (
       <WidgetShell module="kern" size={size} kicker="Huishouden Activiteit" href={href}>

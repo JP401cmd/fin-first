@@ -39,11 +39,26 @@ export async function GET() {
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
 
+    // Filter out expired invitations (auto-expire)
+    const now = new Date()
+    const validInvites = (pendingInvites ?? []).filter(invite => {
+      if (new Date(invite.expires_at as string) < now) {
+        // Mark as expired in DB (fire-and-forget)
+        supabase
+          .from('household_invitations')
+          .update({ status: 'expired', updated_at: now.toISOString() })
+          .eq('id', invite.id)
+          .then(() => {})
+        return false
+      }
+      return true
+    })
+
     return NextResponse.json({
       has_household: false,
       household: null,
       members: [],
-      pending_invitations_received: pendingInvites ?? [],
+      pending_invitations_received: validInvites,
       pending_invitations_sent: [],
     })
   }
@@ -90,15 +105,30 @@ export async function GET() {
     .from('household_invitations')
     .select('id, invited_email, status, expires_at, created_at, token')
     .eq('household_id', membership.household_id)
-    .eq('status', 'pending')
+    .in('status', ['pending', 'expired'])
     .order('created_at', { ascending: false })
+
+  // Auto-expire stale pending invitations (past expires_at)
+  const now = new Date()
+  const processedInvitations = (sentInvitations ?? []).map(invite => {
+    if (invite.status === 'pending' && new Date(invite.expires_at) < now) {
+      // Mark as expired in DB (fire-and-forget)
+      supabase
+        .from('household_invitations')
+        .update({ status: 'expired', updated_at: now.toISOString() })
+        .eq('id', invite.id)
+        .then(() => {})
+      return { ...invite, status: 'expired' }
+    }
+    return invite
+  })
 
   return NextResponse.json({
     has_household: true,
     household,
     my_role: membership.role,
     members: memberDetails,
-    pending_invitations_sent: sentInvitations ?? [],
+    pending_invitations_sent: processedInvitations,
     pending_invitations_received: [],
   })
 }

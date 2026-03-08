@@ -5,14 +5,18 @@ import { NextResponse } from 'next/server'
  * Household Leave API
  * POST /api/household/leave - Leave current household
  *
- * When a member leaves:
- * - Their membership is removed
- * - Their profile.household_id is cleared
- * - Shared items owned by them revert to personal
+ * Graceful degradation when a partner leaves:
+ * - Their shared items (assets, debts, budgets, transactions, goals, etc.) revert to personal
+ * - Their profile is reset: household_id=null, household_type='solo', perspective='personal'
+ * - Badges and history are preserved (no deletion of user_badges, streaks, etc.)
  *
- * When the owner leaves:
- * - If partner is still in household, they become owner
- * - If no members left, household is deleted
+ * When only 1 partner remains after departure:
+ * - Household is fully dissolved for both partners
+ * - Remaining partner's shared items also revert to personal
+ * - Both profiles reset to solo
+ *
+ * When no members remain:
+ * - Household and invitations are deleted
  */
 
 export async function POST() {
@@ -44,8 +48,8 @@ export async function POST() {
 
   const otherMembers = (allMembers ?? []).filter(m => m.user_id !== user.id)
 
-  // Revert user's shared items to personal
-  const dataTables = ['assets', 'debts', 'budgets', 'transactions', 'bank_accounts', 'net_worth_snapshots', 'valuations', 'recurring_transactions'] as const
+  // Revert user's shared items to personal (all tables with ownership + household_id)
+  const dataTables = ['assets', 'debts', 'budgets', 'transactions', 'bank_accounts', 'net_worth_snapshots', 'valuations', 'recurring_transactions', 'goals'] as const
 
   for (const table of dataTables) {
     await supabase
@@ -66,10 +70,10 @@ export async function POST() {
     return NextResponse.json({ error: 'Verlaten mislukt' }, { status: 500 })
   }
 
-  // Clear profile household_id
+  // Clear profile household_id and reset household_type to solo
   await supabase
     .from('profiles')
-    .update({ household_id: null })
+    .update({ household_id: null, household_type: 'solo', selected_perspective: 'personal' })
     .eq('id', user.id)
 
   // Handle remaining household
@@ -84,8 +88,43 @@ export async function POST() {
       .from('households')
       .delete()
       .eq('id', householdId)
+  } else if (otherMembers.length === 1) {
+    // Only 1 partner remains — dissolve household for them too
+    const remainingPartner = otherMembers[0]
+
+    // Revert remaining partner's shared items to personal
+    for (const table of dataTables) {
+      await supabase
+        .from(table)
+        .update({ ownership: 'personal', household_id: null })
+        .eq('user_id', remainingPartner.user_id)
+        .eq('household_id', householdId)
+    }
+
+    // Remove remaining partner's membership
+    await supabase
+      .from('household_members')
+      .delete()
+      .eq('id', remainingPartner.id)
+
+    // Reset remaining partner's profile
+    await supabase
+      .from('profiles')
+      .update({ household_id: null, household_type: 'solo', selected_perspective: 'personal' })
+      .eq('id', remainingPartner.user_id)
+
+    // Clean up invitations and delete household
+    await supabase
+      .from('household_invitations')
+      .delete()
+      .eq('household_id', householdId)
+
+    await supabase
+      .from('households')
+      .delete()
+      .eq('id', householdId)
   } else if (membership.role === 'owner') {
-    // Owner left but partner remains — promote partner to owner
+    // Owner left but multiple members remain — promote first partner to owner
     const newOwner = otherMembers[0]
     await supabase
       .from('household_members')

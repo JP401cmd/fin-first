@@ -15,12 +15,15 @@ interface Props {
 }
 
 export function HuishoudenVergelijkingWidget({ size, data, href }: Props) {
-  const { perspective, partnerName } = usePerspective()
+  const { perspective, isHousehold, partnerName } = usePerspective()
 
   const dailyExp = data.monthlyExpenses / 30
   const ho = data.householdOverrides
 
-  // Only visible in household perspective with overrides
+  // Solo users: hide widget completely (no empty state)
+  if (!isHousehold) return null
+
+  // Household user but not in household perspective
   if (perspective !== 'household' || !ho) {
     return (
       <WidgetShell module="kern" size={size} kicker="Huishouden Vergelijking" href={href}>

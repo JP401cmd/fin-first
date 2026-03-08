@@ -183,6 +183,10 @@ export default function CheckinPage() {
       })
       // Mark the month as completed
       await fetch('/api/monthly-checkin', { method: 'POST' })
+      // Suppress the dashboard card immediately via sessionStorage
+      // (the card checks this key on mount before fetching the API)
+      const monthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+      sessionStorage.setItem('checkin_dismissed', monthKey)
       router.push('/dashboard')
     } catch {
       setSaving(false)
@@ -463,7 +467,7 @@ function StepDoelen({ goals }: { goals: GoalSummary[] }) {
           Doelen
         </h2>
         <p className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
-          Hoe staat het met jullie gedeelde doelen?
+          Hoe staat het met je doelen?
         </p>
       </div>
 

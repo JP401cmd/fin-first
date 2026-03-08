@@ -419,47 +419,70 @@ export function HouseholdSection() {
           {status.pending_invitations_sent.length > 0 && (
             <div className="mb-5">
               <h3 className="text-xs font-semibold text-[var(--ink-3)] uppercase tracking-wider mb-2">
-                Openstaande uitnodigingen
+                Uitnodigingen
               </h3>
-              {status.pending_invitations_sent.map((invite) => (
-                <div
-                  key={invite.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-amber-100 bg-amber-50/50 p-3"
-                  data-testid="sent-invitation"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-[var(--ink-2)] truncate">{invite.invited_email}</p>
-                    <p className="text-xs text-[var(--ink-3)] flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {formatTimeRemaining(invite.expires_at)}
-                    </p>
+              {status.pending_invitations_sent.map((invite) => {
+                const isExpired = invite.status === 'expired' || new Date(invite.expires_at) < new Date()
+                return (
+                  <div
+                    key={invite.id}
+                    className={`flex items-center justify-between gap-3 rounded-lg border p-3 mb-2 last:mb-0 ${
+                      isExpired
+                        ? 'border-[var(--border-ed)] bg-[var(--subtle)] opacity-75'
+                        : 'border-amber-100 bg-amber-50/50'
+                    }`}
+                    data-testid="sent-invitation"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-[var(--ink-2)] truncate">{invite.invited_email}</p>
+                      <p className="text-xs text-[var(--ink-3)] flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {isExpired ? 'Verlopen' : formatTimeRemaining(invite.expires_at)}
+                      </p>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      {isExpired ? (
+                        <button
+                          onClick={() => {
+                            handleCancelInvite(invite.id)
+                            setInviteEmail(invite.invited_email)
+                          }}
+                          className="flex items-center gap-1 rounded-lg bg-kern-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-kern-700 transition-colors"
+                          data-testid="reinvite-btn"
+                        >
+                          <Mail className="h-3 w-3" />
+                          Opnieuw uitnodigen
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleCopyInviteLink(invite.token)}
+                            className="flex items-center gap-1 rounded-lg border border-[var(--border-md)] px-2 py-1 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
+                            title="Kopieer uitnodigingslink"
+                            data-testid="copy-invite-link"
+                          >
+                            <Copy className="h-3 w-3" />
+                            {copiedToken === invite.token ? 'Gekopieerd!' : 'Link'}
+                          </button>
+                          <button
+                            onClick={() => handleCancelInvite(invite.id)}
+                            className="flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+                            data-testid="cancel-invite-btn"
+                          >
+                            <X className="h-3 w-3" />
+                            Annuleren
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex gap-2 shrink-0">
-                    <button
-                      onClick={() => handleCopyInviteLink(invite.token)}
-                      className="flex items-center gap-1 rounded-lg border border-[var(--border-md)] px-2 py-1 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
-                      title="Kopieer uitnodigingslink"
-                      data-testid="copy-invite-link"
-                    >
-                      <Copy className="h-3 w-3" />
-                      {copiedToken === invite.token ? 'Gekopieerd!' : 'Link'}
-                    </button>
-                    <button
-                      onClick={() => handleCancelInvite(invite.id)}
-                      className="flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
-                      data-testid="cancel-invite-btn"
-                    >
-                      <X className="h-3 w-3" />
-                      Annuleren
-                    </button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
 
-          {/* Invite partner (if only 1 member and user is owner) */}
-          {status.my_role === 'owner' && status.members.length < 2 && status.pending_invitations_sent.length === 0 && (
+          {/* Invite partner (if only 1 member and user is owner, no active pending invitations) */}
+          {status.my_role === 'owner' && status.members.length < 2 && !status.pending_invitations_sent.some(i => i.status === 'pending' && new Date(i.expires_at) > new Date()) && (
             <div className="mb-5" data-testid="invite-partner-section">
               <h3 className="text-xs font-semibold text-[var(--ink-3)] uppercase tracking-wider mb-2">
                 Partner uitnodigen
