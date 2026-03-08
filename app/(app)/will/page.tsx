@@ -65,6 +65,7 @@ export default function WillPage() {
   const [loading, setLoading] = useState(true)
   const [showGoalModal, setShowGoalModal] = useState(false)
   const [showGoalForm, setShowGoalForm] = useState(false)
+  const [goalFilter, setGoalFilter] = useState<'all' | 'personal' | 'shared'>('all')
   const [goalAssets, setGoalAssets] = useState<{ id: string; name: string; current_value: number }[]>([])
   const [goalDebts, setGoalDebts] = useState<{ id: string; name: string; current_balance: number }[]>([])
   const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([])
@@ -335,6 +336,15 @@ export default function WillPage() {
 
   // --- Calculations ---
   const { completedActions, allActions, openActions, allPendingRecs, goals, completedGoalCount, totalGoalCount, goalProgresses } = kpi
+
+  // Filter goals by ownership
+  const hasSharedGoals = goals.some(g => g.ownership === 'shared')
+  const filteredGoals = goalFilter === 'all' ? goals
+    : goalFilter === 'shared' ? goals.filter(g => g.ownership === 'shared')
+    : goals.filter(g => g.ownership !== 'shared')
+  const filteredGoalProgresses = goals.map((g, i) => ({ goal: g, progress: goalProgresses[i] }))
+    .filter(({ goal }) => goalFilter === 'all' ? true : goalFilter === 'shared' ? goal.ownership === 'shared' : goal.ownership !== 'shared')
+    .map(({ progress }) => progress)
 
   const totalFreedomDaysWon = completedActions.reduce(
     (sum, a) => sum + (Number(a.freedom_days_impact) || 0), 0
@@ -699,14 +709,37 @@ export default function WillPage() {
           </div>
         </div>
 
-        {goals.length > 0 ? (
+        {/* Goal filter tabs — only show when there are shared goals */}
+        {hasSharedGoals && goals.length > 0 && (
+          <div className="mb-3 flex gap-1 rounded-lg bg-[var(--subtle)] p-1">
+            {([
+              { key: 'all' as const, label: 'Alle' },
+              { key: 'personal' as const, label: 'Persoonlijk' },
+              { key: 'shared' as const, label: 'Gedeeld' },
+            ]).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setGoalFilter(key)}
+                className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  goalFilter === key
+                    ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
+                    : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {filteredGoals.length > 0 ? (
           <div className="card-editorial overflow-hidden">
             <div className="divide-y divide-zinc-100">
-              {goals.map((goal, i) => (
+              {filteredGoals.map((goal, i) => (
                 <GoalSummaryRow
                   key={goal.id}
                   goal={goal}
-                  progress={goalProgresses[i]}
+                  progress={filteredGoalProgresses[i]}
                   onClick={() => setShowGoalModal(true)}
                   dailyExpenses={dailyExpenseRate}
                 />
@@ -716,7 +749,11 @@ export default function WillPage() {
         ) : (
           <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-8 text-center">
             <p className="text-sm text-[var(--ink-3)]">
-              Nog geen doelen ingesteld. Klik op &quot;Nieuw doel&quot; om te starten.
+              {goalFilter === 'all'
+                ? 'Nog geen doelen ingesteld. Klik op "Nieuw doel" om te starten.'
+                : goalFilter === 'shared'
+                  ? 'Geen gedeelde doelen. Maak een gedeeld doel aan met je partner.'
+                  : 'Geen persoonlijke doelen in dit filter.'}
             </p>
           </div>
         )}

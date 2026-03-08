@@ -32,6 +32,7 @@ export function GoalDetailModal({
   const [editGoal, setEditGoal] = useState<Goal | null>(null)
   const [showCompleted, setShowCompleted] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [goalFilter, setGoalFilter] = useState<'all' | 'personal' | 'shared'>('all')
 
   const loadData = useCallback(async () => {
     const supabase = createClient()
@@ -96,8 +97,11 @@ export function GoalDetailModal({
     onClose()
   }
 
-  const activeGoals = goals.filter(g => !g.is_completed)
-  const completedGoals = goals.filter(g => g.is_completed)
+  const hasSharedGoals = goals.some(g => g.ownership === 'shared')
+  const filterFn = (g: Goal) =>
+    goalFilter === 'all' ? true : goalFilter === 'shared' ? g.ownership === 'shared' : g.ownership !== 'shared'
+  const activeGoals = goals.filter(g => !g.is_completed && filterFn(g))
+  const completedGoals = goals.filter(g => g.is_completed && filterFn(g))
 
   if (!open) return null
 
@@ -130,6 +134,31 @@ export function GoalDetailModal({
             </button>
           </div>
         </div>
+
+        {/* Filter tabs */}
+        {hasSharedGoals && !loading && goals.length > 0 && (
+          <div className="border-b border-[var(--border-ed)] px-6 py-2">
+            <div className="flex gap-1 rounded-lg bg-[var(--subtle)] p-1">
+              {([
+                { key: 'all' as const, label: 'Alle' },
+                { key: 'personal' as const, label: 'Persoonlijk' },
+                { key: 'shared' as const, label: 'Gedeeld' },
+              ]).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setGoalFilter(key)}
+                  className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                    goalFilter === key
+                      ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
+                      : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Content */}
         <div className="p-6">
