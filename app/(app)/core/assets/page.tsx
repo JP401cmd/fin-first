@@ -1851,6 +1851,8 @@ function AssetForm({
   const [depreciationRate, setDepreciationRate] = useState(String(asset?.depreciation_rate ?? ''))
   const [addressPostcode, setAddressPostcode] = useState(asset?.address_postcode ?? '')
   const [addressHouseNumber, setAddressHouseNumber] = useState(asset?.address_house_number ?? '')
+  const [expiryDate, setExpiryDate] = useState(asset?.expiry_date ?? '')
+  const [beneficiary, setBeneficiary] = useState(asset?.beneficiary ?? '')
   const [wozLoading, setWozLoading] = useState(false)
   const [wozResult, setWozResult] = useState<{ peildatum: string; waarde: number }[] | null>(null)
   const [wozError, setWozError] = useState<string | null>(null)
@@ -1977,6 +1979,8 @@ function AssetForm({
       depreciation_rate: depreciationRate ? Number(depreciationRate) : null,
       address_postcode: addressPostcode || null,
       address_house_number: addressHouseNumber || null,
+      expiry_date: expiryDate || null,
+      beneficiary: beneficiary || null,
       // Household fields
       ownership: ownership,
       household_id: ownership === 'shared' ? householdId : null,
@@ -2160,7 +2164,7 @@ function AssetForm({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
-                    {assetType === 'eigen_huis' ? 'Marktwaarde' : 'Huidige waarde'}
+                    {assetType === 'eigen_huis' ? 'Marktwaarde' : assetType === 'levensverzekering' ? 'Afkoopwaarde' : 'Huidige waarde'}
                   </label>
                   <input
                     type="number"
@@ -2204,7 +2208,9 @@ function AssetForm({
                 </div>
                 {assetType !== 'eigen_huis' && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Inleg p/m</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+                      {assetType === 'levensverzekering' ? 'Premie p/m' : 'Inleg p/m'}
+                    </label>
                     <input
                       type="number"
                       value={monthlyContribution}
@@ -2226,12 +2232,14 @@ function AssetForm({
 
               {assetType !== 'eigen_huis' && (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Instelling</label>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+                    {assetType === 'levensverzekering' ? 'Verzekeraar' : 'Instelling'}
+                  </label>
                   <input
                     value={institution}
                     onChange={(e) => setInstitution(e.target.value)}
                     className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
-                    placeholder="ABN AMRO, DEGIRO, ABP..."
+                    placeholder={assetType === 'levensverzekering' ? 'Nationale-Nederlanden, Aegon...' : 'ABN AMRO, DEGIRO, ABP...'}
                   />
                 </div>
               )}
@@ -2417,6 +2425,28 @@ function AssetForm({
                       value={depreciationRate}
                       onChange={(e) => setDepreciationRate(e.target.value)}
                       className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
+                    />
+                  </div>
+                )}
+                {visibleFields.includes('expiry_date') && (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Einddatum polis</label>
+                    <input
+                      type="date"
+                      value={expiryDate}
+                      onChange={(e) => setExpiryDate(e.target.value)}
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
+                    />
+                  </div>
+                )}
+                {visibleFields.includes('beneficiary') && (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Begunstigde</label>
+                    <input
+                      value={beneficiary}
+                      onChange={(e) => setBeneficiary(e.target.value)}
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
+                      placeholder="Bijv. partner, kinderen"
                     />
                   </div>
                 )}

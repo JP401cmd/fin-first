@@ -35,6 +35,8 @@ export interface AssetEntry {
   depreciation_rate: string
   address_postcode: string
   address_house_number: string
+  expiry_date: string
+  beneficiary: string
 }
 
 const EMPTY: AssetEntry = {
@@ -57,9 +59,11 @@ const EMPTY: AssetEntry = {
   depreciation_rate: '',
   address_postcode: '',
   address_house_number: '',
+  expiry_date: '',
+  beneficiary: '',
 }
 
-const ALL_TYPES: AssetType[] = ['savings', 'investment', 'retirement', 'eigen_huis', 'real_estate', 'crypto', 'vehicle', 'physical', 'other']
+const ALL_TYPES: AssetType[] = ['savings', 'investment', 'retirement', 'eigen_huis', 'real_estate', 'crypto', 'vehicle', 'physical', 'deelneming', 'levensverzekering', 'other']
 
 export function MiniAssetForm({
   items,
@@ -115,6 +119,8 @@ export function MiniAssetForm({
       depreciation_rate: asset_type === 'vehicle' ? '15' : '',
       address_postcode: '',
       address_house_number: '',
+      expiry_date: '',
+      beneficiary: '',
       expected_return: defaults ? String(defaults) : '',
       monthly_contribution: asset_type === 'eigen_huis' ? '0' : draft.monthly_contribution,
     })
@@ -221,7 +227,7 @@ export function MiniAssetForm({
               {/* Current value */}
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
-                  {draft.asset_type === 'eigen_huis' ? 'Marktwaarde' : 'Huidige waarde'}
+                  {draft.asset_type === 'eigen_huis' ? 'Marktwaarde' : draft.asset_type === 'levensverzekering' ? 'Afkoopwaarde' : 'Huidige waarde'}
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">&euro;</span>
@@ -275,7 +281,9 @@ export function MiniAssetForm({
               {/* Monthly contribution (hidden for eigen_huis) */}
               {draft.asset_type !== 'eigen_huis' && (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Maandelijkse inleg</label>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+                    {draft.asset_type === 'levensverzekering' ? 'Maandelijkse premie' : 'Maandelijkse inleg'}
+                  </label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">&euro;</span>
                     <input
@@ -294,10 +302,12 @@ export function MiniAssetForm({
               {/* Institution (hidden for eigen_huis) */}
               {draft.asset_type !== 'eigen_huis' && (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Instelling</label>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+                    {draft.asset_type === 'levensverzekering' ? 'Verzekeraar' : 'Instelling'}
+                  </label>
                   <input
                     type="text"
-                    placeholder="Bijv. ING, DEGIRO, ABP"
+                    placeholder={draft.asset_type === 'levensverzekering' ? 'Bijv. Nationale-Nederlanden, Aegon' : 'Bijv. ING, DEGIRO, ABP'}
                     value={draft.institution}
                     onChange={(e) => updateDraft({ institution: e.target.value })}
                     className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
@@ -474,6 +484,33 @@ export function MiniAssetForm({
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">%</span>
                   </div>
+                </div>
+              )}
+
+              {/* Expiry date (levensverzekering) */}
+              {visibleFields.includes('expiry_date') && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Einddatum polis</label>
+                  <input
+                    type="date"
+                    value={draft.expiry_date}
+                    onChange={(e) => updateDraft({ expiry_date: e.target.value })}
+                    className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                  />
+                </div>
+              )}
+
+              {/* Beneficiary (levensverzekering) */}
+              {visibleFields.includes('beneficiary') && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Begunstigde</label>
+                  <input
+                    type="text"
+                    placeholder="Bijv. partner, kinderen"
+                    value={draft.beneficiary}
+                    onChange={(e) => updateDraft({ beneficiary: e.target.value })}
+                    className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+                  />
                 </div>
               )}
             </div>
