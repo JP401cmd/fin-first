@@ -49,6 +49,7 @@ export function WhatIfEventsPanel({
   baselineFireAge,
   computeImpact,
   dailyExpenses,
+  isHousehold = false,
 }: {
   events: WhatIfEvent[]
   onToggleEvent: (id: string) => void
@@ -58,6 +59,8 @@ export function WhatIfEventsPanel({
   computeImpact: (eventId: string) => EventImpact | null
   /** Daily expenses for freedom-time calc (optional — hides freedom time if missing) */
   dailyExpenses?: number
+  /** Whether user has a household (enables household-only events) */
+  isHousehold?: boolean
 }) {
   const [expanded, setExpanded] = useState(true)
   const [showCatalog, setShowCatalog] = useState(false)
@@ -238,7 +241,7 @@ export function WhatIfEventsPanel({
       >
         <div className="space-y-1.5">
           {Object.entries(LIFE_EVENT_CATALOG)
-            .filter(([key]) => key !== 'aow' && key !== 'pension')
+            .filter(([key, cat]) => key !== 'aow' && key !== 'pension' && (!cat.householdOnly || isHousehold))
             .map(([key, cat]) => {
               const icon = EVENT_ICONS[cat.icon] ?? <Calendar className="h-4 w-4" />
               const alreadyAdded = events.some(e => e.event_type === key && e.id.startsWith('whatif-'))

@@ -25,6 +25,7 @@ import { SimChart } from '@/components/app/horizon/sim-chart'
 import { WhatIfHeader } from '@/components/app/horizon/whatif-header'
 import { WhatIfSliders, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
 import { WhatIfEventsPanel, type WhatIfEvent } from '@/components/app/horizon/whatif-events'
+import { usePerspective } from '@/components/app/perspective-provider'
 import { WhatIfActions } from '@/components/app/horizon/whatif-actions'
 import { WhatIfPresets } from '@/components/app/horizon/whatif-presets'
 import { WhatIfChat } from '@/components/app/horizon/whatif-chat'
@@ -46,6 +47,9 @@ export default function WhatIfPage() {
       window.history.replaceState(null, '', '/horizon/whatif')
     }
   }, [])
+
+  // ── Household context ───────────────────────────────────
+  const { isHousehold } = usePerspective()
 
   // ── Base data state ──────────────────────────────────────
   const [input, setInput] = useState<FinancialInput | null>(null)
@@ -605,6 +609,8 @@ export default function WhatIfPage() {
               onRemoveEvent={handleRemoveEvent}
               baselineFireAge={baselineFireAge}
               computeImpact={computeImpact}
+              dailyExpenses={whatIfInput ? whatIfInput.monthlyExpenses / 30 : undefined}
+              isHousehold={isHousehold}
             />
 
             {/* Scenario Actions */}

@@ -7,6 +7,7 @@ import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
 import { FfinAvatar } from '@/components/app/avatars'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/components/app/budget-shared'
+import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import {
   computeFireProjection, computeFireRange, projectForward,
   computeResilienceScore, formatFireAge, formatCountdown,
@@ -1491,9 +1492,29 @@ export default function HorizonPage() {
       </section>
 
       {/* === Event Form Modal === */}
-      {showForm && (
+      {showForm && (() => {
+        // Compute summary card values
+        const amt = typeof formAmount === 'number' ? formAmount : 0
+        const dur = typeof formDuration === 'number' ? formDuration : 0
+        const isOneTime = formDurationType === 'one_time'
+        const isPeriod = formDurationType === 'period'
+        const isExpense = formDirection === 'expense'
+        const sign = isExpense ? -1 : 1
+        const oneTimeCost = isOneTime ? amt * sign : 0
+        const monthlyCost = !isOneTime ? amt * sign : 0
+        const totalImpact = isOneTime
+          ? amt * sign
+          : isPeriod && dur > 0
+            ? amt * dur * sign
+            : amt * 12 * 10 * sign // continuous: show 10-year estimate
+        const dailyExp = effectiveInput ? effectiveInput.monthlyExpenses / 30 : 0
+        const freedomBreakdown = dailyExp > 0 ? calculateFreedomTime(Math.abs(totalImpact), dailyExp) : null
+        const freedomStr = freedomBreakdown ? formatFreedomTimeString(freedomBreakdown, 'short') : null
+        const hasCatalogFields = LIFE_EVENT_CATALOG[formType]?.fields && LIFE_EVENT_CATALOG[formType].fields!.length > 0
+
+        return (
         <BottomSheet open={true} onClose={() => { setShowForm(false); setEditingEvent(null) }} title={editingEvent ? 'Evenement bewerken' : 'Nieuw evenement'}>
-          <div className="space-y-4 p-6">
+          <div className="space-y-5 p-6">
             {/* Template tip */}
             {LIFE_EVENT_CATALOG[formType]?.tip && !editingEvent && (
               <div className="rounded-[var(--r)] bg-horizon-50 p-3 text-xs text-horizon-700">
@@ -1501,180 +1522,256 @@ export default function HorizonPage() {
               </div>
             )}
 
-            {/* Naam */}
-            <div>
-              <label className="text-xs font-medium text-[var(--ink-3)]">Naam</label>
-              <input
-                type="text" value={formName} onChange={e => setFormName(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
-              />
-            </div>
+            {/* ── SECTIE: Basis ── */}
+            <div className="space-y-4">
+              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">Basis</p>
 
-            {/* Leeftijd */}
-            <div>
-              <label className="text-xs font-medium text-[var(--ink-3)]">Vanaf welke leeftijd?</label>
-              <input
-                type="number" value={formAge} onChange={e => setFormAge(e.target.value ? Number(e.target.value) : '')}
-                className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
-                placeholder="bijv. 45"
-              />
-            </div>
-
-            {/* Duratie-type */}
-            <div>
-              <label className="text-xs font-medium text-[var(--ink-3)]">Type</label>
-              <div className="mt-1 flex gap-2">
-                {(['one_time', 'period', 'continuous'] as const).map(dt => (
-                  <button
-                    key={dt}
-                    type="button"
-                    onClick={() => setFormDurationType(dt)}
-                    className={`flex-1 rounded-[var(--r)] border px-3 py-2 text-xs font-medium transition-colors ${
-                      formDurationType === dt
-                        ? 'border-horizon-400 bg-horizon-50 text-horizon-700'
-                        : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200'
-                    }`}
-                  >
-                    {dt === 'one_time' ? 'Eenmalig' : dt === 'period' ? 'Tijdelijk' : 'Continu'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Richting + bedrag */}
-            <div>
-              <label className="text-xs font-medium text-[var(--ink-3)]">
-                {formDurationType === 'one_time' ? 'Bedrag' : 'Maandbedrag'}
-              </label>
-              <div className="mt-1 flex gap-2">
-                <div className="flex overflow-hidden rounded-[var(--r)] border border-[var(--border-ed)]">
-                  <button
-                    type="button"
-                    onClick={() => setFormDirection('income')}
-                    className={`px-3 py-2 text-xs font-medium transition-colors ${
-                      formDirection === 'income'
-                        ? 'bg-emerald-500 text-white'
-                        : 'bg-[var(--paper)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
-                    }`}
-                  >
-                    Inkomen
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormDirection('expense')}
-                    className={`px-3 py-2 text-xs font-medium transition-colors ${
-                      formDirection === 'expense'
-                        ? 'bg-red-500 text-white'
-                        : 'bg-[var(--paper)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
-                    }`}
-                  >
-                    Kosten
-                  </button>
-                </div>
-                <input
-                  type="number"
-                  min="0"
-                  value={formAmount}
-                  onChange={e => setFormAmount(e.target.value ? Number(e.target.value) : '')}
-                  className="min-w-0 flex-1 rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
-                  placeholder="0"
-                />
-              </div>
-            </div>
-
-            {/* Duur (alleen bij Tijdelijk) */}
-            {formDurationType === 'period' && (
+              {/* Naam */}
               <div>
-                <label className="text-xs font-medium text-[var(--ink-3)]">Duur (maanden)</label>
+                <label className="text-xs font-medium text-[var(--ink-3)]">Naam</label>
                 <input
-                  type="number"
-                  value={formDuration}
-                  onChange={e => setFormDuration(e.target.value ? Number(e.target.value) : '')}
+                  type="text" value={formName} onChange={e => setFormName(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
-                  placeholder="bijv. 12"
                 />
               </div>
-            )}
 
-            {/* Indexering (alleen bij recurring) */}
-            {formDurationType !== 'one_time' && (
-              <label className="flex cursor-pointer items-center gap-3">
+              {/* Leeftijd */}
+              <div>
+                <label className="text-xs font-medium text-[var(--ink-3)]">Vanaf welke leeftijd?</label>
                 <input
-                  type="checkbox"
-                  checked={formIsIndexed}
-                  onChange={e => setFormIsIndexed(e.target.checked)}
-                  className="h-4 w-4 rounded border-[var(--border-md)] accent-horizon-600"
+                  type="number" value={formAge} onChange={e => setFormAge(e.target.value ? Number(e.target.value) : '')}
+                  className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                  placeholder="bijv. 45"
                 />
-                <span className="text-sm text-[var(--ink-2)]">Bedrag groeit mee met inflatie (~2%/jaar)</span>
-              </label>
-            )}
-
-            {/* ── Context-specifieke velden ── */}
-            {LIFE_EVENT_CATALOG[formType]?.fields && LIFE_EVENT_CATALOG[formType].fields!.length > 0 && (
-              <div className="space-y-3 rounded-[var(--r)] border border-dashed border-horizon-200 bg-horizon-50/30 p-4">
-                <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
-                  Details
-                </p>
-                {LIFE_EVENT_CATALOG[formType].fields!.map((field: CatalogField) => (
-                  <div key={field.key}>
-                    <label className="text-xs font-medium text-[var(--ink-3)]">
-                      {field.label}
-                      {field.tip && (
-                        <span className="ml-1 font-normal text-[var(--ink-4)]" title={field.tip}>ⓘ</span>
-                      )}
-                    </label>
-                    {field.fieldType === 'number' || field.fieldType === 'percentage' ? (
-                      <div className="mt-1 flex items-center gap-2">
-                        <input
-                          type="number"
-                          value={formMetadata[field.key] !== undefined ? String(formMetadata[field.key]) : String(field.default)}
-                          onChange={e => setFormMetadata(prev => ({ ...prev, [field.key]: e.target.value ? Number(e.target.value) : '' }))}
-                          className="min-w-0 flex-1 rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
-                        />
-                        {field.suffix && (
-                          <span className="shrink-0 text-xs text-[var(--ink-3)]">{field.suffix}</span>
-                        )}
-                      </div>
-                    ) : field.fieldType === 'select' ? (
-                      <select
-                        value={String(formMetadata[field.key] ?? field.default)}
-                        onChange={e => {
-                          const val = e.target.value
-                          // For numeric option values (e.g. aantalKinderen), store as number
-                          const numVal = field.options?.some(o => typeof o.value === 'number') ? Number(val) : val
-                          setFormMetadata(prev => ({ ...prev, [field.key]: numVal }))
-                          // Auto-scale costs for children event based on NIBUD
-                          if (formType === 'children' && field.key === 'aantalKinderen') {
-                            setFormAmount(nibudChildrenCost(Number(val)))
-                          }
-                        }}
-                        className="mt-1 w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
-                      >
-                        {field.options?.map(opt => (
-                          <option key={String(opt.value)} value={String(opt.value)}>{opt.label}</option>
-                        ))}
-                      </select>
-                    ) : field.fieldType === 'toggle' ? (
-                      <label className="mt-1 flex cursor-pointer items-center gap-3">
-                        <input
-                          type="checkbox"
-                          checked={formMetadata[field.key] !== undefined ? Boolean(formMetadata[field.key]) : Boolean(field.default)}
-                          onChange={e => setFormMetadata(prev => ({ ...prev, [field.key]: e.target.checked }))}
-                          className="h-4 w-4 rounded border-[var(--border-md)] accent-horizon-600"
-                        />
-                        <span className="text-xs text-[var(--ink-2)]">{field.tip ?? ''}</span>
-                      </label>
-                    ) : null}
-                    {/* NIBUD scaling explanation for children */}
-                    {formType === 'children' && field.key === 'aantalKinderen' && (
-                      <p className="mt-1 text-[10px] leading-relaxed text-[var(--ink-4)]">
-                        Kosten schalen niet lineair (NIBUD): 1 kind ~&#8364;500/mnd, 2 kinderen ~&#8364;830/mnd, 3 ~&#8364;1.100/mnd, 4 ~&#8364;1.320/mnd. Het bedrag hierboven is automatisch aangepast, maar blijft handmatig aanpasbaar.
-                      </p>
-                    )}
-                  </div>
-                ))}
               </div>
-            )}
+
+              {/* Duratie-type */}
+              <div>
+                <label className="text-xs font-medium text-[var(--ink-3)]">Type</label>
+                <div className="mt-1 flex gap-2">
+                  {(['one_time', 'period', 'continuous'] as const).map(dt => (
+                    <button
+                      key={dt}
+                      type="button"
+                      onClick={() => setFormDurationType(dt)}
+                      className={`flex-1 rounded-[var(--r)] border px-3 py-2 text-xs font-medium transition-colors ${
+                        formDurationType === dt
+                          ? 'border-horizon-400 bg-horizon-50 text-horizon-700'
+                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200'
+                      }`}
+                    >
+                      {dt === 'one_time' ? 'Eenmalig' : dt === 'period' ? 'Tijdelijk' : 'Continu'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="h-px bg-[var(--border-ed)]" />
+
+            {/* ── SECTIE: Details ── */}
+            <div className="space-y-4">
+              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">Details</p>
+
+              {/* Richting + bedrag */}
+              <div>
+                <label className="text-xs font-medium text-[var(--ink-3)]">
+                  {formDurationType === 'one_time' ? 'Bedrag' : 'Maandbedrag'}
+                </label>
+                <div className="mt-1 flex gap-2">
+                  <div className="flex overflow-hidden rounded-[var(--r)] border border-[var(--border-ed)]">
+                    <button
+                      type="button"
+                      onClick={() => setFormDirection('income')}
+                      className={`px-3 py-2 text-xs font-medium transition-colors ${
+                        formDirection === 'income'
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-[var(--paper)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
+                      }`}
+                    >
+                      Inkomen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormDirection('expense')}
+                      className={`px-3 py-2 text-xs font-medium transition-colors ${
+                        formDirection === 'expense'
+                          ? 'bg-red-500 text-white'
+                          : 'bg-[var(--paper)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
+                      }`}
+                    >
+                      Kosten
+                    </button>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formAmount}
+                    onChange={e => setFormAmount(e.target.value ? Number(e.target.value) : '')}
+                    className="min-w-0 flex-1 rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              {/* Duur (alleen bij Tijdelijk) */}
+              {formDurationType === 'period' && (
+                <div>
+                  <label className="text-xs font-medium text-[var(--ink-3)]">Duur (maanden)</label>
+                  <input
+                    type="number"
+                    value={formDuration}
+                    onChange={e => setFormDuration(e.target.value ? Number(e.target.value) : '')}
+                    className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                    placeholder="bijv. 12"
+                  />
+                </div>
+              )}
+
+              {/* Indexering (alleen bij recurring) */}
+              {formDurationType !== 'one_time' && (
+                <label className="flex cursor-pointer items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={formIsIndexed}
+                    onChange={e => setFormIsIndexed(e.target.checked)}
+                    className="h-4 w-4 rounded border-[var(--border-md)] accent-horizon-600"
+                  />
+                  <span className="text-sm text-[var(--ink-2)]">Bedrag groeit mee met inflatie (~2%/jaar)</span>
+                </label>
+              )}
+
+              {/* Context-specifieke velden */}
+              {hasCatalogFields && (
+                <div className="space-y-3 rounded-[var(--r)] border border-dashed border-horizon-200 bg-horizon-50/30 p-4">
+                  <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
+                    Specifieke instellingen
+                  </p>
+                  {LIFE_EVENT_CATALOG[formType].fields!.map((field: CatalogField) => (
+                    <div key={field.key}>
+                      <label className="text-xs font-medium text-[var(--ink-3)]">
+                        {field.label}
+                        {field.tip && (
+                          <span className="ml-1 font-normal text-[var(--ink-4)]" title={field.tip}>ⓘ</span>
+                        )}
+                      </label>
+                      {field.fieldType === 'number' || field.fieldType === 'percentage' ? (
+                        <div className="mt-1 flex items-center gap-2">
+                          <input
+                            type="number"
+                            value={formMetadata[field.key] !== undefined ? String(formMetadata[field.key]) : String(field.default)}
+                            onChange={e => setFormMetadata(prev => ({ ...prev, [field.key]: e.target.value ? Number(e.target.value) : '' }))}
+                            className="min-w-0 flex-1 rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                          />
+                          {field.suffix && (
+                            <span className="shrink-0 text-xs text-[var(--ink-3)]">{field.suffix}</span>
+                          )}
+                        </div>
+                      ) : field.fieldType === 'select' ? (
+                        <select
+                          value={String(formMetadata[field.key] ?? field.default)}
+                          onChange={e => {
+                            const val = e.target.value
+                            const numVal = field.options?.some(o => typeof o.value === 'number') ? Number(val) : val
+                            setFormMetadata(prev => ({ ...prev, [field.key]: numVal }))
+                            if (formType === 'children' && field.key === 'aantalKinderen') {
+                              setFormAmount(nibudChildrenCost(Number(val)))
+                            }
+                          }}
+                          className="mt-1 w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                        >
+                          {field.options?.map(opt => (
+                            <option key={String(opt.value)} value={String(opt.value)}>{opt.label}</option>
+                          ))}
+                        </select>
+                      ) : field.fieldType === 'toggle' ? (
+                        <label className="mt-1 flex cursor-pointer items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={formMetadata[field.key] !== undefined ? Boolean(formMetadata[field.key]) : Boolean(field.default)}
+                            onChange={e => setFormMetadata(prev => ({ ...prev, [field.key]: e.target.checked }))}
+                            className="h-4 w-4 rounded border-[var(--border-md)] accent-horizon-600"
+                          />
+                          <span className="text-xs text-[var(--ink-2)]">{field.tip ?? ''}</span>
+                        </label>
+                      ) : null}
+                      {formType === 'children' && field.key === 'aantalKinderen' && (
+                        <p className="mt-1 text-[10px] leading-relaxed text-[var(--ink-4)]">
+                          Kosten schalen niet lineair (NIBUD): 1 kind ~&#8364;500/mnd, 2 kinderen ~&#8364;830/mnd, 3 ~&#8364;1.100/mnd, 4 ~&#8364;1.320/mnd. Het bedrag hierboven is automatisch aangepast, maar blijft handmatig aanpasbaar.
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Divider */}
+            <div className="h-px bg-[var(--border-ed)]" />
+
+            {/* ── SECTIE: Financiele impact ── */}
+            <div className="space-y-3">
+              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">Financiele impact</p>
+
+              {amt > 0 && (
+                <div className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] p-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Eenmalige kosten */}
+                    {isOneTime && (
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-[var(--ink-4)]">Eenmalig</p>
+                        <p className={`font-mono tabular-nums text-sm font-semibold ${isExpense ? 'text-red-600' : 'text-emerald-600'}`}>
+                          {isExpense ? '-' : '+'}{formatCurrency(amt)}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Maandelijkse impact */}
+                    {!isOneTime && (
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-[var(--ink-4)]">Per maand</p>
+                        <p className={`font-mono tabular-nums text-sm font-semibold ${isExpense ? 'text-red-600' : 'text-emerald-600'}`}>
+                          {isExpense ? '-' : '+'}{formatCurrency(amt)}/mnd
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Totale impact */}
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-[var(--ink-4)]">
+                        {isOneTime ? 'Totaal' : isPeriod && dur > 0 ? `Totaal (${dur} mnd)` : 'Totaal (10 jaar)'}
+                      </p>
+                      <p className={`font-mono tabular-nums text-sm font-semibold ${isExpense ? 'text-red-600' : 'text-emerald-600'}`}>
+                        {isExpense ? '-' : '+'}{formatCurrency(Math.abs(totalImpact))}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Freedom time equivalent */}
+                  {freedomStr && (
+                    <div className="border-t border-[var(--border-ed)] pt-3 flex items-center gap-2">
+                      <Hourglass className="h-3.5 w-3.5 text-horizon-500 shrink-0" />
+                      <p className="text-xs text-[var(--ink-2)]">
+                        {isExpense
+                          ? <><span className="font-medium text-red-600">{freedomStr}</span> aan vrijheid die dit kost</>
+                          : <><span className="font-medium text-emerald-600">{freedomStr}</span> aan vrijheid die dit oplevert</>
+                        }
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Continuous disclaimer */}
+                  {formDurationType === 'continuous' && (
+                    <p className="text-[10px] text-[var(--ink-4)]">* Schatting op basis van 10 jaar</p>
+                  )}
+                </div>
+              )}
+
+              {amt === 0 && (
+                <p className="text-xs text-[var(--ink-4)] italic">Vul een bedrag in om de impact te berekenen</p>
+              )}
+            </div>
 
             <button
               onClick={saveEvent}
@@ -1685,7 +1782,8 @@ export default function HorizonPage() {
             </button>
           </div>
         </BottomSheet>
-      )}
+        )
+      })()}
 
       {/* === KPI Kassabon Modals === */}
       <BottomSheet open={showFireAgeReceipt} onClose={() => setShowFireAgeReceipt(false)} title="Vrijheidsleeftijd">

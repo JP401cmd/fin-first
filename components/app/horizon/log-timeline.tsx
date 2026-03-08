@@ -5,7 +5,7 @@ import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { Action } from '@/lib/recommendation-data'
 import {
   Calendar, Globe, Baby, Hammer, GraduationCap, Briefcase,
-  Clock, Sunset, Home, Heart, Truck, Car, Gift, Zap,
+  Clock, Sunset, Home, Heart, HeartHandshake, Truck, Car, Gift, Zap,
 } from 'lucide-react'
 
 export const EVENT_ICONS: Record<string, React.ReactNode> = {
@@ -24,6 +24,7 @@ export const EVENT_ICONS: Record<string, React.ReactNode> = {
   Car: <Car className="h-4 w-4" />,
   Gift: <Gift className="h-4 w-4" />,
   Zap: <Zap className="h-4 w-4" />,
+  HeartHandshake: <HeartHandshake className="h-4 w-4" />,
 }
 
 // Logarithmic position: maps months-from-now to 0..1 range
