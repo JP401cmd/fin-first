@@ -74,6 +74,7 @@ export default function WillPage() {
   const [detectingAlgo, setDetectingAlgo] = useState(false)
   const [detectingAI, setDetectingAI] = useState(false)
   const { dailyExpenseRate } = useDailyExpenseRate()
+  const [partnerInfo, setPartnerInfo] = useState<{ partnerId: string; partnerName: string } | null>(null)
 
   // Deep-link: open modal via ?modal= URL param (from dashboard widgets)
   const searchParams = useSearchParams()
@@ -194,6 +195,23 @@ export default function WillPage() {
         .maybeSingle()
       if (membership?.household_id) {
         householdFilter = `,and(ownership.eq.shared,household_id.eq.${membership.household_id})`
+        // Fetch partner info for action assignment
+        const { data: allMembers } = await supabase
+          .from('household_members')
+          .select('user_id')
+          .eq('household_id', membership.household_id)
+        const partnerId = (allMembers ?? []).find(m => m.user_id !== authUser.id)?.user_id
+        if (partnerId) {
+          const { data: partnerProfile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', partnerId)
+            .single()
+          setPartnerInfo({
+            partnerId,
+            partnerName: partnerProfile?.full_name ?? 'Partner',
+          })
+        }
       }
     }
 
@@ -660,6 +678,7 @@ export default function WillPage() {
         </div>
         <ActionBoard
           initialActions={actions}
+          partnerInfo={partnerInfo}
           onCancellationOpen={(metadata) => {
             setOpzegInitialMetadata(metadata)
             setOpzegModalSub({

@@ -11,14 +11,39 @@ import type { CancellationMetadata } from '@/lib/cancellation-types'
 type ActionBoardProps = {
   initialActions: Action[]
   onCancellationOpen?: (metadata: CancellationMetadata) => void
+  /** Partner info for assignment — null if no household */
+  partnerInfo?: { partnerId: string; partnerName: string } | null
 }
 
-export function ActionBoard({ initialActions, onCancellationOpen }: ActionBoardProps) {
+export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo }: ActionBoardProps) {
   const [actions, setActions] = useState<Action[]>(initialActions)
   const [showForm, setShowForm] = useState(false)
   const [showPostponed, setShowPostponed] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
   const { triggerAnimation } = useFreedomDaysAnimation()
+
+  async function handleAssign(actionId: string, partnerId: string | null) {
+    const res = await fetch(`/api/ai/actions/${actionId}/assign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ partner_id: partnerId }),
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    setActions((prev) =>
+      prev.map((a) =>
+        a.id === actionId
+          ? {
+              ...a,
+              assigned_to: data.assigned_to,
+              assigned_by: data.assigned_by,
+              assigned_by_name: data.assigned_by_name,
+              assigned_to_name: partnerId ? (partnerInfo?.partnerName ?? 'Partner') : null,
+            }
+          : a
+      )
+    )
+  }
 
   const openActions = actions
     .filter((a) => a.status === 'open')
@@ -159,7 +184,7 @@ export function ActionBoard({ initialActions, onCancellationOpen }: ActionBoardP
           </div>
           <div className="space-y-2">
             {openActions.map((action) => (
-              <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} onCancellationOpen={onCancellationOpen} />
+              <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} onCancellationOpen={onCancellationOpen} partnerInfo={partnerInfo} onAssign={handleAssign} />
             ))}
           </div>
         </div>
@@ -179,7 +204,7 @@ export function ActionBoard({ initialActions, onCancellationOpen }: ActionBoardP
           {showPostponed && (
             <div className="space-y-2">
               {postponedActions.map((action) => (
-                <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} onCancellationOpen={onCancellationOpen} />
+                <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} onCancellationOpen={onCancellationOpen} partnerInfo={partnerInfo} onAssign={handleAssign} />
               ))}
             </div>
           )}
@@ -205,7 +230,7 @@ export function ActionBoard({ initialActions, onCancellationOpen }: ActionBoardP
           {showCompleted && (
             <div className="space-y-2">
               {completedActions.map((action) => (
-                <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} onCancellationOpen={onCancellationOpen} />
+                <ActionCard key={action.id} action={action} onStatusChange={handleStatusChange} onUpdate={handleUpdateAction} onCancellationOpen={onCancellationOpen} partnerInfo={partnerInfo} onAssign={handleAssign} />
               ))}
             </div>
           )}

@@ -69,6 +69,11 @@ export type Action = {
   created_at: string
   updated_at: string
   metadata?: Record<string, unknown> | null
+  // Partner assignment
+  assigned_to: string | null          // user_id of assigned partner
+  assigned_by: string | null          // user_id of who assigned it
+  assigned_by_name?: string | null    // display name of assigner (joined)
+  assigned_to_name?: string | null    // display name of assignee (joined)
   // Joined fields
   recommendation?: Pick<Recommendation, 'title' | 'recommendation_type'> | null
 }

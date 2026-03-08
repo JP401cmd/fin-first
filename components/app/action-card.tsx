@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, Clock, X, RotateCcw } from 'lucide-react'
+import { Check, Clock, X, RotateCcw, UserPlus, UserCheck } from 'lucide-react'
 import { PostponeForm } from '@/components/app/postpone-form'
 import { ActionEditModal } from '@/components/app/action-edit-modal'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
@@ -17,14 +17,22 @@ type ActionCardProps = {
   onStatusChange: (id: string, status: ActionStatus, data?: Record<string, unknown>) => Promise<void>
   onUpdate?: (id: string, data: Record<string, unknown>) => Promise<void>
   onCancellationOpen?: (metadata: CancellationMetadata) => void
+  /** Partner info for assignment feature — null if no household */
+  partnerInfo?: { partnerId: string; partnerName: string } | null
+  /** Callback when action is assigned/unassigned to partner */
+  onAssign?: (actionId: string, partnerId: string | null) => Promise<void>
 }
 
-export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpen }: ActionCardProps) {
+export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpen, partnerInfo, onAssign }: ActionCardProps) {
   const [showPostpone, setShowPostpone] = useState(false)
   const [showReject, setShowReject] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [assigning, setAssigning] = useState(false)
+
+  const isAssigned = action.assigned_to != null
+  const assignedByName = action.assigned_by_name ?? action.assigned_by ?? null
 
   const statusBorder = getActionStatusColor(action.status)
   const sourceBadge = getSourceBadgeClasses(action.source)
@@ -55,6 +63,18 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
             <span className={`shrink-0 rounded-full px-1.5 py-px text-xs font-medium ${sourceBadge}`}>
               {ACTION_SOURCE_LABELS[action.source]}
             </span>
+            {/* Partner assignment badge */}
+            {isAssigned && (
+              <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-wil-50 px-1.5 py-px text-[10px] font-medium text-wil-700">
+                <UserCheck className="h-2.5 w-2.5" />
+                {action.assigned_to_name ?? 'Partner'}
+              </span>
+            )}
+            {assignedByName && (
+              <span className="hidden sm:inline shrink-0 text-[10px] text-[var(--ink-4)]">
+                Toegewezen door {assignedByName}
+              </span>
+            )}
           </div>
 
           {/* Right: meta + action buttons */}
@@ -85,6 +105,29 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
             {/* Quick action buttons */}
             {action.status === 'open' && !showPostpone && !showReject && (
               <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
+                {/* Assign to partner button */}
+                {partnerInfo && onAssign && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setAssigning(true)
+                      try {
+                        await onAssign(action.id, isAssigned ? null : partnerInfo.partnerId)
+                      } finally {
+                        setAssigning(false)
+                      }
+                    }}
+                    disabled={assigning || isLoading}
+                    title={isAssigned ? 'Toewijzing intrekken' : `Toewijzen aan ${partnerInfo.partnerName}`}
+                    className={`touch-target rounded transition-colors disabled:opacity-50 ${
+                      isAssigned
+                        ? 'text-wil-600 hover:bg-wil-50'
+                        : 'text-[var(--ink-3)] hover:bg-wil-50 hover:text-wil-600'
+                    }`}
+                  >
+                    {isAssigned ? <UserCheck className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => handleStatus('completed')}
