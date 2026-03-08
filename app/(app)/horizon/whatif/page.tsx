@@ -179,6 +179,10 @@ export default function WhatIfPage() {
     setEvents(prev => prev.filter(e => e.id !== id))
   }, [])
 
+  const handleEditEvent = useCallback((id: string, updated: WhatIfEvent) => {
+    setEvents(prev => prev.map(e => e.id === id ? updated : e))
+  }, [])
+
   // ── Load saved scenario ────────────────────────────────────
   const handleLoadScenario = useCallback((loadedOverrides: WhatIfOverrides, loadedEvents: WhatIfEvent[]) => {
     setOverrides(loadedOverrides)
@@ -622,6 +626,7 @@ export default function WhatIfPage() {
               onToggleEvent={handleToggleEvent}
               onAddEvent={handleAddEvent}
               onRemoveEvent={handleRemoveEvent}
+              onEditEvent={handleEditEvent}
               baselineFireAge={baselineFireAge}
               computeImpact={computeImpact}
               dailyExpenses={whatIfInput ? whatIfInput.monthlyExpenses / 30 : undefined}

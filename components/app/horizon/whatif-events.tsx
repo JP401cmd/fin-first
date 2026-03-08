@@ -9,7 +9,7 @@ import { KassabonShell } from '@/components/app/kassabon-shell'
 import { EVENT_ICONS } from '@/components/app/horizon/log-timeline'
 import {
   Calendar, Plus, ChevronDown, ChevronUp, Eye, EyeOff, Info, Clock,
-  ArrowLeft, Check,
+  ArrowLeft, Check, Pencil,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -46,6 +46,7 @@ export function WhatIfEventsPanel({
   onToggleEvent,
   onAddEvent,
   onRemoveEvent,
+  onEditEvent,
   baselineFireAge,
   computeImpact,
   dailyExpenses,
@@ -55,6 +56,7 @@ export function WhatIfEventsPanel({
   onToggleEvent: (id: string) => void
   onAddEvent: (event: WhatIfEvent) => void
   onRemoveEvent: (id: string) => void
+  onEditEvent?: (id: string, updated: WhatIfEvent) => void
   baselineFireAge: number | null
   computeImpact: (eventId: string) => EventImpact | null
   /** Daily expenses for freedom-time calc (optional — hides freedom time if missing) */
@@ -66,6 +68,8 @@ export function WhatIfEventsPanel({
   const [showCatalog, setShowCatalog] = useState(false)
   const [selectedImpact, setSelectedImpact] = useState<EventImpact | null>(null)
   const [formState, setFormState] = useState<EventFormState | null>(null)
+  /** The event being edited (null = creating new) */
+  const [editingEventId, setEditingEventId] = useState<string | null>(null)
 
   const activeCount = events.filter(e => !e.whatIfDisabled).length
   const totalCount = events.length
@@ -94,30 +98,96 @@ export function WhatIfEventsPanel({
     setShowCatalog(false)
   }
 
-  /** Submit the form and create the event */
+  /** Open the form to edit an existing event */
+  function openFormForEdit(ev: WhatIfEvent) {
+    setEditingEventId(ev.id)
+    setFormState({
+      eventType: ev.event_type,
+      name: ev.name,
+      targetAge: ev.target_age ?? null,
+      oneTimeCost: Number(ev.one_time_cost) || 0,
+      monthlyCostChange: Number(ev.monthly_cost_change) || 0,
+      monthlyIncomeChange: Number(ev.monthly_income_change) || 0,
+      durationMonths: Number(ev.duration_months) || 0,
+      metadata: ev.metadata ?? {},
+    })
+  }
+
+  /** Submit the form — create new or update existing event */
   function handleFormSubmit() {
     if (!formState) return
     const cat = LIFE_EVENT_CATALOG[formState.eventType]
     if (!cat) return
 
-    const newEvent: WhatIfEvent = {
-      id: `whatif-${formState.eventType}-${Date.now()}`,
-      name: formState.name,
-      event_type: formState.eventType,
-      target_age: formState.targetAge,
-      target_date: null,
-      one_time_cost: formState.oneTimeCost,
-      monthly_cost_change: formState.monthlyCostChange,
-      monthly_income_change: formState.monthlyIncomeChange,
-      duration_months: formState.durationMonths,
-      icon: cat.icon,
-      is_active: true,
-      sort_order: events.length,
-      is_indexed: true,
-      metadata: formState.metadata,
+    if (editingEventId && onEditEvent) {
+      // ── Edit mode ──
+      const existingEvent = events.find(e => e.id === editingEventId)
+
+      if (existingEvent && !existingEvent.id.startsWith('whatif-')) {
+        // DB event → create a what-if copy with modified values, remove original from what-if list
+        const copyEvent: WhatIfEvent = {
+          id: `whatif-copy-${existingEvent.event_type}-${Date.now()}`,
+          name: formState.name,
+          event_type: formState.eventType,
+          target_age: formState.targetAge,
+          target_date: null,
+          one_time_cost: formState.oneTimeCost,
+          monthly_cost_change: formState.monthlyCostChange,
+          monthly_income_change: formState.monthlyIncomeChange,
+          duration_months: formState.durationMonths,
+          icon: cat.icon,
+          is_active: true,
+          sort_order: existingEvent.sort_order,
+          is_indexed: true,
+          metadata: formState.metadata,
+        }
+        // Replace original with copy
+        onEditEvent(editingEventId, copyEvent)
+      } else {
+        // What-if event → update in-place
+        const updatedEvent: WhatIfEvent = {
+          ...(existingEvent ?? {}),
+          id: editingEventId,
+          name: formState.name,
+          event_type: formState.eventType,
+          target_age: formState.targetAge,
+          target_date: null,
+          one_time_cost: formState.oneTimeCost,
+          monthly_cost_change: formState.monthlyCostChange,
+          monthly_income_change: formState.monthlyIncomeChange,
+          duration_months: formState.durationMonths,
+          icon: cat.icon,
+          is_active: true,
+          sort_order: existingEvent?.sort_order ?? events.length,
+          is_indexed: true,
+          metadata: formState.metadata,
+        }
+        onEditEvent(editingEventId, updatedEvent)
+      }
+
+      setEditingEventId(null)
+      setFormState(null)
+    } else {
+      // ── Create mode ──
+      const newEvent: WhatIfEvent = {
+        id: `whatif-${formState.eventType}-${Date.now()}`,
+        name: formState.name,
+        event_type: formState.eventType,
+        target_age: formState.targetAge,
+        target_date: null,
+        one_time_cost: formState.oneTimeCost,
+        monthly_cost_change: formState.monthlyCostChange,
+        monthly_income_change: formState.monthlyIncomeChange,
+        duration_months: formState.durationMonths,
+        icon: cat.icon,
+        is_active: true,
+        sort_order: events.length,
+        is_indexed: true,
+        metadata: formState.metadata,
+      }
+      onAddEvent(newEvent)
+      setFormState(null)
     }
-    onAddEvent(newEvent)
-    setFormState(null)
   }
 
   return (
@@ -188,6 +258,18 @@ export function WhatIfEventsPanel({
                           {Number(ev.monthly_cost_change) !== 0 && ` · ${formatCurrency(Number(ev.monthly_cost_change))}/mnd`}
                         </p>
                       </button>
+
+                      {/* Edit */}
+                      {onEditEvent && (
+                        <button
+                          type="button"
+                          onClick={() => openFormForEdit(ev)}
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r-sm)] text-[var(--ink-4)] transition-colors hover:bg-wil-50 hover:text-wil-600"
+                          title="Bewerken"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      )}
 
                       {/* Toggle */}
                       <button
@@ -282,16 +364,25 @@ export function WhatIfEventsPanel({
       {/* ── Event Form BottomSheet ──────────────────────── */}
       <BottomSheet
         open={formState !== null}
-        onClose={() => setFormState(null)}
-        title={formState ? LIFE_EVENT_CATALOG[formState.eventType]?.label ?? 'Gebeurtenis' : 'Gebeurtenis'}
+        onClose={() => { setFormState(null); setEditingEventId(null) }}
+        title={
+          editingEventId
+            ? `${formState ? LIFE_EVENT_CATALOG[formState.eventType]?.label ?? 'Gebeurtenis' : 'Gebeurtenis'} bewerken`
+            : formState ? LIFE_EVENT_CATALOG[formState.eventType]?.label ?? 'Gebeurtenis' : 'Gebeurtenis'
+        }
       >
         {formState && (
           <EventFormSheet
             form={formState}
             onChange={setFormState}
             onSubmit={handleFormSubmit}
-            onBack={() => { setFormState(null); setShowCatalog(true) }}
+            onBack={editingEventId
+              ? () => { setFormState(null); setEditingEventId(null) }
+              : () => { setFormState(null); setShowCatalog(true) }
+            }
             dailyExpenses={dailyExpenses}
+            isEditing={editingEventId !== null}
+            isDbEvent={editingEventId !== null && !editingEventId.startsWith('whatif-')}
           />
         )}
       </BottomSheet>
@@ -331,12 +422,16 @@ function EventFormSheet({
   onSubmit,
   onBack,
   dailyExpenses,
+  isEditing = false,
+  isDbEvent = false,
 }: {
   form: EventFormState
   onChange: (f: EventFormState) => void
   onSubmit: () => void
   onBack: () => void
   dailyExpenses?: number
+  isEditing?: boolean
+  isDbEvent?: boolean
 }) {
   const catalog = LIFE_EVENT_CATALOG[form.eventType]
   if (!catalog) return null
@@ -561,6 +656,16 @@ function EventFormSheet({
         )}
       </div>
 
+      {/* ── DB event notice ────────────────────────── */}
+      {isEditing && isDbEvent && (
+        <div className="flex items-start gap-2 rounded-[var(--r-sm)] bg-wil-50/50 px-3 py-2.5">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-wil-600" />
+          <p className="font-sans text-[11px] leading-relaxed text-wil-700">
+            Dit is een bestaande gebeurtenis. Wijzigingen worden alleen in dit scenario toegepast — het origineel op de Horizon-pagina blijft ongewijzigd.
+          </p>
+        </div>
+      )}
+
       {/* ── Actions ────────────────────────────────── */}
       <div className="flex gap-3">
         <button
@@ -569,7 +674,7 @@ function EventFormSheet({
           className="flex items-center gap-1 rounded-[var(--r)] px-4 py-2.5 font-sans text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)]"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          Terug
+          {isEditing ? 'Annuleren' : 'Terug'}
         </button>
         <button
           type="button"
@@ -578,7 +683,7 @@ function EventFormSheet({
           className="flex flex-1 items-center justify-center gap-1.5 rounded-[var(--r)] bg-horizon-600 px-4 py-2.5 font-sans text-[11px] font-medium text-white transition-colors hover:bg-horizon-700 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Check className="h-3.5 w-3.5" />
-          Toevoegen aan scenario
+          {isEditing ? 'Wijzigingen toepassen' : 'Toevoegen aan scenario'}
         </button>
       </div>
     </div>
