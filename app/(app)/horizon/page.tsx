@@ -565,6 +565,26 @@ export default function HorizonPage() {
       setFormAge(Number(metaDefaults.ingangLeeftijd ?? 67))
       setFormIsIndexed(Boolean(metaDefaults.isGeindexeerd ?? false))
     }
+    // Early retirement: set age from pensioenLeeftijd, calculate AOW gap
+    if (type === 'early_retirement') {
+      const pensioenLeeftijd = Number(metaDefaults.pensioenLeeftijd ?? 62)
+      const aowGapMaanden = Math.max(0, (67 - pensioenLeeftijd) * 12)
+      const maanduitgaven = effectiveInput?.monthlyExpenses ?? 3000
+      const overbrugging = Number(metaDefaults.overbruggingsUitkering ?? 0)
+      setFormAge(pensioenLeeftijd)
+      setFormAmount(Math.max(0, maanduitgaven - overbrugging))
+      setFormDurationType('period')
+      setFormDirection('expense')
+      setFormDuration(aowGapMaanden)
+    }
+    // World trip: set vertrekkosten as one-time cost, duration as period
+    if (type === 'world_trip') {
+      const vertrek = Number(metaDefaults.vertrekkosten ?? 4000)
+      setFormAmount(vertrek)
+      setFormDurationType('one_time')
+      setFormDirection('expense')
+      setFormDuration(catalog?.defaultDuration ?? 12)
+    }
     setEditingEvent(null)
     setShowForm(true)
   }
@@ -779,6 +799,38 @@ export default function HorizonPage() {
       durMonths = Math.max(wwDuur, zoektijd)
     }
 
+    // Special handling for career_change: three-phase salary model
+    // Phase 1: gap (0 income), Phase 2: transition (lower salary), Phase 3: new normal
+    if (formType === 'career_change') {
+      const huidig = Number(formMetadata.huidigNettoSalaris) || 3000
+      const nieuw = Number(formMetadata.verwachtNieuwNettoSalaris) || 3000
+      const gapMaanden = Number(formMetadata.periodeZonderInkomen) || 3
+      const overgangMaanden = Number(formMetadata.overgangsperiodeMaanden) || 12
+      const omscholing = Number(formMetadata.omscholingskosten) || 0
+
+      // Omscholingskosten as one-time expense
+      oneTimeCost = omscholing
+
+      // Average monthly income loss across all three phases:
+      // Phase 1: full income loss (gapMaanden months at -huidig)
+      // Phase 2: partial loss (overgangMaanden months at midpoint between huidig and nieuw)
+      // Phase 3: new salary (permanent, modeled separately if different from huidig)
+      const overgangSalaris = Math.round((huidig + nieuw) / 2) // midpoint during transition
+      const totalMaanden = gapMaanden + overgangMaanden
+
+      if (totalMaanden > 0) {
+        // Weighted average income loss per month during gap+transition
+        const totalLoss = (gapMaanden * huidig) + (overgangMaanden * (huidig - overgangSalaris))
+        const gemiddeldVerlies = Math.round(totalLoss / totalMaanden)
+        monthlyIncomeChange = -gemiddeldVerlies
+        durMonths = totalMaanden
+      }
+
+      // If new salary is permanently different, that's a separate ongoing change
+      // We don't model permanent salary change here — only the transition period
+      // The user can adjust their profile income after the switch
+    }
+
     // Special handling for schenking: calculate total including belasting
     if (formType === 'schenking') {
       const bedrag = Number(formAmount) || 0
@@ -862,6 +914,22 @@ export default function HorizonPage() {
       } else {
         durMonths = Number(uitkeringsduur) * 12
       }
+    }
+
+    // Special handling for early_retirement: income loss from pensioenleeftijd to AOW
+    if (formType === 'early_retirement') {
+      const pensioenLeeftijd = Number(formMetadata.pensioenLeeftijd ?? 62)
+      const aowLeeftijd = 67
+      const aowGapMaanden = Math.max(0, (aowLeeftijd - pensioenLeeftijd) * 12)
+      const maanduitgaven = effectiveInput?.monthlyExpenses ?? 3000
+      const overbrugging = Number(formMetadata.overbruggingsUitkering ?? 0)
+      // Net monthly income loss = -(expenses - any bridging income)
+      monthlyIncomeChange = -(maanduitgaven - overbrugging)
+      monthlyCostChange = 0
+      oneTimeCost = 0
+      durMonths = aowGapMaanden
+      // Override form age with pension age
+      formAge = pensioenLeeftijd
     }
 
     // Special handling for car_purchase: compute monthly costs from breakdown
@@ -2357,6 +2425,105 @@ export default function HorizonPage() {
                           Gemiddeld aanvullend pensioen Nederland: ca. &#8364;675/mnd bruto. Check <span className="underline">mijnpensioenoverzicht.nl</span> voor je persoonlijke verwachte uitkering.
                         </p>
                       )}
+                      {formType === 'early_retirement' && field.key === 'overbruggingsUitkering' && (() => {
+                        const pensioenLeeftijd = Number(formMetadata.pensioenLeeftijd ?? 62)
+                        const aowLeeftijd = 67
+                        const aowGapJaren = Math.max(0, aowLeeftijd - pensioenLeeftijd)
+                        const aowGapMaanden = aowGapJaren * 12
+                        const maanduitgaven = effectiveInput?.monthlyExpenses ?? 3000
+                        const overbrugging = Number(formMetadata.overbruggingsUitkering ?? 0)
+                        const vroegpensioen = Number(formMetadata.vroegpensioenUitkering ?? 0)
+                        const vroegpensioenVanaf = Number(formMetadata.vroegpensioenVanafLeeftijd ?? 63)
+                        // Calculate total bridging cost
+                        // From pensioenLeeftijd to vroegpensioenVanaf: full expenses minus overbrugging only
+                        // From vroegpensioenVanaf to AOW: expenses minus overbrugging minus vroegpensioen
+                        const phase1Maanden = Math.max(0, Math.min(vroegpensioenVanaf, aowLeeftijd) - pensioenLeeftijd) * 12
+                        const phase2Maanden = Math.max(0, aowLeeftijd - Math.max(vroegpensioenVanaf, pensioenLeeftijd)) * 12
+                        const phase1Tekort = Math.max(0, maanduitgaven - overbrugging)
+                        const phase2Tekort = Math.max(0, maanduitgaven - overbrugging - vroegpensioen)
+                        const totaalOverbrugging = (phase1Tekort * phase1Maanden) + (phase2Tekort * phase2Maanden)
+                        const vermogenPct = effectiveNetWorth > 0 ? Math.round((totaalOverbrugging / effectiveNetWorth) * 100) : 0
+                        return (
+                          <div className="mt-2 space-y-3">
+                            <div className="rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                              <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">AOW-gat berekening</p>
+                              <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                                <div className="flex justify-between">
+                                  <span>Gewenste pensioenleeftijd</span>
+                                  <span className="font-mono tabular-nums font-semibold">{pensioenLeeftijd} jaar</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>AOW-leeftijd</span>
+                                  <span className="font-mono tabular-nums">{aowLeeftijd} jaar</span>
+                                </div>
+                                <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
+                                  <span>AOW-gat</span>
+                                  <span className={`font-mono tabular-nums ${aowGapJaren > 5 ? 'text-red-600' : 'text-amber-600'}`}>
+                                    {aowGapJaren} jaar ({aowGapMaanden} maanden)
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                              <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Geschatte overbruggingskosten</p>
+                              <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                                <div className="flex justify-between">
+                                  <span>Maanduitgaven</span>
+                                  <span className="font-mono tabular-nums">{formatCurrency(maanduitgaven)}/mnd</span>
+                                </div>
+                                {overbrugging > 0 && (
+                                  <div className="flex justify-between">
+                                    <span>Overbruggingsuitkering</span>
+                                    <span className="font-mono tabular-nums text-emerald-600">-{formatCurrency(overbrugging)}/mnd</span>
+                                  </div>
+                                )}
+                                {vroegpensioen > 0 && phase2Maanden > 0 && (
+                                  <div className="flex justify-between">
+                                    <span>Vroegpensioen (vanaf {vroegpensioenVanaf}j)</span>
+                                    <span className="font-mono tabular-nums text-emerald-600">-{formatCurrency(vroegpensioen)}/mnd</span>
+                                  </div>
+                                )}
+                                {phase1Maanden > 0 && (
+                                  <div className="flex justify-between text-[var(--ink-4)]">
+                                    <span className="pl-3">Tekort fase 1 ({pensioenLeeftijd}–{Math.min(vroegpensioenVanaf, aowLeeftijd)}j): {phase1Maanden} mnd × {formatCurrency(phase1Tekort)}</span>
+                                  </div>
+                                )}
+                                {phase2Maanden > 0 && vroegpensioen > 0 && (
+                                  <div className="flex justify-between text-[var(--ink-4)]">
+                                    <span className="pl-3">Tekort fase 2 ({Math.max(vroegpensioenVanaf, pensioenLeeftijd)}–{aowLeeftijd}j): {phase2Maanden} mnd × {formatCurrency(phase2Tekort)}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
+                                  <span>Totaal overbruggen uit vermogen</span>
+                                  <span className="font-mono tabular-nums text-red-600">-{formatCurrency(totaalOverbrugging)}</span>
+                                </div>
+                                {effectiveNetWorth > 0 && (
+                                  <div className="flex justify-between text-[var(--ink-4)]">
+                                    <span>Dit is {vermogenPct}% van je netto vermogen</span>
+                                    <span className="font-mono tabular-nums">{formatCurrency(effectiveNetWorth)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            {aowGapJaren > 5 && (
+                              <div className="flex gap-2 rounded-lg border border-red-200 bg-red-50/50 p-3">
+                                <AlertTriangle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
+                                <p className="text-xs text-red-800">
+                                  Een AOW-gat van meer dan 5 jaar is aanzienlijk. Zorg voor voldoende vermogen of overweeg een latere pensioenleeftijd. Je moet {formatCurrency(totaalOverbrugging)} overbruggen.
+                                </p>
+                              </div>
+                            )}
+                            {vermogenPct > 50 && effectiveNetWorth > 0 && (
+                              <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                                <p className="text-xs text-amber-800">
+                                  De overbruggingskosten beslaan {vermogenPct}% van je vermogen. Dit laat weinig ruimte voor onvoorziene uitgaven na pensionering.
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
                       {formType === 'car_purchase' && field.key === 'jaarlijkseKm' && (() => {
                         const brandstof = String(formMetadata.brandstof ?? 'benzine')
                         const km = Number(formMetadata.jaarlijkseKm ?? 15000)

@@ -280,8 +280,16 @@ export interface StudyMetadata {
 }
 
 export interface CareerChangeMetadata {
+  huidigNettoSalaris?: number
+  verwachtNieuwNettoSalaris?: number
+  periodeZonderInkomen?: number
+  overgangsperiodeMaanden?: number
+  omscholingskosten?: number
+  /** @deprecated replaced by periodeZonderInkomen */
   tussenperiode?: number
+  /** @deprecated replaced by omscholingskosten */
   omscholing?: number
+  /** @deprecated replaced by explicit salary fields */
   salarisstijging?: number
 }
 
@@ -295,6 +303,8 @@ export interface EarlyRetirementMetadata {
   pensioenLeeftijd?: number
   heeftPensioenregeling?: boolean
   overbruggingsUitkering?: number
+  vroegpensioenUitkering?: number
+  vroegpensioenVanafLeeftijd?: number
 }
 
 export interface WeddingMetadata {
@@ -637,20 +647,22 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     ],
   },
   career_change: {
-    label: 'Carriere switch',
+    label: 'Carrière switch',
     icon: 'Briefcase',
     group: 'werk',
-    impactRange: '€5K–€15K totaal',
+    impactRange: '€5K–€30K totaal',
     defaultCost: 3000,
     defaultMonthlyCost: 0,
     defaultMonthlyIncome: 0,
-    defaultDuration: 6,
-    description: 'Overgang naar ander werk',
-    tip: 'Reken met 1–3 maanden inkomensgat tussen banen. Gemiddelde omscholingskosten: €2.000–€8.000. Transitievergoeding: 1/3 maandsalaris per dienstjaar (UWV).',
+    defaultDuration: 18,
+    description: 'Overgang naar ander werk met salarisverschil en overgangsperiode',
+    tip: 'Modelleert drie fasen: (1) gap — geen inkomen, (2) overgangsperiode — lager salaris, (3) nieuw normaal — verwacht salaris. Inclusief eenmalige omscholingskosten.',
     fields: [
-      { key: 'tussenperiode', label: 'Tussenperiode zonder inkomen', fieldType: 'number', default: 3, tip: 'Gemiddeld 2–4 maanden zoektijd. WW-uitkering mogelijk als je >26 weken hebt gewerkt.', suffix: 'maanden' },
-      { key: 'omscholing', label: 'Omscholingskosten', fieldType: 'number', default: 2000, tip: 'Cursus/certificering €500–€3.000. Volledige omscholing €5.000–€15.000. STAP-budget: €1.000 subsidie.' },
-      { key: 'salarisstijging', label: 'Verwachte salarisstijging', fieldType: 'percentage', default: 0, tip: 'Laterale switch: 0–5%. Stap omhoog: 10–20%. Bewuste downshift: -10% tot -30%.', suffix: '%' },
+      { key: 'huidigNettoSalaris', label: 'Huidig netto salaris', fieldType: 'number', default: 3000, tip: 'Je huidige netto maandinkomen. Gemiddeld netto salaris NL: ca. €2.800/mnd (CBS, 2025).', suffix: '/mnd' },
+      { key: 'verwachtNieuwNettoSalaris', label: 'Verwacht nieuw netto salaris', fieldType: 'number', default: 3000, tip: 'Je verwachte netto maandinkomen na de switch. Laterale switch: gelijk. Stap omhoog: +10–20%. Bewuste downshift: -10% tot -30%.', suffix: '/mnd' },
+      { key: 'periodeZonderInkomen', label: 'Periode zonder inkomen', fieldType: 'number', default: 3, tip: 'Gemiddeld 2–4 maanden zoektijd/omscholing zonder salaris. WW-uitkering mogelijk als je >26 weken hebt gewerkt.', suffix: 'maanden' },
+      { key: 'overgangsperiodeMaanden', label: 'Overgangsperiode lager salaris', fieldType: 'number', default: 12, tip: 'Periode waarin je in je nieuwe baan een lager (ingroei)salaris ontvangt. Bij zij-instap of omscholing vaak 6–18 maanden.', suffix: 'maanden' },
+      { key: 'omscholingskosten', label: 'Omscholingskosten', fieldType: 'number', default: 2000, tip: 'Cursus/certificering €500–€3.000. Volledige omscholing €5.000–€15.000. STAP-budget: €1.000 subsidie (eenmalig).' },
     ],
   },
   part_time: {
@@ -682,9 +694,11 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     description: 'Eerder stoppen met werken',
     tip: 'AOW-leeftijd is 67 jaar (2026). Eerder stoppen = overbruggen zonder AOW-inkomen. RVU-drempelvrijstelling 2026: ca. €2.182/mnd bruto (max 3 jaar vóór AOW). Check mijnpensioenoverzicht.nl voor je verwachte pensioeninkomen.',
     fields: [
-      { key: 'pensioenLeeftijd', label: 'Gewenste pensioenleeftijd', fieldType: 'number', default: 60 },
+      { key: 'pensioenLeeftijd', label: 'Gewenste pensioenleeftijd', fieldType: 'number', default: 62, tip: 'AOW-leeftijd is 67 (2026). Elke jaar eerder stoppen = extra jaar overbruggen uit eigen vermogen.' },
+      { key: 'vroegpensioenUitkering', label: 'Vroegpensioen uitkering (optioneel)', fieldType: 'number', default: 0, suffix: '/mnd', tip: 'Sommige regelingen bieden een vroegpensioenuitkering (bijv. 70% van je pensioen). Check mijnpensioenoverzicht.nl. Laat op 0 als je geen regeling hebt.' },
+      { key: 'vroegpensioenVanafLeeftijd', label: 'Uitkering vanaf leeftijd', fieldType: 'number', default: 63, tip: 'Leeftijd waarop de vroegpensioenuitkering ingaat. Vaak 60-65 jaar.' },
       { key: 'heeftPensioenregeling', label: 'Aanvullende pensioenregeling', fieldType: 'toggle', default: false, tip: 'Check mijnpensioenoverzicht.nl. Sommige regelingen staan vervroegde opname toe vanaf 60 jaar (met actuariële korting).' },
-      { key: 'overbruggingsUitkering', label: 'Verwachte overbruggingsuitkering', fieldType: 'number', default: 0, tip: 'RVU-regeling: max €2.182/mnd bruto (2026). Alleen beschikbaar als je werkgever meedoet. Anders uit eigen vermogen overbruggen.' },
+      { key: 'overbruggingsUitkering', label: 'Verwachte overbruggingsuitkering', fieldType: 'number', default: 0, suffix: '/mnd', tip: 'RVU-regeling: max €2.182/mnd bruto (2026). Alleen beschikbaar als je werkgever meedoet. Anders uit eigen vermogen overbruggen.' },
     ],
   },
   house_purchase: {
@@ -834,8 +848,12 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
         { value: 'content', label: 'Content creatie' },
         { value: 'overig', label: 'Overig' },
       ]},
+      { key: 'brutoOmzet', label: 'Verwachte bruto omzet/mnd', fieldType: 'number', default: 1500, tip: 'Gemiddelde bruto omzet ZZP naast loondienst: €1.000–€3.000/mnd. Dit is vóór aftrek van kosten en belastingen.' },
+      { key: 'kostenPerMaand', label: 'Kosten/mnd', fieldType: 'number', default: 300, tip: 'Vaste kosten: software, werkplek, marketing, verzekeringen, administratie. Gemiddeld 20–40% van de omzet.' },
       { key: 'opstartkosten', label: 'Opstartkosten', fieldType: 'number', default: 1000, tip: 'Freelance: €500–€2.000 (laptop, website). Webshop: €1.000–€5.000 (voorraad, platform). KvK-inschrijving: €75.' },
-      { key: 'groeipercentage', label: 'Jaarlijkse inkomstengroei', fieldType: 'percentage', default: 10, tip: 'Realistisch: 5–15% groei per jaar na het eerste jaar. Eerste jaar vaak lager door opbouw klantenbestand.', suffix: '%' },
+      { key: 'opbouwperiode', label: 'Opbouwperiode (maanden)', fieldType: 'number', default: 0, tip: 'Aantal maanden met lagere omzet in het begin. Typisch 3–6 maanden voor freelance, 6–12 voor webshop.' },
+      { key: 'opbouwOmzetPct', label: 'Omzet tijdens opbouw', fieldType: 'percentage', default: 30, tip: 'Percentage van de verwachte bruto omzet tijdens de opbouwperiode. Typisch 20–50%.', suffix: '%' },
+      { key: 'doorlopend', label: 'Doorlopend', fieldType: 'toggle', default: true, tip: 'Doorlopende bijverdienste of tijdelijk project met een einddatum.' },
     ],
   },
   aow: {
