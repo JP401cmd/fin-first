@@ -489,8 +489,8 @@ export default function WillPage() {
   return (
     <FreedomDaysAnimationProvider>
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
-      {/* === 1. Hero (Gradient) === */}
-      <section data-testid="wil-hero" className="card-editorial overflow-hidden">
+      {/* === 1. Hero (Editorial) === */}
+      <section data-testid="wil-hero" className="bg-[var(--paper)] border border-[var(--border-ed)] border-b-[var(--border-md)] overflow-hidden">
         <div className="h-1.5 bg-wil-500" />
 
         <div className="p-4 sm:p-6 md:p-8">
@@ -523,15 +523,15 @@ export default function WillPage() {
 
           {/* Progress bar: completion ratio */}
           <div className="mb-4 sm:mb-6">
-            <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+            <div className="h-[5px] w-full overflow-hidden rounded-full bg-wil-100">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-wil-600 via-wil-400 to-wil-300 transition-all duration-1000"
+                className="h-full rounded-full bg-wil-500 transition-all duration-1000"
                 style={{ width: `${Math.min(completionRatio, 100)}%` }}
               />
             </div>
             <div className="mt-2 flex justify-between text-xs text-[var(--ink-4)]">
               <span>0% acties voltooid</span>
-              <span className="font-mono">{completionRatio}% afgerond</span>
+              <span className="font-mono tabular-nums">{completionRatio}% afgerond</span>
               <span>100%</span>
             </div>
           </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, ChevronDown, Sparkles, Users } from 'lucide-react'
+import { Plus, ChevronDown, Users } from 'lucide-react'
 import { ActionCard } from '@/components/app/action-card'
 import { ActionForm } from '@/components/app/action-form'
 import { useFreedomDaysAnimation } from '@/components/app/freedom-days-animation'
@@ -151,20 +151,16 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
 
   if (ownActions.length === 0 && partnerAssignedActions.length === 0 && !showForm) {
     return (
-      <div className="rounded-[var(--r-lg)] border border-wil-200 bg-wil-50 p-8 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-wil-100">
-          <Sparkles className="h-6 w-6 text-wil-600" />
-        </div>
-        <h2 className="mb-2 text-xl font-bold text-[var(--ink)]">Nog geen acties</h2>
-        <p className="mb-6 text-[var(--ink-3)]">
-          Maak handmatig een actie aan of bekijk de suggesties hierboven.
+      <div>
+        <p className="text-sm font-serif italic text-[var(--ink-3)]">
+          Nog geen acties — maak er een aan of accepteer een voorstel
         </p>
         <button
           type="button"
           onClick={() => setShowForm(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-wil-500 px-6 py-3 font-medium text-white transition-colors hover:bg-wil-600"
+          className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-wil-600 transition-colors hover:text-wil-700"
         >
-          <Plus className="h-5 w-5" />
+          <Plus className="h-4 w-4" />
           Nieuwe actie
         </button>
       </div>
