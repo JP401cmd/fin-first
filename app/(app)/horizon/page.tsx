@@ -13,7 +13,8 @@ import {
   computeResilienceScore, formatFireAge, formatCountdown,
   computeLifeEventImpact, ageAtDate, deriveCountdown,
   runMonteCarlo,
-  LIFE_EVENT_CATALOG, nibudChildrenCost,
+  LIFE_EVENT_CATALOG, LIFE_EVENT_GROUPS, nibudChildrenCost,
+  type LifeEventGroup,
   type FinancialInput, type FireProjection, type FireRange,
   type ProjectionMonth, type ResilienceScore,
   type LifeEvent, type LifeEventImpact,
@@ -575,6 +576,20 @@ export default function HorizonPage() {
       monthlyIncomeChange = amount
     } else {
       monthlyCostChange = amount
+    }
+
+    // Special handling for house_sale: also include monthly cost difference
+    if (formType === 'house_sale') {
+      const oudeLasten = Number(formMetadata.oudeHypotheeklasten) || 0
+      const nieuweLasten = Number(formMetadata.nieuweWoonlasten) || 0
+      const verschil = oudeLasten - nieuweLasten // positive = saving money
+      if (verschil > 0) {
+        // Old costs were higher → monthly income (savings)
+        monthlyIncomeChange = verschil
+      } else if (verschil < 0) {
+        // New costs are higher → monthly expense increase
+        monthlyCostChange = Math.abs(verschil)
+      }
     }
 
     const payload = {
@@ -1467,30 +1482,59 @@ export default function HorizonPage() {
           </div>
         )}
 
-        {/* Event Catalog */}
+        {/* Event Catalog — grouped */}
         <div className="mt-6">
-          <h2 className="mb-3 label-editorial text-[var(--ink-2)]">
+          <h2 className="mb-4 label-editorial text-[var(--ink-2)]">
             Evenement toevoegen
           </h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {Object.entries(LIFE_EVENT_CATALOG)
+          {(() => {
+            // Build grouped entries
+            const filteredEntries = Object.entries(LIFE_EVENT_CATALOG)
               .filter(([, val]) => !val.householdOnly || isHouseholdView)
-              .map(([key, val]) => (
-              <button
-                key={key}
-                onClick={() => openCatalogForm(key)}
-                className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 text-left transition-colors hover:border-horizon-200 hover:bg-horizon-50/30"
-              >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] text-horizon-600">
-                  {EVENT_ICONS[val.icon] ?? <Calendar className="h-4 w-4" />}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-[var(--ink)]">{val.label}</p>
-                  <p className="truncate text-xs text-[var(--ink-4)]">{val.description}</p>
-                </div>
-              </button>
-            ))}
-          </div>
+            const grouped = new Map<LifeEventGroup, [string, typeof LIFE_EVENT_CATALOG[string]][]>()
+            for (const entry of filteredEntries) {
+              const group = entry[1].group
+              if (!grouped.has(group)) grouped.set(group, [])
+              grouped.get(group)!.push(entry)
+            }
+            // Sort groups by order
+            const sortedGroups = [...grouped.entries()].sort(
+              (a, b) => LIFE_EVENT_GROUPS[a[0]].order - LIFE_EVENT_GROUPS[b[0]].order
+            )
+            return (
+              <div className="space-y-5">
+                {sortedGroups.map(([groupKey, entries]) => (
+                  <div key={groupKey}>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--ink-4)]">
+                      {LIFE_EVENT_GROUPS[groupKey].label}
+                    </p>
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                      {entries.map(([key, val]) => (
+                        <button
+                          key={key}
+                          onClick={() => openCatalogForm(key)}
+                          className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-[var(--paper)] p-3.5 text-left transition-colors hover:border-horizon-200 hover:bg-horizon-50/30"
+                        >
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] text-horizon-600">
+                            {EVENT_ICONS[val.icon] ?? <Calendar className="h-4 w-4" />}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-[var(--ink)]">{val.label}</p>
+                            <p className="mt-0.5 text-xs leading-relaxed text-[var(--ink-3)]">{val.description}</p>
+                            {val.impactRange && (
+                              <p className="mt-1 font-mono text-[11px] tabular-nums text-horizon-600">
+                                {val.impactRange}
+                              </p>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
         </div>
       </section>
       </FeatureGate>
@@ -1739,7 +1783,22 @@ export default function HorizonPage() {
                           <input
                             type="number"
                             value={formMetadata[field.key] !== undefined ? String(formMetadata[field.key]) : String(field.default)}
-                            onChange={e => setFormMetadata(prev => ({ ...prev, [field.key]: e.target.value ? Number(e.target.value) : '' }))}
+                            onChange={e => {
+                              const val = e.target.value ? Number(e.target.value) : ''
+                              const updated = { ...formMetadata, [field.key]: val }
+                              setFormMetadata(updated)
+                              // Auto-calculate netto overwaarde for house_sale
+                              if (formType === 'house_sale' && ['verkoopprijs', 'resterendeHypotheek', 'makelaarskosten'].includes(field.key)) {
+                                const vp = Number(updated.verkoopprijs) || 0
+                                const rh = Number(updated.resterendeHypotheek) || 0
+                                const mkPct = Number(updated.makelaarskosten) || 1.5
+                                const mkBedrag = Math.round(vp * mkPct / 100)
+                                const netto = vp - rh - mkBedrag
+                                setFormAmount(Math.abs(netto))
+                                setFormDirection(netto >= 0 ? 'income' : 'expense')
+                                setFormDurationType('one_time')
+                              }
+                            }}
                             className="min-w-0 flex-1 rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
                           />
                           {field.suffix && (
@@ -1779,6 +1838,54 @@ export default function HorizonPage() {
                           Kosten schalen niet lineair (NIBUD): 1 kind ~&#8364;500/mnd, 2 kinderen ~&#8364;830/mnd, 3 ~&#8364;1.100/mnd, 4 ~&#8364;1.320/mnd. Het bedrag hierboven is automatisch aangepast, maar blijft handmatig aanpasbaar.
                         </p>
                       )}
+                      {formType === 'house_sale' && field.key === 'makelaarskosten' && (() => {
+                        const vp = Number(formMetadata.verkoopprijs) || 0
+                        const rh = Number(formMetadata.resterendeHypotheek) || 0
+                        const mkPct = Number(formMetadata.makelaarskosten) || 1.5
+                        const mkBedrag = Math.round(vp * mkPct / 100)
+                        const netto = vp - rh - mkBedrag
+                        return (
+                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Netto overwaarde</p>
+                            <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                              <div className="flex justify-between"><span>Verkoopprijs</span><span className="font-mono tabular-nums">{formatCurrency(vp)}</span></div>
+                              <div className="flex justify-between"><span>Resterende hypotheek</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(rh)}</span></div>
+                              <div className="flex justify-between"><span>Makelaarskosten ({mkPct}%)</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(mkBedrag)}</span></div>
+                              <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
+                                <span>Netto overwaarde</span>
+                                <span className={`font-mono tabular-nums ${netto >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                  {netto >= 0 ? '+' : ''}{formatCurrency(netto)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })()}
+                      {formType === 'house_sale' && field.key === 'oudeHypotheeklasten' && (() => {
+                        const oudeLasten = Number(formMetadata.oudeHypotheeklasten) || 0
+                        const nieuweLasten = Number(formMetadata.nieuweWoonlasten) || 0
+                        const verschil = oudeLasten - nieuweLasten
+                        return (
+                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Verschil maandlasten</p>
+                            <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                              <div className="flex justify-between"><span>Oude hypotheeklasten</span><span className="font-mono tabular-nums">{formatCurrency(oudeLasten)}/mnd</span></div>
+                              <div className="flex justify-between"><span>Nieuwe woonlasten</span><span className="font-mono tabular-nums">{formatCurrency(nieuweLasten)}/mnd</span></div>
+                              <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
+                                <span>Verschil</span>
+                                <span className={`font-mono tabular-nums ${verschil >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                  {verschil >= 0 ? '+' : ''}{formatCurrency(verschil)}/mnd
+                                </span>
+                              </div>
+                            </div>
+                            {verschil !== 0 && (
+                              <p className="text-[10px] text-[var(--ink-4)]">
+                                {verschil > 0 ? 'Je bespaart ' : 'Je betaalt '}{formatCurrency(Math.abs(verschil))}/mnd {verschil > 0 ? 'aan woonlasten' : 'meer aan woonlasten'}
+                              </p>
+                            )}
+                          </div>
+                        )
+                      })()}
                     </div>
                   ))}
                 </div>

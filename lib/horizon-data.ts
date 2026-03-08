@@ -223,6 +223,15 @@ export interface HousePurchaseMetadata {
   huidigeHuur?: number
 }
 
+export interface HouseSaleMetadata {
+  verkoopprijs?: number
+  resterendeHypotheek?: number
+  makelaarskosten?: number // percentage, default 1.5%
+  nieuweSituatie?: 'huren' | 'goedkoper_kopen' | 'bij_partner'
+  nieuweWoonlasten?: number // maandelijkse woonlasten na verkoop
+  oudeHypotheeklasten?: number // huidige maandelijkse hypotheeklasten
+}
+
 export interface InheritanceMetadata {
   brutoBedrag?: number
   erfbelastingSchijf?: 'ouder' | 'partner' | 'overig'
@@ -287,6 +296,17 @@ export interface SideHustleMetadata {
   groeipercentage?: number
 }
 
+export interface ScheidingMetadata {
+  advocaatKosten?: number
+  vermogensBehoudPct?: number
+  partneralimentatieBedrag?: number
+  partneralimentatieDuur?: number
+  partneralimentatieRichting?: 'betalen' | 'ontvangen'
+  kinderalimentatieBedrag?: number
+  kinderalimentatieDuur?: number
+  extraWoonlasten?: number
+}
+
 /** Union of all typed metadata interfaces per event_type key. */
 export type LifeEventMetadataMap = {
   children: ChildrenMetadata
@@ -294,6 +314,7 @@ export type LifeEventMetadataMap = {
   pension: PensionMetadata
   car_purchase: CarPurchaseMetadata
   house_purchase: HousePurchaseMetadata
+  house_sale: HouseSaleMetadata
   inheritance: InheritanceMetadata
   sabbatical: SabbaticalMetadata
   world_trip: WorldTripMetadata
@@ -305,6 +326,7 @@ export type LifeEventMetadataMap = {
   wedding: WeddingMetadata
   move: MoveMetadata
   side_hustle: SideHustleMetadata
+  scheiding: ScheidingMetadata
   custom: Record<string, unknown>
 }
 
@@ -355,6 +377,17 @@ export interface CatalogField {
   suffix?: string
 }
 
+export type LifeEventGroup = 'leven' | 'wonen' | 'werk' | 'inkomen' | 'vrije_tijd' | 'anders'
+
+export const LIFE_EVENT_GROUPS: Record<LifeEventGroup, { label: string; order: number }> = {
+  leven:      { label: 'Leven',      order: 0 },
+  wonen:      { label: 'Wonen',      order: 1 },
+  werk:       { label: 'Werk',       order: 2 },
+  inkomen:    { label: 'Inkomen',    order: 3 },
+  vrije_tijd: { label: 'Vrije tijd', order: 4 },
+  anders:     { label: 'Anders',     order: 5 },
+}
+
 export interface LifeEventCatalogEntry {
   label: string
   icon: string
@@ -365,6 +398,10 @@ export interface LifeEventCatalogEntry {
   defaultAge?: number
   description: string
   tip?: string
+  /** Estimated total impact range string, e.g. "€100K–€200K totaal" */
+  impactRange?: string
+  /** Grouping category for catalog display */
+  group: LifeEventGroup
   /** Context-specific fields for this event type */
   fields?: CatalogField[]
   /** If true, this event is only available in household mode */
@@ -393,6 +430,8 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   sabbatical: {
     label: 'Sabbatical',
     icon: 'Palmtree',
+    group: 'werk',
+    impactRange: '€15K–€25K totaal',
     defaultCost: 2000,
     defaultMonthlyCost: 0,
     defaultMonthlyIncome: -3000,
@@ -412,6 +451,8 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   world_trip: {
     label: 'Wereldreis',
     icon: 'Globe',
+    group: 'vrije_tijd',
+    impactRange: '€25K–€60K totaal',
     defaultCost: 15000,
     defaultMonthlyCost: 2000,
     defaultMonthlyIncome: -3000,
@@ -431,11 +472,13 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   children: {
     label: 'Kinderen',
     icon: 'Baby',
+    group: 'leven',
+    impactRange: '€100K–€200K totaal',
     defaultCost: 5000,
     defaultMonthlyCost: 500,
     defaultMonthlyIncome: 0,
     defaultDuration: 216,
-    description: 'Opvoedkosten per kind',
+    description: 'Opvoedkosten 0–18 jaar',
     tip: 'Gemiddeld ca. 500/mnd. Kinderbijslag en kinderopvangtoeslag verlagen de netto kosten',
     fields: [
       { key: 'aantalKinderen', label: 'Aantal kinderen', fieldType: 'select', default: 1, options: [
@@ -457,6 +500,8 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   renovation: {
     label: 'Verbouwing',
     icon: 'Hammer',
+    group: 'wonen',
+    impactRange: '€10K–€80K eenmalig',
     defaultCost: 30000,
     defaultMonthlyCost: 0,
     defaultMonthlyIncome: 0,
@@ -478,6 +523,8 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   study: {
     label: 'Studie',
     icon: 'GraduationCap',
+    group: 'werk',
+    impactRange: '€5K–€30K totaal',
     defaultCost: 8000,
     defaultMonthlyCost: 0,
     defaultMonthlyIncome: 0,
@@ -498,6 +545,8 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   career_change: {
     label: 'Carriere switch',
     icon: 'Briefcase',
+    group: 'werk',
+    impactRange: '€5K–€15K totaal',
     defaultCost: 3000,
     defaultMonthlyCost: 0,
     defaultMonthlyIncome: 0,
@@ -513,6 +562,8 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   part_time: {
     label: 'Part-time werken',
     icon: 'Clock',
+    group: 'werk',
+    impactRange: '€500–€1.500/mnd inkomensverlies',
     defaultCost: 0,
     defaultMonthlyCost: 0,
     defaultMonthlyIncome: -1000,
@@ -528,6 +579,8 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   early_retirement: {
     label: 'Vervroegd pensioen',
     icon: 'Sunset',
+    group: 'inkomen',
+    impactRange: '€50K–€200K overbrugging',
     defaultCost: 0,
     defaultMonthlyCost: 0,
     defaultMonthlyIncome: -2500,
@@ -543,6 +596,8 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   house_purchase: {
     label: 'Huis kopen',
     icon: 'Home',
+    group: 'wonen',
+    impactRange: '€15K–€40K kosten koper',
     defaultCost: 25000,
     defaultMonthlyCost: 300,
     defaultMonthlyIncome: 0,
@@ -556,9 +611,35 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
       { key: 'huidigeHuur', label: 'Huidige maandhuur', fieldType: 'number', default: 1000, tip: 'Dit bedrag bespaar je — verschil met hypotheek is de netto maandlast' },
     ],
   },
+  house_sale: {
+    label: 'Huis verkopen',
+    icon: 'HandCoins',
+    group: 'wonen',
+    impactRange: 'Overwaarde vrijval + maandlastenverschil',
+    defaultCost: -50000,
+    defaultMonthlyCost: 0,
+    defaultMonthlyIncome: 0,
+    defaultDuration: 0,
+    description: 'Huis verkopen met overwaarde-vrijval',
+    tip: 'Vergeet niet het huis als asset te verwijderen na verkoop. De netto overwaarde (verkoopprijs - hypotheek - kosten) komt vrij als vermogen.',
+    fields: [
+      { key: 'verkoopprijs', label: 'Verwachte verkoopprijs', fieldType: 'number', default: 400000, tip: 'Geschatte marktwaarde van de woning' },
+      { key: 'resterendeHypotheek', label: 'Resterende hypotheek', fieldType: 'number', default: 200000, tip: 'Openstaand hypotheekbedrag op moment van verkoop' },
+      { key: 'makelaarskosten', label: 'Makelaarskosten', fieldType: 'percentage', default: 1.5, suffix: '%', tip: 'Gemiddeld 1-2% van de verkoopprijs' },
+      { key: 'nieuweSituatie', label: 'Nieuwe woonsituatie', fieldType: 'select', default: 'huren', options: [
+        { value: 'huren', label: 'Huren' },
+        { value: 'goedkoper_kopen', label: 'Goedkoper kopen' },
+        { value: 'bij_partner', label: 'Bij partner intrekken' },
+      ], tip: 'Dit bepaalt je nieuwe maandelijkse woonlasten' },
+      { key: 'nieuweWoonlasten', label: 'Nieuwe maandelijkse woonlasten', fieldType: 'number', default: 1200, tip: 'Huur of hypotheeklasten van de nieuwe situatie' },
+      { key: 'oudeHypotheeklasten', label: 'Huidige hypotheeklasten', fieldType: 'number', default: 1500, tip: 'Je huidige maandelijkse hypotheeklasten die wegvallen' },
+    ],
+  },
   move: {
     label: 'Verhuizing',
     icon: 'Truck',
+    group: 'wonen',
+    impactRange: '€3K–€10K eenmalig',
     defaultCost: 5000,
     defaultMonthlyCost: 0,
     defaultMonthlyIncome: 0,
@@ -576,6 +657,8 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   wedding: {
     label: 'Trouwerij',
     icon: 'Heart',
+    group: 'leven',
+    impactRange: '€15K–€25K eenmalig',
     defaultCost: 20000,
     defaultMonthlyCost: 0,
     defaultMonthlyIncome: 0,
@@ -591,6 +674,8 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   car_purchase: {
     label: 'Auto kopen',
     icon: 'Car',
+    group: 'vrije_tijd',
+    impactRange: '€15K–€50K + €350/mnd',
     defaultCost: 20000,
     defaultMonthlyCost: 350,
     defaultMonthlyIncome: 0,
@@ -614,6 +699,8 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   inheritance: {
     label: 'Erfenis ontvangen',
     icon: 'Gift',
+    group: 'inkomen',
+    impactRange: '€10K–€500K+ ontvangst',
     defaultCost: -50000,
     defaultMonthlyCost: 0,
     defaultMonthlyIncome: 0,
@@ -633,6 +720,8 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   side_hustle: {
     label: 'Bijverdienste starten',
     icon: 'Zap',
+    group: 'inkomen',
+    impactRange: '+€300–€1.500/mnd extra',
     defaultCost: 1000,
     defaultMonthlyCost: 0,
     defaultMonthlyIncome: 500,
@@ -654,6 +743,8 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   aow: {
     label: 'AOW',
     icon: 'Landmark',
+    group: 'inkomen',
+    impactRange: '+€950–€1.380/mnd bruto',
     defaultCost: 0,
     defaultMonthlyCost: 0,
     defaultMonthlyIncome: 1380,
@@ -672,6 +763,8 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   pension: {
     label: 'Aanvullend pensioen',
     icon: 'PiggyBank',
+    group: 'inkomen',
+    impactRange: '+€200–€2.000/mnd bruto',
     defaultCost: 0,
     defaultMonthlyCost: 0,
     defaultMonthlyIncome: 0,
@@ -695,6 +788,8 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   overlijden_partner: {
     label: 'Overlijden partner',
     icon: 'HeartHandshake',
+    group: 'leven',
+    impactRange: 'Hoog — inkomensafhankelijk',
     defaultCost: -10000,
     defaultMonthlyCost: 0,
     defaultMonthlyIncome: -2500,
@@ -714,9 +809,35 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
       { key: 'levensverzekering', label: 'Levensverzekering uitkering', fieldType: 'number', default: 0, tip: 'Eenmalig bedrag uit levensverzekering of overlijdensrisicoverzekering (ORV)' },
     ],
   },
+  scheiding: {
+    label: 'Scheiding',
+    icon: 'HeartCrack',
+    group: 'leven',
+    impactRange: '€20K–€200K+ totaal',
+    defaultCost: 7500,
+    defaultMonthlyCost: 500,
+    defaultMonthlyIncome: 0,
+    defaultDuration: 60,
+    description: 'Echtscheiding met vermogensverdeling en alimentatie',
+    tip: 'Modelleert eenmalige kosten (advocaat, vermogensverdeling) én structurele maandelijkse veranderingen (alimentatie, dubbele woonlasten)',
+    fields: [
+      { key: 'advocaatKosten', label: 'Advocaat/mediationkosten', fieldType: 'number', default: 7500, tip: 'Eenmalig: gemiddeld €5.000–€10.000 voor mediation, meer bij vechtscheiding' },
+      { key: 'vermogensBehoudPct', label: 'Vermogensverdeling: % dat je behoudt', fieldType: 'percentage', default: 50, tip: 'Bij gemeenschap van goederen standaard 50%. Bij huwelijkse voorwaarden kan dit afwijken.', suffix: '%' },
+      { key: 'partneralimentatieRichting', label: 'Partneralimentatie', fieldType: 'select', default: 'betalen', options: [
+        { value: 'betalen', label: 'Ik betaal alimentatie' },
+        { value: 'ontvangen', label: 'Ik ontvang alimentatie' },
+      ], tip: 'De meest verdienende partner betaalt doorgaans alimentatie' },
+      { key: 'partneralimentatieBedrag', label: 'Partneralimentatie bedrag', fieldType: 'number', default: 800, tip: 'Netto maandbedrag partneralimentatie', suffix: '/mnd' },
+      { key: 'partneralimentatieDuur', label: 'Partneralimentatie duur', fieldType: 'number', default: 60, tip: 'Maximaal 5 jaar (60 maanden) bij huwelijk <15 jaar, langer bij kinderen <12', suffix: 'maanden' },
+      { key: 'kinderalimentatieBedrag', label: 'Kinderalimentatie bedrag', fieldType: 'number', default: 0, tip: 'Maandbedrag per kind, afhankelijk van inkomen en zorgverdeling. Vul 0 in als er geen kinderen zijn.', suffix: '/mnd' },
+      { key: 'kinderalimentatieDuur', label: 'Kinderalimentatie duur', fieldType: 'number', default: 0, tip: 'Tot het kind 21 wordt. Vul het aantal resterende maanden in.', suffix: 'maanden' },
+      { key: 'extraWoonlasten', label: 'Extra woonlasten (dubbele huishouding)', fieldType: 'number', default: 500, tip: 'Het verschil met je huidige situatie: extra huur, inrichting, vaste lasten', suffix: '/mnd' },
+    ],
+  },
   custom: {
     label: 'Anders',
     icon: 'Calendar',
+    group: 'anders',
     defaultCost: 0,
     defaultMonthlyCost: 0,
     defaultMonthlyIncome: 0,
