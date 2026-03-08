@@ -26,6 +26,7 @@ export {
   DEFAULT_VOLATILITY,
   NL_AOW_AGE,
   NL_AOW_MONTHLY,
+  NL_AOW_MONTHLY_SAMENWONEND,
   INFLATION,
   NL_FICTIEF_BELEGGINGEN,
   BOX3_TARIEF,
@@ -37,7 +38,7 @@ export {
 } from './constants'
 import {
   SWR, DEFAULT_RETURN, DEFAULT_VOLATILITY,
-  NL_AOW_AGE, NL_AOW_MONTHLY, INFLATION,
+  NL_AOW_AGE, NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND, INFLATION,
   NL_SWR,
 } from './constants'
 
@@ -60,8 +61,8 @@ export interface FutureCashflow {
 }
 
 export const CASHFLOW_CATALOG: Omit<FutureCashflow, 'id'>[] = [
-  { name: 'AOW (alleenstaand)',  monthlyAmount: 1380, fromAge: 67, toAge: null },
-  { name: 'AOW (per partner)',   monthlyAmount: 940,  fromAge: 67, toAge: null },
+  { name: 'AOW (alleenstaand)',  monthlyAmount: 1558, fromAge: 67, toAge: null },
+  { name: 'AOW (per partner)',   monthlyAmount: 1072, fromAge: 67, toAge: null },
   { name: 'Aanvullend pensioen', monthlyAmount: 0,    fromAge: 65, toAge: null },
   { name: 'Deeltijds werken',    monthlyAmount: 0,    fromAge: 55, toAge: 67 },
   { name: 'Erfenis',             monthlyAmount: 0,    fromAge: 0,  toAge: null, oneTimeAmount: 0 },
@@ -201,7 +202,8 @@ export interface ChildrenMetadata {
 
 export interface AOWMetadata {
   leefsituatie?: 'alleenstaand' | 'samenwonend'
-  jarenInNL?: number
+  jarenInNL?: number       // legacy — use jarenBuitenNL
+  jarenBuitenNL?: number   // years abroad (0 = full AOW)
 }
 
 export interface PensionMetadata {
@@ -221,6 +223,7 @@ export interface HousePurchaseMetadata {
   hypotheekRente?: number
   eersteWoning?: boolean
   huidigeHuur?: number
+  nhg?: boolean
 }
 
 export interface HouseSaleMetadata {
@@ -655,6 +658,7 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
       { key: 'hypotheekRente', label: 'Hypotheekrente', fieldType: 'percentage', default: 4.0, tip: 'Indicatie 2026: 10-jarig vast ca. 3,8–4,2%. NHG-rente ca. 0,2% lager. Check hypotheker.nl voor actuele tarieven.', suffix: '%' },
       { key: 'eersteWoning', label: 'Eerste woning (starter)', fieldType: 'toggle', default: true, tip: 'Starters (18–35 jaar) zijn vrijgesteld van 2% overdrachtsbelasting tot €510.000 (Belastingdienst, 2026).' },
       { key: 'huidigeHuur', label: 'Huidige maandhuur', fieldType: 'number', default: 1000, tip: 'Gemiddelde vrije sector huur NL: ca. €1.100–€1.400/mnd. Dit bedrag bespaar je — verschil met hypotheek is de netto maandlast.' },
+      { key: 'nhg', label: 'Nationale Hypotheek Garantie (NHG)', fieldType: 'toggle', default: false, tip: 'NHG-grens 2026: €435.000. Eenmalige kosten: 0,6% van hypotheeksom. Levert ca. 0,2% rentekorting op.' },
     ],
   },
   house_sale: {
@@ -791,20 +795,20 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     label: 'AOW',
     icon: 'Landmark',
     group: 'pensioen',
-    impactRange: '+€950–€1.380/mnd bruto',
+    impactRange: '+€1.072–€1.558/mnd netto',
     defaultCost: 0,
     defaultMonthlyCost: 0,
-    defaultMonthlyIncome: 1380,
+    defaultMonthlyIncome: 1558,
     defaultDuration: 0,
     defaultAge: 67,
-    description: 'AOW staatspension (alleenstaand, 2026)',
-    tip: 'AOW-leeftijd: 67 jaar (2026). Bruto bedragen 2026: alleenstaand ca. €1.380/mnd, samenwonend ca. €948/mnd. Netto na belasting ca. 15–20% lager. Geïndexeerd aan minimumloon (SVB).',
+    description: 'AOW staatspension (alleenstaand netto, 2026)',
+    tip: 'AOW-leeftijd: 67 jaar (2026). Netto bedragen 2026: alleenstaand ca. €1.558/mnd, samenwonend ca. €1.072/mnd per persoon. Geïndexeerd aan minimumloon (SVB).',
     fields: [
       { key: 'leefsituatie', label: 'Leefsituatie bij AOW-leeftijd', fieldType: 'select', default: 'alleenstaand', options: [
-        { value: 'alleenstaand', label: 'Alleenstaand (€1.380/mnd bruto)' },
-        { value: 'samenwonend', label: 'Samenwonend/gehuwd (€948/mnd bruto)' },
+        { value: 'alleenstaand', label: 'Alleenstaand (€1.558/mnd netto)' },
+        { value: 'samenwonend', label: 'Samenwonend/gehuwd (€1.072/mnd netto p.p.)' },
       ], tip: 'Alleenstaand: 70% minimumloon. Samenwonend: 50% minimumloon per persoon. Check svb.nl voor actuele bedragen.' },
-      { key: 'jarenInNL', label: 'Aantal opbouwjaren in NL', fieldType: 'number', default: 50, tip: 'Opbouw: 2% per jaar woonachtig/werkzaam in NL (15–67 jaar). 50 jaar = volledige AOW. Buitenlandjaren? Check svb.nl voor je opbouwoverzicht.' },
+      { key: 'jarenBuitenNL', label: 'Jaren buiten Nederland', fieldType: 'number', default: 0, tip: '2% korting per jaar niet woonachtig in NL (leeftijd 15–67). Maximaal 50 opbouwjaren. Check svb.nl voor je opbouwoverzicht.' },
     ],
   },
   pension: {
@@ -855,6 +859,7 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
       ], tip: 'Anw-uitkering (SVB): met kinderen <18 ca. €1.380/mnd bruto (halfwezenuitkering). Zonder kinderen: beperkt of nihil. Eigen inkomen wordt verrekend.' },
       { key: 'anwBedrag', label: 'Anw-bedrag per maand (bruto)', fieldType: 'number', default: 1380, tip: 'Halfwezenuitkering 2026: ca. €1.380/mnd bruto. Nabestaandenuitkering (zonder kinderen): ca. €1.380/mnd bruto maar inkomensafhankelijk (SVB).', suffix: '/mnd' },
       { key: 'levensverzekering', label: 'Levensverzekering uitkering', fieldType: 'number', default: 0, tip: 'Gemiddelde ORV-uitkering: €100.000–€300.000. Premie: €5–€25/mnd. Check je polis voor het exacte bedrag.' },
+      { key: 'kostendalingPct', label: 'Verwachte daling gedeelde kosten', fieldType: 'percentage', default: 30, tip: 'Na overlijden partner dalen gedeelde kosten (boodschappen, energie, verzekeringen) gemiddeld met 25–35%. Woonlasten (hypotheek/huur) blijven gelijk.', suffix: '%' },
     ],
   },
   scheiding: {

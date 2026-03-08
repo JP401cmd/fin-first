@@ -1960,6 +1960,21 @@ export default function HorizonPage() {
                                 const factor = (50 - jarenBuiten) / 50
                                 setFormAmount(Math.round(baseAmount * factor))
                               }
+                              // Auto-calculate kosten koper for house_purchase
+                              if (formType === 'house_purchase' && field.key === 'aankoopprijs') {
+                                const prijs = Number(val) || 0
+                                const isStarter = Boolean(updated.eersteWoning ?? true)
+                                const hasNHG = Boolean(updated.nhg ?? false)
+                                const overdracht = (isStarter && prijs <= 510000) ? 0 : Math.round(prijs * 0.02)
+                                const notaris = 1200
+                                const taxatie = 500
+                                const bankgarantie = Math.round(prijs * 0.001)
+                                const nhgKosten = (hasNHG && prijs <= 435000) ? Math.round(prijs * 0.006) : 0
+                                const totaal = overdracht + notaris + taxatie + bankgarantie + nhgKosten
+                                setFormAmount(totaal)
+                                setFormDirection('expense')
+                                setFormDurationType('one_time')
+                              }
                               // Auto-calculate vermogensverlies + totale kosten for scheiding
                               if (formType === 'scheiding' && ['vermogensBehoudPct', 'advocaatKosten'].includes(field.key)) {
                                 const behoudPct = Number(updated.vermogensBehoudPct ?? 50)
@@ -2015,12 +2030,108 @@ export default function HorizonPage() {
                           <input
                             type="checkbox"
                             checked={formMetadata[field.key] !== undefined ? Boolean(formMetadata[field.key]) : Boolean(field.default)}
-                            onChange={e => setFormMetadata(prev => ({ ...prev, [field.key]: e.target.checked }))}
+                            onChange={e => {
+                              const checked = e.target.checked
+                              setFormMetadata(prev => {
+                                const updated = { ...prev, [field.key]: checked }
+                                // Recalculate kosten koper when eersteWoning or nhg toggles
+                                if (formType === 'house_purchase' && (field.key === 'eersteWoning' || field.key === 'nhg')) {
+                                  const prijs = Number(updated.aankoopprijs ?? 350000)
+                                  const isStarter = Boolean(updated.eersteWoning ?? true)
+                                  const hasNHG = Boolean(updated.nhg ?? false)
+                                  const overdracht = (isStarter && prijs <= 510000) ? 0 : Math.round(prijs * 0.02)
+                                  const notaris = 1200
+                                  const taxatie = 500
+                                  const bankgarantie = Math.round(prijs * 0.001)
+                                  const nhgKosten = (hasNHG && prijs <= 435000) ? Math.round(prijs * 0.006) : 0
+                                  const totaal = overdracht + notaris + taxatie + bankgarantie + nhgKosten
+                                  setFormAmount(totaal)
+                                  setFormDirection('expense')
+                                  setFormDurationType('one_time')
+                                }
+                                return updated
+                              })
+                            }}
                             className="h-4 w-4 rounded border-[var(--border-md)] accent-horizon-600"
                           />
                           <span className="text-xs text-[var(--ink-2)]">{field.tip ?? ''}</span>
                         </label>
                       ) : null}
+                      {formType === 'aow' && field.key === 'jarenBuitenNL' && (() => {
+                        const jarenBuiten = Math.min(50, Math.max(0, Number(formMetadata.jarenBuitenNL ?? 0)))
+                        const opbouwPct = Math.round(((50 - jarenBuiten) / 50) * 100)
+                        const leefsituatie = String(formMetadata.leefsituatie ?? 'alleenstaand')
+                        const baseAmount = leefsituatie === 'samenwonend' ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY
+                        const gecorrigeerdBedrag = Math.round(baseAmount * opbouwPct / 100)
+                        return (
+                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">AOW-opbouw</p>
+                            <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                              <div className="flex justify-between">
+                                <span>Opbouwjaren in NL</span>
+                                <span className="font-mono tabular-nums">{50 - jarenBuiten} van 50 jaar</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Opbouwpercentage</span>
+                                <span className={`font-mono tabular-nums font-semibold ${opbouwPct < 100 ? 'text-amber-600' : 'text-emerald-600'}`}>{opbouwPct}%</span>
+                              </div>
+                              <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
+                                <span>Gecorrigeerd bedrag</span>
+                                <span className="font-mono tabular-nums">{formatCurrency(gecorrigeerdBedrag)}/mnd netto</span>
+                              </div>
+                            </div>
+                            {jarenBuiten > 0 && (
+                              <p className="text-[10px] text-[var(--ink-4)]">
+                                2% korting per jaar niet woonachtig in NL. Vrijwillige verzekering mogelijk via SVB.
+                              </p>
+                            )}
+                          </div>
+                        )
+                      })()}
+                      {formType === 'house_purchase' && field.key === 'nhg' && (() => {
+                        const prijs = Number(formMetadata.aankoopprijs ?? 350000)
+                        const isStarter = Boolean(formMetadata.eersteWoning ?? true)
+                        const hasNHG = Boolean(formMetadata.nhg ?? false)
+                        const overdracht = (isStarter && prijs <= 510000) ? 0 : Math.round(prijs * 0.02)
+                        const notaris = 1200
+                        const taxatie = 500
+                        const bankgarantie = Math.round(prijs * 0.001)
+                        const nhgKosten = (hasNHG && prijs <= 435000) ? Math.round(prijs * 0.006) : 0
+                        const totaal = overdracht + notaris + taxatie + bankgarantie + nhgKosten
+                        const pct = prijs > 0 ? ((totaal / prijs) * 100).toFixed(1) : '0.0'
+                        return (
+                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Kosten koper ({pct}%)</p>
+                            <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                              <div className="flex justify-between">
+                                <span>Overdrachtsbelasting (2%)</span>
+                                <span className="font-mono tabular-nums">
+                                  {overdracht === 0 ? (
+                                    <span className="text-emerald-600">Vrijgesteld (starter &lt;35j)</span>
+                                  ) : (
+                                    formatCurrency(overdracht)
+                                  )}
+                                </span>
+                              </div>
+                              <div className="flex justify-between"><span>Notariskosten</span><span className="font-mono tabular-nums">{formatCurrency(notaris)}</span></div>
+                              <div className="flex justify-between"><span>Taxatiekosten</span><span className="font-mono tabular-nums">{formatCurrency(taxatie)}</span></div>
+                              <div className="flex justify-between"><span>Bankgarantie (0,1%)</span><span className="font-mono tabular-nums">{formatCurrency(bankgarantie)}</span></div>
+                              {nhgKosten > 0 && (
+                                <div className="flex justify-between"><span>NHG-premie (0,6%)</span><span className="font-mono tabular-nums">{formatCurrency(nhgKosten)}</span></div>
+                              )}
+                              <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
+                                <span>Totaal kosten koper</span>
+                                <span className="font-mono tabular-nums">{formatCurrency(totaal)}</span>
+                              </div>
+                            </div>
+                            {isStarter && prijs > 510000 && (
+                              <p className="text-[10px] text-amber-600">
+                                Let op: startersvrijstelling geldt alleen tot €510.000 (2026).
+                              </p>
+                            )}
+                          </div>
+                        )
+                      })()}
                       {formType === 'children' && field.key === 'aantalKinderen' && (
                         <p className="mt-1 text-[10px] leading-relaxed text-[var(--ink-4)]">
                           Kosten schalen niet lineair (NIBUD): 1 kind ~&#8364;500/mnd, 2 kinderen ~&#8364;830/mnd, 3 ~&#8364;1.100/mnd, 4 ~&#8364;1.320/mnd. Het bedrag hierboven is automatisch aangepast, maar blijft handmatig aanpasbaar.
