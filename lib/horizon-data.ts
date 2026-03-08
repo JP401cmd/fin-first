@@ -249,6 +249,9 @@ export interface SabbaticalMetadata {
   reiskosten?: number
   bestemming?: 'nederland' | 'europa' | 'wereldwijd'
   behoudtZorgverzekering?: boolean
+  doorbetalingsPct?: number
+  nettoInkomen?: number
+  extraKosten?: number
 }
 
 export interface WorldTripMetadata {
@@ -331,9 +334,17 @@ export interface EarlyRetirementMetadata {
 }
 
 export interface WeddingMetadata {
+  budgetPreset?: 'intiem' | 'gemiddeld' | 'uitgebreid'
   aantalGasten?: number
   huwelijksreis?: number
   huwelijksvoorwaarden?: boolean
+}
+
+/** Wedding budget presets based on Dutch average of €23.675 (ThePerfectWedding, 2025) */
+export const BRUILOFT_BUDGET_PRESETS: Record<string, { label: string; bedrag: number; gasten: number }> = {
+  intiem:     { label: 'Intiem (€5K–€10K)',     bedrag: 8000,  gasten: 30 },
+  gemiddeld:  { label: 'Gemiddeld (€15K–€25K)',  bedrag: 20000, gasten: 80 },
+  uitgebreid: { label: 'Uitgebreid (€25K–€40K)', bedrag: 32000, gasten: 120 },
 }
 
 export interface MoveMetadata {
@@ -603,7 +614,9 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     description: 'Onbetaald verlof van het werk',
     tip: 'Gemiddeld netto inkomensverlies €2.000–€3.500/mnd. Vul je netto maandinkomen als negatieve inkomenswijziging in. Check je cao voor eventuele sabbaticalregelingen.',
     fields: [
-      { key: 'reiskosten', label: 'Reiskosten (eenmalig)', fieldType: 'number', default: 2000, tip: 'Europa €1.000–€3.000, wereldwijd €3.000–€8.000 (vluchten, visa, vaccinaties)' },
+      { key: 'nettoInkomen', label: 'Netto maandinkomen', fieldType: 'number', default: 3000, tip: 'Je huidige netto maandinkomen. Wordt gebruikt om het inkomensverlies te berekenen.' },
+      { key: 'doorbetalingsPct', label: 'Doorbetalingspercentage', fieldType: 'percentage', default: 0, suffix: '%', tip: 'Sommige werkgevers betalen (gedeeltelijk) door tijdens sabbatical. 0% = volledig onbetaald, 50% = halve doorbetaling. Check je cao of arbeidsvoorwaarden.' },
+      { key: 'extraKosten', label: 'Extra kosten (reis, activiteiten)', fieldType: 'number', default: 2000, tip: 'Eenmalige extra kosten: vluchten, verblijf, cursussen, uitrusting. Europa €1.000–€3.000, wereldwijd €3.000–€8.000.' },
       { key: 'bestemming', label: 'Bestemming', fieldType: 'select', default: 'europa', options: [
         { value: 'nederland', label: 'Nederland' },
         { value: 'europa', label: 'Europa' },
@@ -842,10 +855,15 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     defaultMonthlyIncome: 0,
     defaultDuration: 0,
     description: 'Bruiloft en huwelijk',
-    tip: 'Gemiddelde bruiloft in NL: €15.000–€25.000 (ThePerfectWedding, 2025). Budget per gast: ca. €150–€250. Gemeentehuistrouwen: vanaf €300 (gratis op maandag in sommige gemeenten).',
+    tip: 'Gemiddelde bruiloft in NL: €23.675 (ThePerfectWedding, 2025). Budget per gast: ca. €150–€250. Fiscaal partnerschap: na trouwen gezamenlijke Box 3 aangifte mogelijk. Dat kan voordelig zijn als één partner veel vermogen heeft — de vrijstelling (€57.000 p.p. in 2025) wordt gedeeld.',
     fields: [
+      { key: 'budgetPreset', label: 'Budget preset', fieldType: 'select', default: 'gemiddeld', options: [
+        { value: 'intiem', label: 'Intiem — €5K–€10K (kleine kring)' },
+        { value: 'gemiddeld', label: 'Gemiddeld — €15K–€25K (NL gemiddelde)' },
+        { value: 'uitgebreid', label: 'Uitgebreid — €25K–€40K (groots feest)' },
+      ], tip: 'Kies een budget-niveau gebaseerd op Nederlands gemiddelde. Het bedrag wordt automatisch ingesteld maar is handmatig aanpasbaar.' },
       { key: 'aantalGasten', label: 'Aantal gasten', fieldType: 'number', default: 80, tip: 'Gemiddeld 80 gasten. Locatie + catering is 40–50% van het budget. Per gast €150–€250.' },
-      { key: 'huwelijksreis', label: 'Budget huwelijksreis', fieldType: 'number', default: 3000, tip: 'Europa: €2.000–€4.000. Verre bestemming: €4.000–€10.000. All-inclusive: €3.000–€6.000.' },
+      { key: 'huwelijksreis', label: 'Budget huwelijksreis', fieldType: 'number', default: 3000, tip: 'Europa: €2.000–€4.000. Verre bestemming: €4.000–€10.000. All-inclusive: €3.000–€6.000. Wordt opgeteld bij het bruiloftsbudget.' },
       { key: 'huwelijksvoorwaarden', label: 'Huwelijkse voorwaarden', fieldType: 'toggle', default: false, tip: 'Notariskosten huwelijksvoorwaarden: €800–€1.500. Sinds 2018 geldt beperkte gemeenschap van goederen als standaard.' },
     ],
   },

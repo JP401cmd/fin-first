@@ -585,6 +585,18 @@ export default function HorizonPage() {
       setFormDirection('expense')
       setFormDuration(catalog?.defaultDuration ?? 12)
     }
+    // Sabbatical: pre-fill netto inkomen from profile, calculate initial loss
+    if (type === 'sabbatical') {
+      const profileIncome = effectiveInput?.monthlyIncome ?? 3000
+      metaDefaults.nettoInkomen = profileIncome
+      setFormMetadata({ ...metaDefaults })
+      const doorbetalingsPct = Number(metaDefaults.doorbetalingsPct ?? 0)
+      const inkomensverlies = Math.round(profileIncome * (1 - doorbetalingsPct / 100))
+      setFormAmount(inkomensverlies)
+      setFormDurationType('period')
+      setFormDirection('income')
+      setFormDuration(catalog?.defaultDuration ?? 6)
+    }
     // Renovation: set cost from type preset
     if (type === 'renovation') {
       const verbouwType = String(metaDefaults.type ?? 'keuken')
@@ -950,6 +962,19 @@ export default function HorizonPage() {
       monthlyCostChange = 0
       monthlyIncomeChange = 0
       durMonths = 0
+    }
+
+    // Special handling for sabbatical: inkomensverlies + extra kosten
+    if (formType === 'sabbatical') {
+      const nettoInkomen = Number(formMetadata.nettoInkomen ?? 3000)
+      const doorbetalingsPct = Math.min(100, Math.max(0, Number(formMetadata.doorbetalingsPct ?? 0)))
+      const extraKosten = Number(formMetadata.extraKosten ?? 2000)
+      // Income loss = netto * (1 - doorbetaling%)
+      const inkomensverlies = Math.round(nettoInkomen * (1 - doorbetalingsPct / 100))
+      monthlyIncomeChange = -inkomensverlies // negative = loss of income
+      monthlyCostChange = 0
+      // Extra kosten as one-time expense
+      oneTimeCost = extraKosten
     }
 
     // Special handling for overlijden_partner: net income impact + cost reduction
@@ -2360,6 +2385,15 @@ export default function HorizonPage() {
                                 setFormDirection('income')
                                 setFormDurationType('one_time')
                               }
+                              // Auto-update sabbatical income loss when nettoInkomen or doorbetalingsPct changes
+                              if (formType === 'sabbatical' && (field.key === 'nettoInkomen' || field.key === 'doorbetalingsPct')) {
+                                const inkomen = Number(field.key === 'nettoInkomen' ? val : (updated.nettoInkomen ?? 3000))
+                                const pct = Math.min(100, Math.max(0, Number(field.key === 'doorbetalingsPct' ? val : (updated.doorbetalingsPct ?? 0))))
+                                const verlies = Math.round(inkomen * (1 - pct / 100))
+                                setFormAmount(verlies)
+                                setFormDirection('income')
+                                setFormDurationType('period')
+                              }
                               // World trip: auto-update vertrekkosten as one-time cost
                               if (formType === 'world_trip' && field.key === 'vertrekkosten') {
                                 const vertrek = Number(val) || 4000
@@ -2668,6 +2702,29 @@ export default function HorizonPage() {
                               <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold"><span>Netto erfenis</span><span className="font-mono tabular-nums text-emerald-600">+{formatCurrency(erf.netto)}</span></div>
                             </div>
                             {relatie === 'partner' && bruto <= erf.vrijstelling && (<p className="text-[10px] text-emerald-700">Volledig vrijgesteld: de partnervrijstelling ({formatCurrency(erf.vrijstelling)}) overschrijdt het bedrag.</p>)}
+                          </div>
+                        )
+                      })()}
+                      {formType === 'sabbatical' && field.key === 'doorbetalingsPct' && (() => {
+                        const nettoInkomen = Number(formMetadata.nettoInkomen ?? 3000)
+                        const doorbetalingsPct = Math.min(100, Math.max(0, Number(formMetadata.doorbetalingsPct ?? 0)))
+                        const inkomensverlies = Math.round(nettoInkomen * (1 - doorbetalingsPct / 100))
+                        const doorbetaling = Math.round(nettoInkomen * doorbetalingsPct / 100)
+                        const extraKosten = Number(formMetadata.extraKosten ?? 2000)
+                        const durMnd = Number(formDuration) || 6
+                        const totaalVerlies = (inkomensverlies * durMnd) + extraKosten
+                        return (
+                          <div className="mt-2 space-y-1.5 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Inkomensverlies berekening</p>
+                            <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                              <div className="flex justify-between"><span>Netto maandinkomen</span><span className="font-mono tabular-nums">{formatCurrency(nettoInkomen)}/mnd</span></div>
+                              {doorbetalingsPct > 0 && (<div className="flex justify-between text-emerald-600"><span>Doorbetaling werkgever ({doorbetalingsPct}%)</span><span className="font-mono tabular-nums">+{formatCurrency(doorbetaling)}/mnd</span></div>)}
+                              <div className="flex justify-between font-semibold"><span>Maandelijks inkomensverlies</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(inkomensverlies)}/mnd</span></div>
+                              {extraKosten > 0 && (<div className="flex justify-between"><span>Extra kosten (eenmalig)</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(extraKosten)}</span></div>)}
+                              <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold"><span>Totaal impact ({durMnd} mnd)</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(totaalVerlies)}</span></div>
+                            </div>
+                            {doorbetalingsPct === 0 && (<p className="text-[10px] text-[var(--ink-4)]">Tip: vraag je werkgever naar sabbaticalregelingen. Sommige cao&#39;s bieden gedeeltelijke doorbetaling.</p>)}
+                            {doorbetalingsPct === 100 && (<p className="text-[10px] text-emerald-700">Volledig doorbetaald sabbatical — alleen extra kosten zijn van toepassing.</p>)}
                           </div>
                         )
                       })()}
