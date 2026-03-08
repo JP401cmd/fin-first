@@ -41,6 +41,7 @@ import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { HouseholdFireSection } from '@/components/app/household-fire-section'
+import { usePerspective } from '@/components/app/perspective-provider'
 import { SimChartModal } from '@/components/app/horizon/sim-chart-widget'
 import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverlay, type MonteCarloOverlay } from '@/components/app/horizon/sim-chart'
 import { parseFireStrategy, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
@@ -56,8 +57,24 @@ type SnapshotForTrend = {
   fire_age: number | null
 }
 
+// Household FIRE data shape (from /api/household/fire-projections)
+interface HouseholdHeroData {
+  householdName: string
+  fireAge: number | null
+  fireTarget: number
+  freedomPercentage: number
+  countdownDays: number
+  fireDate: string
+  freedomYears: number
+  freedomMonths: number
+  savingsRate: number
+}
+
 export default function HorizonPage() {
   const { triggerDream, phase } = useDreamTransition()
+  const { perspective } = usePerspective()
+  const isHouseholdView = perspective === 'household'
+  const [householdHero, setHouseholdHero] = useState<HouseholdHeroData | null>(null)
   const [fireParams, setFireParams] = useState<FireParams>(resolveFireParams({}))
   const fireSwr = fireParams.effectiveSwr
   const [input, setInput] = useState<FinancialInput | null>(null)
@@ -263,6 +280,37 @@ export default function HorizonPage() {
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
+
+  // Fetch household FIRE data when in household perspective
+  useEffect(() => {
+    if (!isHouseholdView) {
+      setHouseholdHero(null)
+      return
+    }
+    async function loadHousehold() {
+      try {
+        const res = await fetch('/api/household/fire-projections')
+        if (!res.ok) return
+        const data = await res.json()
+        if (!data.hasHousehold) return
+        const cp = data.combined.projection
+        setHouseholdHero({
+          householdName: data.householdName,
+          fireAge: cp.fireAge,
+          fireTarget: cp.fireTarget,
+          freedomPercentage: cp.freedomPercentage,
+          countdownDays: cp.countdownDays,
+          fireDate: cp.fireDate,
+          freedomYears: cp.freedomYears,
+          freedomMonths: cp.freedomMonths,
+          savingsRate: cp.savingsRate,
+        })
+      } catch {
+        // Non-critical — fallback to personal data
+      }
+    }
+    loadHousehold()
+  }, [isHouseholdView])
 
   // Compute effective input: base data from DB, with optional income override
   const effectiveInput: FinancialInput | null = input
@@ -498,9 +546,18 @@ export default function HorizonPage() {
           <div className="mb-3 sm:mb-6 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <FfinAvatar size={40} />
-              <p className="label-editorial text-horizon-600">
-                Jouw horizon naar vrijheid
-              </p>
+              <div>
+                <p className="label-editorial text-horizon-600">
+                  {isHouseholdView && householdHero
+                    ? `${householdHero.householdName} — Gezamenlijke horizon`
+                    : 'Jouw horizon naar vrijheid'}
+                </p>
+                {isHouseholdView && householdHero && (
+                  <p className="mt-0.5 text-[11px] text-[var(--ink-3)]" title="Deze projectie is gebaseerd op gecombineerd vermogen, gecombineerde inkomsten en gedeelde uitgaven van het huishouden.">
+                    Gecombineerde financiën van het huishouden
+                  </p>
+                )}
+              </div>
             </div>
             {simResult && (
               <button
@@ -522,17 +579,22 @@ export default function HorizonPage() {
               onClick={() => setShowFireAgeReceipt(true)}
               className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3 text-left transition-all hover:border-horizon-300 hover:shadow-sm"
               data-testid="hero-stat-fire-age"
+              title={isHouseholdView && householdHero ? 'Gezamenlijke FIRE-leeftijd op basis van gecombineerd vermogen en gedeelde uitgaven' : undefined}
             >
               <div className="mb-1.5 flex items-center gap-1.5">
                 <Hourglass className="h-3.5 w-3.5 text-horizon-500" />
                 <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Vrijheidsleeftijd</span>
               </div>
               <p className="font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">
-                {simResult?.fireAgeFractional != null
-                  ? simResult.fireAgeFractional.toFixed(1)
-                  : fire.fireAge !== null ? Math.round(fire.fireAge) : '-'}
+                {isHouseholdView && householdHero
+                  ? (householdHero.fireAge !== null ? Math.round(householdHero.fireAge) : '-')
+                  : simResult?.fireAgeFractional != null
+                    ? simResult.fireAgeFractional.toFixed(1)
+                    : fire.fireAge !== null ? Math.round(fire.fireAge) : '-'}
               </p>
-              <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">jaar</p>
+              <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">
+                {isHouseholdView && householdHero ? 'jaar (huishouden)' : 'jaar'}
+              </p>
             </button>
 
             {/* FIRE Doelbedrag */}
@@ -541,13 +603,16 @@ export default function HorizonPage() {
               onClick={() => setShowFireTargetReceipt(true)}
               className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3 text-left transition-all hover:border-horizon-300 hover:shadow-sm"
               data-testid="hero-stat-fire-target"
+              title={isHouseholdView && householdHero ? 'Gezamenlijk FIRE-doelbedrag op basis van gedeelde uitgaven' : undefined}
             >
               <div className="mb-1.5 flex items-center gap-1.5">
                 <Target className="h-3.5 w-3.5 text-horizon-500" />
                 <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Doelbedrag</span>
               </div>
               <p className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
-                {formatCurrency(simResult?.requiredFirePortfolio ?? fire.fireTarget)}
+                {isHouseholdView && householdHero
+                  ? formatCurrency(householdHero.fireTarget)
+                  : formatCurrency(simResult?.requiredFirePortfolio ?? fire.fireTarget)}
               </p>
               <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">benodigd</p>
             </button>
@@ -579,13 +644,16 @@ export default function HorizonPage() {
               onClick={() => setShowCountdownReceipt(true)}
               className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3 text-left transition-all hover:border-horizon-300 hover:shadow-sm"
               data-testid="hero-stat-countdown"
+              title={isHouseholdView && householdHero ? 'Aftellen tot gezamenlijke FIRE-datum' : undefined}
             >
               <div className="mb-1.5 flex items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5 text-horizon-500" />
                 <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Aftellen</span>
               </div>
               <p className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
-                {effectiveCountdown.countdownDays > 0 ? effectiveCountdown.countdownDays.toLocaleString('nl-NL') : '0'}
+                {isHouseholdView && householdHero
+                  ? (householdHero.countdownDays > 0 ? householdHero.countdownDays.toLocaleString('nl-NL') : '0')
+                  : effectiveCountdown.countdownDays > 0 ? effectiveCountdown.countdownDays.toLocaleString('nl-NL') : '0'}
               </p>
               <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">dagen</p>
             </button>
@@ -596,12 +664,16 @@ export default function HorizonPage() {
             <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-horizon-600 via-horizon-400 to-horizon-300 transition-all duration-1000"
-                style={{ width: `${effectiveFreedomPct}%` }}
+                style={{ width: `${isHouseholdView && householdHero ? Math.max(Math.min(householdHero.freedomPercentage, 100), 0) : effectiveFreedomPct}%` }}
               />
             </div>
             <div className="mt-2 flex justify-between text-xs text-[var(--ink-4)]">
               <span>0%</span>
-              <span className="font-mono">{formatCurrency(simResult?.requiredFirePortfolio ?? fire.fireTarget)} — volledige vrijheid</span>
+              <span className="font-mono">
+                {isHouseholdView && householdHero
+                  ? `${formatCurrency(householdHero.fireTarget)} — gezamenlijke vrijheid`
+                  : `${formatCurrency(simResult?.requiredFirePortfolio ?? fire.fireTarget)} — volledige vrijheid`}
+              </span>
               <span>100%</span>
             </div>
           </div>
