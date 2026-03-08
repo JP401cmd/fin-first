@@ -4,6 +4,8 @@
 
 export type GoalType = 'savings' | 'debt_payoff' | 'net_worth' | 'freedom_days'
 
+export type GoalOwnership = 'personal' | 'shared'
+
 export type Goal = {
   id: string
   user_id: string
@@ -21,6 +23,8 @@ export type Goal = {
   is_completed: boolean
   completed_at: string | null
   sort_order: number
+  ownership: GoalOwnership
+  household_id: string | null
   created_at: string
   updated_at: string
 }

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { X, Save } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X, Save, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
   GOAL_TYPE_LABELS, GOAL_COLORS, type Goal, type GoalType,
@@ -31,6 +31,28 @@ export function GoalForm({
   const isEdit = !!goal
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [hasHousehold, setHasHousehold] = useState(false)
+  const [householdId, setHouseholdId] = useState<string | null>(null)
+  const [isShared, setIsShared] = useState(goal?.ownership === 'shared')
+
+  // Check if user has a household
+  useEffect(() => {
+    async function checkHousehold() {
+      try {
+        const res = await fetch('/api/household/status')
+        if (res.ok) {
+          const data = await res.json()
+          if (data.has_household && data.household?.id) {
+            setHasHousehold(true)
+            setHouseholdId(data.household.id)
+          }
+        }
+      } catch {
+        // No household — keep defaults
+      }
+    }
+    checkHousehold()
+  }, [])
 
   const [form, setForm] = useState({
     name: goal?.name ?? initialValues?.name ?? '',
@@ -93,7 +115,7 @@ export function GoalForm({
       return
     }
 
-    const row = {
+    const row: Record<string, unknown> = {
       user_id: user.id,
       name: form.name.trim(),
       description: form.description.trim() || null,
@@ -105,6 +127,8 @@ export function GoalForm({
       linked_debt_id: form.linked_debt_id || null,
       icon: form.icon,
       color: form.color,
+      ownership: isShared ? 'shared' : 'personal',
+      household_id: isShared ? householdId : null,
     }
 
     if (isEdit && goal) {
@@ -173,6 +197,40 @@ export function GoalForm({
                 required
               />
             </div>
+
+            {/* Shared goal toggle */}
+            {hasHousehold && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setIsShared(!isShared)}
+                  className={`flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
+                    isShared
+                      ? 'border-wil-300 bg-wil-50'
+                      : 'border-[var(--border-md)] hover:bg-[var(--subtle)]'
+                  }`}
+                >
+                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                    isShared ? 'bg-wil-100' : 'bg-zinc-100'
+                  }`}>
+                    <Users className={`h-4 w-4 ${isShared ? 'text-wil-600' : 'text-[var(--ink-3)]'}`} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-medium ${isShared ? 'text-wil-700' : 'text-[var(--ink)]'}`}>
+                      Gedeeld doel
+                    </p>
+                    <p className="text-xs text-[var(--ink-3)]">
+                      {isShared
+                        ? 'Beide partners zien dit doel en kunnen bijdragen'
+                        : 'Maak dit een gezamenlijk doel met je partner'}
+                    </p>
+                  </div>
+                  <div className={`h-5 w-9 rounded-full transition-colors ${isShared ? 'bg-wil-500' : 'bg-zinc-300'}`}>
+                    <div className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${isShared ? 'translate-x-4' : 'translate-x-0'}`} />
+                  </div>
+                </button>
+              </div>
+            )}
 
             {/* Type */}
             {!lockedToSavings && (

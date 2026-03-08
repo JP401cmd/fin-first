@@ -28,6 +28,7 @@ export async function GET() {
       target_date: null, linked_asset_id: null, linked_debt_id: null,
       icon: 'Target', color: 'teal', is_completed: false,
       completed_at: null, sort_order: 0,
+      ownership: 'personal' as const, household_id: null,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }
     const progress30 = computeGoalProgress(goal30)
@@ -49,6 +50,7 @@ export async function GET() {
       target_date: null, linked_asset_id: null, linked_debt_id: null,
       icon: 'Target', color: 'teal', is_completed: false,
       completed_at: null, sort_order: 0,
+      ownership: 'personal' as const, household_id: null,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }
     const progress50 = computeGoalProgress(goal50)
@@ -113,6 +115,7 @@ export async function GET() {
         target_date: null, linked_asset_id: null, linked_debt_id: null,
         icon: 'Target', color: 'teal', is_completed: false,
         completed_at: null, sort_order: 0,
+        ownership: 'personal' as const, household_id: null,
         created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
       }
       return computeGoalProgress(goal).pct === tc.expectedPct
@@ -135,6 +138,7 @@ export async function GET() {
       target_date: null, linked_asset_id: null, linked_debt_id: null,
       icon: 'Target', color: 'teal', is_completed: false,
       completed_at: null, sort_order: 0,
+      ownership: 'personal' as const, household_id: null,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }
     const zeroResult = computeGoalProgress(zeroTarget)

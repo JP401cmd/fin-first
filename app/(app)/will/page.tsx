@@ -20,7 +20,7 @@ type GoalWithBudget = Goal & {
   budgets?: { id: string; name: string } | null
 }
 import {
-  CheckCircle, Sparkles, Target, Flame, Info, Plus,
+  CheckCircle, Sparkles, Target, Flame, Info, Plus, Users,
   AlertTriangle, Clock, TrendingDown, ArrowRight, RotateCcw, BarChart3, CreditCard,
 } from 'lucide-react'
 import { NibudBenchmarkSection } from '@/components/app/will/nibud-benchmark'
@@ -29,7 +29,7 @@ import { CollapsibleSection } from '@/components/app/collapsible-section'
 import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-animation'
 import { FreedomDaysMonthlyTrend } from '@/components/app/will/freedom-days-monthly-trend'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
+import { FreedomTimeBadge, useDailyExpenseRate } from '@/components/app/freedom-time-label'
 import { formatCurrency } from '@/lib/format'
 import { OpzegModal } from '@/components/app/opzeg-modal'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
@@ -72,6 +72,7 @@ export default function WillPage() {
   const [subscriptionsOpen, setSubscriptionsOpen] = useState(false)
   const [detectingAlgo, setDetectingAlgo] = useState(false)
   const [detectingAI, setDetectingAI] = useState(false)
+  const { dailyExpenseRate } = useDailyExpenseRate()
 
   // Deep-link: open modal via ?modal= URL param (from dashboard widgets)
   const searchParams = useSearchParams()
@@ -181,6 +182,24 @@ export default function WillPage() {
     const supabase = createClient()
     const today = new Date().toISOString().split('T')[0]
 
+    // Get household_id for shared goal filtering
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    let householdFilter = ''
+    if (authUser) {
+      const { data: membership } = await supabase
+        .from('household_members')
+        .select('household_id')
+        .eq('user_id', authUser.id)
+        .maybeSingle()
+      if (membership?.household_id) {
+        householdFilter = `,and(ownership.eq.shared,household_id.eq.${membership.household_id})`
+      }
+    }
+
+    const goalFilter = authUser
+      ? `user_id.eq.${authUser.id}${householdFilter}`
+      : `user_id.eq.00000000-0000-0000-0000-000000000000`
+
     const [
       actionsRes,
       pendingRecsRes,
@@ -192,7 +211,6 @@ export default function WillPage() {
       actionsForBoardRes,
       assetsRes,
       debtsRes,
-      userRes,
     ] = await Promise.all([
       supabase
         .from('actions')
@@ -208,16 +226,19 @@ export default function WillPage() {
       supabase
         .from('goals')
         .select('*, budgets:budget_id(id, name)')
+        .or(goalFilter)
         .eq('is_completed', false)
         .order('sort_order', { ascending: true })
         .limit(5),
       supabase
         .from('goals')
         .select('*', { count: 'exact', head: true })
+        .or(goalFilter)
         .eq('is_completed', true),
       supabase
         .from('goals')
-        .select('*', { count: 'exact', head: true }),
+        .select('*', { count: 'exact', head: true })
+        .or(goalFilter),
       // For RecommendationList inline
       supabase
         .from('recommendations')
@@ -235,8 +256,6 @@ export default function WillPage() {
         // For GoalForm
       supabase.from('assets').select('id, name, current_value').eq('is_active', true),
       supabase.from('debts').select('id, name, current_balance').eq('is_active', true),
-      // For OpzegModal
-      supabase.auth.getUser(),
     ])
 
     const allActions = (actionsRes.data ?? []) as KpiData['allActions']
@@ -246,9 +265,8 @@ export default function WillPage() {
     const loadedDebts = (debtsRes.data ?? []) as { id: string; name: string; current_balance: number }[]
 
     // Profile for OpzegModal
-    const userId = userRes.data.user?.id
-    if (userId) {
-      const { data: profileData } = await supabase.from('profiles').select('full_name').eq('id', userId).single()
+    if (authUser?.id) {
+      const { data: profileData } = await supabase.from('profiles').select('full_name').eq('id', authUser.id).single()
       setUserProfile({ full_name: profileData?.full_name ?? null })
     }
 
@@ -690,6 +708,7 @@ export default function WillPage() {
                   goal={goal}
                   progress={goalProgresses[i]}
                   onClick={() => setShowGoalModal(true)}
+                  dailyExpenses={dailyExpenseRate}
                 />
               ))}
             </div>
@@ -1244,12 +1263,30 @@ function GoalSummaryRow({
   goal,
   progress,
   onClick,
+  dailyExpenses,
 }: {
   goal: GoalWithBudget
   progress: { current: number; target: number; pct: number; onTrack: boolean; eta: string | null }
   onClick: () => void
+  dailyExpenses?: number
 }) {
   const colors = getGoalColorClasses(goal.color)
+  const isFreedm = goal.goal_type === 'freedom_days'
+
+  // Freedom-time framing for non-freedom_days goals with target > 100
+  let freedomTimeStr: string | null = null
+  if (!isFreedm && dailyExpenses && dailyExpenses > 0 && progress.target > 100) {
+    const totalDays = Math.round(progress.target / dailyExpenses)
+    if (totalDays >= 365) {
+      const y = Math.floor(totalDays / 365)
+      const m = Math.round((totalDays % 365) / 30)
+      freedomTimeStr = m > 0 ? `${y}j ${m}m vrijheid` : `${y}j vrijheid`
+    } else if (totalDays >= 30) {
+      freedomTimeStr = `${Math.round(totalDays / 30)}m vrijheid`
+    } else {
+      freedomTimeStr = `${totalDays}d vrijheid`
+    }
+  }
 
   return (
     <button
@@ -1263,6 +1300,11 @@ function GoalSummaryRow({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             <p className="truncate text-sm font-medium text-[var(--ink)]">{goal.name}</p>
+            {goal.ownership === 'shared' && (
+              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-wil-50 px-1.5 py-0.5 text-[9px] font-semibold text-wil-600">
+                <Users className="h-2.5 w-2.5" /> Gedeeld
+              </span>
+            )}
             {goal.budgets?.name && (
               <span className="inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] bg-kern-50 text-kern-600 border border-kern-200">
                 via {goal.budgets.name}
@@ -1271,6 +1313,9 @@ function GoalSummaryRow({
           </div>
           <div className="ml-3 flex items-center gap-2">
             <span className="text-sm font-bold text-[var(--ink-2)]">{progress.pct}%</span>
+            {freedomTimeStr && (
+              <span className="text-[10px] text-[var(--ink-3)]">{freedomTimeStr}</span>
+            )}
             {progress.eta && (
               <span className="text-xs text-[var(--ink-3)]">{progress.eta}</span>
             )}

@@ -34,6 +34,8 @@ const demoGoals: { goal: Goal; contribs: { date: string; amount: number }[]; lab
       completed_at: null,
       sort_order: 0,
       created_at: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString(),
+      ownership: 'personal' as const,
+      household_id: null,
       updated_at: new Date().toISOString(),
     },
     contribs: [
@@ -64,6 +66,8 @@ const demoGoals: { goal: Goal; contribs: { date: string; amount: number }[]; lab
       completed_at: null,
       sort_order: 1,
       created_at: new Date(Date.now() - 150 * 24 * 60 * 60 * 1000).toISOString(),
+      ownership: 'personal' as const,
+      household_id: null,
       updated_at: new Date().toISOString(),
     },
     contribs: [
@@ -93,6 +97,8 @@ const demoGoals: { goal: Goal; contribs: { date: string; amount: number }[]; lab
       completed_at: null,
       sort_order: 2,
       created_at: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString(),
+      ownership: 'personal' as const,
+      household_id: null,
       updated_at: new Date().toISOString(),
     },
     contribs: [
@@ -128,6 +134,8 @@ const demoGoals: { goal: Goal; contribs: { date: string; amount: number }[]; lab
       completed_at: null,
       sort_order: 3,
       created_at: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString(),
+      ownership: 'personal' as const,
+      household_id: null,
       updated_at: new Date().toISOString(),
     },
     contribs: [
@@ -158,6 +166,8 @@ const demoGoals: { goal: Goal; contribs: { date: string; amount: number }[]; lab
       completed_at: null,
       sort_order: 4,
       created_at: new Date().toISOString(),
+      ownership: 'personal' as const,
+      household_id: null,
       updated_at: new Date().toISOString(),
     },
     contribs: [],
@@ -181,6 +191,8 @@ const demoGoals: { goal: Goal; contribs: { date: string; amount: number }[]; lab
       completed_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
       sort_order: 5,
       created_at: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString(),
+      ownership: 'personal' as const,
+      household_id: null,
       updated_at: new Date().toISOString(),
     },
     contribs: [

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { X, Plus, Check, ChevronDown, ChevronUp, Trash2, BarChart3 } from 'lucide-react'
+import { X, Plus, Check, ChevronDown, ChevronUp, Trash2, BarChart3, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
   type Goal, type GoalType, GOAL_TYPE_LABELS,
@@ -35,29 +35,30 @@ export function GoalDetailModal({
 
   const loadData = useCallback(async () => {
     const supabase = createClient()
-    const [goalsRes, assetsRes, debtsRes] = await Promise.all([
-      supabase.from('goals').select('*').order('sort_order', { ascending: true }),
+    // Use the API for goals (includes shared household goals)
+    const [goalsApiRes, assetsRes, debtsRes] = await Promise.all([
+      fetch('/api/goals').then(r => r.ok ? r.json() : []),
       supabase.from('assets').select('id, name, current_value').eq('is_active', true),
       supabase.from('debts').select('id, name, current_balance').eq('is_active', true),
     ])
 
-    if (goalsRes.data) {
-      const updatedGoals = (goalsRes.data as Goal[]).map((goal) => {
-        if (goal.linked_asset_id && assetsRes.data) {
-          const asset = (assetsRes.data as Asset[]).find(a => a.id === goal.linked_asset_id)
-          if (asset) return { ...goal, current_value: Number(asset.current_value) }
+    const goalsData = (Array.isArray(goalsApiRes) ? goalsApiRes : []) as Goal[]
+    const updatedGoals = goalsData.map((goal) => {
+      if (goal.linked_asset_id && assetsRes.data) {
+        const asset = (assetsRes.data as Asset[]).find(a => a.id === goal.linked_asset_id)
+        if (asset) return { ...goal, current_value: Number(asset.current_value) }
+      }
+      if (goal.linked_debt_id && debtsRes.data) {
+        const debt = (debtsRes.data as Debt[]).find(d => d.id === goal.linked_debt_id)
+        if (debt) {
+          const paid = Number(goal.target_value) - Number(debt.current_balance)
+          return { ...goal, current_value: Math.max(0, paid) }
         }
-        if (goal.linked_debt_id && debtsRes.data) {
-          const debt = (debtsRes.data as Debt[]).find(d => d.id === goal.linked_debt_id)
-          if (debt) {
-            const paid = Number(goal.target_value) - Number(debt.current_balance)
-            return { ...goal, current_value: Math.max(0, paid) }
-          }
-        }
-        return goal
-      })
-      setGoals(updatedGoals)
-    }
+      }
+      return goal
+    })
+    setGoals(updatedGoals)
+
     if (assetsRes.data) setAssets(assetsRes.data as Asset[])
     if (debtsRes.data) setDebts(debtsRes.data as Debt[])
     setLoading(false)
@@ -374,6 +375,11 @@ function GoalCard({
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${colors.bgLight} ${colors.text}`}>
               {typeLabel}
             </span>
+            {goal.ownership === 'shared' && (
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-wil-50 px-2 py-0.5 text-[10px] font-medium text-wil-600">
+                <Users className="h-2.5 w-2.5" /> Gedeeld
+              </span>
+            )}
             {!goal.is_completed && !onTrack && goal.target_date && (
               <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-600">
                 Achterstand

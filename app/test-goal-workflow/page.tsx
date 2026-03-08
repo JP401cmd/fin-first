@@ -43,6 +43,8 @@ export default function TestGoalWorkflow() {
     is_completed: false,
     completed_at: null,
     sort_order: 0,
+    ownership: 'personal' as const,
+    household_id: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-02-16T00:00:00Z',
   }

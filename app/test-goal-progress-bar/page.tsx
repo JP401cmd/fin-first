@@ -33,7 +33,8 @@ export default function TestGoalProgressBarPage() {
     goal_type: 'savings', target_value: 10000, current_value: 3000,
     target_date: '2027-06-01', linked_asset_id: null, linked_debt_id: null,
     icon: '🎯', color: 'teal', is_completed: false, completed_at: null,
-    sort_order: 0, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-02-16T00:00:00Z',
+    sort_order: 0, ownership: 'personal' as const, household_id: null,
+    created_at: '2026-01-01T00:00:00Z', updated_at: '2026-02-16T00:00:00Z',
   }
 
   const goal50: Goal = {
@@ -42,7 +43,8 @@ export default function TestGoalProgressBarPage() {
     goal_type: 'savings', target_value: 10000, current_value: 5000,
     target_date: '2027-06-01', linked_asset_id: null, linked_debt_id: null,
     icon: '🎯', color: 'emerald', is_completed: false, completed_at: null,
-    sort_order: 1, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-02-16T00:00:00Z',
+    sort_order: 1, ownership: 'personal' as const, household_id: null,
+    created_at: '2026-01-01T00:00:00Z', updated_at: '2026-02-16T00:00:00Z',
   }
 
   const progress30 = computeGoalProgress(goal30)
