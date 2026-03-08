@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { NOTIFICATION_TYPES } from '@/lib/identity-constants'
-import { Lock, GripVertical, ChevronDown, ChevronRight, Shield, Eye, EyeOff, Server, FileText, Users, CalendarCheck, HandCoins, BellRing, SplitSquareVertical, Bell, UserPlus } from 'lucide-react'
+import { Lock, GripVertical, ChevronDown, ChevronRight, Shield, Eye, EyeOff, Server, FileText, Users, CalendarCheck, HandCoins, BellRing, SplitSquareVertical, Bell, UserPlus, Wallet, CreditCard, Receipt, ArrowLeftRight, Banknote } from 'lucide-react'
 import Link from 'next/link'
 import {
   DndContext,
@@ -1685,7 +1685,7 @@ export default function InstellingenPage() {
           <div>
             <h2 className="label-editorial text-[var(--ink-2)]">Privacy & AI</h2>
             {!privacyOpen && (
-              <p className="mt-0.5 text-xs text-[var(--ink-3)]">Hoe je data wordt beschermd bij AI-verwerking</p>
+              <p className="mt-0.5 text-xs text-[var(--ink-3)]">Transparantie over hoe je gegevens worden gebruikt</p>
             )}
           </div>
           <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${privacyOpen ? 'rotate-180' : ''}`} />
@@ -1715,10 +1715,18 @@ export default function InstellingenPage() {
               </button>
             </div>
 
-            {/* Intro */}
-            <p className="text-sm text-[var(--ink-2)] leading-relaxed">
-              TriFinity gebruikt AI om je financiële inzichten en aanbevelingen te geven. Hieronder zie je precies welke data wordt gedeeld en hoe deze wordt beschermd.
-            </p>
+            {/* Normalizing intro */}
+            <div className="flex items-start gap-3 rounded-xl bg-wil-50/40 p-4">
+              <Shield className="mt-0.5 h-5 w-5 text-wil-500 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-[var(--ink)]">Jij bent eigenaar van je data</p>
+                <p className="mt-1 text-sm text-[var(--ink-2)] leading-relaxed">
+                  TriFinity gebruikt AI om je financiële inzichten te geven. Hieronder zie je
+                  precies welke informatie wordt gedeeld — en wat altijd privé blijft.
+                  Je kunt AI op elk moment uitschakelen.
+                </p>
+              </div>
+            </div>
 
             {/* Wat WEL wordt gedeeld */}
             <div className="rounded-xl border border-[var(--border-ed)] p-4">
@@ -1758,7 +1766,7 @@ export default function InstellingenPage() {
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-50">
                   <EyeOff className="h-4 w-4 text-red-500" />
                 </div>
-                <h3 className="text-sm font-semibold text-[var(--ink)]">Wat NOOIT wordt gedeeld</h3>
+                <h3 className="text-sm font-semibold text-[var(--ink)]">Wat altijd privé blijft</h3>
               </div>
               <ul className="space-y-2 text-sm text-[var(--ink-2)]">
                 <li className="flex items-start gap-2">
@@ -1969,10 +1977,13 @@ export default function InstellingenPage() {
                 <div className="rounded-xl border border-wil-200 bg-wil-50/30 p-4 sm:p-5 space-y-4">
                   <div className="flex items-start gap-3">
                     <Shield className="mt-0.5 h-5 w-5 text-wil-600 shrink-0" />
-                    <p className="text-sm text-[var(--ink-2)] leading-relaxed">
-                      Stel per categorie in welke financiële gegevens je partner kan zien.
-                      Dit geldt alleen voor hoe jouw data wordt getoond aan je partner.
-                    </p>
+                    <div>
+                      <p className="text-sm font-medium text-[var(--ink)]">Samen financieel, eigen grenzen</p>
+                      <p className="mt-1 text-sm text-[var(--ink-2)] leading-relaxed">
+                        Ieder huishouden is anders — het is heel normaal om niet alles te delen.
+                        Stel per categorie in wat je partner kan zien. Je kunt dit altijd aanpassen.
+                      </p>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap gap-4 rounded-lg border border-[var(--border-ed)] p-3 bg-[var(--paper)]">
@@ -1992,19 +2003,25 @@ export default function InstellingenPage() {
 
                   <div className="space-y-3">
                     {([
-                      { key: 'vermogen', label: 'Vermogen', description: 'Bezittingen en beleggingen' },
-                      { key: 'schulden', label: 'Schulden', description: 'Leningen en schulden' },
-                      { key: 'budgetten', label: 'Budgetten', description: 'Maandbudgetten en bestedingen' },
-                      { key: 'transacties', label: 'Transacties', description: 'Individuele transacties' },
-                      { key: 'inkomen', label: 'Inkomen', description: 'Salaris en overig inkomen' },
+                      { key: 'vermogen', label: 'Vermogen', description: 'Bezittingen en beleggingen', icon: Wallet },
+                      { key: 'schulden', label: 'Schulden', description: 'Leningen en schulden', icon: CreditCard },
+                      { key: 'budgetten', label: 'Budgetten', description: 'Maandbudgetten en bestedingen', icon: Receipt },
+                      { key: 'transacties', label: 'Transacties', description: 'Individuele transacties', icon: ArrowLeftRight },
+                      { key: 'inkomen', label: 'Inkomen', description: 'Salaris en overig inkomen', icon: Banknote },
                     ] as const).map(cat => {
                       const currentLevel = householdPrivacy[cat.key] || 'totalen'
+                      const CatIcon = cat.icon
                       return (
                         <div key={cat.key} className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
                           <div className="flex items-center justify-between mb-2">
-                            <div>
-                              <h3 className="text-sm font-semibold text-[var(--ink)]">{cat.label}</h3>
-                              <p className="text-xs text-[var(--ink-3)]">{cat.description}</p>
+                            <div className="flex items-center gap-2.5">
+                              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-wil-50">
+                                <CatIcon className="h-3.5 w-3.5 text-wil-600" />
+                              </div>
+                              <div>
+                                <h3 className="text-sm font-semibold text-[var(--ink)]">{cat.label}</h3>
+                                <p className="text-xs text-[var(--ink-3)]">{cat.description}</p>
+                              </div>
                             </div>
                           </div>
                           <div className="flex gap-2">
