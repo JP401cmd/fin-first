@@ -3069,6 +3069,44 @@
 - Fire age chart uses same data source as resilience trend chart (resilienceSnapshots)
 - Chart only visible when user has 2+ monthly snapshots with valid fire_age values
 
+## Session 2026-03-08 - Features #525, #530, #526
+
+### Feature #525: Dashboard toont gecombineerde huishouden-vrijheidstijd - PASSING
+- Added `householdOverrides` field to DashboardData interface (widget-renderer.tsx)
+- Dashboard server component (dashboard/page.tsx) queries household_members and household_partner_totals RPC
+- Computes combined net worth (user + partner personal totals) when user is in a household
+- Updated all DashboardData consumers: daishboard, test-kern-widgets, mock-dashboard-data, draggable-widget-grid.test
+- NettoVermogenWidget uses usePerspective() to switch between personal/household data
+- Shows "Netto Vermogen — Huishouden" kicker and Users icon in household perspective
+- MoM delta hidden in household view (not yet computed for combined data)
+- Commit: 22d8b35
+
+### Feature #530: De Kern hero toont huishouden-vrijheidstijd bij huishouden-perspectief - PASSING
+- Core page (core/page.tsx) imports usePerspective, adds householdOverrides state
+- loadData() fetches household_partner_totals via RPC and stores combined overrides
+- Hero shows effectiveNetWorth, effectiveFreedomYears/Months when perspective='household'
+- Title changes to "Jullie tijdlijn naar vrijheid" with Huishouden badge
+- Per-partner breakdown (Persoonlijk: €X · Partner: €Y) shown below net worth
+- Freedom percentage bar uses effectiveNetWorth for household perspective
+- Commit: dec6e18
+
+### Feature #526: Per-partner vrijheidstijd vergelijking op dashboard - PASSING
+- Created HuishoudenVergelijkingWidget (components/widgets/huishouden-vergelijking-widget.tsx)
+- Two-column layout: "Jij" (kern-colored) vs partner name (wil-colored)
+- Each column: avatar icon, name, net worth (font-mono), freedom time (font-serif italic)
+- Comparison bar showing relative net worth proportion (kern-400 vs wil-400)
+- Full size adds combined total row with Users icon
+- Empty state when not in household perspective
+- Widget registered in catalog (half/full sizes), renderer switch, WIDGET_HREFS
+- Not enabled by default (user opt-in via widget settings)
+- Commit: 6637d06
+
+### Current Status
+- 3 features completed this session (#525, #530, #526)
+- Zero TypeScript errors in changed files
+- All 93 unit tests passing
+- Note: Browser testing blocked by Supabase email rate limit (persistent issue)
+
 ---
 
 ## Session 2026-02-17 - Feature #214
