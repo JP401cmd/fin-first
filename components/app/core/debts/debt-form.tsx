@@ -51,6 +51,9 @@ export function DebtForm({
   const [linkedAssetId, setLinkedAssetId] = useState(debt?.linked_asset_id ?? '')
   const [creditLimit, setCreditLimit] = useState(String(debt?.credit_limit ?? ''))
   const [draagkrachtmetingDate, setDraagkrachtmetingDate] = useState(debt?.draagkrachtmeting_date ?? '')
+  // Belastingschuld fields
+  const [taxYear, setTaxYear] = useState(String(debt?.tax_year ?? ''))
+  const [hasPaymentPlan, setHasPaymentPlan] = useState(debt?.has_payment_plan ?? false)
   const [validationError, setValidationError] = useState<string | null>(null)
   // Household ownership
   const [ownership, setOwnership] = useState<OwnershipType>(debt?.ownership ?? 'personal')
@@ -69,6 +72,13 @@ export function DebtForm({
       setRepaymentType('')
       setIsTaxDeductible(false)
       setNhg(false)
+      // Default creditor for belastingschuld
+      if (type === 'belastingschuld') {
+        setCreditor('Belastingdienst')
+        setInterestRate('4')
+        setHasPaymentPlan(false)
+        setTaxYear('')
+      }
     }
   }
 
@@ -143,6 +153,9 @@ export function DebtForm({
       linked_asset_id: linkedAssetId || null,
       credit_limit: creditLimit ? Number(creditLimit) : null,
       draagkrachtmeting_date: draagkrachtmetingDate || null,
+      // Belastingschuld fields
+      tax_year: taxYear ? Number(taxYear) : null,
+      has_payment_plan: debtType === 'belastingschuld' ? hasPaymentPlan : false,
       // Household fields
       ownership: ownership,
       household_id: ownership === 'shared' ? householdId : null,
@@ -458,7 +471,57 @@ export function DebtForm({
                     />
                   </div>
                 )}
+                {visibleFields.includes('tax_year') && (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Belastingjaar</label>
+                    <input
+                      type="number"
+                      value={taxYear}
+                      onChange={(e) => setTaxYear(e.target.value)}
+                      placeholder={String(new Date().getFullYear())}
+                      min={2000}
+                      max={2099}
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
+                    />
+                  </div>
+                )}
+                {visibleFields.includes('has_payment_plan') && (
+                  <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
+                    <input
+                      type="checkbox"
+                      checked={hasPaymentPlan}
+                      onChange={(e) => setHasPaymentPlan(e.target.checked)}
+                      className="rounded border-[var(--border-md)]"
+                    />
+                    Betalingsregeling
+                  </label>
+                )}
               </div>
+              {visibleFields.includes('has_payment_plan') && hasPaymentPlan && (
+                <div className="mt-2 rounded-[var(--r)] border border-kern-200 bg-kern-50/50 p-3">
+                  <p className="mb-2 text-[10px] font-medium uppercase text-kern-600/60">Betalingsregeling details</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Maandelijks bedrag</label>
+                      <input
+                        type="number"
+                        value={monthlyPayment}
+                        onChange={(e) => setMonthlyPayment(e.target.value)}
+                        className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Einddatum regeling</label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

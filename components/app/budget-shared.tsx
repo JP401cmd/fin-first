@@ -12,6 +12,7 @@ import {
   GraduationCap, RefreshCw, CalendarCheck, CircleDot,
   Gem, Bitcoin, LineChart, Building, Briefcase,
   SlidersHorizontal, ArrowRightLeft, ArrowLeftRight,
+  Heart,
 } from 'lucide-react'
 
 export const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -26,6 +27,7 @@ export const iconMap: Record<string, React.ComponentType<{ className?: string }>
   GraduationCap, RefreshCw, CalendarCheck, CircleDot,
   Gem, Bitcoin, LineChart, Building, Briefcase,
   Sliders: SlidersHorizontal, SlidersHorizontal, ArrowRightLeft, ArrowLeftRight,
+  Heart,
 }
 
 export const iconOptions = Object.keys(iconMap)

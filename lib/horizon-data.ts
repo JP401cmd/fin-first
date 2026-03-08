@@ -319,7 +319,35 @@ export interface WerkloosheidMetadata {
 export interface SchenkingMetadata {
   relatieOntvanger?: 'kind' | 'kleinkind' | 'overig'
   eenmaligOfJaarlijks?: 'eenmalig' | 'jaarlijks'
+  aantalOntvangers?: number
+  aantalJaren?: number
   doelBestemming?: 'vrij' | 'studie' | 'woning' | 'onderneming'
+}
+
+/** Schenkingsvrijstellingen 2026 (Belastingdienst) per jaar per ontvanger */
+export const SCHENKING_VRIJSTELLING: Record<string, number> = {
+  kind: 6633,
+  kleinkind: 2658,
+  overig: 2658,
+}
+
+/** Schenkbelasting tarieven 2026 (Belastingdienst) */
+export const SCHENKING_TARIEVEN: Record<string, { laag: number; hoog: number; grens: number }> = {
+  kind: { laag: 0.10, hoog: 0.20, grens: 154197 },
+  kleinkind: { laag: 0.18, hoog: 0.36, grens: 154197 },
+  overig: { laag: 0.30, hoog: 0.40, grens: 154197 },
+}
+
+/** Bereken schenkbelasting per ontvanger */
+export function berekenSchenkbelasting(bedrag: number, relatie: string): { vrijstelling: number; belastbaar: number; belasting: number } {
+  const vrijstelling = SCHENKING_VRIJSTELLING[relatie] ?? 2658
+  const tarief = SCHENKING_TARIEVEN[relatie] ?? SCHENKING_TARIEVEN.overig
+  const belastbaar = Math.max(0, bedrag - vrijstelling)
+  if (belastbaar <= 0) return { vrijstelling, belastbaar: 0, belasting: 0 }
+  const laagDeel = Math.min(belastbaar, tarief.grens)
+  const hoogDeel = Math.max(0, belastbaar - tarief.grens)
+  const belasting = Math.round(laagDeel * tarief.laag + hoogDeel * tarief.hoog)
+  return { vrijstelling, belastbaar, belasting }
 }
 
 /** Union of all typed metadata interfaces per event_type key. */
@@ -897,10 +925,12 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
         { value: 'kleinkind', label: 'Kleinkind (vrijstelling ~€2.658/jr)' },
         { value: 'overig', label: 'Overig (vrijstelling ~€2.658/jr)' },
       ], tip: 'Vrijstellingsbedragen 2026 (Belastingdienst). Bij hogere bedragen geldt schenkbelasting.' },
+      { key: 'aantalOntvangers', label: 'Aantal ontvangers', fieldType: 'number', default: 1, tip: 'Per ontvanger geldt een aparte vrijstelling. Bij 2 kinderen = 2× vrijstelling.' },
       { key: 'eenmaligOfJaarlijks', label: 'Frequentie', fieldType: 'select', default: 'eenmalig', options: [
         { value: 'eenmalig', label: 'Eenmalig' },
         { value: 'jaarlijks', label: 'Jaarlijks (binnen vrijstelling)' },
       ], tip: 'Jaarlijks schenken binnen de vrijstelling is belastingvrij en verlaagt je Box 3-grondslag structureel.' },
+      { key: 'aantalJaren', label: 'Aantal jaren schenken', fieldType: 'number', default: 10, tip: 'Hoe lang je jaarlijks wilt schenken. Wordt alleen gebruikt bij jaarlijkse schenking.' },
       { key: 'doelBestemming', label: 'Doel van schenking', fieldType: 'select', default: 'vrij', options: [
         { value: 'vrij', label: 'Vrij besteedbaar' },
         { value: 'studie', label: 'Studie' },

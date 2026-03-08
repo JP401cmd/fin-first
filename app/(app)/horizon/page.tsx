@@ -13,7 +13,7 @@ import {
   computeResilienceScore, formatFireAge, formatCountdown,
   computeLifeEventImpact, ageAtDate, deriveCountdown,
   runMonteCarlo,
-  LIFE_EVENT_CATALOG, LIFE_EVENT_GROUPS, nibudChildrenCost,
+  LIFE_EVENT_CATALOG, LIFE_EVENT_GROUPS, nibudChildrenCost, berekenSchenkbelasting,
   type LifeEventGroup,
   type FinancialInput, type FireProjection, type FireRange,
   type ProjectionMonth, type ResilienceScore,
@@ -673,6 +673,28 @@ export default function HorizonPage() {
       monthlyIncomeChange = -inkomensgat // negative = loss of income
       // Duration = total unemployment period
       durMonths = Math.max(wwDuur, zoektijd)
+    }
+
+    // Special handling for schenking: calculate total including belasting
+    if (formType === 'schenking') {
+      const bedrag = Number(formAmount) || 0
+      const aantalOntvangers = Math.max(1, Number(formMetadata.aantalOntvangers) || 1)
+      const relatie = String(formMetadata.relatieOntvanger ?? 'kind')
+      const frequentie = String(formMetadata.eenmaligOfJaarlijks ?? 'eenmalig')
+      const bedragPerOntvanger = bedrag / aantalOntvangers
+      const { belasting } = berekenSchenkbelasting(bedragPerOntvanger, relatie)
+      const totaleBelasting = belasting * aantalOntvangers
+      // Total cost = schenking + belasting
+      oneTimeCost = bedrag + totaleBelasting
+      monthlyCostChange = 0
+      monthlyIncomeChange = 0
+      if (frequentie === 'jaarlijks') {
+        const jaren = Math.max(1, Number(formMetadata.aantalJaren) || 10)
+        durMonths = jaren * 12
+        // Convert to monthly: yearly total / 12
+        monthlyCostChange = Math.round((bedrag + totaleBelasting) / 12)
+        oneTimeCost = 0
+      }
     }
 
     const payload = {
@@ -1918,6 +1940,16 @@ export default function HorizonPage() {
                             if (formType === 'children' && field.key === 'aantalKinderen') {
                               setFormAmount(nibudChildrenCost(Number(val)))
                             }
+                            if (formType === 'schenking' && field.key === 'eenmaligOfJaarlijks') {
+                              if (val === 'jaarlijks') {
+                                setFormDurationType('period')
+                                const jaren = Number(formMetadata.aantalJaren) || 10
+                                setFormDuration(jaren * 12)
+                              } else {
+                                setFormDurationType('one_time')
+                                setFormDuration(0)
+                              }
+                            }
                           }}
                           className="mt-1 w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
                         >
@@ -2039,6 +2071,55 @@ export default function HorizonPage() {
                                 </p>
                               )}
                             </div>
+                          </div>
+                        )
+                      })()}
+                      {formType === 'schenking' && field.key === 'eenmaligOfJaarlijks' && (() => {
+                        const bedrag = Number(formAmount) || 10000
+                        const aantalOntvangers = Math.max(1, Number(formMetadata.aantalOntvangers) || 1)
+                        const relatie = String(formMetadata.relatieOntvanger ?? 'kind')
+                        const frequentie = String(formMetadata.eenmaligOfJaarlijks ?? 'eenmalig')
+                        const bedragPerOntvanger = bedrag / aantalOntvangers
+                        const result = berekenSchenkbelasting(bedragPerOntvanger, relatie)
+                        const totaleBelasting = result.belasting * aantalOntvangers
+                        const totaleVrijstelling = result.vrijstelling * aantalOntvangers
+                        const isJaarlijks = frequentie === 'jaarlijks'
+                        const jaren = isJaarlijks ? Math.max(1, Number(formMetadata.aantalJaren) || 10) : 1
+                        const totaalOverJaren = (bedrag + totaleBelasting) * jaren
+                        return (
+                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Schenkingsoverzicht</p>
+                            <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                              <div className="flex justify-between"><span>Bedrag per ontvanger</span><span className="font-mono tabular-nums">{formatCurrency(bedragPerOntvanger)}</span></div>
+                              <div className="flex justify-between"><span>Vrijstelling ({relatie === 'kind' ? 'kind' : 'overig'})</span><span className="font-mono tabular-nums text-emerald-600">-{formatCurrency(result.vrijstelling)}</span></div>
+                              <div className="flex justify-between"><span>Belastbaar per ontvanger</span><span className="font-mono tabular-nums">{formatCurrency(result.belastbaar)}</span></div>
+                              {result.belasting > 0 && (
+                                <div className="flex justify-between"><span>Schenkbelasting per ontvanger ({relatie === 'kind' ? '10–20%' : relatie === 'kleinkind' ? '18–36%' : '30–40%'})</span><span className="font-mono tabular-nums text-red-600">{formatCurrency(result.belasting)}</span></div>
+                              )}
+                              {aantalOntvangers > 1 && (
+                                <>
+                                  <div className="h-px bg-horizon-200 my-1" />
+                                  <div className="flex justify-between"><span>Totale vrijstelling ({aantalOntvangers}×)</span><span className="font-mono tabular-nums text-emerald-600">{formatCurrency(totaleVrijstelling)}</span></div>
+                                  {totaleBelasting > 0 && (
+                                    <div className="flex justify-between"><span>Totale schenkbelasting ({aantalOntvangers}×)</span><span className="font-mono tabular-nums text-red-600">{formatCurrency(totaleBelasting)}</span></div>
+                                  )}
+                                </>
+                              )}
+                              <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
+                                <span>Totale kosten{isJaarlijks ? ` (${jaren} jaar)` : ''}</span>
+                                <span className="font-mono tabular-nums text-red-600">-{formatCurrency(totaalOverJaren)}</span>
+                              </div>
+                            </div>
+                            {result.belasting === 0 && (
+                              <p className="text-[10px] text-emerald-600">
+                                ✓ Volledig binnen de vrijstelling — geen schenkbelasting verschuldigd
+                              </p>
+                            )}
+                            {isJaarlijks && (
+                              <p className="text-[10px] text-[var(--ink-4)]">
+                                Jaarlijkse schenking verlaagt je Box 3 vermogen en daarmee je belasting
+                              </p>
+                            )}
                           </div>
                         )
                       })()}
