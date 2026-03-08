@@ -257,6 +257,14 @@ export interface DashboardData {
   topLifeEvents: TopLifeEvent[]
   // Whether user actively chose to budget during onboarding
   budgetingActive: boolean
+  // Household perspective overrides (null if no household)
+  householdOverrides: {
+    netWorth: number
+    totalAssets: number
+    totalDebts: number
+    monthlyExpenses: number
+    monthlyIncome: number
+  } | null
 }
 
 interface WidgetRendererProps {

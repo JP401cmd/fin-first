@@ -216,4 +216,5 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     { id: 'le2', name: 'Erfenis', year: 2035, impactType: 'positive', estimatedImpact: 50000 },
   ],
   budgetingActive: true,
+  householdOverrides: null,
 }

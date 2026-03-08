@@ -18,6 +18,7 @@ import {
 import { mergeWidgetPrefs, type WidgetPref, type WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData, TopAction, TopGoal, TopRecurringTransaction, TopRecommendation, TopLifeEvent, Notification, StreakData, AiInsight, NextStep, UpcomingEvent } from '@/components/widgets/widget-renderer'
 import { DraggableWidgetGrid } from '@/components/widgets/draggable-widget-grid'
+import { MonthlyCheckinCard } from '@/components/dashboard/monthly-checkin-card'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -777,6 +778,46 @@ export default async function DashboardPage() {
     isComplete: emergencyMonthsCovered >= TARGET_EMERGENCY_MONTHS,
   }
 
+  // ── Household perspective overrides ──────────────────────────
+  let householdOverrides: DashboardData['householdOverrides'] = null
+  try {
+    // Check if user has a household
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: membership } = await supabase
+        .from('household_members')
+        .select('household_id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (membership?.household_id) {
+        // Get partner's personal asset/debt totals via RPC
+        const { data: partnerTotals } = await supabase.rpc('household_partner_totals')
+        const pt = partnerTotals?.[0] ?? null
+
+        if (pt) {
+          const partnerAssets = Number(pt.partner_total_assets) || 0
+          const partnerDebts = Number(pt.partner_total_debts) || 0
+
+          // Household net worth = user's totals + partner's personal totals
+          // (shared items are already included in user's totals)
+          householdOverrides = {
+            netWorth: netWorth + partnerAssets - partnerDebts,
+            totalAssets: totalAssets + partnerAssets,
+            totalDebts: totalDebts + partnerDebts,
+            // Combined monthly expenses/income: use user's tracked expenses
+            // (these represent the household's tracked expenses from the user's bank accounts)
+            monthlyExpenses,
+            monthlyIncome,
+          }
+        }
+      }
+    }
+  } catch {
+    // Household data not available — gracefully degrade
+    householdOverrides = null
+  }
+
   // DashboardData bundle for widgets
   const dashboardData: DashboardData = {
     netWorth,
@@ -847,6 +888,7 @@ export default async function DashboardPage() {
     topRecommendations,
     topLifeEvents,
     budgetingActive,
+    householdOverrides,
   }
 
   return (
@@ -1003,6 +1045,11 @@ export default async function DashboardPage() {
             </div>
           </div>
         </Link>
+      </div>
+
+      {/* ── Monthly Check-in Reminder ─────────────────────────── */}
+      <div className="mt-6">
+        <MonthlyCheckinCard />
       </div>
 
       {/* ── Mijn Dashboard — Widget Grid ────────────────────────── */}

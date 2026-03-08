@@ -99,6 +99,7 @@ const mockData: DashboardData = {
   topRecommendations: [],
   topLifeEvents: [],
   budgetingActive: true,
+  householdOverrides: null,
 }
 
 const makePrefs = (ids: string[], sizes: ('half' | 'full')[] = []): WidgetPref[] =>
