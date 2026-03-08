@@ -14,6 +14,8 @@ export type AssetType =
   | 'crypto'
   | 'vehicle'
   | 'physical'
+  | 'deelneming'
+  | 'levensverzekering'
   | 'other'
 
 export type RiskProfile = 'laag' | 'middel' | 'hoog'
@@ -27,6 +29,8 @@ export type RealEstateSubtype = 'beleggingspand' | 'grond' | 'recreatiewoning'
 export type CryptoSubtype = 'bitcoin' | 'ethereum' | 'altcoins' | 'stablecoins' | 'defi'
 export type VehicleSubtype = 'auto_eigendom' | 'auto_financial_lease' | 'motor' | 'camper'
 export type PhysicalSubtype = 'kunst' | 'sieraden' | 'inboedel' | 'verzameling'
+export type DeelnemingSubtype = 'holding_bv' | 'familie_bv' | 'startup' | 'overig_belang'
+export type LevensverzekeringSubtype = 'kapitaalverzekering' | 'uitvaartverzekering' | 'gemengde_polis' | 'overig_verzekering'
 
 export type AssetSubtype =
   | CashSubtype
@@ -37,6 +41,8 @@ export type AssetSubtype =
   | CryptoSubtype
   | VehicleSubtype
   | PhysicalSubtype
+  | DeelnemingSubtype
+  | LevensverzekeringSubtype
 
 export interface Asset {
   id: string
@@ -68,6 +74,8 @@ export interface Asset {
   depreciation_rate: number | null
   address_postcode: string | null
   address_house_number: string | null
+  expiry_date: string | null
+  beneficiary: string | null
   // Household fields
   ownership: 'personal' | 'shared'
   household_id: string | null
@@ -87,6 +95,8 @@ export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
   crypto: 'Crypto',
   vehicle: 'Voertuig',
   physical: 'Fysieke bezittingen',
+  deelneming: 'Deelneming / Aanmerkelijk belang',
+  levensverzekering: 'Levensverzekering',
   other: 'Overig',
 }
 
@@ -100,6 +110,8 @@ export const ASSET_TYPE_ICONS: Record<AssetType, string> = {
   crypto: 'Bitcoin',
   vehicle: 'Car',
   physical: 'Gem',
+  deelneming: 'Building2',
+  levensverzekering: 'Shield',
   other: 'Briefcase',
 }
 
@@ -113,6 +125,8 @@ export const ASSET_TYPE_COLORS: Record<AssetType, string> = {
   crypto: '#f97316',
   vehicle: '#6366f1',
   physical: '#ec4899',
+  deelneming: '#0d9488',
+  levensverzekering: '#7c3aed',
   other: '#71717a',
 }
 
@@ -127,6 +141,8 @@ export const TYPICAL_RETURNS: Record<AssetType, number> = {
   crypto: 0, // too volatile to estimate
   vehicle: -15, // depreciates
   physical: 0,
+  deelneming: 0, // waarde is intrinsiek — handmatige waardering
+  levensverzekering: 1.5, // conservatief rendement op opbouwwaarde
   other: 0,
 }
 
@@ -182,6 +198,18 @@ export const ASSET_SUBTYPE_LABELS: Partial<Record<AssetType, Record<string, stri
     inboedel: 'Inboedel',
     verzameling: 'Verzameling',
   },
+  deelneming: {
+    holding_bv: 'Eigen holding BV',
+    familie_bv: 'Familie-BV',
+    startup: 'Startup deelneming',
+    overig_belang: 'Overig aanmerkelijk belang',
+  },
+  levensverzekering: {
+    kapitaalverzekering: 'Kapitaalverzekering',
+    uitvaartverzekering: 'Uitvaartverzekering met opbouwwaarde',
+    gemengde_polis: 'Gemengde polis',
+    overig_verzekering: 'Overige levensverzekering',
+  },
 }
 
 export const RISK_PROFILE_LABELS: Record<RiskProfile, string> = {
@@ -229,6 +257,16 @@ export const ASSET_SUBTYPE_DEFAULTS: Record<string, Partial<{
   altcoins: { risk_profile: 'hoog', expected_return: 0 },
   stablecoins: { risk_profile: 'laag', expected_return: 3 },
   defi: { risk_profile: 'hoog', expected_return: 0 },
+  // Deelneming
+  holding_bv: { risk_profile: 'hoog', is_liquid: false, expected_return: 0 },
+  familie_bv: { risk_profile: 'hoog', is_liquid: false, expected_return: 0 },
+  startup: { risk_profile: 'hoog', is_liquid: false, expected_return: 0 },
+  overig_belang: { risk_profile: 'hoog', is_liquid: false, expected_return: 0 },
+  // Levensverzekering
+  kapitaalverzekering: { risk_profile: 'laag', is_liquid: false, expected_return: 1.5 },
+  uitvaartverzekering: { risk_profile: 'laag', is_liquid: false, expected_return: 1 },
+  gemengde_polis: { risk_profile: 'middel', is_liquid: false, expected_return: 1.5 },
+  overig_verzekering: { risk_profile: 'laag', is_liquid: false, expected_return: 1.5 },
 }
 
 /** Which type-specific fields to show per asset_type */
@@ -242,6 +280,8 @@ export const ASSET_TYPE_FIELDS: Record<AssetType, string[]> = {
   crypto: ['subtype', 'risk_profile', 'ticker_symbol'],
   vehicle: ['subtype', 'depreciation_rate'],
   physical: ['subtype'],
+  deelneming: ['subtype', 'risk_profile'],
+  levensverzekering: ['subtype', 'risk_profile', 'is_liquid', 'expiry_date', 'beneficiary'],
   other: [],
 }
 
@@ -317,7 +357,7 @@ export function projectPortfolio(
   for (let m = 0; m < months; m++) {
     const byType: Record<AssetType, number> = {
       cash: 0, savings: 0, investment: 0, retirement: 0, eigen_huis: 0, real_estate: 0,
-      crypto: 0, vehicle: 0, physical: 0, other: 0,
+      crypto: 0, vehicle: 0, physical: 0, deelneming: 0, levensverzekering: 0, other: 0,
     }
     let total = 0
     for (const p of projections) {
