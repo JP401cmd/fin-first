@@ -1,3 +1,69 @@
+## Session 2026-03-08 - Features #558, #559, #561
+
+### Feature #558: Partner-notificatie instellingen configureren - PASSING
+- Added "Partner transacties" section to Identity > Instellingen > Notificaties
+- 4 modes: all_shared, threshold (€ amount), categories (budget picker), disabled
+- Radio-button UI with teal module colors, only visible when hasHousehold
+- Created /api/partner-notifications (GET/PUT) storing in app_settings
+- Loads budget categories dynamically from user's budgets
+- Separate save button per section with unsaved changes indicator
+
+### Feature #559: In-app notificatie bij grote partner-transactie - PASSING
+- Added partner_transaction type to NotificationType union
+- Notification generator in GET /api/notifications checks household membership
+- Loads partner notification preferences (mode, threshold, categories)
+- Fetches partner's recent transactions and applies filter rules
+- Each notification includes: amount (€XX.XX), category name, freedom-days impact
+- Freedom days calculated from user's daily expenses
+- Added partner_transaction to MODULE_MAP in notification-item.tsx (DE KERN / kern colors)
+- Added to validTypes in PUT handler
+
+### Feature #561: Partner activiteitsfeed voor gedeelde uitgaven - PASSING
+- Created huishouden-activiteit-widget.tsx (WidgetShell + chronological feed)
+- Added to widget-catalog.ts (id: huishouden_activiteit, kern module, half/full sizes)
+- Added to widget-renderer.tsx (HouseholdActivityItem type + switch case)
+- Dashboard page.tsx fetches shared transactions from all household members
+- Shows partner name initial, description, amount, date, category, shared badge
+- Max 10 items (half) or 15 items (full) with "Meer bekijken" link
+- Respects partner's transaction privacy settings (hides if verborgen/hidden)
+- Only visible in household perspective
+
+### Current Status
+- 3 features completed this session (#558, #559, #561)
+- Zero TypeScript errors in changed files
+- Commit: 6c63479
+
+## Session 2026-03-08 - Features #551, #552, #553
+
+### Feature #551: Maandelijkse geldcheck-in herinnering - PASSING
+- Already fully implemented: MonthlyCheckinCard on dashboard, API at /api/monthly-checkin, settings toggle
+- Dashboard card shows at start of new month if enabled and not yet completed
+- Dismiss button, CTA to start check-in, toggle in /identity/instellingen
+
+### Feature #552: Geldcheck-in wizard met gestructureerde gesprekspunten - PASSING
+- Created 5-step wizard page at /core/checkin
+- Steps: Terugblik (metrics), Doelen (goal progress), Budget (status), Vooruitblik (upcoming), Reflectie (open question)
+- API endpoints: /api/checkin/{overview,budgets,upcoming,save}
+- Updated dashboard card CTA to link to /core/checkin instead of /core
+- Step progress bar with wil-colored theme
+- Reflection saved privately in app_settings table
+
+### Feature #553: Geldcheck-in toont veranderingen sinds vorige check-in - PASSING
+- Metrics snapshot saved on check-in completion (netWorth, income, expenses, savings, actions, goals, fireAge)
+- GET /api/checkin/save returns previous month's snapshot for delta computation
+- StepTerugblik shows delta cards with +/- amounts and freedom-time equivalents
+- Over-budget items highlighted in red in StepBudget
+- Completed actions count + freedom days won displayed
+- FIRE age change shown with positive/negative framing
+- StepReflectie summary includes freedom-time for savings and FIRE delta
+
+### Current Status
+- 3 features completed this session (#551, #552, #553)
+- Zero TypeScript errors in new files
+- All API endpoints auth-gated (401 for unauthenticated)
+- No mock data patterns
+- Commit: fd243df
+
 ## Session 2026-03-08 - Features #533, #534, #535
 
 ### Feature #533: Privacy-instellingen UI in huishouden-settings - PASSING
@@ -10658,3 +10724,43 @@ For Feature #51 (Transaction Import):
 - Zero TypeScript errors
 - Zero console errors
 - 520/520 features passing (100%)
+## Session 2026-03-08 - Features #541, #546, #542
+
+### Feature #541: Gedeeld financieel doel aanmaken met partner - PASSING
+- Extended Goal type with ownership (personal/shared) and household_id fields
+- GoalForm: added Gedeeld doel toggle (Users icon, visible when user has household)
+- Toggle fetches household status via /api/household/status on mount
+- API /api/goals GET: returns own goals + shared household goals (via .or filter)
+- API /api/goals POST: supports ownership and household_id; checks household membership
+- API /api/goals PATCH: tries own goal first, then shared household goal
+- API /api/goals DELETE: same dual-try pattern for own/shared goals
+- GoalSummaryRow: shows Gedeeld badge + freedom-time framing (uses dailyExpenseRate)
+- GoalDetailModal: loads via fetch /api/goals (includes shared), shows Gedeeld badge
+- Will page goal queries updated to include shared goals via .or filter
+- Fixed Goal type in 5 test/verify files (ownership + household_id defaults)
+- Zero TypeScript errors
+- Commit: 3d7cec2
+
+### Feature #546: Gedeelde doelen filter in De Wil overzicht - PASSING
+- Added goalFilter state: all / personal / shared
+- Filter tabs (Alle / Persoonlijk / Gedeeld) shown when shared goals exist
+- Tabs use pill-style segmented control UI (bg-subtle + bg-paper active)
+- Will page: filteredGoals + filteredGoalProgresses computed from goalFilter
+- GoalDetailModal: filter tabs in separate border-b section below header
+- Empty state messages per filter type
+- Commit: 25bf217
+
+### Feature #542: Gedeeld doel toont per-partner bijdrage - PASSING
+- GoalDetailModal fetches household settings + member info when shared goals exist
+- HouseholdInfo type: splitMode, member names, mySharePct (via computeSharePct)
+- GoalCard: per-partner contribution breakdown for shared goals
+- Two color-coded progress bars: wil-400 (me) + horizon-400 (partner)
+- Shows expected contribution amount per partner based on split mode
+- Split mode label shown (50/50, Inkomenratio, Aangepast, etc.)
+- Only shown for active (non-completed) shared goals
+- Commit: b3d6772
+
+### Current Status
+- 3 features completed this session (#541, #546, #542)
+- Zero TypeScript errors in changed files
+- All data from real Supabase queries, no mock data
