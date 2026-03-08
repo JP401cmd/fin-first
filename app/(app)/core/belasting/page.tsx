@@ -357,7 +357,7 @@ export default function BelastingPage() {
                   <CalcRow label="Totaal spaargeld" value={activeResult.totaalSpaargeld} />
                   <CalcRow label="Totaal beleggingen" value={activeResult.totaalBeleggingen} />
                   {activeResult.totaalUitgesloten > 0 && (
-                    <CalcRow label="Uitgesloten (Box 1)" value={activeResult.totaalUitgesloten} muted />
+                    <CalcRow label="Uitgesloten (Box 1/2)" value={activeResult.totaalUitgesloten} muted />
                   )}
                   <div className="h-px bg-[var(--border-ed)]" />
                   <CalcRow label="Box 3 schulden" value={activeResult.totaalBox3Schulden} />
@@ -658,8 +658,8 @@ export default function BelastingPage() {
                         )}
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-[10px] font-medium text-[var(--ink-3)] uppercase">
-                          {ac.category ?? 'Uitgesloten'}
+                        <span className={`text-[10px] font-medium uppercase ${ac.category ? 'text-[var(--ink-3)]' : 'text-[var(--ink-4)]'}`}>
+                          {ac.category ?? (ac.exclusionReason ? `Uitgesloten (${ac.exclusionReason.includes('Box 2') ? 'Box 2' : 'Box 1'})` : 'Uitgesloten')}
                         </span>
                         <span className="font-mono tabular-nums text-[var(--ink)]">
                           {formatCurrency(Number(ac.asset.current_value))}
