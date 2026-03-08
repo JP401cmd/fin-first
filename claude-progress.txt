@@ -1,3 +1,33 @@
+## Session 2026-03-08 - Features #596, #597, #598
+
+### Feature #596: Carriereswitch salarisverschil en overgangsperiode modellering - PASSING
+- Already fully implemented by previous agents
+- Catalog fields: huidigNettoSalaris, verwachtNieuwNettoSalaris, periodeZonderInkomen (3), overgangsperiodeMaanden (12), omscholingskosten
+- Three-phase save: gap (no income), transition (midpoint salary), new normal
+- Summary card with per-phase breakdown and terugverdientijd calculation
+
+### Feature #597: Trouwerij budget presets en huwelijksreis optie - PASSING
+- Added budgetPreset select field: Intiem (€5-10K), Gemiddeld (€15-25K), Uitgebreid (€25-40K)
+- BRUILOFT_BUDGET_PRESETS constant with bedrag + gasten per preset
+- Auto-update formAmount and aantalGasten on preset change
+- Special save: oneTimeCost = bruiloft + huwelijksreis + notariskosten (if huwelijksvoorwaarden)
+- Summary card with full breakdown + fiscaal partnerschap Box 3 tip
+- Updated WeddingMetadata with budgetPreset field
+
+### Feature #598: Verhuizing dubbele lasten en maandlastenverschil berekening - PASSING
+- Extended MoveMetadata: verhuiskosten, inrichtingskosten, dubbeleLastenMaanden, dubbeleLastenBedrag, huurverschil, verschilPermanent
+- Updated move catalog: 7 fields (afstand, verhuiskosten €1500, inrichtingskosten €3000, dubbele lasten maanden/bedrag, huurverschil, permanent toggle)
+- Auto-update verhuiskosten when afstand changes (lokaal €1500, regionaal €3000, internationaal €8000)
+- Special save: oneTimeCost = verhuis + inrichting + dubbele lasten; monthlyCostChange = huurverschil
+- Duration: permanent (0) or tijdelijk (formDuration)
+- Summary card with eenmalige kosten breakdown + structureel maandlastenverschil
+- Commit: 297e96c
+
+### Current Status
+- 3 features completed this session (#596, #597, #598)
+- Zero TypeScript errors in changed files
+- Could not verify via browser (Supabase auth rate limiting)
+
 ## Session 2026-03-08 - Features #599, #600, #605
 
 ### Feature #599: Bijverdienste netto berekening met belastingwaarschuwing - PASSING
