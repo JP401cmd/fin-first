@@ -277,6 +277,8 @@ export interface DashboardData {
   } | null
   // Household activity feed — recent shared transactions from both partners
   householdActivity: HouseholdActivityItem[]
+  // Partner privacy: categories the partner has hidden (Feature #537)
+  partnerHiddenCategories: string[]
 }
 
 export interface HouseholdActivityItem {

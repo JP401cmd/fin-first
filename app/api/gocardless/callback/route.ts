@@ -111,6 +111,7 @@ export async function GET(req: Request) {
             has_budget_tracking: true,
             ownership: 'personal',
             net_worth_inclusion_pct: 100,
+            is_active: true,
           })
           .select('id')
           .single()

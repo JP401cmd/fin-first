@@ -104,11 +104,11 @@ export default function HorizonPage() {
   const [simModalOpen, setSimModalOpen] = useState(false)
 
   // Scenario overlay state
-  const [scenariosExpanded, setScenariosExpanded] = useState(false)
+  const [scenariosExpanded, setScenariosExpanded] = useState(true)
   const [scenarioData, setScenarioData] = useState<ScenarioOverlay[] | null>(null)
 
   // Monte Carlo overlay state
-  const [mcExpanded, setMcExpanded] = useState(false)
+  const [mcExpanded, setMcExpanded] = useState(true)
   const [mcData, setMcData] = useState<MonteCarloResult | null>(null)
 
   // Kassabon modal state
@@ -1362,6 +1362,46 @@ export default function HorizonPage() {
                 </div>
               )}
 
+              {/* ── Overlay toggles boven de grafiek ── */}
+              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setScenariosExpanded(prev => !prev)}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                    scenariosExpanded
+                      ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
+                      : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
+                  }`}
+                >
+                  <BarChart3 className="h-3 w-3" />
+                  Scenario&apos;s
+                  {scenarioData && scenariosExpanded && (
+                    <span className="flex items-center gap-0.5">
+                      {scenarioData.map(s => (
+                        <span key={s.name} className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: s.color }} />
+                      ))}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMcExpanded(prev => !prev)}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                    mcExpanded
+                      ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
+                      : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
+                  }`}
+                >
+                  <FlaskConical className="h-3 w-3" />
+                  Monte Carlo
+                  {mcData && mcExpanded && (
+                    <span className="font-mono text-[10px] tabular-nums opacity-75">
+                      {Math.round(mcData.fireProb * 100)}%
+                    </span>
+                  )}
+                </button>
+              </div>
+
               <div className="-mx-4 sm:-mx-6 md:-mx-8 overflow-hidden">
                 <SimChart
                   rows={simResult.rows}
@@ -1388,8 +1428,62 @@ export default function HorizonPage() {
                 )}
               </div>
 
+              {/* ── Legenda + detail-links onder de grafiek ── */}
+              <div className="mt-2 space-y-2">
+                {/* Scenario legenda */}
+                {scenariosExpanded && scenarioData && (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    {scenarioData.map((s, i) => (
+                      <span key={s.name} className="inline-flex items-center gap-1.5 text-[11px] text-[var(--ink-2)]">
+                        <span className="inline-block h-0.5 w-3.5 rounded-full" style={{ backgroundColor: s.color, opacity: 0.7 }} />
+                        {s.label}
+                        <span className="font-mono tabular-nums text-[var(--ink-4)]">
+                          {((fireParams.grossReturn + SCENARIO_VARIANTS[i].delta) * 100).toFixed(1)}%
+                        </span>
+                      </span>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setActiveModal('scenarios')}
+                      className="font-serif text-[11px] italic text-horizon-600 transition-colors hover:text-horizon-700"
+                    >
+                      Verdiepen &rarr;
+                    </button>
+                  </div>
+                )}
+
+                {/* Monte Carlo legenda */}
+                {mcExpanded && mcData && (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--ink-2)]">
+                      <span className="inline-block h-2.5 w-3.5 rounded-sm bg-[var(--hor-t,#8a6e42)] opacity-10" />
+                      p10–p90
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--ink-2)]">
+                      <span className="inline-block h-2.5 w-3.5 rounded-sm bg-[var(--hor-t,#8a6e42)] opacity-[0.18]" />
+                      p25–p75
+                    </span>
+                    <span className="text-[11px] text-[var(--ink-2)]">
+                      FIRE kans <span className="font-mono tabular-nums font-medium text-[var(--ink)]">{Math.round(mcData.fireProb * 100)}%</span>
+                    </span>
+                    {mcData.p50FireAge != null && (
+                      <span className="text-[11px] text-[var(--ink-2)]">
+                        Mediaan <span className="font-mono tabular-nums text-[var(--ink-3)]">{Math.round(mcData.p50FireAge)}j</span>
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setActiveModal('simulations')}
+                      className="font-serif text-[11px] italic text-horizon-600 transition-colors hover:text-horizon-700"
+                    >
+                      Verdiepen &rarr;
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {simCashflows.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
+                <div className="mt-2 flex flex-wrap gap-1.5">
                   {simCashflows.map(cf => (
                     <span
                       key={cf.id}
@@ -1405,119 +1499,6 @@ export default function HorizonPage() {
                   ))}
                 </div>
               )}
-
-              {/* ── Uitklapbare kaarten onder de grafiek ── */}
-              <div className="mt-3 space-y-2">
-                {/* Scenario overlay toggle */}
-                <FeatureGate featureId="fire_scenario_analyse" fallback="hidden">
-                  <div className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)]">
-                    <button
-                      type="button"
-                      onClick={() => setScenariosExpanded(prev => !prev)}
-                      className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-[var(--subtle)]/60"
-                    >
-                      <BarChart3 className="h-4 w-4 shrink-0 text-horizon-500" />
-                      <span className="flex-1 font-sans text-[13px] font-medium text-[var(--ink)]">Toekomstpaden</span>
-                      {scenarioData && scenariosExpanded && (
-                        <span className="flex items-center gap-1">
-                          {scenarioData.map(s => (
-                            <span key={s.name} className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
-                          ))}
-                        </span>
-                      )}
-                      {scenariosExpanded ? (
-                        <ChevronUp className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
-                      )}
-                    </button>
-
-                    {scenariosExpanded && scenarioData && (
-                      <div className="border-t border-dashed border-[var(--border-ed)] px-3 pb-3 pt-2">
-                        <div className="space-y-1.5">
-                          {scenarioData.map((s, i) => (
-                            <div key={s.name} className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span className="inline-block h-0.5 w-4 rounded-full" style={{ backgroundColor: s.color, opacity: 0.7 }} />
-                                <span className="font-sans text-[12px] text-[var(--ink-2)]">{s.label}</span>
-                              </div>
-                              <span className="font-mono text-[12px] tabular-nums text-[var(--ink-3)]">
-                                {((fireParams.grossReturn + SCENARIO_VARIANTS[i].delta) * 100).toFixed(1)}% rendement
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setActiveModal('scenarios')}
-                          className="mt-2.5 font-serif text-[12px] italic text-horizon-600 transition-colors hover:text-horizon-700"
-                        >
-                          Verdiepen &rarr;
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </FeatureGate>
-
-                {/* Monte Carlo overlay toggle */}
-                <FeatureGate featureId="monte_carlo" fallback="hidden">
-                  <div className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)]">
-                    <button
-                      type="button"
-                      onClick={() => setMcExpanded(prev => !prev)}
-                      className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-[var(--subtle)]/60"
-                    >
-                      <FlaskConical className="h-4 w-4 shrink-0 text-horizon-500" />
-                      <span className="flex-1 font-sans text-[13px] font-medium text-[var(--ink)]">Monte Carlo</span>
-                      {mcData && mcExpanded && (
-                        <span className="font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
-                          {Math.round(mcData.fireProb * 100)}% kans
-                        </span>
-                      )}
-                      {mcExpanded ? (
-                        <ChevronUp className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
-                      )}
-                    </button>
-
-                    {mcExpanded && mcData && (
-                      <div className="border-t border-dashed border-[var(--border-ed)] px-3 pb-3 pt-2">
-                        <p className="mb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-                          1.000 simulaties met willekeurige marktrendementen. De band op de grafiek toont de spreiding van uitkomsten (p10–p90).
-                        </p>
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <span className="font-sans text-[12px] text-[var(--ink-2)]">FIRE kans</span>
-                            <span className="font-mono text-[12px] tabular-nums text-[var(--ink)]">
-                              {Math.round(mcData.fireProb * 100)}%
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="font-sans text-[12px] text-[var(--ink-2)]">Mediaan FIRE</span>
-                            <span className="font-mono text-[12px] tabular-nums text-[var(--ink-3)]">
-                              {mcData.p50FireAge != null ? `leeftijd ${Math.round(mcData.p50FireAge)}` : '—'}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="font-sans text-[12px] text-[var(--ink-2)]">Bereik</span>
-                            <span className="font-mono text-[12px] tabular-nums text-[var(--ink-3)]">
-                              {mcData.p10FireAge != null ? Math.round(mcData.p10FireAge) : '—'} – {mcData.p90FireAge != null ? Math.round(mcData.p90FireAge) : '—'}
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setActiveModal('simulations')}
-                          className="mt-2.5 font-serif text-[12px] italic text-horizon-600 transition-colors hover:text-horizon-700"
-                        >
-                          Verdiepen &rarr;
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </FeatureGate>
-              </div>
 
               <p className="mt-3 font-sans text-[10px] text-[var(--ink-4)]">
                 {STRATEGY_LABELS[simResult.strategy].name} &middot; Simulatie tot leeftijd {simResult.displayEndAge} &middot; Klik Details voor jaar-op-jaar tabel

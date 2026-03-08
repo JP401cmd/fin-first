@@ -1,3 +1,30 @@
+## Session 2026-03-08 - Features #690, #691, #692
+
+### Feature #690: De Wil hero sectie zonder gradient progress bar - PASSING
+- Progress bar: solid bg-wil-500 on bg-wil-100 track (was gradient from-wil-600 via-wil-400 to-wil-300)
+- Percentage label: font-mono tabular-nums
+- Hero container: no rounded corners (removed card-editorial), border-b-[var(--border-md)]
+- Editorial bg-[var(--paper)] with border-[var(--border-ed)]
+- Commit: 4917e7b
+
+### Feature #691: Lege voorstellen state editorial - PASSING
+- Avatar: 48px (was 64px)
+- Text: font-serif on heading and paragraph
+- Button: outline style (border-wil-500 bg-transparent text-wil-600) instead of solid
+- Container: bg-[var(--paper)] border-[var(--border-ed)], no bg-wil-50, no rounded corners
+- Commit: included in parallel agent commit (06bd420) + 4917e7b
+
+### Feature #692: Lege acties state editorial - PASSING
+- Replaced large container+icon with minimal text line
+- font-serif italic text-sm text-[var(--ink-3)]
+- "+ Nieuwe actie" as subtle text link below
+- Removed unused Sparkles import
+- Commit: 4917e7b
+
+### Current Status
+- 3 features completed this session (#690, #691, #692)
+- Zero TypeScript errors
+
 ## Session 2026-03-08 - Features #537, #539, #584
 
 ### Feature #537: Privacy verborgen-modus verbergt categorie volledig - PASSING
@@ -12085,3 +12112,133 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#677, #678, #680)
 - Zero TypeScript errors
 - Commit: 43bf081
+
+## Session 2026-03-08 - Features #674, #675, #676
+
+### Feature #674: Voorstellen summary bar zonder gradient - PASSING
+- Removed gradient background (from-wil-500 to-wil-600) from summary bar
+- New style: bg-[var(--paper)] with border border-[var(--border-ed)] and border-l-3 border-l-wil-500
+- Dark text using var(--ink) and var(--ink-3) instead of white
+- Freedom days number in font-mono tabular-nums
+- Label "Potentieel te winnen" in font-serif italic
+- Commit: 332f6d6
+
+### Feature #675: RecommendationCard compact zonder gradient - PASSING
+- Removed gradient background (from-wil-50 via-white to-kern-50/30)
+- New style: bg-[var(--paper)] with border border-[var(--border-ed)]
+- Added border-l-4 in type-specific color (mapped from colors.bg)
+- Compact layout: py-2.5 instead of py-3, smaller icon padding
+- Single-line layout: icon + title + type-label + freedom days all in one flex row
+- Removed two-row meta section (current/proposed values)
+- Commit: 332f6d6
+
+### Feature #676: RecommendationCard priority stars vervangen door subtiele indicator - PASSING
+- Removed Sparkles import and star rendering completely
+- High priority (score >= 2): filled 8px dot in bg-wil-500
+- Medium priority (score === 1): outline 8px dot with border-wil-400
+- Low priority (score 0 or null): no indicator shown
+- Added title attributes for accessibility ("Hoge prioriteit" / "Medium prioriteit")
+- Commit: 332f6d6
+
+### Current Status
+- 3 features completed this session (#674, #675, #676)
+- Zero TypeScript errors
+- Could not verify via browser (Supabase auth - invalid credentials)
+
+## Session 2026-03-08 - Features #684, #694
+
+### Feature #684: Actierij klik opent detail modal - PASSING
+- Already fully implemented by previous sessions
+- Card div has onClick handler that opens ActionEditModal when onUpdate is present
+- Action buttons use e.stopPropagation() to prevent card click
+- cursor-pointer visual affordance on card
+- onUpdate passed from ActionBoard via handleUpdateAction
+
+### Feature #694: Actie opzegbrief link behouden in compact rij - PASSING
+- Added `group` class to action card container div
+- Cancellation shortcut div: `hidden group-hover:block group-focus-within:block`
+- Link hidden by default, appears on hover over the action row
+- group-focus-within:block for keyboard/tap accessibility on mobile
+- Preserves existing styling: font-serif text-[11px] italic text-wil-600
+- e.stopPropagation() preserved so clicking link doesn't open edit modal
+- Zero TypeScript errors
+- Commit: b7c7f55
+
+### Current Status
+- 2 features completed this session (#684, #694)
+- Could not verify via browser (Supabase email rate limit exceeded)
+
+## Session 2026-03-08 - Features #687, #688, #689
+
+### Feature #687: Partner acties sectie compact - PASSING
+- Removed bg-wil-50/40 container and border-wil-200 wrapper from partner section
+- Plain div with section header: Users icon + partner name + count
+- Partner actions use identical checkbox-strip rows as own actions
+- Partner badge per row already existed (Toegewezen door [naam])
+- Commit: a45e93a
+
+### Feature #688: Completed actie doorgestreept met fade - PASSING
+- Changed completed title color from --ink-3 to --ink-4 for stronger fade
+- line-through already in place
+- Emerald-500 filled checkbox with white Check icon already correct
+
+### Feature #689: Postponed actie met amber accent - PASSING
+- Moved Clock icon from inside checkbox to next to checkbox (h-3.5 w-3.5 amber-500)
+- Added "tot [datum]" inline text in amber-600 next to title
+- Removed duplicate postponed_until display from right-side meta section
+- Checkbox remains empty circle with amber border
+
+### Current Status
+- 3 features completed this session (#687, #688, #689)
+- Zero TypeScript errors
+- Commit: a45e93a
+
+## Session 2026-03-08 - Feature #693
+
+### Feature #693: Skeleton loading states compact - PASSING
+- Updated skeleton cards in recommendation-list.tsx to match compact RecommendationCard style
+- Container: matches card styling (border-[var(--border-ed)], border-l-4, bg-[var(--paper)], px-3 py-2.5)
+- Circle placeholder: h-7 w-7 rounded-full bg-wil-100 (was h-8 w-8 rounded-lg)
+- Two inline line placeholders: title (h-3.5 w-2/5) + meta (h-3 w-16) in flex row
+- Freedom days placeholder on right (h-3.5 w-14)
+- ~48px height matching compact card style
+- No large rounded containers
+- Zero TypeScript errors
+- Could not verify via browser (Supabase auth rate limiting 400)
+- Commit: 06bd420
+
+### Current Status
+- 1 feature completed this session (#693)
+- Zero TypeScript errors
+
+## Session 2026-03-08 - Features #679, #681, #683
+
+### Feature #679: Voorstellen sectie header compact met count - PASSING
+- Added count badge (pending.length) in wil-100 pill next to "Voorstellen" h2
+- Badge: rounded-full, bg-wil-100, text-wil-700, font-mono tabular-nums
+- Generate button responsive: icon-only on mobile (hidden sm:inline for text), text+icon on desktop
+- Button uses p-2 on mobile, sm:px-4 sm:py-2 on desktop
+- Commit: 7d5acfd
+
+### Feature #681: Actie checkbox tap-to-complete - PASSING
+- Added justCompleted state with 500ms timeout for animation
+- Checkbox scales to 125% on completion (scale-125 with transition-all duration-300)
+- Check icon uses checkPop keyframe animation (scale 0 → 1.3 → 1 over 300ms)
+- Background fills to emerald-500 with smooth transition
+- freedomDaysAnimation already wired in ActionBoard (pre-existing)
+- Added checkPop keyframe to globals.css
+- Commit: 7d5acfd
+
+### Feature #683: Actierij inline acties via hover/long-press - PASSING
+- Desktop: action buttons hidden by default (opacity-0), visible on hover (group-hover:opacity-100)
+- Desktop buttons: 24px targets (h-6 w-6) with Clock, X, UserPlus icons
+- Mobile: long-press (500ms) opens compact action menu (absolute positioned popup)
+- Mobile menu: sm:hidden, 36px touch targets (h-9 w-9), shadow-lg
+- Menu closes on outside click/touch with delayed event listener
+- Long-press prevents accidental edit modal opening
+- Commit: 7d5acfd
+
+### Current Status
+- 3 features completed this session (#679, #681, #683)
+- Zero TypeScript errors
+- Could not verify via browser (Supabase auth 400 rate limiting)

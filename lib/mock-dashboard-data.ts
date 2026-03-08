@@ -219,4 +219,5 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   householdOverrides: null,
   partnerOverrides: null,
   householdActivity: [],
+  partnerHiddenCategories: [],
 }

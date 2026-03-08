@@ -12,6 +12,7 @@ import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { GoalForm } from '@/components/app/goal-form'
 import { GoalProgressTimeline, buildGoalHistory } from '@/components/app/will/goal-progress-timeline'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { useDailyExpenseRate, eurToFreedomTime } from '@/components/app/freedom-time-label'
 
 type HouseholdInfo = {
   householdId: string
@@ -348,6 +349,11 @@ function GoalCard({
   const isFreedm = goal.goal_type === 'freedom_days'
   const isLinked = !!(goal.linked_asset_id || goal.linked_debt_id)
   const { ref: inViewRef, hasEntered } = useInViewAnimation({ threshold: 0.1, duration: 600, triggerDelay: 300 })
+  const { dailyExpenseRate, source } = useDailyExpenseRate()
+  const hasFreedomData = !isFreedm && source === 'transactions' && dailyExpenseRate > 0
+  const targetFreedom = hasFreedomData && target >= 100 ? eurToFreedomTime(target, dailyExpenseRate) : null
+  const currentFreedom = hasFreedomData && current >= 100 ? eurToFreedomTime(current, dailyExpenseRate) : null
+  const remainingFreedom = hasFreedomData && (target - current) >= 100 ? eurToFreedomTime(target - current, dailyExpenseRate) : null
 
   const [showContrib, setShowContrib] = useState(false)
   const [contributions, setContributions] = useState<GoalContribution[]>([])
@@ -480,6 +486,11 @@ function GoalCard({
                 {isFreedm
                   ? `${Math.round(current)} / ${Math.round(target)} dagen`
                   : `${formatCurrency(current)} / ${formatCurrency(target)}`}
+                {targetFreedom && (
+                  <span className="ml-1.5 font-normal italic text-[var(--ink-3)]">
+                    ≈ {currentFreedom ? currentFreedom.formatted : '0d'} / {targetFreedom.formatted} vrijheid
+                  </span>
+                )}
               </span>
               <span className="text-[var(--ink-3)]">
                 {pct}%
@@ -497,6 +508,12 @@ function GoalCard({
                 }}
               />
             </div>
+            {/* Remaining freedom time */}
+            {remainingFreedom && !goal.is_completed && (
+              <p className="mt-1 text-[10px] italic text-[var(--ink-3)]">
+                Nog {remainingFreedom.formatted} vrijheid te gaan
+              </p>
+            )}
           </div>
 
           {/* Per-partner contribution breakdown for shared goals */}
@@ -512,39 +529,55 @@ function GoalCard({
               </div>
               {/* My contribution */}
               <div className="space-y-1.5">
-                <div>
-                  <div className="flex items-center justify-between text-[10px]">
-                    <span className="font-medium text-wil-600">{householdInfo.myName}</span>
-                    <span className="text-[var(--ink-3)]">
-                      {isFreedm
-                        ? `${Math.round(target * householdInfo.mySharePct / 100)} dgn verwacht`
-                        : `${formatCurrency(target * householdInfo.mySharePct / 100)} verwacht`}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
-                    <div
-                      className="h-full rounded-full bg-wil-400 transition-all duration-500"
-                      style={{ width: `${Math.min(100, target > 0 ? ((current * householdInfo.mySharePct / 100) / (target * householdInfo.mySharePct / 100)) * 100 : 0)}%` }}
-                    />
-                  </div>
-                </div>
-                {/* Partner contribution */}
-                <div>
-                  <div className="flex items-center justify-between text-[10px]">
-                    <span className="font-medium text-horizon-600">{householdInfo.partnerName}</span>
-                    <span className="text-[var(--ink-3)]">
-                      {isFreedm
-                        ? `${Math.round(target * (100 - householdInfo.mySharePct) / 100)} dgn verwacht`
-                        : `${formatCurrency(target * (100 - householdInfo.mySharePct) / 100)} verwacht`}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
-                    <div
-                      className="h-full rounded-full bg-horizon-400 transition-all duration-500"
-                      style={{ width: `${Math.min(100, target > 0 ? ((current * (100 - householdInfo.mySharePct) / 100) / (target * (100 - householdInfo.mySharePct) / 100)) * 100 : 0)}%` }}
-                    />
-                  </div>
-                </div>
+                {(() => {
+                  const myExpected = target * householdInfo.mySharePct / 100
+                  const partnerExpected = target * (100 - householdInfo.mySharePct) / 100
+                  const myFreedom = hasFreedomData && myExpected >= 100 ? eurToFreedomTime(myExpected, dailyExpenseRate) : null
+                  const partnerFreedom = hasFreedomData && partnerExpected >= 100 ? eurToFreedomTime(partnerExpected, dailyExpenseRate) : null
+                  return (
+                    <>
+                      <div>
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="font-medium text-wil-600">{householdInfo.myName}</span>
+                          <span className="text-[var(--ink-3)]">
+                            {isFreedm
+                              ? `${Math.round(myExpected)} dgn verwacht`
+                              : `${formatCurrency(myExpected)} verwacht`}
+                            {myFreedom && (
+                              <span className="ml-1 italic">≈ {myFreedom.formatted}</span>
+                            )}
+                          </span>
+                        </div>
+                        <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+                          <div
+                            className="h-full rounded-full bg-wil-400 transition-all duration-500"
+                            style={{ width: `${Math.min(100, target > 0 ? ((current * householdInfo.mySharePct / 100) / (target * householdInfo.mySharePct / 100)) * 100 : 0)}%` }}
+                          />
+                        </div>
+                      </div>
+                      {/* Partner contribution */}
+                      <div>
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="font-medium text-horizon-600">{householdInfo.partnerName}</span>
+                          <span className="text-[var(--ink-3)]">
+                            {isFreedm
+                              ? `${Math.round(partnerExpected)} dgn verwacht`
+                              : `${formatCurrency(partnerExpected)} verwacht`}
+                            {partnerFreedom && (
+                              <span className="ml-1 italic">≈ {partnerFreedom.formatted}</span>
+                            )}
+                          </span>
+                        </div>
+                        <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+                          <div
+                            className="h-full rounded-full bg-horizon-400 transition-all duration-500"
+                            style={{ width: `${Math.min(100, target > 0 ? ((current * (100 - householdInfo.mySharePct) / 100) / (target * (100 - householdInfo.mySharePct) / 100)) * 100 : 0)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
             </div>
           )}

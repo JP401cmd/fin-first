@@ -102,7 +102,7 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
             type="button"
             onClick={(e) => {
               e.stopPropagation()
-              if (action.status === 'open') {
+              if (action.status === 'open' || action.status === 'postponed') {
                 setJustCompleted(true)
                 if (animTimeout.current) clearTimeout(animTimeout.current)
                 animTimeout.current = setTimeout(() => setJustCompleted(false), 500)
@@ -112,7 +112,7 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
               }
             }}
             disabled={isLoading}
-            title={action.status === 'completed' ? 'Heropenen' : 'Afronden'}
+            title={action.status === 'completed' ? 'Heropenen' : action.status === 'rejected' ? 'Afgewezen' : 'Afronden'}
             className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-300 disabled:opacity-50 ${justCompleted ? 'scale-125' : ''}`}
             style={{
               borderColor: action.status === 'completed' ? 'var(--color-emerald-500)' : action.status === 'postponed' ? 'var(--color-amber-400)' : 'var(--border-md)',

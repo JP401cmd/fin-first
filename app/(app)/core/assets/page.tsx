@@ -67,7 +67,7 @@ export default function AssetsPage() {
         .from('assets')
         .select('*')
       if (perspective === 'personal') {
-        query = query.eq('ownership', 'personal')
+        query = query.or('ownership.eq.personal,ownership.is.null')
       }
       const { data, error: fetchError } = await query
         .order('sort_order', { ascending: true })
@@ -239,7 +239,7 @@ export default function AssetsPage() {
     loadAssets(signal).then(() => { if (!signal.aborted) loadAllValuations() })
   }, [loadAssets, loadAllValuations, perspectiveSignal])
 
-  const activeAssets = assets.filter((a) => a.is_active)
+  const activeAssets = assets.filter((a) => a.is_active !== false)
   const totalValue = activeAssets.reduce((s, a) => s + Number(a.current_value), 0)
   const totalPurchase = activeAssets.reduce((s, a) => s + Number(a.purchase_value), 0)
   const totalMonthlyContrib = activeAssets.reduce((s, a) => s + Number(a.monthly_contribution), 0)
@@ -2299,6 +2299,8 @@ function AssetForm({
       net_worth_inclusion_pct: netWorthInclusionPct,
       // Budget tracking
       has_budget_tracking: isCashType ? hasBudgetTracking : false,
+      // Ensure new assets are visible
+      is_active: true,
     }
 
     let assetId: string | undefined

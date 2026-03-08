@@ -75,13 +75,23 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
   const partnerOpenDays = partnerOpenActions.reduce((sum, a) => sum + (a.freedom_days_impact || 0), 0)
 
   async function handleStatusChange(id: string, status: ActionStatus, data?: Record<string, unknown>) {
-    const res = await fetch(`/api/ai/actions/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, ...data }),
-    })
+    let res: Response
+    try {
+      res = await fetch(`/api/ai/actions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, ...data }),
+      })
+    } catch (err) {
+      console.error('[ActionBoard] Fetch failed:', err)
+      return
+    }
 
-    if (!res.ok) return
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      console.error(`[ActionBoard] PATCH /api/ai/actions/${id} → ${res.status}:`, text)
+      return
+    }
 
     setActions((prev) =>
       prev.map((a) => {

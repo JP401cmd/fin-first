@@ -82,7 +82,7 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
 
   if (pending.length === 0 && !isGenerating) {
     return (
-      <div className="border border-[var(--border-ed)] bg-[var(--paper)] p-8 text-center">
+      <div className="p-4 text-center">
         <div className="mx-auto mb-4 flex justify-center">
           <FinnAvatar size={48} />
         </div>
@@ -113,7 +113,7 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
     <div className="space-y-6">
       {/* Summary bar */}
       {totalFreedomDays > 0 && (
-        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] border-l-3 border-l-wil-500 bg-[var(--paper)] p-4">
+        <div className="rounded-[var(--r)] border-l-3 border-l-wil-500 bg-[var(--subtle)] p-4">
           <div className="flex items-center justify-between">
             <div>
               <div className="font-serif text-sm italic text-[var(--ink-3)]">Potentieel te winnen</div>

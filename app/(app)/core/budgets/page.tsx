@@ -19,6 +19,7 @@ import { BudgetSparkline, SparklineWithLabel, type SparklineDataPoint } from '@/
 import { computeBudgetForecast, getConfidenceLabel, getConfidenceColors, type BudgetForecast } from '@/lib/budget-forecast'
 import { OwnershipToggle, OwnershipBadge, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
+import { usePartnerPrivacy, PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
 import { SpendingConfidenceBadge, SpendingVarianceDetailPanel, calculateSpendingVariance, type SpendingVarianceData } from '@/components/app/spending-confidence-indicator'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import { GoalForm } from '@/components/app/goal-form'
@@ -54,6 +55,7 @@ export default function BudgetsPage() {
   const router = useRouter()
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
+  const { partnerPrivacy, hiddenCategories } = usePartnerPrivacy()
   const { openWithMessage } = useChatContext()
   const [budgets, setBudgets] = useState<BudgetWithChildren[]>([])
   const [loading, setLoading] = useState(true)
@@ -295,8 +297,28 @@ export default function BudgetsPage() {
         return
       }
 
-      const parents = (data as Budget[]).filter((b) => !b.parent_id)
-      const children = (data as Budget[]).filter((b) => b.parent_id && Number(b.default_limit) > 0)
+      // Apply privacy filtering in household mode (Feature #537)
+      let filteredBudgetData = data as Budget[]
+      if (perspective === 'household') {
+        try {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (signal?.aborted) return
+          if (user) {
+            const ppRes = await fetch('/api/household/partner-privacy')
+            if (ppRes.ok) {
+              const ppData = await ppRes.json()
+              if (ppData.partnerPrivacy?.budgets === 'hidden') {
+                filteredBudgetData = filteredBudgetData.filter(
+                  b => b.user_id === user.id || b.ownership === 'shared'
+                )
+              }
+            }
+          }
+        } catch { /* non-critical */ }
+      }
+
+      const parents = filteredBudgetData.filter((b) => !b.parent_id)
+      const children = filteredBudgetData.filter((b) => b.parent_id && Number(b.default_limit) > 0)
 
       const tree: BudgetWithChildren[] = parents.map((parent) => ({
         ...parent,
@@ -689,6 +711,12 @@ export default function BudgetsPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+      {/* Privacy notice for hidden budget data (Feature #537) */}
+      {perspective === 'household' && hiddenCategories.includes('budgets') && (
+        <div className="mb-4">
+          <PrivacyHiddenNotice hiddenCategories={hiddenCategories} forCategories={['budgets']} />
+        </div>
+      )}
       {/* Month selector */}
       <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
         <div className="mb-6 flex items-center justify-between gap-2">

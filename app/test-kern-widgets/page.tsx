@@ -160,6 +160,7 @@ const MOCK_DATA: DashboardData = {
   householdOverrides: null,
   partnerOverrides: null,
   householdActivity: [],
+  partnerHiddenCategories: [],
 }
 
 const KERN_WIDGETS = [

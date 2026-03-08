@@ -26,23 +26,16 @@ export async function PATCH(
     scheduled_week?: string | null
   }
 
-  // Fetch action first (scoped to current user OR assigned to user)
+  // Fetch action first — RLS handles access control (supports household membership)
   const { data: action, error: fetchError } = await supabase
     .from('actions')
     .select('*, recommendation:recommendations(id, recommendation_type, related_budget_slug, freedom_days_per_year)')
     .eq('id', id)
-    .or(`user_id.eq.${user.id},assigned_to.eq.${user.id}`)
     .single()
 
   if (fetchError || !action) {
     return Response.json({ error: 'Action not found' }, { status: 404 })
   }
-
-  // Determine if user is owner or assignee
-  const isOwner = action.user_id === user.id
-  const isAssignee = (action as Record<string, unknown>).assigned_to === user.id
-  const userFilter = isOwner ? { user_id: user.id } : { assigned_to: user.id }
-  const filterColumn = isOwner ? 'user_id' : 'assigned_to'
 
   const now = new Date().toISOString()
 
@@ -61,7 +54,6 @@ export async function PATCH(
       .from('actions')
       .update(updates)
       .eq('id', id)
-      .eq(filterColumn, user.id)
       .select()
       .single()
 
@@ -82,7 +74,6 @@ export async function PATCH(
         updated_at: now,
       })
       .eq('id', id)
-      .eq(filterColumn, user.id)
 
     if (error) {
       return Response.json({ error: error.message }, { status: 500 })
@@ -169,7 +160,6 @@ export async function PATCH(
         updated_at: now,
       })
       .eq('id', id)
-      .eq(filterColumn, user.id)
 
     if (error) {
       return Response.json({ error: error.message }, { status: 500 })
@@ -188,7 +178,6 @@ export async function PATCH(
         updated_at: now,
       })
       .eq('id', id)
-      .eq(filterColumn, user.id)
 
     if (error) {
       return Response.json({ error: error.message }, { status: 500 })
@@ -220,7 +209,6 @@ export async function PATCH(
         updated_at: now,
       })
       .eq('id', id)
-      .eq(filterColumn, user.id)
 
     if (error) {
       return Response.json({ error: error.message }, { status: 500 })

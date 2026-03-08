@@ -34,7 +34,7 @@ import type { BudgetWithChildren } from '@/lib/budget-data'
 import { FullScreenModal } from '@/components/app/full-screen-modal'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { usePerspective } from '@/components/app/perspective-provider'
-import { Users } from 'lucide-react'
+import { Users, EyeOff } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 const DynBudgetsPage = dynamic(() => import('@/app/(app)/core/budgets/page'), {
@@ -115,6 +115,8 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   const [householdOverrides, setHouseholdOverrides] = useState<{
     netWorth: number; totalAssets: number; totalDebts: number
   } | null>(null)
+  // Partner privacy: which categories the partner has hidden
+  const [partnerHiddenCategories, setPartnerHiddenCategories] = useState<string[]>([])
   const [partnerOverrides, setPartnerOverrides] = useState<{
     netWorth: number; totalAssets: number; totalDebts: number
   } | null>(null)
@@ -296,17 +298,30 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       const monthlySavings = monthlyIncome - monthlyExpenses
 
       // Household & partner perspective: fetch partner totals if in a household
+      // Respects partner's privacy settings (Feature #537)
       try {
         const { data: membership } = await supabase
           .from('household_members')
           .select('household_id')
           .maybeSingle()
         if (membership?.household_id) {
-          const { data: partnerTotals } = await supabase.rpc('household_partner_totals')
-          const pt = partnerTotals?.[0] ?? null
+          // Fetch partner totals and partner privacy in parallel
+          const [partnerTotalsRes, partnerPrivacyRes] = await Promise.all([
+            supabase.rpc('household_partner_totals'),
+            fetch('/api/household/partner-privacy').then(r => r.ok ? r.json() : null).catch(() => null),
+          ])
+          const pt = partnerTotalsRes.data?.[0] ?? null
           if (pt) {
-            const partnerAssets = Number(pt.partner_total_assets) || 0
-            const partnerDebts = Number(pt.partner_total_debts) || 0
+            let partnerAssets = Number(pt.partner_total_assets) || 0
+            let partnerDebts = Number(pt.partner_total_debts) || 0
+
+            // Apply privacy: zero out hidden categories
+            const pp = partnerPrivacyRes?.partnerPrivacy
+            const hidden: string[] = partnerPrivacyRes?.hiddenCategories ?? []
+            if (pp?.assets === 'hidden') partnerAssets = 0
+            if (pp?.debts === 'hidden') partnerDebts = 0
+            setPartnerHiddenCategories(hidden)
+
             setHouseholdOverrides({
               netWorth: netWorth + partnerAssets - partnerDebts,
               totalAssets: totalAssets + partnerAssets,
@@ -718,6 +733,15 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             {(isHouseholdView || isPartnerView) && (
               <span className="inline-flex items-center gap-1 rounded-full bg-kern-50 px-2 py-0.5 text-[10px] font-medium text-kern-700">
                 <Users className="h-3 w-3" /> {isPartnerView ? (partnerName ?? 'Partner') : 'Huishouden'}
+              </span>
+            )}
+            {isHouseholdView && partnerHiddenCategories.length > 0 && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-[var(--subtle)] px-2 py-0.5 text-[10px] text-[var(--ink-4)]"
+                title="Niet alle partnerdata is zichtbaar vanwege privacy-instellingen"
+                data-testid="privacy-hidden-notice"
+              >
+                <EyeOff className="h-3 w-3" /> Beperkte zichtbaarheid
               </span>
             )}
           </div>

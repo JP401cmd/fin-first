@@ -44,6 +44,240 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'fin_prod_0.82',
+    date: '2026-03-08',
+    title:
+      'Huishouden & partner, levensgebeurtenissen, what-if scenario\'s, gids-pagina & De Wil editorial',
+    sections: [
+      {
+        module: 'Platform — Huishouden & Partner',
+        color: 'rose',
+        items: [
+          {
+            title: 'Privacy-instellingen per partner',
+            description:
+              'Huishouden privacy-instellingen met database-schema en tweetalige API. Partners kiezen zelf welke financiële gegevens ze delen.',
+          },
+          {
+            title: 'Perspectiefwisseling',
+            description:
+              'Dashboard, De Kern en De Horizon tonen gecombineerde huishoudcijfers wanneer het perspectief op "Huishouden" staat. Race conditions bij snel wisselen zijn opgelost.',
+          },
+          {
+            title: 'Vrijheidstijd per partner',
+            description:
+              'Nieuw vergelijkingswidget toont de vrijheidstijd van beide partners naast elkaar. De Kern hero toont huishoud-vrijheidstijd in huishoudperspectief.',
+          },
+          {
+            title: 'FIRE-vergelijking',
+            description:
+              'De Horizon toont een 3-weg FIRE-leeftijdvergelijking: Partner 1, Partner 2 en Gecombineerd. Huishouden FIRE gebruikt split_mode in plaats van gelijke verdeling.',
+          },
+          {
+            title: 'Gedeelde doelen',
+            description:
+              'Partners kunnen financiële doelen delen met per-partner bijdrageverdeling. Filtertabs Alle/Persoonlijk/Gedeeld op de doelenpagina.',
+          },
+          {
+            title: 'Partner-acties in De Wil',
+            description:
+              'Acties kunnen aan je partner worden toegewezen. De partner ziet toegewezen acties in een "Van je partner" sectie.',
+          },
+          {
+            title: 'Maandelijkse check-in',
+            description:
+              'Check-in wizard met delta-tracking, gespreksstarters en aandachtspunten. Samenvatting wordt opgeslagen voor beide partners met geschiedenispagina.',
+          },
+          {
+            title: 'Meldingen en activiteitenfeed',
+            description:
+              'Partner-notificatie-instellingen, transactiemeldingen en een gedeelde huishoudactiviteitenfeed.',
+          },
+          {
+            title: 'Monte Carlo en Box 3 voor huishouden',
+            description:
+              'Monte Carlo simulatie gebruikt huishouddata. Box 3 partner-optimalisatie berekent de fiscaal voordeligste verdeling.',
+          },
+          {
+            title: 'Graceful degradation solo-gebruikers',
+            description:
+              'Alle huishoudfuncties werken soepel voor solo-gebruikers. Uitnodigingsverlopen en opruiming na vertrek zijn geïmplementeerd.',
+          },
+        ],
+      },
+      {
+        module: 'De Horizon — Levensgebeurtenissen',
+        color: 'purple',
+        items: [
+          {
+            title: 'Uitgebreid event-catalogus',
+            description:
+              'Gegroepeerde catalogus met beschrijvingen en impactranges. Nieuwe events: scheiding, werkloosheid, schenking, overlijden partner, sabbatical, wereldreis, auto kopen, verbouwing, huis kopen/verkopen, erfenis, kinderopvang, vroegpensioen, bijverdienste en meer.',
+          },
+          {
+            title: 'Nederlandse belastingberekeningen',
+            description:
+              'Erfbelasting met breakdown card, schenkbelasting met belastingvrije bedragen, WW-uitkering met transitievergoeding, AOW-gap berekening met overbruggingskosten, en kosten koper bij huis kopen.',
+          },
+          {
+            title: 'Slimme formulieren',
+            description:
+              'Event-formulieren met secties, dividers en financiële impact-samenvatting. Metadata-aware cashflows, NIBUD kinderkostenschaling, en pre-fill vanuit bestaande profieldata.',
+          },
+          {
+            title: 'Vrijheidstijd per event',
+            description:
+              'Elke levensgebeurtenis toont het impact in vrijheidstijd-equivalent, consistent met de kernfilosofie.',
+          },
+          {
+            title: 'Kinderen-event verrijkt',
+            description:
+              'Kinderopvangtoeslag en kinderbijslag verrekening. Babyuitzet-kosten meegenomen bij kinderen-event.',
+          },
+          {
+            title: 'Pensioen verbeterd',
+            description:
+              'Standaard pensioenleeftijd 67, gesplitste Lijfrente/Banksparen opties. AOW leefsituatie met netto 2026 bedragen en opbouwcorrectie.',
+          },
+        ],
+      },
+      {
+        module: 'De Horizon — What-If Scenario\'s',
+        color: 'purple',
+        items: [
+          {
+            title: 'Scenario opslaan en laden',
+            description:
+              'Sla tot 5 what-if scenario\'s op en laad ze later weer in. Vergelijk verschillende toekomstpaden naast elkaar.',
+          },
+          {
+            title: 'Inline event bewerking',
+            description:
+              'Levensgebeurtenissen direct bewerken via een BottomSheet, zonder de scenario-flow te verlaten.',
+          },
+          {
+            title: 'Reality-check planner',
+            description:
+              'Nieuw planner-modus in de what-if chat die scenario\'s toetst aan realistische aannames.',
+          },
+          {
+            title: 'Verrijkte chat-context',
+            description:
+              'What-if chat ontvangt de volledige scenario-context: sliders, FIRE-delta en alle levensgebeurtenissen.',
+          },
+          {
+            title: 'Actiekaarten met De Wil integratie',
+            description:
+              'What-if inzichten worden omgezet in actiekaarten die doorlinken naar De Wil. Profielgebaseerde parameters en duplicaat-event detectie.',
+          },
+          {
+            title: 'Vermogensprojectie-visualisatie',
+            description:
+              'Verbeterde cashflow-annotaties op de vermogensprojectiegrafiek. Nieuwe events-tijdlijn visualisatie onder de grafiek.',
+          },
+        ],
+      },
+      {
+        module: 'De Kern — Belasting',
+        color: 'amber',
+        items: [
+          {
+            title: 'Box 2 aanmerkelijk belang',
+            description:
+              'Volledige Box 2 belastingberekening-engine met API endpoint en integratie op de belastingpagina. Classificatielabel voor deelnemingen.',
+          },
+          {
+            title: 'Nieuwe vermogenstypes',
+            description:
+              'Deelneming, levensverzekering en vordering als nieuwe asset-types met formuliervelden, migraties en Box 3 classificatie.',
+          },
+          {
+            title: 'Nieuwe schuldtypes',
+            description:
+              'Belastingschuld (met subtypes en betalingsregeling), DGA-schuld (met deelneming-koppeling en Wet excessief lenen waarschuwing) en familielening als nieuwe schuldtypes.',
+          },
+          {
+            title: 'Studieschuld in huishouden-FIRE',
+            description:
+              'Studieschuld wordt correct meegenomen in huishouden FIRE-berekening met per-schuld split overrides.',
+          },
+          {
+            title: 'Hypotheek partner-split',
+            description:
+              'Per hypotheek instelbare partner-splitverdeling voor nauwkeurigere huishoudberekeningen.',
+          },
+        ],
+      },
+      {
+        module: 'De Wil — Editorial Redesign',
+        color: 'teal',
+        items: [
+          {
+            title: 'Hero en lege staten',
+            description:
+              'Nieuwe editorial styling voor De Wil hero-sectie. Verbeterde lege-staat designs voor voorstellen en acties.',
+          },
+          {
+            title: 'Recommendation en Action cards',
+            description:
+              'Volledig herontworpen kaarten met checkbox-strip layout, editorial finance stijl en summary bar conform het design language.',
+          },
+          {
+            title: 'Interactie-verbeteringen',
+            description:
+              'Voorstellen count badge, vloeiende checkbox-animatie op acties, hover/long-press interacties. Opzegbrief-link is standaard verborgen en verschijnt bij hover.',
+          },
+          {
+            title: 'Partner-acties compact',
+            description:
+              'Compacte weergave voor partner-acties. Afgeronde acties vervagen subtiel, uitgestelde acties krijgen een amber accent.',
+          },
+          {
+            title: 'Skeleton loading',
+            description:
+              'Compacte skeleton loading states voor voorstellen, zodat de pagina minder springt tijdens het laden.',
+          },
+        ],
+      },
+      {
+        module: 'Identiteit — Gids',
+        color: 'blue',
+        items: [
+          {
+            title: 'Nieuwe gids-pagina',
+            description:
+              'Volledig nieuwe /gids pagina met 5 reis-stappen die je door je financiële reis leiden, met progress tracker en geanimeerde voortgangsbalk.',
+          },
+          {
+            title: 'Interactieve reis-stappen',
+            description:
+              'Stap 1-5 als interactieve kaarten: breng in kaart, maak een plan, neem actie, kijk vooruit, en droom & plan.',
+          },
+          {
+            title: 'Ontdekken-sectie',
+            description:
+              'Toont onbezochte en coming-soon features. 18 ontdek-items met sovereignty-level filtering.',
+          },
+          {
+            title: 'Conceptkaarten',
+            description:
+              'Interactieve flip-cards die kernconcepten uitleggen met gepersonaliseerde data van de gebruiker.',
+          },
+          {
+            title: 'Pro-tips en FAQ',
+            description:
+              'Horizontaal scrollbare pro-tips carousel en FAQ-sectie met 8 inklapbare vragen.',
+          },
+          {
+            title: 'Responsive editorial design',
+            description:
+              'Volledige responsive layout met Editorial Finance stijl, inclusief guide-progress API voor voortgangstracking.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: 'fin_prod_0.81',
     date: '2026-03-07',
     title:

@@ -781,6 +781,7 @@ export default async function DashboardPage() {
   // ── Household & partner perspective overrides ──────────────────────────
   let householdOverrides: DashboardData['householdOverrides'] = null
   let partnerOverrides: DashboardData['partnerOverrides'] = null
+  let partnerHiddenCategories: string[] = []
   try {
     // Check if user has a household
     const { data: { user } } = await supabase.auth.getUser()
@@ -792,13 +793,34 @@ export default async function DashboardPage() {
         .maybeSingle()
 
       if (membership?.household_id) {
-        // Get partner's personal asset/debt totals via RPC
-        const { data: partnerTotals } = await supabase.rpc('household_partner_totals')
-        const pt = partnerTotals?.[0] ?? null
+        // Get partner's personal asset/debt totals via RPC + partner's privacy settings
+        const [partnerTotalsRes, partnerMemberRes] = await Promise.all([
+          supabase.rpc('household_partner_totals'),
+          supabase
+            .from('household_members')
+            .select('user_id, privacy_settings')
+            .eq('household_id', membership.household_id)
+            .neq('user_id', user.id)
+            .maybeSingle(),
+        ])
+        const pt = partnerTotalsRes.data?.[0] ?? null
+        // Parse partner's privacy settings (Feature #537)
+        const ppRaw = partnerMemberRes.data?.privacy_settings as Record<string, string> | null
+        const ppAssets = ppRaw?.assets ?? 'totals'
+        const ppDebts = ppRaw?.debts ?? 'totals'
+        // Build list of hidden categories
+        if (ppRaw) {
+          for (const [cat, level] of Object.entries(ppRaw)) {
+            if (level === 'hidden') partnerHiddenCategories.push(cat)
+          }
+        }
 
         if (pt) {
-          const partnerAssets = Number(pt.partner_total_assets) || 0
-          const partnerDebts = Number(pt.partner_total_debts) || 0
+          let partnerAssets = Number(pt.partner_total_assets) || 0
+          let partnerDebts = Number(pt.partner_total_debts) || 0
+          // Feature #537: zero out hidden categories
+          if (ppAssets === 'hidden') partnerAssets = 0
+          if (ppDebts === 'hidden') partnerDebts = 0
           const partnerNetWorth = partnerAssets - partnerDebts
           const partnerMonthlyIncome = Number(pt.partner_monthly_income) || 0
           const partnerMonthlyExpenses = Number(pt.partner_monthly_expenses) || 0
@@ -1015,6 +1037,7 @@ export default async function DashboardPage() {
     householdOverrides,
     partnerOverrides,
     householdActivity,
+    partnerHiddenCategories,
   }
 
   return (

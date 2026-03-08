@@ -770,6 +770,7 @@ export default async function DAIshboardPage() {
     householdOverrides: null,
     partnerOverrides: null,
     householdActivity: [],
+    partnerHiddenCategories: [],
   }
 
   // ── Build temporal context ────────────────────────────────

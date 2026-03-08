@@ -671,138 +671,134 @@ export default function WillPage() {
         </section>
       )}
 
-      {/* === 4. Suggesties (Primary Content) === */}
-      <section id="section-suggesties" className="mt-5 sm:mt-8 scroll-mt-8">
-        <div className="mb-5">
-          <h2 className="label-editorial text-[var(--ink-2)]">
-            Suggesties
-          </h2>
-          <p className="mt-1 text-sm text-[var(--ink-3)]">
-            Ontdek verborgen vrijheidsdagen
-          </p>
+      {/* === 4. Three-column layout: Voorstellen | Acties | Doelen === */}
+      <section className="mt-5 sm:mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-stretch">
+
+        {/* --- Column 1: Voorstellen --- */}
+        <div id="section-suggesties" className="scroll-mt-8 flex flex-col rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5">
+          <RecommendationList initialRecommendations={recommendations} />
         </div>
-        <RecommendationList initialRecommendations={recommendations} />
+
+        {/* --- Column 2: Acties --- */}
+        <div id="section-acties" className="scroll-mt-8 flex flex-col rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--ink)]">
+            Acties
+          </h2>
+          <p className="mt-1 mb-4 text-sm text-[var(--ink-3)]">
+            Concrete stappen die je vrijheid laten groeien
+          </p>
+          <div className="flex-1">
+            <ActionBoard
+              initialActions={actions}
+              partnerInfo={partnerInfo}
+              currentUserId={currentUserId}
+              onCancellationOpen={(metadata) => {
+                setOpzegInitialMetadata(metadata)
+                setOpzegModalSub({
+                  id: '',
+                  name: metadata.subscription_name,
+                  monthlyAmount: metadata.monthly_amount,
+                  averageAmount: metadata.monthly_amount,
+                  frequency: (metadata.frequency ?? 'monthly') as SubscriptionItem['frequency'],
+                  nextDate: null,
+                  confidence: 'high',
+                  isVariableAmount: false,
+                  occurrences: 0,
+                  alreadyConfirmed: false,
+                })
+              }}
+            />
+          </div>
+        </div>
+
+        {/* --- Column 3: Doelen --- */}
+        <FeatureGate featureId="doelen_systeem" fallback="hidden">
+        <div id="section-doelen" className="scroll-mt-8 flex flex-col rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-[var(--ink)]">
+              Doelen
+            </h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowGoalForm(true)}
+                className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-wil-200 px-3 py-1.5 text-sm font-medium text-wil-600 hover:bg-wil-50"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Nieuw doel
+              </button>
+              {goals.length > 0 && (
+                <button
+                  onClick={() => setShowGoalModal(true)}
+                  className="rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-1.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+                >
+                  Alles
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="mt-1 mb-4 text-sm text-[var(--ink-3)]">
+            Je actieve financiele doelen
+          </p>
+
+          {/* Goal filter tabs — only show when there are shared goals */}
+          {hasSharedGoals && goals.length > 0 && (
+            <div className="mb-3 flex gap-1 rounded-lg bg-[var(--subtle)] p-1">
+              {([
+                { key: 'all' as const, label: 'Alle' },
+                { key: 'personal' as const, label: 'Persoonlijk' },
+                { key: 'shared' as const, label: 'Gedeeld' },
+              ]).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setGoalFilter(key)}
+                  className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                    goalFilter === key
+                      ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
+                      : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="flex-1">
+            {filteredGoals.length > 0 ? (
+              <div className="overflow-hidden rounded-[var(--r)] border border-[var(--border-ed)]">
+                <div className="divide-y divide-zinc-100">
+                  {filteredGoals.map((goal, i) => (
+                    <GoalSummaryRow
+                      key={goal.id}
+                      goal={goal}
+                      progress={filteredGoalProgresses[i]}
+                      onClick={() => setShowGoalModal(true)}
+                      dailyExpenses={dailyExpenseRate}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-6 text-center">
+                <p className="text-sm text-[var(--ink-3)]">
+                  {goalFilter === 'all'
+                    ? 'Nog geen doelen. Klik op "Nieuw doel" om te starten.'
+                    : goalFilter === 'shared'
+                      ? 'Geen gedeelde doelen.'
+                      : 'Geen persoonlijke doelen in dit filter.'}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+        </FeatureGate>
       </section>
 
-      {/* === 5. Budget Gezondheidscheck (NIBUD) (Primary Content) === */}
+      {/* === 5. Budget Gezondheidscheck (NIBUD) === */}
       <FeatureGate featureId="nibud_benchmark" fallback="hidden">
         <section id="section-gezondheidscheck" className="mt-4 sm:mt-8 scroll-mt-8">
           <NibudBenchmarkSection />
         </section>
-      </FeatureGate>
-
-      {/* === 6. Acties (Primary Content) === */}
-      <section id="section-acties" className="mt-5 sm:mt-8 scroll-mt-8">
-        <div className="mb-5">
-          <h2 className="label-editorial text-[var(--ink-2)]">
-            Acties
-          </h2>
-          <p className="mt-1 text-sm text-[var(--ink-3)]">
-            Concrete stappen die je vrijheid laten groeien
-          </p>
-        </div>
-        <ActionBoard
-          initialActions={actions}
-          partnerInfo={partnerInfo}
-          currentUserId={currentUserId}
-          onCancellationOpen={(metadata) => {
-            setOpzegInitialMetadata(metadata)
-            setOpzegModalSub({
-              id: '',
-              name: metadata.subscription_name,
-              monthlyAmount: metadata.monthly_amount,
-              averageAmount: metadata.monthly_amount,
-              frequency: (metadata.frequency ?? 'monthly') as SubscriptionItem['frequency'],
-              nextDate: null,
-              confidence: 'high',
-              isVariableAmount: false,
-              occurrences: 0,
-              alreadyConfirmed: false,
-            })
-          }}
-        />
-      </section>
-
-      {/* === 7. Doelen (Primary Content) === */}
-      <FeatureGate featureId="doelen_systeem" fallback="hidden">
-      <section id="section-doelen" className="mt-5 sm:mt-8 scroll-mt-8">
-        <div className="mb-5 flex items-center justify-between">
-          <div>
-            <h2 className="label-editorial text-[var(--ink-2)]">
-              Doelvoortgang
-            </h2>
-            <p className="mt-1 text-sm text-[var(--ink-3)]">
-              Je actieve financiele doelen
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowGoalForm(true)}
-              className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-wil-200 px-3 py-1.5 text-sm font-medium text-wil-600 hover:bg-wil-50"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Nieuw doel
-            </button>
-            {goals.length > 0 && (
-              <button
-                onClick={() => setShowGoalModal(true)}
-                className="rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-1.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-              >
-                Alle doelen bekijken
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Goal filter tabs — only show when there are shared goals */}
-        {hasSharedGoals && goals.length > 0 && (
-          <div className="mb-3 flex gap-1 rounded-lg bg-[var(--subtle)] p-1">
-            {([
-              { key: 'all' as const, label: 'Alle' },
-              { key: 'personal' as const, label: 'Persoonlijk' },
-              { key: 'shared' as const, label: 'Gedeeld' },
-            ]).map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setGoalFilter(key)}
-                className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                  goalFilter === key
-                    ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
-                    : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {filteredGoals.length > 0 ? (
-          <div className="card-editorial overflow-hidden">
-            <div className="divide-y divide-zinc-100">
-              {filteredGoals.map((goal, i) => (
-                <GoalSummaryRow
-                  key={goal.id}
-                  goal={goal}
-                  progress={filteredGoalProgresses[i]}
-                  onClick={() => setShowGoalModal(true)}
-                  dailyExpenses={dailyExpenseRate}
-                />
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-8 text-center">
-            <p className="text-sm text-[var(--ink-3)]">
-              {goalFilter === 'all'
-                ? 'Nog geen doelen ingesteld. Klik op "Nieuw doel" om te starten.'
-                : goalFilter === 'shared'
-                  ? 'Geen gedeelde doelen. Maak een gedeeld doel aan met je partner.'
-                  : 'Geen persoonlijke doelen in dit filter.'}
-            </p>
-          </div>
-        )}
-      </section>
       </FeatureGate>
 
       {/* === 8. Beslissingspatronen (Deep Dive) === */}
