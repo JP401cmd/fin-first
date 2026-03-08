@@ -4,9 +4,11 @@ import { useEffect, useState, useCallback } from 'react'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { formatFireAge } from '@/lib/horizon-data'
+import { usePerspective } from '@/components/app/perspective-provider'
+import { SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
 import {
   Users, TrendingUp, Hourglass, Percent, Target, User,
-  ArrowRight, Clock, PiggyBank, Wallet, Info,
+  ArrowRight, Clock, PiggyBank, Wallet, Info, Settings2,
 } from 'lucide-react'
 
 // Types matching the API response
@@ -52,6 +54,8 @@ interface PartnerProjection {
 interface HouseholdFireData {
   hasHousehold: boolean
   householdName: string
+  splitMode: SplitMode
+  customSplitPct: number | null
   combined: {
     projection: FireProjectionData
   }
@@ -85,6 +89,7 @@ export function HouseholdFireSection() {
   const [data, setData] = useState<HouseholdFireData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { perspective } = usePerspective()
 
   const loadData = useCallback(async () => {
     try {
@@ -116,6 +121,9 @@ export function HouseholdFireSection() {
   if (!loading && !data) return null
   if (error) return null
 
+  // In personal perspective, show only current user's individual FIRE projection
+  const isPersonalView = perspective === 'personal'
+
   if (loading) {
     return (
       <section className="mt-10" data-testid="household-fire-section">
@@ -134,9 +142,100 @@ export function HouseholdFireSection() {
 
   if (!data) return null
 
-  const { combined, partners, comparison, householdName } = data
+  const { combined, partners, comparison, householdName, splitMode } = data
   const hasMultiplePartners = partners.length >= 2
   const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 1100 })
+  const currentUserPartner = partners.find(p => p.isCurrentUser)
+  const splitLabel = SPLIT_MODE_LABELS[splitMode] ?? splitMode
+
+  // Personal perspective: show only the user's individual FIRE age
+  if (isPersonalView && currentUserPartner) {
+    return (
+      <section className="mt-10" data-testid="household-fire-section">
+        <div ref={inViewRef}>
+          {/* Section Header */}
+          <div className="mb-5">
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-horizon-500" />
+              <h2 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
+                Persoonlijk FIRE-doel
+              </h2>
+            </div>
+            <p className="mt-1 text-sm text-[var(--ink-3)]">
+              Jouw individuele FIRE-projectie op basis van je persoonlijk vermogen en jouw aandeel ({splitLabel}) van gedeelde bezittingen.
+            </p>
+          </div>
+
+          {/* Personal FIRE Card */}
+          <div className="rounded-[var(--r-lg)] border-2 border-horizon-200 bg-gradient-to-br from-horizon-50 to-white p-6" data-testid="personal-fire-card">
+            <div className="mb-4 flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-horizon-100">
+                <User className="h-4 w-4 text-horizon-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-horizon-900">Jouw FIRE-projectie</p>
+                <p className="text-xs text-horizon-600/60">
+                  Verdeling: {splitLabel}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4" data-testid="personal-fire-kpis">
+              <div>
+                <p className="text-[10px] font-medium text-horizon-600/50 uppercase">Vrijheid</p>
+                <p className="text-2xl font-bold text-horizon-700" data-testid="personal-freedom-pct">
+                  {currentUserPartner.projection.freedomPercentage.toFixed(1)}%
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-medium text-horizon-600/50 uppercase">FIRE leeftijd</p>
+                <p className="text-2xl font-bold text-horizon-700" data-testid="personal-fire-age">
+                  {currentUserPartner.projection.fireAge !== null ? Math.round(currentUserPartner.projection.fireAge) : '-'}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-medium text-horizon-600/50 uppercase">FIRE-doel</p>
+                <p className="text-lg font-bold text-horizon-700" data-testid="personal-fire-target">
+                  {formatCurrency(currentUserPartner.projection.fireTarget)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-medium text-horizon-600/50 uppercase">Vrijheidstijd</p>
+                <p className="text-lg font-bold text-horizon-700" data-testid="personal-freedom-time">
+                  {currentUserPartner.projection.freedomYears}j {currentUserPartner.projection.freedomMonths}mnd
+                </p>
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div className="mt-4">
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-horizon-100">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-horizon-600 to-horizon-400"
+                  style={{
+                    width: hasEntered ? `${Math.max(Math.min(currentUserPartner.projection.freedomPercentage, 100), 0)}%` : '0%',
+                    transition: hasEntered ? 'width 1000ms cubic-bezier(.22,1,.36,1)' : 'none',
+                  }}
+                  data-testid="personal-progress-bar"
+                />
+              </div>
+              <div className="mt-1 flex justify-between text-[10px] text-horizon-400">
+                <span>0%</span>
+                <span>{currentUserPartner.projection.fireDate}</span>
+                <span>100%</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Split mode info */}
+          <div className="mt-3 flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-xs text-[var(--ink-3)]">
+            <Settings2 className="h-3.5 w-3.5 shrink-0" />
+            <span>Gedeelde bezittingen verdeeld volgens <strong>{splitLabel}</strong>-modus. Wissel naar <strong>Huishouden</strong> perspectief voor de gecombineerde FIRE-leeftijd.</span>
+          </div>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section className="mt-10" data-testid="household-fire-section">
@@ -150,7 +249,7 @@ export function HouseholdFireSection() {
           </h2>
         </div>
         <p className="mt-1 text-sm text-[var(--ink-3)]">
-          Gecombineerd inkomen, gecombineerde uitgaven. Gedeeld en individueel FIRE-doel.
+          Gecombineerd inkomen, gecombineerde uitgaven. Gedeeld en individueel FIRE-doel (verdeling: {splitLabel}).
         </p>
       </div>
 

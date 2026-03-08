@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { computeFireProjection, computeFireRange, type FinancialInput, type FireProjection, type FireRange } from '@/lib/horizon-data'
+import { computeSharePct, type SplitMode } from '@/lib/household-data'
 
 /**
  * GET /api/household/fire-projections
@@ -33,6 +34,8 @@ interface PartnerFinancials {
 interface HouseholdFireResponse {
   hasHousehold: boolean
   householdName: string
+  splitMode: SplitMode
+  customSplitPct: number | null
   // Combined household projection
   combined: {
     input: FinancialInput
@@ -170,39 +173,65 @@ export async function GET() {
   const allEssentialBudgets = allEssentialBudgetsResult.data ?? []
   const allChildBudgets = allChildBudgetsResult.data ?? []
 
-  // Compute financials per partner
+  // Compute per-member monthly income first (needed for income_ratio split mode)
+  const memberIncomes = new Map<string, number>()
+  for (const memberId of memberIds) {
+    const memberTx = allTransactions.filter(t => t.user_id === memberId)
+    let income = 0
+    for (const tx of memberTx) {
+      const amt = Number(tx.amount)
+      if (amt > 0) income += amt
+    }
+    memberIncomes.set(memberId, income)
+  }
+
+  // Determine each member's share percentage via split_mode
+  const householdSettings = {
+    splitMode: (household.split_mode ?? 'equal') as SplitMode,
+    customSplitPct: household.custom_split_pct ?? null,
+    primaryPayerId: household.primary_payer_id ?? null,
+  }
+
+  // Compute financials per partner using split_mode-aware share percentages
   const partnersData: PartnerFinancials[] = memberIds.map(memberId => {
     const profile = profiles.find(p => p.id === memberId)
+    const myIncome = memberIncomes.get(memberId) ?? 0
+    // For income_ratio, find partner's income
+    const partnerIncome = memberIds
+      .filter(id => id !== memberId)
+      .reduce((sum, id) => sum + (memberIncomes.get(id) ?? 0), 0)
+
+    // Compute this member's share percentage based on split_mode
+    const sharePct = computeSharePct(householdSettings, memberId, myIncome, partnerIncome)
+    const shareFraction = sharePct / 100
 
     // Transactions for this member
     const memberTx = allTransactions.filter(t => t.user_id === memberId)
-    let monthlyIncome = 0
+    let monthlyIncome = myIncome
     let monthlyExpenses = 0
     for (const tx of memberTx) {
       const amt = Number(tx.amount)
-      if (amt > 0) monthlyIncome += amt
-      else monthlyExpenses += Math.abs(amt)
+      if (amt < 0) monthlyExpenses += Math.abs(amt)
     }
 
-    // Personal assets + share of shared assets
+    // Personal assets + split-mode share of shared assets
     const personalAssets = allAssets
       .filter(a => a.ownership === 'personal' && a.user_id === memberId)
       .reduce((sum, a) => sum + Number(a.current_value), 0)
     const sharedAssets = allAssets
       .filter(a => a.ownership === 'shared')
       .reduce((sum, a) => sum + Number(a.current_value), 0)
-    // Each partner owns 50% of shared assets for individual calculations
-    const sharedAssetsValue = sharedAssets / Math.max(memberIds.length, 1)
+    const sharedAssetsValue = sharedAssets * shareFraction
     const totalAssets = personalAssets + sharedAssetsValue
 
-    // Personal debts + share of shared debts
+    // Personal debts + split-mode share of shared debts
     const personalDebts = allDebts
       .filter(d => d.ownership === 'personal' && d.user_id === memberId)
       .reduce((sum, d) => sum + Number(d.current_balance), 0)
     const sharedDebts = allDebts
       .filter(d => d.ownership === 'shared')
       .reduce((sum, d) => sum + Number(d.current_balance), 0)
-    const sharedDebtsValue = sharedDebts / Math.max(memberIds.length, 1)
+    const sharedDebtsValue = sharedDebts * shareFraction
     const totalDebts = personalDebts + sharedDebtsValue
 
     // Monthly contributions
@@ -212,7 +241,7 @@ export async function GET() {
     const sharedContributions = allAssets
       .filter(a => a.ownership === 'shared')
       .reduce((sum, a) => sum + Number(a.monthly_contribution), 0)
-    const monthlyContributions = personalContributions + (sharedContributions / Math.max(memberIds.length, 1))
+    const monthlyContributions = personalContributions + (sharedContributions * shareFraction)
 
     // Yearly must expenses
     const memberBudgets = allEssentialBudgets.filter(
@@ -225,8 +254,8 @@ export async function GET() {
         ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
         : Number(b.default_limit)
       if (b.ownership === 'shared') {
-        // Split shared budget expenses
-        const share = limit / Math.max(memberIds.length, 1)
+        // Split shared budget expenses according to split_mode
+        const share = limit * shareFraction
         yearlyMustExpenses += (b as { interval?: string }).interval === 'monthly' ? share * 12
           : (b as { interval?: string }).interval === 'quarterly' ? share * 4
           : share
@@ -362,6 +391,8 @@ export async function GET() {
   const response: HouseholdFireResponse = {
     hasHousehold: true,
     householdName: household.name ?? 'Huishouden',
+    splitMode: householdSettings.splitMode,
+    customSplitPct: householdSettings.customSplitPct,
     combined: {
       input: combinedInput,
       projection: combinedProjection,
