@@ -1,3 +1,19 @@
+## Session 2026-03-08 - Feature #571
+
+### Feature #571: Huishouden-instellingen bereikbaar vanuit Identity - PASSING
+- Already fully implemented: Section G on /identity/instellingen page
+- hasHousehold gate: section only renders when /api/household/privacy returns 200
+- 4 quick-link cards in 2x2 grid: Privacy (inline expand), Split-modus (link), Notificaties (scroll), Leden (link)
+- Privacy sub-section expands inline with per-category volledig/totalen/verborgen controls
+- Solo users: hasHousehold defaults false, section hidden
+- Consistent styling: same rounded-2xl border pattern as sections A-F
+- Zero console errors, zero TypeScript errors
+- No code changes needed — verified existing implementation covers all 5 steps
+
+### Current Status
+- 1 feature verified this session (#571)
+- 556/614 features passing (90.6%)
+
 ## Session 2026-03-08 - Features #576, #606
 
 ### Feature #576: Concurrent perspectief-wissels geen data-corruptie - PASSING
