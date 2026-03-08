@@ -13,7 +13,7 @@ import {
   computeResilienceScore, formatFireAge, formatCountdown,
   computeLifeEventImpact, ageAtDate, deriveCountdown,
   runMonteCarlo,
-  LIFE_EVENT_CATALOG, LIFE_EVENT_GROUPS, nibudChildrenCost, berekenSchenkbelasting, berekenAutoMaandkosten, WERELDREIS_STIJL_PRESETS,
+  LIFE_EVENT_CATALOG, LIFE_EVENT_GROUPS, nibudChildrenCost, berekenSchenkbelasting, berekenAutoMaandkosten, berekenErfbelasting, WERELDREIS_STIJL_PRESETS, VERBOUWING_TYPE_KOSTEN,
   type LifeEventGroup,
   type FinancialInput, type FireProjection, type FireRange,
   type ProjectionMonth, type ResilienceScore,
@@ -875,6 +875,18 @@ export default function HorizonPage() {
       durMonths = Number(formDuration) || LIFE_EVENT_CATALOG.world_trip?.defaultDuration || 12
     }
 
+    // Special handling for inheritance: calculate netto erfenis after erfbelasting
+    if (formType === 'inheritance') {
+      const brutoBedrag = Number(formMetadata.brutoBedrag ?? 50000)
+      const relatie = String(formMetadata.erfbelastingSchijf ?? 'kind')
+      const erf = berekenErfbelasting(brutoBedrag, relatie)
+      // Netto erfenis as one-time income (negative cost = income)
+      oneTimeCost = -erf.netto
+      monthlyCostChange = 0
+      monthlyIncomeChange = 0
+      durMonths = 0
+    }
+
     // Special handling for overlijden_partner: net income impact + cost reduction
     if (formType === 'overlijden_partner') {
       const partnerInkomen = Number(formMetadata.nettoInkomenPartner) || 2500
@@ -928,8 +940,7 @@ export default function HorizonPage() {
       monthlyCostChange = 0
       oneTimeCost = 0
       durMonths = aowGapMaanden
-      // Override form age with pension age
-      formAge = pensioenLeeftijd
+      // formAge is already set to pensioenLeeftijd via setFormAge in openAddForm
     }
 
     // Special handling for car_purchase: compute monthly costs from breakdown
@@ -2254,6 +2265,14 @@ export default function HorizonPage() {
                               if (formType === 'car_purchase' && field.key === 'huidigeAutoKosten') {
                                 // Just update metadata, the breakdown card will show the difference
                               }
+                              // Auto-update netto erfenis when brutoBedrag changes
+                              if (formType === 'inheritance' && field.key === 'brutoBedrag') {
+                                const relatie = String(updated.erfbelastingSchijf ?? 'kind')
+                                const erf = berekenErfbelasting(Number(val) || 0, relatie)
+                                setFormAmount(erf.netto)
+                                setFormDirection('income')
+                                setFormDurationType('one_time')
+                              }
                               // World trip: auto-update vertrekkosten as one-time cost
                               if (formType === 'world_trip' && field.key === 'vertrekkosten') {
                                 const vertrek = Number(val) || 4000
@@ -2286,7 +2305,25 @@ export default function HorizonPage() {
                               setFormDirection('expense')
                               setFormDurationType('period')
                             }
+                            // Auto-update netto erfenis when relatie changes
+                            if (formType === 'inheritance' && field.key === 'erfbelastingSchijf') {
+                              const bruto = Number(formMetadata.brutoBedrag ?? 50000)
+                              const erf = berekenErfbelasting(bruto, val)
+                              setFormAmount(erf.netto)
+                              setFormDirection('income')
+                              setFormDurationType('one_time')
+                            }
                             // Auto-update AOW amount based on leefsituatie
+                            // Renovation: auto-update cost based on type preset
+                            if (formType === 'renovation' && field.key === 'type') {
+                              const preset = VERBOUWING_TYPE_KOSTEN[val]
+                              if (preset) {
+                                setFormAmount(preset.bedrag)
+                                setFormDirection('expense')
+                                setFormDurationType('one_time')
+                                setFormMetadata(prev => ({ ...prev, type: val, waardevermeerdering: preset.waardePct }))
+                              }
+                            }
                             if (formType === 'aow' && field.key === 'leefsituatie') {
                               const baseAmount = val === 'samenwonend' ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY
                               const jarenBuiten = Number(formMetadata.jarenBuitenNL ?? 0)

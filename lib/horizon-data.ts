@@ -273,6 +273,16 @@ export interface RenovationMetadata {
   waardevermeerdering?: number
 }
 
+/** Default cost presets per renovation type */
+export const VERBOUWING_TYPE_KOSTEN: Record<string, { label: string; bedrag: number; waardePct: number }> = {
+  keuken:       { label: 'Keuken',            bedrag: 15000, waardePct: 60 },
+  badkamer:     { label: 'Badkamer',          bedrag: 12000, waardePct: 55 },
+  uitbouw:      { label: 'Uitbouw / aanbouw', bedrag: 50000, waardePct: 70 },
+  dakkapel:     { label: 'Dakkapel',          bedrag: 14000, waardePct: 65 },
+  energetisch:  { label: 'Energetisch',       bedrag: 20000, waardePct: 50 },
+  totaal:       { label: 'Totale renovatie',  bedrag: 80000, waardePct: 65 },
+}
+
 export interface StudyMetadata {
   studieType?: 'cursus' | 'bachelor' | 'master' | 'promotie'
   parttime?: boolean
@@ -376,6 +386,42 @@ export function berekenSchenkbelasting(bedrag: number, relatie: string): { vrijs
   const hoogDeel = Math.max(0, belastbaar - tarief.grens)
   const belasting = Math.round(laagDeel * tarief.laag + hoogDeel * tarief.hoog)
   return { vrijstelling, belastbaar, belasting }
+}
+
+/** Erfbelasting 2026 vrijstellingen (Belastingdienst) */
+export const ERFBELASTING_VRIJSTELLING: Record<string, number> = {
+  partner: 804698,
+  kind: 25490,
+  kleinkind: 25490,
+  overig: 2658,
+}
+
+/** Erfbelasting 2026 tarieven (Belastingdienst) */
+export const ERFBELASTING_TARIEVEN: Record<string, { laag: number; hoog: number; grens: number }> = {
+  partner: { laag: 0.10, hoog: 0.20, grens: 154197 },
+  kind: { laag: 0.10, hoog: 0.20, grens: 154197 },
+  kleinkind: { laag: 0.18, hoog: 0.36, grens: 154197 },
+  overig: { laag: 0.30, hoog: 0.40, grens: 154197 },
+}
+
+/** Bereken erfbelasting op basis van bruto erfenis en relatie tot erflater */
+export function berekenErfbelasting(brutoBedrag: number, relatie: string): {
+  vrijstelling: number; belastbaar: number; belastingLaag: number; belastingHoog: number; totaalBelasting: number; netto: number; effectiefTarief: number
+} {
+  const vrijstelling = ERFBELASTING_VRIJSTELLING[relatie] ?? 2658
+  const tarief = ERFBELASTING_TARIEVEN[relatie] ?? ERFBELASTING_TARIEVEN.overig
+  const belastbaar = Math.max(0, brutoBedrag - vrijstelling)
+  if (belastbaar <= 0) {
+    return { vrijstelling, belastbaar: 0, belastingLaag: 0, belastingHoog: 0, totaalBelasting: 0, netto: brutoBedrag, effectiefTarief: 0 }
+  }
+  const laagDeel = Math.min(belastbaar, tarief.grens)
+  const hoogDeel = Math.max(0, belastbaar - tarief.grens)
+  const belastingLaag = Math.round(laagDeel * tarief.laag)
+  const belastingHoog = Math.round(hoogDeel * tarief.hoog)
+  const totaalBelasting = belastingLaag + belastingHoog
+  const netto = brutoBedrag - totaalBelasting
+  const effectiefTarief = brutoBedrag > 0 ? Math.round((totaalBelasting / brutoBedrag) * 1000) / 10 : 0
+  return { vrijstelling, belastbaar, belastingLaag, belastingHoog, totaalBelasting, netto, effectiefTarief }
 }
 
 /** NIBUD/ANWB gemiddelde maandkosten auto per brandstoftype (2025/2026) */
