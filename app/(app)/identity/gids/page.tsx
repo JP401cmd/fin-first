@@ -1,8 +1,149 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronDown, LayoutDashboard, Landmark, Zap, Compass, BookOpen, MessageSquare, type LucideIcon } from 'lucide-react'
+import Link from 'next/link'
+import { ChevronDown, LayoutDashboard, Landmark, Zap, Compass, BookOpen, MessageSquare, Sparkles, Lock, Receipt, CheckCircle2, ArrowRight, Wallet, CreditCard, PieChart, Upload, RefreshCw, Target, type LucideIcon } from 'lucide-react'
+import { formatCurrency } from '@/lib/format'
 import { createClient } from '@/lib/supabase/client'
+import { useFeatureAccess } from '@/components/app/feature-access-provider'
+import { DISCOVER_ITEMS, getVisitedFeaturesLocal, markFeatureVisitedLocal, type DiscoverItem } from '@/components/app/discover-carousel'
+import { FEATURES, DEFAULT_MATRIX, PHASES, levelToPhaseId } from '@/lib/feature-phases'
+import ConceptFlipCards from '@/components/app/concept-flip-cards'
+
+/* ── Types ─────────────────────── */
+
+interface GuideProgress {
+  counts: {
+    assets: number
+    transactions: number
+    completedActions: number
+    lifeEvents: number
+    budgets: number
+    debts: number
+    pendingRecommendations: number
+    wonFreedomDays: number
+  }
+  financial: {
+    netWorth: number
+    dailyExpenseRate: number
+    monthlyExpenses: number
+    freedomDays: { days: number; months: number; years: number }
+    fireAge: number | null
+    fireTarget: number
+    sovereigntyLevel: number
+  }
+  steps: {
+    hasAssets: boolean
+    hasTransactions: boolean
+    hasBudgets: boolean
+    hasCompletedActions: boolean
+    hasLifeEvents: boolean
+    hasFireData: boolean
+    hasDebts: boolean
+  }
+}
+
+/* ── Reis-stap card component ─────────────────────── */
+
+function ReisStapCard({
+  icon: Icon,
+  title,
+  color,
+  bg,
+  borderColor,
+  howSteps,
+  statusLines,
+  valueSentence,
+  ctaLabel,
+  ctaHref,
+  isComplete,
+}: {
+  icon: LucideIcon
+  title: string
+  color: string
+  bg: string
+  borderColor: string
+  howSteps: { icon: LucideIcon; text: string }[]
+  statusLines: string[]
+  valueSentence: string
+  ctaLabel: string
+  ctaHref: string
+  isComplete: boolean
+}) {
+  return (
+    <div
+      className="rounded-[var(--r)] border bg-[var(--paper)] overflow-hidden"
+      style={{ borderColor }}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-3 p-4 pb-3">
+        <div
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)]"
+          style={{ backgroundColor: bg, color }}
+        >
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-[var(--ink)]">{title}</p>
+        </div>
+        {isComplete && (
+          <div className="flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            <span className="text-[11px] font-medium">Voltooid</span>
+          </div>
+        )}
+      </div>
+
+      {/* Hoe-stappen */}
+      <div className="px-4 pb-3">
+        <p className="label-editorial text-[var(--ink-4)] mb-2">Hoe</p>
+        <div className="space-y-2">
+          {howSteps.map((step, i) => {
+            const StepIcon = step.icon
+            return (
+              <div key={i} className="flex items-start gap-2.5">
+                <div
+                  className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold"
+                  style={{ backgroundColor: bg, color }}
+                >
+                  {i + 1}
+                </div>
+                <p className="text-[12px] leading-relaxed text-[var(--ink-2)]">{step.text}</p>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Jouw status */}
+      <div className="mx-4 mb-3 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 p-3">
+        <p className="label-editorial text-[var(--ink-4)] mb-1.5">Jouw status</p>
+        {statusLines.map((line, i) => (
+          <p key={i} className="text-[12px] leading-relaxed text-[var(--ink-2)]">{line}</p>
+        ))}
+      </div>
+
+      {/* Waarde */}
+      <div className="px-4 pb-3">
+        <p className="font-serif italic text-[12px] leading-relaxed text-[var(--ink-3)]">
+          {valueSentence}
+        </p>
+      </div>
+
+      {/* CTA */}
+      <div className="px-4 pb-4">
+        <Link
+          href={ctaHref}
+          className="inline-flex items-center gap-1.5 rounded-[var(--r-sm)] px-4 py-2 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
+          style={{ backgroundColor: color }}
+        >
+          {ctaLabel}
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      </div>
+    </div>
+  )
+}
 
 /* ── Helper components ─────────────────────── */
 
@@ -69,9 +210,10 @@ export default function GidsPage() {
   const [guideSection, setGuideSection] = useState<string | null>(null)
   const [fullName, setFullName] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [progress, setProgress] = useState<GuideProgress | null>(null)
 
   useEffect(() => {
-    async function loadUser() {
+    async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const { data: profile } = await supabase
@@ -81,9 +223,21 @@ export default function GidsPage() {
           .single()
         if (profile?.full_name) setFullName(profile.full_name)
       }
+
+      // Fetch guide progress data
+      try {
+        const res = await fetch('/api/guide-progress')
+        if (res.ok) {
+          const data = await res.json()
+          setProgress(data)
+        }
+      } catch (e) {
+        // Progress data is optional — cards still render without it
+      }
+
       setLoading(false)
     }
-    loadUser()
+    loadData()
   }, [supabase])
 
   if (loading) {
@@ -154,19 +308,142 @@ export default function GidsPage() {
         })}
       </div>
 
-      {/* Kernbegrippen — snelle rij */}
-      <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {[
-          { label: 'Vrijheidsdagen', desc: 'Dagen die je vermogen dekt' },
-          { label: 'Kassabon', desc: 'Tik op een getal → zie hoe het berekend is' },
-          { label: 'Soevereiniteit', desc: 'Je niveau op de reis naar vrijheid' },
-          { label: 'FIRE', desc: 'Het moment dat werken optioneel wordt' },
-        ].map((item) => (
-          <div key={item.label} className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] p-2.5">
-            <p className="text-[11px] font-semibold text-[var(--ink)]">{item.label}</p>
-            <p className="mt-0.5 text-[11px] leading-snug text-[var(--ink-3)]">{item.desc}</p>
-          </div>
-        ))}
+      {/* Kernconcepten — interactieve flip-cards */}
+      <ConceptFlipCards />
+
+      {/* ── Je reis — interactieve stappen ── */}
+      <p className="label-editorial text-[var(--ink-3)] mb-3">Je reis</p>
+      <div className="mb-6 sm:mb-8 space-y-3">
+        {/* Stap 1: Weet waar je staat (De Kern) */}
+        <ReisStapCard
+          icon={Landmark}
+          title="Weet waar je staat"
+          color="var(--kern-400, #b45309)"
+          bg="var(--kern-50, #fffbeb)"
+          borderColor="var(--kern-200, #fde68a)"
+          howSteps={[
+            { icon: Wallet, text: 'Voeg je bankrekeningen toe' },
+            { icon: CreditCard, text: 'Registreer bezittingen en schulden' },
+            { icon: PieChart, text: 'Stel budgetten in' },
+          ]}
+          statusLines={
+            progress
+              ? progress.steps.hasAssets || progress.steps.hasDebts
+                ? [
+                    `Je hebt ${progress.counts.assets} bezitting${progress.counts.assets !== 1 ? 'en' : ''} en ${progress.counts.debts} schuld${progress.counts.debts !== 1 ? 'en' : ''} geregistreerd.`,
+                    progress.financial.netWorth !== 0
+                      ? `Netto vermogen: ${formatCurrency(progress.financial.netWorth)}`
+                      : '',
+                  ].filter(Boolean)
+                : ['Je hebt nog geen vermogen ingevoerd.']
+              : ['Laden...']
+          }
+          valueSentence="Je ziet voor het eerst je complete financiële plaatje in vrijheidstijd."
+          ctaLabel="Bekijk je vermogen"
+          ctaHref="/core"
+          isComplete={!!(progress?.steps.hasAssets && progress?.steps.hasBudgets)}
+        />
+
+        {/* Stap 2: Begrijp je patronen (De Kern) */}
+        <ReisStapCard
+          icon={Receipt}
+          title="Begrijp je patronen"
+          color="var(--kern-400, #b45309)"
+          bg="var(--kern-50, #fffbeb)"
+          borderColor="var(--kern-200, #fde68a)"
+          howSteps={[
+            { icon: Upload, text: 'Importeer transacties (MT940/CSV)' },
+            { icon: RefreshCw, text: 'Bekijk terugkerende kosten' },
+            { icon: CreditCard, text: 'Ontdek je abonnementen' },
+          ]}
+          statusLines={
+            progress
+              ? progress.steps.hasTransactions
+                ? [
+                    `Je hebt ${progress.counts.transactions.toLocaleString('nl-NL')} transactie${progress.counts.transactions !== 1 ? 's' : ''} geïmporteerd.`,
+                  ]
+                : ['Importeer je eerste transacties.']
+              : ['Laden...']
+          }
+          valueSentence="Ontdek waar je tijd weglekt zonder dat je het doorhebt."
+          ctaLabel={progress?.steps.hasTransactions ? 'Bekijk je kas' : 'Importeer transacties'}
+          ctaHref={progress?.steps.hasTransactions ? '/core/cash' : '/core/cash/import'}
+          isComplete={!!progress?.steps.hasTransactions}
+        />
+
+        {/* Stap 3: Onderneem actie (De Wil) */}
+        <ReisStapCard
+          icon={Zap}
+          title="Onderneem actie"
+          color="var(--wil-400, #2dd4bf)"
+          bg="var(--wil-50, #f0fdfa)"
+          borderColor="var(--wil-200, #99f6e4)"
+          howSteps={[
+            { icon: Sparkles, text: 'Bekijk je aanbevelingen' },
+            { icon: Zap, text: 'Accepteer en voer acties uit' },
+            { icon: Target, text: 'Stel financiële doelen' },
+          ]}
+          statusLines={
+            progress
+              ? progress.steps.hasCompletedActions
+                ? [
+                    `Je hebt ${progress.counts.wonFreedomDays} vrijheidsdag${progress.counts.wonFreedomDays !== 1 ? 'en' : ''} gewonnen door ${progress.counts.completedActions} actie${progress.counts.completedActions !== 1 ? 's' : ''}.`,
+                  ]
+                : progress.counts.pendingRecommendations > 0
+                  ? [`Er staan ${progress.counts.pendingRecommendations} aanbeveling${progress.counts.pendingRecommendations !== 1 ? 'en' : ''} voor je klaar.`]
+                  : ['Voeg eerst je financiële gegevens toe om aanbevelingen te ontvangen.']
+              : ['Laden...']
+          }
+          valueSentence="Elke afgeronde actie is een gewonnen vrijheidsdag."
+          ctaLabel="Bekijk aanbevelingen"
+          ctaHref="/will"
+          isComplete={!!progress?.steps.hasCompletedActions}
+        />
+
+        {/* Stap 4: Kijk vooruit (De Horizon) — #665 */}
+        <ReisStapCard
+          icon={Compass}
+          title="Kijk vooruit"
+          color="var(--horizon-400, #a855f7)"
+          bg="var(--horizon-50, #faf5ff)"
+          borderColor="var(--horizon-200, #e9d5ff)"
+          howSteps={[
+            { icon: Compass, text: 'Bekijk je FIRE-prognose' },
+            { icon: Compass, text: 'Voeg levensgebeurtenissen toe' },
+            { icon: Compass, text: 'Vergelijk scenario\u2019s' },
+          ]}
+          statusLines={
+            progress?.financial.fireAge != null
+              ? [
+                  `Je geschatte FIRE-leeftijd is ${progress.financial.fireAge}`,
+                  `${progress.counts.lifeEvents} levensgebeurtenis${progress.counts.lifeEvents !== 1 ? 'sen' : ''} toegevoegd`,
+                ]
+              : ['Bereken wanneer werken optioneel wordt']
+          }
+          valueSentence="Zie wanneer werken optioneel wordt"
+          ctaLabel="Bekijk je prognose"
+          ctaHref="/horizon"
+          isComplete={!!progress?.steps.hasFireData && !!progress?.steps.hasLifeEvents}
+        />
+
+        {/* Stap 5: Droom en plan (What-If + Will) — #666 */}
+        <ReisStapCard
+          icon={MessageSquare}
+          title="Droom en plan"
+          color="var(--horizon-400, #a855f7)"
+          bg="var(--horizon-50, #faf5ff)"
+          borderColor="var(--horizon-200, #e9d5ff)"
+          howSteps={[
+            { icon: MessageSquare, text: 'Open een What-If scenario' },
+            { icon: MessageSquare, text: 'Beschrijf je droom aan Will' },
+            { icon: MessageSquare, text: 'Vraag om een reality-check' },
+          ]}
+          statusLines={['Probeer: \u201cIk wil over 5 jaar een huis kopen...\u201d']}
+          valueSentence="Vertaal je dromen naar een concreet plan"
+          ctaLabel="Start een scenario"
+          ctaHref="/horizon/whatif"
+          isComplete={false}
+        />
       </div>
 
       <p className="label-editorial text-[var(--ink-3)] mb-3">De onderdelen</p>
