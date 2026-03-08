@@ -169,9 +169,14 @@ export function WhatIfEventsPanel({
       setFormState(null)
     } else {
       // ── Create mode ──
+      // Auto-suffix duplicate event names: "Kinderen" → "Kinderen (2)", "Kinderen (3)", ...
+      const sameTypeCount = events.filter(e => e.event_type === formState.eventType).length
+      const eventName = sameTypeCount > 0
+        ? `${formState.name} (${sameTypeCount + 1})`
+        : formState.name
       const newEvent: WhatIfEvent = {
         id: `whatif-${formState.eventType}-${Date.now()}`,
-        name: formState.name,
+        name: eventName,
         event_type: formState.eventType,
         target_age: formState.targetAge,
         target_date: null,
@@ -326,19 +331,14 @@ export function WhatIfEventsPanel({
             .filter(([key, cat]) => key !== 'aow' && key !== 'pension' && (!cat.householdOnly || isHousehold))
             .map(([key, cat]) => {
               const icon = EVENT_ICONS[cat.icon] ?? <Calendar className="h-4 w-4" />
-              const alreadyAdded = events.some(e => e.event_type === key && e.id.startsWith('whatif-'))
+              const existingCount = events.filter(e => e.event_type === key && e.id.startsWith('whatif-')).length
 
               return (
                 <button
                   key={key}
                   type="button"
-                  disabled={alreadyAdded}
                   onClick={() => openFormForCatalog(key)}
-                  className={`flex w-full items-center gap-3 rounded-[var(--r)] px-3 py-2.5 text-left transition-colors ${
-                    alreadyAdded
-                      ? 'opacity-40 cursor-not-allowed'
-                      : 'hover:bg-[var(--subtle)]'
-                  }`}
+                  className="flex w-full items-center gap-3 rounded-[var(--r)] px-3 py-2.5 text-left transition-colors hover:bg-[var(--subtle)]"
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r-sm)] bg-horizon-50 text-horizon-600">
                     {icon}
@@ -347,11 +347,18 @@ export function WhatIfEventsPanel({
                     <p className="font-sans text-sm font-medium text-[var(--ink)]">{cat.label}</p>
                     <p className="font-sans text-[11px] text-[var(--ink-3)]">{cat.description}</p>
                   </div>
-                  {cat.defaultCost !== 0 && (
-                    <span className="shrink-0 font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
-                      {formatCurrency(cat.defaultCost)}
-                    </span>
-                  )}
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {existingCount > 0 && (
+                      <span className="rounded-full bg-horizon-100 px-1.5 py-0.5 text-[10px] font-medium text-horizon-700">
+                        {existingCount}×
+                      </span>
+                    )}
+                    {cat.defaultCost !== 0 && (
+                      <span className="font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
+                        {formatCurrency(cat.defaultCost)}
+                      </span>
+                    )}
+                  </div>
                 </button>
               )
             })}
