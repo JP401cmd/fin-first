@@ -3112,6 +3112,62 @@ export default function HorizonPage() {
                           </div>
                         )
                       })()}
+                      {formType === 'study' && field.key === 'salarisstijging' && (() => {
+                        const studieType = String(formMetadata.studieType ?? 'master')
+                        const preset = STUDIE_TYPE_KOSTEN[studieType]
+                        const collegegeld = Number(formMetadata.collegegeld ?? preset?.bedrag ?? 5000)
+                        const salarisstijging = Number(formMetadata.salarisstijging ?? 300)
+                        const studieDuur = Number(formDuration) || preset?.duur || 12
+                        const studieDuurJaren = (studieDuur / 12).toFixed(1)
+                        const terugverdientijd = salarisstijging > 0 ? Math.ceil(collegegeld / salarisstijging) : 0
+                        const terugverdientijdJaren = (terugverdientijd / 12).toFixed(1)
+                        const dagKosten = (effectiveInput?.monthlyExpenses ?? 3000) / 30
+                        const freedomDaysInvestment = dagKosten > 0 ? Math.round(collegegeld / dagKosten) : 0
+                        const freedomDaysPerYear = salarisstijging > 0 && dagKosten > 0 ? Math.round((salarisstijging * 12) / dagKosten) : 0
+                        return (
+                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Rendement studie-investering</p>
+                            <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                              <div className="flex justify-between">
+                                <span>Studiekosten ({preset?.label ?? 'Studie'})</span>
+                                <span className="font-mono tabular-nums text-red-600">{formatCurrency(collegegeld)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Studieduur</span>
+                                <span className="font-mono tabular-nums">{studieDuurJaren} jaar ({studieDuur} mnd)</span>
+                              </div>
+                              {salarisstijging > 0 && (
+                                <>
+                                  <div className="h-px bg-horizon-200 my-1" />
+                                  <div className="flex justify-between">
+                                    <span>Salarisverhoging na afronding</span>
+                                    <span className="font-mono tabular-nums text-emerald-600">+{formatCurrency(salarisstijging)}/mnd</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Terugverdientijd</span>
+                                    <span className="font-mono tabular-nums">{terugverdientijdJaren} jaar ({terugverdientijd} mnd)</span>
+                                  </div>
+                                  {freedomDaysPerYear > 0 && (
+                                    <div className="flex justify-between font-semibold">
+                                      <span>Extra vrijheidstijd per jaar</span>
+                                      <span className="font-mono tabular-nums text-emerald-600">+{freedomDaysPerYear} dagen</span>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                              {freedomDaysInvestment > 0 && (
+                                <div className="flex justify-between text-[var(--ink-4)]">
+                                  <span>Investering in vrijheidstijd</span>
+                                  <span className="font-mono tabular-nums">{freedomDaysInvestment} dagen</span>
+                                </div>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-[var(--ink-4)] mt-1">
+                              STAP-budget (max €1.000) en scholingsaftrek kunnen de kosten verlagen
+                            </p>
+                          </div>
+                        )
+                      })()}
                       {formType === 'overlijden_partner' && field.key === 'kostendalingPct' && (() => {
                         const partnerInkomen = Number(formMetadata.nettoInkomenPartner ?? 2500)
                         const nabestaanden = Number(formMetadata.nabestaandenpensioen ?? 0)
