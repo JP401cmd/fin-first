@@ -1,3 +1,38 @@
+## Session 2026-03-08 - Features #599, #600, #605
+
+### Feature #599: Bijverdienste netto berekening met belastingwaarschuwing - PASSING
+- Updated side_hustle catalog fields: brutoOmzet, kostenPerMaand, opstartkosten, opbouwperiode, opbouwOmzetPct, doorlopend toggle
+- Auto-calculate netto (omzet - kosten) on field change, sets form amount + direction
+- Summary card: netto berekening breakdown, jaarresultaat, opstartkosten
+- Tax warning card: marginal rate 37-49% with after-tax estimate
+- Opbouwperiode info card when months > 0 with reduced revenue display
+- Doorlopend toggle switches between continuous and period duration
+- Special saveEvent handler: opstartkosten as one-time, netto as monthly income
+- Commit: d87715b
+
+### Feature #600: lifeEventsToCashflows verwerkt metadata voor nauwkeurigere cashflows - PASSING
+- Enhanced lifeEventsToCashflows with metadata-aware processing
+- Children: phased costs by age period (baby 120%, basisschool 100%, tiener 130% of NIBUD base)
+- AOW: adjusted amount based on leefsituatie (alleenstaand/samenwonend) and opbouwpercentage
+- Inheritance: netto after erfbelasting using berekenErfbelasting helper
+- Backward compatible: events without metadata use generic fallback (skipGeneric flags)
+- Updated SideHustleMetadata interface with new fields
+- Commit: d87715b
+
+### Feature #605: Pre-fill uit profiel: inkomen en leeftijd automatisch invullen - PASSING
+- Pre-fill nettoInkomen from effectiveInput.monthlyIncome for part-time, career_change, werkloosheid
+- Pre-fill AOW leefsituatie from isHouseholdView (samenwonend vs alleenstaand)
+- AOW amount auto-adjusted based on pre-filled leefsituatie
+- Sabbatical already had pre-fill (verified)
+- All pre-filled values remain manually adjustable (standard form inputs)
+- When profile data missing, catalog defaults are used as fallback
+- Commit: d87715b
+
+### Current Status
+- 3 features completed this session (#599, #600, #605)
+- Zero TypeScript errors in changed files (identity/page.tsx error is from another agent)
+- Could not verify via browser due to Supabase auth rate limiting
+
 ## Session 2026-03-08 - Features #590, #591, #592
 
 ### Feature #590: Auto kopen: brandstoftype en totale maandkosten breakdown - PASSING
