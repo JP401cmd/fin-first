@@ -5,7 +5,17 @@
  * Pure functions, geen Supabase dependency.
  */
 
-import { BOX3_DRAG, type LifeEvent } from '@/lib/horizon-data'
+import {
+  BOX3_DRAG,
+  type LifeEvent,
+  type ChildrenMetadata,
+  type AOWMetadata,
+  type InheritanceMetadata,
+  NIBUD_CHILDREN_MONTHLY_COST,
+  NL_AOW_MONTHLY,
+  NL_AOW_MONTHLY_SAMENWONEND,
+  berekenErfbelasting,
+} from '@/lib/horizon-data'
 import { type FireEndStrategy, type FireStrategyConfig, DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -338,58 +348,146 @@ export function lifeEventsToCashflows(events: LifeEvent[]): SimCashflow[] {
     if (age === null) continue
 
     const isIndexed = ev.is_indexed ?? true
+    const meta = ev.metadata ?? {}
+
+    // ── Metadata-enhanced processing per event type ──
+    // When metadata is present, generate more accurate phased cashflows
+    // and skip the generic fallback for the same cost categories.
+
+    let skipGenericCost = false
+    let skipGenericMonthlyCost = false
+    let skipGenericMonthlyIncome = false
+
+    // Children: phased costs by age period (NIBUD-based)
+    if (ev.event_type === 'children' && meta.aantalKinderen) {
+      const m = meta as ChildrenMetadata
+      const count = Math.min(4, Math.max(1, Number(m.aantalKinderen) || 1))
+      // NIBUD phases: 0-3 baby (120%), 4-11 basisschool (100%), 12-17 tiener (130%)
+      const baseCost = NIBUD_CHILDREN_MONTHLY_COST[count] ?? NIBUD_CHILDREN_MONTHLY_COST[4]!
+      const phases = [
+        { label: 'baby/peuter', factor: 1.2, fromAge: age, toAge: age + 4 },
+        { label: 'basisschool', factor: 1.0, fromAge: age + 4, toAge: age + 12 },
+        { label: 'tiener', factor: 1.3, fromAge: age + 12, toAge: age + 18 },
+      ]
+      for (const phase of phases) {
+        const amount = Math.round(baseCost * phase.factor)
+        flows.push({
+          id: `le-children-${phase.label}-${ev.id}`,
+          name: `${ev.name} (${phase.label})`,
+          type: 'recurring',
+          direction: 'expense',
+          amount,
+          fromAge: phase.fromAge,
+          toAge: phase.toAge,
+          indexed: true,
+        })
+      }
+      skipGenericMonthlyCost = true
+      skipGenericMonthlyIncome = true
+    }
+
+    // AOW: adjust amount based on leefsituatie and opbouwpercentage
+    if (ev.event_type === 'aow' && (meta.leefsituatie || meta.jarenBuitenNL)) {
+      const m = meta as AOWMetadata
+      const leefsituatie = m.leefsituatie ?? 'alleenstaand'
+      const jarenBuiten = Math.min(50, Math.max(0, Number(m.jarenBuitenNL ?? m.jarenInNL ?? 0)))
+      const opbouwFactor = (50 - jarenBuiten) / 50
+      const baseAmount = leefsituatie === 'samenwonend' ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY
+      const adjustedAmount = Math.round(baseAmount * opbouwFactor)
+      if (adjustedAmount > 0) {
+        flows.push({
+          id: `le-aow-adjusted-${ev.id}`,
+          name: ev.name,
+          type: 'recurring',
+          direction: 'income',
+          amount: adjustedAmount,
+          fromAge: age,
+          toAge: null, // AOW is levenslang
+          indexed: true,
+        })
+      }
+      skipGenericMonthlyIncome = true
+    }
+
+    // Inheritance: calculate netto after erfbelasting
+    if (ev.event_type === 'inheritance' && meta.brutoBedrag) {
+      const m = meta as InheritanceMetadata
+      const bruto = Number(m.brutoBedrag) || 0
+      const relatie = m.erfbelastingSchijf ?? 'overig'
+      const result = berekenErfbelasting(bruto, relatie)
+      const netto = result.netto
+      if (netto > 0) {
+        flows.push({
+          id: `le-inheritance-netto-${ev.id}`,
+          name: ev.name,
+          type: 'one_time',
+          direction: 'income',
+          amount: netto,
+          fromAge: age,
+          toAge: age,
+          indexed: false,
+        })
+      }
+      skipGenericCost = true
+    }
+
+    // ── Generic fallback: use stored amounts (backward compatible) ──
 
     // 1. Eenmalige kosten (one_time_cost) — eenmalige bedragen zijn nooit geïndexeerd
-    const cost = Number(ev.one_time_cost ?? 0)
-    if (cost !== 0) {
-      flows.push({
-        id: `le-cost-${ev.id}`,
-        name: ev.name,
-        type: 'one_time',
-        direction: cost > 0 ? 'expense' : 'income',
-        // Eenmalig bedrag — direct als totaalbedrag doorgeven.
-        // oneTimeAmount() past dit 1x toe op de exacte leeftijd.
-        amount: Math.abs(cost),
-        fromAge: age,
-        toAge: age,
-        indexed: false,
-      })
+    if (!skipGenericCost) {
+      const cost = Number(ev.one_time_cost ?? 0)
+      if (cost !== 0) {
+        flows.push({
+          id: `le-cost-${ev.id}`,
+          name: ev.name,
+          type: 'one_time',
+          direction: cost > 0 ? 'expense' : 'income',
+          amount: Math.abs(cost),
+          fromAge: age,
+          toAge: age,
+          indexed: false,
+        })
+      }
     }
 
     // 2. Maandelijkse kostenwijziging (monthly_cost_change)
-    const monthlyCost = Number(ev.monthly_cost_change ?? 0)
-    if (monthlyCost !== 0) {
-      const toAge = ev.duration_months && ev.duration_months > 0
-        ? age + Math.ceil(ev.duration_months / 12)
-        : null
-      flows.push({
-        id: `le-costchange-${ev.id}`,
-        name: ev.name,
-        type: 'recurring',
-        direction: monthlyCost > 0 ? 'expense' : 'income',
-        amount: Math.abs(monthlyCost),
-        fromAge: age,
-        toAge,
-        indexed: isIndexed,
-      })
+    if (!skipGenericMonthlyCost) {
+      const monthlyCost = Number(ev.monthly_cost_change ?? 0)
+      if (monthlyCost !== 0) {
+        const toAge = ev.duration_months && ev.duration_months > 0
+          ? age + Math.ceil(ev.duration_months / 12)
+          : null
+        flows.push({
+          id: `le-costchange-${ev.id}`,
+          name: ev.name,
+          type: 'recurring',
+          direction: monthlyCost > 0 ? 'expense' : 'income',
+          amount: Math.abs(monthlyCost),
+          fromAge: age,
+          toAge,
+          indexed: isIndexed,
+        })
+      }
     }
 
     // 3. Maandelijkse inkomenswijziging (monthly_income_change)
-    const monthlyIncome = Number(ev.monthly_income_change ?? 0)
-    if (monthlyIncome !== 0) {
-      const toAge = ev.duration_months && ev.duration_months > 0
-        ? age + Math.ceil(ev.duration_months / 12)
-        : null
-      flows.push({
-        id: `le-incomechange-${ev.id}`,
-        name: ev.name,
-        type: 'recurring',
-        direction: monthlyIncome > 0 ? 'income' : 'expense',
-        amount: Math.abs(monthlyIncome),
-        fromAge: age,
-        toAge,
-        indexed: isIndexed,
-      })
+    if (!skipGenericMonthlyIncome) {
+      const monthlyIncome = Number(ev.monthly_income_change ?? 0)
+      if (monthlyIncome !== 0) {
+        const toAge = ev.duration_months && ev.duration_months > 0
+          ? age + Math.ceil(ev.duration_months / 12)
+          : null
+        flows.push({
+          id: `le-incomechange-${ev.id}`,
+          name: ev.name,
+          type: 'recurring',
+          direction: monthlyIncome > 0 ? 'income' : 'expense',
+          amount: Math.abs(monthlyIncome),
+          fromAge: age,
+          toAge,
+          indexed: isIndexed,
+        })
+      }
     }
   }
 

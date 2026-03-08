@@ -13,7 +13,7 @@ import {
   computeResilienceScore, formatFireAge, formatCountdown,
   computeLifeEventImpact, ageAtDate, deriveCountdown,
   runMonteCarlo,
-  LIFE_EVENT_CATALOG, LIFE_EVENT_GROUPS, nibudChildrenCost, berekenSchenkbelasting, berekenAutoMaandkosten, berekenErfbelasting, WERELDREIS_STIJL_PRESETS, VERBOUWING_TYPE_KOSTEN, STUDIE_TYPE_KOSTEN,
+  LIFE_EVENT_CATALOG, LIFE_EVENT_GROUPS, nibudChildrenCost, berekenSchenkbelasting, berekenAutoMaandkosten, berekenErfbelasting, WERELDREIS_STIJL_PRESETS, VERBOUWING_TYPE_KOSTEN, STUDIE_TYPE_KOSTEN, BRUILOFT_BUDGET_PRESETS,
   type LifeEventGroup,
   type FinancialInput, type FireProjection, type FireRange,
   type ProjectionMonth, type ResilienceScore,
@@ -500,7 +500,31 @@ export default function HorizonPage() {
         metaDefaults[f.key] = f.default
       }
     }
-    setFormMetadata(metaDefaults)
+    // ── Pre-fill from profile data ──
+    // Netto maandinkomen pre-fill for income-related events
+    const profileIncome = effectiveInput?.monthlyIncome ?? 0
+    if (profileIncome > 0) {
+      if (type === 'part_time' && metaDefaults.nettoInkomen !== undefined) {
+        metaDefaults.nettoInkomen = profileIncome
+      }
+      if (type === 'career_change' && metaDefaults.huidigNettoSalaris !== undefined) {
+        metaDefaults.huidigNettoSalaris = profileIncome
+      }
+      if (type === 'werkloosheid' && metaDefaults.huidigNetto !== undefined) {
+        metaDefaults.huidigNetto = profileIncome
+      }
+    }
+    // AOW: pre-fill leefsituatie from household status
+    if (type === 'aow' && metaDefaults.leefsituatie !== undefined) {
+      metaDefaults.leefsituatie = isHouseholdView ? 'samenwonend' : 'alleenstaand'
+      const baseAmount = isHouseholdView ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY
+      const jarenBuiten = Number(metaDefaults.jarenBuitenNL ?? 0)
+      const factor = Math.min(1, Math.max(0, (50 - jarenBuiten) / 50))
+      setFormAmount(Math.round(baseAmount * factor))
+      setFormDirection('income')
+      setFormDurationType('continuous')
+    }
+    setFormMetadata({ ...metaDefaults })
     // Auto-calculate initial vermogensverlies for scheiding
     if (type === 'scheiding') {
       const behoudPct = Number(metaDefaults.vermogensBehoudPct ?? 50)
@@ -877,6 +901,18 @@ export default function HorizonPage() {
       // If new salary is permanently different, that's a separate ongoing change
       // We don't model permanent salary change here — only the transition period
       // The user can adjust their profile income after the switch
+    }
+
+    // Special handling for wedding: bruiloft + huwelijksreis + optional huwelijksvoorwaarden
+    if (formType === 'wedding') {
+      const bruiloftBudget = Number(formAmount) || 20000
+      const huwelijksreis = Number(formMetadata.huwelijksreis) || 0
+      const huwelijksvoorwaarden = Boolean(formMetadata.huwelijksvoorwaarden)
+      const notariskosten = huwelijksvoorwaarden ? 1200 : 0
+      oneTimeCost = bruiloftBudget + huwelijksreis + notariskosten
+      monthlyCostChange = 0
+      monthlyIncomeChange = 0
+      durMonths = 0
     }
 
     // Special handling for schenking: calculate total including belasting
@@ -2407,6 +2443,11 @@ export default function HorizonPage() {
                                 setFormDirection('expense')
                                 setFormDurationType('one_time')
                               }
+                              // Wedding: auto-update total when huwelijksreis changes
+                              if (formType === 'wedding' && field.key === 'huwelijksreis') {
+                                // formAmount already reflects bruiloft cost; we'll add huwelijksreis in save
+                                // No need to change formAmount here — save handler combines them
+                              }
                             }}
                             className="min-w-0 flex-1 rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
                           />
@@ -2460,6 +2501,16 @@ export default function HorizonPage() {
                                 setFormDurationType('one_time')
                                 setFormDuration(preset.duur)
                                 setFormMetadata(prev => ({ ...prev, studieType: val, collegegeld: preset.bedrag }))
+                              }
+                            }
+                            // Wedding: auto-update budget when preset changes
+                            if (formType === 'wedding' && field.key === 'budgetPreset') {
+                              const preset = BRUILOFT_BUDGET_PRESETS[val]
+                              if (preset) {
+                                setFormAmount(preset.bedrag)
+                                setFormDirection('expense')
+                                setFormDurationType('one_time')
+                                setFormMetadata(prev => ({ ...prev, budgetPreset: val, aantalGasten: preset.gasten }))
                               }
                             }
                             if (formType === 'aow' && field.key === 'leefsituatie') {
@@ -3023,6 +3074,30 @@ export default function HorizonPage() {
                             {ccDelta < 0 && (
                               <p className="text-[10px] text-[var(--ink-4)] mt-1">Let op: je nieuwe salaris is {formatCurrency(Math.abs(ccDelta))}/mnd lager dan je huidige inkomen</p>
                             )}
+                          </div>
+                        )
+                      })()}
+                      {formType === 'wedding' && field.key === 'huwelijksvoorwaarden' && (() => {
+                        const bruiloftBudget = Number(formAmount) || 20000
+                        const huwelijksreis = Number(formMetadata.huwelijksreis) || 0
+                        const huwelijksvoorwaarden = Boolean(formMetadata.huwelijksvoorwaarden)
+                        const notariskosten = huwelijksvoorwaarden ? 1200 : 0
+                        const totaal = bruiloftBudget + huwelijksreis + notariskosten
+                        return (
+                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Financieel overzicht trouwerij</p>
+                            <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                              <div className="flex justify-between"><span>Bruiloftsbudget</span><span className="font-mono tabular-nums">{formatCurrency(bruiloftBudget)}</span></div>
+                              {huwelijksreis > 0 && (
+                                <div className="flex justify-between"><span>Huwelijksreis</span><span className="font-mono tabular-nums">{formatCurrency(huwelijksreis)}</span></div>
+                              )}
+                              {huwelijksvoorwaarden && (
+                                <div className="flex justify-between"><span>Notaris huwelijksvoorwaarden</span><span className="font-mono tabular-nums">{formatCurrency(notariskosten)}</span></div>
+                              )}
+                              <div className="h-px bg-horizon-200 my-1" />
+                              <div className="flex justify-between font-semibold"><span>Totale kosten</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(totaal)}</span></div>
+                            </div>
+                            <p className="text-[10px] text-[var(--ink-4)] mt-1">💍 Na trouwen word je fiscaal partners — Box 3 vermogen en vrijstelling (€57.000 p.p.) worden gezamenlijk berekend.</p>
                           </div>
                         )
                       })()}

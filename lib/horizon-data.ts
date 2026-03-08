@@ -349,7 +349,12 @@ export const BRUILOFT_BUDGET_PRESETS: Record<string, { label: string; bedrag: nu
 
 export interface MoveMetadata {
   afstand?: 'lokaal' | 'regionaal' | 'internationaal'
+  verhuiskosten?: number
+  inrichtingskosten?: number
+  dubbeleLastenMaanden?: number
+  dubbeleLastenBedrag?: number
   huurverschil?: number
+  verschilPermanent?: boolean
 }
 
 export interface SideHustleMetadata {
@@ -829,20 +834,25 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     label: 'Verhuizing',
     icon: 'Truck',
     group: 'wonen',
-    impactRange: '€3K–€10K eenmalig',
+    impactRange: '€3K–€10K eenmalig + maandlasten',
     defaultCost: 5000,
     defaultMonthlyCost: 0,
     defaultMonthlyIncome: 0,
     defaultDuration: 0,
     description: 'Verhuizen naar ander huis of stad',
-    tip: 'Verhuiskosten: lokaal €1.500–€3.000, regionaal €3.000–€5.000, internationaal €5.000–€15.000. Inclusief verhuisbedrijf, herinrichting en dubbele woonlasten.',
+    tip: 'Verhuiskosten: lokaal €1.500–€3.000, regionaal €3.000–€5.000, internationaal €5.000–€15.000. Denk ook aan dubbele woonlasten tijdens de overlap en inrichtingskosten voor je nieuwe woning.',
     fields: [
       { key: 'afstand', label: 'Verhuisafstand', fieldType: 'select', default: 'regionaal', options: [
         { value: 'lokaal', label: 'Lokaal (zelfde stad)' },
         { value: 'regionaal', label: 'Regionaal (andere stad)' },
         { value: 'internationaal', label: 'Internationaal' },
-      ]},
-      { key: 'huurverschil', label: 'Maandelijks huurverschil', fieldType: 'number', default: 0, tip: 'Huurprijzen variëren sterk per regio. Randstad vs. buiten: verschil van €300–€600/mnd. Negatief = goedkoper.' },
+      ], tip: 'De afstand bepaalt de verhuiskosten. Lokaal: €1.500, regionaal: €3.000, internationaal: €8.000.' },
+      { key: 'verhuiskosten', label: 'Verhuiskosten', fieldType: 'number', default: 3000, tip: 'Kosten voor verhuisbedrijf, dozen, transport. Lokaal: €1.000–€2.000. Regionaal: €2.000–€4.000. Internationaal: €5.000–€15.000.' },
+      { key: 'inrichtingskosten', label: 'Inrichtingskosten', fieldType: 'number', default: 3000, tip: 'Meubels, apparatuur, gordijnen, verf. Eerste woning: €5.000–€10.000. Vervanging: €2.000–€5.000.' },
+      { key: 'dubbeleLastenMaanden', label: 'Dubbele woonlasten (maanden)', fieldType: 'number', default: 2, tip: 'Overlap tussen oude en nieuwe woning. Gemiddeld 1–3 maanden dubbele huur/hypotheek.', suffix: 'maanden' },
+      { key: 'dubbeleLastenBedrag', label: 'Dubbele woonlasten per maand', fieldType: 'number', default: 1200, tip: 'Je huidige maandlasten die je extra betaalt tijdens de overlap (huur of hypotheek).', suffix: '/mnd' },
+      { key: 'huurverschil', label: 'Verschil maandlasten nieuw vs oud', fieldType: 'number', default: 0, tip: 'Positief = duurder wonen, negatief = goedkoper. Randstad vs. buiten: verschil van €300–€600/mnd.', suffix: '/mnd' },
+      { key: 'verschilPermanent', label: 'Maandlastenverschil is permanent', fieldType: 'toggle', default: true, tip: 'Permanent: het verschil loopt door tot FIRE. Tijdelijk: alleen tijdens de opgegeven duur (bijv. bij tijdelijke huur).' },
     ],
   },
   wedding: {
