@@ -50,6 +50,7 @@ export const identityNav: ModuleNavConfig = {
   items: [
     { label: 'Overzicht', href: '/identity' },
     { label: 'Profiel', href: '/identity/profiel' },
+    { label: 'Gids', href: '/identity/gids' },
     { label: 'Instellingen', href: '/identity/instellingen' },
     { label: 'Delen', href: '/identity/delen' },
   ],
