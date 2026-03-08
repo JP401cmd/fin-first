@@ -11,6 +11,7 @@ import { FEATURES, DEFAULT_MATRIX, PHASES, levelToPhaseId } from '@/lib/feature-
 import ConceptFlipCards from '@/components/app/concept-flip-cards'
 import { OntdekkenSection } from '@/components/app/ontdekken-section'
 import GuideFaq from '@/components/app/guide-faq'
+import GuideProTips from '@/components/app/guide-pro-tips'
 
 /* ── Types ─────────────────────── */
 
@@ -598,24 +599,8 @@ export default function GidsPage() {
       {/* Ontdekken sectie */}
       <OntdekkenSection />
 
-      {/* Pro tips */}
-      <div className="mt-5 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/50 p-4">
-        <p className="label-editorial text-[var(--ink-3)] mb-2">Snelle tips</p>
-        <ul className="space-y-1">
-          {[
-            'Tik op elk bedrag om de kassabon te openen — een stapsgewijze berekening van het getal.',
-            'Bedragen boven €100 tonen ook het vrijheidstijd-equivalent in jaren, maanden of dagen.',
-            'Dashboard-widgets zijn aanpasbaar — schakel ze aan of uit via Identiteit → Instellingen.',
-            'Nieuwe features ontgrendelen automatisch als je soevereiniteitsniveau stijgt.',
-            'Stel Will een vraag via de chatknop rechtsonder — hij kent de context van je pagina.',
-          ].map((tip, i) => (
-            <li key={i} className="flex items-start gap-2 text-[12px] leading-relaxed text-[var(--ink-2)]">
-              <span className="mt-0.5 shrink-0 text-[var(--ink-3)]">{i + 1}.</span>
-              <span>{tip}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
+      {/* Pro tips carrousel */}
+      <GuideProTips />
     </div>
   )
 }
