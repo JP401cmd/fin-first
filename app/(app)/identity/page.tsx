@@ -260,7 +260,7 @@ export default function IdentityPage() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-[var(--ink)]">Hoe werkt TriFinity?</p>
-          <p className="text-[12px] text-[var(--ink-3)]">Bekijk de gids</p>
+          <p className="text-[12px] text-[var(--ink-3)]">Bekijk de interactieve gids</p>
         </div>
         <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />
       </Link>
