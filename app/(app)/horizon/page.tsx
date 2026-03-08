@@ -20,6 +20,7 @@ import {
   type LifeEvent, type LifeEventImpact,
   type MonteCarloResult, type CatalogField,
 } from '@/lib/horizon-data'
+import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
@@ -46,6 +47,7 @@ import { HouseholdFireSection } from '@/components/app/household-fire-section'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { SimChartModal } from '@/components/app/horizon/sim-chart-widget'
 import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverlay, type MonteCarloOverlay } from '@/components/app/horizon/sim-chart'
+import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { parseFireStrategy, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
 
 type ActiveModal = null | 'projections' | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting'
@@ -940,6 +942,14 @@ export default function HorizonPage() {
                   scenarioOverlays={scenarioOverlays}
                   monteCarloOverlay={monteCarloOverlay}
                 />
+                {/* Events timeline aligned to same age axis */}
+                {events.length > 0 && (
+                  <EventsTimeline
+                    events={events}
+                    currentAge={currentAge ?? 30}
+                    endAge={simResult.displayEndAge}
+                  />
+                )}
               </div>
 
               {simCashflows.length > 0 && (
@@ -1914,6 +1924,14 @@ export default function HorizonPage() {
                                 setFormDirection('income')
                                 setFormDurationType('one_time')
                               }
+                              // Auto-update AOW amount based on jarenInNL
+                              if (formType === 'aow' && field.key === 'jarenInNL') {
+                                const leefsituatie = String(updated.leefsituatie ?? 'alleenstaand')
+                                const baseAmount = leefsituatie === 'samenwonend' ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY
+                                const jarenInNL = Math.min(50, Math.max(0, Number(val) || 0))
+                                const factor = jarenInNL / 50
+                                setFormAmount(Math.round(baseAmount * factor))
+                              }
                               // Auto-calculate vermogensverlies + totale kosten for scheiding
                               if (formType === 'scheiding' && ['vermogensBehoudPct', 'advocaatKosten'].includes(field.key)) {
                                 const behoudPct = Number(updated.vermogensBehoudPct ?? 50)
@@ -1939,6 +1957,13 @@ export default function HorizonPage() {
                             setFormMetadata(prev => ({ ...prev, [field.key]: numVal }))
                             if (formType === 'children' && field.key === 'aantalKinderen') {
                               setFormAmount(nibudChildrenCost(Number(val)))
+                            }
+                            // Auto-update AOW amount based on leefsituatie
+                            if (formType === 'aow' && field.key === 'leefsituatie') {
+                              const baseAmount = val === 'samenwonend' ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY
+                              const jarenInNL = Number(formMetadata.jarenInNL ?? 50)
+                              const factor = Math.min(1, Math.max(0, jarenInNL / 50))
+                              setFormAmount(Math.round(baseAmount * factor))
                             }
                             if (formType === 'schenking' && field.key === 'eenmaligOfJaarlijks') {
                               if (val === 'jaarlijks') {

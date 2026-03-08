@@ -13,6 +13,7 @@ import {
   formatFireAgeShort,
   formatFireAgeDelta,
 } from '@/lib/horizon-data'
+import { resolveFireParams } from '@/lib/fire-params'
 import {
   runSimulation,
   lifeEventsToCashflows,
@@ -22,6 +23,7 @@ import {
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { parseFireStrategy, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { SimChart } from '@/components/app/horizon/sim-chart'
+import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { WhatIfHeader } from '@/components/app/horizon/whatif-header'
 import { WhatIfSliders, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
 import { WhatIfEventsPanel, type WhatIfEvent } from '@/components/app/horizon/whatif-events'
@@ -56,6 +58,8 @@ export default function WhatIfPage() {
   const [input, setInput] = useState<FinancialInput | null>(null)
   const [events, setEvents] = useState<WhatIfEvent[]>([])
   const [fireStrategy, setFireStrategy] = useState<FireStrategyConfig | undefined>(undefined)
+  const [userGrossReturn, setUserGrossReturn] = useState(DEFAULT_RETURN)
+  const [userInflation, setUserInflation] = useState(INFLATION)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -81,7 +85,7 @@ export default function WhatIfPage() {
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount').single(),
+        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate').single(),
         supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
         supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         supabase.from('budgets').select('id, name, parent_id, default_limit, is_essential, interval, budget_type').not('parent_id', 'is', null).not('budget_type', 'in', '("archive","income","savings")'),
@@ -134,6 +138,11 @@ export default function WhatIfPage() {
 
       setFireStrategy(parseFireStrategy(profileResult.data ?? {}))
 
+      // Resolve user's FIRE parameters (expected_return + inflation_rate)
+      const fireParams = resolveFireParams(profileResult.data ?? {})
+      setUserGrossReturn(fireParams.grossReturn)
+      setUserInflation(fireParams.inflationRate)
+
       const horizonInput: FinancialInput = {
         totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
         monthlyContributions, yearlyMustExpenses: yearlyRetirementExpenses, dateOfBirth: dob,
@@ -151,7 +160,7 @@ export default function WhatIfPage() {
         monthlyIncome: Math.round(monthlyIncome),
         workDaysPerWeek: 5,
         savingsRate: Math.max(0, Math.min(80, savingsRate)),
-        expectedReturn: DEFAULT_RETURN * 100, // as percentage
+        expectedReturn: fireParams.grossReturn * 100, // as percentage, from user profile
         extraContribution: 0,
       })
     } catch (err) {
@@ -205,10 +214,10 @@ export default function WhatIfPage() {
       monthlyIncome: Math.round(input.monthlyIncome),
       workDaysPerWeek: 5,
       savingsRate: Math.max(0, Math.min(80, savingsRate)),
-      expectedReturn: DEFAULT_RETURN * 100,
+      expectedReturn: userGrossReturn * 100,
       extraContribution: 0,
     }
-  }, [input])
+  }, [input, userGrossReturn])
 
   // ── Compute what-if FinancialInput from overrides ──────────
   const whatIfInput = useMemo<FinancialInput | null>(() => {
@@ -253,15 +262,15 @@ export default function WhatIfPage() {
       currentPortfolio,
       yearlyExpenses,
       annualSavings,
-      DEFAULT_RETURN,
+      userGrossReturn,
       'nl_box3',
-      INFLATION,
+      userInflation,
       cashflows,
       strategyForSim,
     )
 
     return { result, cashflows }
-  }, [input, activeEvents, fireStrategy])
+  }, [input, activeEvents, fireStrategy, userGrossReturn, userInflation])
 
   // ── Run what-if simulation ───────────────────────────────
   const whatIfSim = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
@@ -277,7 +286,7 @@ export default function WhatIfPage() {
     // Use what-if savings: income adjusted by sliders
     const adjustedSavings = (whatIfInput.monthlyIncome - whatIfInput.monthlyExpenses) * 12
     const annualSavings = Math.max(0, adjustedSavings) + (overrides?.extraContribution ?? 0) * 12
-    const grossReturn = whatIfInput.expectedReturn ?? DEFAULT_RETURN
+    const grossReturn = whatIfInput.expectedReturn ?? userGrossReturn
     const strategyForSim = fireStrategy ?? { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 }
     const cashflows = lifeEventsToCashflows(activeEvents)
 
@@ -289,13 +298,13 @@ export default function WhatIfPage() {
       annualSavings,
       grossReturn,
       'nl_box3',
-      INFLATION,
+      userInflation,
       cashflows,
       strategyForSim,
     )
 
     return { result, cashflows }
-  }, [whatIfInput, activeEvents, fireStrategy, overrides?.extraContribution])
+  }, [whatIfInput, activeEvents, fireStrategy, overrides?.extraContribution, userGrossReturn, userInflation])
 
   // ── Impact computation (per-event FIRE delta) ──────────────
   const computeImpact = useCallback((eventId: string) => {
@@ -313,7 +322,7 @@ export default function WhatIfPage() {
 
     const adjustedSavings = (whatIfInput.monthlyIncome - whatIfInput.monthlyExpenses) * 12
     const annualSavings = Math.max(0, adjustedSavings) + (overrides?.extraContribution ?? 0) * 12
-    const grossReturn = whatIfInput.expectedReturn ?? DEFAULT_RETURN
+    const grossReturn = whatIfInput.expectedReturn ?? userGrossReturn
     const strategyForSim = fireStrategy ?? { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 }
 
     // Simulate WITH this event (all active events)
@@ -321,12 +330,12 @@ export default function WhatIfPage() {
       ? activeEvents
       : [...activeEvents, event]
     const cfWith = lifeEventsToCashflows(eventsWithThis)
-    const simWith = runSimulation(currentAge, strategyForSim.endAge, currentPortfolio, yearlyExpenses, annualSavings, grossReturn, 'nl_box3', INFLATION, cfWith, strategyForSim)
+    const simWith = runSimulation(currentAge, strategyForSim.endAge, currentPortfolio, yearlyExpenses, annualSavings, grossReturn, 'nl_box3', userInflation, cfWith, strategyForSim)
 
     // Simulate WITHOUT this event
     const eventsWithout = activeEvents.filter(e => e.id !== eventId)
     const cfWithout = lifeEventsToCashflows(eventsWithout)
-    const simWithout = runSimulation(currentAge, strategyForSim.endAge, currentPortfolio, yearlyExpenses, annualSavings, grossReturn, 'nl_box3', INFLATION, cfWithout, strategyForSim)
+    const simWithout = runSimulation(currentAge, strategyForSim.endAge, currentPortfolio, yearlyExpenses, annualSavings, grossReturn, 'nl_box3', userInflation, cfWithout, strategyForSim)
 
     // Calculate total cost of the event
     const oneTimeCost = Number(event.one_time_cost ?? 0)
@@ -344,7 +353,7 @@ export default function WhatIfPage() {
     }
 
     return { event, fireAgeWith, fireAgeWithout, deltaMonths, totalCost }
-  }, [whatIfInput, events, activeEvents, fireStrategy, overrides?.extraContribution])
+  }, [whatIfInput, events, activeEvents, fireStrategy, overrides?.extraContribution, userGrossReturn, userInflation])
 
   // ── Derived values for display ───────────────────────────
   const currentAge = input?.dateOfBirth ? ageAtDate(input.dateOfBirth) : null
@@ -553,6 +562,14 @@ export default function WhatIfPage() {
             baselineRows={baselineSim?.result.rows}
             baselineFireAge={baselineFireAge}
           />
+          {/* Events timeline aligned to same age axis */}
+          {events.length > 0 && (
+            <EventsTimeline
+              events={events.filter(e => !e.whatIfDisabled)}
+              currentAge={currentAge ?? 30}
+              endAge={simResult.displayEndAge}
+            />
+          )}
         </div>
 
         {/* Cashflow pills */}
