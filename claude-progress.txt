@@ -12054,3 +12054,34 @@ For Feature #51 (Transaction Import):
 - Zero TypeScript errors
 - Could not verify via browser (Supabase auth rate limiting 400)
 - Commit: 219f86c
+
+## Session 2026-03-08 - Features #677, #678, #680
+
+### Feature #677: RecommendationCard vrijheidsdagen in font-mono - PASSING
+- Freedom days number: font-mono tabular-nums font-semibold text-[var(--ink)]
+- "dagen" text: font-serif italic text-[var(--ink-3)]
+- Consistent with recommendation-list total which already uses font-mono tabular-nums
+
+### Feature #678: RecommendationCard hover state editorial - PASSING
+- Removed hover:shadow-md
+- Added hover:border-[var(--border-md)] for border deepening
+- Added hover:-translate-y-px for 1px lift
+- Transition: duration-150 ease-in-out
+
+### Feature #680: Acties sectie als checkbox-strip layout - PASSING
+- Redesigned ActionCard as compact checkbox-strip rows (~40px with py-1.5)
+- Circle checkbox on left: empty circle (open), filled green check (completed), clock icon (postponed), X icon (rejected)
+- Checkbox click toggles between open/completed
+- Removed border-l-4 status colors entirely
+- Completed actions: title in line-through text-[var(--ink-3)]
+- Meta-badges (freedom days, date, source) right-aligned
+- Quick action buttons (postpone, reject, assign) still available on right
+- Removed redundant standalone complete button (checkbox handles it)
+- Removed standalone completed status indicator (checkbox handles it)
+- Hover: border deepening instead of shadow
+- Removed unused getActionStatusColor import
+
+### Current Status
+- 3 features completed this session (#677, #678, #680)
+- Zero TypeScript errors
+- Commit: 43bf081
