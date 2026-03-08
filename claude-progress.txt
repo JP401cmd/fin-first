@@ -1,3 +1,33 @@
+## Session 2026-03-08 - Features #650, #651, #652
+
+### Feature #650: Schuldentype 'dga_schuld' toegevoegd aan DEBT_TYPES - PASSING
+- Added 'dga_schuld' to DebtType union type
+- Label: 'DGA-schuld aan eigen BV'
+- Icon: Building2
+- No subtypes needed
+- DEBT_TYPE_FIELDS: linked_asset_id, repayment_type
+
+### Feature #651: DGA-schuld formulier met koppeling aan deelneming - PASSING
+- Linked_asset_id dropdown filtered to asset_type='deelneming' for dga_schuld
+- Required validation for linked_asset_id on dga_schuld
+- Smart defaults: creditor='Eigen BV'
+- Wet excessief lenen warnings: orange at 400k, red at 500k with bovenmatig calculation
+- Link to belastingdienst.nl for more info
+- allDebts prop added to DebtForm for total DGA calculation
+- Hint to add deelneming if none exist
+
+### Feature #652: DGA-schuld Box 3 classificatie en weergave - PASSING
+- dga_schuld correctly classified as Box 3 schuld (default behavior in classifyDebt)
+- Debt card subtitle shows linked deelneming name instead of creditor
+- Debt detail modal shows "Gekoppelde deelneming" label for dga_schuld
+- Deelneming asset detail already had DGA-lening section (from #630)
+- Commit: 091b6dd
+
+### Current Status
+- 3 features completed this session (#650, #651, #652)
+- Zero TypeScript errors
+- All changes use existing patterns and real Supabase queries
+
 ## Session 2026-03-08 - Features #602, #603, #615
 
 ### Feature #602: Event catalogus: verbeterde knoppen met beschrijving en geschatte impact - PASSING
