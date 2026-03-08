@@ -847,7 +847,7 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
         { value: 'regionaal', label: 'Regionaal (andere stad)' },
         { value: 'internationaal', label: 'Internationaal' },
       ], tip: 'De afstand bepaalt de verhuiskosten. Lokaal: €1.500, regionaal: €3.000, internationaal: €8.000.' },
-      { key: 'verhuiskosten', label: 'Verhuiskosten', fieldType: 'number', default: 3000, tip: 'Kosten voor verhuisbedrijf, dozen, transport. Lokaal: €1.000–€2.000. Regionaal: €2.000–€4.000. Internationaal: €5.000–€15.000.' },
+      { key: 'verhuiskosten', label: 'Verhuiskosten', fieldType: 'number', default: 1500, tip: 'Kosten voor verhuisbedrijf, dozen, transport. Lokaal: €1.000–€2.000. Regionaal: €2.000–€4.000. Internationaal: €5.000–€15.000.' },
       { key: 'inrichtingskosten', label: 'Inrichtingskosten', fieldType: 'number', default: 3000, tip: 'Meubels, apparatuur, gordijnen, verf. Eerste woning: €5.000–€10.000. Vervanging: €2.000–€5.000.' },
       { key: 'dubbeleLastenMaanden', label: 'Dubbele woonlasten (maanden)', fieldType: 'number', default: 2, tip: 'Overlap tussen oude en nieuwe woning. Gemiddeld 1–3 maanden dubbele huur/hypotheek.', suffix: 'maanden' },
       { key: 'dubbeleLastenBedrag', label: 'Dubbele woonlasten per maand', fieldType: 'number', default: 1200, tip: 'Je huidige maandlasten die je extra betaalt tijdens de overlap (huur of hypotheek).', suffix: '/mnd' },

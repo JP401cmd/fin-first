@@ -903,6 +903,27 @@ export default function HorizonPage() {
       // The user can adjust their profile income after the switch
     }
 
+    // Special handling for move: verhuiskosten + inrichting + dubbele lasten + maandlastenverschil
+    if (formType === 'move') {
+      const verhuiskosten = Number(formMetadata.verhuiskosten) || 1500
+      const inrichtingskosten = Number(formMetadata.inrichtingskosten) || 3000
+      const dubbeleLastenMaanden = Number(formMetadata.dubbeleLastenMaanden) || 2
+      const dubbeleLastenBedrag = Number(formMetadata.dubbeleLastenBedrag) || 1200
+      const huurverschil = Number(formMetadata.huurverschil) || 0
+      const verschilPermanent = formMetadata.verschilPermanent !== undefined ? Boolean(formMetadata.verschilPermanent) : true
+      const dubbeleLastenTotaal = dubbeleLastenMaanden * dubbeleLastenBedrag
+      // One-time = verhuiskosten + inrichting + dubbele lasten
+      oneTimeCost = verhuiskosten + inrichtingskosten + dubbeleLastenTotaal
+      // Monthly = huurverschil (positive = duurder = expense, negative = goedkoper = saving)
+      if (huurverschil > 0) {
+        monthlyCostChange = huurverschil
+      } else if (huurverschil < 0) {
+        monthlyIncomeChange = Math.abs(huurverschil) // savings modeled as income change
+      }
+      // Duration: permanent (0 = until FIRE) or use formDuration
+      durMonths = verschilPermanent ? 0 : (Number(formDuration) || 60)
+    }
+
     // Special handling for wedding: bruiloft + huwelijksreis + optional huwelijksvoorwaarden
     if (formType === 'wedding') {
       const bruiloftBudget = Number(formAmount) || 20000
@@ -2465,6 +2486,12 @@ export default function HorizonPage() {
                             if (formType === 'children' && field.key === 'aantalKinderen') {
                               setFormAmount(nibudChildrenCost(Number(val)))
                             }
+                            // Move: auto-update verhuiskosten when afstand changes
+                            if (formType === 'move' && field.key === 'afstand') {
+                              const kostenMap: Record<string, number> = { lokaal: 1500, regionaal: 3000, internationaal: 8000 }
+                              const kosten = kostenMap[val] ?? 3000
+                              setFormMetadata(prev => ({ ...prev, afstand: val, verhuiskosten: kosten }))
+                            }
                             // Auto-update car monthly costs when brandstof changes
                             if (formType === 'car_purchase' && field.key === 'brandstof') {
                               const km = Number(formMetadata.jaarlijkseKm ?? 15000)
@@ -3074,6 +3101,42 @@ export default function HorizonPage() {
                             {ccDelta < 0 && (
                               <p className="text-[10px] text-[var(--ink-4)] mt-1">Let op: je nieuwe salaris is {formatCurrency(Math.abs(ccDelta))}/mnd lager dan je huidige inkomen</p>
                             )}
+                          </div>
+                        )
+                      })()}
+                      {formType === 'move' && field.key === 'verschilPermanent' && (() => {
+                        const verhuiskosten = Number(formMetadata.verhuiskosten) || 1500
+                        const inrichtingskosten = Number(formMetadata.inrichtingskosten) || 3000
+                        const dubbeleLastenMaanden = Number(formMetadata.dubbeleLastenMaanden) || 2
+                        const dubbeleLastenBedrag = Number(formMetadata.dubbeleLastenBedrag) || 1200
+                        const dubbeleLastenTotaal = dubbeleLastenMaanden * dubbeleLastenBedrag
+                        const huurverschil = Number(formMetadata.huurverschil) || 0
+                        const verschilPermanent = formMetadata.verschilPermanent !== undefined ? Boolean(formMetadata.verschilPermanent) : true
+                        const eenmaligTotaal = verhuiskosten + inrichtingskosten + dubbeleLastenTotaal
+                        return (
+                          <div className="mt-2 rounded-lg border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Financieel overzicht verhuizing</p>
+                            <div className="space-y-0.5 text-xs text-[var(--ink-2)]">
+                              <p className="text-[10px] font-semibold text-horizon-500 mb-1">Eenmalige kosten</p>
+                              <div className="flex justify-between"><span>Verhuiskosten</span><span className="font-mono tabular-nums">{formatCurrency(verhuiskosten)}</span></div>
+                              <div className="flex justify-between"><span>Inrichtingskosten</span><span className="font-mono tabular-nums">{formatCurrency(inrichtingskosten)}</span></div>
+                              <div className="flex justify-between"><span>Dubbele lasten ({dubbeleLastenMaanden} mnd × {formatCurrency(dubbeleLastenBedrag)})</span><span className="font-mono tabular-nums">{formatCurrency(dubbeleLastenTotaal)}</span></div>
+                              <div className="h-px bg-horizon-200 my-1" />
+                              <div className="flex justify-between font-semibold"><span>Totaal eenmalig</span><span className="font-mono tabular-nums text-red-600">-{formatCurrency(eenmaligTotaal)}</span></div>
+                              {huurverschil !== 0 && (
+                                <>
+                                  <p className="text-[10px] font-semibold text-horizon-500 mt-2 mb-1">Structureel maandlastenverschil</p>
+                                  <div className="flex justify-between">
+                                    <span>{huurverschil > 0 ? 'Duurder wonen' : 'Goedkoper wonen'}</span>
+                                    <span className={`font-mono tabular-nums ${huurverschil > 0 ? 'text-red-600' : 'text-emerald-600'}`}>{huurverschil > 0 ? '+' : ''}{formatCurrency(huurverschil)}/mnd</span>
+                                  </div>
+                                  <div className="flex justify-between text-[var(--ink-4)]">
+                                    <span>Duur</span>
+                                    <span>{verschilPermanent ? 'Permanent (tot FIRE)' : 'Tijdelijk'}</span>
+                                  </div>
+                                </>
+                              )}
+                            </div>
                           </div>
                         )
                       })()}
