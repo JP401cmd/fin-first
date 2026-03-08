@@ -377,15 +377,16 @@ export interface CatalogField {
   suffix?: string
 }
 
-export type LifeEventGroup = 'leven' | 'wonen' | 'werk' | 'inkomen' | 'vrije_tijd' | 'anders'
+export type LifeEventGroup = 'leven' | 'wonen' | 'werk' | 'pensioen' | 'vermogen' | 'vrije_tijd' | 'anders'
 
 export const LIFE_EVENT_GROUPS: Record<LifeEventGroup, { label: string; order: number }> = {
-  leven:      { label: 'Leven',      order: 0 },
-  wonen:      { label: 'Wonen',      order: 1 },
-  werk:       { label: 'Werk',       order: 2 },
-  inkomen:    { label: 'Inkomen',    order: 3 },
-  vrije_tijd: { label: 'Vrije tijd', order: 4 },
-  anders:     { label: 'Anders',     order: 5 },
+  leven:      { label: 'Leven & Relatie',       order: 0 },
+  wonen:      { label: 'Wonen',                 order: 1 },
+  werk:       { label: 'Werk & Inkomen',        order: 2 },
+  pensioen:   { label: 'Pensioen & Uitkering',  order: 3 },
+  vermogen:   { label: 'Vermogen',              order: 4 },
+  vrije_tijd: { label: 'Vrije tijd',            order: 5 },
+  anders:     { label: 'Anders',                order: 6 },
 }
 
 export interface LifeEventCatalogEntry {
@@ -579,7 +580,7 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
   early_retirement: {
     label: 'Vervroegd pensioen',
     icon: 'Sunset',
-    group: 'inkomen',
+    group: 'pensioen',
     impactRange: '€50K–€200K overbrugging',
     defaultCost: 0,
     defaultMonthlyCost: 0,
