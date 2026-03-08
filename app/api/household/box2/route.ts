@@ -38,13 +38,41 @@ export async function GET(request: NextRequest) {
   const partnerId = partnerMember?.user_id
 
   // Fetch all deelneming assets (RLS scoped)
-  const { data: assetsRaw } = await supabase
-    .from('assets')
-    .select('*')
-    .eq('is_active', true)
-    .eq('asset_type', 'deelneming')
+  const [{ data: assetsRaw }, { data: vorderingenRaw }] = await Promise.all([
+    supabase
+      .from('assets')
+      .select('*')
+      .eq('is_active', true)
+      .eq('asset_type', 'deelneming'),
+    supabase
+      .from('assets')
+      .select('id, name, current_value, user_id, subtype, ownership, linked_asset_id')
+      .eq('is_active', true)
+      .eq('asset_type', 'vordering')
+      .eq('subtype', 'dga_lening'),
+  ])
 
   const allAssets = (assetsRaw ?? []) as Asset[]
+  const dgaLeningen = (vorderingenRaw ?? []) as { id: string; name: string; current_value: number; user_id: string; subtype: string; ownership: string; linked_asset_id: string | null }[]
+
+  // Calculate total DGA-leningen per perspective
+  const myDgaTotal = dgaLeningen
+    .filter(v => v.user_id === user.id && v.ownership !== 'shared')
+    .reduce((s, v) => s + Number(v.current_value), 0)
+    + dgaLeningen
+    .filter(v => v.ownership === 'shared')
+    .reduce((s, v) => s + Number(v.current_value), 0)
+
+  const partnerDgaTotal = partnerId
+    ? dgaLeningen
+        .filter(v => v.user_id === partnerId && v.ownership !== 'shared')
+        .reduce((s, v) => s + Number(v.current_value), 0)
+      + dgaLeningen
+        .filter(v => v.ownership === 'shared')
+        .reduce((s, v) => s + Number(v.current_value), 0)
+    : 0
+
+  const combinedDgaTotal = dgaLeningen.reduce((s, v) => s + Number(v.current_value), 0)
 
   // Get monthly expenses for freedom days calculation
   const { data: budgets } = await supabase
@@ -81,6 +109,7 @@ export async function GET(request: NextRequest) {
     year,
     hasPartner: !!hasHousehold,
     dailyExpenses,
+    dgaLeningenTotal: myDgaTotal,
   })
 
   // Get current user name
@@ -137,6 +166,7 @@ export async function GET(request: NextRequest) {
     year,
     hasPartner: true,
     dailyExpenses,
+    dgaLeningenTotal: partnerDgaTotal,
   })
 
   // Combined calculation
@@ -151,6 +181,7 @@ export async function GET(request: NextRequest) {
     year,
     hasPartner: true,
     dailyExpenses,
+    dgaLeningenTotal: combinedDgaTotal,
   })
 
   // Build enriched deelneming details

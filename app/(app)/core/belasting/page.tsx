@@ -4,12 +4,12 @@ import { useEffect, useState, useCallback } from 'react'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
 import { formatCurrency } from '@/lib/format'
 import { BOX3_PARAMS, BOX3_TOOLTIPS, type Box3Result, type TaxYear, type PartnerAllocation } from '@/lib/box3-data'
-import { BOX2_TOOLTIPS, type Box2Result } from '@/lib/box2-data'
+import { BOX2_TOOLTIPS, DGA_LENING_DREMPEL, type Box2Result } from '@/lib/box2-data'
 import {
   Calculator, Users, User, ArrowLeftRight, Info,
   TrendingDown, Wallet, PiggyBank, BarChart3,
   Clock, ChevronDown, ChevronUp, Lightbulb, ArrowLeft,
-  Sparkles, SlidersHorizontal, Shield, Building2,
+  Sparkles, SlidersHorizontal, Shield, Building2, AlertTriangle,
 } from 'lucide-react'
 import { Box3PartnerModal } from '@/components/app/core/box3-partner-modal'
 import Link from 'next/link'
@@ -782,8 +782,13 @@ function Box2Section({
                 {viewMode === 'combined' ? 'Gecombineerde belasting' : 'Jouw belasting'}
               </p>
               <span className="font-display text-[36px] sm:text-[44px] font-bold tracking-tight text-[var(--ink)] font-mono tabular-nums">
-                {formatCurrency(result.totalTax)}
+                {formatCurrency(result.totalTaxInclDga)}
               </span>
+              {result.dgaExcessTax > 0 && (
+                <p className="text-xs text-red-500 mt-1">
+                  incl. {formatCurrency(result.dgaExcessTax)} wet excessief lenen
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-2 pb-1 sm:pb-2">
               <Clock className="h-4 w-4 text-teal-500" />
@@ -861,7 +866,16 @@ function Box2Section({
                 value={result.taxHigh}
               />
               <div className="h-px bg-[var(--border-ed)]" />
-              <CalcRow label="Box 2 belasting" value={result.totalTax} bold highlight />
+              <CalcRow label="Box 2 belasting (regulier)" value={result.totalTax} bold highlight />
+              {result.dgaExcessTax > 0 && (
+                <>
+                  <div className="h-px bg-[var(--border-ed)]" />
+                  <CalcRow label="Fictief voordeel (excessief lenen)" value={result.dgaLeningenExcess} muted />
+                  <CalcRow label="Extra belasting excessief lenen" value={result.dgaExcessTax} bold />
+                  <div className="h-px bg-[var(--border-ed)]" />
+                  <CalcRow label="Totaal Box 2 belasting" value={result.totalTaxInclDga} bold highlight />
+                </>
+              )}
               <div className="flex items-center gap-2 pt-1">
                 <Clock className="h-3.5 w-3.5 text-teal-500" />
                 <span className="text-xs text-[var(--ink-2)]">
@@ -872,6 +886,65 @@ function Box2Section({
           </div>
         )}
       </section>
+
+      {/* Wet excessief lenen DGA waarschuwing */}
+      {result.dgaLeningenTotal > 0 && (
+        <section className={`card-editorial overflow-hidden mb-6 border-l-4 ${result.dgaLeningenExcess > 0 ? 'border-l-red-500' : result.dgaLeningenTotal >= 400_000 ? 'border-l-amber-500' : 'border-l-teal-300'}`}>
+          <div className="p-4 sm:p-5">
+            <div className="flex items-start gap-3">
+              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${result.dgaLeningenExcess > 0 ? 'bg-red-100' : result.dgaLeningenTotal >= 400_000 ? 'bg-amber-100' : 'bg-teal-50'}`}>
+                <AlertTriangle className={`h-4 w-4 ${result.dgaLeningenExcess > 0 ? 'text-red-600' : result.dgaLeningenTotal >= 400_000 ? 'text-amber-600' : 'text-teal-500'}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-semibold text-[var(--ink)] mb-1">
+                  Wet excessief lenen bij eigen vennootschap
+                  <InfoTooltip text={BOX2_TOOLTIPS.wetExcessiefLenen} />
+                </h3>
+                <p className="text-xs text-[var(--ink-3)] mb-3">
+                  {result.dgaLeningenExcess > 0
+                    ? 'Je DGA-leningen overschrijden de drempel. Het bovenmatige deel wordt als fictief regulier voordeel belast in Box 2.'
+                    : result.dgaLeningenTotal >= 400_000
+                    ? 'Je DGA-leningen naderen de drempel van €500.000. Let op dat je deze grens niet overschrijdt.'
+                    : 'Je DGA-leningen vallen binnen de drempel.'}
+                </p>
+
+                {/* Calculation breakdown */}
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[var(--ink-2)]">Totaal DGA-leningen</span>
+                    <span className="font-mono tabular-nums font-medium text-[var(--ink)]">{formatCurrency(result.dgaLeningenTotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[var(--ink-3)]">Drempel</span>
+                    <span className="font-mono tabular-nums text-[var(--ink-3)]">{formatCurrency(DGA_LENING_DREMPEL)}</span>
+                  </div>
+                  {result.dgaLeningenExcess > 0 && (
+                    <>
+                      <div className="h-px bg-[var(--border-ed)]" />
+                      <div className="flex items-center justify-between">
+                        <span className="text-[var(--ink-2)] font-medium">Bovenmatig deel (fictief voordeel)</span>
+                        <span className="font-mono tabular-nums font-medium text-red-600">{formatCurrency(result.dgaLeningenExcess)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[var(--ink-2)]">Extra Box 2 belasting</span>
+                        <span className="font-mono tabular-nums font-bold text-red-600">{formatCurrency(result.dgaExcessTax)}</span>
+                      </div>
+                      {result.dailyExpenses > 0 && result.dgaExcessTax > 0 && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <Clock className="h-3 w-3 text-red-400" />
+                          <span className="text-[10px] text-red-500/80">
+                            = {Math.round(result.dgaExcessTax / result.dailyExpenses)} extra vrijheidsdagen
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Per-deelneming breakdown */}
       {deelnemingen.length > 0 && (
@@ -961,7 +1034,7 @@ function CombinedTaxSummary({
   box2Result: Box2Result | null
   dailyExpenses: number
 }) {
-  const box2Tax = box2Result?.totalTax ?? 0
+  const box2Tax = box2Result?.totalTaxInclDga ?? box2Result?.totalTax ?? 0
   const box2FreedomDays = box2Result?.freedomDays ?? 0
   const hasBox2 = box2Tax > 0
 

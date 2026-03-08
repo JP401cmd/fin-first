@@ -12,6 +12,7 @@ import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { OwnershipToggle, OwnershipBadge, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
+import { usePartnerPrivacy, filterPartnerItems, PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
 import {
   type Asset,
   type AssetType,
@@ -51,6 +52,7 @@ export default function AssetsPage() {
   const seedingRef = useRef(false)
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
+  const { partnerPrivacy, hiddenCategories } = usePartnerPrivacy()
 
   function getMortgageForAsset(assetId: string): { name: string; balance: number } | null {
     const m = mortgages.find((m) => m.linked_asset_id === assetId)
@@ -84,10 +86,26 @@ export default function AssetsPage() {
         return
       }
 
-      setAssets(data as Asset[])
+      // Apply privacy filtering in household mode (Feature #537)
+      let filteredData = data as Asset[]
+      const { data: { user } } = await supabase.auth.getUser()
+      if (signal?.aborted) return
+      if (perspective === 'household' && user) {
+        try {
+          const ppRes = await fetch('/api/household/partner-privacy')
+          if (ppRes.ok) {
+            const ppData = await ppRes.json()
+            if (ppData.partnerPrivacy?.assets === 'hidden') {
+              filteredData = filteredData.filter(
+                a => a.user_id === user.id || a.ownership === 'shared'
+              )
+            }
+          }
+        } catch { /* non-critical */ }
+      }
+      setAssets(filteredData)
 
       // Load linked mortgages + daily expenses for freedom-time + bank account links
-      const { data: { user } } = await supabase.auth.getUser()
       if (signal?.aborted) return
       if (user) {
         const now = new Date()
@@ -309,6 +327,9 @@ export default function AssetsPage() {
             <p className="mt-1 text-sm text-[var(--ink-3)]">
               {activeAssets.length} bezitting{activeAssets.length !== 1 ? 'en' : ''} — opgeslagen vrijheid
             </p>
+            {perspective === 'household' && hiddenCategories.includes('assets') && (
+              <PrivacyHiddenNotice hiddenCategories={hiddenCategories} forCategories={['assets']} />
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Link
@@ -532,6 +553,26 @@ export default function AssetsPage() {
                                 asset.subtype && ASSET_SUBTYPE_LABELS[asset.asset_type]?.[asset.subtype],
                                 asset.institution,
                                 asset.asset_type === 'deelneming' && asset.ownership_percentage != null ? `${asset.ownership_percentage}% belang` : null,
+                                asset.asset_type === 'levensverzekering' && asset.expiry_date ? (() => {
+                                  const now = new Date()
+                                  const end = new Date(asset.expiry_date!)
+                                  const diffMs = end.getTime() - now.getTime()
+                                  if (diffMs <= 0) return 'Verlopen'
+                                  const diffYears = Math.floor(diffMs / (365.25 * 24 * 60 * 60 * 1000))
+                                  const diffMonths = Math.floor((diffMs % (365.25 * 24 * 60 * 60 * 1000)) / (30.44 * 24 * 60 * 60 * 1000))
+                                  if (diffYears > 0) return `Nog ${diffYears} jaar${diffMonths > 0 ? ` en ${diffMonths} mnd` : ''}`
+                                  return `Nog ${diffMonths} maanden`
+                                })() : null,
+                                asset.asset_type === 'vordering' && asset.lock_end_date ? (() => {
+                                  const now = new Date()
+                                  const end = new Date(asset.lock_end_date!)
+                                  const diffMs = end.getTime() - now.getTime()
+                                  if (diffMs <= 0) return 'Afgelopen'
+                                  const diffYears = Math.floor(diffMs / (365.25 * 24 * 60 * 60 * 1000))
+                                  const diffMonths = Math.floor((diffMs % (365.25 * 24 * 60 * 60 * 1000)) / (30.44 * 24 * 60 * 60 * 1000))
+                                  if (diffYears > 0) return `Nog ${diffYears} jaar${diffMonths > 0 ? ` en ${diffMonths} mnd` : ''}`
+                                  return `Nog ${diffMonths} maanden`
+                                })() : null,
                               ].filter(Boolean).join(' \u2022 ')
                           }
                         </p>
@@ -540,6 +581,28 @@ export default function AssetsPage() {
                             Dividend: {formatCurrency(asset.annual_dividend)} p.j.
                           </p>
                         )}
+                        {asset.asset_type === 'levensverzekering' && Number(asset.monthly_contribution) > 0 && (
+                          <p className="text-[10px] text-purple-600/80">
+                            Premie: {formatCurrency(Number(asset.monthly_contribution))} p/m
+                          </p>
+                        )}
+                        {asset.asset_type === 'vordering' && (
+                          <p className="text-[10px] text-sky-600/80">
+                            {[
+                              `Rente: ${Number(asset.expected_return)}% p.j.`,
+                              Number(asset.monthly_contribution) > 0 ? `Aflossing: ${formatCurrency(Number(asset.monthly_contribution))} p/m` : null,
+                            ].filter(Boolean).join(' \u2022 ')}
+                          </p>
+                        )}
+                        {asset.asset_type === 'vordering' && asset.subtype === 'dga_lening' && asset.linked_asset_id && (() => {
+                          const linked = assets.find(a => a.id === asset.linked_asset_id)
+                          if (!linked) return null
+                          return (
+                            <p className="text-[10px] text-teal-600/80">
+                              DGA-lening bij {linked.name}
+                            </p>
+                          )
+                        })()}
                         {(asset.net_worth_inclusion_pct ?? 100) < 100 && (
                           <span className="mt-0.5 inline-block rounded bg-kern-50 border border-kern-200 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-kern-600">
                             {asset.net_worth_inclusion_pct}% meegeteld
@@ -584,6 +647,7 @@ export default function AssetsPage() {
           valuations={valuations[selectedAsset.id]}
           mortgage={getMortgageForAsset(selectedAsset.id)}
           dailyExpenses={dailyExpenses}
+          allAssets={assets}
           onClose={closeAssetModal}
           onEdit={() => setModalStep('edit')}
           onRevalue={() => setModalStep('revalue')}
@@ -657,6 +721,7 @@ function AssetDetailModal({
   valuations,
   mortgage,
   dailyExpenses,
+  allAssets,
   onClose,
   onEdit,
   onRevalue,
@@ -666,6 +731,7 @@ function AssetDetailModal({
   valuations: Valuation[] | undefined
   mortgage: { name: string; balance: number } | null
   dailyExpenses: number
+  allAssets?: Asset[]
   onClose: () => void
   onEdit: () => void
   onRevalue: () => void
@@ -775,6 +841,8 @@ function AssetDetailModal({
         {/* Value highlight */}
         <div className="border-b border-[var(--border-ed)] px-6 py-4 text-center">
           {isEigenHuis && <p className="mb-1 text-xs font-medium text-[var(--ink-3)] uppercase">Marktwaarde</p>}
+          {asset.asset_type === 'levensverzekering' && <p className="mb-1 text-xs font-medium text-[var(--ink-3)] uppercase">Afkoopwaarde</p>}
+          {asset.asset_type === 'vordering' && <p className="mb-1 text-xs font-medium text-[var(--ink-3)] uppercase">Uitstaand bedrag</p>}
           <p className="text-3xl font-bold text-[var(--ink)]">{formatCurrency(value)}</p>
           {dailyExpenses > 0 && value > 0 && (
             <p className="mt-0.5 text-xs text-kern-600/70" data-testid="detail-value-freedom">
@@ -830,7 +898,7 @@ function AssetDetailModal({
             </div>
             {!isEigenHuis && (
               <div className="rounded-[var(--r)] bg-[var(--subtle)] p-3">
-                <p className="text-xs text-[var(--ink-3)]">{asset.asset_type === 'vordering' ? 'Maandelijkse aflossing' : 'Maandelijkse inleg'}</p>
+                <p className="text-xs text-[var(--ink-3)]">{asset.asset_type === 'vordering' ? 'Maandelijkse aflossing' : asset.asset_type === 'levensverzekering' ? 'Maandelijkse premie' : 'Maandelijkse inleg'}</p>
                 <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">
                   {Number(asset.monthly_contribution) > 0 ? formatCurrency(Number(asset.monthly_contribution)) : '-'}
                 </p>
@@ -996,7 +1064,36 @@ function AssetDetailModal({
             if (asset.rental_income) details.push({ label: 'Huurinkomsten p/m', value: formatCurrency(Number(asset.rental_income)) })
             if (asset.retirement_provider_type) details.push({ label: 'Pensioenuitvoerder', value: RETIREMENT_PROVIDER_LABELS[asset.retirement_provider_type] })
             if (asset.depreciation_rate != null && asset.depreciation_rate !== 0) details.push({ label: 'Afschrijving p/j', value: `${asset.depreciation_rate}%` })
-            if (asset.lock_end_date) details.push({ label: 'Vastgezet tot', value: new Date(asset.lock_end_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' }) })
+            if (asset.lock_end_date) {
+              const lockEnd = new Date(asset.lock_end_date)
+              const formatted = lockEnd.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
+              if (asset.asset_type === 'vordering') {
+                const diffMs = lockEnd.getTime() - Date.now()
+                const remaining = diffMs <= 0 ? '(afgelopen)' : (() => {
+                  const y = Math.floor(diffMs / (365.25 * 24 * 60 * 60 * 1000))
+                  const m = Math.floor((diffMs % (365.25 * 24 * 60 * 60 * 1000)) / (30.44 * 24 * 60 * 60 * 1000))
+                  if (y > 0) return `(nog ${y} jaar${m > 0 ? ` en ${m} mnd` : ''})`
+                  return `(nog ${m} maanden)`
+                })()
+                details.push({ label: 'Einddatum lening', value: `${formatted} ${remaining}` })
+              } else {
+                details.push({ label: 'Vastgezet tot', value: formatted })
+              }
+            }
+            // Levensverzekering-specific fields
+            if (asset.expiry_date) {
+              const endDate = new Date(asset.expiry_date)
+              const formatted = endDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
+              const diffMs = endDate.getTime() - Date.now()
+              const remaining = diffMs <= 0 ? '(verlopen)' : (() => {
+                const y = Math.floor(diffMs / (365.25 * 24 * 60 * 60 * 1000))
+                const m = Math.floor((diffMs % (365.25 * 24 * 60 * 60 * 1000)) / (30.44 * 24 * 60 * 60 * 1000))
+                if (y > 0) return `(nog ${y} jaar${m > 0 ? ` en ${m} mnd` : ''})`
+                return `(nog ${m} maanden)`
+              })()
+              details.push({ label: 'Einddatum polis', value: `${formatted} ${remaining}` })
+            }
+            if (asset.beneficiary) details.push({ label: 'Begunstigde', value: asset.beneficiary })
             // Deelneming-specific fields
             if (asset.kvk_number) details.push({ label: 'KvK-nummer', value: asset.kvk_number })
             if (asset.ownership_percentage != null) details.push({ label: 'Belang', value: `${asset.ownership_percentage}%` })
@@ -1010,6 +1107,24 @@ function AssetDetailModal({
                     <p className="mt-0.5 text-sm font-medium text-[var(--ink)]">{d.value}</p>
                   </div>
                 ))}
+              </div>
+            )
+          })()}
+
+          {/* DGA-lening linked deelneming */}
+          {asset.asset_type === 'vordering' && asset.subtype === 'dga_lening' && asset.linked_asset_id && (() => {
+            const linked = allAssets?.find(a => a.id === asset.linked_asset_id)
+            if (!linked) return null
+            return (
+              <div className="rounded-[var(--r)] border border-teal-200 bg-teal-50/50 p-3 space-y-1">
+                <p className="text-xs font-semibold text-teal-700/60 uppercase">Gekoppelde deelneming</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-[var(--ink)]">{linked.name}</span>
+                  <span className="text-sm text-[var(--ink-2)]">{formatCurrency(Number(linked.current_value))}</span>
+                </div>
+                {linked.ownership_percentage != null && (
+                  <p className="text-xs text-teal-600/80">{linked.ownership_percentage}% belang</p>
+                )}
               </div>
             )
           })()}

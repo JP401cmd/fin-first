@@ -34,6 +34,7 @@ export interface Box2Input {
   year: TaxYear
   hasPartner: boolean
   dailyExpenses: number  // for freedom-days calculation
+  dgaLeningenTotal?: number  // totaal DGA-leningen (vorderingen subtype dga_lening)
 }
 
 export interface Box2PerDeelneming {
@@ -63,6 +64,13 @@ export interface Box2Result {
   totalTax: number
   effectiveRate: number // effectief tarief (0–1)
 
+  // Wet excessief lenen DGA
+  dgaLeningenTotal: number       // totaal uitstaande DGA-leningen
+  dgaLeningenDrempel: number     // drempel (€500.000)
+  dgaLeningenExcess: number      // bovenmatig deel
+  dgaExcessTax: number           // extra belasting op bovenmatig deel
+  totalTaxInclDga: number        // totalTax + dgaExcessTax
+
   // Freedom metric
   freedomDays: number
   dailyExpenses: number
@@ -85,6 +93,9 @@ export const BOX2_PARAMS: Record<TaxYear, Box2Params> = {
   },
 }
 
+/** Wet excessief lenen bij eigen vennootschap — drempel */
+export const DGA_LENING_DREMPEL = 500_000
+
 export const BOX2_TOOLTIPS: Record<string, string> = {
   box2: 'Box 2 belast inkomen uit aanmerkelijk belang — dividend en verkoopwinst van deelnemingen (≥5%).',
   aanmerkelijkBelang: 'Je hebt een aanmerkelijk belang als je (direct of indirect) 5% of meer van de aandelen bezit.',
@@ -92,6 +103,7 @@ export const BOX2_TOOLTIPS: Record<string, string> = {
   dividend: 'Winstuitkering die je ontvangt van een BV of deelneming waarin je aanmerkelijk belang hebt.',
   vervreemdingswinst: 'Winst bij verkoop van je aandelen: verkoopprijs minus verkrijgingsprijs.',
   fiscaalPartner: 'Met een fiscaal partner verdubbelt de grens voor het lage tarief naar €135.608.',
+  wetExcessiefLenen: 'De Wet excessief lenen bij eigen vennootschap belast leningen boven €500.000 van je BV als fictief regulier voordeel in Box 2. Het bovenmatige deel wordt belast tegen Box 2 tarieven.',
 }
 
 // ── Core Calculation ─────────────────────────────────────────
@@ -141,12 +153,39 @@ export function calculateBox2(input: Box2Input): Box2Result {
     taxHigh = (totalIncome - grens) * params.tariefHoog
   }
 
-  const totalTax = Math.round((taxLow + taxHigh) * 100) / 100
+  const baseTax = Math.round((taxLow + taxHigh) * 100) / 100
+
+  // Wet excessief lenen DGA — bovenmatig deel als fictief regulier voordeel
+  const dgaLeningenTotal = input.dgaLeningenTotal ?? 0
+  const dgaLeningenExcess = Math.max(0, dgaLeningenTotal - DGA_LENING_DREMPEL)
+
+  // Het bovenmatige deel wordt belast tegen Box 2 tarieven (staffel)
+  let dgaExcessTax = 0
+  if (dgaLeningenExcess > 0) {
+    // Fictief regulier voordeel adds to Box 2 income — apply bracket tax on excess
+    const totalIncomeWithDga = totalIncome + dgaLeningenExcess
+    const grensForDga = input.hasPartner ? params.grensPartner : params.grens
+
+    let fullTaxLow: number
+    let fullTaxHigh: number
+    if (totalIncomeWithDga <= grensForDga) {
+      fullTaxLow = totalIncomeWithDga * params.tariefLaag
+      fullTaxHigh = 0
+    } else {
+      fullTaxLow = grensForDga * params.tariefLaag
+      fullTaxHigh = (totalIncomeWithDga - grensForDga) * params.tariefHoog
+    }
+    const fullTax = Math.round((fullTaxLow + fullTaxHigh) * 100) / 100
+    dgaExcessTax = Math.round((fullTax - baseTax) * 100) / 100
+  }
+
+  const totalTax = baseTax
+  const totalTaxInclDga = Math.round((baseTax + dgaExcessTax) * 100) / 100
   const effectiveRate = totalIncome > 0 ? totalTax / totalIncome : 0
 
-  // Freedom metric
+  // Freedom metric (including DGA excess tax)
   const freedomDays = input.dailyExpenses > 0
-    ? Math.round(totalTax / input.dailyExpenses)
+    ? Math.round(totalTaxInclDga / input.dailyExpenses)
     : 0
 
   return {
@@ -161,6 +200,11 @@ export function calculateBox2(input: Box2Input): Box2Result {
     taxHigh: Math.round(taxHigh * 100) / 100,
     totalTax,
     effectiveRate,
+    dgaLeningenTotal,
+    dgaLeningenDrempel: DGA_LENING_DREMPEL,
+    dgaLeningenExcess,
+    dgaExcessTax,
+    totalTaxInclDga,
     freedomDays,
     dailyExpenses: input.dailyExpenses,
   }
