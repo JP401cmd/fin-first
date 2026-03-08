@@ -26,8 +26,10 @@ import { type RecurringTransaction, getExpectedMonthlyTotal, getNextOccurrence, 
 import { BillCalendar, type CalendarTransaction } from '@/components/app/bill-calendar'
 import { RecurringEditSheet } from '@/components/app/recurring-edit-sheet'
 import { CategoryRulesSheet } from '@/components/app/category-rules-sheet'
-import { usePerspective } from '@/components/app/perspective-provider'
+import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
 import { useHouseholdStatus } from '@/components/app/ownership-toggle'
+import { computeSharePct, SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
+import { Users } from 'lucide-react'
 import { SettlementOverview } from '@/components/app/settlement-overview'
 import { UncategorizedTransactionsBanner } from '@/components/app/uncategorized-transactions-banner'
 import { AICategorizeSheet } from '@/components/app/ai-categorize-sheet'
@@ -48,6 +50,8 @@ type Transaction = {
   category_source: string
   transaction_type: string | null
   is_split?: boolean
+  ownership?: 'personal' | 'shared'
+  user_id?: string
 }
 
 type SplitRow = {
@@ -153,9 +157,16 @@ export function CashAccountView({
   const [confirmTransferTx, setConfirmTransferTx] = useState<Transaction | null>(null)
 
   const { perspective } = usePerspective()
+  const perspectiveSignal = usePerspectiveAbort(perspective)
   const { hasHousehold, householdId } = useHouseholdStatus()
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [householdMembers, setHouseholdMembers] = useState<{ userId: string; name: string }[]>([])
+  const [householdSplit, setHouseholdSplit] = useState<{
+    splitMode: SplitMode
+    mySharePct: number
+    myName: string
+    partnerName: string
+  } | null>(null)
 
   const hasActiveFilters = filterSearch !== '' || filterType !== 'all' || filterBudgetId !== 'all'
 
@@ -169,7 +180,7 @@ export function CashAccountView({
   const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1).toISOString().split('T')[0]
   const monthLabel = monthDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
 
-  const loadBudgets = useCallback(async () => {
+  const loadBudgets = useCallback(async (signal?: AbortSignal) => {
     const supabase = createClient()
     let budgetsQuery = supabase
       .from('budgets')
@@ -181,6 +192,7 @@ export function CashAccountView({
     }
 
     const { data } = await budgetsQuery
+    if (signal?.aborted) return // Discard stale results
 
     if (data) {
       setBudgets(data as Budget[])
@@ -216,7 +228,7 @@ export function CashAccountView({
     if (data) setRecurrings(data as RecurringTransaction[])
   }, [accountId])
 
-  const loadTransactions = useCallback(async () => {
+  const loadTransactions = useCallback(async (signal?: AbortSignal) => {
     const supabase = createClient()
     let query = supabase
       .from('transactions')
@@ -232,13 +244,15 @@ export function CashAccountView({
     }
 
     const { data } = await query
+    if (signal?.aborted) return // Discard stale results
     if (data) setTransactions(data as Transaction[])
   }, [accountId, monthStart, monthEnd, perspective])
 
-  const loadAccount = useCallback(async () => {
+  const loadAccount = useCallback(async (signal?: AbortSignal) => {
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
+      if (signal?.aborted) return
 
       // Load all active accounts (needed for transfers)
       let accountsQuery = supabase.from('bank_accounts').select('*').eq('is_active', true).order('sort_order', { ascending: true })
@@ -253,6 +267,7 @@ export function CashAccountView({
           : Promise.resolve({ data: [] }),
       ])
 
+      if (signal?.aborted) return // Discard stale results
       if (fetchError) throw fetchError
       if (!allData) throw new Error('Geen rekeningen gevonden')
 
@@ -275,9 +290,9 @@ export function CashAccountView({
       setOwnIbans(new Set([...ibansFromAccounts, ...ibansFromOwn]))
     } catch (err) {
       console.error('Error loading account:', err)
-      setError('Kon rekening niet laden. Probeer het opnieuw.')
+      if (!signal?.aborted) setError('Kon rekening niet laden. Probeer het opnieuw.')
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
   }, [accountId, perspective])
 
@@ -323,11 +338,12 @@ export function CashAccountView({
   }, [])
 
   useEffect(() => {
-    loadBudgets()
-    loadAccount()
+    const signal = perspectiveSignal
+    loadBudgets(signal)
+    loadAccount(signal)
     loadGcAccounts()
     loadCashFlowForecast()
-  }, [loadBudgets, loadAccount, loadGcAccounts, loadCashFlowForecast])
+  }, [loadBudgets, loadAccount, loadGcAccounts, loadCashFlowForecast, perspectiveSignal])
 
   useEffect(() => {
     const supabase = createClient()
@@ -355,9 +371,46 @@ export function CashAccountView({
       })
   }, [householdId])
 
+  // Fetch household split settings for per-partner freedom time
   useEffect(() => {
-    if (account) loadTransactions()
-  }, [account, loadTransactions])
+    if (!hasHousehold || !householdId) {
+      setHouseholdSplit(null)
+      return
+    }
+    async function loadSplit() {
+      try {
+        const [statusRes, settingsRes] = await Promise.all([
+          fetch('/api/household/status'),
+          fetch('/api/household/settings'),
+        ])
+        if (!statusRes.ok || !settingsRes.ok) return
+        const status = await statusRes.json()
+        const settings = await settingsRes.json()
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        const splitMode: SplitMode = settings.split_mode || 'equal'
+        const mySharePct = computeSharePct(
+          { splitMode, customSplitPct: settings.custom_split_pct ?? null, primaryPayerId: settings.primary_payer_id ?? null },
+          user?.id ?? '',
+        )
+        const myMember = (status.members ?? []).find((m: { is_current_user: boolean }) => m.is_current_user)
+        const partnerMember = (status.members ?? []).find((m: { is_current_user: boolean }) => !m.is_current_user)
+        setHouseholdSplit({
+          splitMode,
+          mySharePct,
+          myName: myMember?.full_name || 'Jij',
+          partnerName: partnerMember?.full_name || 'Partner',
+        })
+      } catch {
+        // Non-critical
+      }
+    }
+    loadSplit()
+  }, [hasHousehold, householdId])
+
+  useEffect(() => {
+    if (account) loadTransactions(perspectiveSignal)
+  }, [account, loadTransactions, perspectiveSignal])
 
   useEffect(() => {
     if (account) loadRecurrings()
@@ -403,6 +456,32 @@ export function CashAccountView({
   const netFreedomDays = dailyExpenses > 0
     ? calculateFreedomTime(Math.abs(netAmount), dailyExpenses)
     : null
+
+  // Per-partner expense breakdown for household perspective
+  const partnerExpenseBreakdown = useMemo(() => {
+    if (!householdSplit || perspective !== 'household' || dailyExpenses <= 0) return null
+    const sharedExpenses = nonTransferTx
+      .filter((t) => Number(t.amount) < 0 && t.ownership === 'shared')
+      .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
+    if (sharedExpenses <= 0) return null
+    const myShare = sharedExpenses * (householdSplit.mySharePct / 100)
+    const partnerShare = sharedExpenses * ((100 - householdSplit.mySharePct) / 100)
+    const personalExpenses = nonTransferTx
+      .filter((t) => Number(t.amount) < 0 && t.ownership !== 'shared')
+      .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
+    return {
+      sharedExpenses,
+      myShareAmount: myShare,
+      partnerShareAmount: partnerShare,
+      personalExpenses,
+      myFreedomDays: calculateFreedomTime(myShare + personalExpenses, dailyExpenses),
+      partnerFreedomDays: calculateFreedomTime(partnerShare, dailyExpenses),
+      mySharePct: householdSplit.mySharePct,
+      myName: householdSplit.myName,
+      partnerName: householdSplit.partnerName,
+      splitMode: householdSplit.splitMode,
+    }
+  }, [householdSplit, perspective, dailyExpenses, nonTransferTx])
 
   // Apply filters
   const filteredTransactions = useMemo(() => {
@@ -861,6 +940,39 @@ export function CashAccountView({
         </p>
       )}
 
+      {/* Per-partner freedom time breakdown — household perspective */}
+      {partnerExpenseBreakdown && (
+        <div className="mt-2 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3" data-testid="partner-freedom-breakdown">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Users className="h-3.5 w-3.5 text-kern-500" />
+            <p className="text-xs font-semibold text-[var(--ink-2)]">Vrijheidstijd per partner</p>
+            <span className="ml-auto text-[10px] text-[var(--ink-4)]">{SPLIT_MODE_LABELS[partnerExpenseBreakdown.splitMode]}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="text-center">
+              <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase truncate">{partnerExpenseBreakdown.myName}</p>
+              <p className="mt-0.5 text-sm font-semibold font-mono tabular-nums text-[var(--ink)]">
+                {formatCurrencyShort(partnerExpenseBreakdown.myShareAmount + partnerExpenseBreakdown.personalExpenses)}
+              </p>
+              <p className="text-[10px] text-red-400/70">
+                {partnerExpenseBreakdown.myFreedomDays.totalDays.toFixed(1)} dagen
+              </p>
+              <p className="text-[9px] text-[var(--ink-4)]">{partnerExpenseBreakdown.mySharePct}% gedeeld</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase truncate">{partnerExpenseBreakdown.partnerName}</p>
+              <p className="mt-0.5 text-sm font-semibold font-mono tabular-nums text-[var(--ink)]">
+                {formatCurrencyShort(partnerExpenseBreakdown.partnerShareAmount)}
+              </p>
+              <p className="text-[10px] text-red-400/70">
+                {partnerExpenseBreakdown.partnerFreedomDays.totalDays.toFixed(1)} dagen
+              </p>
+              <p className="text-[9px] text-[var(--ink-4)]">{100 - partnerExpenseBreakdown.mySharePct}% gedeeld</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Uncategorized transactions banner */}
       {uncatTx.length > 0 && (
         <div className="mt-3 sm:mt-6">
@@ -1212,15 +1324,22 @@ export function CashAccountView({
                               {!isTransfer && !isPendingTransfer && (isPositive ? '+' : '')}{formatCurrency(amount)}
                             </span>
                             {!isTransfer && !isPendingTransfer && dailyExpenses > 0 && (
-                              <p className={`text-[10px] leading-tight ${isPositive ? 'text-emerald-500/60' : 'text-[var(--ink-3)]'}`} data-testid="tx-freedom-time">
-                                {(() => {
-                                  const fd = calculateFreedomTime(Math.abs(amount), dailyExpenses)
-                                  const fdStr = fd.totalDays < 1
-                                    ? `${fd.totalDays.toFixed(1)} dagen`
-                                    : formatFreedomTimeString(fd, 'short', true)
-                                  return isPositive ? `${fdStr} verdiend` : fdStr
-                                })()}
-                              </p>
+                              <>
+                                <p className={`text-[10px] leading-tight ${isPositive ? 'text-emerald-500/60' : 'text-[var(--ink-3)]'}`} data-testid="tx-freedom-time">
+                                  {(() => {
+                                    const fd = calculateFreedomTime(Math.abs(amount), dailyExpenses)
+                                    const fdStr = fd.totalDays < 1
+                                      ? `${fd.totalDays.toFixed(1)} dagen`
+                                      : formatFreedomTimeString(fd, 'short', true)
+                                    return isPositive ? `${fdStr} verdiend` : fdStr
+                                  })()}
+                                </p>
+                                {tx.ownership === 'shared' && householdSplit && !isPositive && (
+                                  <p className="text-[9px] leading-tight text-kern-500/70" data-testid="tx-partner-split">
+                                    {householdSplit.myName.split(' ')[0]} {(Math.abs(amount) * householdSplit.mySharePct / 100 / dailyExpenses).toFixed(1)}d · {householdSplit.partnerName.split(' ')[0]} {(Math.abs(amount) * (100 - householdSplit.mySharePct) / 100 / dailyExpenses).toFixed(1)}d
+                                  </p>
+                                )}
+                              </>
                             )}
                           </div>
 

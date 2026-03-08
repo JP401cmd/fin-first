@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { usePerspective } from '@/components/app/perspective-provider'
+import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
 import { formatCurrency } from '@/lib/format'
 import { BOX3_PARAMS, BOX3_TOOLTIPS, type Box3Result, type TaxYear, type PartnerAllocation } from '@/lib/box3-data'
 import {
@@ -67,6 +67,7 @@ function InfoTooltip({ text }: { text: string }) {
 
 export default function BelastingPage() {
   const { perspective, isHousehold } = usePerspective()
+  const perspectiveSignal = usePerspectiveAbort(perspective)
   const [data, setData] = useState<Box3ApiResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -75,11 +76,12 @@ export default function BelastingPage() {
   const [showDetails, setShowDetails] = useState(false)
   const [showPartnerModal, setShowPartnerModal] = useState(false)
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/household/box3?year=${year}`)
+      const res = await fetch(`/api/household/box3?year=${year}`, { signal })
+      if (signal?.aborted) return
       if (!res.ok) throw new Error('Fout bij ophalen gegevens')
       const json = await res.json()
       setData(json)
@@ -91,12 +93,16 @@ export default function BelastingPage() {
         setViewMode('personal')
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Onbekende fout')
+      if (e instanceof DOMException && e.name === 'AbortError') return
+      if (!signal?.aborted) setError(e instanceof Error ? e.message : 'Onbekende fout')
     }
-    setLoading(false)
+    if (!signal?.aborted) setLoading(false)
   }, [year, perspective])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => {
+    const signal = perspectiveSignal
+    loadData(signal)
+  }, [loadData, perspectiveSignal])
 
   // Determine which result to show
   const getActiveResult = (): Box3Result | null => {
@@ -131,7 +137,7 @@ export default function BelastingPage() {
         <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-700">{error ?? 'Geen gegevens beschikbaar.'}</p>
           <button
-            onClick={loadData}
+            onClick={() => loadData()}
             className="mt-3 rounded-[var(--r)] bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
           >
             Opnieuw proberen

@@ -18,7 +18,7 @@ import { useDailyExpenseRate, eurToFreedomTime } from '@/components/app/freedom-
 import { BudgetSparkline, SparklineWithLabel, type SparklineDataPoint } from '@/components/app/budget-sparkline'
 import { computeBudgetForecast, getConfidenceLabel, getConfidenceColors, type BudgetForecast } from '@/lib/budget-forecast'
 import { OwnershipToggle, OwnershipBadge, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
-import { usePerspective } from '@/components/app/perspective-provider'
+import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
 import { SpendingConfidenceBadge, SpendingVarianceDetailPanel, calculateSpendingVariance, type SpendingVarianceData } from '@/components/app/spending-confidence-indicator'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import { GoalForm } from '@/components/app/goal-form'
@@ -28,6 +28,8 @@ import { TransactionForm } from '@/components/app/transaction-form'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FeatureGate } from '@/components/app/feature-gate'
+import { computeSharePct, SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
+import { Users } from 'lucide-react'
 
 
 type Goal = {
@@ -51,6 +53,7 @@ export default function BudgetsPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { perspective } = usePerspective()
+  const perspectiveSignal = usePerspectiveAbort(perspective)
   const { openWithMessage } = useChatContext()
   const [budgets, setBudgets] = useState<BudgetWithChildren[]>([])
   const [loading, setLoading] = useState(true)
@@ -86,7 +89,7 @@ export default function BudgetsPage() {
   const monthStart = localDateStr(monthDate)
   const monthEnd = localDateStr(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1))
 
-  const loadSpending = useCallback(async () => {
+  const loadSpending = useCallback(async (signal?: AbortSignal) => {
     const supabase = createClient()
     let spendQuery = supabase
       .from('transactions')
@@ -100,6 +103,7 @@ export default function BudgetsPage() {
     }
 
     const { data } = await spendQuery
+    if (signal?.aborted) return // Discard stale results
 
     if (data && data.length > 0) {
       const map: Record<string, number> = {}
@@ -143,6 +147,8 @@ export default function BudgetsPage() {
         }
       }
 
+      if (signal?.aborted) return // Discard stale results after split query
+
       setSpending(map)
       setTransactions([
         ...data.filter(t => t.budget_id) as typeof transactions,
@@ -163,6 +169,7 @@ export default function BudgetsPage() {
         uncategorized.reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0),
       )
     } else {
+      if (signal?.aborted) return
       setSpending({})
       setTransactions([])
       setUncategorizedCount(0)
@@ -175,11 +182,13 @@ export default function BudgetsPage() {
       .from('budget_rollovers')
       .select('*')
       .eq('period', currentPeriod)
+    if (signal?.aborted) return // Discard stale results
 
     // Fetch budget amount overrides
     const { data: amountsData } = await supabase
       .from('budget_amounts')
       .select('*')
+    if (signal?.aborted) return
     if (amountsData) setBudgetAmounts(amountsData as { id: string; budget_id: string; effective_from: string; amount: number }[])
 
     // Auto-compute rollovers if none exist for the current period
@@ -262,7 +271,7 @@ export default function BudgetsPage() {
     setRollovers((rolloverData ?? []) as BudgetRollover[])
   }, [monthStart, monthEnd, monthDate, perspective])
 
-  const loadBudgets = useCallback(async () => {
+  const loadBudgets = useCallback(async (signal?: AbortSignal) => {
     try {
       const supabase = createClient()
       let query = supabase
@@ -278,6 +287,7 @@ export default function BudgetsPage() {
 
       const { data, error: fetchError } = await query
 
+      if (signal?.aborted) return // Discard stale results
       if (fetchError) throw fetchError
 
       if (!data || data.length === 0) {
@@ -298,9 +308,9 @@ export default function BudgetsPage() {
       setBudgets(tree)
     } catch (err) {
       console.error('Error loading budgets:', err)
-      setError('Kon budgetten niet laden. Probeer het opnieuw.')
+      if (!signal?.aborted) setError('Kon budgetten niet laden. Probeer het opnieuw.')
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
   }, [perspective])
 
@@ -364,15 +374,17 @@ export default function BudgetsPage() {
   }
 
   useEffect(() => {
-    loadBudgets()
+    const signal = perspectiveSignal
+    loadBudgets(signal)
     loadGoals()
-  }, [loadBudgets, loadGoals])
+  }, [loadBudgets, loadGoals, perspectiveSignal])
 
   // Run loadSpending independently — no longer gated on loadBudgets completing.
   // loadSpending has no dependency on budgets state, so it can fetch in parallel.
   useEffect(() => {
-    loadSpending()
-  }, [loadSpending])
+    const signal = perspectiveSignal
+    loadSpending(signal)
+  }, [loadSpending, perspectiveSignal])
 
   useEffect(() => {
     if (!selectedBudgetId) { setBudgetRolloverHistory([]); return }
@@ -1282,6 +1294,49 @@ function BudgetDetailModal({
   const [overrideSaving, setOverrideSaving] = useState(false)
   const [showForecastExpanded, setShowForecastExpanded] = useState(false)
   const [showForecastModal, setShowForecastModal] = useState(false)
+  const [budgetPartnerSplit, setBudgetPartnerSplit] = useState<{ splitMode: SplitMode; mySharePct: number; myName: string; partnerName: string } | null>(null)
+
+  // Fetch household split for shared budget per-partner freedom time
+  useEffect(() => {
+    if (perspective !== 'household' || budget.ownership !== 'shared') {
+      setBudgetPartnerSplit(null)
+      return
+    }
+    const controller = new AbortController()
+    async function loadSplit() {
+      try {
+        const [statusRes, settingsRes] = await Promise.all([
+          fetch('/api/household/status', { signal: controller.signal }),
+          fetch('/api/household/settings', { signal: controller.signal }),
+        ])
+        if (controller.signal.aborted) return
+        if (!statusRes.ok || !settingsRes.ok) return
+        const status = await statusRes.json()
+        const settings = await settingsRes.json()
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (controller.signal.aborted) return
+        const splitMode: SplitMode = settings.split_mode || 'equal'
+        const mySharePct = computeSharePct(
+          { splitMode, customSplitPct: settings.custom_split_pct ?? null, primaryPayerId: settings.primary_payer_id ?? null },
+          user?.id ?? '',
+        )
+        const myMember = (status.members ?? []).find((m: { is_current_user: boolean }) => m.is_current_user)
+        const partnerMember = (status.members ?? []).find((m: { is_current_user: boolean }) => !m.is_current_user)
+        setBudgetPartnerSplit({
+          splitMode,
+          mySharePct,
+          myName: myMember?.full_name || 'Jij',
+          partnerName: partnerMember?.full_name || 'Partner',
+        })
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return
+        // Non-critical
+      }
+    }
+    loadSplit()
+    return () => controller.abort()
+  }, [perspective, budget.ownership])
   type FullTx = { id: string; account_id: string; budget_id: string | null; date: string; amount: number; description: string; counterparty_name: string | null; counterparty_iban: string | null; is_income: boolean; notes: string | null; category_source: string; is_split?: boolean }
   const [txToEdit, setTxToEdit] = useState<FullTx | null>(null)
 
@@ -1616,6 +1671,37 @@ function BudgetDetailModal({
               <p className="text-right text-xs text-[var(--ink-3)]">{pct}% besteed</p>
             </div>
           </div>
+
+          {/* Per-partner breakdown for shared budgets */}
+          {budgetPartnerSplit && hasFreedomData && spent >= 100 && (
+            <div className="mt-3 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-3" data-testid="budget-partner-breakdown">
+              <div className="flex items-center gap-1.5 mb-2">
+                <Users className="h-3.5 w-3.5 text-kern-500" />
+                <p className="text-xs font-semibold text-[var(--ink-2)]">Impact per partner</p>
+                <span className="ml-auto text-[10px] text-[var(--ink-4)]">{SPLIT_MODE_LABELS[budgetPartnerSplit.splitMode]}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-center">
+                <div>
+                  <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase truncate">{budgetPartnerSplit.myName}</p>
+                  <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
+                    {formatCurrency(spent * budgetPartnerSplit.mySharePct / 100)}
+                  </p>
+                  <p className="text-xs italic text-[var(--ink-3)]">
+                    ≈ {eurToFreedomTime(spent * budgetPartnerSplit.mySharePct / 100, dailyExpenseRate).formattedDagen}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase truncate">{budgetPartnerSplit.partnerName}</p>
+                  <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
+                    {formatCurrency(spent * (100 - budgetPartnerSplit.mySharePct) / 100)}
+                  </p>
+                  <p className="text-xs italic text-[var(--ink-3)]">
+                    ≈ {eurToFreedomTime(spent * (100 - budgetPartnerSplit.mySharePct) / 100, dailyExpenseRate).formattedDagen}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {carry > 0 && (
             <div className={`mt-2 flex items-center gap-1.5 rounded border px-2 py-1.5 ${colors.bg} ${colors.border}`}>

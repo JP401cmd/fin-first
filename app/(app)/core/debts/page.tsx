@@ -19,8 +19,9 @@ import {
 } from '@/lib/debt-data'
 import type { Asset } from '@/lib/asset-data'
 import { FeatureGate } from '@/components/app/feature-gate'
-import { OwnershipBadge } from '@/components/app/ownership-toggle'
-import { usePerspective } from '@/components/app/perspective-provider'
+import { OwnershipBadge, useHouseholdStatus } from '@/components/app/ownership-toggle'
+import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
+import { computeSharePct, SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { FhinAvatar } from '@/components/app/avatars'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
@@ -52,7 +53,44 @@ export default function DebtsPage() {
   const [dailyExpenses, setDailyExpenses] = useState(0)
   const seedingRef = useRef(false)
   const { perspective } = usePerspective()
+  const perspectiveSignal = usePerspectiveAbort(perspective)
   const { ref: debtListRef, hasEntered: debtListEntered } = useInViewAnimation({ duration: 800 })
+  const { hasHousehold, householdId } = useHouseholdStatus()
+  const [householdSplit, setHouseholdSplit] = useState<{ splitMode: SplitMode; mySharePct: number; myName: string; partnerName: string } | null>(null)
+
+  // Load household split settings for per-partner debt breakdown
+  useEffect(() => {
+    if (!hasHousehold || !householdId) { setHouseholdSplit(null); return }
+    async function loadSplit() {
+      try {
+        const [statusRes, settingsRes] = await Promise.all([
+          fetch('/api/household/status'),
+          fetch('/api/household/settings'),
+        ])
+        if (!statusRes.ok || !settingsRes.ok) return
+        const status = await statusRes.json()
+        const settings = await settingsRes.json()
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        const splitMode: SplitMode = settings.split_mode || 'equal'
+        const mySharePct = computeSharePct(
+          { splitMode, customSplitPct: settings.custom_split_pct ?? null, primaryPayerId: settings.primary_payer_id ?? null },
+          user?.id ?? '',
+        )
+        const myMember = (status.members ?? []).find((m: { is_current_user: boolean }) => m.is_current_user)
+        const partnerMember = (status.members ?? []).find((m: { is_current_user: boolean }) => !m.is_current_user)
+        setHouseholdSplit({
+          splitMode,
+          mySharePct,
+          myName: myMember?.full_name || 'Jij',
+          partnerName: partnerMember?.full_name || 'Partner',
+        })
+      } catch {
+        // Non-critical
+      }
+    }
+    loadSplit()
+  }, [hasHousehold, householdId])
 
   // Kassabon modal state
   const [showTotalKassabon, setShowTotalKassabon] = useState(false)
@@ -61,7 +99,7 @@ export default function DebtsPage() {
   const [showProgressKassabon, setShowProgressKassabon] = useState(false)
 
   // Load monthly expenses to compute daily expenses for freedom-time calculations
-  const loadExpenses = useCallback(async () => {
+  const loadExpenses = useCallback(async (signal?: AbortSignal) => {
     try {
       const supabase = createClient()
       const now = new Date()
@@ -80,6 +118,7 @@ export default function DebtsPage() {
       }
 
       const { data } = await expQuery
+      if (signal?.aborted) return // Discard stale results
 
       if (data && data.length > 0) {
         const totalExpenses = data.reduce((sum: number, t: { amount: number }) => sum + Math.abs(Number(t.amount)), 0)
@@ -90,7 +129,7 @@ export default function DebtsPage() {
     }
   }, [perspective])
 
-  const loadDebts = useCallback(async () => {
+  const loadDebts = useCallback(async (signal?: AbortSignal) => {
     try {
       const supabase = createClient()
       let query = supabase
@@ -102,6 +141,7 @@ export default function DebtsPage() {
       const { data, error: fetchError } = await query
         .order('sort_order', { ascending: true })
 
+      if (signal?.aborted) return // Discard stale results
       if (fetchError) throw fetchError
 
       if (!data || data.length === 0) {
@@ -109,7 +149,8 @@ export default function DebtsPage() {
         seedingRef.current = true
         // Double-check: count to prevent race conditions
         const { count } = await supabase.from('debts').select('id', { count: 'exact', head: true })
-        if (count && count > 0) { seedingRef.current = false; await loadDebts(); return }
+        if (signal?.aborted) return
+        if (count && count > 0) { seedingRef.current = false; await loadDebts(signal); return }
         await seedDebts(supabase)
         return
       }
@@ -117,9 +158,9 @@ export default function DebtsPage() {
       setDebts(data as Debt[])
     } catch (err) {
       console.error('Error loading debts:', err)
-      setError('Kon schulden niet laden. Probeer het opnieuw.')
+      if (!signal?.aborted) setError('Kon schulden niet laden. Probeer het opnieuw.')
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
   }, [perspective])
 
@@ -192,10 +233,11 @@ export default function DebtsPage() {
   }, [])
 
   useEffect(() => {
-    loadDebts().then(() => loadAllDebtValuations())
+    const signal = perspectiveSignal
+    loadDebts(signal).then(() => { if (!signal.aborted) loadAllDebtValuations() })
     loadUserAssets()
-    loadExpenses()
-  }, [loadDebts, loadUserAssets, loadExpenses, loadAllDebtValuations])
+    loadExpenses(signal)
+  }, [loadDebts, loadUserAssets, loadExpenses, loadAllDebtValuations, perspectiveSignal])
 
   const activeDebts = debts.filter((d) => d.is_active && Number(d.current_balance) > 0)
   const totalBalance = activeDebts.reduce((s, d) => s + Number(d.current_balance), 0)
@@ -592,6 +634,22 @@ export default function DebtsPage() {
                     }}
                   />
                 </div>
+                {/* Per-partner split for shared debts */}
+                {debt.ownership === 'shared' && (() => {
+                  const debtSplitPct = debt.partner_split_pct != null ? debt.partner_split_pct : householdSplit?.mySharePct
+                  const splitInfo = debt.partner_split_pct != null
+                    ? { myName: householdSplit?.myName ?? 'Jij', partnerName: householdSplit?.partnerName ?? 'Partner', label: 'Eigen verdeling' }
+                    : householdSplit
+                      ? { myName: householdSplit.myName, partnerName: householdSplit.partnerName, label: SPLIT_MODE_LABELS[householdSplit.splitMode] }
+                      : null
+                  if (debtSplitPct == null || !splitInfo) return null
+                  return (
+                    <p className="mt-1 text-[9px] text-kern-500/70" data-testid="debt-card-partner-split">
+                      {splitInfo.myName.split(' ')[0]} {formatCurrency(balance * debtSplitPct / 100)} · {splitInfo.partnerName.split(' ')[0]} {formatCurrency(balance * (100 - debtSplitPct) / 100)}
+                      <span className="ml-1 text-[var(--ink-4)]">({splitInfo.label})</span>
+                    </p>
+                  )
+                })()}
               </div>
             </div>
           )

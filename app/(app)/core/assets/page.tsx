@@ -11,7 +11,7 @@ import { createClient } from '@/lib/supabase/client'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { OwnershipToggle, OwnershipBadge, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
-import { usePerspective } from '@/components/app/perspective-provider'
+import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
 import {
   type Asset,
   type AssetType,
@@ -50,6 +50,7 @@ export default function AssetsPage() {
   const [dailyExpenses, setDailyExpenses] = useState(0)
   const seedingRef = useRef(false)
   const { perspective } = usePerspective()
+  const perspectiveSignal = usePerspectiveAbort(perspective)
 
   function getMortgageForAsset(assetId: string): { name: string; balance: number } | null {
     const m = mortgages.find((m) => m.linked_asset_id === assetId)
@@ -57,7 +58,7 @@ export default function AssetsPage() {
     return { name: m.name, balance: Number(m.current_balance) }
   }
 
-  const loadAssets = useCallback(async () => {
+  const loadAssets = useCallback(async (signal?: AbortSignal) => {
     try {
       const supabase = createClient()
       let query = supabase
@@ -69,6 +70,7 @@ export default function AssetsPage() {
       const { data, error: fetchError } = await query
         .order('sort_order', { ascending: true })
 
+      if (signal?.aborted) return // Discard stale results
       if (fetchError) throw fetchError
 
       if (!data || data.length === 0) {
@@ -76,7 +78,8 @@ export default function AssetsPage() {
         seedingRef.current = true
         // Double-check: count to prevent race conditions
         const { count } = await supabase.from('assets').select('id', { count: 'exact', head: true })
-        if (count && count > 0) { seedingRef.current = false; await loadAssets(); return }
+        if (signal?.aborted) return
+        if (count && count > 0) { seedingRef.current = false; await loadAssets(signal); return }
         await seedAssets(supabase)
         return
       }
@@ -85,6 +88,7 @@ export default function AssetsPage() {
 
       // Load linked mortgages + daily expenses for freedom-time + bank account links
       const { data: { user } } = await supabase.auth.getUser()
+      if (signal?.aborted) return
       if (user) {
         const now = new Date()
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
@@ -108,6 +112,8 @@ export default function AssetsPage() {
             .not('linked_asset_id', 'is', null)
             .eq('is_active', true),
         ])
+
+        if (signal?.aborted) return // Discard stale results after parallel queries
 
         if (mortgageResult.data) setMortgages(mortgageResult.data as Mortgage[])
 
@@ -139,9 +145,9 @@ export default function AssetsPage() {
       }
     } catch (err) {
       console.error('Error loading assets:', err)
-      setError('Kon assets niet laden. Probeer het opnieuw.')
+      if (!signal?.aborted) setError('Kon assets niet laden. Probeer het opnieuw.')
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
   }, [perspective])
 
@@ -211,8 +217,9 @@ export default function AssetsPage() {
   }, [])
 
   useEffect(() => {
-    loadAssets().then(() => loadAllValuations())
-  }, [loadAssets, loadAllValuations])
+    const signal = perspectiveSignal
+    loadAssets(signal).then(() => { if (!signal.aborted) loadAllValuations() })
+  }, [loadAssets, loadAllValuations, perspectiveSignal])
 
   const activeAssets = assets.filter((a) => a.is_active)
   const totalValue = activeAssets.reduce((s, a) => s + Number(a.current_value), 0)
