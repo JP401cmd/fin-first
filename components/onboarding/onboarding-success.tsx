@@ -56,7 +56,7 @@ export function OnboardingSuccess({ onDashboard }: { onDashboard: () => void }) 
         onClick={onDashboard}
         className="mt-6 min-h-[48px] w-full max-w-xs rounded-xl bg-wil-600 px-8 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-wil-700 hover:shadow-md active:bg-wil-800 active:shadow-none sm:w-auto sm:min-w-[200px]"
       >
-        Ontdek je dashboard
+        Ga naar De Wil
       </button>
     </div>
   )

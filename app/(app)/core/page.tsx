@@ -58,8 +58,8 @@ export default function CorePage() {
   const [snapshots, setSnapshots] = useState<NetWorthSnapshot[]>([])
   const [snapshotLoading, setSnapshotLoading] = useState(false)
   const [incomeMonths, setIncomeMonths] = useState(12)
-  const [savingsRate12, setSavingsRate12] = useState(0)
-  const [savingsRateMonths, setSavingsRateMonths] = useState(12)
+  const [savingsRate6m, setSavingsRate6m] = useState(0)
+  const [savingsRateMonths, setSavingsRateMonths] = useState(6)
   const [budgetCount, setBudgetCount] = useState(0)
   const [hasTransactions, setHasTransactions] = useState(false)
 const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalCurrent: number; progressPct: number } | null>(null)
@@ -96,7 +96,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   const [overviewSpending, setOverviewSpending] = useState<Record<string, number>>({})
   const [expandedOverviewGroupId, setExpandedOverviewGroupId] = useState<string | null>(null)
   // Savings rate kassabon data
-  const [savingsReceiptData, setSavingsReceiptData] = useState<{extYearlyIncome: number; extYearlyExpenses: number; yearlySavings: number; last12Income: number; last12Expenses: number}>({extYearlyIncome: 0, extYearlyExpenses: 0, yearlySavings: 0, last12Income: 0, last12Expenses: 0})
+  const [savingsReceiptData, setSavingsReceiptData] = useState<{extHalfYearIncome: number; extHalfYearExpenses: number; halfYearSavings: number; rawIncome6m: number; rawExpenses6m: number}>({extHalfYearIncome: 0, extHalfYearExpenses: 0, halfYearSavings: 0, rawIncome6m: 0, rawExpenses6m: 0})
   // Net worth kassabon state
   const [showNetWorthReceipt, setShowNetWorthReceipt] = useState(false)
   const [showFreeDaysReceipt, setShowFreeDaysReceipt] = useState(false)
@@ -172,7 +172,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           .not('budget_type', 'in', '("archive","income","savings")'),
         supabase
           .from('transactions')
-          .select('amount')
+          .select('amount, date')
           .lt('amount', 0)
           .gte('date', twelveMonthsAgo)
           .lt('date', monthEnd),
@@ -235,28 +235,37 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         .map(([month, amount]) => ({ month, amount }))
       setIncomeByMonth(sortedIncomeMonths)
 
-      // Last 12 months expenses & savings rate
-      const last12MonthsExpenses = Math.abs(expense12Result.data.reduce((s, t) => s + Number(t.amount), 0))
+      // Last 6 months expenses & savings rate (rollend gemiddelde)
+      const sixMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 6, 1))
+        .toISOString().split('T')[0]
+      const last6MonthsIncome = income12Result.data
+        .filter(t => t.date >= sixMonthsAgo)
+        .reduce((s, t) => s + Number(t.amount), 0)
+      const last6MonthsExpenses = Math.abs(
+        expense12Result.data
+          .filter(t => t.date >= sixMonthsAgo)
+          .reduce((s, t) => s + Number(t.amount), 0)
+      )
       const earliestTxDate = earliestTxResult.data?.[0]?.date
-      let savingsRateDataMonths = 12
-      if (earliestTxDate && (last12MonthsIncome > 0 || last12MonthsExpenses > 0)) {
+      let savingsRateDataMonths = 6
+      if (earliestTxDate && (last6MonthsIncome > 0 || last6MonthsExpenses > 0)) {
         const earliest = new Date(earliestTxDate)
         savingsRateDataMonths = Math.max(1,
           (now.getFullYear() - earliest.getFullYear()) * 12 +
           (now.getMonth() - earliest.getMonth())
         )
-        savingsRateDataMonths = Math.min(savingsRateDataMonths, 12)
+        savingsRateDataMonths = Math.min(savingsRateDataMonths, 6)
       }
-      const extYearlyIncome = savingsRateDataMonths < 12
-        ? (last12MonthsIncome / savingsRateDataMonths) * 12
-        : last12MonthsIncome
-      const extYearlyExpenses = savingsRateDataMonths < 12
-        ? (last12MonthsExpenses / savingsRateDataMonths) * 12
-        : last12MonthsExpenses
-      const yearlySavings = extYearlyIncome - extYearlyExpenses
-      setSavingsRate12(extYearlyIncome > 0 ? (yearlySavings / extYearlyIncome) * 100 : 0)
+      const extHalfYearIncome = savingsRateDataMonths < 6
+        ? (last6MonthsIncome / savingsRateDataMonths) * 6
+        : last6MonthsIncome
+      const extHalfYearExpenses = savingsRateDataMonths < 6
+        ? (last6MonthsExpenses / savingsRateDataMonths) * 6
+        : last6MonthsExpenses
+      const halfYearSavings = extHalfYearIncome - extHalfYearExpenses
+      setSavingsRate6m(extHalfYearIncome > 0 ? (halfYearSavings / extHalfYearIncome) * 100 : 0)
       setSavingsRateMonths(savingsRateDataMonths)
-      setSavingsReceiptData({ extYearlyIncome, extYearlyExpenses, yearlySavings, last12Income: last12MonthsIncome, last12Expenses: last12MonthsExpenses })
+      setSavingsReceiptData({ extHalfYearIncome, extHalfYearExpenses, halfYearSavings, rawIncome6m: last6MonthsIncome, rawExpenses6m: last6MonthsExpenses })
 
       // Yearly must expenses from essential budgets (gedeelde utility — zelfde logica als /horizon)
       const allChildren = childBudgetsResult.data ?? []
@@ -837,16 +846,16 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
 
               {/* Spaarquote */}
               <div className="mt-2 flex items-center gap-1.5">
-                <p className={`font-mono text-2xl font-bold ${savingsRate12 >= 0 ? 'text-[var(--ink)]' : 'text-red-400'}`}>
-                  {savingsRate12.toFixed(1)}%
+                <p className={`font-mono text-2xl font-bold ${savingsRate6m >= 0 ? 'text-[var(--ink)]' : 'text-red-400'}`}>
+                  {savingsRate6m.toFixed(1)}%
                 </p>
                 <span className="text-sm text-[var(--ink-3)]">spaarquote</span>
-                <HeroTooltip text="Percentage van je inkomen dat je spaart over de afgelopen 12 maanden. Bij minder data wordt geëxtrapoleerd." />
+                <HeroTooltip text="Percentage van je inkomen dat je spaart over de afgelopen 6 maanden. Bij minder data wordt geëxtrapoleerd." />
               </div>
               <p className="text-[10px] text-[var(--ink-4)]">
-                {savingsRateMonths < 12
+                {savingsRateMonths < 6
                   ? `${savingsRateMonths} maand${savingsRateMonths > 1 ? 'en' : ''} data`
-                  : 'laatste 12 maanden'}
+                  : 'laatste 6 maanden'}
               </p>
 
               {/* Vrije dagen per jaar */}
@@ -1280,9 +1289,9 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           <div className="mb-3 text-center">
             <p className="text-xs font-bold uppercase tracking-widest text-[var(--ink-3)]">Spaarquote berekening</p>
             <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">
-              {savingsRateMonths < 12
-                ? `${savingsRateMonths} maand${savingsRateMonths > 1 ? 'en' : ''} data, geëxtrapoleerd naar 12`
-                : 'Laatste 12 maanden'}
+              {savingsRateMonths < 6
+                ? `${savingsRateMonths} maand${savingsRateMonths > 1 ? 'en' : ''} data, geëxtrapoleerd naar 6`
+                : 'Laatste 6 maanden'}
             </p>
           </div>
 
@@ -1292,31 +1301,31 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
 
           <div className="border-b border-dashed border-[var(--border-ed)] mb-2 pb-2 mt-2">
             <div className="flex justify-between py-0.5">
-              <span className="text-[var(--ink-2)]">Jaarinkomen{savingsRateMonths < 12 ? ' (geëxtrapoleerd)' : ''}</span>
-              <span className="tabular-nums text-[var(--ink)]">{formatCurrency(savingsReceiptData.extYearlyIncome)}</span>
+              <span className="text-[var(--ink-2)]">Inkomen 6 mnd{savingsRateMonths < 6 ? ' (geëxtrapoleerd)' : ''}</span>
+              <span className="tabular-nums text-[var(--ink)]">{formatCurrency(savingsReceiptData.extHalfYearIncome)}</span>
             </div>
             <div className="flex justify-between py-0.5">
-              <span className="text-[var(--ink-2)]">Jaaruitgaven{savingsRateMonths < 12 ? ' (geëxtrapoleerd)' : ''}</span>
-              <span className="tabular-nums text-red-600">- {formatCurrency(savingsReceiptData.extYearlyExpenses)}</span>
+              <span className="text-[var(--ink-2)]">Uitgaven 6 mnd{savingsRateMonths < 6 ? ' (geëxtrapoleerd)' : ''}</span>
+              <span className="tabular-nums text-red-600">- {formatCurrency(savingsReceiptData.extHalfYearExpenses)}</span>
             </div>
           </div>
           <div className="flex justify-between py-1">
-            <span className="font-medium text-[var(--ink-2)]">Jaarlijkse besparing</span>
-            <span className={`tabular-nums font-medium ${savingsReceiptData.yearlySavings >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-              {savingsReceiptData.yearlySavings >= 0 ? '+' : ''}{formatCurrency(savingsReceiptData.yearlySavings)}
+            <span className="font-medium text-[var(--ink-2)]">Besparing 6 mnd</span>
+            <span className={`tabular-nums font-medium ${savingsReceiptData.halfYearSavings >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              {savingsReceiptData.halfYearSavings >= 0 ? '+' : ''}{formatCurrency(savingsReceiptData.halfYearSavings)}
             </span>
           </div>
           <div className="mt-2 border-t-2 border-[var(--ink)] pt-2 flex justify-between">
             <span className="font-bold text-[var(--ink)]">Spaarquote</span>
-            <span className={`tabular-nums font-bold ${savingsRate12 >= 0 ? 'text-[var(--ink)]' : 'text-red-600'}`}>{savingsRate12.toFixed(1)}%</span>
+            <span className={`tabular-nums font-bold ${savingsRate6m >= 0 ? 'text-[var(--ink)]' : 'text-red-600'}`}>{savingsRate6m.toFixed(1)}%</span>
           </div>
 
-          {savingsRateMonths < 12 && (
+          {savingsRateMonths < 6 && (
             <div className="mt-2 border-t border-dashed border-[var(--border-ed)] pt-2">
               <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
-                Werkelijk inkomen: {formatCurrency(savingsReceiptData.last12Income)} over {savingsRateMonths} mnd.
-                Werkelijke uitgaven: {formatCurrency(savingsReceiptData.last12Expenses)} over {savingsRateMonths} mnd.
-                Beide geëxtrapoleerd naar 12 maanden.
+                Werkelijk inkomen: {formatCurrency(savingsReceiptData.rawIncome6m)} over {savingsRateMonths} mnd.
+                Werkelijke uitgaven: {formatCurrency(savingsReceiptData.rawExpenses6m)} over {savingsRateMonths} mnd.
+                Beide geëxtrapoleerd naar 6 maanden.
               </p>
             </div>
           )}

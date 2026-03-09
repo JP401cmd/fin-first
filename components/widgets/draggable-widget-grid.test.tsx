@@ -98,11 +98,20 @@ const mockData: DashboardData = {
   totalRecurringAmount: 0,
   topRecommendations: [],
   topLifeEvents: [],
+  savingsRate6m: 27,
   budgetingActive: true,
   householdOverrides: null,
   partnerOverrides: null,
   householdActivity: [],
   partnerHiddenCategories: [],
+  decisionPatterns: [],
+  freedomDaysMonthly: [],
+  totalFreedomDaysWon: 0,
+  totalCompletedActions: 0,
+  totalActions: 0,
+  weeklyFreedomDaysWon: 0,
+  completionRatio: 0,
+  willpowerScore: 'E',
 }
 
 const makePrefs = (ids: string[], sizes: ('half' | 'full')[] = []): WidgetPref[] =>
@@ -174,7 +183,7 @@ describe('DraggableWidgetGrid', () => {
       />
     )
 
-    expect(screen.getByRole('button', { name: /volgorde/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /modify/i })).toBeInTheDocument()
   })
 
   it('drag handles are not present when not in edit mode', () => {

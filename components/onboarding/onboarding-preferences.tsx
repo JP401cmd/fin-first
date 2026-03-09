@@ -106,7 +106,7 @@ const SPEECH_BUBBLES: Record<number, string> = {
   1: 'Sommige mensen checken dagelijks hun voortgang, anderen doen het één keer per maand. Wat past bij jou? Dit bepaalt hoe vaak je updates en samenvattingen krijgt.',
   2: 'Er zijn drie perspectieven op je financiën: je fundament, je keuzes, en je toekomst. Kies welke je het meest aanspreken — je kunt dit later altijd aanpassen.',
   3: 'Ik kan je persoonlijke tips en patronen laten zien op basis van je gegevens. Handig als je wilt leren van je eigen financiële gedrag. Geen zorgen: je data blijft privé.',
-  4: 'Bijna klaar! Welke onderwerpen wil je op je startscherm zien? Kies er zoveel als je wilt — je kunt dit later altijd wijzigen in je instellingen.',
+  4: 'Bijna klaar! Welke categorieën wil je op je startpagina zien? Kies er zoveel als je wilt — je kunt dit later altijd wijzigen in je instellingen.',
 }
 
 // ── Preference → Widget mapping ──────────────────────────────
@@ -139,7 +139,7 @@ const CATEGORY_WIDGETS: Record<DashboardCategory, string[]> = {
   voortgang: ['jouw_pad', 'badges', 'streaks'],
 }
 
-const MAX_ONBOARDING_WIDGETS = 8
+// No hard cap — user decides how many widgets to enable
 
 const BASELINE_WIDGETS = ['netto_vermogen', 'cash_flow', 'jouw_pad', 'vrijheidsvoortgang'] as const
 
@@ -184,8 +184,8 @@ export function buildWidgetPrefsFromPreferences(prefs: PreferencesData): WidgetP
     for (const id of CATEGORY_WIDGETS[cat]) add(id)
   }
 
-  // Cap at MAX_ONBOARDING_WIDGETS — keep first N by priority order
-  const enabledSet = new Set(ordered.slice(0, MAX_ONBOARDING_WIDGETS))
+  // All selected widgets are enabled — no cap
+  const enabledSet = new Set(ordered)
 
   // Build ordered widget prefs from catalog
   // Enabled widgets first (in catalog order), disabled widgets after
@@ -497,7 +497,7 @@ export function OnboardingPreferences({
       {/* Question 5: Dashboard categorieën (multi-select) */}
       {questionIndex === 4 && (
         <div className="space-y-3">
-          <h2 className="mb-4 font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">Wat wil je op je dashboard?</h2>
+          <h2 className="mb-4 font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">Welke categorieën wil je op je startpagina zien?</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
             {DASHBOARD_OPTIONS.map((opt) => (
               <MultiSelectCard
@@ -514,7 +514,7 @@ export function OnboardingPreferences({
             ))}
           </div>
           <p className="mt-3 text-xs text-[var(--ink-4)]">
-            Je dashboard start met maximaal 8 widgets. Je kunt er later meer aanzetten in je instellingen.
+            Je kunt dit later altijd wijzigen in je instellingen.
           </p>
         </div>
       )}

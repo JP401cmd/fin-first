@@ -70,7 +70,7 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
     <header className="sticky top-0 z-50 border-b-2 border-[var(--ink)] bg-[var(--paper)] shadow-[var(--s0)]">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
         <div className="flex items-center gap-8">
-          <Link href={dashboardHref} className="font-display text-[28px] font-bold tracking-tight text-[var(--ink)]">
+          <Link href="/will" className="font-display text-[28px] font-bold tracking-tight text-[var(--ink)]">
             <span className="lowercase">t</span>ri<span className="lowercase">f</span>inity<span className="text-kern-500">.</span>
           </Link>
 

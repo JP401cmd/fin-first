@@ -1,29 +1,86 @@
-import { createClient } from '@/lib/supabase/server'
+// ── Dashboard Data Loader ──────────────────────────────────────
+// Extracts all data-loading logic from dashboard/page.tsx into a
+// reusable async function that only needs a SupabaseClient.
+
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type {
+  DashboardData,
+  TopAction,
+  TopGoal,
+  TopRecurringTransaction,
+  TopRecommendation,
+  TopLifeEvent,
+  Notification,
+  StreakData,
+  AiInsight,
+  NextStep,
+  UpcomingEvent,
+  HouseholdActivityItem,
+} from '@/components/widgets/widget-renderer'
+import type { WidgetPref } from '@/lib/widget-catalog'
+import type { FireProjection, FireCountdown } from '@/lib/horizon-data'
+
 import { computeEffectiveExpenses, computeFireTarget, computeFreedomPercentage } from '@/lib/core-metrics'
-import { computeFireProjection, computeFireRange, runBacktest, ageAtDate, deriveCountdown, NL_SWR, type FinancialInput, type LifeEvent, type FireCountdown } from '@/lib/horizon-data'
+import {
+  computeFireProjection,
+  computeFireRange,
+  runBacktest,
+  ageAtDate,
+  deriveCountdown,
+  NL_SWR,
+  type FinancialInput,
+  type LifeEvent,
+} from '@/lib/horizon-data'
 import { resolveFireParams } from '@/lib/fire-params'
 import { runSimulation, lifeEventsToCashflows } from '@/lib/fire-simulation'
-import { parseFireStrategy, type FireEndStrategy } from '@/lib/fire-strategy'
+import { parseFireStrategy } from '@/lib/fire-strategy'
 import { computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
-import { calculateBox3 } from '@/lib/box3-data'
+import { calculateBox3, type TaxYear } from '@/lib/box3-data'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
-import { calculateFreedomTime, formatFreedomTimeString, formatCurrency } from '@/lib/format'
+import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
-import type { DashboardData, TopAction, CompletedAction, RejectedAction, TopGoal, TopRecurringTransaction, TopRecommendation, TopLifeEvent, Notification, StreakData, AiInsight, NextStep, UpcomingEvent } from '@/components/widgets/widget-renderer'
-import { buildTemporalContext } from '@/lib/briefing/temporal'
-import { DAIshboard } from '@/components/daishboard/daishboard'
+import { mergeWidgetPrefs, type WidgetSize } from '@/lib/widget-catalog'
 
-export default async function DAIshboardPage() {
-  const supabase = await createClient()
+// ── Result type ────────────────────────────────────────────────
 
-  // ── Data fetching (same queries as /dashboard) ────────────
+export interface DashboardDataResult {
+  /** The complete data bundle for all widgets */
+  dashboardData: DashboardData
+  /** Enabled widgets sorted by order */
+  activeWidgets: WidgetPref[]
+  /** All widget prefs (catalog + dynamic favs) */
+  allWidgetPrefs: WidgetPref[]
+  /** Monthly net cash flow (income - expenses) */
+  monthlyGrowth: number
+  /** Formatted freedom-time string for growth, or null */
+  growthDaysStr: string | null
+  /** Number of open/postponed actions */
+  openActionsCount: number
+  /** Total freedom days from open actions + pending recommendations */
+  totalFreedomDaysOpen: number
+  /** Simulation-derived countdown to FIRE, or null */
+  simFireCountdown: FireCountdown | null
+  /** FIRE projection from computeFireProjection */
+  fireProjResult: FireProjection
+  /** Whether user has activated (last_known_phase !== null) */
+  activated: boolean
+  /** Next steps for check-in detection */
+  nextSteps: NextStep[]
+}
+
+// ── Main loader ────────────────────────────────────────────────
+
+export async function loadDashboardData(supabase: SupabaseClient): Promise<DashboardDataResult> {
+  // Parallel data fetches for all module previews
   const now = new Date()
   const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0]
   const monthEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1)).toISOString().split('T')[0]
   const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
-  const prev3MonthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 3, 1)).toISOString().split('T')[0]
+  // Previous month range for cashflow comparison
   const prevMonthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 1)).toISOString().split('T')[0]
+  // Previous 3 full months (excl. current month) for stable sovereignty calculation
+  const prev3MonthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 3, 1)).toISOString().split('T')[0]
 
   const [
     txResult, assetsResult, debtsResult, profileResult,
@@ -38,11 +95,11 @@ export default async function DAIshboardPage() {
     supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('id, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
     supabase.from('debts').select('id, current_balance, debt_type, net_worth_inclusion_pct, is_tax_deductible, linked_asset_id').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, full_name, ai_enabled').single(),
+    supabase.from('profiles').select('date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate').single(),
     supabase.from('budgets').select('id, default_limit, interval').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
     supabase.from('actions')
-      .select('id, title, status, freedom_days_impact, priority_score, due_date, source, completed_at')
-      .in('status', ['open', 'postponed', 'completed', 'rejected']),
+      .select('id, title, status, freedom_days_impact, priority_score, due_date, source, completed_at, recommendation:recommendations(recommendation_type)')
+      .in('status', ['open', 'postponed', 'completed']),
     supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, alert_threshold, parent_id').is('parent_id', null),
     supabase.from('recommendations').select('id, title, freedom_days_per_year, priority_score, recommendation_type, status').in('status', ['pending', 'postponed']),
@@ -63,7 +120,16 @@ export default async function DAIshboardPage() {
     supabase.from('transactions').select('amount, date').lt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
   ])
 
-  // ── Core calculations ─────────────────────────────────────
+  // Fetch budgeting_active separately (column may not exist yet before migration)
+  let budgetingActive = true
+  try {
+    const { data: ba } = await supabase.from('profiles').select('budgeting_active').single()
+    if (ba && typeof (ba as Record<string, unknown>).budgeting_active === 'boolean') {
+      budgetingActive = (ba as Record<string, unknown>).budgeting_active as boolean
+    }
+  } catch { /* column not yet migrated — default to true */ }
+
+  // Core calculations
   let monthlyIncome = 0
   let monthlyExpenses = 0
   for (const tx of txResult.data ?? []) {
@@ -72,6 +138,16 @@ export default async function DAIshboardPage() {
     else monthlyExpenses += Math.abs(amt)
   }
 
+  // Previous month income/expenses for cashflow comparison widget
+  let prevMonthIncome = 0
+  let prevMonthExpenses = 0
+  for (const tx of prevMonthTxResult.data ?? []) {
+    const amt = Number(tx.amount)
+    if (amt > 0) prevMonthIncome += amt
+    else prevMonthExpenses += Math.abs(amt)
+  }
+
+  // Cash assets already included via assets table — only add unlinked bank_accounts (legacy/transition)
   const totalAssetsOnly = (assetsResult.data ?? []).reduce((s, a) =>
     s + Number(a.current_value) * (((a as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100), 0)
   const unlinkedCash = (bankAccountsResult.data ?? []).reduce((s, a) => s + Number(a.balance), 0)
@@ -81,6 +157,7 @@ export default async function DAIshboardPage() {
   const netWorth = totalAssets - totalDebts
   const monthlyContributions = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.monthly_contribution), 0)
 
+  // Asset breakdown per type
   const assetsByType = Object.values(
     (assetsResult.data ?? []).reduce((acc, a) => {
       const type = (a as { asset_type?: string | null }).asset_type ?? 'other'
@@ -91,7 +168,7 @@ export default async function DAIshboardPage() {
       return acc
     }, {} as Record<string, { type: string; value: number; purchaseValue: number; weightedReturn: number }>)
   ).map(g => ({ ...g, expectedReturn: g.value > 0 ? g.weightedReturn / g.value : 0 }))
-    .sort((a, b) => b.value - a.value)
+   .sort((a, b) => b.value - a.value)
 
   const totalPurchaseValue = assetsByType.reduce((s, a) => s + a.purchaseValue, 0)
 
@@ -107,8 +184,9 @@ export default async function DAIshboardPage() {
     else yearlyMustExpenses += limit
   }
 
-  // Budget totals per type
+  // Budget totals per type — limiet en werkelijke besteding
   const allParentBudgets = (allBudgetsResult.data ?? []) as { id: string; budget_type: string; default_limit: number; interval: string }[]
+  // Map: budget_id → budget_type (voor zowel parent als child budgetten)
   const budgetTypeMap = new Map<string, string>()
   for (const b of allParentBudgets) budgetTypeMap.set(b.id, b.budget_type)
   for (const c of allChildren) {
@@ -148,12 +226,14 @@ export default async function DAIshboardPage() {
     debt:    { limit: budgetLimits.debt,    spent: budgetSpent.debt },
   }
 
-  // Favorite budgets
+  // Favorite budgets: compute limit + spent for each
   const favBudgetsRaw = (favBudgetsResult.data ?? []) as { id: string; name: string; icon: string; budget_type: string; default_limit: number; interval: string; parent_id: string | null; is_favorite: boolean }[]
   const txData = txResult.data ?? []
   const favoriteBudgets = favBudgetsRaw.map(fb => {
+    // Determine effective limit
     let limit: number
     if (fb.parent_id === null) {
+      // Parent: sum children limits (or own if no children)
       const children = allChildren.filter(c => c.parent_id === fb.id)
       limit = children.length > 0
         ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
@@ -161,9 +241,11 @@ export default async function DAIshboardPage() {
     } else {
       limit = Number(fb.default_limit)
     }
+    // Normalize to monthly
     if (fb.interval === 'quarterly') limit = limit / 3
     else if (fb.interval === 'yearly') limit = limit / 12
 
+    // Determine spent: sum transaction amounts for this budget + its children
     const relevantIds = new Set<string>([fb.id])
     if (fb.parent_id === null) {
       for (const c of allChildren) {
@@ -177,9 +259,12 @@ export default async function DAIshboardPage() {
     }
 
     return {
-      id: fb.id, name: fb.name, icon: fb.icon,
+      id: fb.id,
+      name: fb.name,
+      icon: fb.icon,
       budgetType: fb.budget_type as 'income' | 'expense' | 'savings' | 'debt' | 'archive',
-      limit, spent,
+      limit,
+      spent,
     }
   })
 
@@ -196,6 +281,35 @@ export default async function DAIshboardPage() {
       extrapolatedIncome = (last12Income / incomeMonths) * 12
     }
   }
+
+  // ── 6-month rolling average savings rate ─────────────────────
+  const sixMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 6, 1))
+    .toISOString().split('T')[0]
+
+  const income6m = (income12Result.data ?? [])
+    .filter(t => (t as { date: string }).date >= sixMonthsAgo)
+    .reduce((s, t) => s + Number(t.amount), 0)
+
+  const expenses6m = Math.abs(
+    (expenseTx12Result.data ?? [])
+      .filter(t => (t as { date: string }).date >= sixMonthsAgo)
+      .reduce((s, t) => s + Number(t.amount), 0)
+  )
+
+  let dataMonths6 = 6
+  if (earliestIncomeDateD) {
+    const earliest = new Date(earliestIncomeDateD)
+    dataMonths6 = Math.max(1, Math.min(6,
+      (now.getFullYear() - earliest.getFullYear()) * 12 +
+      (now.getMonth() - earliest.getMonth())
+    ))
+  }
+  const extIncome6 = dataMonths6 < 6 ? (income6m / dataMonths6) * 6 : income6m
+  const extExpenses6 = dataMonths6 < 6 ? (expenses6m / dataMonths6) * 6 : expenses6m
+
+  const savingsRate6m = extIncome6 > 0
+    ? ((extIncome6 - extExpenses6) / extIncome6) * 100
+    : 0
 
   const fireParams = resolveFireParams(profileResult.data ?? {})
   const fireSwr = fireParams.effectiveSwr
@@ -219,8 +333,10 @@ export default async function DAIshboardPage() {
   }
   const fireProjResult = computeFireProjection(horizonInput, fireParams.grossReturn, fireSwr)
 
+  // Horizon extra: scenario range (optimistic / expected / pessimistic)
   const fireRange = computeFireRange(horizonInput, fireSwr, undefined, fireParams.grossReturn)
 
+  // Horizon extra: sim rows for vermogenspad chart
   const dob = profileResult.data?.date_of_birth ?? null
   let simRows: { age: number; endPortfolio: number; phase: string }[] | null = null
   let simRequiredPortfolio: number | null = null
@@ -231,10 +347,16 @@ export default async function DAIshboardPage() {
       const currentAge = ageAtDate(dob)
       const simCashflows = lifeEventsToCashflows((eventsResult.data ?? []) as LifeEvent[])
       const simResult = runSimulation(
-        currentAge, fireStrategy.endAge, netWorth,
+        currentAge,
+        fireStrategy.endAge,
+        netWorth,
         yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses : monthlyExpenses * 12,
-        monthlyContributions * 12, fireParams.grossReturn, 'nl_box3',
-        fireParams.inflationRate, simCashflows, fireStrategy,
+        monthlyContributions * 12,
+        fireParams.grossReturn,
+        'nl_box3',
+        fireParams.inflationRate,
+        simCashflows,
+        fireStrategy,
       )
       simRows = simResult.rows.map(r => ({ age: r.age, endPortfolio: r.endPortfolio, phase: r.phase }))
       simRequiredPortfolio = simResult.requiredFirePortfolio > 0 ? simResult.requiredFirePortfolio : null
@@ -246,11 +368,13 @@ export default async function DAIshboardPage() {
     }
   }
 
+  // Countdown afgeleid uit simulatie-engine (consistent met fireAgeFractional)
   const simCurrentAge = dob ? ageAtDate(dob) : null
   const simFireCountdown: FireCountdown | null = simFireAgeFractional != null && simCurrentAge != null
     ? deriveCountdown(simFireAgeFractional, simCurrentAge)
     : null
 
+  // Horizon extra: backtesting success rate + named crash paths
   let backtestSuccessRate: number | null = null
   let backtestNamedPaths: { label: string; success: boolean }[] | null = null
   if (netWorth > 0 && dob) {
@@ -264,6 +388,7 @@ export default async function DAIshboardPage() {
     }
   }
 
+  // Box 3 tax — same calculation as /core/belasting (default: 2025, no partner)
   let box3Tax: number | null = null
   const rawAssets = assetsResult.data ?? []
   const rawDebts = debtsResult.data ?? []
@@ -273,7 +398,9 @@ export default async function DAIshboardPage() {
       const box3Result = calculateBox3({
         assets: rawAssets as unknown as Asset[],
         debts: rawDebts as unknown as Debt[],
-        hasPartner: false, dailyExpenses: dailyExp, year: 2025,
+        hasPartner: false,
+        dailyExpenses: dailyExp,
+        year: 2025,
       })
       box3Tax = box3Result.tax
     } catch {
@@ -288,60 +415,45 @@ export default async function DAIshboardPage() {
   const pendingRecDays = (recsResult.data ?? []).reduce((s, r) => s + (Number((r as { freedom_days_per_year?: number | null }).freedom_days_per_year) || 0), 0)
   const totalFreedomDaysOpen = openActionDays + pendingRecDays
 
+  // Acties afgerond deze maand
   const completedActionsThisMonth = allActions.filter(a => {
     if (a.status !== 'completed' || !(a as { completed_at?: string | null }).completed_at) return false
     const completedAt = (a as { completed_at?: string | null }).completed_at!
     return completedAt >= monthStart && completedAt < monthEnd
   }).length
 
+  // Top 5 open acties gesorteerd op prioriteit
   const topOpenActions: TopAction[] = openActions
     .sort((a, b) => (Number((b as { priority_score?: number | null }).priority_score) || 0) - (Number((a as { priority_score?: number | null }).priority_score) || 0))
     .slice(0, 5)
     .map(a => {
       const act = a as { id: string; title: string; freedom_days_impact?: number | null; priority_score?: number | null; due_date?: string | null; source?: string }
       return {
-        id: act.id, title: act.title,
-        freedom_days_impact: act.freedom_days_impact != null ? Number(act.freedom_days_impact) : null,
-        priority_score: act.priority_score != null ? Number(act.priority_score) : null,
-        due_date: act.due_date ?? null, source: act.source ?? '',
-      }
-    })
-
-  // Recently completed actions (last 60 days) for briefing context + effectmeting
-  const sixtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 60).toISOString().slice(0, 10)
-  const ninetyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90).toISOString().slice(0, 10)
-
-  const recentCompletedActions: CompletedAction[] = allActions
-    .filter(a => {
-      if (a.status !== 'completed') return false
-      const completedAt = (a as { completed_at?: string | null }).completed_at
-      return completedAt != null && completedAt >= sixtyDaysAgo
-    })
-    .slice(0, 10)
-    .map(a => {
-      const act = a as { id: string; title: string; freedom_days_impact?: number | null; completed_at?: string | null }
-      return {
         id: act.id,
         title: act.title,
-        freedomDaysImpact: act.freedom_days_impact != null ? Number(act.freedom_days_impact) : null,
-        completedAt: act.completed_at ?? '',
+        freedom_days_impact: act.freedom_days_impact != null ? Number(act.freedom_days_impact) : null,
+        priority_score: act.priority_score != null ? Number(act.priority_score) : null,
+        due_date: act.due_date ?? null,
+        source: act.source ?? '',
       }
     })
 
-  const recentRejectedActions: RejectedAction[] = allActions
-    .filter(a => {
-      if (a.status !== 'rejected') return false
-      const completedAt = (a as { completed_at?: string | null }).completed_at
-      // Use completed_at as rejection timestamp, or include all rejected if no date
-      return completedAt == null || completedAt >= ninetyDaysAgo
-    })
-    .slice(0, 10)
-    .map(a => {
-      const act = a as { id: string; title: string }
-      return { id: act.id, title: act.title }
-    })
+  // Daily expenses for freedom-time calculations
+  const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 0
 
-  // Sovereignty level
+  // Vermogensgroei deze maand (net cash flow this month: income - expenses)
+  const monthlyGrowth = monthlyIncome - monthlyExpenses
+  const growthDays = dailyExpenses > 0
+    ? calculateFreedomTime(Math.abs(monthlyGrowth), dailyExpenses)
+    : null
+  const growthDaysStr = growthDays
+    ? formatFreedomTimeString(growthDays, 'long')
+    : null
+
+  const activated = profileResult.data?.last_known_phase !== null
+
+  // Sovereignty level calculation for Jouw Pad widget
+  // Uses stable 3-month average expenses (excl. current month) + NL_SWR, matching identity page
   const consumerDebtTypes = ['personal_loan', 'credit_card', 'revolving_credit', 'payment_plan', 'car_loan']
   const hasConsumerDebt = (debtsResult.data ?? []).some(d => {
     const dt = (d as { debt_type?: string }).debt_type
@@ -354,7 +466,33 @@ export default async function DAIshboardPage() {
   const sovereigntyLevel = computeSovereigntyLevel(netWorth, sovMonthlyExp, sovFreedomPct, hasConsumerDebt)
   const currentPhaseId = levelToPhaseId(sovereigntyLevel)
 
-  // Net worth history
+  // Widget prefs
+  const rawWidgetPrefs = profileResult.data?.widget_prefs as { widgets: { id: string; enabled: boolean; size: 'half' | 'full'; order: number }[] } | null
+  const widgetPrefs = mergeWidgetPrefs(rawWidgetPrefs)
+
+  // Inject dynamic favorite budget widget prefs (merge with saved positions)
+  const savedFavIds = new Set(widgetPrefs.widgets.filter(w => w.id.startsWith('budget_fav:')).map(w => w.id))
+  const currentFavIds = new Set(favoriteBudgets.map(b => `budget_fav:${b.id}`))
+  // Add new favorites that aren't in saved prefs yet (insert at top)
+  const lowestOrder = Math.min(0, ...widgetPrefs.widgets.map(w => w.order))
+  const newFavPrefs: WidgetPref[] = favoriteBudgets
+    .filter(b => !savedFavIds.has(`budget_fav:${b.id}`))
+    .map((b, i) => ({
+      id: `budget_fav:${b.id}`,
+      enabled: true,
+      size: 'quarter' as WidgetSize,
+      order: lowestOrder - 100 + i,
+    }))
+  // Combine: catalog widgets + saved fav prefs (only if still favorited) + new fav prefs
+  const allWidgetPrefs = [
+    ...widgetPrefs.widgets.filter(w => !w.id.startsWith('budget_fav:') || currentFavIds.has(w.id)),
+    ...newFavPrefs,
+  ]
+  const activeWidgets = allWidgetPrefs
+    .filter(w => w.enabled)
+    .sort((a, b) => a.order - b.order)
+
+  // Net worth history: monthly snapshots for the sparkline
   const snapshotRows = netWorthSnapshotsResult.data ?? []
   const netWorthHistory = snapshotRows.map(s => ({
     month: s.snapshot_date as string,
@@ -371,30 +509,19 @@ export default async function DAIshboardPage() {
   // Expense history: aggregate negative transactions per month (absolute values)
   const expenseByMonth = new Map<string, number>()
   for (const tx of (expenseTx12Result.data ?? []) as { amount: number; date: string }[]) {
-    const month = (tx.date as string).slice(0, 7)
+    const month = (tx.date as string).slice(0, 7) // "YYYY-MM"
     expenseByMonth.set(month, (expenseByMonth.get(month) ?? 0) + Math.abs(Number(tx.amount)))
   }
   const expenseHistory = Array.from(expenseByMonth.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, value]) => ({ month, value }))
 
+  // Meest recente fire_age uit snapshot (gezet door useHorizonFireSim bij bezoek /horizon)
   const latestSnapshotFireAge = snapshotRows
     .filter(s => (s as { fire_age?: number | null }).fire_age != null)
     .at(-1)
   const fireAgeFractional = latestSnapshotFireAge
     ? Number((latestSnapshotFireAge as { fire_age?: number | null }).fire_age)
-    : null
-
-  // ── Previous month income/expenses + net worth delta ─────────────
-  let prevMonthIncome = 0
-  let prevMonthExpenses = 0
-  for (const tx of prevMonthTxResult.data ?? []) {
-    const amt = Number(tx.amount)
-    if (amt > 0) prevMonthIncome += amt
-    else prevMonthExpenses += Math.abs(amt)
-  }
-  const netWorthDelta = netWorthHistory.length >= 2
-    ? netWorthHistory[netWorthHistory.length - 1].value - netWorthHistory[netWorthHistory.length - 2].value
     : null
 
   // Top recurring transactions (vaste lasten): top 5 by absolute amount
@@ -411,6 +538,7 @@ export default async function DAIshboardPage() {
       frequency: r.frequency,
       category: r.budget_id ? (budgetNameMap.get(r.budget_id) ?? null) : null,
     }))
+  // Monthly total for all recurring
   const totalRecurringAmount = allRecurring.reduce((sum, r) => {
     const amt = Math.abs(Number(r.amount))
     switch (r.frequency) {
@@ -436,7 +564,7 @@ export default async function DAIshboardPage() {
       category: r.recommendation_type ?? 'general',
     }))
 
-  // Top life events: top 5 active by sort order
+  // Top life events: top 5 active by impact
   const allLifeEvents = (eventsResult.data ?? []) as LifeEvent[]
   const topLifeEvents: TopLifeEvent[] = allLifeEvents
     .slice(0, 5)
@@ -447,15 +575,13 @@ export default async function DAIshboardPage() {
       return {
         id: e.id,
         name: e.name,
-        year: e.target_date ? new Date(e.target_date).getFullYear() : null,
+        year: e.target_date ? new Date(e.target_date).getFullYear() : (e.target_age != null ? null : null),
         impactType: (totalImpact > 0 ? 'negative' : 'positive') as 'positive' | 'negative',
         estimatedImpact: totalImpact !== 0 ? Math.abs(totalImpact) : null,
       }
     })
 
   // ── Notifications: derived from budget alerts, streaks, milestones ──
-  const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 0
-  const monthlyGrowth = monthlyIncome - monthlyExpenses
   const notifications: Notification[] = []
   // Budget overspending alerts
   for (const [type, vals] of Object.entries(budgetTotals) as [string, { limit: number; spent: number }][]) {
@@ -482,6 +608,7 @@ export default async function DAIshboardPage() {
       : Number(bData.default_limit)
     if (bData.interval === 'quarterly') limit = limit / 3
     else if (bData.interval === 'yearly') limit = limit / 12
+    // Sum spent for this budget + children
     const relevantIds = new Set<string>([bData.id])
     for (const c of children) relevantIds.add(c.id)
     let spent = 0
@@ -501,6 +628,7 @@ export default async function DAIshboardPage() {
       })
     }
   }
+  // FIRE milestone proximity
   if (freedomPct >= 90 && freedomPct < 100) {
     notifications.push({
       id: 'milestone-fire-near',
@@ -520,6 +648,7 @@ export default async function DAIshboardPage() {
       actionHref: '/horizon',
     })
   }
+  // Positive: monthly growth
   if (monthlyGrowth > 0 && dailyExpenses > 0) {
     const freedomDaysGained = monthlyGrowth / dailyExpenses
     if (freedomDaysGained >= 5) {
@@ -533,7 +662,7 @@ export default async function DAIshboardPage() {
     }
   }
 
-  // ── Badge Summary ─────────────────────────────────────────
+  // ── Badge Summary: from user_badges + badges ──────────────
   const allBadges = (badgesResult.data ?? []) as { id: string; slug: string; name: string; icon: string; category: string; sort_order: number }[]
   const earnedBadges = (userBadgesResult.data ?? []) as { id: string; badge_id: string; earned_at: string }[]
   const earnedBadgeIds = new Set(earnedBadges.map(ub => ub.badge_id))
@@ -548,16 +677,18 @@ export default async function DAIshboardPage() {
       ? { name: latestBadgeDef.name, icon: latestBadgeDef.icon, earnedAt: latestEarned.earned_at }
       : null,
     nearestBadge: (() => {
+      // Find first unearned badge by sort_order as "nearest"
       const unearned = allBadges
         .filter(b => !earnedBadgeIds.has(b.id))
         .sort((a, b) => a.sort_order - b.sort_order)
       if (unearned.length === 0) return null
+      // Estimate progress (simple: earned count / total as proxy)
       const progress = allBadges.length > 0 ? Math.round((earnedBadges.length / allBadges.length) * 100) : 0
       return { name: unearned[0].name, progress: Math.min(progress, 99) }
     })(),
   }
 
-  // ── Streaks ───────────────────────────────────────────────
+  // ── Streaks: from user_streaks ──────────────────────────────
   const rawStreaks = (userStreaksResult.data ?? []) as { id: string; streak_type: string; current_count: number; longest_count: number; last_activity_date: string | null }[]
   const streaks: StreakData[] = rawStreaks.map(s => ({
     type: (s.streak_type === 'budget_compliance' ? 'budget' : s.streak_type === 'action_completion' ? 'action' : 'login') as 'login' | 'budget' | 'action',
@@ -565,6 +696,7 @@ export default async function DAIshboardPage() {
     longestCount: s.longest_count,
     lastActivityDate: s.last_activity_date ?? new Date().toISOString().split('T')[0],
   }))
+  // Streak notifications
   for (const s of streaks) {
     if (s.currentCount >= 7 && s.currentCount === s.longestCount) {
       notifications.push({
@@ -577,21 +709,20 @@ export default async function DAIshboardPage() {
     }
   }
 
-  // ── AI Insights ───────────────────────────────────────────
+  // ── AI Insights: derived from financial data (no DB table) ──
   const aiInsights: AiInsight[] = []
-  if (monthlyIncome > 0 && monthlyExpenses > 0) {
-    const savingsRateAi = ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100
-    if (savingsRateAi >= 50) {
+  if (savingsRate6m !== 0 || (monthlyIncome > 0 && monthlyExpenses > 0)) {
+    if (savingsRate6m >= 50) {
       aiInsights.push({
         id: 'insight-high-savings',
-        text: `Je spaarquote is ${Math.round(savingsRateAi)}% — uitstekend voor versnelde vrijheid.`,
+        text: `Je spaarquote is ${Math.round(savingsRate6m)}% — uitstekend voor versnelde vrijheid.`,
         module: 'kern',
         createdAt: new Date().toISOString(),
       })
-    } else if (savingsRateAi < 10 && savingsRateAi >= 0) {
+    } else if (savingsRate6m < 10 && savingsRate6m >= 0) {
       aiInsights.push({
         id: 'insight-low-savings',
-        text: `Je spaarquote is ${Math.round(savingsRateAi)}%. Kleine besparingen kunnen al dagen vrijheid opleveren.`,
+        text: `Je spaarquote is ${Math.round(savingsRate6m)}%. Kleine besparingen kunnen al dagen vrijheid opleveren.`,
         module: 'wil',
         createdAt: new Date().toISOString(),
       })
@@ -617,7 +748,7 @@ export default async function DAIshboardPage() {
     })
   }
 
-  // ── Next Steps ────────────────────────────────────────────
+  // ── Next Steps: based on data completeness ──────────────────
   const completedSteps = (nextStepCompletionsResult.data ?? []) as { step_key: string; dismissed: boolean }[]
   const completedStepMap = new Map(completedSteps.map(s => [s.step_key, s.dismissed]))
   const potentialSteps: NextStep[] = []
@@ -652,26 +783,32 @@ export default async function DAIshboardPage() {
     .map(s => ({ ...s, dismissed: completedStepMap.get(s.key) === true }))
     .filter(s => !completedStepMap.has(s.key) || !s.dismissed)
 
-  // ── Month Summary ─────────────────────────────────────────
-  const savingsRate = monthlyIncome > 0 ? ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100 : 0
+  // ── Month Summary: derived from existing calculations ────────
+  // Use 6-month rolling average for consistency across the app
+  const savingsRate = savingsRate6m
+  // Budget score: average % of budgets within limit (0-100)
   const budgetScoreEntries = Object.values(budgetTotals).filter(v => v.limit > 0)
   const budgetScore = budgetScoreEntries.length > 0
     ? Math.round(budgetScoreEntries.reduce((s, v) => s + Math.min(100, (1 - Math.max(0, v.spent - v.limit) / v.limit) * 100), 0) / budgetScoreEntries.length)
     : 100
+  // Net worth delta from snapshots
+  const prevSnapshot = snapshotRows.length >= 2 ? snapshotRows[snapshotRows.length - 2] : null
+  const netWorthDeltaComputed = prevSnapshot ? netWorth - Number(prevSnapshot.net_worth) : null
   const freedomDaysWon = dailyExpenses > 0 && monthlyGrowth > 0 ? monthlyGrowth / dailyExpenses : 0
   const prevExpenseComparison = prevMonthExpenses > 0
     ? Math.round(((monthlyExpenses - prevMonthExpenses) / prevMonthExpenses) * 100)
     : 0
   const monthSummary = {
-    netWorthDelta: netWorthDelta ?? monthlyGrowth,
+    netWorthDelta: netWorthDeltaComputed ?? monthlyGrowth,
     freedomDaysWon: Math.round(freedomDaysWon * 10) / 10,
     savingsRate: Math.round(savingsRate * 10) / 10,
     budgetScore,
     prevMonthComparison: prevExpenseComparison,
   }
 
-  // ── Upcoming Events ───────────────────────────────────────
+  // ── Upcoming Events: from recurring + goals + life events ──
   const upcomingEvents: UpcomingEvent[] = []
+  // Goal deadlines
   for (const g of (goalsResult.data ?? []) as { id: string; name: string; target_date?: string | null; target_value?: number | null }[]) {
     if (g.target_date) {
       upcomingEvents.push({
@@ -684,6 +821,7 @@ export default async function DAIshboardPage() {
       })
     }
   }
+  // Life events with target dates
   for (const e of allLifeEvents) {
     if (e.target_date) {
       const cost = Number(e.one_time_cost) || 0
@@ -697,11 +835,13 @@ export default async function DAIshboardPage() {
       })
     }
   }
+  // Sort by date ascending, take first 10
   upcomingEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
   const upcomingEventsLimited = upcomingEvents.slice(0, 10)
 
-  // ── Emergency Fund ────────────────────────────────────────
+  // ── Emergency Fund: derived from liquid assets + expenses ──
   const TARGET_EMERGENCY_MONTHS = 6
+  // Liquid assets = unlinked bank accounts + savings-type assets
   const liquidAssets = (assetsResult.data ?? [])
     .filter(a => {
       const type = (a as { asset_type?: string }).asset_type
@@ -718,15 +858,267 @@ export default async function DAIshboardPage() {
     isComplete: emergencyMonthsCovered >= TARGET_EMERGENCY_MONTHS,
   }
 
-  // ── Build DashboardData ───────────────────────────────────
+  // ── Household & partner perspective overrides ──────────────────────────
+  let householdOverrides: DashboardData['householdOverrides'] = null
+  let partnerOverrides: DashboardData['partnerOverrides'] = null
+  let partnerHiddenCategories: string[] = []
+  try {
+    // Check if user has a household
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: membership } = await supabase
+        .from('household_members')
+        .select('household_id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (membership?.household_id) {
+        // Get partner's personal asset/debt totals via RPC + partner's privacy settings
+        const [partnerTotalsRes, partnerMemberRes] = await Promise.all([
+          supabase.rpc('household_partner_totals'),
+          supabase
+            .from('household_members')
+            .select('user_id, privacy_settings')
+            .eq('household_id', membership.household_id)
+            .neq('user_id', user.id)
+            .maybeSingle(),
+        ])
+        const pt = partnerTotalsRes.data?.[0] ?? null
+        // Parse partner's privacy settings (Feature #537)
+        const ppRaw = partnerMemberRes.data?.privacy_settings as Record<string, string> | null
+        const ppAssets = ppRaw?.assets ?? 'totals'
+        const ppDebts = ppRaw?.debts ?? 'totals'
+        // Build list of hidden categories
+        if (ppRaw) {
+          for (const [cat, level] of Object.entries(ppRaw)) {
+            if (level === 'hidden') partnerHiddenCategories.push(cat)
+          }
+        }
+
+        if (pt) {
+          let partnerAssets = Number(pt.partner_total_assets) || 0
+          let partnerDebts = Number(pt.partner_total_debts) || 0
+          // Feature #537: zero out hidden categories
+          if (ppAssets === 'hidden') partnerAssets = 0
+          if (ppDebts === 'hidden') partnerDebts = 0
+          const partnerNetWorth = partnerAssets - partnerDebts
+          const partnerMonthlyIncome = Number(pt.partner_monthly_income) || 0
+          const partnerMonthlyExpenses = Number(pt.partner_monthly_expenses) || 0
+
+          // Household net worth = user's totals + partner's personal totals
+          // (shared items are already included in user's totals)
+          householdOverrides = {
+            netWorth: netWorth + partnerAssets - partnerDebts,
+            totalAssets: totalAssets + partnerAssets,
+            totalDebts: totalDebts + partnerDebts,
+            // Combined monthly expenses/income: use user's tracked expenses
+            // (these represent the household's tracked expenses from the user's bank accounts)
+            monthlyExpenses,
+            monthlyIncome,
+          }
+
+          // Partner-only perspective: show partner's individual data
+          partnerOverrides = {
+            netWorth: partnerNetWorth,
+            totalAssets: partnerAssets,
+            totalDebts: partnerDebts,
+            // Use partner's tracked income/expenses if available, otherwise approximate
+            monthlyExpenses: partnerMonthlyExpenses > 0 ? partnerMonthlyExpenses : monthlyExpenses,
+            monthlyIncome: partnerMonthlyIncome > 0 ? partnerMonthlyIncome : monthlyIncome,
+          }
+        }
+      }
+    }
+  } catch {
+    // Household data not available — gracefully degrade
+    householdOverrides = null
+    partnerOverrides = null
+  }
+
+  // ── Household activity feed — recent shared transactions from both partners ──
+  let householdActivity: HouseholdActivityItem[] = []
+  try {
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    if (currentUser && householdOverrides) {
+      const { data: myMembership } = await supabase
+        .from('household_members')
+        .select('household_id')
+        .eq('user_id', currentUser.id)
+        .maybeSingle()
+
+      if (myMembership) {
+        // Get all household members
+        const { data: allMembers } = await supabase
+          .from('household_members')
+          .select('user_id')
+          .eq('household_id', myMembership.household_id)
+
+        const memberIds = (allMembers ?? []).map(m => m.user_id)
+
+        if (memberIds.length > 1) {
+          // Get partner's profile name
+          const partnerId = memberIds.find(id => id !== currentUser.id)
+          let partnerDisplayName = 'Partner'
+          if (partnerId) {
+            const { data: partnerProfile } = await supabase
+              .from('profiles')
+              .select('first_name')
+              .eq('id', partnerId)
+              .maybeSingle()
+            if (partnerProfile?.first_name) {
+              partnerDisplayName = partnerProfile.first_name
+            }
+          }
+
+          // Get current user's name
+          const { data: myProfile } = await supabase
+            .from('profiles')
+            .select('first_name')
+            .eq('id', currentUser.id)
+            .maybeSingle()
+          const myDisplayName = myProfile?.first_name || 'Jij'
+
+          // Fetch recent shared transactions from all household members (last 30 days)
+          const thirtyDaysAgo = new Date()
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+          const cutoffStr = thirtyDaysAgo.toISOString().split('T')[0]
+
+          const { data: sharedTxs } = await supabase
+            .from('transactions')
+            .select('id, description, amount, date, budget_id, user_id, ownership')
+            .in('user_id', memberIds)
+            .gte('date', cutoffStr)
+            .order('date', { ascending: false })
+            .limit(30)
+
+          if (sharedTxs && sharedTxs.length > 0) {
+            // Get budget names
+            const budgetIds = [...new Set(sharedTxs.map(t => t.budget_id).filter(Boolean))]
+            let budgetMap: Record<string, string> = {}
+            if (budgetIds.length > 0) {
+              const { data: budgets } = await supabase
+                .from('budgets')
+                .select('id, name')
+                .in('id', budgetIds)
+              if (budgets) {
+                budgetMap = Object.fromEntries(budgets.map(b => [b.id, b.name]))
+              }
+            }
+
+            // Check partner's privacy settings for transactions
+            let partnerTxPrivacy = 'totalen'  // default
+            if (partnerId) {
+              const partnerMem = (allMembers ?? []).find(m => m.user_id === partnerId)
+              const privSettings = (partnerMem as { privacy_settings?: Record<string, string> })?.privacy_settings
+              if (privSettings) {
+                partnerTxPrivacy = privSettings.transactions || privSettings.transacties || 'totalen'
+              }
+            }
+
+            householdActivity = sharedTxs
+              .filter(tx => {
+                const isMe = tx.user_id === currentUser.id
+                const isShared = tx.ownership === 'shared'
+                // If partner's privacy is 'verborgen'/'hidden', don't show partner's personal transactions
+                if (!isMe && !isShared && (partnerTxPrivacy === 'verborgen' || partnerTxPrivacy === 'hidden')) {
+                  return false
+                }
+                return true
+              })
+              .map(tx => ({
+                id: tx.id,
+                description: tx.description || 'Transactie',
+                amount: Number(tx.amount),
+                date: tx.date,
+                category: tx.budget_id ? budgetMap[tx.budget_id] ?? null : null,
+                partnerName: tx.user_id === currentUser.id ? myDisplayName : partnerDisplayName,
+                isCurrentUser: tx.user_id === currentUser.id,
+                ownership: tx.ownership || 'personal',
+              }))
+              .slice(0, 15)
+          }
+        }
+      }
+    }
+  } catch {
+    // Household activity feed not available — leave empty
+  }
+
+  // ── Decision Patterns: group completed actions by recommendation_type ──
+  const completedActions = allActions.filter(a => a.status === 'completed')
+  const patternMap = new Map<string, number>()
+  for (const a of completedActions) {
+    const recType = (a as { recommendation?: { recommendation_type?: string } | null }).recommendation?.recommendation_type ?? 'overig'
+    const days = Number(a.freedom_days_impact) || 0
+    patternMap.set(recType, (patternMap.get(recType) ?? 0) + days)
+  }
+  const decisionPatterns = Array.from(patternMap.entries())
+    .map(([type, days]) => ({ type, days }))
+    .sort((a, b) => b.days - a.days)
+
+  // ── Freedom Days Monthly: group completed actions by month (last 12 months) ──
+  const freedomMonthMap = new Map<string, number>()
+  for (const a of completedActions) {
+    const completedAt = (a as { completed_at?: string | null }).completed_at
+    if (!completedAt) continue
+    const month = completedAt.slice(0, 7) // "YYYY-MM"
+    if (month < twelveMonthsAgo.slice(0, 7)) continue // only last 12 months
+    const days = Number(a.freedom_days_impact) || 0
+    freedomMonthMap.set(month, (freedomMonthMap.get(month) ?? 0) + days)
+  }
+  const freedomDaysMonthly = Array.from(freedomMonthMap.entries())
+    .map(([month, days]) => ({ month, days }))
+    .sort((a, b) => a.month.localeCompare(b.month))
+
+  // ── Wilskracht widget data ──
+  const totalFreedomDaysWon = completedActions.reduce(
+    (sum, a) => sum + (Number(a.freedom_days_impact) || 0), 0,
+  )
+  const totalCompletedActionsCount = completedActions.length
+  const totalActionsCount = allActions.length
+  const completionRatio = totalActionsCount > 0
+    ? Math.round((totalCompletedActionsCount / totalActionsCount) * 100)
+    : 0
+
+  // Weekly freedom days (current ISO week)
+  const weekStart = new Date(now)
+  weekStart.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1))
+  weekStart.setHours(0, 0, 0, 0)
+  const weeklyFreedomDaysWon = completedActions
+    .filter(a => {
+      const completedAt = (a as { completed_at?: string | null }).completed_at
+      return completedAt && new Date(completedAt) >= weekStart
+    })
+    .reduce((sum, a) => sum + (Number(a.freedom_days_impact) || 0), 0)
+
+  const willpowerScore = completionRatio > 80 ? 'A'
+    : completionRatio > 60 ? 'B'
+    : completionRatio > 40 ? 'C'
+    : completionRatio > 20 ? 'D'
+    : 'E'
+
+  // DashboardData bundle for widgets
   const dashboardData: DashboardData = {
-    netWorth, totalAssets, totalDebts,
-    monthlyIncome, monthlyExpenses, monthlyContributions,
-    yearlyMustExpenses, budgetTotals, freedomPct, fireTarget, fireProjResult,
+    netWorth,
+    totalAssets,
+    totalDebts,
+    monthlyIncome,
+    monthlyExpenses,
+    monthlyContributions,
+    yearlyMustExpenses,
+    budgetTotals,
+    freedomPct,
+    fireTarget,
+    fireProjResult,
     fireAgeFractional,
-    openActions: openActions.length, totalFreedomDaysOpen, completedActionsThisMonth,
-    topOpenActions, recentCompletedActions, recentRejectedActions,
-    sovereigntyLevel, currentPhaseId,
+    openActions: openActions.length,
+    totalFreedomDaysOpen,
+    completedActionsThisMonth,
+    topOpenActions,
+    recentCompletedActions: [],
+    recentRejectedActions: [],
+    sovereigntyLevel,
+    currentPhaseId,
     monthsCovered: monthlyExpenses > 0 ? netWorth / monthlyExpenses : 0,
     hasConsumerDebt,
     recommendations: (recsResult.data ?? []).filter(r => (r as { status: string }).status === 'pending').length,
@@ -740,18 +1132,27 @@ export default async function DAIshboardPage() {
       target_date: (g as { target_date?: string | null }).target_date ?? null,
       color: (g as { color?: string }).color ?? 'teal',
       icon: (g as { icon?: string }).icon ?? 'Target',
+      custom_unit: (g as { custom_unit?: string | null }).custom_unit ?? null,
     })) satisfies TopGoal[],
     recurringTransactions: (recurringResult.data ?? []).length,
     lifeEvents: (eventsResult.data ?? []).length,
-    netWorthHistory, savingsHistory, expenseHistory, assetsByType, totalPurchaseValue,
-    fireRange, simRows, simRequiredPortfolio,
-    backtestSuccessRate, backtestNamedPaths,
-    box3Tax, simFireCountdown,
+    netWorthHistory,
+    savingsHistory,
+    expenseHistory,
+    assetsByType,
+    totalPurchaseValue,
+    fireRange,
+    simRows,
+    simRequiredPortfolio,
+    backtestSuccessRate,
+    backtestNamedPaths,
+    box3Tax,
+    simFireCountdown,
     fireEndStrategy: fireStrategy.strategy,
     fireEndAge: fireStrategy.endAge,
     prevMonthIncome,
     prevMonthExpenses,
-    netWorthDelta,
+    netWorthDelta: netWorthDeltaComputed,
     favoriteBudgets,
     // Real widget data from queries and computations
     notifications,
@@ -766,26 +1167,33 @@ export default async function DAIshboardPage() {
     totalRecurringAmount: Math.round(totalRecurringAmount * 100) / 100,
     topRecommendations,
     topLifeEvents,
-    savingsRate6m: monthlyIncome > 0 ? Math.round(((monthlyIncome - monthlyExpenses) / monthlyIncome) * 1000) / 10 : 0,
-    budgetingActive: true,
-    householdOverrides: null,
-    partnerOverrides: null,
-    householdActivity: [],
-    partnerHiddenCategories: [],
-    decisionPatterns: [],
-    freedomDaysMonthly: [],
-    totalFreedomDaysWon: 0,
-    totalCompletedActions: 0,
-    totalActions: 0,
-    weeklyFreedomDaysWon: 0,
-    completionRatio: 0,
-    willpowerScore: 'E',
+    savingsRate6m: Math.round(savingsRate6m * 10) / 10,
+    budgetingActive,
+    householdOverrides,
+    partnerOverrides,
+    householdActivity,
+    partnerHiddenCategories,
+    decisionPatterns,
+    freedomDaysMonthly,
+    totalFreedomDaysWon,
+    totalCompletedActions: totalCompletedActionsCount,
+    totalActions: totalActionsCount,
+    weeklyFreedomDaysWon,
+    completionRatio,
+    willpowerScore,
   }
 
-  // ── Build temporal context ────────────────────────────────
-  const temporal = buildTemporalContext(now)
-  const userName = (profileResult.data as { full_name?: string | null })?.full_name?.split(' ')[0] ?? undefined
-  const aiEnabled = (profileResult.data as { ai_enabled?: boolean | null })?.ai_enabled !== false
-
-  return <DAIshboard data={dashboardData} temporal={temporal} userName={userName} aiEnabled={aiEnabled} />
+  return {
+    dashboardData,
+    activeWidgets,
+    allWidgetPrefs,
+    monthlyGrowth,
+    growthDaysStr,
+    openActionsCount: openActions.length,
+    totalFreedomDaysOpen,
+    simFireCountdown,
+    fireProjResult,
+    activated,
+    nextSteps,
+  }
 }

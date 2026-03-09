@@ -96,6 +96,7 @@ interface GoalSummary {
 }
 
 interface BudgetSummary {
+  id: string
   name: string
   icon: string | null
   limit: number
@@ -159,6 +160,8 @@ export default function CheckinPage() {
   const [assetsSaved, setAssetsSaved] = useState(false)
   const [debtsSaved, setDebtsSaved] = useState(false)
   const [goalsSaved, setGoalsSaved] = useState(false)
+  const [budgetNewValues, setBudgetNewValues] = useState<Record<string, string>>({})
+  const [budgetsSaved, setBudgetsSaved] = useState(false)
 
   const currentIdx = STEPS.findIndex(s => s.key === step)
 
@@ -199,7 +202,15 @@ export default function CheckinPage() {
         }
         if (budgetsRes.ok) {
           const data = await budgetsRes.json()
-          setBudgets(Array.isArray(data) ? data : data.budgets || [])
+          const budgetData: BudgetSummary[] = Array.isArray(data) ? data : data.budgets || []
+          setBudgets(budgetData)
+          const bVals: Record<string, string> = {}
+          for (const b of budgetData) {
+            if (b.budget_type === 'expense' && b.limit > 0) {
+              bVals[b.id] = String(b.limit)
+            }
+          }
+          setBudgetNewValues(bVals)
         }
         if (upcomingRes.ok) {
           const data = await upcomingRes.json()
@@ -398,7 +409,15 @@ export default function CheckinPage() {
             setSaved={setGoalsSaved}
           />
         )}
-        {step === 'budget' && <StepBudget budgets={budgets} />}
+        {step === 'budget' && (
+          <StepBudget
+            budgets={budgets}
+            newValues={budgetNewValues}
+            setNewValues={setBudgetNewValues}
+            saved={budgetsSaved}
+            setSaved={setBudgetsSaved}
+          />
+        )}
         {step === 'vooruitblik' && <StepVooruitblik upcoming={upcoming} />}
         {step === 'reflectie' && (
           <StepReflectie
@@ -1201,19 +1220,102 @@ function StepDoelen({
 }
 
 /* ── Step 5: Budget ──────────────────────────────────────────────────── */
-function StepBudget({ budgets }: { budgets: BudgetSummary[] }) {
+function StepBudget({
+  budgets,
+  newValues,
+  setNewValues,
+  saved,
+  setSaved,
+}: {
+  budgets: BudgetSummary[]
+  newValues: Record<string, string>
+  setNewValues: (v: Record<string, string>) => void
+  saved: boolean
+  setSaved: (v: boolean) => void
+}) {
+  const [savingBudgets, setSavingBudgets] = useState(false)
   const expenseBudgets = budgets.filter(b => b.budget_type === 'expense')
+  // Groups based on original limit, not the edited value
   const overBudget = expenseBudgets.filter(b => b.limit > 0 && b.spent > b.limit)
   const underBudget = expenseBudgets.filter(b => b.limit > 0 && b.spent <= b.limit)
+
+  const changedCount = useMemo(() => {
+    let count = 0
+    for (const b of expenseBudgets) {
+      if (b.limit <= 0) continue
+      const newVal = Number(newValues[b.id])
+      if (!isNaN(newVal) && Math.abs(newVal - b.limit) >= 0.01) count++
+    }
+    return count
+  }, [expenseBudgets, newValues])
+
+  function handleValueChange(id: string, value: string) {
+    if (value !== '' && !/^\d*[.,]?\d*$/.test(value)) return
+    setNewValues({ ...newValues, [id]: value.replace(',', '.') })
+    setSaved(false)
+  }
+
+  async function handleSave() {
+    if (changedCount === 0 || savingBudgets) return
+    setSavingBudgets(true)
+    try {
+      const supabase = createClient()
+      const now = new Date()
+      const effectiveDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+
+      for (const b of expenseBudgets) {
+        const newVal = Number(newValues[b.id])
+        if (isNaN(newVal) || Math.abs(newVal - b.limit) < 0.01) continue
+
+        // Baseline protection: insert original limit for 2020-01-01 if no overrides exist yet
+        const { data: existing } = await supabase
+          .from('budget_amounts')
+          .select('id')
+          .eq('budget_id', b.id)
+          .limit(1)
+
+        if (!existing || existing.length === 0) {
+          await supabase
+            .from('budget_amounts')
+            .insert({
+              budget_id: b.id,
+              effective_from: '2020-01-01',
+              amount: Number(b.limit),
+            })
+        }
+
+        // Delete + insert for current month
+        await supabase
+          .from('budget_amounts')
+          .delete()
+          .eq('budget_id', b.id)
+          .eq('effective_from', effectiveDate)
+
+        await supabase
+          .from('budget_amounts')
+          .insert({
+            budget_id: b.id,
+            effective_from: effectiveDate,
+            amount: newVal,
+          })
+      }
+
+      setSaved(true)
+    } catch {
+      // silent — user can retry
+    } finally {
+      setSavingBudgets(false)
+    }
+  }
 
   return (
     <div className="space-y-4">
       <div className="card-editorial p-5">
         <h2 className="text-base font-display font-semibold text-[var(--ink)]">
-          Budget
+          Budget aanpassen
         </h2>
         <p className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
-          Budget-status en eventuele afwijkingen deze maand.
+          Pas je budgetlimieten aan voor deze maand.
         </p>
       </div>
 
@@ -1233,7 +1335,13 @@ function StepBudget({ budgets }: { budgets: BudgetSummary[] }) {
                 Overschreden ({overBudget.length})
               </p>
               {overBudget.map(b => (
-                <BudgetRow key={b.name} budget={b} overBudget />
+                <BudgetRow
+                  key={b.id}
+                  budget={b}
+                  overBudget
+                  editValue={newValues[b.id]}
+                  onValueChange={handleValueChange}
+                />
               ))}
             </div>
           )}
@@ -1245,10 +1353,41 @@ function StepBudget({ budgets }: { budgets: BudgetSummary[] }) {
                 Binnen budget ({underBudget.length})
               </p>
               {underBudget.map(b => (
-                <BudgetRow key={b.name} budget={b} />
+                <BudgetRow
+                  key={b.id}
+                  budget={b}
+                  editValue={newValues[b.id]}
+                  onValueChange={handleValueChange}
+                />
               ))}
             </div>
           )}
+
+          {/* Save button */}
+          <button
+            onClick={handleSave}
+            disabled={changedCount === 0 || savingBudgets || saved}
+            className={`w-full inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+              saved
+                ? 'bg-emerald-600 text-white'
+                : changedCount === 0
+                  ? 'bg-[var(--subtle)] text-[var(--ink-4)] cursor-not-allowed'
+                  : 'bg-kern-600 text-white hover:bg-kern-700'
+            }`}
+          >
+            {savingBudgets ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : saved ? (
+              <>
+                <Check className="h-4 w-4" />
+                Opgeslagen
+              </>
+            ) : (
+              changedCount > 0
+                ? `${changedCount} budget${changedCount !== 1 ? 'ten' : ''} opslaan`
+                : 'Geen wijzigingen'
+            )}
+          </button>
         </>
       )}
     </div>
@@ -1577,11 +1716,25 @@ function MetricCard({
 }
 
 /* ── Shared: BudgetRow ───────────────────────────────────────────────── */
-function BudgetRow({ budget, overBudget }: { budget: BudgetSummary; overBudget?: boolean }) {
-  const pct = budget.limit > 0 ? Math.min(120, (budget.spent / budget.limit) * 100) : 0
+function BudgetRow({
+  budget,
+  overBudget,
+  editValue,
+  onValueChange,
+}: {
+  budget: BudgetSummary
+  overBudget?: boolean
+  editValue?: string
+  onValueChange?: (id: string, value: string) => void
+}) {
+  const editedLimit = Number(editValue) || budget.limit
+  const pct = editedLimit > 0 ? Math.min(120, (budget.spent / editedLimit) * 100) : 0
+  const isOver = budget.spent > editedLimit
+  const delta = editedLimit - budget.limit
+  const hasChanged = Math.abs(delta) >= 0.01
 
   return (
-    <div className="card-editorial p-3">
+    <div className={`card-editorial p-3 ${hasChanged ? 'border-kern-300' : ''}`}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-[var(--ink)] truncate">
           {budget.icon && <span className="mr-1">{budget.icon}</span>}
@@ -1591,9 +1744,30 @@ function BudgetRow({ budget, overBudget }: { budget: BudgetSummary; overBudget?:
           {formatCurrency(budget.spent)} / {formatCurrency(budget.limit)}
         </p>
       </div>
+      {onValueChange && (
+        <div className="mt-2 flex items-center gap-2">
+          <div className="w-28 shrink-0">
+            <div className="relative">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-[var(--ink-3)]">€</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={editValue ?? ''}
+                onChange={e => onValueChange(budget.id, e.target.value)}
+                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] pl-6 pr-2 py-1.5 text-sm font-mono tabular-nums text-[var(--ink)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
+              />
+            </div>
+          </div>
+          {hasChanged && (
+            <span className={`text-xs font-mono tabular-nums font-medium ${delta > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+              {delta > 0 ? '+' : ''}{formatCurrency(delta)}
+            </span>
+          )}
+        </div>
+      )}
       <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-[var(--border-ed)]">
         <div
-          className={`h-full rounded-full transition-all ${overBudget ? 'bg-red-500' : 'bg-emerald-500'}`}
+          className={`h-full rounded-full transition-all ${isOver ? 'bg-red-500' : 'bg-emerald-500'}`}
           style={{ width: `${Math.min(pct, 100)}%` }}
         />
       </div>

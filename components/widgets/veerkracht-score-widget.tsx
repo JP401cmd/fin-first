@@ -105,8 +105,7 @@ function SubFactorCard({ label, score, maxScore, description }: {
 
 // ── Resilience breakdown (mirrors computeResilienceScore from horizon-data.ts) ──
 function computeFullBreakdown(data: DashboardData) {
-  const { totalAssets, totalDebts, monthlyIncome, monthlyExpenses } = data
-  const monthlySavings = monthlyIncome - monthlyExpenses
+  const { totalAssets, totalDebts, monthlyExpenses } = data
 
   const liquidAssets = totalAssets * 0.3
   const emergencyMonths = monthlyExpenses > 0 ? liquidAssets / monthlyExpenses : 0
@@ -118,7 +117,7 @@ function computeFullBreakdown(data: DashboardData) {
   const debtPct = totalAssets > 0 ? totalDebts / totalAssets : 1
   const debtScore = Math.max(0, Math.min(25, Math.round((1 - Math.min(debtPct, 1)) * 25)))
 
-  const sr = monthlyIncome > 0 ? monthlySavings / monthlyIncome : 0
+  const sr = data.savingsRate6m / 100
   const savingsScore = Math.max(0, Math.min(25, Math.round(Math.min(sr / 0.30, 1) * 25)))
 
   const total = Math.max(0, emergency + diversification + debtScore + savingsScore)

@@ -100,7 +100,13 @@
       "Bash(npx vitest:*)",
       "Bash(rm:*)",
       "Bash(npx playwright-cli:*)",
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Bash(find C:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\\\\app\\\\\\(app\\):*)",
+      "Bash(echo EXIT: $?:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(git worktree:*)",
+      "Bash(find C:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\\\\app\\\\\\(app\\)\\\\core:*)",
+      "Bash(mcp__supabase__execute_sql:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

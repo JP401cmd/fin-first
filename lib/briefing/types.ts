@@ -203,6 +203,23 @@ export interface DiscoverCardSpec {
   featureId: string
 }
 
+export interface DecisionPatternsCardSpec {
+  type: 'decisionPatterns'
+  patterns: { type: string; label: string; days: number }[]
+  totalDays: number
+  module: CardModule
+  href?: string
+}
+
+export interface FreedomDaysTrendCardSpec {
+  type: 'freedomDaysTrend'
+  months: { month: string; days: number }[]
+  currentMonthDays: number
+  trend: 'rising' | 'falling' | 'stable'
+  module: CardModule
+  href?: string
+}
+
 // ── Union Type ──────────────────────────────────────────────
 
 export type BriefingCardSpec =
@@ -224,6 +241,8 @@ export type BriefingCardSpec =
   | LifeEventCardSpec
   | NextStepCardSpec
   | DiscoverCardSpec
+  | DecisionPatternsCardSpec
+  | FreedomDaysTrendCardSpec
 
 // ── SSE Event Types ─────────────────────────────────────────
 
@@ -309,4 +328,6 @@ export const CARD_SPAN: Record<BriefingCardSpec['type'], number> = {
   lifeEvent: 2,
   nextStep: 2,
   discover: 2,
+  decisionPatterns: 2,
+  freedomDaysTrend: 2,
 }

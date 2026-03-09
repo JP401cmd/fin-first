@@ -58,11 +58,13 @@ export async function GET() {
   const monthEnd = new Date(currentYear, currentMonth + 1, 1).toISOString().slice(0, 10)
   const prevMonthStart = new Date(currentYear, currentMonth - 1, 1).toISOString().slice(0, 10)
   const prevMonthEnd = monthStart
+  const sixMonthsAgo = new Date(Date.UTC(currentYear, currentMonth - 6, 1)).toISOString().slice(0, 10)
 
   // Fetch data in parallel
   const [
     assetsRes, debtsRes, curIncomeRes, curExpenseRes, prevIncomeRes, prevExpenseRes,
     goalsRes, budgetsRes, actionsRes, snapshotsRes,
+    income6mRes, expense6mRes,
   ] = await Promise.all([
     supabase.from('assets').select('current_value').eq('user_id', user.id),
     supabase.from('debts').select('current_balance, name, debt_type').eq('user_id', user.id),
@@ -74,6 +76,8 @@ export async function GET() {
     supabase.from('budgets').select('name, monthly_limit, budget_type').eq('user_id', user.id).eq('budget_type', 'expense'),
     supabase.from('actions').select('id, freedom_days, is_completed, completed_at').eq('user_id', user.id),
     supabase.from('net_worth_snapshots').select('value, snapshot_date').eq('user_id', user.id).order('snapshot_date', { ascending: false }).limit(6),
+    supabase.from('transactions').select('amount').eq('user_id', user.id).eq('is_income', true).gte('date', sixMonthsAgo).lt('date', monthEnd),
+    supabase.from('transactions').select('amount').eq('user_id', user.id).eq('is_income', false).gte('date', sixMonthsAgo).lt('date', monthEnd),
   ])
 
   // Compute metrics
@@ -88,8 +92,12 @@ export async function GET() {
 
   const monthlySavings = monthlyIncome - monthlyExpenses
   const prevMonthlySavings = prevMonthIncome - prevMonthExpenses
-  const savingsRate = monthlyIncome > 0 ? (monthlySavings / monthlyIncome) * 100 : 0
   const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 0
+
+  // 6-month rolling average savings rate
+  const income6m = (income6mRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
+  const expenses6m = (expense6mRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
+  const savingsRate = income6m > 0 ? ((income6m - expenses6m) / income6m) * 100 : 0
 
   const goals = goalsRes.data || []
   const activeGoals = goals.filter(g => !g.is_completed)

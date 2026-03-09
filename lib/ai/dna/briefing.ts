@@ -118,6 +118,8 @@ Default href per card type:
 - showStreak → contextafhankelijk (kies de route die past bij het streak-onderwerp)
 - showNextStep → volgt uit de VOLGENDE STAPPEN data (kern→"/core/*", wil→"/will", horizon→"/horizon")
 - showDiscover → de relevante pagina van de feature (bijv. "/core/belasting", "/horizon")
+- showDecisionPatterns → "/will"
+- showFreedomDaysTrend → "/will"
 
 == LAYOUT CONSTRAINTS ==
 - Nooit twee metric-cards direct naast elkaar (wissel af met andere types)
@@ -640,6 +642,34 @@ export const briefingTools = {
       href: z.string().describe('Link naar de feature pagina'),
       module: moduleEnum.describe('Kleurmodule van de feature'),
       featureId: z.string().describe('Unieke feature ID voor visit-tracking, bijv. "belasting", "scenarios", "simulaties"'),
+    }),
+  }),
+
+  showDecisionPatterns: tool({
+    description: 'Toon een barchart van beslissingspatronen: hoeveel vrijheidsdagen per type actie (besparing, groei, schuld, etc). Gebruik als de gebruiker voltooide acties heeft.',
+    inputSchema: z.object({
+      patterns: z.array(z.object({
+        type: z.string().describe('Patroon type, bijv. "besparing", "groei"'),
+        label: z.string().describe('Leesbaar label, bijv. "Besparingen"'),
+        days: z.number().describe('Vrijheidsdagen impact'),
+      })).describe('Patronen met vrijheidsdagen per type'),
+      totalDays: z.number().describe('Totaal vrijheidsdagen uit alle patronen'),
+      module: moduleEnum.describe('Kleurmodule (gebruik "wil")'),
+      href: z.string().optional().describe('Link, bijv. "/will"'),
+    }),
+  }),
+
+  showFreedomDaysTrend: tool({
+    description: 'Toon een 12-maanden trend van gewonnen vrijheidsdagen per maand. Gebruik als de gebruiker meerdere maanden voltooide acties heeft.',
+    inputSchema: z.object({
+      months: z.array(z.object({
+        month: z.string().describe('Maand label, bijv. "jan", "feb"'),
+        days: z.number().describe('Vrijheidsdagen gewonnen die maand'),
+      })).describe('Maandelijkse vrijheidsdagen data'),
+      currentMonthDays: z.number().describe('Vrijheidsdagen gewonnen deze maand'),
+      trend: z.enum(['rising', 'falling', 'stable']).describe('Trend richting'),
+      module: moduleEnum.describe('Kleurmodule (gebruik "wil")'),
+      href: z.string().optional().describe('Link, bijv. "/will"'),
     }),
   }),
 }

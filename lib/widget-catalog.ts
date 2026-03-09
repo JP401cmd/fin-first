@@ -401,6 +401,43 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultSize: 'half',
     minLevel: -2,
   },
+  {
+    id: 'beslissingspatronen',
+    name: 'Beslissingspatronen',
+    description: 'Vrijheidsdagen gewonnen per type actie',
+    module: 'wil',
+    sizes: ['half', 'full'],
+    defaultSize: 'half',
+    minLevel: 1,
+    requiredPhase: 'Stability',
+  },
+  {
+    id: 'vrijheidsdagen_maand',
+    name: 'Vrijheidsdagen/maand',
+    description: 'Maandelijkse trend van gewonnen vrijheidsdagen',
+    module: 'wil',
+    sizes: ['half', 'full'],
+    defaultSize: 'half',
+    minLevel: -2,
+  },
+  {
+    id: 'wilskracht',
+    name: 'Wilskracht',
+    description: 'Wilskrachtscore en vrijheidsdagen gewonnen',
+    module: 'wil',
+    sizes: ['quarter', 'half', 'full'],
+    defaultSize: 'half',
+    minLevel: -2,
+  },
+  {
+    id: 'berichten',
+    name: 'Berichten',
+    description: 'Laatste nieuws uit je persoonlijke editie',
+    module: 'cross',
+    sizes: ['quarter', 'half', 'full'],
+    defaultSize: 'half',
+    minLevel: -2,
+  },
 ]
 
 export const DEFAULT_WIDGET_PREFS: WidgetPrefs = {
@@ -423,9 +460,9 @@ export const WIDGET_HREFS: Record<string, string> = {
   assets:                   '/core/assets',
   schulden:                 '/core/debts',
   holdings:                 '/core/assets',
-  voorstellen:              '/will',
-  acties:                   '/will',
-  doelen:                   '/will',
+  voorstellen:              '/will#voorstellen',
+  acties:                   '/will#acties',
+  doelen:                   '/will#doelen',
   fire_prognose:            '/horizon?modal=projections',
   monte_carlo:              '/horizon?modal=simulations',
   levensgebeurtenissen:     '/horizon?modal=life_events',
@@ -446,13 +483,17 @@ export const WIDGET_HREFS: Record<string, string> = {
   meldingen:                '/berichten',
   badges:                   '/identity',
   streaks:                  '/identity',
-  ai_inzicht:               '/dashboard',
+  ai_inzicht:               '/berichten',
   volgende_stap:            '/will',
   maandoverzicht:           '/core',
   agenda:                   '/core/cash',
   noodfonds:                '/core',
   huishouden_vergelijking:  '/core',
   huishouden_activiteit:   '/core/cash',
+  beslissingspatronen:     '/will',
+  vrijheidsdagen_maand:    '/will',
+  wilskracht:              '/will',
+  berichten:               '/berichten',
 }
 
 // ── Widget → Feature-phase mapping ───────────────────────────
@@ -478,6 +519,7 @@ export const WIDGET_FEATURE_MAP: Record<string, string> = {
   backtesting_score:    'widget_backtesting_score',
   ai_inzicht:           'widget_ai_inzicht',
   nibud_benchmark:      'nibud_benchmark',
+  beslissingspatronen:  'beslissingspatronen',
 }
 
 // ── Sync minLevel & requiredPhase from matrix ────────────────

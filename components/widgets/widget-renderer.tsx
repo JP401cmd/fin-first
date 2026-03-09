@@ -35,6 +35,10 @@ import { AgendaWidget } from './agenda-widget'
 import { NoodfondsWidget } from './noodfonds-widget'
 import { HuishoudenVergelijkingWidget } from './huishouden-vergelijking-widget'
 import { HuishoudenActiviteitWidget } from './huishouden-activiteit-widget'
+import { BeslissingspatronenWidget } from './beslissingspatronen-widget'
+import { VrijheidsdagenMaandWidget } from './vrijheidsdagen-maand-widget'
+import { WilskrachtWidget } from './wilskracht-widget'
+import { BerichtenWidget } from './berichten-widget'
 import { getWidgetDef, WIDGET_HREFS, WIDGET_FEATURE_MAP } from '@/lib/widget-catalog'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { FireProjection, FireRange, FireCountdown } from '@/lib/horizon-data'
@@ -258,6 +262,8 @@ export interface DashboardData {
   topRecommendations: TopRecommendation[]
   // Enriched widget data: top life events
   topLifeEvents: TopLifeEvent[]
+  // 6-month rolling average savings rate (%)
+  savingsRate6m: number
   // Whether user actively chose to budget during onboarding
   budgetingActive: boolean
   // Household perspective overrides (null if no household)
@@ -280,6 +286,17 @@ export interface DashboardData {
   householdActivity: HouseholdActivityItem[]
   // Partner privacy: categories the partner has hidden (Feature #537)
   partnerHiddenCategories: string[]
+  // Will: decision patterns — freedom days per recommendation type
+  decisionPatterns: { type: string; days: number }[]
+  // Will: 12-month freedom days trend (monthly aggregation of completed actions)
+  freedomDaysMonthly: { month: string; days: number }[]
+  // Wilskracht widget data
+  totalFreedomDaysWon: number
+  totalCompletedActions: number
+  totalActions: number
+  weeklyFreedomDaysWon: number
+  completionRatio: number
+  willpowerScore: string  // 'A' | 'B' | 'C' | 'D' | 'E'
 }
 
 export interface HouseholdActivityItem {
@@ -393,6 +410,14 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
       return <HuishoudenVergelijkingWidget size={size} data={data} href={href} />
     case 'huishouden_activiteit':
       return <HuishoudenActiviteitWidget size={size} data={data} href={href} />
+    case 'beslissingspatronen':
+      return <BeslissingspatronenWidget size={size} data={data} href={href} />
+    case 'vrijheidsdagen_maand':
+      return <VrijheidsdagenMaandWidget size={size} data={data} href={href} />
+    case 'wilskracht':
+      return <WilskrachtWidget size={size} data={data} href={href} />
+    case 'berichten':
+      return <BerichtenWidget size={size} href={href} />
     default:
       return null
   }

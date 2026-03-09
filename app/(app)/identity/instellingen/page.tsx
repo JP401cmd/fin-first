@@ -4,37 +4,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { NOTIFICATION_TYPES } from '@/lib/identity-constants'
-import { Lock, GripVertical, ChevronDown, ChevronRight, Shield, Eye, EyeOff, Server, FileText, Users, CalendarCheck, HandCoins, BellRing, SplitSquareVertical, Bell, UserPlus, Wallet, CreditCard, Receipt, ArrowLeftRight, Banknote } from 'lucide-react'
+import { ChevronDown, ChevronRight, Shield, Eye, EyeOff, Server, FileText, Users, CalendarCheck, HandCoins, BellRing, SplitSquareVertical, Bell, UserPlus, Wallet, CreditCard, Receipt, ArrowLeftRight, Banknote } from 'lucide-react'
 import Link from 'next/link'
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core'
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-  useSortable,
-  arrayMove,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import {
-  WIDGET_CATALOG,
-  DEFAULT_WIDGET_PREFS,
-  mergeWidgetPrefs,
-  type WidgetDef,
-  type WidgetPref,
-  type WidgetModule,
-  type WidgetSize,
-} from '@/lib/widget-catalog'
-import { reassignOrders } from '@/lib/widget-order'
-import { computeSovereigntyLevel } from '@/lib/feature-phases'
-import { NL_SWR, BOX3_DRAG } from '@/lib/horizon-data'
+import { BOX3_DRAG } from '@/lib/horizon-data'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { useModuleColors, useBudgetColors, usePhaseColors, useFontTheme } from '@/components/app/module-color-provider'
@@ -43,122 +15,10 @@ import { DEFAULT_MODULE_COLORS, DEFAULT_BUDGET_COLORS, DEFAULT_PHASE_COLORS } fr
 import type { ModuleColorConfig, ModuleName, BudgetColorConfig, PhaseColorConfig } from '@/lib/color-palette'
 import { ColorPickerCard } from '@/components/app/color-picker-card'
 import { Palette, RotateCcw, Type } from 'lucide-react'
-import { useDashboardType } from '@/components/app/dashboard-type-provider'
-import { readBriefingContentPrefs, saveBriefingContentPrefs, type BriefingContentPrefs } from '@/lib/briefing/user-preferences'
 import { type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { type FireEndStrategy, STRATEGY_LABELS, parseFireStrategy } from '@/lib/fire-strategy'
 
 import { formatCurrency } from '@/lib/format'
-
-// ── Widget section helpers ────────────────────────────────────────────────
-
-const MODULE_GROUPS: { module: WidgetModule; label: string; accentClass: string }[] = [
-  { module: 'kern',    label: 'De Kern',      accentClass: 'border-kern-400 text-kern-600' },
-  { module: 'wil',     label: 'De Wil',       accentClass: 'border-wil-400 text-wil-600' },
-  { module: 'horizon', label: 'De Horizon',   accentClass: 'border-horizon-400 text-horizon-600' },
-  { module: 'cross',   label: 'Cross-Module', accentClass: 'border-[var(--border-md)] text-[var(--ink-3)]' },
-]
-
-const MODULE_DOT: Record<WidgetModule, string> = {
-  kern:    'bg-kern-500',
-  wil:     'bg-wil-500',
-  horizon: 'bg-horizon-500',
-  cross:   'bg-[var(--border-md)]',
-}
-
-interface SortableWidgetRowProps {
-  def: WidgetDef
-  pref: WidgetPref | undefined
-  locked: boolean
-  module: WidgetModule
-  onToggle: (id: string) => void
-  onSizeChange: (id: string, size: WidgetSize) => void
-}
-
-function SortableWidgetRow({ def, pref, locked, module, onToggle, onSizeChange }: SortableWidgetRowProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: def.id,
-    disabled: locked,
-  })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  }
-
-  const enabled = pref?.enabled ?? false
-  const size = pref?.size ?? def.defaultSize
-  const allowedSizes = def.sizes
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`flex items-center justify-between gap-4 px-4 sm:px-6 py-3 ${locked ? 'opacity-60' : ''}`}
-    >
-      {!locked ? (
-        <button
-          type="button"
-          {...attributes}
-          {...listeners}
-          aria-label={`Versleep ${def.name}`}
-          className="shrink-0 flex h-7 w-7 items-center justify-center rounded-[var(--r-sm)] text-[var(--ink-4)] hover:text-[var(--ink-3)] cursor-grab active:cursor-grabbing transition-colors"
-        >
-          <GripVertical className="h-4 w-4" />
-        </button>
-      ) : (
-        <div className="shrink-0 flex h-7 w-7 items-center justify-center">
-          <div className="h-4 w-4" />
-        </div>
-      )}
-
-      <div className="flex items-center gap-3 min-w-0 flex-1">
-        <div className={`h-2 w-2 shrink-0 rounded-full ${MODULE_DOT[module]} ${locked ? 'opacity-40' : ''}`} />
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-[var(--ink-2)]">{def.name}</p>
-          <p className="text-xs text-[var(--ink-3)]">{def.description}</p>
-        </div>
-      </div>
-
-      {locked ? (
-        <div className="flex shrink-0 items-center gap-1.5">
-          <Lock className="h-3.5 w-3.5 text-[var(--ink-4)]" />
-          <span className="rounded-full border border-[var(--border-ed)] bg-[var(--subtle)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-3)]">
-            {def.requiredPhase}
-          </span>
-        </div>
-      ) : (
-        <div className="flex shrink-0 items-center gap-3">
-          {allowedSizes.length > 1 && (
-            <select
-              value={size}
-              onChange={e => onSizeChange(def.id, e.target.value as WidgetSize)}
-              disabled={!enabled}
-              className="rounded border border-[var(--border-ed)] bg-[var(--subtle)] px-2 py-1 text-xs text-[var(--ink-2)] disabled:opacity-50"
-            >
-              {allowedSizes.map(s => (
-                <option key={s} value={s}>{s === 'quarter' ? 'Kwart' : s === 'half' ? 'Half' : 'Volledig'}</option>
-              ))}
-            </select>
-          )}
-          <button
-            type="button"
-            onClick={() => onToggle(def.id)}
-            className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-              enabled ? 'bg-zinc-900' : 'bg-zinc-300'
-            }`}
-            aria-label={`${enabled ? 'Verberg' : 'Toon'} ${def.name}`}
-          >
-            <span className={`inline-block h-3.5 w-3.5 rounded-full bg-[var(--paper)] transition-transform ${
-              enabled ? 'translate-x-4' : 'translate-x-0.5'
-            }`} />
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ── Typography helpers ────────────────────────────────────────────────────
 
@@ -212,7 +72,6 @@ export default function InstellingenPage() {
 
   // ─ Accordion open state ─
   const [notifOpen, setNotifOpen] = useState(false)
-  const [widgetsOpen, setWidgetsOpen] = useState(false)
   const [fireOpen, setFireOpen] = useState(false)
   const [weergaveOpen, setWeergaveOpen] = useState(false)
   const [gegevensOpen, setGegevensOpen] = useState(false)
@@ -265,16 +124,6 @@ export default function InstellingenPage() {
   const [checkinEnabled, setCheckinEnabled] = useState(true)
   const [checkinSaving, setCheckinSaving] = useState(false)
 
-  // ─ Section B: Dashboard Widgets ─
-  const { dashboardType, setDashboardType } = useDashboardType()
-  const [dashTypeSaving, setDashTypeSaving] = useState(false)
-  const [prefs, setPrefs] = useState<WidgetPref[]>(DEFAULT_WIDGET_PREFS.widgets)
-  const [widgetsLoading, setWidgetsLoading] = useState(true)
-  const [widgetsSaving, setWidgetsSaving] = useState(false)
-  const [widgetsMessage, setWidgetsMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [sovereigntyLevel, setSovereigntyLevel] = useState<number>(-2)
-  const [briefingContentPrefs, setBriefingContentPrefs] = useState<BriefingContentPrefs>({ showNextSteps: true, showDiscover: true })
-
   // ─ Section C: FIRE Instellingen ─
   const [expectedReturn, setExpectedReturn] = useState(7)
   const [inflationRate, setInflationRate] = useState(2)
@@ -310,29 +159,17 @@ export default function InstellingenPage() {
   const [resetting, setResetting] = useState(false)
   const [resetError, setResetError] = useState<string | null>(null)
 
-  // DnD sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  )
-
   // ─ Load all data ─────────────────────────────────────────────────────────
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const [notifData, profileData, assetsResult, debtsResult, txResult, briefingPrefsData] = await Promise.all([
+      const [notifData, profileData] = await Promise.all([
         supabase.from('app_settings').select('value').eq('key', `notifications_preferences_${user.id}`).maybeSingle(),
         supabase.from('profiles').select(
-          'widget_prefs, expected_return, inflation_rate, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, module_colors, budget_colors, phase_colors, typography_theme, ai_enabled'
+          'expected_return, inflation_rate, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, module_colors, budget_colors, phase_colors, typography_theme, ai_enabled'
         ).eq('id', user.id).single(),
-        supabase.from('assets').select('current_value').eq('is_active', true),
-        supabase.from('debts').select('current_balance, debt_type').eq('is_active', true),
-        supabase.from('transactions').select('amount')
-          .gte('date', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0])
-          .lt('date', new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().split('T')[0]),
-        supabase.from('app_settings').select('value').eq('key', `briefing_preferences_${user.id}`).maybeSingle(),
       ])
 
       // Notificaties
@@ -352,20 +189,6 @@ export default function InstellingenPage() {
           setCheckinEnabled(checkinData.enabled !== false)
         }
       } catch { /* ignore */ }
-
-      // Briefing content preferences (DB → localStorage fallback)
-      if (briefingPrefsData.data?.value) {
-        try {
-          const parsed = JSON.parse(briefingPrefsData.data.value) as BriefingContentPrefs
-          const merged = { showNextSteps: parsed.showNextSteps !== false, showDiscover: parsed.showDiscover !== false }
-          setBriefingContentPrefs(merged)
-          saveBriefingContentPrefs(merged) // sync to localStorage
-        } catch {
-          setBriefingContentPrefs(readBriefingContentPrefs())
-        }
-      } else {
-        setBriefingContentPrefs(readBriefingContentPrefs())
-      }
 
       // FIRE parameters
       const d = profileData.data
@@ -423,29 +246,6 @@ export default function InstellingenPage() {
         }
 
       }
-
-      // Widgets + sovereignty level
-      const totalAssets = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.current_value), 0)
-      const totalDebts = (debtsResult.data ?? []).reduce((s, d) => s + Number(d.current_balance), 0)
-      const netWorth = totalAssets - totalDebts
-      let monthlyExpenses = 0
-      for (const tx of txResult.data ?? []) {
-        const amt = Number(tx.amount)
-        if (amt < 0) monthlyExpenses += Math.abs(amt)
-      }
-      const hasConsumerDebt = (debtsResult.data ?? []).some(d => {
-        const dt = (d as { debt_type?: string }).debt_type
-        return dt === 'credit_card' || dt === 'personal_loan' || dt === 'consumer'
-      })
-      const yearlyExpenses = monthlyExpenses * 12
-      const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / NL_SWR : 0
-      const freedomPct = fireTarget > 0 ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0) : 0
-      setSovereigntyLevel(computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPct, hasConsumerDebt))
-
-      const saved = d?.widget_prefs as { widgets: WidgetPref[] } | null
-      const merged = mergeWidgetPrefs(saved)
-      setPrefs(merged.widgets)
-      setWidgetsLoading(false)
 
       // Household privacy settings + partner notification prefs
       try {
@@ -562,78 +362,6 @@ export default function InstellingenPage() {
     }
     setCheckinSaving(false)
   }, [checkinEnabled])
-
-  // ─ Section B handlers ────────────────────────────────────────────────────
-  const isWidgetLocked = useCallback((def: WidgetDef): boolean => {
-    return sovereigntyLevel < def.minLevel
-  }, [sovereigntyLevel])
-
-  const toggleEnabled = useCallback((id: string) => {
-    setPrefs(prev => prev.map(p => p.id === id ? { ...p, enabled: !p.enabled } : p))
-  }, [])
-
-  const changeSize = useCallback((id: string, size: WidgetSize) => {
-    setPrefs(prev => prev.map(p => p.id === id ? { ...p, size } : p))
-  }, [])
-
-  const handleDragEnd = useCallback((event: DragEndEvent, moduleWidgetIds: string[]) => {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-    setPrefs(prev => {
-      const modulePrefs = moduleWidgetIds
-        .map(id => prev.find(p => p.id === id))
-        .filter((p): p is WidgetPref => p !== undefined)
-      const oldIdx = modulePrefs.findIndex(p => p.id === active.id)
-      const newIdx = modulePrefs.findIndex(p => p.id === over.id)
-      if (oldIdx === -1 || newIdx === -1) return prev
-      const reorderedModule = arrayMove(modulePrefs, oldIdx, newIdx)
-      const reorderedWithOrders = reassignOrders(reorderedModule)
-      const moduleIdSet = new Set(moduleWidgetIds)
-      const otherPrefs = prev.filter(p => !moduleIdSet.has(p.id))
-      return [...otherPrefs, ...reorderedWithOrders]
-    })
-  }, [])
-
-  const saveDashboardType = useCallback(async (type: 'widgets' | 'briefing') => {
-    setDashTypeSaving(true)
-    await setDashboardType(type)
-    setDashTypeSaving(false)
-  }, [setDashboardType])
-
-  const toggleBriefingContentPref = useCallback(async (key: keyof BriefingContentPrefs) => {
-    setBriefingContentPrefs(prev => {
-      const updated = { ...prev, [key]: !prev[key] }
-      saveBriefingContentPrefs(updated)
-      // Persist to app_settings (fire-and-forget)
-      const sb = createClient()
-      sb.auth.getUser().then(({ data: { user: u } }) => {
-        if (!u) return
-        sb.from('app_settings').upsert(
-          { key: `briefing_preferences_${u.id}`, value: JSON.stringify(updated) },
-          { onConflict: 'key' },
-        )
-      })
-      return updated
-    })
-  }, [])
-
-  const saveWidgets = useCallback(async () => {
-    setWidgetsSaving(true)
-    setWidgetsMessage(null)
-    try {
-      const res = await fetch('/api/widgets', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ widgets: prefs }),
-      })
-      if (!res.ok) throw new Error('Save failed')
-      setWidgetsMessage({ type: 'success', text: 'Opgeslagen!' })
-      setTimeout(() => setWidgetsMessage(null), 3000)
-    } catch {
-      setWidgetsMessage({ type: 'error', text: 'Opslaan mislukt. Probeer opnieuw.' })
-    }
-    setWidgetsSaving(false)
-  }, [prefs])
 
   // ─ Section C handlers ────────────────────────────────────────────────────
   const box3Pct = BOX3_DRAG * 100
@@ -824,7 +552,7 @@ export default function InstellingenPage() {
           Instellingen
         </h1>
         <p className="mt-1 font-serif italic text-[13px] text-[var(--ink-3)]">
-          Notificaties, widgets, berekeningen, weergave, huishouden en gegevensbeheer.
+          Notificaties, berekeningen, weergave, huishouden en gegevensbeheer.
         </p>
       </div>
 
@@ -1051,181 +779,6 @@ export default function InstellingenPage() {
               </>
             )}
           </div>
-        )}
-      </section>
-
-      {/* ── B: Dashboard ─────────────────────────────────────────────── */}
-      <section className="mb-5 sm:mb-8 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setWidgetsOpen(o => !o)}
-          className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
-        >
-          <div>
-            <h2 className="label-editorial text-[var(--ink-2)]">Dashboard</h2>
-            {!widgetsOpen && (
-              <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-                {dashboardType === 'briefing' ? 'AI Briefing' : 'Widgets'} · {prefs.filter(p => p.enabled).length} van {prefs.length} widgets actief
-              </p>
-            )}
-          </div>
-          <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${widgetsOpen ? 'rotate-180' : ''}`} />
-        </button>
-
-        {widgetsOpen && (
-          <>
-            {/* Dashboard type toggle */}
-            <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 py-4">
-              <label className="text-sm font-medium text-[var(--ink-2)]">Standaard dashboard</label>
-              <div className="mt-2 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => saveDashboardType('widgets')}
-                  disabled={dashTypeSaving}
-                  className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-                    dashboardType === 'widgets'
-                      ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
-                      : 'border-[var(--border-md)] text-[var(--ink-2)] hover:bg-[var(--subtle)]'
-                  }`}
-                >
-                  Widgets
-                </button>
-                <button
-                  type="button"
-                  onClick={() => saveDashboardType('briefing')}
-                  disabled={dashTypeSaving}
-                  className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-                    dashboardType === 'briefing'
-                      ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
-                      : 'border-[var(--border-md)] text-[var(--ink-2)] hover:bg-[var(--subtle)]'
-                  }`}
-                >
-                  AI Briefing
-                </button>
-              </div>
-              {dashboardType === 'briefing' && (
-                <div className="mt-3 space-y-3">
-                  <p className="text-xs text-[var(--ink-3)]">
-                    Widget-instellingen hieronder gelden alleen voor het widgets-dashboard.
-                  </p>
-
-                  <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]/30 p-3 sm:p-4 space-y-1">
-                    <p className="text-xs font-medium text-[var(--ink-2)]">Briefing-inhoud</p>
-
-                    <label className="flex items-center justify-between gap-4 min-h-[44px] py-2 cursor-pointer">
-                      <div className="min-w-0">
-                        <span className="text-sm font-medium text-[var(--ink)]">Volgende stappen tonen</span>
-                        <p className="text-xs text-zinc-500">Will toont relevante volgende stappen in je DAIshboard</p>
-                      </div>
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={briefingContentPrefs.showNextSteps}
-                        aria-label="Volgende stappen tonen"
-                        onClick={() => toggleBriefingContentPref('showNextSteps')}
-                        className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors touch-manipulation ${
-                          briefingContentPrefs.showNextSteps ? 'bg-[var(--ink)]' : 'bg-[var(--border-md)]'
-                        }`}
-                      >
-                        <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                          briefingContentPrefs.showNextSteps ? 'translate-x-[22px]' : 'translate-x-[3px]'
-                        }`} />
-                      </button>
-                    </label>
-
-                    <label className="flex items-center justify-between gap-4 min-h-[44px] py-2 cursor-pointer">
-                      <div className="min-w-0">
-                        <span className="text-sm font-medium text-[var(--ink)]">Ontdek-suggesties tonen</span>
-                        <p className="text-xs text-zinc-500">Will toont tips over features die je nog niet hebt ontdekt</p>
-                      </div>
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={briefingContentPrefs.showDiscover}
-                        aria-label="Ontdek-suggesties tonen"
-                        onClick={() => toggleBriefingContentPref('showDiscover')}
-                        className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors touch-manipulation ${
-                          briefingContentPrefs.showDiscover ? 'bg-[var(--ink)]' : 'bg-[var(--border-md)]'
-                        }`}
-                      >
-                        <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                          briefingContentPrefs.showDiscover ? 'translate-x-[22px]' : 'translate-x-[3px]'
-                        }`} />
-                      </button>
-                    </label>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 py-3">
-              <p className="text-sm text-[var(--ink-3)]">
-                Kies welke widgets op jouw dashboard verschijnen en in welk formaat. Sleep rijen om de volgorde aan te passen.
-              </p>
-            </div>
-
-            {widgetsLoading ? (
-              <div className="flex items-center justify-center py-16">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--border-md)] border-t-zinc-900" />
-              </div>
-            ) : (
-              <div className="space-y-0">
-                {MODULE_GROUPS.map(({ module, label, accentClass }) => {
-                  const widgets = WIDGET_CATALOG.filter(w => w.module === module && sovereigntyLevel >= w.minLevel)
-                  if (widgets.length === 0) return null
-                  const widgetIds = widgets.map(w => w.id)
-                  const sortedWidgets = [...widgets].sort((a, b) => {
-                    const pa = prefs.find(p => p.id === a.id)
-                    const pb = prefs.find(p => p.id === b.id)
-                    return (pa?.order ?? 999) - (pb?.order ?? 999)
-                  })
-                  return (
-                    <div key={module}>
-                      <div className={`flex items-center gap-2 border-l-[3px] px-4 sm:px-6 py-3 bg-[var(--subtle)]/50 ${accentClass}`}>
-                        <div className={`h-2 w-2 rounded-full ${MODULE_DOT[module]}`} />
-                        <h3 className="label-editorial">{label.toUpperCase()}</h3>
-                      </div>
-                      <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragEnd={e => handleDragEnd(e, widgetIds)}
-                      >
-                        <SortableContext items={widgetIds} strategy={verticalListSortingStrategy}>
-                          <div className="divide-y divide-[var(--border-ed)]">
-                            {sortedWidgets.map(def => (
-                              <SortableWidgetRow
-                                key={def.id}
-                                def={def}
-                                pref={prefs.find(p => p.id === def.id)}
-                                locked={isWidgetLocked(def)}
-                                module={module}
-                                onToggle={toggleEnabled}
-                                onSizeChange={changeSize}
-                              />
-                            ))}
-                          </div>
-                        </SortableContext>
-                      </DndContext>
-                    </div>
-                  )
-                })}
-                <div className="flex items-center gap-3 px-4 sm:px-8 py-4 sm:py-6">
-                  <button
-                    onClick={saveWidgets}
-                    disabled={widgetsSaving}
-                    className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
-                  >
-                    {widgetsSaving ? 'Opslaan...' : 'Opslaan'}
-                  </button>
-                  {widgetsMessage && (
-                    <span className={`text-sm ${widgetsMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {widgetsMessage.text}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-          </>
         )}
       </section>
 

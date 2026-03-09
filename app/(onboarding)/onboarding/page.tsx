@@ -152,7 +152,7 @@ export default function OnboardingPage() {
         .single()
 
       if (profile?.onboarding_completed) {
-        router.replace('/dashboard')
+        router.replace('/will')
         return
       }
       setLoading(false)
@@ -455,7 +455,7 @@ export default function OnboardingPage() {
           )}
 
           {state.step === 'success' && (
-            <OnboardingSuccess onDashboard={() => router.push('/dashboard')} />
+            <OnboardingSuccess onDashboard={() => router.push('/will')} />
           )}
         </StepTransition>
       </div>

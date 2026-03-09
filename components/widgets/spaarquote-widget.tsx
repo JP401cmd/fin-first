@@ -14,10 +14,10 @@ interface Props {
 export function SpaarquoteWidget({ size, data, href }: Props) {
   const { monthlyIncome, monthlyExpenses } = data
   const savings = monthlyIncome - monthlyExpenses
-  const rate = monthlyIncome > 0 ? (savings / monthlyIncome) * 100 : 0
+  const rate = data.savingsRate6m
   const isPositive = rate >= 0
 
-  if (monthlyIncome === 0) {
+  if (monthlyIncome === 0 && rate === 0) {
     return (
       <WidgetShell module="kern" size={size} kicker="Spaarquote" href={href}>
         <WidgetEmpty icon={PiggyBank} message="Stel budgetten in om je spaarquote te berekenen." />

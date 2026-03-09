@@ -29,6 +29,8 @@ import { TransactionForm } from '@/components/app/transaction-form'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FeatureGate } from '@/components/app/feature-gate'
+import { CollapsibleSection } from '@/components/app/collapsible-section'
+import { NibudBenchmarkSection } from '@/components/app/will/nibud-benchmark'
 import { computeSharePct, SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
 import { Users } from 'lucide-react'
 
@@ -1098,6 +1100,11 @@ export default function BudgetsPage() {
           }}
         />
       )}
+
+      {/* NIBUD Benchmark */}
+      <CollapsibleSection storageKey="nibud-benchmark" title="NIBUD Benchmark" defaultOpen={false}>
+        <NibudBenchmarkSection />
+      </CollapsibleSection>
     </div>
   )
 }

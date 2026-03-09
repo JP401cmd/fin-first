@@ -156,11 +156,20 @@ const MOCK_DATA: DashboardData = {
     { id: 'rec6', title: 'Boodschappenbudget bijstellen', freedomDaysImpact: 4, priority: 3, category: 'besparing' },
   ],
   topLifeEvents: [],
+  savingsRate6m: 30,
   budgetingActive: true,
   householdOverrides: null,
   partnerOverrides: null,
   householdActivity: [],
   partnerHiddenCategories: [],
+  decisionPatterns: [],
+  freedomDaysMonthly: [],
+  totalFreedomDaysWon: 0,
+  totalCompletedActions: 0,
+  totalActions: 0,
+  weeklyFreedomDaysWon: 0,
+  completionRatio: 0,
+  willpowerScore: 'E',
 }
 
 const KERN_WIDGETS = [

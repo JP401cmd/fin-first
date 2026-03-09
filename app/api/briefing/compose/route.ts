@@ -57,6 +57,10 @@ function toolCallToCardSpec(toolName: string, input: Record<string, unknown>): B
       return { type: 'nextStep', ...input } as BriefingCardSpec
     case 'showDiscover':
       return { type: 'discover', ...input } as BriefingCardSpec
+    case 'showDecisionPatterns':
+      return { type: 'decisionPatterns', ...input } as BriefingCardSpec
+    case 'showFreedomDaysTrend':
+      return { type: 'freedomDaysTrend', ...input } as BriefingCardSpec
     default:
       return null
   }
