@@ -147,14 +147,14 @@ export async function GET() {
       : 'Missing deletion explanation',
   })
 
-  // Test 12: Not-found page also links to dashboard
-  const hasDashboardLink = notFoundContent.includes('href="/dashboard"')
+  // Test 12: Not-found page also links to De Wil
+  const hasWillLink = notFoundContent.includes('href="/will"')
   results.push({
-    test: 'Not-found page also provides link to dashboard',
-    pass: hasDashboardLink,
-    detail: hasDashboardLink
-      ? 'Includes alternative link to dashboard for broader navigation'
-      : 'Missing dashboard link',
+    test: 'Not-found page also provides link to De Wil',
+    pass: hasWillLink,
+    detail: hasWillLink
+      ? 'Includes alternative link to De Wil for broader navigation'
+      : 'Missing De Wil link',
   })
 
   const passing = results.filter(r => r.pass).length

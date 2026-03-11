@@ -17,8 +17,6 @@ const VALID_ROUTES = new Set([
   '/identity',
   '/identity/profiel',
   '/identity/instellingen',
-  '/daishboard',
-  '/dashboard',
   '/berichten',
   '/rapportages',
 ])

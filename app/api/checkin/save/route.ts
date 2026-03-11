@@ -17,6 +17,15 @@ export interface CheckinSnapshot {
     activeGoals: number
     fireAge: number | null
   }
+  details?: {
+    netWorthChange?: number
+    freedomDaysWon?: number
+    prevMonthExpenses?: number
+    assets?: { name: string; type: string; value: number }[]
+    debts?: { name: string; type: string; balance: number }[]
+    goals?: { name: string; current: number; target: number; completed: boolean; icon?: string | null }[]
+    budgets?: { name: string; icon: string | null; limit: number; spent: number }[]
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -25,7 +34,7 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
 
   const body = await request.json()
-  const { reflection, monthKey, metrics } = body
+  const { reflection, monthKey, metrics, details } = body
 
   const now = new Date()
   const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -56,6 +65,7 @@ export async function POST(request: NextRequest) {
       activeGoals: 0,
       fireAge: null,
     },
+    details: details || undefined,
   }
 
   // Save personal snapshot
@@ -65,7 +75,7 @@ export async function POST(request: NextRequest) {
       {
         key,
         value: JSON.stringify(snapshot),
-        user_id: user.id,
+        updated_by: user.id,
       },
       { onConflict: 'key' }
     )
@@ -79,7 +89,7 @@ export async function POST(request: NextRequest) {
         {
           key: householdKey,
           value: JSON.stringify(snapshot),
-          user_id: user.id,
+          updated_by: user.id,
         },
         { onConflict: 'key' }
       )
@@ -101,6 +111,23 @@ export async function GET(request: NextRequest) {
     return handleHistory(supabase, user.id)
   }
 
+  // Single month snapshot lookup (for read-only view)
+  const month = searchParams.get('month')
+  if (month) {
+    const snapshotKey = `checkin_snapshot_${user.id}_${month}`
+    const { data: snapshot } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', snapshotKey)
+      .maybeSingle()
+    if (!snapshot?.value) return NextResponse.json({ found: false, snapshot: null })
+    try {
+      return NextResponse.json({ found: true, snapshot: JSON.parse(snapshot.value) })
+    } catch {
+      return NextResponse.json({ found: false, snapshot: null })
+    }
+  }
+
   // Default: find previous snapshot for delta display
   const now = new Date()
   const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -110,7 +137,7 @@ export async function GET(request: NextRequest) {
   const { data: snapshots } = await supabase
     .from('app_settings')
     .select('key, value')
-    .eq('user_id', user.id)
+    .eq('updated_by', user.id)
     .like('key', `checkin_snapshot_${user.id}_%`)
     .order('key', { ascending: false })
     .limit(12)
@@ -136,7 +163,7 @@ async function handleHistory(supabase: any, userId: string) {
   const { data: ownSnapshots } = await supabase
     .from('app_settings')
     .select('key, value')
-    .eq('user_id', userId)
+    .eq('updated_by', userId)
     .like('key', `checkin_snapshot_${userId}_%`)
     .order('key', { ascending: false })
     .limit(24)
@@ -176,14 +203,14 @@ async function handleHistory(supabase: any, userId: string) {
     if (partnerIds.length > 0) {
       const { data: householdSnaps } = await supabase
         .from('app_settings')
-        .select('key, value, user_id')
+        .select('key, value, updated_by')
         .like('key', `checkin_household_${membership.household_id}_%`)
         .order('key', { ascending: false })
         .limit(48)
 
       // Filter to partner snapshots only (not own)
       partnerSnapshots = (householdSnaps || [])
-        .filter((s: { user_id: string }) => s.user_id !== userId)
+        .filter((s: { updated_by: string }) => s.updated_by !== userId)
         .map((s: { value: string }) => {
           try { return JSON.parse(s.value) as CheckinSnapshot } catch { return null }
         })

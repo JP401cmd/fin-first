@@ -4,13 +4,12 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, Building2, ExternalLink, Shield, Clock, AlertTriangle } from 'lucide-react'
-import { BankSelector } from '@/components/app/gocardless/bank-selector'
+import { BankSelector } from '@/components/app/bank-connect/bank-selector'
 
-type Institution = {
+type Provider = {
   id: string
   name: string
   logo: string
-  bic: string
 }
 
 type Step = 'select' | 'confirm' | 'redirect'
@@ -21,7 +20,7 @@ export default function ConnectBankPage() {
   const error = searchParams.get('error')
 
   const [step, setStep] = useState<Step>('select')
-  const [selectedBank, setSelectedBank] = useState<Institution | null>(null)
+  const [selectedBank, setSelectedBank] = useState<Provider | null>(null)
   const [connecting, setConnecting] = useState(false)
   const [connectError, setConnectError] = useState<string | null>(
     error === 'missing_reference' ? 'Ontbrekende referentie in callback'
@@ -31,8 +30,8 @@ export default function ConnectBankPage() {
     : null
   )
 
-  function handleSelectBank(institution: Institution) {
-    setSelectedBank(institution)
+  function handleSelectBank(provider: Provider) {
+    setSelectedBank(provider)
     setStep('confirm')
     setConnectError(null)
   }
@@ -43,13 +42,13 @@ export default function ConnectBankPage() {
     setConnectError(null)
 
     try {
-      const res = await fetch('/api/gocardless/connect', {
+      const res = await fetch('/api/bank-connect/auth-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          institution_id: selectedBank.id,
-          institution_name: selectedBank.name,
-          institution_logo: selectedBank.logo,
+          provider_id: selectedBank.id,
+          provider_name: selectedBank.name,
+          provider_logo: selectedBank.logo,
         }),
       })
 
@@ -61,7 +60,7 @@ export default function ConnectBankPage() {
 
       // Redirect to bank authorization
       setStep('redirect')
-      window.location.href = data.link
+      window.location.href = data.auth_url
     } catch (err) {
       setConnectError(err instanceof Error ? err.message : 'Verbinding maken mislukt')
       setConnecting(false)
@@ -147,7 +146,7 @@ export default function ConnectBankPage() {
               <div>
                 <p className="text-sm font-medium text-[var(--ink-2)]">Veilige verbinding</p>
                 <p className="text-xs text-[var(--ink-3)]">
-                  Je inloggegevens worden nooit met ons gedeeld. De verbinding loopt via GoCardless, een door de EU gereguleerde dienst.
+                  Je inloggegevens worden nooit met ons gedeeld. De verbinding loopt via TrueLayer, een door de FCA gereguleerde dienst.
                 </p>
               </div>
             </div>

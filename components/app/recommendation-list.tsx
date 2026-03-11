@@ -18,9 +18,11 @@ const MAX_VISIBLE = 5
 
 type RecommendationListProps = {
   initialRecommendations: Recommendation[]
+  /** When true, hides the internal header (icon + title + count + description). Used when parent renders a unified column header. */
+  hideHeader?: boolean
 }
 
-export function RecommendationList({ initialRecommendations }: RecommendationListProps) {
+export function RecommendationList({ initialRecommendations, hideHeader }: RecommendationListProps) {
   const [recommendations, setRecommendations] = useState<Recommendation[]>(initialRecommendations)
   useEffect(() => { setRecommendations(initialRecommendations) }, [initialRecommendations])
   const [isGenerating, setIsGenerating] = useState(false)
@@ -126,7 +128,7 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
   if (pending.length === 0 && !isGenerating) {
     return (
       <div className="space-y-4">
-        {header}
+        {!hideHeader && header}
         <div className="py-6 text-center">
           <div className="mx-auto mb-3 flex justify-center">
             <FinnAvatar size={40} />
@@ -154,7 +156,7 @@ export function RecommendationList({ initialRecommendations }: RecommendationLis
   // --- Filled state ---
   return (
     <div className="space-y-4">
-      {header}
+      {!hideHeader && header}
 
       {error && (
         <p className="text-sm text-red-600">{error}</p>

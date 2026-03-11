@@ -399,7 +399,6 @@ export async function updateSession(request: NextRequest) {
 
   // Protected route prefixes that require authentication
   const protectedPrefixes = [
-    '/dashboard',
     '/core',
     '/will',
     '/horizon',
@@ -422,7 +421,7 @@ export async function updateSession(request: NextRequest) {
   const authPages = ['/', '/login', '/signup', '/forgot-password', '/reset-password']
   if (user && authPages.includes(pathname)) {
     const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
+    url.pathname = '/will'
     return NextResponse.redirect(url)
   }
 

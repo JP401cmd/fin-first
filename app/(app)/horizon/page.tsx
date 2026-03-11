@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useDreamTransition } from '@/components/app/horizon/dream-transition-context'
 import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
-import { FfinAvatar } from '@/components/app/avatars'
+import { previewEventCashflows, type SimCashflow } from '@/lib/fire-simulation'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
@@ -19,6 +19,7 @@ import {
   type ProjectionMonth, type ResilienceScore,
   type LifeEvent, type LifeEventImpact,
   type MonteCarloResult, type CatalogField,
+  type UserDefinedCashflow,
 } from '@/lib/horizon-data'
 import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
@@ -27,7 +28,6 @@ import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementEx
 import type { Debt } from '@/lib/debt-data'
 import { ActionCard } from '@/components/app/action-card'
 import { LogTimeline, EVENT_ICONS } from '@/components/app/horizon/log-timeline'
-import { ProjectionsModal } from '@/components/app/horizon/projections-modal'
 import { ScenariosModal } from '@/components/app/horizon/scenarios-modal'
 import { SimulationsModal } from '@/components/app/horizon/simulations-modal'
 import { WithdrawalModal } from '@/components/app/horizon/withdrawal-modal'
@@ -36,7 +36,7 @@ import {
   Hourglass, TrendingUp, Percent, Shield, Info,
   AlertTriangle, Calendar, BarChart3, Clock, FlaskConical, Landmark,
   Plus, X, Trash2, Edit3, Zap, Target, History, Sparkles,
-  DollarSign, Wallet, PiggyBank, Check, Pencil, TableProperties,
+  DollarSign, TableProperties,
   ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -50,7 +50,7 @@ import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverla
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { parseFireStrategy, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
 
-type ActiveModal = null | 'projections' | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting'
+type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting'
 
 // Snapshot type for resilience trend data
 type SnapshotForTrend = {
@@ -88,7 +88,6 @@ export default function HorizonPage() {
   const [input, setInput] = useState<FinancialInput | null>(null)
   const [fire, setFire] = useState<FireProjection | null>(null)
   const [range, setRange] = useState<FireRange | null>(null)
-  const [projection, setProjection] = useState<ProjectionMonth[]>([])
   const [resilience, setResilience] = useState<ResilienceScore | null>(null)
   const [avgIncome6m, setAvgIncome6m] = useState<number | null>(null)
   const [avgExpenses6m, setAvgExpenses6m] = useState<number | null>(null)
@@ -126,7 +125,7 @@ export default function HorizonPage() {
   useEffect(() => {
     const modal = searchParams.get('modal')
     if (!modal) return
-    if (modal === 'projections' || modal === 'scenarios' || modal === 'simulations' || modal === 'withdrawal' || modal === 'backtesting') {
+    if (modal === 'scenarios' || modal === 'simulations' || modal === 'withdrawal' || modal === 'backtesting') {
       setActiveModal(modal)
     } else if (modal === 'life_events') {
       setShowForm(true)
@@ -134,14 +133,11 @@ export default function HorizonPage() {
     router.replace('/horizon', { scroll: false })
   }, [searchParams, router])
 
-  // Income override for what-if analysis
-  const [incomeOverride, setIncomeOverride] = useState<number | null>(null)
-  const [editingIncome, setEditingIncome] = useState(false)
-
   // Event form state
   const [showForm, setShowForm] = useState(false)
   const [editingEvent, setEditingEvent] = useState<LifeEvent | null>(null)
   const [formName, setFormName] = useState('')
+  const [formDescription, setFormDescription] = useState('')
   const [formType, setFormType] = useState('custom')
   const [formAge, setFormAge] = useState<number | ''>('')
   const [formDuration, setFormDuration] = useState<number | ''>(0)
@@ -152,6 +148,15 @@ export default function HorizonPage() {
   const [formMetadata, setFormMetadata] = useState<Record<string, unknown>>({})
   const [formErrors, setFormErrors] = useState<string[]>([])
   const [formWarnings, setFormWarnings] = useState<string[]>([])
+  const [showCatalogFields, setShowCatalogFields] = useState(false)
+
+  // Compact life events UI state
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
+  const [viewModalMode, setViewModalMode] = useState<'view' | 'edit'>('view')
+  const [formCashflows, setFormCashflows] = useState<UserDefinedCashflow[]>([])
+  const [editingCashflowId, setEditingCashflowId] = useState<string | null>(null)
+  const [showAddEventModal, setShowAddEventModal] = useState(false)
+  const [openCatalogGroups, setOpenCatalogGroups] = useState<Set<LifeEventGroup>>(new Set())
 
   // Simulatie-engine met echte app-data (fractionele FIRE-leeftijd + kasstromen)
   const { result: simResult, cashflows: simCashflows } = useHorizonFireSim(
@@ -406,19 +411,14 @@ export default function HorizonPage() {
     loadHouseholdData()
   }, [isHouseholdView, isPartnerView])
 
-  // Compute effective input: base data from DB, with optional income override
+  // Compute effective input: base data from DB
   const effectiveInput: FinancialInput | null = input
-    ? incomeOverride !== null
-      ? { ...input, monthlyIncome: incomeOverride }
-      : input
-    : null
 
-  // Recalculate projections when income override, input, or FIRE method changes
+  // Recalculate projections when input or FIRE method changes
   useEffect(() => {
     if (!effectiveInput) return
     setFire(computeFireProjection(effectiveInput, fireParams.grossReturn, fireSwr))
     setRange(computeFireRange(effectiveInput, fireSwr, undefined, fireParams.grossReturn))
-    setProjection(projectForward(effectiveInput, 360))
     // Resilience score: use 6-month averaged income/expenses for stability
     const resilienceInput: FinancialInput = avgIncome6m !== null && avgExpenses6m !== null
       ? { ...effectiveInput, monthlyIncome: avgIncome6m, monthlyExpenses: avgExpenses6m }
@@ -428,7 +428,7 @@ export default function HorizonPage() {
       setImpacts(computeCumulativeImpacts(effectiveInput, events))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [incomeOverride, input, fireSwr, fireParams, avgIncome6m, avgExpenses6m])
+  }, [input, fireSwr, fireParams, avgIncome6m, avgExpenses6m])
 
   // Lazy scenario computation — replay main sim with variant returns
   useEffect(() => {
@@ -446,7 +446,7 @@ export default function HorizonPage() {
     const years = Math.max(simResult.displayEndAge - age, 10)
     setMcData(runMonteCarlo(effectiveInput, 1000, years))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mcExpanded, simResult, incomeOverride, input])
+  }, [mcExpanded, simResult, input])
 
   const currentAge = effectiveInput?.dateOfBirth ? ageAtDate(effectiveInput.dateOfBirth) : null
   const baseFire = effectiveInput ? computeFireProjection(effectiveInput, fireParams.grossReturn, fireSwr) : null
@@ -485,10 +485,27 @@ export default function HorizonPage() {
     }
   }
 
+  /** Convert a SimCashflow to a UserDefinedCashflow for editing */
+  function toUserDefinedCashflow(flow: SimCashflow): UserDefinedCashflow {
+    return {
+      id: crypto.randomUUID(),
+      name: flow.name,
+      type: flow.type,
+      direction: flow.direction,
+      amount: flow.amount,
+      durationMonths: flow.toAge != null && flow.fromAge != null
+        ? (flow.toAge - flow.fromAge) * 12
+        : 0,
+      indexed: flow.indexed,
+    }
+  }
+
   function openCatalogForm(type: string) {
     const catalog = LIFE_EVENT_CATALOG[type]
     setFormType(type)
     setFormName(catalog?.label ?? '')
+    setFormDescription('')
+    setShowCatalogFields(false)
     setFormDuration(catalog?.defaultDuration ?? 0)
     setFormAge(catalog?.defaultAge !== undefined ? catalog.defaultAge : (currentAge ? currentAge + 5 : ''))
     setFormIsIndexed(true)
@@ -680,12 +697,16 @@ export default function HorizonPage() {
       }
     }
     setEditingEvent(null)
+    setFormCashflows([])
+    setEditingCashflowId(null)
     setShowForm(true)
   }
 
   function openEditForm(ev: LifeEvent) {
     setFormType(ev.event_type)
     setFormName(ev.name)
+    setFormDescription(String(ev.metadata?.toelichting ?? ''))
+    setShowCatalogFields(false)
     setFormDuration(Number(ev.duration_months))
     setFormAge(ev.target_age ?? '')
     setFormIsIndexed(ev.is_indexed ?? true)
@@ -1155,6 +1176,30 @@ export default function HorizonPage() {
       }
     }
 
+    // Store custom cashflows and toelichting in metadata and compute backward-compatible flat fields
+    const metaWithCashflows: Record<string, unknown> = { ...formMetadata, toelichting: formDescription || undefined }
+    if (formCashflows.length > 0) {
+      metaWithCashflows.cashflows = formCashflows
+      // Backward-compatible flat fields from cashflows
+      const cfOneTimeCost = formCashflows
+        .filter(cf => cf.type === 'one_time' && cf.direction === 'expense')
+        .reduce((s, cf) => s + cf.amount, 0)
+        - formCashflows
+        .filter(cf => cf.type === 'one_time' && cf.direction === 'income')
+        .reduce((s, cf) => s + cf.amount, 0)
+      const cfMonthlyCost = formCashflows
+        .filter(cf => cf.type === 'recurring' && cf.direction === 'expense')
+        .reduce((s, cf) => s + cf.amount, 0)
+      const cfMonthlyIncome = formCashflows
+        .filter(cf => cf.type === 'recurring' && cf.direction === 'income')
+        .reduce((s, cf) => s + cf.amount, 0)
+      const cfMaxDuration = Math.max(0, ...formCashflows.map(cf => cf.durationMonths))
+      oneTimeCost = cfOneTimeCost
+      monthlyCostChange = cfMonthlyCost
+      monthlyIncomeChange = cfMonthlyIncome
+      durMonths = cfMaxDuration
+    }
+
     const payload = {
       user_id: user.id,
       name: formName,
@@ -1168,7 +1213,7 @@ export default function HorizonPage() {
       icon,
       sort_order: events.length,
       is_active: true,
-      metadata: formMetadata,
+      metadata: metaWithCashflows,
     }
 
     if (editingEvent) {
@@ -1181,6 +1226,14 @@ export default function HorizonPage() {
     setEditingEvent(null)
     setFormErrors([])
     setFormWarnings([])
+    setFormCashflows([])
+    setEditingCashflowId(null)
+    setFormDescription('')
+    setShowCatalogFields(false)
+    if (selectedEventId) {
+      setSelectedEventId(null)
+      setViewModalMode('view')
+    }
     setLoading(true)
     loadData()
   }
@@ -1233,23 +1286,20 @@ export default function HorizonPage() {
           {/* Header rij: kicker + Details pill */}
           <div className="mb-3 sm:mb-6 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <FfinAvatar size={40} />
-              <div>
-                <p className="label-editorial text-horizon-600">
-                  {hasPerspectiveHero
-                    ? isPartnerView
+              {hasPerspectiveHero && (
+                <div>
+                  <p className="label-editorial text-horizon-600">
+                    {isPartnerView
                       ? `${perspectiveHero!.householdName} — Horizon`
-                      : `${perspectiveHero!.householdName} — Gezamenlijke horizon`
-                    : 'Jouw horizon naar vrijheid'}
-                </p>
-                {hasPerspectiveHero && (
+                      : `${perspectiveHero!.householdName} — Gezamenlijke horizon`}
+                  </p>
                   <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
                     {isPartnerView
                       ? `FIRE-projectie van ${perspectiveHero!.householdName}`
                       : 'Gecombineerde financiën van het huishouden'}
                   </p>
-                )}
-              </div>
+                </div>
+              )}
             </div>
             {simResult && (
               <button
@@ -1593,163 +1643,6 @@ export default function HorizonPage() {
         </section>
       )}
 
-      {/* === 4. Projectie-invoer (Financial Inputs Summary / Primary Content) === */}
-      <section className="mt-5 sm:mt-8" data-testid="fire-inputs">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <h2 className="label-editorial text-[var(--ink-2)]">
-              Projectie-invoer
-            </h2>
-            <p className="mt-1 text-sm text-[var(--ink-3)]">
-              Jouw financiële gegevens die je pad naar volledige vrijheid bepalen
-            </p>
-          </div>
-          {incomeOverride !== null && (
-            <button
-              onClick={() => { setIncomeOverride(null); setEditingIncome(false) }}
-              className="rounded-[var(--r)] border border-horizon-200 bg-horizon-50 px-3 py-1.5 text-xs font-medium text-horizon-600 hover:bg-horizon-100"
-            >
-              Reset naar werkelijk
-            </button>
-          )}
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Monthly Income - editable */}
-          <div className="rounded-xl border border-zinc-200 bg-[var(--paper)] p-4" data-testid="input-income">
-            <div className="mb-2 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-[var(--r)] bg-emerald-50">
-                  <DollarSign className="h-4 w-4 text-emerald-600" />
-                </div>
-                <p className="text-xs font-medium text-[var(--ink-3)]">Maandinkomen</p>
-              </div>
-              {!editingIncome && (
-                <button
-                  onClick={() => setEditingIncome(true)}
-                  className="rounded p-1 text-zinc-400 hover:bg-zinc-50 hover:text-[var(--ink-2)]"
-                  title="Inkomen aanpassen"
-                  data-testid="edit-income-btn"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-            {editingIncome ? (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-[var(--ink-3)]">&euro;</span>
-                <input
-                  type="number"
-                  data-testid="income-input"
-                  defaultValue={Math.round(effectiveInput?.monthlyIncome ?? input?.monthlyIncome ?? 0)}
-                  className="w-full rounded-lg border border-horizon-300 bg-horizon-50/30 px-2 py-1.5 text-lg font-bold text-[var(--ink)] focus:border-horizon-500 focus:outline-none"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      const val = Number((e.target as HTMLInputElement).value)
-                      if (val >= 0) {
-                        setIncomeOverride(val)
-                        setEditingIncome(false)
-                      }
-                    }
-                    if (e.key === 'Escape') {
-                      setEditingIncome(false)
-                    }
-                  }}
-                  onBlur={(e) => {
-                    const val = Number(e.target.value)
-                    if (val >= 0) {
-                      setIncomeOverride(val)
-                    }
-                    setEditingIncome(false)
-                  }}
-                  autoFocus
-                />
-                <button
-                  onClick={() => setEditingIncome(false)}
-                  className="rounded p-1 text-zinc-400 hover:text-[var(--ink-2)]"
-                >
-                  <Check className="h-4 w-4" />
-                </button>
-              </div>
-            ) : (
-              <p className="text-lg font-bold text-[var(--ink)]" data-testid="income-display">
-                {formatCurrency(effectiveInput?.monthlyIncome ?? 0)}
-                {incomeOverride !== null && (
-                  <span className="ml-1.5 text-xs font-normal text-horizon-500">(aangepast)</span>
-                )}
-              </p>
-            )}
-            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">
-              {incomeOverride !== null
-                ? `Werkelijk: ${formatCurrency(input?.monthlyIncome ?? 0)}`
-                : 'uit transacties deze maand'}
-            </p>
-          </div>
-
-          {/* Monthly Expenses */}
-          <div className="rounded-xl border border-zinc-200 bg-[var(--paper)] p-4" data-testid="input-expenses">
-            <div className="mb-2 flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-[var(--r)] bg-red-50">
-                <Wallet className="h-4 w-4 text-red-500" />
-              </div>
-              <p className="text-xs font-medium text-[var(--ink-3)]">Maanduitgaven</p>
-            </div>
-            <p className="text-lg font-bold text-[var(--ink)]">{formatCurrency(effectiveInput?.monthlyExpenses ?? 0)}</p>
-            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">uit transacties deze maand</p>
-          </div>
-
-          {/* Total Assets */}
-          <div className="rounded-xl border border-zinc-200 bg-[var(--paper)] p-4" data-testid="input-assets">
-            <div className="mb-2 flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)]">
-                <PiggyBank className="h-4 w-4 text-horizon-600" />
-              </div>
-              <p className="text-xs font-medium text-[var(--ink-3)]">Totaal vermogen</p>
-            </div>
-            <p className="text-lg font-bold text-[var(--ink)]">{formatCurrency(effectiveInput?.totalAssets ?? 0)}</p>
-            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">actieve bezittingen</p>
-          </div>
-
-          {/* Total Debts */}
-          <div className="rounded-xl border border-zinc-200 bg-[var(--paper)] p-4" data-testid="input-debts">
-            <div className="mb-2 flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-[var(--r)] bg-kern-50">
-                <TrendingUp className="h-4 w-4 text-kern-600" />
-              </div>
-              <p className="text-xs font-medium text-[var(--ink-3)]">Totaal schulden</p>
-            </div>
-            <p className="text-lg font-bold text-[var(--ink)]">{formatCurrency(effectiveInput?.totalDebts ?? 0)}</p>
-            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">actieve schulden</p>
-          </div>
-
-          {/* Savings Rate - computed from income & expenses */}
-          <div className="rounded-xl border border-zinc-200 bg-[var(--paper)] p-4" data-testid="input-savings-rate">
-            <div className="mb-2 flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-[var(--r)] bg-wil-50">
-                <Percent className="h-4 w-4 text-wil-600" />
-              </div>
-              <p className="text-xs font-medium text-[var(--ink-3)]">Spaarquote</p>
-            </div>
-            <p className="text-lg font-bold text-[var(--ink)]" data-testid="savings-rate-display">
-              {fire ? `${fire.savingsRate.toFixed(1)}%` : '0.0%'}
-            </p>
-            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">berekend uit inkomen &amp; uitgaven</p>
-          </div>
-
-          {/* Annual Expenses - from budget data */}
-          <div className="rounded-xl border border-zinc-200 bg-[var(--paper)] p-4" data-testid="input-annual-expenses">
-            <div className="mb-2 flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-[var(--r)] bg-rose-50">
-                <Target className="h-4 w-4 text-rose-500" />
-              </div>
-              <p className="text-xs font-medium text-[var(--ink-3)]">Jaarlijkse vaste lasten</p>
-            </div>
-            <p className="text-lg font-bold text-[var(--ink)]" data-testid="annual-expenses-display">
-              {formatCurrency(effectiveInput?.yearlyMustExpenses ?? 0)}
-            </p>
-            <p className="mt-0.5 text-[10px] text-[var(--ink-3)]">uit budget categorieën</p>
-          </div>
-        </div>
-      </section>
 
       {/* === 5. Resilience Trend Chart (Deep Dive) === */}
       {resilienceSnapshots.filter(s => s.resilience_score !== null).length >= 2 && (
@@ -1834,15 +1727,6 @@ export default function HorizonPage() {
 
       {/* === 6. Verken-kaarten (Explore Cards / Primary Content) === */}
       <section className="mt-4 sm:mt-8 space-y-3 sm:space-y-4">
-        <FeatureGate featureId="fire_projecties" fallback="hidden">
-          <ExploreCard
-            onClick={() => setActiveModal('projections')}
-            icon={<TrendingUp className="h-5 w-5 text-horizon-600" />}
-            title="Projecties"
-            value={simResult?.fireAgeFractional != null ? `Vrij op ${simResult.fireAgeFractional.toFixed(1)}` : fire.fireAge !== null ? `Vrij op ${Math.round(fire.fireAge)}` : effectiveCountdown.fireDate}
-            subtitle="vrijheidsvoorspelling"
-          />
-        </FeatureGate>
         <FeatureGate featureId="withdrawal_strategie" fallback="hidden">
           <ExploreCard
             onClick={() => setActiveModal('withdrawal')}
@@ -1876,7 +1760,7 @@ export default function HorizonPage() {
         </FeatureGate>
       </section>
 
-      {/* === 7. Tijdlijn + Levensgebeurtenissen (Primary Content) === */}
+      {/* === 7. Tijdlijn (Primary Content) === */}
       <FeatureGate featureId="levensgebeurtenissen" fallback="hidden">
       <section className="mt-5 sm:mt-8">
         <div className="mb-5">
@@ -1927,169 +1811,373 @@ export default function HorizonPage() {
             />
           </div>
         )}
-      </section>
 
-      {/* === 8. Levensgebeurtenissen (Primary Content) === */}
-      <section className="mt-4 sm:mt-8">
-        {events.length > 0 && (
-          <>
-            <h2 className="mb-3 label-editorial text-[var(--ink-2)]">
-              <Target className="mr-1.5 inline h-3.5 w-3.5 text-horizon-500" />
-              Levensgebeurtenissen
-            </h2>
-            <div className="space-y-3">
-              {events.map((ev, i) => {
-                const impact = impacts[i]
-                const catalog = LIFE_EVENT_CATALOG[ev.event_type]
+        {/* === Levensgebeurtenissen kaart === */}
+        <div className="mt-6 rounded-xl border border-zinc-200 bg-[var(--paper)] p-5">
+          {/* Header met + knop */}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="label-editorial text-[var(--ink-2)]">Levensgebeurtenissen</h3>
+            <button
+              onClick={() => setShowAddEventModal(true)}
+              className="flex items-center gap-1.5 rounded-[var(--r)] border border-horizon-200 bg-horizon-50 px-3 py-1.5 text-xs font-medium text-horizon-600 transition hover:bg-horizon-100"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Levensgebeurtenis
+            </button>
+          </div>
+
+          {/* Ingeplande events lijst */}
+          {events.length > 0 ? (
+            <div className="space-y-2">
+              {events.map((ev) => {
+                const evCatalog = LIFE_EVENT_CATALOG[ev.event_type]
+                const evImpactIdx = events.findIndex(e => e.id === ev.id)
+                const evImpact = evImpactIdx >= 0 ? impacts[evImpactIdx] : null
                 return (
-                  <div key={ev.id} className="card-editorial p-5">
-                    <div className="flex items-start gap-4">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] text-horizon-600">
-                        {EVENT_ICONS[ev.icon] ?? EVENT_ICONS[catalog?.icon ?? 'Calendar'] ?? <Calendar className="h-4 w-4" />}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium text-[var(--ink)]">{ev.name}</p>
-                            <p className="text-xs text-[var(--ink-4)]">
-                              {ev.target_age ? `op leeftijd ${ev.target_age}` : 'geen leeftijd ingesteld'}
-                              {Number(ev.duration_months) > 0 ? ` \u00B7 ${ev.duration_months} maanden` : ''}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button onClick={() => openEditForm(ev)} className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-50 hover:text-[var(--ink-2)]">
-                              <Edit3 className="h-4 w-4" />
-                            </button>
-                            <button onClick={() => deleteEvent(ev.id)} className="rounded-lg p-1.5 text-[var(--ink-3)] hover:bg-red-50 hover:text-red-500">
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="mt-3 flex flex-wrap gap-3">
-                          {Number(ev.one_time_cost) > 0 && (
-                            <span className="rounded-[var(--r)] bg-red-50 px-2 py-1 text-xs font-medium text-red-600">
-                              {formatCurrency(Number(ev.one_time_cost))} eenmalig
-                            </span>
-                          )}
-                          {Number(ev.one_time_cost) < 0 && (
-                            <span className="rounded-[var(--r)] bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-600">
-                              {formatCurrency(Math.abs(Number(ev.one_time_cost)))} eenmalig inkomen
-                            </span>
-                          )}
-                          {Number(ev.monthly_cost_change) > 0 && (
-                            <span className="rounded-[var(--r)] bg-red-50 px-2 py-1 text-xs font-medium text-red-600">
-                              +{formatCurrency(Number(ev.monthly_cost_change))}/mnd
-                            </span>
-                          )}
-                          {Number(ev.monthly_income_change) !== 0 && (
-                            <span className={`rounded-[var(--r)] px-2 py-1 text-xs font-medium ${Number(ev.monthly_income_change) < 0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                              {Number(ev.monthly_income_change) > 0 ? '+' : ''}{formatCurrency(Number(ev.monthly_income_change))}/mnd inkomen
-                            </span>
-                          )}
-                          {ev.is_indexed && Number(ev.monthly_income_change) > 0 && (
-                            <span className="rounded-[var(--r)] bg-horizon-50 px-2 py-1 text-xs font-medium text-horizon-600">
-                              ↑ geïndexeerd
-                            </span>
-                          )}
-                        </div>
-
-                        {impact && (() => {
-                          const evDailyExp = effectiveInput ? effectiveInput.monthlyExpenses / 30 : 0
-                          const isPositiveImpact = impact.totalCost < 0
-                          const absCost = Math.abs(impact.totalCost)
-                          const freedomBd = evDailyExp > 0 && absCost >= 100
-                            ? calculateFreedomTime(absCost, evDailyExp)
-                            : null
-                          const freedomTimeStr = freedomBd
-                            ? formatFreedomTimeString(freedomBd, 'long')
-                            : null
-                          return (
-                            <div className="mt-3 rounded-lg bg-[var(--subtle)] p-3">
-                              <p className="text-xs text-[var(--ink-2)]">
-                                <span className="font-medium">Impact:</span>{' '}
-                                Vrijheid {impact.fireDelayMonths > 0 ? `+${impact.fireDelayMonths} maanden later` : 'geen vertraging'}{' '}
-                                {'\u00B7'} {isPositiveImpact ? 'opbrengst' : 'totale kosten'} {formatCurrency(absCost)}
-                              </p>
-                              {freedomTimeStr && (
-                                <p className={`mt-1 text-xs font-medium ${isPositiveImpact ? 'text-emerald-600' : 'text-red-600'}`}>
-                                  ≈ {freedomTimeStr} {isPositiveImpact ? 'gewonnen vrijheid' : 'aan vrijheidstijd'}
-                                </p>
-                              )}
-                            </div>
-                          )
-                        })()}
-                      </div>
+                  <button
+                    key={ev.id}
+                    onClick={() => { setSelectedEventId(ev.id); setViewModalMode('view') }}
+                    className="group flex w-full items-center gap-3 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-3 text-left transition hover:border-horizon-300 hover:bg-horizon-50/30"
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] text-horizon-600 group-hover:bg-horizon-50">
+                      {EVENT_ICONS[ev.icon] ?? EVENT_ICONS[evCatalog?.icon ?? 'Calendar'] ?? <Calendar className="h-4 w-4" />}
                     </div>
-                  </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-[var(--ink)]">{ev.name}</p>
+                      <p className="text-xs text-[var(--ink-3)]">
+                        {ev.target_age != null ? `Leeftijd ${ev.target_age}` : 'Geen leeftijd'}
+                        {evImpact && evImpact.fireDelayMonths !== 0 && (
+                          <span className={evImpact.fireDelayMonths > 0 ? ' text-red-500' : ' text-emerald-500'}>
+                            {' · '}{evImpact.fireDelayMonths > 0 ? '+' : ''}{evImpact.fireDelayMonths} mnd
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    {ev.target_age != null && (
+                      <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink-4)]">{ev.target_age}j</span>
+                    )}
+                  </button>
                 )
               })}
             </div>
-          </>
-        )}
-
-        {events.length === 0 && actions.length === 0 && (
-          <div className="rounded-xl border border-dashed border-zinc-300 bg-[var(--subtle)] p-8 text-center">
+          ) : (
             <p className="text-sm text-[var(--ink-3)]">
-              Nog geen levensgebeurtenissen gepland. Klik op een evenement hieronder om te beginnen.
+              Nog geen levensgebeurtenissen gepland. Voeg er een toe om de impact op je vrijheid te zien.
             </p>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* Event Catalog — grouped */}
-        <div className="mt-6">
-          <h2 className="mb-4 label-editorial text-[var(--ink-2)]">
-            Evenement toevoegen
-          </h2>
-          {(() => {
-            // Build grouped entries
-            const filteredEntries = Object.entries(LIFE_EVENT_CATALOG)
-              .filter(([, val]) => !val.householdOnly || isHouseholdView)
-            const grouped = new Map<LifeEventGroup, [string, typeof LIFE_EVENT_CATALOG[string]][]>()
-            for (const entry of filteredEntries) {
-              const group = entry[1].group
-              if (!grouped.has(group)) grouped.set(group, [])
-              grouped.get(group)!.push(entry)
-            }
-            // Sort groups by order
-            const sortedGroups = [...grouped.entries()].sort(
-              (a, b) => LIFE_EVENT_GROUPS[a[0]].order - LIFE_EVENT_GROUPS[b[0]].order
-            )
-            return (
-              <div className="space-y-5">
-                {sortedGroups.map(([groupKey, entries]) => (
-                  <div key={groupKey}>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--ink-4)]">
-                      {LIFE_EVENT_GROUPS[groupKey].label}
-                    </p>
-                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                      {entries.map(([key, val]) => (
-                        <button
-                          key={key}
-                          onClick={() => openCatalogForm(key)}
-                          className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-[var(--paper)] p-3.5 text-left transition-colors hover:border-horizon-200 hover:bg-horizon-50/30"
-                        >
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] text-horizon-600">
-                            {EVENT_ICONS[val.icon] ?? <Calendar className="h-4 w-4" />}
+        {/* === Add Event Modal === */}
+        <BottomSheet
+          open={showAddEventModal}
+          onClose={() => setShowAddEventModal(false)}
+          title="Levensgebeurtenis toevoegen"
+        >
+          <div className="space-y-5 p-1">
+            {/* Eigen levensgebeurtenis */}
+            <button
+              onClick={() => { setShowAddEventModal(false); openCatalogForm('custom') }}
+              className="flex w-full items-center gap-3 rounded-xl border-2 border-dashed border-horizon-300 bg-horizon-50/30 p-4 text-left transition hover:border-horizon-400 hover:bg-horizon-50"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-horizon-100 text-horizon-600">
+                <Plus className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-[var(--ink)]">Eigen levensgebeurtenis</p>
+                <p className="text-xs text-[var(--ink-3)]">Maak een volledig aangepaste gebeurtenis</p>
+              </div>
+            </button>
+
+            {/* Voorgestelde levensgebeurtenissen */}
+            <div>
+              <p className="mb-3 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+                Voorgestelde gebeurtenissen
+              </p>
+              {(() => {
+                const filteredEntries = Object.entries(LIFE_EVENT_CATALOG)
+                  .filter(([key, val]) => key !== 'custom' && (!val.householdOnly || isHouseholdView))
+                const grouped = new Map<LifeEventGroup, [string, typeof LIFE_EVENT_CATALOG[string]][]>()
+                for (const entry of filteredEntries) {
+                  const group = entry[1].group
+                  if (!grouped.has(group)) grouped.set(group, [])
+                  grouped.get(group)!.push(entry)
+                }
+                const sortedGroups = [...grouped.entries()].sort(
+                  (a, b) => LIFE_EVENT_GROUPS[a[0]].order - LIFE_EVENT_GROUPS[b[0]].order
+                )
+                const toggleCatalogGroup = (group: LifeEventGroup) => {
+                  setOpenCatalogGroups(prev => {
+                    const next = new Set(prev)
+                    if (next.has(group)) next.delete(group)
+                    else next.add(group)
+                    return next
+                  })
+                }
+                return (
+                  <div className="space-y-1">
+                    {sortedGroups.map(([groupKey, entries]) => {
+                      const isOpen = openCatalogGroups.has(groupKey)
+                      return (
+                        <div key={groupKey}>
+                          <button
+                            onClick={() => toggleCatalogGroup(groupKey)}
+                            className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition hover:bg-[var(--subtle)]"
+                          >
+                            <ChevronDown className={`h-3.5 w-3.5 text-[var(--ink-4)] transition-transform duration-200 ${isOpen ? 'rotate-0' : '-rotate-90'}`} />
+                            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--ink-4)]">
+                              {LIFE_EVENT_GROUPS[groupKey].label}
+                            </span>
+                            <span className="rounded-full bg-[var(--subtle)] px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-[var(--ink-4)]">
+                              {entries.length}
+                            </span>
+                          </button>
+                          <div
+                            className="overflow-hidden transition-all duration-300"
+                            style={{
+                              maxHeight: isOpen ? `${entries.length * 80}px` : '0px',
+                              opacity: isOpen ? 1 : 0,
+                            }}
+                          >
+                            <div className="grid grid-cols-1 gap-2 px-2 pb-2 pt-1 sm:grid-cols-2">
+                              {entries.map(([key, val]) => (
+                                <button
+                                  key={key}
+                                  onClick={() => { setShowAddEventModal(false); openCatalogForm(key) }}
+                                  className="flex items-center gap-2.5 rounded-lg border border-zinc-200 bg-[var(--paper)] p-2.5 text-left transition-colors hover:border-horizon-200 hover:bg-horizon-50/30"
+                                >
+                                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] text-horizon-600">
+                                    {EVENT_ICONS[val.icon] ?? <Calendar className="h-4 w-4" />}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-medium text-[var(--ink)]">{val.label}</p>
+                                    {val.impactRange && (
+                                      <p className="font-mono text-[11px] tabular-nums text-horizon-600">
+                                        {val.impactRange}
+                                      </p>
+                                    )}
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-[var(--ink)]">{val.label}</p>
-                            <p className="mt-0.5 text-xs leading-relaxed text-[var(--ink-3)]">{val.description}</p>
-                            {val.impactRange && (
-                              <p className="mt-1 font-mono text-[11px] tabular-nums text-horizon-600">
-                                {val.impactRange}
-                              </p>
-                            )}
-                          </div>
-                        </button>
-                      ))}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+            </div>
+          </div>
+        </BottomSheet>
+
+        {/* Unified view/edit BottomSheet for selected event */}
+        {(() => {
+          const selectedEvent = events.find(e => e.id === selectedEventId)
+          const selectedIndex = events.findIndex(e => e.id === selectedEventId)
+          const impact = selectedIndex >= 0 ? impacts[selectedIndex] : null
+          if (!selectedEvent) return null
+
+          // Compute cashflows for the view
+          const storedCashflows = selectedEvent.metadata?.cashflows as UserDefinedCashflow[] | undefined
+          const eventCashflows = storedCashflows?.length
+            ? storedCashflows
+            : previewEventCashflows(selectedEvent).map(toUserDefinedCashflow)
+
+          // Netto impact berekening
+          const viewMonthlyExpenses = eventCashflows
+            .filter(cf => cf.direction === 'expense' && cf.type === 'recurring')
+            .reduce((sum, cf) => sum + cf.amount, 0)
+          const viewMonthlyIncome = eventCashflows
+            .filter(cf => cf.direction === 'income' && cf.type === 'recurring')
+            .reduce((sum, cf) => sum + cf.amount, 0)
+          const viewOneTimeExpenses = eventCashflows
+            .filter(cf => cf.direction === 'expense' && cf.type === 'one_time')
+            .reduce((sum, cf) => sum + cf.amount, 0)
+          const viewOneTimeIncome = eventCashflows
+            .filter(cf => cf.direction === 'income' && cf.type === 'one_time')
+            .reduce((sum, cf) => sum + cf.amount, 0)
+          const nettoMonthly = viewMonthlyIncome - viewMonthlyExpenses
+          const nettoOneTime = viewOneTimeIncome - viewOneTimeExpenses
+
+          // Catalog info
+          const evCatalog = LIFE_EVENT_CATALOG[selectedEvent.event_type]
+          const eventIcon = EVENT_ICONS[selectedEvent.icon] ?? EVENT_ICONS[evCatalog?.icon ?? ''] ?? <Calendar className="h-5 w-5" />
+
+          return (
+            <BottomSheet
+              open={selectedEventId !== null && viewModalMode === 'view'}
+              onClose={() => { setSelectedEventId(null); setViewModalMode('view') }}
+              title={selectedEvent.name}
+            >
+                <div className="space-y-5 p-1">
+                  {/* Event header with icon */}
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-horizon-50 text-horizon-600">
+                      {eventIcon}
+                    </div>
+                    <div>
+                      <p className="text-sm text-[var(--ink-2)]">
+                        {selectedEvent.target_age ? `Op leeftijd ${selectedEvent.target_age}` : 'Geen leeftijd ingesteld'}
+                      </p>
+                      <p className="text-xs text-[var(--ink-3)]">
+                        {Number(selectedEvent.duration_months) > 0
+                          ? `${Math.ceil(Number(selectedEvent.duration_months) / 12)} jaar`
+                          : 'Continu'}
+                        {selectedEvent.is_indexed ? ' · Geïndexeerd' : ''}
+                      </p>
                     </div>
                   </div>
-                ))}
-              </div>
-            )
-          })()}
-        </div>
+
+                  {/* Toelichting */}
+                  {selectedEvent.metadata?.toelichting && (
+                    <p className="text-sm text-[var(--ink-2)] italic">{String(selectedEvent.metadata.toelichting)}</p>
+                  )}
+
+                  {/* Metadata details */}
+                  {evCatalog?.fields && evCatalog.fields.length > 0 && (() => {
+                    const visibleFields = evCatalog.fields!.filter(field => {
+                      const value = selectedEvent.metadata?.[field.key]
+                      return value !== undefined && value !== null
+                    })
+                    if (visibleFields.length === 0) return null
+                    return (
+                      <div className="space-y-1">
+                        <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+                          Details
+                        </p>
+                        <div className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] p-3">
+                          {visibleFields.map(field => {
+                            const value = selectedEvent.metadata?.[field.key]
+                            const formatted = field.fieldType === 'toggle'
+                              ? (value ? 'Ja' : 'Nee')
+                              : field.fieldType === 'select'
+                              ? field.options?.find(o => o.value === value)?.label ?? String(value)
+                              : field.fieldType === 'percentage'
+                              ? `${value}%`
+                              : String(value)
+                            return (
+                              <div key={field.key} className="flex justify-between py-0.5">
+                                <span className="text-sm text-[var(--ink-2)]">{field.label}</span>
+                                <span className="font-mono tabular-nums text-sm text-[var(--ink)]">{formatted}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Cashflows kassabon */}
+                  {eventCashflows.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+                        Geldstromen
+                      </p>
+                      <KassabonShell>
+                        <div className="space-y-1">
+                          {eventCashflows.map((cf) => (
+                            <div key={cf.id} className="flex items-baseline justify-between py-0.5">
+                              <span className="text-[var(--ink-2)]">{cf.name}</span>
+                              <span className={`font-mono tabular-nums ${cf.direction === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
+                                {cf.direction === 'income' ? '+' : '-'}{formatCurrency(cf.amount)}
+                                {cf.type === 'recurring' ? '/mnd' : ''}
+                                {cf.durationMonths > 0 ? ` · ${Math.ceil(cf.durationMonths / 12)}j` : ''}
+                              </span>
+                            </div>
+                          ))}
+                          {/* Totaal */}
+                          {eventCashflows.length > 1 && (
+                            <>
+                              <div className="border-t border-[var(--border-ed)] pt-2 mt-1">
+                                {nettoMonthly !== 0 && (
+                                  <div className="flex justify-between font-semibold">
+                                    <span className="text-[var(--ink)]">Netto maandelijks</span>
+                                    <span className={`font-mono tabular-nums ${nettoMonthly >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                      {nettoMonthly >= 0 ? '+' : ''}{formatCurrency(nettoMonthly)}/mnd
+                                    </span>
+                                  </div>
+                                )}
+                                {nettoOneTime !== 0 && (
+                                  <div className="flex justify-between font-semibold">
+                                    <span className="text-[var(--ink)]">Netto eenmalig</span>
+                                    <span className={`font-mono tabular-nums ${nettoOneTime >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                      {nettoOneTime >= 0 ? '+' : ''}{formatCurrency(nettoOneTime)}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </KassabonShell>
+                    </div>
+                  )}
+
+                  {/* Impact op vrijheid */}
+                  {impact && (() => {
+                    const evDailyExp = effectiveInput ? effectiveInput.monthlyExpenses / 30 : 0
+                    const isPositiveImpact = impact.totalCost < 0
+                    const absCost = Math.abs(impact.totalCost)
+                    const freedomBd = evDailyExp > 0 && absCost >= 100
+                      ? calculateFreedomTime(absCost, evDailyExp)
+                      : null
+                    const freedomTimeStr = freedomBd
+                      ? formatFreedomTimeString(freedomBd, 'long')
+                      : null
+                    return (
+                      <div className="space-y-1">
+                        <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+                          Impact op vrijheid
+                        </p>
+                        <div className="rounded-[var(--r)] border border-horizon-200 bg-horizon-50 p-4">
+                          <p className="text-sm text-[var(--ink)]">
+                            {impact.fireDelayMonths > 0
+                              ? `+${impact.fireDelayMonths} maanden later`
+                              : impact.fireDelayMonths < 0
+                              ? `${impact.fireDelayMonths} maanden eerder`
+                              : 'Geen vertraging'}
+                            {' · '}{formatCurrency(absCost)}
+                          </p>
+                          {freedomTimeStr && (
+                            <p className={`mt-1 text-sm font-medium ${isPositiveImpact ? 'text-emerald-600' : 'text-red-600'}`}>
+                              ≈ {freedomTimeStr} {isPositiveImpact ? 'gewonnen vrijheid' : 'aan vrijheidstijd'}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-2 pt-2">
+                    <button
+                      onClick={() => {
+                        openEditForm(selectedEvent)
+                        const existingCashflows = (selectedEvent.metadata?.cashflows as UserDefinedCashflow[] | undefined)
+                        setFormCashflows(
+                          existingCashflows?.length
+                            ? existingCashflows
+                            : previewEventCashflows(selectedEvent).map(toUserDefinedCashflow)
+                        )
+                        setViewModalMode('edit')
+                      }}
+                      className="flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm font-medium text-[var(--ink-2)] transition hover:bg-zinc-50"
+                    >
+                      <Edit3 className="h-3.5 w-3.5" />
+                      Bewerken
+                    </button>
+                    <button
+                      onClick={() => { setSelectedEventId(null); deleteEvent(selectedEvent.id) }}
+                      className="flex items-center gap-1.5 rounded-[var(--r)] border border-red-200 bg-[var(--paper)] px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Verwijderen
+                    </button>
+                  </div>
+                </div>
+            </BottomSheet>
+          )
+        })()}
       </section>
       </FeatureGate>
 
@@ -2112,22 +2200,6 @@ export default function HorizonPage() {
         </section>
       )}
 
-      {/* === 10. Projectie-chart (Deep Dive) === */}
-      <FeatureGate featureId="vermogensprojectie_chart" fallback="hidden">
-      <section className="mt-5 sm:mt-8">
-        <div className="mb-5">
-          <h2 className="label-editorial text-[var(--ink-2)]">
-            Vermogensprojectie
-          </h2>
-          <p className="mt-1 text-sm text-[var(--ink-3)]">
-            Verwacht netto vermogen richting volledige vrijheid (30 jaar, 7% rendement)
-          </p>
-        </div>
-        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 sm:p-6">
-          <ProjectionChart data={projection} fireTarget={effectiveFireTarget} />
-        </div>
-      </section>
-      </FeatureGate>
 
       {/* === 11. Samenvatting (Deep Dive) === */}
       <section className="mt-5 sm:mt-8">
@@ -2189,8 +2261,31 @@ export default function HorizonPage() {
         const hasCatalogFields = LIFE_EVENT_CATALOG[formType]?.fields && LIFE_EVENT_CATALOG[formType].fields!.length > 0
 
         return (
-        <BottomSheet open={true} onClose={() => { setShowForm(false); setEditingEvent(null); setFormErrors([]); setFormWarnings([]) }} title={editingEvent ? 'Evenement bewerken' : 'Nieuw evenement'}>
+        <BottomSheet open={true} onClose={() => {
+          if (selectedEventId && viewModalMode === 'edit') {
+            setShowForm(false); setEditingEvent(null); setFormErrors([]); setFormWarnings([])
+            setViewModalMode('view')
+          } else {
+            setShowForm(false); setEditingEvent(null); setFormErrors([]); setFormWarnings([])
+          }
+        }} title={editingEvent ? 'Evenement bewerken' : 'Nieuw evenement'}>
           <div className="space-y-5 p-6">
+            {/* Back button when editing from view modal */}
+            {selectedEventId && viewModalMode === 'edit' && (
+              <button
+                onClick={() => {
+                  setShowForm(false)
+                  setEditingEvent(null)
+                  setFormErrors([])
+                  setFormWarnings([])
+                  setViewModalMode('view')
+                  setEditingCashflowId(null)
+                }}
+                className="flex items-center gap-1 text-sm text-[var(--ink-3)] hover:text-[var(--ink-2)]"
+              >
+                ← Terug naar details
+              </button>
+            )}
             {/* Template tip */}
             {LIFE_EVENT_CATALOG[formType]?.tip && !editingEvent && (
               <div className="rounded-[var(--r)] border border-horizon-100 bg-horizon-50/50 p-3 text-sm italic text-[var(--ink-3)]">
@@ -2198,10 +2293,8 @@ export default function HorizonPage() {
               </div>
             )}
 
-            {/* ── SECTIE: Basis ── */}
+            {/* ── SECTIE: Naam & Toelichting ── */}
             <div className="space-y-4">
-              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">Basis</p>
-
               {/* Naam */}
               <div>
                 <label className="text-xs font-medium text-[var(--ink-3)]">Naam</label>
@@ -2211,119 +2304,146 @@ export default function HorizonPage() {
                 />
               </div>
 
-              {/* Leeftijd */}
+              {/* Toelichting */}
               <div>
-                <label className="text-xs font-medium text-[var(--ink-3)]">Vanaf welke leeftijd?</label>
-                <input
-                  type="number" value={formAge} onChange={e => { setFormAge(e.target.value ? Number(e.target.value) : ''); setFormErrors([]); setFormWarnings([]) }}
-                  className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${(formErrors.some(e => e.includes('eeftijd')) || formWarnings.some(w => w.includes('AOW'))) ? 'border-amber-400 bg-amber-50/30' : 'border-[var(--border-ed)]'}`}
-                  placeholder="bijv. 45"
+                <label className="text-xs font-medium text-[var(--ink-3)]">Toelichting</label>
+                <textarea
+                  value={formDescription}
+                  onChange={e => setFormDescription(e.target.value)}
+                  rows={2}
+                  className="mt-1 w-full rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none resize-none"
+                  placeholder="Optioneel: beschrijf waarom of wat je verwacht"
                 />
-              </div>
-
-              {/* Duratie-type */}
-              <div>
-                <label className="text-xs font-medium text-[var(--ink-3)]">Type</label>
-                <div className="mt-1 flex gap-2">
-                  {(['one_time', 'period', 'continuous'] as const).map(dt => (
-                    <button
-                      key={dt}
-                      type="button"
-                      onClick={() => setFormDurationType(dt)}
-                      className={`flex-1 rounded-[var(--r)] border px-3 py-2 text-xs font-medium transition-colors ${
-                        formDurationType === dt
-                          ? 'border-horizon-400 bg-horizon-50 text-horizon-700'
-                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200'
-                      }`}
-                    >
-                      {dt === 'one_time' ? 'Eenmalig' : dt === 'period' ? 'Tijdelijk' : 'Continu'}
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
 
             {/* Divider */}
             <div className="h-px bg-[var(--border-ed)]" />
 
-            {/* ── SECTIE: Details ── */}
+            {/* ── SECTIE: Financiële impact ── */}
             <div className="space-y-4">
-              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">Details</p>
+              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">Financiële impact</p>
 
-              {/* Richting + bedrag */}
-              <div>
-                <label className="text-xs font-medium text-[var(--ink-3)]">
-                  {formDurationType === 'one_time' ? 'Bedrag' : 'Maandbedrag'}
-                </label>
-                <div className="mt-1 flex gap-2">
-                  <div className="flex overflow-hidden rounded-[var(--r)] border border-[var(--border-ed)]">
-                    <button
-                      type="button"
-                      onClick={() => setFormDirection('income')}
-                      className={`px-3 py-2 text-xs font-medium transition-colors ${
-                        formDirection === 'income'
-                          ? 'bg-emerald-500 text-white'
-                          : 'bg-[var(--paper)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
-                      }`}
-                    >
-                      Inkomen
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormDirection('expense')}
-                      className={`px-3 py-2 text-xs font-medium transition-colors ${
-                        formDirection === 'expense'
-                          ? 'bg-red-500 text-white'
-                          : 'bg-[var(--paper)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
-                      }`}
-                    >
-                      Kosten
-                    </button>
+              {/* Impact #1 */}
+              <div className="space-y-3 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+                {/* Type */}
+                <div>
+                  <label className="text-xs font-medium text-[var(--ink-3)]">Type</label>
+                  <div className="mt-1 flex gap-2">
+                    {(['one_time', 'period', 'continuous'] as const).map(dt => (
+                      <button
+                        key={dt}
+                        type="button"
+                        onClick={() => setFormDurationType(dt)}
+                        className={`flex-1 rounded-[var(--r)] border px-3 py-2 text-xs font-medium transition-colors ${
+                          formDurationType === dt
+                            ? 'border-horizon-400 bg-horizon-50 text-horizon-700'
+                            : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200'
+                        }`}
+                      >
+                        {dt === 'one_time' ? 'Eenmalig' : dt === 'period' ? 'Tijdelijk' : 'Continu'}
+                      </button>
+                    ))}
                   </div>
+                </div>
+
+                {/* Leeftijd */}
+                <div>
+                  <label className="text-xs font-medium text-[var(--ink-3)]">Vanaf welke leeftijd?</label>
                   <input
-                    type="number"
-                    min="0"
-                    value={formAmount}
-                    onChange={e => { setFormAmount(e.target.value ? Number(e.target.value) : ''); setFormErrors([]) }}
-                    className={`min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${formErrors.some(e => e.includes('edrag')) ? 'border-red-400 bg-red-50/30' : 'border-[var(--border-ed)]'}`}
-                    placeholder="0"
+                    type="number" value={formAge} onChange={e => { setFormAge(e.target.value ? Number(e.target.value) : ''); setFormErrors([]); setFormWarnings([]) }}
+                    className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${(formErrors.some(e => e.includes('eeftijd')) || formWarnings.some(w => w.includes('AOW'))) ? 'border-amber-400 bg-amber-50/30' : 'border-[var(--border-ed)]'}`}
+                    placeholder="bijv. 45"
                   />
                 </div>
+
+                {/* Richting + bedrag */}
+                <div>
+                  <label className="text-xs font-medium text-[var(--ink-3)]">
+                    {formDurationType === 'one_time' ? 'Bedrag' : 'Maandbedrag'}
+                  </label>
+                  <div className="mt-1 flex gap-2">
+                    <div className="flex overflow-hidden rounded-[var(--r)] border border-[var(--border-ed)]">
+                      <button
+                        type="button"
+                        onClick={() => setFormDirection('income')}
+                        className={`px-3 py-2 text-xs font-medium transition-colors ${
+                          formDirection === 'income'
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-[var(--paper)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
+                        }`}
+                      >
+                        Inkomen
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormDirection('expense')}
+                        className={`px-3 py-2 text-xs font-medium transition-colors ${
+                          formDirection === 'expense'
+                            ? 'bg-red-500 text-white'
+                            : 'bg-[var(--paper)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
+                        }`}
+                      >
+                        Kosten
+                      </button>
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formAmount}
+                      onChange={e => { setFormAmount(e.target.value ? Number(e.target.value) : ''); setFormErrors([]) }}
+                      className={`min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${formErrors.some(e => e.includes('edrag')) ? 'border-red-400 bg-red-50/30' : 'border-[var(--border-ed)]'}`}
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+
+                {/* Duur (alleen bij Tijdelijk) */}
+                {formDurationType === 'period' && (
+                  <div>
+                    <label className="text-xs font-medium text-[var(--ink-3)]">Duur (maanden)</label>
+                    <input
+                      type="number"
+                      value={formDuration}
+                      onChange={e => { setFormDuration(e.target.value ? Number(e.target.value) : ''); setFormErrors([]) }}
+                      className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${formErrors.some(e => e.includes('duur')) ? 'border-red-400 bg-red-50/30' : 'border-[var(--border-ed)]'}`}
+                      placeholder="bijv. 12"
+                    />
+                  </div>
+                )}
+
+                {/* Indexering (alleen bij recurring) */}
+                {formDurationType !== 'one_time' && (
+                  <label className="flex cursor-pointer items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={formIsIndexed}
+                      onChange={e => setFormIsIndexed(e.target.checked)}
+                      className="h-4 w-4 rounded border-[var(--border-md)] accent-horizon-600"
+                    />
+                    <span className="text-sm text-[var(--ink-2)]">Bedrag groeit mee met inflatie (~2%/jaar)</span>
+                  </label>
+                )}
               </div>
 
-              {/* Duur (alleen bij Tijdelijk) */}
-              {formDurationType === 'period' && (
-                <div>
-                  <label className="text-xs font-medium text-[var(--ink-3)]">Duur (maanden)</label>
-                  <input
-                    type="number"
-                    value={formDuration}
-                    onChange={e => { setFormDuration(e.target.value ? Number(e.target.value) : ''); setFormErrors([]) }}
-                    className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${formErrors.some(e => e.includes('duur')) ? 'border-red-400 bg-red-50/30' : 'border-[var(--border-ed)]'}`}
-                    placeholder="bijv. 12"
-                  />
-                </div>
-              )}
+              {/* Extra impacts (geldstromen) worden hieronder getoond via de Geldstromen sectie */}
+            </div>
 
-              {/* Indexering (alleen bij recurring) */}
-              {formDurationType !== 'one_time' && (
-                <label className="flex cursor-pointer items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={formIsIndexed}
-                    onChange={e => setFormIsIndexed(e.target.checked)}
-                    className="h-4 w-4 rounded border-[var(--border-md)] accent-horizon-600"
-                  />
-                  <span className="text-sm text-[var(--ink-2)]">Bedrag groeit mee met inflatie (~2%/jaar)</span>
-                </label>
-              )}
-
-              {/* Context-specifieke velden */}
-              {hasCatalogFields && (
-                <div className="space-y-3 rounded-[var(--r)] border border-dashed border-horizon-200 bg-horizon-50/30 p-4">
-                  <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
-                    Specifieke instellingen
-                  </p>
+            {/* ── Voorgestelde instellingen (inklapbaar) ── */}
+            {hasCatalogFields && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowCatalogFields(!showCatalogFields)}
+                  className="flex w-full items-center justify-between rounded-[var(--r)] border border-dashed border-horizon-200 bg-horizon-50/30 px-4 py-3 text-left transition-colors hover:bg-horizon-50/50"
+                >
+                  <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
+                    Voorgestelde instellingen
+                  </span>
+                  <ChevronDown className={`h-4 w-4 text-horizon-500 transition-transform ${showCatalogFields ? 'rotate-180' : ''}`} />
+                </button>
+                {showCatalogFields && (
+                <div className="mt-2 space-y-3 rounded-[var(--r)] border border-dashed border-horizon-200 bg-horizon-50/30 p-4">
                   {LIFE_EVENT_CATALOG[formType].fields!.map((field: CatalogField) => {
                     // Conditionally hide huidigeAutoKosten when vervangtHuidigeAuto is false
                     if (formType === 'car_purchase' && field.key === 'huidigeAutoKosten' && !formMetadata.vervangtHuidigeAuto) {
@@ -3648,6 +3768,7 @@ export default function HorizonPage() {
                 </div>
               )}
             </div>
+            )}
 
             {/* ── SECTIE: Scheiding huishouden-impact ── */}
             {formType === 'scheiding' && isHouseholdView && (() => {
@@ -3745,6 +3866,219 @@ export default function HorizonPage() {
                 </div>
               )
             })()}
+
+            {/* Divider */}
+            <div className="h-px bg-[var(--border-ed)]" />
+
+            {/* ── SECTIE: Extra financiële impacts ── */}
+            <div className="space-y-3">
+              {formCashflows.length === 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newCf: UserDefinedCashflow = {
+                      id: crypto.randomUUID(),
+                      name: '',
+                      type: 'recurring',
+                      direction: 'expense',
+                      amount: 0,
+                      durationMonths: 0,
+                      indexed: true,
+                    }
+                    setFormCashflows(prev => [...prev, newCf])
+                    setEditingCashflowId(newCf.id)
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-[var(--r)] border border-dashed border-[var(--border-md)] py-2.5 text-xs font-medium text-[var(--ink-3)] transition-colors hover:border-horizon-300 hover:text-horizon-600"
+                >
+                  + Extra impact toevoegen
+                </button>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">Extra impacts</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newCf: UserDefinedCashflow = {
+                        id: crypto.randomUUID(),
+                        name: '',
+                        type: 'recurring',
+                        direction: 'expense',
+                        amount: 0,
+                        durationMonths: 0,
+                        indexed: true,
+                      }
+                      setFormCashflows(prev => [...prev, newCf])
+                      setEditingCashflowId(newCf.id)
+                    }}
+                    className="text-xs font-medium text-horizon-600 hover:text-horizon-800"
+                  >
+                    + Toevoegen
+                  </button>
+                </div>
+              )}
+
+              {formCashflows.map((cf) => (
+                <div key={cf.id} className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] p-3">
+                  {editingCashflowId === cf.id ? (
+                    /* Expanded edit form */
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wide text-[var(--ink-4)]">Naam</label>
+                        <input
+                          type="text"
+                          value={cf.name}
+                          onChange={(e) => setFormCashflows(prev => prev.map(c => c.id === cf.id ? { ...c, name: e.target.value } : c))}
+                          className="mt-1 w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-horizon-500 focus:outline-none"
+                          placeholder="Bv. Hypotheeklasten"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] uppercase tracking-wide text-[var(--ink-4)]">Type</label>
+                          <select
+                            value={cf.type}
+                            onChange={(e) => setFormCashflows(prev => prev.map(c => c.id === cf.id ? { ...c, type: e.target.value as 'one_time' | 'recurring' } : c))}
+                            className="mt-1 w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)]"
+                          >
+                            <option value="recurring">Maandelijks</option>
+                            <option value="one_time">Eenmalig</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase tracking-wide text-[var(--ink-4)]">Richting</label>
+                          <div className="mt-1 flex rounded-[var(--r)] border border-[var(--border-ed)] overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setFormCashflows(prev => prev.map(c => c.id === cf.id ? { ...c, direction: 'income' } : c))}
+                              className={`flex-1 py-2 text-xs font-medium transition ${cf.direction === 'income' ? 'bg-emerald-50 text-emerald-700' : 'text-[var(--ink-3)] hover:bg-[var(--subtle)]'}`}
+                            >
+                              Inkomen
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setFormCashflows(prev => prev.map(c => c.id === cf.id ? { ...c, direction: 'expense' } : c))}
+                              className={`flex-1 py-2 text-xs font-medium transition ${cf.direction === 'expense' ? 'bg-red-50 text-red-700' : 'text-[var(--ink-3)] hover:bg-[var(--subtle)]'}`}
+                            >
+                              Kosten
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] uppercase tracking-wide text-[var(--ink-4)]">Bedrag</label>
+                          <div className="mt-1 flex items-center gap-1">
+                            <span className="text-sm text-[var(--ink-3)]">&euro;</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={cf.amount || ''}
+                              onChange={(e) => setFormCashflows(prev => prev.map(c => c.id === cf.id ? { ...c, amount: Math.max(0, Number(e.target.value) || 0) } : c))}
+                              className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm font-mono tabular-nums text-[var(--ink)] focus:border-horizon-500 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase tracking-wide text-[var(--ink-4)]">Duur (maanden)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={cf.durationMonths || ''}
+                            onChange={(e) => setFormCashflows(prev => prev.map(c => c.id === cf.id ? { ...c, durationMonths: Math.max(0, Number(e.target.value) || 0) } : c))}
+                            className="mt-1 w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm font-mono tabular-nums text-[var(--ink)] focus:border-horizon-500 focus:outline-none"
+                            placeholder="0 = eenmalig"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
+                          <input
+                            type="checkbox"
+                            checked={cf.indexed}
+                            onChange={(e) => setFormCashflows(prev => prev.map(c => c.id === cf.id ? { ...c, indexed: e.target.checked } : c))}
+                            className="rounded border-[var(--border-ed)]"
+                          />
+                          Geïndexeerd
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setEditingCashflowId(null)}
+                          className="rounded-[var(--r)] bg-horizon-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-horizon-700"
+                        >
+                          Klaar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Collapsed row */
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[var(--ink)]">{cf.name || 'Naamloze geldstroom'}</p>
+                        <p className="text-xs text-[var(--ink-3)]">
+                          {cf.direction === 'income' ? 'Inkomen' : 'Kosten'}
+                          {' · '}
+                          <span className={`font-mono tabular-nums ${cf.direction === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {cf.direction === 'income' ? '+' : '-'}{formatCurrency(cf.amount)}
+                            {cf.type === 'recurring' ? '/mnd' : ''}
+                          </span>
+                          {cf.durationMonths > 0 ? ` · ${cf.durationMonths} mnd` : ''}
+                          {cf.indexed ? ' · ↑' : ''}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setEditingCashflowId(cf.id)}
+                          className="rounded p-1 text-[var(--ink-4)] hover:text-[var(--ink-2)]"
+                        >
+                          <Edit3 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormCashflows(prev => prev.filter(c => c.id !== cf.id))}
+                          className="rounded p-1 text-[var(--ink-4)] hover:text-red-600"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* Netto summary */}
+              {formCashflows.length > 0 && (() => {
+                const netRecurring = formCashflows
+                  .filter(cf => cf.type === 'recurring')
+                  .reduce((s, cf) => s + (cf.direction === 'income' ? cf.amount : -cf.amount), 0)
+                const netOneTime = formCashflows
+                  .filter(cf => cf.type === 'one_time')
+                  .reduce((s, cf) => s + (cf.direction === 'income' ? cf.amount : -cf.amount), 0)
+                const dailyExpCf = effectiveInput ? effectiveInput.monthlyExpenses / 30 : 0
+                const totalNetImpact = Math.abs(netRecurring * 12 * 10 + netOneTime) // 10yr estimate
+                const freedomBdCf = dailyExpCf > 0 && totalNetImpact >= 100
+                  ? calculateFreedomTime(totalNetImpact, dailyExpCf)
+                  : null
+                const freedomStrCf = freedomBdCf ? formatFreedomTimeString(freedomBdCf, 'short') : null
+                return (
+                  <div className="rounded-[var(--r)] border-t border-[var(--border-ed)] pt-2 text-xs text-[var(--ink-2)]">
+                    {netRecurring !== 0 && (
+                      <p>Netto: <span className={`font-mono tabular-nums font-semibold ${netRecurring >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {netRecurring >= 0 ? '+' : ''}{formatCurrency(netRecurring)}/mnd
+                      </span></p>
+                    )}
+                    {netOneTime !== 0 && (
+                      <p>Eenmalig: <span className={`font-mono tabular-nums font-semibold ${netOneTime >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {netOneTime >= 0 ? '+' : ''}{formatCurrency(netOneTime)}
+                      </span></p>
+                    )}
+                    {freedomStrCf && (
+                      <p className="mt-1 text-[var(--ink-3)]">≈ {freedomStrCf} vrijheidstijd</p>
+                    )}
+                  </div>
+                )
+              })()}
+            </div>
 
             {/* Divider */}
             <div className="h-px bg-[var(--border-ed)]" />
@@ -4331,7 +4665,6 @@ export default function HorizonPage() {
       {/* === Deep-dive Modals === */}
       {effectiveInput && (
         <>
-          <ProjectionsModal input={effectiveInput} open={activeModal === 'projections'} onClose={() => setActiveModal(null)} />
           <ScenariosModal input={effectiveInput} debts={debts} open={activeModal === 'scenarios'} onClose={() => setActiveModal(null)} />
           <SimulationsModal
             input={effectiveInput}
@@ -4402,74 +4735,6 @@ function ExploreCard({
   )
 }
 
-function ProjectionChart({ data, fireTarget }: { data: ProjectionMonth[]; fireTarget: number }) {
-  if (data.length === 0) return null
-
-  const W = 600
-  const H = 220
-  const PAD = 45
-
-  const sampled = data.filter((_, i) => i % 6 === 0 || i === data.length - 1)
-
-  const allValues = [...sampled.map(d => d.netWorth), fireTarget]
-  const maxVal = Math.max(...allValues, 1)
-  const minVal = Math.min(...allValues.filter(v => v >= 0), 0)
-  const valRange = maxVal - minVal || 1
-
-  function x(i: number) { return PAD + (i / (sampled.length - 1)) * (W - PAD * 2) }
-  function y(val: number) { return H - PAD - ((val - minVal) / valRange) * (H - PAD * 2) }
-
-  const linePath = sampled.map((d, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(d.netWorth).toFixed(1)}`).join(' ')
-  const areaPath = linePath + ` L${x(sampled.length - 1).toFixed(1)},${(H - PAD).toFixed(1)} L${PAD},${(H - PAD).toFixed(1)} Z`
-
-  const fireY = y(fireTarget)
-  const fireInRange = fireY > PAD && fireY < H - PAD
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 240 }}>
-      {[0.25, 0.5, 0.75].map(pct => {
-        const yPos = H - PAD - pct * (H - PAD * 2)
-        const val = minVal + pct * valRange
-        return (
-          <g key={pct}>
-            <line x1={PAD} y1={yPos} x2={W - PAD} y2={yPos} stroke="#e4e4e7" strokeDasharray="4" />
-            <text x={PAD - 4} y={yPos + 3} textAnchor="end" className="fill-zinc-400" style={{ fontSize: 9 }}>
-              {val >= 1000000 ? `${(val/1000000).toFixed(1)}M` : val >= 1000 ? `${(val/1000).toFixed(0)}k` : val.toFixed(0)}
-            </text>
-          </g>
-        )
-      })}
-
-      {fireInRange && (
-        <>
-          <line x1={PAD} y1={fireY} x2={W - PAD} y2={fireY} stroke="#8B5CB8" strokeWidth="1.5" strokeDasharray="6 3" />
-          <text x={W - PAD + 4} y={fireY + 3} className="fill-horizon-500" style={{ fontSize: 9, fontWeight: 600 }}>
-            Vrij
-          </text>
-        </>
-      )}
-
-      <path d={areaPath} fill="url(#projGrad)" opacity="0.3" />
-      <defs>
-        <linearGradient id="projGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#8B5CB8" stopOpacity="0.4" />
-          <stop offset="100%" stopColor="#8B5CB8" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-
-      <path d={linePath} fill="none" stroke="#8B5CB8" strokeWidth="2" />
-
-      {sampled.filter((_, i) => i % Math.max(1, Math.floor(sampled.length / 6)) === 0 || i === sampled.length - 1).map((d, i) => (
-        <text key={i} x={x(sampled.indexOf(d))} y={H - 8} textAnchor="middle" className="fill-zinc-400" style={{ fontSize: 9 }}>
-          {d.age !== null ? `${Math.round(d.age)}j` : new Date(d.date).getFullYear().toString()}
-        </text>
-      ))}
-
-      <circle cx={PAD} cy={12} r="4" fill="#8B5CB8" />
-      <text x={PAD + 8} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Netto vermogen</text>
-    </svg>
-  )
-}
 
 // ── Resilience score helper ─────────────────────────────────
 

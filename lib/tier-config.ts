@@ -82,10 +82,10 @@ export const TIER_FEATURES: TierFeatureDef[] = [
   // ── Connected features ───────────────────────────────────────────────────────
   {
     id: 'bank_connection',
-    label: 'GoCardless bankverbinding',
-    description: 'Koppeling met bankrekeningen via GoCardless',
+    label: 'TrueLayer bankverbinding',
+    description: 'Koppeling met bankrekeningen via TrueLayer',
     tier: 'connected',
-    ref: 'app/api/gocardless/',
+    ref: 'app/api/bank-connect/',
   },
   {
     id: 'auto_import',

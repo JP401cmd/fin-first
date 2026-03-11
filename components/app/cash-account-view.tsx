@@ -16,7 +16,7 @@ import { PendingTransferBanner } from '@/components/app/pending-transfer-banner'
 import { CashFlowForecastChart, type ForecastPoint, type ForecastAlert } from '@/components/app/cashflow-forecast-chart'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { LineChart } from 'lucide-react'
-import { ConnectedAccountCard } from '@/components/app/gocardless/connected-account-card'
+import { ConnectedAccountCard } from '@/components/app/bank-connect/connected-account-card'
 import { type Budget } from '@/lib/budget-data'
 import { TransactionForm } from '@/components/app/transaction-form'
 import { BudgetIcon, formatCurrency as formatCurrencyShort, formatCurrencyDecimals as formatCurrency } from '@/components/app/budget-shared'
@@ -77,18 +77,22 @@ type DetectedPattern = {
 }
 
 /**
- * CashAccountView — Full cash account detail view for a single bank account.
- * Extracted from the monolithic /core/cash page to be reusable under /core/assets/cash/[accountId].
+ * CashAccountView — Full cash account detail view.
+ * Without accountId: combined view showing all accounts aggregated.
+ * With accountId: single account detail view.
  */
 export function CashAccountView({
   accountId,
   backHref = '/core/assets',
   backLabel = 'Assets',
+  embedded = false,
 }: {
-  accountId: string
+  accountId?: string
   backHref?: string
   backLabel?: string
+  embedded?: boolean
 }) {
+  const isCombined = !accountId
   const router = useRouter()
   const [account, setAccount] = useState<Account | null>(null)
   const [allAccounts, setAllAccounts] = useState<Account[]>([])
@@ -114,21 +118,22 @@ export function CashAccountView({
   const [detectedPatterns, setDetectedPatterns] = useState<DetectedPattern[]>([])
   const [showDetectModal, setShowDetectModal] = useState(false)
 
-  // GoCardless state
+  // Bank Connect state
   const [gcEnabled, setGcEnabled] = useState(false)
   const [gcAccounts, setGcAccounts] = useState<Array<{
     id: string
-    gc_account_id: string
+    external_account_id: string
     iban: string | null
+    account_name: string | null
     last_synced_at: string | null
     daily_requests: number
     rate_limit_reset_date: string | null
     is_active: boolean
     bank_account_id: string | null
-    gocardless_requisitions: {
-      institution_name: string
-      institution_logo: string | null
-      expires_at: string | null
+    bank_connections: {
+      provider_name: string
+      provider_logo: string | null
+      token_expires_at: string | null
       status: string
     }
   }>>([])
@@ -219,27 +224,34 @@ export function CashAccountView({
   }, [perspective])
 
   const loadRecurrings = useCallback(async () => {
-    if (!accountId) return
     const supabase = createClient()
-    const { data } = await supabase
+    let query = supabase
       .from('recurring_transactions')
       .select('*')
-      .eq('account_id', accountId)
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
+
+    if (!isCombined) {
+      query = query.eq('account_id', accountId!)
+    }
+
+    const { data } = await query
     if (data) setRecurrings(data as RecurringTransaction[])
-  }, [accountId])
+  }, [accountId, isCombined])
 
   const loadTransactions = useCallback(async (signal?: AbortSignal) => {
     const supabase = createClient()
     let query = supabase
       .from('transactions')
       .select('*')
-      .eq('account_id', accountId)
       .gte('date', monthStart)
       .lt('date', monthEnd)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
+
+    if (!isCombined) {
+      query = query.eq('account_id', accountId!)
+    }
 
     if (perspective === 'personal') {
       query = query.eq('ownership', 'personal')
@@ -248,7 +260,7 @@ export function CashAccountView({
     const { data } = await query
     if (signal?.aborted) return // Discard stale results
     if (data) setTransactions(data as Transaction[])
-  }, [accountId, monthStart, monthEnd, perspective])
+  }, [accountId, isCombined, monthStart, monthEnd, perspective])
 
   const loadAccount = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -275,13 +287,27 @@ export function CashAccountView({
 
       setAllAccounts(allData as Account[])
 
-      const target = (allData as Account[]).find((a) => a.id === accountId)
-      if (!target) {
-        setError('Rekening niet gevonden')
-        setLoading(false)
-        return
+      if (isCombined) {
+        const total = (allData as Account[]).reduce((s, a) => s + Number(a.balance), 0)
+        setAccount({
+          id: 'all',
+          name: 'Alle rekeningen',
+          iban: null,
+          bank_name: null,
+          account_type: 'combined',
+          balance: total,
+          is_active: true,
+          sort_order: 0,
+        })
+      } else {
+        const target = (allData as Account[]).find((a) => a.id === accountId)
+        if (!target) {
+          setError('Rekening niet gevonden')
+          setLoading(false)
+          return
+        }
+        setAccount(target)
       }
-      setAccount(target)
 
       // Build own IBAN set
       const ibansFromAccounts = (allData as Account[])
@@ -300,7 +326,7 @@ export function CashAccountView({
 
   const loadGcAccounts = useCallback(async () => {
     try {
-      const res = await fetch('/api/gocardless/status')
+      const res = await fetch('/api/bank-connect/status')
       if (!res.ok) return
       const { enabled } = await res.json()
       setGcEnabled(enabled)
@@ -308,8 +334,8 @@ export function CashAccountView({
 
       const supabase = createClient()
       const { data } = await supabase
-        .from('gocardless_accounts')
-        .select('*, gocardless_requisitions(institution_name, institution_logo, expires_at, status)')
+        .from('bank_connection_accounts')
+        .select('*, bank_connections(provider_name, provider_logo, token_expires_at, status)')
         .eq('is_active', true)
         .order('iban', { ascending: true })
 
@@ -318,7 +344,7 @@ export function CashAccountView({
         setGcAccounts(data as any)
       }
     } catch {
-      // Silently fail — GoCardless is optional
+      // Silently fail — Bank Connect is optional
     }
   }, [])
 
@@ -760,7 +786,7 @@ export function CashAccountView({
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
+      <div className={embedded ? '' : 'mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12'}>
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
         </div>
@@ -770,28 +796,32 @@ export function CashAccountView({
 
   if (error || !account) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
+      <div className={embedded ? '' : 'mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12'}>
         <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm font-medium text-red-700">{error ?? 'Rekening niet gevonden'}</p>
-          <Link href={backHref} className="mt-3 inline-flex items-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700">
-            <ArrowLeft className="h-4 w-4" />
-            Terug naar {backLabel}
-          </Link>
+          {!embedded && (
+            <Link href={backHref} className="mt-3 inline-flex items-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700">
+              <ArrowLeft className="h-4 w-4" />
+              Terug naar {backLabel}
+            </Link>
+          )}
         </div>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+    <div className={embedded ? '' : 'mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8'}>
       {/* Back button */}
-      <Link
-        href={backHref}
-        className="mb-4 inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--paper)] px-3 py-1.5 text-sm font-medium text-[var(--ink-2)] shadow-[var(--s0)] transition-all hover:shadow-[var(--s1)] hover:text-[var(--ink)]"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        {backLabel}
-      </Link>
+      {!embedded && (
+        <Link
+          href={backHref}
+          className="mb-4 inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--paper)] px-3 py-1.5 text-sm font-medium text-[var(--ink-2)] shadow-[var(--s0)] transition-all hover:shadow-[var(--s1)] hover:text-[var(--ink)]"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          {backLabel}
+        </Link>
+      )}
 
       {/* Account header */}
       <section className="rounded-[var(--r-lg)] border border-kern-200 card-editorial p-4 sm:p-6">
@@ -803,28 +833,37 @@ export function CashAccountView({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-bold text-[var(--ink)]">{account.name}</h1>
-                <button
-                  onClick={() => setShowAccountForm(true)}
-                  className="rounded-[var(--r)] p-1.5 text-[var(--ink-3)] hover:bg-kern-100 hover:text-kern-600"
-                  title="Rekening bewerken"
-                >
-                  <Settings2 className="h-4 w-4" />
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                {account.iban && (
-                  <p className="text-xs text-[var(--ink-3)]">{account.iban}</p>
-                )}
-                {account.bank_name && (
-                  <span className="text-xs text-[var(--ink-3)]">
-                    {account.iban ? '\u00B7' : ''} {account.bank_name}
+                {isCombined && (
+                  <span className="rounded-full bg-kern-100 px-2 py-0.5 text-[10px] font-medium text-kern-700">
+                    {allAccounts.length} rekeningen
                   </span>
                 )}
+                {!isCombined && (
+                  <button
+                    onClick={() => setShowAccountForm(true)}
+                    className="rounded-[var(--r)] p-1.5 text-[var(--ink-3)] hover:bg-kern-100 hover:text-kern-600"
+                    title="Rekening bewerken"
+                  >
+                    <Settings2 className="h-4 w-4" />
+                  </button>
+                )}
               </div>
+              {!isCombined && (
+                <div className="flex items-center gap-2">
+                  {account.iban && (
+                    <p className="text-xs text-[var(--ink-3)]">{account.iban}</p>
+                  )}
+                  {account.bank_name && (
+                    <span className="text-xs text-[var(--ink-3)]">
+                      {account.iban ? '\u00B7' : ''} {account.bank_name}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <div className="text-right">
-            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Saldo</p>
+            <p className="text-xs font-medium text-[var(--ink-3)] uppercase">{isCombined ? 'Totaal saldo' : 'Saldo'}</p>
             <p className="text-2xl font-bold text-[var(--ink)]">
               {formatCurrency(Number(account.balance))}
             </p>
@@ -842,13 +881,15 @@ export function CashAccountView({
             <Upload className="h-4 w-4" />
             Importeer transacties
           </Link>
-          <button
-            onClick={() => { setEditTransaction(null); setShowForm(true) }}
-            className="inline-flex items-center gap-2 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
-          >
-            <Plus className="h-4 w-4" />
-            Nieuwe transactie
-          </button>
+          {!isCombined && (
+            <button
+              onClick={() => { setEditTransaction(null); setShowForm(true) }}
+              className="inline-flex items-center gap-2 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
+            >
+              <Plus className="h-4 w-4" />
+              Nieuwe transactie
+            </button>
+          )}
           {allAccounts.length >= 2 && (
             <button
               onClick={() => setShowManualTransfer(true)}
@@ -880,7 +921,7 @@ export function CashAccountView({
         </div>
       </div>
 
-      {/* GoCardless bank connections */}
+      {/* Bank connections */}
       {gcEnabled && (
         <section className="mt-3 sm:mt-6">
           <button
@@ -1096,18 +1137,20 @@ export function CashAccountView({
               </span>
             )}
           </button>
-          <button
-            onClick={detectPatterns}
-            disabled={detectingPatterns}
-            title="Detecteer terugkerende patronen"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] transition-colors hover:bg-kern-50 hover:text-kern-600 disabled:opacity-50"
-          >
-            {detectingPatterns ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-kern-400 border-t-transparent" />
-            ) : (
-              <Sparkles className="h-4 w-4" />
-            )}
-          </button>
+          {!isCombined && (
+            <button
+              onClick={detectPatterns}
+              disabled={detectingPatterns}
+              title="Detecteer terugkerende patronen"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] transition-colors hover:bg-kern-50 hover:text-kern-600 disabled:opacity-50"
+            >
+              {detectingPatterns ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-kern-400 border-t-transparent" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+            </button>
+          )}
           <button
             onClick={() => setShowCategoryRules(true)}
             title="Categorisatieregels beheren"
@@ -1146,6 +1189,14 @@ export function CashAccountView({
                           · {nextDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
                         </span>
                       )}
+                      {isCombined && (() => {
+                        const acctName = allAccounts.find(a => a.id === r.account_id)?.name
+                        return acctName ? (
+                          <span className="rounded bg-kern-50 border border-kern-200 px-1.5 py-px text-[9px] font-medium text-kern-600">
+                            {acctName}
+                          </span>
+                        ) : null
+                      })()}
                     </div>
                   </div>
                   {budget && (
@@ -1173,13 +1224,15 @@ export function CashAccountView({
           <div className="mt-2 rounded-[var(--r-lg)] border border-dashed border-[var(--border-ed)] py-5 text-center">
             <Repeat className="mx-auto mb-2 h-5 w-5 text-[var(--ink-4)]" />
             <p className="text-xs text-[var(--ink-4)]">Geen terugkerende boekingen</p>
-            <button
-              onClick={detectPatterns}
-              disabled={detectingPatterns}
-              className="mt-2 text-xs text-kern-600 hover:underline disabled:opacity-50"
-            >
-              Detecteer patronen automatisch
-            </button>
+            {!isCombined && (
+              <button
+                onClick={detectPatterns}
+                disabled={detectingPatterns}
+                className="mt-2 text-xs text-kern-600 hover:underline disabled:opacity-50"
+              >
+                Detecteer patronen automatisch
+              </button>
+            )}
           </div>
         )}
       </section>
@@ -1436,6 +1489,14 @@ export function CashAccountView({
                               {isTransfer && tx.counterparty_name
                                 ? `${tx.counterparty_name}${tx.counterparty_iban ? ' \u00B7 ' + tx.counterparty_iban.slice(-4) : ''}`
                                 : tx.counterparty_name ?? ''}
+                              {isCombined && (() => {
+                                const acctName = allAccounts.find(a => a.id === tx.account_id)?.name
+                                return acctName ? (
+                                  <span className="ml-1.5 inline-flex rounded bg-kern-50 border border-kern-200 px-1.5 py-px text-[9px] font-medium text-kern-600 align-middle">
+                                    {acctName}
+                                  </span>
+                                ) : null
+                              })()}
                             </p>
                           </div>
 
@@ -1587,7 +1648,7 @@ export function CashAccountView({
       {showForm && (
         <TransactionForm
           transaction={editTransaction ?? undefined}
-          accountId={accountId}
+          accountId={editTransaction?.account_id ?? accountId ?? allAccounts[0]?.id ?? ''}
           budgetGroups={budgetGroups}
           onClose={() => { setShowForm(false); setEditTransaction(null) }}
           onSaved={() => {

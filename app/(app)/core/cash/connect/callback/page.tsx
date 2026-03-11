@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 
 /**
  * This page handles the return from bank authorization.
- * The actual callback processing happens in the API route (/api/gocardless/callback).
+ * The actual callback processing happens in the API route (/api/bank-connect/callback).
  * This client page is a fallback in case the redirect lands here instead.
  */
 export default function ConnectCallbackPage() {
@@ -14,11 +14,12 @@ export default function ConnectCallbackPage() {
 
   useEffect(() => {
     // If we land on this page, redirect to the API callback endpoint
-    const ref = searchParams.get('ref')
-    if (ref) {
-      router.replace(`/api/gocardless/callback?ref=${ref}`)
+    const code = searchParams.get('code')
+    const state = searchParams.get('state')
+    if (code && state) {
+      router.replace(`/api/bank-connect/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`)
     } else {
-      router.replace('/core/cash/connect?error=missing_reference')
+      router.replace('/core/cash/connect?error=missing_code')
     }
   }, [router, searchParams])
 

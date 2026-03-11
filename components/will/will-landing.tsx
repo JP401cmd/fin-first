@@ -10,7 +10,6 @@ import { DraggableWidgetGrid } from '@/components/widgets/draggable-widget-grid'
 import { DAIshboard } from '@/components/daishboard/daishboard'
 import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-animation'
 import { useDashboardType } from '@/components/app/dashboard-type-provider'
-import { ModuleSideBar } from './module-side-bar'
 import { ActionCenter } from './action-center'
 import { CollapsibleSection } from '@/components/app/collapsible-section'
 import { OpzegModal } from '@/components/app/opzeg-modal'
@@ -96,45 +95,40 @@ export function WillLanding({
     <FreedomDaysAnimationProvider>
       <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
 
-        {/* ── Sectie 1: Widget grid of DAIshboard met zijnavigatie (geschaald naar 90%) ── */}
-        <section aria-label={dashboardType === 'widgets' ? 'Mijn Widgets' : "Will's Briefing"} data-testid="will-widget-grid">
-          <div className="overflow-hidden">
-            <div style={{ transform: 'scale(0.9)', transformOrigin: 'top left', width: 'calc(100% / 0.9)' }}>
-              <div className="flex items-stretch gap-1.5">
-                <ModuleSideBar module="kern" label="De Kern" href="/core" side="left" />
-
-                <div className="flex-1 min-w-0">
-                  <DraggableWidgetGrid
-                    initialPrefs={activeWidgets}
-                    allPrefs={allPrefs}
-                    data={dashboardData}
-                    showDashboardTypeToggle
-                  />
-                  {dashboardType === 'briefing' && (
-                    <div className="mt-4">
-                      <DAIshboard
-                        data={dashboardData}
-                        temporal={temporal}
-                        userName={userName}
-                        aiEnabled={aiEnabled}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <ModuleSideBar module="horizon" label="De Horizon" href="/horizon" side="right" />
+        {/* ── Sectie 1: Widget grid of DAIshboard ── */}
+        <section
+          aria-label={dashboardType === 'widgets' ? 'Mijn Widgets' : "Will's Briefing"}
+          data-testid="will-widget-grid"
+          className="card-editorial overflow-hidden"
+        >
+          <div className="h-1.5 bg-wil-500" />
+          <div className="p-4 sm:p-6 md:p-8">
+            <DraggableWidgetGrid
+              initialPrefs={activeWidgets}
+              allPrefs={allPrefs}
+              data={dashboardData}
+              showDashboardTypeToggle
+            />
+            {dashboardType === 'briefing' && (
+              <div className="mt-4">
+                <DAIshboard
+                  data={dashboardData}
+                  temporal={temporal}
+                  userName={userName}
+                  aiEnabled={aiEnabled}
+                />
               </div>
-            </div>
+            )}
           </div>
         </section>
 
         {/* ── Sectie 2: Check-in ─────────────────────────────── */}
-        <div className="mt-6">
+        <div className="mt-2">
           <MonthlyCheckinCard />
         </div>
 
         {/* ── Sectie 3: Actiecentrum met KPI-header ──────────── */}
-        <section className="mt-10" aria-label="Actiecentrum">
+        <section className="mt-4" aria-label="Actiecentrum">
           <ActionCenter
             recommendations={recommendations}
             actions={actions}

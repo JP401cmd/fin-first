@@ -128,13 +128,13 @@ export async function GET() {
 
   // Test 9: Login page supports redirectTo param for post-login redirect
   const loginReadsRedirect = loginContent.includes('redirectTo')
-  const loginFallbackDashboard = loginContent.includes("'/dashboard'")
+  const loginFallbackWill = loginContent.includes("'/will'")
   results.push({
-    test: 'Login page reads redirectTo param and navigates after login (fallback: /dashboard)',
-    pass: loginReadsRedirect && loginFallbackDashboard,
-    detail: loginReadsRedirect && loginFallbackDashboard
-      ? 'Login reads redirectTo from searchParams; redirects to that path or /dashboard'
-      : `readsRedirect=${loginReadsRedirect}, fallback=${loginFallbackDashboard}`,
+    test: 'Login page reads redirectTo param and navigates after login (fallback: /will)',
+    pass: loginReadsRedirect && loginFallbackWill,
+    detail: loginReadsRedirect && loginFallbackWill
+      ? 'Login reads redirectTo from searchParams; redirects to that path or /will'
+      : `readsRedirect=${loginReadsRedirect}, fallback=${loginFallbackWill}`,
   })
 
   // Test 10: No mock/fake data patterns in identity page

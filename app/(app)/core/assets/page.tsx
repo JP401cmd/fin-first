@@ -30,6 +30,8 @@ import {
   getDefaultAssets,
   projectPortfolio,
 } from '@/lib/asset-data'
+import { FullScreenModal } from '@/components/app/full-screen-modal'
+import { CashAccountView } from '@/components/app/cash-account-view'
 
 type Mortgage = { id: string; name: string; current_balance: number; linked_asset_id: string | null }
 
@@ -48,6 +50,7 @@ export default function AssetsPage() {
   const [projectionYears, setProjectionYears] = useState(10)
   const [valuations, setValuations] = useState<Record<string, Valuation[]>>({})
   const [dailyExpenses, setDailyExpenses] = useState(0)
+  const [showCashModal, setShowCashModal] = useState(false)
   const seedingRef = useRef(false)
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
@@ -496,9 +499,18 @@ export default function AssetsPage() {
               {/* Group header */}
               <div className="flex items-center gap-2 pt-4 pb-1.5">
                 <span style={{ color: groupColor }}><BudgetIcon name={groupIcon} className="h-4 w-4" /></span>
-                <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-                  {ASSET_TYPE_LABELS[type]}
-                </h3>
+                {isCash ? (
+                  <button
+                    onClick={() => setShowCashModal(true)}
+                    className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)] hover:text-kern-600 transition-colors cursor-pointer"
+                  >
+                    {ASSET_TYPE_LABELS[type]}
+                  </button>
+                ) : (
+                  <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                    {ASSET_TYPE_LABELS[type]}
+                  </h3>
+                )}
                 <span className="text-xs tabular-nums text-[var(--ink-3)]">
                   {formatCurrency(group.total)}
                 </span>
@@ -707,6 +719,16 @@ export default function AssetsPage() {
           }}
         />
       )}
+
+      {/* Combined cash view modal */}
+      <FullScreenModal
+        open={showCashModal}
+        onClose={() => setShowCashModal(false)}
+        title="Cash"
+        href="/core/cash"
+      >
+        <CashAccountView embedded />
+      </FullScreenModal>
     </div>
   )
 }

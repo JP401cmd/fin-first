@@ -19,10 +19,10 @@ export default function NotFound() {
             Naar startpagina
           </Link>
           <Link
-            href="/dashboard"
+            href="/will"
             className="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-6 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
           >
-            Naar dashboard
+            Naar De Wil
           </Link>
         </div>
       </div>

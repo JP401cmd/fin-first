@@ -101,13 +101,13 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
       .select('id, title, status, freedom_days_impact, priority_score, due_date, source, completed_at, recommendation:recommendations(recommendation_type)')
       .in('status', ['open', 'postponed', 'completed']),
     supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
-    supabase.from('budgets').select('id, name, default_limit, interval, budget_type, alert_threshold, parent_id').is('parent_id', null),
+    supabase.from('budgets').select('id, name, icon, default_limit, interval, budget_type, alert_threshold, parent_id, is_favorite').is('parent_id', null),
     supabase.from('recommendations').select('id, title, freedom_days_per_year, priority_score, recommendation_type, status').in('status', ['pending', 'postponed']),
-    supabase.from('budgets').select('id, parent_id, default_limit').not('parent_id', 'is', null),
+    supabase.from('budgets').select('id, name, icon, parent_id, default_limit, budget_type, is_favorite').not('parent_id', 'is', null),
     supabase.from('goals').select('id, name, goal_type, current_value, target_value, target_date, color, icon').eq('is_completed', false).order('sort_order', { ascending: true }),
     supabase.from('recurring_transactions').select('id, name, amount, frequency, budget_id').eq('is_active', true),
     supabase.from('net_worth_snapshots').select('snapshot_date, net_worth, fire_age, savings_rate').gte('snapshot_date', twelveMonthsAgo).order('snapshot_date', { ascending: true }).limit(12),
-    supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
+    supabase.from('transactions').select('amount, date, budget_id').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
     supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
     supabase.from('transactions').select('amount').lt('amount', 0).gte('date', prev3MonthStart).lt('date', monthStart),
     supabase.from('bank_accounts').select('id, balance').eq('is_active', true).is('linked_asset_id', null),
@@ -117,7 +117,7 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     supabase.from('user_badges').select('id, badge_id, earned_at'),
     supabase.from('user_streaks').select('id, streak_type, current_count, longest_count, last_activity_date'),
     supabase.from('next_step_completions').select('step_key, dismissed'),
-    supabase.from('transactions').select('amount, date').lt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
+    supabase.from('transactions').select('amount, date, budget_id').lt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
   ])
 
   // Fetch budgeting_active separately (column may not exist yet before migration)
@@ -185,7 +185,7 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
   }
 
   // Budget totals per type — limiet en werkelijke besteding
-  const allParentBudgets = (allBudgetsResult.data ?? []) as { id: string; budget_type: string; default_limit: number; interval: string }[]
+  const allParentBudgets = (allBudgetsResult.data ?? []) as { id: string; name: string; icon: string; budget_type: string; default_limit: number; interval: string; is_favorite: boolean }[]
   // Map: budget_id → budget_type (voor zowel parent als child budgetten)
   const budgetTypeMap = new Map<string, string>()
   for (const b of allParentBudgets) budgetTypeMap.set(b.id, b.budget_type)
@@ -267,6 +267,30 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
       spent,
     }
   })
+
+  // All budgets (parents + children, non-archive) for auto-dashboard wizard budget picker
+  const allBudgets = [
+    ...allParentBudgets
+      .filter(b => b.budget_type !== 'archive')
+      .map(b => ({
+        id: b.id,
+        name: b.name,
+        icon: b.icon || '',
+        budgetType: b.budget_type as 'income' | 'expense' | 'savings' | 'debt',
+        isFavorite: b.is_favorite ?? false,
+        parentId: null as string | null,
+      })),
+    ...allChildren
+      .filter((c: { budget_type?: string }) => c.budget_type !== 'archive')
+      .map((c: { id: string; name: string; icon: string; budget_type: string; is_favorite: boolean; parent_id: string }) => ({
+        id: c.id,
+        name: c.name,
+        icon: c.icon || '',
+        budgetType: (c.budget_type ?? budgetTypeMap.get(c.parent_id) ?? 'expense') as 'income' | 'expense' | 'savings' | 'debt',
+        isFavorite: c.is_favorite ?? false,
+        parentId: c.parent_id,
+      })),
+  ]
 
   const last12Income = income12Result.data?.reduce((s, t) => s + Number(t.amount), 0) ?? 0
   let extrapolatedIncome = last12Income
@@ -516,6 +540,33 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, value]) => ({ month, value }))
 
+  // Budget type history: per-type monthly aggregation (income + expense transactions)
+  const typeMonthAgg: Record<string, Map<string, number>> = {
+    income: new Map(), expense: new Map(), savings: new Map(), debt: new Map(),
+  }
+  const allHistTx = [
+    ...((income12Result.data ?? []) as { amount: number; date: string; budget_id?: string | null }[]),
+    ...((expenseTx12Result.data ?? []) as { amount: number; date: string; budget_id?: string | null }[]),
+  ]
+  for (const tx of allHistTx) {
+    if (!tx.budget_id) continue
+    const bType = budgetTypeMap.get(tx.budget_id)
+    if (!bType || !typeMonthAgg[bType]) continue
+    const month = (tx.date as string).slice(0, 7)
+    const map = typeMonthAgg[bType]
+    map.set(month, (map.get(month) ?? 0) + Math.abs(Number(tx.amount)))
+  }
+  const toSortedHistory = (m: Map<string, number>) =>
+    Array.from(m.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, value]) => ({ month, value }))
+  const budgetTypeHistory = {
+    income:  toSortedHistory(typeMonthAgg.income),
+    expense: toSortedHistory(typeMonthAgg.expense),
+    savings: toSortedHistory(typeMonthAgg.savings),
+    debt:    toSortedHistory(typeMonthAgg.debt),
+  }
+
   // Meest recente fire_age uit snapshot (gezet door useHorizonFireSim bij bezoek /horizon)
   const latestSnapshotFireAge = snapshotRows
     .filter(s => (s as { fire_age?: number | null }).fire_age != null)
@@ -576,6 +627,7 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
         id: e.id,
         name: e.name,
         year: e.target_date ? new Date(e.target_date).getFullYear() : (e.target_age != null ? null : null),
+        targetAge: e.target_age ?? null,
         impactType: (totalImpact > 0 ? 'negative' : 'positive') as 'positive' | 'negative',
         estimatedImpact: totalImpact !== 0 ? Math.abs(totalImpact) : null,
       }
@@ -1139,6 +1191,7 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     netWorthHistory,
     savingsHistory,
     expenseHistory,
+    budgetTypeHistory,
     assetsByType,
     totalPurchaseValue,
     fireRange,
@@ -1154,6 +1207,7 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     prevMonthExpenses,
     netWorthDelta: netWorthDeltaComputed,
     favoriteBudgets,
+    allBudgets,
     // Real widget data from queries and computations
     notifications,
     badgeSummary,

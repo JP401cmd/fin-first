@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 
 const tabs = [
   { label: 'AI Instellingen', href: '/beheer/ai' },
+  { label: 'Prompts', href: '/beheer/prompts' },
   { label: 'Briefing', href: '/beheer/briefing' },
   { label: 'Testdata', href: '/beheer/testdata' },
   { label: 'Release Notes', href: '/beheer/releases' },
@@ -12,10 +13,11 @@ const tabs = [
   { label: 'Features', href: '/beheer/features' },
   { label: 'Database', href: '/beheer/migration' },
   { label: 'Mobile Preview', href: '/beheer/testdata#mobile-preview' },
-  { label: 'GoCardless', href: '/beheer/gocardless' },
+  { label: 'Bank Connect', href: '/beheer/bank-connect' },
   { label: 'Tiers', href: '/beheer/tiers', activeClass: 'border-[var(--ink)] text-[var(--ink)]' },
   { label: 'Nieuws', href: '/beheer/nieuws' },
   { label: 'Widgets', href: '/beheer/widgets-test' },
+  { label: 'Propositie', href: '/beheer/propositie' },
 ] as const
 
 export function BeheerNav() {

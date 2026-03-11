@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -135,7 +135,29 @@ const MONTH_NAMES = [
 
 /* ── Main component ──────────────────────────────────────────────────── */
 export default function CheckinPage() {
+  return (
+    <Suspense fallback={
+      <div className="mx-auto max-w-2xl px-4 py-12">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-wil-500" />
+          <p className="text-sm text-[var(--ink-3)] font-serif italic">Check-in wordt geladen...</p>
+        </div>
+      </div>
+    }>
+      <CheckinPageContent />
+    </Suspense>
+  )
+}
+
+function CheckinPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const readOnlyMonth = searchParams.get('month')
+  const returnTo = searchParams.get('from') || '/will'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [readOnlySnapshot, setReadOnlySnapshot] = useState<any>(null)
+  const [readOnlyLoading, setReadOnlyLoading] = useState(!!readOnlyMonth)
+
   const [step, setStep] = useState<StepKey>('terugblik')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -165,8 +187,27 @@ export default function CheckinPage() {
 
   const currentIdx = STEPS.findIndex(s => s.key === step)
 
+  // ── Fetch read-only snapshot if month param is set ───────────────
+  useEffect(() => {
+    if (!readOnlyMonth) return
+    async function fetchSnapshot() {
+      try {
+        const res = await fetch(`/api/checkin/save?month=${readOnlyMonth}`)
+        if (res.ok) {
+          const data = await res.json()
+          if (data.found && data.snapshot) {
+            setReadOnlySnapshot(data.snapshot)
+          }
+        }
+      } catch { /* graceful */ }
+      setReadOnlyLoading(false)
+    }
+    fetchSnapshot()
+  }, [readOnlyMonth])
+
   // ── Fetch all data on mount ───────────────────────────────────────
   useEffect(() => {
+    if (readOnlyMonth) { setLoading(false); return }
     async function loadData() {
       try {
         const supabase = createClient()
@@ -299,7 +340,7 @@ export default function CheckinPage() {
   const handleComplete = useCallback(async () => {
     setSaving(true)
     try {
-      // Save reflection + metrics snapshot
+      // Save reflection + metrics snapshot with full details
       await fetch('/api/checkin/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -315,6 +356,15 @@ export default function CheckinPage() {
             activeGoals: goals.filter(g => !g.is_completed).length,
             fireAge: overview?.fireAge || null,
           },
+          details: {
+            netWorthChange: overview?.netWorthChange || 0,
+            freedomDaysWon: overview?.freedomDaysWon || 0,
+            prevMonthExpenses: overview?.prevMonthExpenses || 0,
+            assets: assets.map(a => ({ name: a.name, type: a.asset_type, value: Number(a.current_value) })),
+            debts: debts.map(d => ({ name: d.name, type: d.debt_type, balance: Number(d.current_balance) })),
+            goals: goals.map(g => ({ name: g.name, current: g.current_value, target: g.target_value, completed: g.is_completed, icon: g.icon })),
+            budgets: budgets.map(b => ({ name: b.name, icon: b.icon, limit: b.limit, spent: b.spent })),
+          },
         }),
       })
       // Mark the month as completed
@@ -323,19 +373,257 @@ export default function CheckinPage() {
       // (the card checks this key on mount before fetching the API)
       const monthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
       sessionStorage.setItem('checkin_dismissed', monthKey)
-      router.push('/dashboard')
+      // Navigate back to the page that started the check-in
+      const allowedPaths = ['/identity', '/will']
+      const dest = allowedPaths.includes(returnTo) ? returnTo : '/will'
+      window.location.href = dest
     } catch {
       setSaving(false)
     }
-  }, [reflection, overview, goals, router])
+  }, [reflection, overview, goals, assets, debts, budgets, returnTo])
 
-  if (loading) {
+  if (loading || readOnlyLoading) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-12">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-wil-500" />
           <p className="text-sm text-[var(--ink-3)] font-serif italic">Check-in wordt geladen...</p>
         </div>
+      </div>
+    )
+  }
+
+  // ── Read-only snapshot view ─────────────────────────────────────
+  if (readOnlyMonth) {
+    const snap = readOnlySnapshot
+    const [yearStr, monthStr] = readOnlyMonth.split('-')
+    const monthIdx = parseInt(monthStr, 10) - 1
+    const monthLabel = `${MONTH_NAMES[monthIdx]} ${yearStr}`
+
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-6 sm:py-10">
+        {/* Header */}
+        <div className="mb-6 flex items-center gap-3">
+          <Link
+            href={returnTo}
+            className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] text-[var(--ink-3)] hover:text-[var(--ink)] hover:bg-[var(--subtle)] transition-colors"
+            aria-label="Terug"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <div className="flex-1">
+            <span className="label-editorial text-kern-600">Geldcheck-in</span>
+            <h1 className="text-lg font-display font-semibold text-[var(--ink)] tracking-tight capitalize">
+              Check-in {monthLabel}
+            </h1>
+          </div>
+          <span className="inline-flex items-center gap-1 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)] px-2 py-1 text-[11px] font-medium text-[var(--ink-3)]">
+            <Lock className="h-3 w-3" />
+            Alleen lezen
+          </span>
+        </div>
+
+        {!snap ? (
+          <div className="card-editorial p-6 text-center">
+            <p className="text-sm text-[var(--ink-3)]">Geen snapshot gevonden voor deze maand.</p>
+            <Link href={returnTo} className="mt-3 inline-block text-sm font-medium text-kern-600 hover:text-kern-700">
+              Terug
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* ── Overzicht ────────────────────────────────────────── */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="card-editorial p-4">
+                <p className="label-editorial text-[var(--ink-3)] mb-1">Netto vermogen</p>
+                <p className="text-lg font-mono tabular-nums font-semibold text-[var(--ink)]">
+                  {formatCurrency(snap.metrics?.netWorth ?? 0)}
+                </p>
+                {snap.details?.netWorthChange != null && snap.details.netWorthChange !== 0 && (
+                  <p className={`text-xs font-mono tabular-nums font-medium mt-0.5 ${snap.details.netWorthChange >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                    {snap.details.netWorthChange >= 0 ? '+' : ''}{formatCurrency(snap.details.netWorthChange)}
+                  </p>
+                )}
+              </div>
+              <div className="card-editorial p-4">
+                <p className="label-editorial text-[var(--ink-3)] mb-1">Inkomen</p>
+                <p className="text-lg font-mono tabular-nums font-semibold text-[var(--ink)]">
+                  {formatCurrency(snap.metrics?.monthlyIncome ?? 0)}
+                </p>
+              </div>
+              <div className="card-editorial p-4">
+                <p className="label-editorial text-[var(--ink-3)] mb-1">Uitgaven</p>
+                <p className="text-lg font-mono tabular-nums font-semibold text-[var(--ink)]">
+                  {formatCurrency(snap.metrics?.monthlyExpenses ?? 0)}
+                </p>
+              </div>
+              <div className="card-editorial p-4">
+                <p className="label-editorial text-[var(--ink-3)] mb-1">Gespaard</p>
+                <p className={`text-lg font-mono tabular-nums font-semibold ${(snap.metrics?.monthlySavings ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {formatCurrency(snap.metrics?.monthlySavings ?? 0)}
+                </p>
+              </div>
+            </div>
+
+            {/* Extra stats row */}
+            <div className="card-editorial p-4">
+              <div className="flex items-center gap-6 text-sm">
+                {snap.details?.freedomDaysWon != null && snap.details.freedomDaysWon > 0 && (
+                  <div>
+                    <span className="label-editorial text-[var(--ink-3)]">Vrijheidsdagen</span>
+                    <p className="font-mono tabular-nums font-semibold text-emerald-600">+{snap.details.freedomDaysWon}</p>
+                  </div>
+                )}
+                <div>
+                  <span className="label-editorial text-[var(--ink-3)]">Acties</span>
+                  <p className="font-mono tabular-nums font-semibold text-[var(--ink)]">{snap.metrics?.completedActions ?? 0}</p>
+                </div>
+                <div>
+                  <span className="label-editorial text-[var(--ink-3)]">Doelen</span>
+                  <p className="font-mono tabular-nums font-semibold text-[var(--ink)]">{snap.metrics?.activeGoals ?? 0}</p>
+                </div>
+                {snap.metrics?.fireAge != null && (
+                  <div>
+                    <span className="label-editorial text-[var(--ink-3)]">FIRE-leeftijd</span>
+                    <p className="font-mono tabular-nums font-semibold text-[var(--ink)]">{snap.metrics.fireAge} jaar</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ── Bezittingen ──────────────────────────────────────── */}
+            {snap.details?.assets && snap.details.assets.length > 0 && (
+              <div className="card-editorial p-4">
+                <p className="label-editorial text-[var(--ink-3)] mb-3">Bezittingen</p>
+                <div className="space-y-2">
+                  {snap.details.assets.map((a: { name: string; type: string; value: number }, i: number) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-[var(--ink)] truncate">{a.name}</p>
+                        <p className="text-[11px] text-[var(--ink-3)]">{ASSET_TYPE_LABELS[a.type as AssetType] || a.type}</p>
+                      </div>
+                      <p className="text-sm font-mono tabular-nums font-semibold text-[var(--ink)] ml-3 shrink-0">
+                        {formatCurrency(a.value)}
+                      </p>
+                    </div>
+                  ))}
+                  <div className="border-t border-[var(--border-ed)] pt-2 mt-2 flex items-center justify-between">
+                    <p className="text-xs font-semibold text-[var(--ink-2)]">Totaal</p>
+                    <p className="text-sm font-mono tabular-nums font-bold text-[var(--ink)]">
+                      {formatCurrency(snap.details.assets.reduce((s: number, a: { value: number }) => s + a.value, 0))}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Schulden ─────────────────────────────────────────── */}
+            {snap.details?.debts && snap.details.debts.length > 0 && (
+              <div className="card-editorial p-4">
+                <p className="label-editorial text-[var(--ink-3)] mb-3">Schulden</p>
+                <div className="space-y-2">
+                  {snap.details.debts.map((d: { name: string; type: string; balance: number }, i: number) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-[var(--ink)] truncate">{d.name}</p>
+                        <p className="text-[11px] text-[var(--ink-3)]">{DEBT_TYPE_LABELS[d.type as keyof typeof DEBT_TYPE_LABELS] || d.type}</p>
+                      </div>
+                      <p className="text-sm font-mono tabular-nums font-semibold text-red-500 ml-3 shrink-0">
+                        {formatCurrency(d.balance)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Doelen ───────────────────────────────────────────── */}
+            {snap.details?.goals && snap.details.goals.length > 0 && (
+              <div className="card-editorial p-4">
+                <p className="label-editorial text-[var(--ink-3)] mb-3">Doelen</p>
+                <div className="space-y-2.5">
+                  {snap.details.goals.map((g: { name: string; current: number; target: number; completed: boolean; icon?: string | null }, i: number) => {
+                    const pct = g.target > 0 ? Math.min(100, (g.current / g.target) * 100) : 0
+                    return (
+                      <div key={i}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-medium text-[var(--ink)]">
+                            {g.icon && <span className="mr-1">{g.icon}</span>}
+                            {g.name}
+                          </span>
+                          <span className="text-xs font-mono tabular-nums text-[var(--ink-3)]">
+                            {g.completed ? (
+                              <span className="text-emerald-600 font-semibold">Voltooid</span>
+                            ) : (
+                              <>{formatCurrency(g.current)} / {formatCurrency(g.target)}</>
+                            )}
+                          </span>
+                        </div>
+                        {!g.completed && (
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--border-ed)]">
+                            <div
+                              className={`h-full rounded-full ${pct >= 100 ? 'bg-emerald-500' : 'bg-kern-400'}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── Budgetten ────────────────────────────────────────── */}
+            {snap.details?.budgets && snap.details.budgets.length > 0 && (
+              <div className="card-editorial p-4">
+                <p className="label-editorial text-[var(--ink-3)] mb-3">Budgetten</p>
+                <div className="space-y-2.5">
+                  {snap.details.budgets.map((b: { name: string; icon: string | null; limit: number; spent: number }, i: number) => {
+                    const pct = b.limit > 0 ? Math.min(100, (b.spent / b.limit) * 100) : 0
+                    const isOver = b.spent > b.limit
+                    return (
+                      <div key={i}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-medium text-[var(--ink)]">
+                            {b.icon && <BudgetIcon name={b.icon} className="inline h-3.5 w-3.5 mr-1" />}
+                            {b.name}
+                          </span>
+                          <span className={`text-xs font-mono tabular-nums ${isOver ? 'text-red-500 font-semibold' : 'text-[var(--ink-3)]'}`}>
+                            {formatCurrency(b.spent)} / {formatCurrency(b.limit)}
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--border-ed)]">
+                          <div
+                            className={`h-full rounded-full ${isOver ? 'bg-red-500' : 'bg-emerald-500'}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── Reflectie ────────────────────────────────────────── */}
+            {snap.reflection && (
+              <div className="card-editorial p-4">
+                <p className="label-editorial text-[var(--ink-3)] mb-2">Reflectie</p>
+                <p className="font-serif italic text-sm text-[var(--ink-2)] leading-relaxed">
+                  &ldquo;{snap.reflection}&rdquo;
+                </p>
+              </div>
+            )}
+
+            {/* Saved date */}
+            {snap.savedAt && (
+              <p className="text-[11px] text-[var(--ink-4)] text-center">
+                Opgeslagen op {new Date(snap.savedAt).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     )
   }
@@ -347,9 +635,9 @@ export default function CheckinPage() {
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="mb-6 flex items-center gap-3">
         <Link
-          href="/dashboard"
+          href={returnTo}
           className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] text-[var(--ink-3)] hover:text-[var(--ink)] hover:bg-[var(--subtle)] transition-colors"
-          aria-label="Terug naar dashboard"
+          aria-label="Terug"
         >
           <ArrowLeft className="h-4 w-4" />
         </Link>

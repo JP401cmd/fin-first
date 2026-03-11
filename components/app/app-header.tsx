@@ -3,11 +3,10 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bell, Lock, Sparkles, LayoutGrid } from 'lucide-react'
+import { Bell, Lock } from 'lucide-react'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
-import { useDashboardType } from '@/components/app/dashboard-type-provider'
 
 const staticNavItems = [
   { label: 'De Kern', href: '/core', color: 'amber', requiresActivation: false },
@@ -16,14 +15,12 @@ const staticNavItems = [
 ] as const
 
 const activeClasses: Record<string, string> = {
-  zinc: 'text-[var(--ink)] border-[var(--ink)]',
   amber: 'text-kern-600 border-kern-500',
   teal: 'text-wil-600 border-wil-500',
   purple: 'text-horizon-600 border-horizon-500',
 }
 
 const hoverClasses: Record<string, string> = {
-  zinc: 'hover:text-[var(--ink)]',
   amber: 'hover:text-kern-600',
   teal: 'hover:text-wil-600',
   purple: 'hover:text-horizon-600',
@@ -36,16 +33,8 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
 
   const { needsActivation } = useFeatureAccess()
   const { unreadCount, openModal } = useNotifications()
-  const { dashboardType } = useDashboardType()
 
-  const dashboardHref = dashboardType === 'briefing' ? '/daishboard' : '/dashboard'
-  const altDashboardHref = dashboardType === 'briefing' ? '/dashboard' : '/daishboard'
-  const isDashboard = pathname === '/dashboard' || pathname === '/daishboard'
-
-  const navItems = [
-    { label: 'Dashboard', href: dashboardHref, color: 'zinc' as const, requiresActivation: false },
-    ...staticNavItems,
-  ]
+  const navItems = staticNavItems
 
   // Close dropdown on click outside or Escape
   useEffect(() => {
@@ -76,40 +65,25 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
 
           <nav className="hidden items-center gap-1 md:flex">
             {navItems.map((item) => {
-              const isItemDashboard = item.label === 'Dashboard'
-              const isActive = isItemDashboard ? isDashboard : pathname.startsWith(item.href)
+              const isActive = pathname.startsWith(item.href)
               const isLocked = item.requiresActivation && needsActivation
               return (
-                <div key={item.label} className="flex items-center">
-                  <Link
-                    href={item.href}
-                    className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors border-b-3 ${
-                      isActive
-                        ? `${activeClasses[item.color]}`
-                        : isLocked
-                          ? 'text-[var(--ink-4)] border-transparent hover:text-[var(--ink-3)]'
-                          : `text-[var(--ink-3)] border-transparent ${hoverClasses[item.color]}`
-                    }`}
-                  >
-                    <span className="flex items-center gap-1">
-                      {item.label}
-                      {isLocked && <Lock className="h-2.5 w-2.5 opacity-50" />}
-                    </span>
-                  </Link>
-                  {isItemDashboard && isDashboard && (
-                    <Link
-                      href={altDashboardHref}
-                      className="ml-0.5 rounded-md p-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink)]"
-                      title={pathname === '/daishboard' ? 'Widgets dashboard' : 'AI Briefing'}
-                    >
-                      {pathname === '/daishboard' ? (
-                        <LayoutGrid className="h-3.5 w-3.5" />
-                      ) : (
-                        <Sparkles className="h-3.5 w-3.5" />
-                      )}
-                    </Link>
-                  )}
-                </div>
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors border-b-3 ${
+                    isActive
+                      ? `${activeClasses[item.color]}`
+                      : isLocked
+                        ? 'text-[var(--ink-4)] border-transparent hover:text-[var(--ink-3)]'
+                        : `text-[var(--ink-3)] border-transparent ${hoverClasses[item.color]}`
+                  }`}
+                >
+                  <span className="flex items-center gap-1">
+                    {item.label}
+                    {isLocked && <Lock className="h-2.5 w-2.5 opacity-50" />}
+                  </span>
+                </Link>
               )
             })}
           </nav>

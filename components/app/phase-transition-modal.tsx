@@ -44,21 +44,21 @@ const FEATURE_PAGE_MAP: Record<string, string> = {
  * Falls back to /dashboard if no clear winner.
  */
 function getBestNavigationTarget(featureIds: string[]): string {
-  if (featureIds.length === 0) return '/dashboard'
+  if (featureIds.length === 0) return '/will'
 
   const pageCounts: Record<string, number> = {}
   for (const id of featureIds) {
-    const page = FEATURE_PAGE_MAP[id] ?? '/dashboard'
+    const page = FEATURE_PAGE_MAP[id] ?? '/will'
     // Group subpages to their parent module for counting
     const module = page.startsWith('/core') ? '/core'
       : page.startsWith('/will') ? '/will'
       : page.startsWith('/horizon') ? '/horizon'
-      : '/dashboard'
+      : '/will'
     pageCounts[module] = (pageCounts[module] ?? 0) + 1
   }
 
   // Find the module with the most newly unlocked features
-  let bestPage = '/dashboard'
+  let bestPage = '/will'
   let bestCount = 0
   for (const [page, count] of Object.entries(pageCounts)) {
     if (count > bestCount) {

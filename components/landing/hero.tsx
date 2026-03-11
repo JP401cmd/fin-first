@@ -32,10 +32,11 @@ export function Hero() {
           </h1>
 
           <p className="mb-8 max-w-[500px] font-serif text-lg leading-relaxed text-[var(--ink-2)]">
-            TriFinity vertaalt je vermogen, je keuzes en je toekomst naar wat er
-            werkelijk toe doet —{' '}
+            TriFinity brengt je financiële leven samen op één plek en begeleidt
+            je bij elke stap — van financieel inzicht naar gepersonaliseerde
+            acties tot{' '}
             <strong className="font-semibold text-[var(--ink)]">
-              de vrijheid om te kiezen hoe je leeft
+              financiële onafhankelijkheid
             </strong>.
           </p>
 

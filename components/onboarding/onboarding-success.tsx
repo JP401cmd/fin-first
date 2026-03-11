@@ -93,7 +93,7 @@ interface ModuleCardDef {
 const MODULE_CARDS: ModuleCardDef[] = [
   {
     name: 'De Kern',
-    description: 'Je financieel fundament: vermogen, budgetten, schulden en cashflow.',
+    description: 'Ken je werkelijkheid: nettovermogen, bezittingen, schulden en budget.',
     icon: Shield,
     borderClass: 'border-kern-400',
     iconBgClass: 'bg-kern-100',
@@ -102,7 +102,7 @@ const MODULE_CARDS: ModuleCardDef[] = [
   },
   {
     name: 'De Wil',
-    description: 'Bewuste keuzes en acties met slimme aanbevelingen en doelen.',
+    description: 'Neem de regie: gepersonaliseerde inzichten en acties op basis van jouw data en de wereld om je heen.',
     icon: Zap,
     borderClass: 'border-wil-400',
     iconBgClass: 'bg-wil-100',
@@ -111,7 +111,7 @@ const MODULE_CARDS: ModuleCardDef[] = [
   },
   {
     name: 'De Horizon',
-    description: 'Je pad naar financiële vrijheid: projecties, scenario\'s en simulaties.',
+    description: 'Zie je vrijheid groeien: prognoses, scenario\'s en het effect van elke keuze.',
     icon: Telescope,
     borderClass: 'border-horizon-400',
     iconBgClass: 'bg-horizon-100',

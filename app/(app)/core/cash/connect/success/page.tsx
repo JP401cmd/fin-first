@@ -8,10 +8,11 @@ import { createClient } from '@/lib/supabase/client'
 type LinkedAccount = {
   id: string
   iban: string | null
-  gc_account_id: string
-  gocardless_requisitions: {
-    institution_name: string
-    institution_logo: string | null
+  external_account_id: string
+  account_name: string | null
+  bank_connections: {
+    provider_name: string
+    provider_logo: string | null
   }
 }
 
@@ -25,8 +26,8 @@ export default function ConnectSuccessPage() {
     async function load() {
       const supabase = createClient()
       const { data } = await supabase
-        .from('gocardless_accounts')
-        .select('id, iban, gc_account_id, gocardless_requisitions(institution_name, institution_logo)')
+        .from('bank_connection_accounts')
+        .select('id, iban, external_account_id, account_name, bank_connections(provider_name, provider_logo)')
         .eq('is_active', true)
         .order('iban', { ascending: true })
 
@@ -41,10 +42,10 @@ export default function ConnectSuccessPage() {
   async function handleSync(accountId: string) {
     setSyncing(accountId)
     try {
-      const res = await fetch('/api/gocardless/sync', {
+      const res = await fetch('/api/bank-connect/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gc_account_id: accountId }),
+        body: JSON.stringify({ connection_account_id: accountId }),
       })
       const data = await res.json()
       if (res.ok) {
@@ -76,7 +77,7 @@ export default function ConnectSuccessPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold text-[var(--ink)]">
-                    {acc.gocardless_requisitions?.institution_name}
+                    {acc.bank_connections?.provider_name}
                   </p>
                   {acc.iban && (
                     <p className="text-xs text-[var(--ink-3)]">{acc.iban}</p>

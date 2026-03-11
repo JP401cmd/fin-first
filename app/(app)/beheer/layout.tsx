@@ -12,7 +12,7 @@ export default async function BeheerLayout({
   const isAdmin = await isSuperAdmin(supabase)
 
   if (!isAdmin) {
-    redirect('/dashboard')
+    redirect('/will')
   }
 
   return (

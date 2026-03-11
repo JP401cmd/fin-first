@@ -4,7 +4,7 @@ import { type ReactNode, useState, useEffect, useRef, useCallback } from 'react'
 import { useMobilePreview, DEVICE_PRESETS } from './mobile-preview-provider'
 
 const NAV_ROUTES = [
-  { label: 'Dashboard', path: '/dashboard' },
+  { label: 'Wil', path: '/will' },
   { label: 'Kern', path: '/core' },
   { label: 'Wil', path: '/will' },
   { label: 'Horizon', path: '/horizon' },
@@ -14,7 +14,7 @@ export function MobilePreviewFrame({ children }: { children: ReactNode }) {
   const { enabled, device, setDevice, setEnabled } = useMobilePreview()
   const [isIframe, setIsIframe] = useState(false)
   const iframeRef = useRef<HTMLIFrameElement>(null)
-  const [activePath, setActivePath] = useState('/dashboard')
+  const [activePath, setActivePath] = useState('/will')
 
   useEffect(() => {
     setIsIframe(window.self !== window.top)
@@ -80,7 +80,7 @@ export function MobilePreviewFrame({ children }: { children: ReactNode }) {
         <PhoneFrame width={device.width} height={device.height}>
           <iframe
             ref={iframeRef}
-            src="/dashboard"
+            src="/will"
             style={{ width: device.width, height: '100%', border: 'none' }}
             title="Mobile preview"
           />

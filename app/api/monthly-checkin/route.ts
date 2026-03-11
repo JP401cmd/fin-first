@@ -54,6 +54,7 @@ export async function GET() {
     monthKey,
     completed,
     enabled,
+    completedMonths: checkinData.completedMonths,
   })
 }
 
@@ -89,7 +90,7 @@ export async function POST() {
   await supabase
     .from('app_settings')
     .upsert(
-      { key, value: JSON.stringify(checkinData), user_id: user.id },
+      { key, value: JSON.stringify(checkinData), updated_by: user.id },
       { onConflict: 'key' }
     )
 
@@ -108,7 +109,7 @@ export async function PUT(request: NextRequest) {
   await supabase
     .from('app_settings')
     .upsert(
-      { key, value: JSON.stringify({ enabled: body.enabled }), user_id: user.id },
+      { key, value: JSON.stringify({ enabled: body.enabled }), updated_by: user.id },
       { onConflict: 'key' }
     )
 

@@ -206,9 +206,9 @@ export function Features() {
 
           <div className="mx-auto max-w-2xl rounded-[var(--r-lg)] border border-[var(--border-md)] bg-[var(--paper)] px-8 py-6 text-center">
             <p className="font-serif text-lg leading-relaxed text-[var(--ink-2)]">
-              TriFinity brengt alles samen in één persoonlijk financieel dagblad — je
-              vermogen, je keuzes en je toekomst, vertaald naar{' '}
-              <strong className="font-semibold text-[var(--ink)]">de vrijheid om te kiezen</strong>.
+              TriFinity begeleidt je bij elke stap — van financieel inzicht naar
+              gepersonaliseerde acties tot{' '}
+              <strong className="font-semibold text-[var(--ink)]">financiële onafhankelijkheid</strong>.
             </p>
           </div>
         </Reveal>
@@ -239,16 +239,17 @@ export function Features() {
             <div className="mb-8 grid items-start gap-10 md:grid-cols-2 md:gap-16">
               <div>
                 <p className="mb-2 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-kern-600">
-                  De Kern — Je fundament
+                  De Kern — Ken je werkelijkheid
                 </p>
                 <h3 className="mb-4 font-display text-[1.7rem] font-bold tracking-[-0.02em] text-[var(--ink)] md:text-[2rem]">
-                  Vermogen, budgetten en{' '}
-                  <span className="text-kern-600">uitgaven</span> in één oogopslag
+                  Je nettovermogen, bezittingen en{' '}
+                  <span className="text-kern-600">uitgaven</span> — <em>helder en eerlijk</em>
                 </h3>
                 <p className="font-serif text-base leading-relaxed text-[var(--ink-2)]">
-                  Van banktransacties tot beleggingsportefeuille, van maandbudget tot
-                  schuldenplan — De Kern geeft je een volledig en eerlijk beeld van je
-                  financiële fundament. Vertaald naar jaren, maanden en dagen vrijheid.
+                  Wat bezit je, wat ben je schuldig, wat geef je uit? De Kern brengt
+                  alles samen: je nettovermogen in euro&apos;s, je vrijheidstijd in
+                  maanden en jaren, je budget als je dat wilt. Begin simpel of ga zo
+                  diep als je wilt.
                 </p>
               </div>
               <QuoteBlock
@@ -370,17 +371,18 @@ export function Features() {
               </div>
               <div className="order-1 md:order-2">
                 <p className="mb-2 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-wil-600">
-                  De Wil — Laat Will je helpen
+                  De Wil — Neem de regie
                 </p>
                 <h3 className="mb-4 font-display text-[1.7rem] font-bold tracking-[-0.02em] text-[var(--ink)] md:text-[2rem]">
-                  Persoonlijke{' '}
-                  <span className="text-wil-600">AI-coaching</span>{' '}
-                  die je vrijheid versnelt
+                  Gepersonaliseerde{' '}
+                  <span className="text-wil-600"><em>inzichten en acties</em></span>{' '}
+                  voor jouw situatie
                 </h3>
                 <p className="font-serif text-base leading-relaxed text-[var(--ink-2)]">
-                  Geen generieke tips uit een spreadsheet. Will is je AI-coach die je
-                  volledige financiële context kent — vermogen, budgetten, uitgavenpatronen,
-                  schulden en doelen — en je helpt betere keuzes maken.
+                  De Wil combineert jouw financiële data met AI om je te laten zien
+                  wat je nu kunt doen. Persoonlijke inzichten over je uitgaven, maar
+                  ook signalen van buiten: belastingwijzigingen, rentestand en
+                  marktontwikkelingen — vertaald naar impact op jou.
                 </p>
               </div>
             </div>
@@ -487,16 +489,17 @@ export function Features() {
             <div className="mb-8 grid items-start gap-10 md:grid-cols-2 md:gap-16">
               <div>
                 <p className="mb-2 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-horizon-600">
-                  De Horizon — Jouw toekomst
+                  De Horizon — Zie je vrijheid groeien
                 </p>
                 <h3 className="mb-4 font-display text-[1.7rem] font-bold tracking-[-0.02em] text-[var(--ink)] md:text-[2rem]">
-                  <span className="text-horizon-600">NL-specifiek</span>{' '}
-                  plannen naar financiële vrijheid
+                  Je <span className="text-horizon-600"><em>toekomst</em></span>{' '}
+                  in jaren en maanden — elke keuze telt
                 </h3>
                 <p className="font-serif text-base leading-relaxed text-[var(--ink-2)]">
-                  Geen internationale tool die het Nederlandse systeem niet snapt. TriFinity
-                  begrijpt Box 3, AOW, werkgeverspensioen en hypotheekrenteaftrek — en
-                  vertaalt het naar jouw persoonlijke vrijheidspad.
+                  Of je doel nu &apos;grip krijgen&apos; of &apos;met 50 stoppen&apos;
+                  is — De Horizon laat je zien waar je naartoe gaat. What-if
+                  scenario&apos;s, levensgebeurtenissen, en je vrijheidsgetal dat maand
+                  na maand groeit.
                 </p>
               </div>
               <QuoteBlock

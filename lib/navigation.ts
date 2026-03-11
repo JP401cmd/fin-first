@@ -13,18 +13,6 @@ export type ModuleNavConfig = {
   items: ModuleNavItem[]
 }
 
-export const coreNav: ModuleNavConfig = {
-  module: 'De Kern',
-  basePath: '/core',
-  color: 'amber',
-  items: [
-    { label: 'Overzicht', href: '/core' },
-    { label: 'Budgetten', href: '/core/budgets' },
-    { label: 'Schulden', href: '/core/debts' },
-    { label: 'Assets', href: '/core/assets' },
-  ],
-}
-
 export const willNav: ModuleNavConfig = {
   module: 'De Wil',
   basePath: '/will',

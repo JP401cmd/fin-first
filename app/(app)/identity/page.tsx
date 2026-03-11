@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { computeSovereigntyLevel, PHASES, levelToPhaseId } from '@/lib/feature-phases'
 import { NL_SWR, ageAtDate } from '@/lib/horizon-data'
-import { ChevronRight, BookOpen } from 'lucide-react'
+import { ChevronRight, BookOpen, Check } from 'lucide-react'
 import {
   temporalLevels,
   chronologyPhases,
@@ -35,6 +35,9 @@ export default function IdentityPage() {
   const [expandedPhase, setExpandedPhase] = useState<string | null>(null)
   const featuresPerPhase = getFeaturesPerPhase()
 
+
+  // Check-in timeline
+  const [completedMonths, setCompletedMonths] = useState<string[]>([])
 
   // Demo user state
   const [isDemoUser, setIsDemoUser] = useState(false)
@@ -98,6 +101,15 @@ export default function IdentityPage() {
 
       setSovereigntyLevel(computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPct, hasConsumerDebt))
       setFinancialData({ netWorth, monthsCovered, freedomPct, hasConsumerDebt })
+
+      // Check-in timeline data
+      try {
+        const checkinRes = await fetch('/api/monthly-checkin')
+        if (checkinRes.ok) {
+          const d = await checkinRes.json()
+          setCompletedMonths(d.completedMonths || [])
+        }
+      } catch { /* graceful fallback */ }
 
       setLoading(false)
     }
@@ -265,6 +277,8 @@ export default function IdentityPage() {
         <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />
       </Link>
 
+      {/* ── Check-in tijdlijn ─────────────────────────────────────── */}
+      <CheckinTimeline completedMonths={completedMonths} />
 
       {/* ── The Temporal Balance ──────────────────────────────────── */}
       <section className="mb-5 sm:mb-8 card-editorial p-4 sm:p-8">
@@ -599,5 +613,78 @@ export default function IdentityPage() {
       </section>
 
     </div>
+  )
+}
+
+/* ── CheckinTimeline ─────────────────────────────────────────────────── */
+const MONTH_LETTERS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D']
+
+function CheckinTimeline({ completedMonths }: { completedMonths: string[] }) {
+  const now = new Date()
+  const year = now.getFullYear()
+  const currentMonth = now.getMonth() // 0-indexed
+  const currentMonthKey = `${year}-${String(currentMonth + 1).padStart(2, '0')}`
+
+  return (
+    <section className="mb-5 sm:mb-8 card-editorial p-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="label-editorial text-[var(--ink-3)]">Geldcheck-ins {year}</p>
+        <Link
+          href="/core/checkin/historie"
+          className="text-[11px] font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors"
+        >
+          Alle bekijken
+        </Link>
+      </div>
+      <div className="flex justify-between">
+        {Array.from({ length: 12 }, (_, i) => {
+          const monthKey = `${year}-${String(i + 1).padStart(2, '0')}`
+          const isCompleted = completedMonths.includes(monthKey)
+          const isCurrent = monthKey === currentMonthKey
+          const isFuture = i > currentMonth
+
+          let href: string | null = null
+          if (isCompleted) {
+            href = `/core/checkin?month=${monthKey}&from=/identity`
+          } else if (isCurrent) {
+            href = '/core/checkin?from=/identity'
+          }
+
+          const circle = (
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-[10px] font-mono text-[var(--ink-3)]">{MONTH_LETTERS[i]}</span>
+              <div
+                className={`flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
+                  isCompleted
+                    ? 'bg-kern-500 text-white'
+                    : isCurrent
+                    ? 'ring-2 ring-kern-400 bg-transparent'
+                    : 'bg-[var(--subtle)]'
+                } ${href ? 'cursor-pointer' : ''}`}
+              >
+                {isCompleted && <Check className="h-3.5 w-3.5" strokeWidth={2.5} />}
+                {isCurrent && !isCompleted && (
+                  <div className="h-2 w-2 rounded-full bg-kern-400" />
+                )}
+              </div>
+            </div>
+          )
+
+          if (href) {
+            return (
+              <Link key={monthKey} href={href} className="hover:opacity-80 transition-opacity">
+                {circle}
+              </Link>
+            )
+          }
+
+          return (
+            <div key={monthKey} className={isFuture ? 'opacity-30' : 'opacity-50'}>
+              {circle}
+            </div>
+          )
+        })}
+      </div>
+    </section>
   )
 }

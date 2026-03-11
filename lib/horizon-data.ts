@@ -192,6 +192,17 @@ export interface LifeEvent {
 /** LifeEvent with camelCase keys (frontend representation). */
 export type LifeEventFe = CamelCaseKeys<LifeEvent>
 
+/** User-editable cashflow definition, stored in metadata.cashflows (JSONB). */
+export interface UserDefinedCashflow {
+  id: string
+  name: string
+  type: 'one_time' | 'recurring'
+  direction: 'income' | 'expense'
+  amount: number       // always positive
+  durationMonths: number // 0 = one-time, >0 = duration in months
+  indexed: boolean
+}
+
 // ── Per-event-type metadata interfaces (type-safe access) ────────────
 
 export interface ChildrenMetadata {

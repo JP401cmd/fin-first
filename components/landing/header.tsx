@@ -78,11 +78,11 @@ export function Header() {
             {menuOpen && (
               <div className="absolute right-0 mt-2 w-44 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] py-1 shadow-[var(--s2)]">
                 <Link
-                  href="/dashboard"
+                  href="/will"
                   className="block px-4 py-2 font-sans text-sm text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
                   onClick={() => setMenuOpen(false)}
                 >
-                  Dashboard
+                  De Wil
                 </Link>
                 <Link
                   href="/logout"

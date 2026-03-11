@@ -8,6 +8,7 @@
 import {
   BOX3_DRAG,
   type LifeEvent,
+  type UserDefinedCashflow,
   type ChildrenMetadata,
   type AOWMetadata,
   type InheritanceMetadata,
@@ -466,6 +467,28 @@ export function lifeEventsToCashflows(events: LifeEvent[]): SimCashflow[] {
       skipGenericCost = true
     }
 
+    // ── User-defined custom cashflows from metadata ──
+    const customFlows = (meta.cashflows as UserDefinedCashflow[] | undefined) ?? []
+    if (customFlows.length > 0) {
+      for (const cf of customFlows) {
+        const dur = cf.durationMonths > 0 ? Math.ceil(cf.durationMonths / 12) : null
+        flows.push({
+          id: `le-custom-${ev.id}-${cf.id}`,
+          name: cf.name || ev.name,
+          type: cf.type,
+          direction: cf.direction,
+          amount: cf.amount,
+          fromAge: age,
+          toAge: dur != null ? age + dur : null,
+          indexed: cf.indexed,
+        })
+      }
+      // Custom cashflows replace the generic fallback
+      skipGenericCost = true
+      skipGenericMonthlyCost = true
+      skipGenericMonthlyIncome = true
+    }
+
     // ── Generic fallback: use stored amounts (backward compatible) ──
 
     // 1. Eenmalige kosten (one_time_cost) — eenmalige bedragen zijn nooit geïndexeerd
@@ -527,4 +550,17 @@ export function lifeEventsToCashflows(events: LifeEvent[]): SimCashflow[] {
   }
 
   return flows
+}
+
+/**
+ * Preview cashflows for a single life event, regardless of is_active or target_age.
+ * Useful for displaying calculated flows in modal previews before saving.
+ */
+export function previewEventCashflows(event: LifeEvent): SimCashflow[] {
+  const previewEvent: LifeEvent = {
+    ...event,
+    is_active: true,
+    target_age: event.target_age ?? 40, // fallback for preview
+  }
+  return lifeEventsToCashflows([previewEvent])
 }

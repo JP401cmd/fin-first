@@ -39,7 +39,7 @@ export default function AppError({
         </h1>
         <p className="mt-3 text-base text-zinc-600">
           Er is een onverwachte fout opgetreden. Onze excuses voor het ongemak.
-          Probeer het opnieuw of ga terug naar het dashboard.
+          Probeer het opnieuw of ga terug naar De Wil.
         </p>
 
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
@@ -50,10 +50,10 @@ export default function AppError({
             Opnieuw proberen
           </button>
           <Link
-            href="/dashboard"
+            href="/will"
             className="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-6 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
           >
-            Naar dashboard
+            Naar De Wil
           </Link>
         </div>
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { DraggableWidgetGrid } from './draggable-widget-grid'
 import type { WidgetPref } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
@@ -9,6 +9,16 @@ vi.mock('./widget-renderer', () => ({
   WidgetRenderer: ({ id, size }: { id: string; size: string }) => (
     <div data-testid={`widget-${id}`} data-size={size}>Widget {id}</div>
   ),
+}))
+
+// Mock AutoDashboardWizard to avoid dependency chain
+vi.mock('./auto-dashboard-wizard', () => ({
+  AutoDashboardWizard: () => null,
+}))
+
+// Mock next/navigation
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }),
 }))
 
 // Mock useFeatureAccess — all features enabled by default
@@ -70,6 +80,7 @@ const mockData: DashboardData = {
   netWorthHistory: [],
   savingsHistory: [],
   expenseHistory: [],
+  budgetTypeHistory: { income: [], expense: [], savings: [], debt: [] },
   assetsByType: [],
   totalPurchaseValue: 0,
   fireAgeFractional: null,
@@ -86,6 +97,7 @@ const mockData: DashboardData = {
   prevMonthExpenses: 0,
   netWorthDelta: null,
   favoriteBudgets: [],
+  allBudgets: [] as { id: string; name: string; icon: string; budgetType: 'income' | 'expense' | 'savings' | 'debt'; isFavorite: boolean; parentId: string | null }[],
   notifications: [],
   badgeSummary: { earned: 0, total: 0, latestBadge: null, nearestBadge: null },
   streaks: [],
@@ -214,5 +226,33 @@ describe('DraggableWidgetGrid', () => {
     )
     // No error initially
     expect(container.querySelector('[data-testid="save-error"]')).not.toBeInTheDocument()
+  })
+
+  it('Auto dashboard button is hidden outside edit mode', () => {
+    const prefs = makePrefs(['acties'])
+    render(
+      <DraggableWidgetGrid
+        initialPrefs={prefs}
+        allPrefs={prefs}
+        data={mockData}
+      />
+    )
+    expect(screen.queryByTestId('auto-dashboard-btn')).not.toBeInTheDocument()
+  })
+
+  it('Auto dashboard button is visible in edit mode', async () => {
+    const prefs = makePrefs(['acties'])
+    render(
+      <DraggableWidgetGrid
+        initialPrefs={prefs}
+        allPrefs={prefs}
+        data={mockData}
+      />
+    )
+    // Enter edit mode
+    const editBtn = screen.getByRole('button', { name: /modify/i })
+    fireEvent.click(editBtn)
+
+    expect(screen.getByTestId('auto-dashboard-btn')).toBeInTheDocument()
   })
 })

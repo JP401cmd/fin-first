@@ -93,8 +93,8 @@ export async function GET() {
   const assetsHasRedirect = assetsPageContent.includes("redirect('/core/assets')") ||
                            assetsPageContent.includes("redirect('/login')")
   const proxyRedirectsAuthToLogin = proxyContent.includes("url.pathname = '/login'")
-  const proxyRedirectsAuthToDash = proxyContent.includes("url.pathname = '/dashboard'")
-  // The proxy should only redirect authenticated users FROM auth pages TO dashboard (not FROM /core pages)
+  const proxyRedirectsAuthToWill = proxyContent.includes("url.pathname = '/will'")
+  // The proxy should only redirect authenticated users FROM auth pages TO /will (not FROM /core pages)
   const noLoopPattern = !assetsHasRedirect && proxyRedirectsAuthToLogin
   results.push({
     test: 'No redirect loop patterns between /core/assets and /login',
@@ -139,16 +139,16 @@ export async function GET() {
       : 'redirectTo param not properly set in proxy',
   })
 
-  // Test 10: Login page navigates to redirectTo (not hardcoded /dashboard)
-  const usesRedirectToOrDashboard = loginContent.includes("redirectTo && redirectTo.startsWith('/')") ||
+  // Test 10: Login page navigates to redirectTo (not hardcoded)
+  const usesRedirectToOrWill = loginContent.includes("redirectTo && redirectTo.startsWith('/')") ||
                                      loginContent.includes('redirectTo')
-  const fallbackToDashboard = loginContent.includes("'/dashboard'")
+  const fallbackToWill = loginContent.includes("'/will'")
   results.push({
-    test: 'Login navigates to redirectTo with /dashboard fallback',
-    pass: usesRedirectToOrDashboard && fallbackToDashboard,
-    detail: usesRedirectToOrDashboard && fallbackToDashboard
-      ? 'Login uses redirectTo if present, falls back to /dashboard'
-      : `usesRedirect=${usesRedirectToOrDashboard}, fallback=${fallbackToDashboard}`,
+    test: 'Login navigates to redirectTo with /will fallback',
+    pass: usesRedirectToOrWill && fallbackToWill,
+    detail: usesRedirectToOrWill && fallbackToWill
+      ? 'Login uses redirectTo if present, falls back to /will'
+      : `usesRedirect=${usesRedirectToOrWill}, fallback=${fallbackToWill}`,
   })
 
   // Test 11: Verify authenticated API check works (assets require auth for data)

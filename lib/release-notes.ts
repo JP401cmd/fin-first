@@ -44,6 +44,150 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'fin_prod_0.83',
+    date: '2026-03-11',
+    title:
+      'TrueLayer bankconnectie, dashboard-wizard, uitgebreide doelen, trend-widgets & data-architectuur',
+    sections: [
+      {
+        module: 'Platform — TrueLayer Bankconnectie',
+        color: 'rose',
+        items: [
+          {
+            title: 'GoCardless vervangen door TrueLayer',
+            description:
+              'Volledige migratie van GoCardless naar TrueLayer als bankconnectie-provider. OAuth 2.0 flow met sandbox- en productie-ondersteuning.',
+          },
+          {
+            title: 'Automatische transactiesynchronisatie',
+            description:
+              'Bankrekeningen worden automatisch gesynchroniseerd met deduplicatie, automatische categorisering en rate limiting (10 requests/dag per rekening).',
+          },
+          {
+            title: 'Rekeningbeheer',
+            description:
+              'Gekoppelde rekeningen tonen syncstatus, laatste synchronisatietijd, dagelijkse requestteller en token-verloopwaarschuwing. Automatische asset-backfill voor nettovermogensberekening.',
+          },
+          {
+            title: 'Beheer: bankconnectie-configuratie',
+            description:
+              'Nieuwe beheer-pagina voor TrueLayer-instellingen: aan/uit-schakelaar, client-credentials, omgeving-keuze en testverbinding.',
+          },
+        ],
+      },
+      {
+        module: 'Dashboard — Wizard & Widgets',
+        color: 'blue',
+        items: [
+          {
+            title: 'Auto Dashboard Wizard',
+            description:
+              'Meerstappen-wizard om je dashboard te personaliseren: kies focusgebieden, modulevoorkeuren, gridformaat en detailniveau. Deterministische scoring rangschikt widgets op basis van je keuzes.',
+          },
+          {
+            title: '4 trend-widgets',
+            description:
+              'Nieuwe sparkline-widgets voor inkomen, uitgaven, sparen en schulden. 6- en 12-maanden trendlijnen met maand-op-maand verandering, budgetlijn en voortschrijdend gemiddelde. Vrijheidstijd-omrekening bij volledig formaat.',
+          },
+          {
+            title: '4 inzicht-widgets',
+            description:
+              'Beslissingspatronen, vrijheidsdagen deze maand, wilskracht-score en berichten als nieuwe dashboard-widgets. Elk met quarter/half/full formaten.',
+          },
+          {
+            title: 'Widget grid verbeterd',
+            description:
+              'Inline groottekeuze per widget (vervangt cyclisch doorschakelen), drop-placeholder bij slepen, verberg/toevoeg-knoppen en wizard-knop. Budgetfavorieten worden apart opgeslagen.',
+          },
+          {
+            title: 'Data loader extractie',
+            description:
+              'Dashboard- en De Wil data-ophalen geëxtraheerd naar dedicated loaders (dashboard-data-loader.ts, will-data-loader.ts). Schonere paginacomponenten en betere testbaarheid.',
+          },
+        ],
+      },
+      {
+        module: 'De Wil — Doelen & Componentarchitectuur',
+        color: 'teal',
+        items: [
+          {
+            title: '6 nieuwe doeltypes',
+            description:
+              'Spaarquote, belegd vermogen, passief inkomen, noodfonds, salaris en vrij doel als nieuwe doeltypes. Elk met eigen metadata, icoon en geformateerde streefwaarde.',
+          },
+          {
+            title: 'Compact actiebord',
+            description:
+              'Actiebord toont maximaal 5 acties met BottomSheet voor de volledige lijst. Editorial kolomstyling met icon-headers en count-badges.',
+          },
+          {
+            title: 'Component-extractie',
+            description:
+              'De Wil volledig gemodulariseerd: will-hero, will-landing, action-center, module-side-bar en module-strip als losse componenten. Berichten-pagina refactored naar berichten-client.',
+          },
+        ],
+      },
+      {
+        module: 'De Kern — Check-in & Herwaardering',
+        color: 'amber',
+        items: [
+          {
+            title: 'Herwaarderingsstappen in check-in',
+            description:
+              'Check-in wizard uitgebreid met bezittingen- en schulden-herwaardering. Bezittingen, schulden en losse doelen worden stap voor stap bijgewerkt met actuele waarden.',
+          },
+          {
+            title: 'Levensgebeurtenissen widget herontworpen',
+            description:
+              'Volledig nieuwe visualisatie met vermogensprojectie-grafiek en event-markers. SVG-animaties tonen de impact van elke levensgebeurtenis op je vrijheidstijd.',
+          },
+          {
+            title: 'Cash-module vernieuwd',
+            description:
+              'Kasoverzicht toont nu CashAccountView in plaats van redirect. Verbindingsflow gemigreerd naar TrueLayer OAuth met nieuwe callback- en succespagina\'s.',
+          },
+        ],
+      },
+      {
+        module: 'De Horizon — Visualisaties',
+        color: 'purple',
+        items: [
+          {
+            title: 'Horizon pagina verbeterd',
+            description:
+              'Vernieuwde De Horizon overzichtspagina met verbeterde layout en datapresentatie.',
+          },
+          {
+            title: 'Simulatiegrafiek updates',
+            description:
+              'SimChart en events-tijdlijn visueel verfijnd. Betere interpolatie en compacte valutalabels bij event-markers.',
+          },
+        ],
+      },
+      {
+        module: 'Beheer — Nieuwe pagina\'s',
+        color: 'zinc',
+        items: [
+          {
+            title: 'AI Prompts inspectiepagina',
+            description:
+              'Alle systeemprompts in één overzicht: base, kern, wil, horizon, briefing, voorstellen en what-if. Met karaktertellingen, bronbestanden en gecombineerde preview.',
+          },
+          {
+            title: 'Propositie-pagina',
+            description:
+              'Editorial narratief van de TriFinity-filosofie: "Geld is opgeslagen tijd". Waardepropositie, modulekaart, differentiatie en het aha-moment.',
+          },
+          {
+            title: 'Check-in beheer',
+            description:
+              'Maandelijkse check-in snapshots bekijken en verwijderen via de beheerpagina.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: 'fin_prod_0.82',
     date: '2026-03-08',
     title:

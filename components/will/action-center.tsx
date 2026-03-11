@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Target, Plus, Users } from 'lucide-react'
+import { Target, Plus, Users, Sparkles, CheckCircle, ChevronRight } from 'lucide-react'
 import { RecommendationList } from '@/components/app/recommendation-list'
 import { ActionBoard } from '@/components/app/action-board'
 import { GoalDetailModal } from '@/components/app/will/goal-detail-modal'
@@ -15,6 +15,7 @@ import {
 import { BudgetIcon } from '@/components/app/budget-shared'
 import { useDailyExpenseRate } from '@/components/app/freedom-time-label'
 import { FeatureGate } from '@/components/app/feature-gate'
+import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import type { Recommendation, Action } from '@/lib/recommendation-data'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
 
@@ -61,7 +62,10 @@ export function ActionCenter({
   const [showGoalModal, setShowGoalModal] = useState(false)
   const [showGoalForm, setShowGoalForm] = useState(false)
   const [goalFilter, setGoalFilter] = useState<'all' | 'personal' | 'shared'>('all')
+  const [activeTab, setActiveTab] = useState<'inzicht' | 'actie' | 'resultaat'>('actie')
   const { dailyExpenseRate } = useDailyExpenseRate()
+  const { features } = useFeatureAccess()
+  const doelenEnabled = features.doelen_systeem !== false
 
   // Filter goals by ownership
   const hasSharedGoals = goals.some(g => g.ownership === 'shared')
@@ -81,145 +85,243 @@ export function ActionCenter({
     onGoalsChanged?.()
   }
 
-  const showKpiCards = openRecommendationCount != null || openActionCount != null || avgGoalProgress != null
+  // --- Pipeline metrics ---
+  const pendingCount = openRecommendationCount ?? recommendations.filter(r => r.status === 'pending').length
+
+  const totalPendingRecDays = Math.round(
+    recommendations
+      .filter(r => r.status === 'pending')
+      .reduce((s, r) => s + (r.freedom_days_per_year || 0), 0)
+  )
+
+  const totalOpenActionDays = Math.round(
+    actions
+      .filter(a => a.status === 'open' || a.status === 'postponed')
+      .reduce((s, a) => s + (a.freedom_days_impact || 0), 0)
+  )
+
+  const goalProgress = avgGoalProgress ?? 0
+
+  // --- Tab config (conditionally include Resultaat) ---
+  const tabs = [
+    { key: 'inzicht' as const, label: `Inzicht (${pendingCount})` },
+    { key: 'actie' as const, label: `Actie (${openActionCount ?? 0})` },
+    ...(doelenEnabled ? [{ key: 'resultaat' as const, label: `Resultaat (${filteredGoals.length})` }] : []),
+  ]
 
   return (
     <>
-      {/* Section header */}
-      <div className="mb-4 border-b border-[var(--border-ed)] pb-2">
-        <h2 className="label-editorial text-[var(--ink-2)]">Actiecentrum</h2>
-      </div>
+      <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
+        {/* ── Accent bar ── */}
+        <div className="h-[3px] w-full bg-wil-500" />
 
-      {/* KPI stat cards */}
-      {showKpiCards && (
-        <div className="grid grid-cols-3 gap-3 mb-5">
-          <div className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/50 px-4 py-3 text-center">
-            <p className="font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">
-              {openRecommendationCount ?? 0}
-            </p>
-            <p className="text-xs text-[var(--ink-3)]">Voorstellen</p>
+        {/* ── Pipeline header: Inzicht → Actie → Resultaat ── */}
+        <div className="border-b border-[var(--border-ed)] px-4 py-4 sm:px-5">
+          <div className="flex items-center justify-between">
+            {/* Step 1: Inzicht */}
+            <div className="flex-1 text-center animate-fade-up" style={{ '--stagger': '0ms' } as React.CSSProperties}>
+              <p className="label-editorial text-wil-600">Inzicht</p>
+              <p className="mt-1 font-mono text-lg font-bold tabular-nums text-[var(--ink)] sm:text-xl">
+                +{totalPendingRecDays}
+              </p>
+              <p className="font-serif text-[11px] italic text-[var(--ink-3)] sm:text-xs">
+                vrijheidsdagen te ontdekken
+              </p>
+            </div>
+
+            {/* Connector 1→2 */}
+            <div className="flex shrink-0 items-center text-[var(--ink-4)]">
+              <div className="h-px w-3 bg-[var(--border-md)] sm:w-6" />
+              <ChevronRight className="h-3 w-3" />
+            </div>
+
+            {/* Step 2: Actie */}
+            <div className="flex-1 text-center animate-fade-up" style={{ '--stagger': '80ms' } as React.CSSProperties}>
+              <p className="label-editorial text-wil-600">Actie</p>
+              <p className="mt-1 font-mono text-lg font-bold tabular-nums text-[var(--ink)] sm:text-xl">
+                +{totalOpenActionDays}
+              </p>
+              <p className="font-serif text-[11px] italic text-[var(--ink-3)] sm:text-xs">
+                vrijheidsdagen in uitvoering
+              </p>
+            </div>
+
+            {/* Connector 2→3 */}
+            <div className="flex shrink-0 items-center text-[var(--ink-4)]">
+              <div className="h-px w-3 bg-[var(--border-md)] sm:w-6" />
+              <ChevronRight className="h-3 w-3" />
+            </div>
+
+            {/* Step 3: Resultaat */}
+            <div className="flex-1 text-center animate-fade-up" style={{ '--stagger': '160ms' } as React.CSSProperties}>
+              <p className="label-editorial text-wil-600">Resultaat</p>
+              <p className="mt-1 font-mono text-lg font-bold tabular-nums text-[var(--ink)] sm:text-xl">
+                {goalProgress}%
+              </p>
+              <p className="font-serif text-[11px] italic text-[var(--ink-3)] sm:text-xs">
+                doelvoortgang
+              </p>
+            </div>
           </div>
-          <div className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/50 px-4 py-3 text-center">
-            <p className="font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">
-              {openActionCount ?? 0}
-            </p>
-            <p className="text-xs text-[var(--ink-3)]">Acties</p>
-          </div>
-          <div className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/50 px-4 py-3 text-center">
-            <p className="font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">
-              {avgGoalProgress ?? 0}%
-            </p>
-            <p className="text-xs text-[var(--ink-3)]">Doel voortgang</p>
+
+          {/* Progress bar */}
+          <div className="mt-3 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+            <div
+              className="h-full rounded-full bg-wil-500 transition-all duration-500"
+              style={{ width: `${goalProgress}%` }}
+            />
           </div>
         </div>
-      )}
 
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-stretch">
-
-        {/* --- Column 1: Voorstellen --- */}
-        <div id="voorstellen" className="scroll-mt-8 flex flex-col rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5">
-          <h2 className="mb-4 label-editorial text-[var(--ink-2)]">Voorstellen</h2>
-          <RecommendationList initialRecommendations={recommendations} />
+        {/* ── Mobile tab bar (< lg) ── */}
+        <div className="border-b border-[var(--border-ed)] px-5 pb-3 pt-3 lg:hidden">
+          <div className="flex gap-1 rounded-[var(--r)] bg-[var(--subtle)] p-1" role="tablist">
+            {tabs.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                role="tab"
+                aria-selected={activeTab === tab.key}
+                className={`flex-1 rounded-[var(--r-sm)] px-2 py-1.5 text-[11px] font-semibold transition-colors ${
+                  activeTab === tab.key
+                    ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
+                    : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* --- Column 2: Acties --- */}
-        <div id="acties" className="scroll-mt-8 flex flex-col rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5">
-          <h2 className="mb-4 label-editorial text-[var(--ink-2)]">Acties</h2>
-          <ActionBoard
-            initialActions={actions}
-            partnerInfo={partnerInfo}
-            currentUserId={currentUserId}
-            onCancellationOpen={onCancellationOpen}
-          />
-        </div>
+        {/* ── Content grid — tabs on mobile, 3-col with vertical rules on desktop ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3">
+          {/* Column 1: Inzicht (Voorstellen) */}
+          <div
+            id="voorstellen"
+            className={`scroll-mt-8 p-5 lg:border-r lg:border-[var(--border-ed)] ${
+              activeTab !== 'inzicht' ? 'hidden lg:block' : ''
+            }`}
+          >
+            <div className="mb-4 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-wil-500" />
+              <h3 className="label-editorial text-[var(--ink-2)]">Inzicht</h3>
+              <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--subtle)] px-1.5 font-mono text-[10px] font-bold tabular-nums text-[var(--ink-3)]">
+                {pendingCount}
+              </span>
+            </div>
+            <RecommendationList initialRecommendations={recommendations} hideHeader />
+          </div>
 
-        {/* --- Column 3: Doelen --- */}
-        <FeatureGate featureId="doelen_systeem" fallback="hidden">
-          <div id="doelen" className="scroll-mt-8 flex flex-col rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="label-editorial text-[var(--ink-2)]">Doelen</h2>
-                <div className="mt-2 flex items-center gap-2">
-                  <Target className="h-4 w-4 shrink-0 text-wil-500" />
-                  <span className="text-sm font-semibold text-[var(--ink)]">Doelen</span>
+          {/* Column 2: Actie */}
+          <div
+            id="acties"
+            className={`scroll-mt-8 p-5 lg:border-r lg:border-[var(--border-ed)] ${
+              activeTab !== 'actie' ? 'hidden lg:block' : ''
+            }`}
+          >
+            <div className="mb-4 flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-wil-500" />
+              <h3 className="label-editorial text-[var(--ink-2)]">Actie</h3>
+              <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--subtle)] px-1.5 font-mono text-[10px] font-bold tabular-nums text-[var(--ink-3)]">
+                {openActionCount ?? 0}
+              </span>
+            </div>
+            <ActionBoard
+              initialActions={actions}
+              partnerInfo={partnerInfo}
+              currentUserId={currentUserId}
+              onCancellationOpen={onCancellationOpen}
+            />
+          </div>
+
+          {/* Column 3: Resultaat (Doelen) */}
+          <FeatureGate featureId="doelen_systeem" fallback="hidden">
+            <div
+              id="doelen"
+              className={`scroll-mt-8 p-5 ${
+                activeTab !== 'resultaat' ? 'hidden lg:block' : ''
+              }`}
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Target className="h-4 w-4 text-wil-500" />
+                  <h3 className="label-editorial text-[var(--ink-2)]">Resultaat</h3>
                   <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--subtle)] px-1.5 font-mono text-[10px] font-bold tabular-nums text-[var(--ink-3)]">
                     {filteredGoals.length}
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-[var(--ink-3)]">
-                  Financiele mijlpalen op weg naar volledige vrijheid
-                </p>
+                <button
+                  onClick={() => setShowGoalForm(true)}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-transparent px-2.5 py-1.5 text-xs font-medium text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] hover:bg-[var(--subtle)]"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Nieuw doel</span>
+                </button>
               </div>
-              <button
-                onClick={() => setShowGoalForm(true)}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-transparent px-2.5 py-1.5 text-xs font-medium text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] hover:bg-[var(--subtle)]"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Nieuw doel</span>
-              </button>
-            </div>
 
-            {/* Goal filter tabs (only when household exists) */}
-            {hasSharedGoals && partnerInfo && (
-              <div className="mb-3 flex gap-1 rounded-[var(--r)] bg-[var(--subtle)] p-1">
-                {([
-                  { key: 'all' as const, label: 'Alles' },
-                  { key: 'personal' as const, label: 'Persoonlijk' },
-                  { key: 'shared' as const, label: 'Gedeeld' },
-                ]).map(({ key, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => setGoalFilter(key)}
-                    className={`flex-1 rounded-[var(--r-sm)] px-2 py-1 text-[11px] font-medium transition-colors ${
-                      goalFilter === key
-                        ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
-                        : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-                    }`}
-                  >
-                    {key === 'shared' && <Users className="mr-1 inline h-3 w-3" />}
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <div className="flex-1">
-              {filteredGoals.length > 0 ? (
-                <div className="space-y-3">
-                  {filteredGoals.slice(0, 3).map((goal, i) => (
-                    <GoalSummaryRow
-                      key={goal.id}
-                      goal={goal}
-                      progress={filteredGoalProgresses[i]}
-                      onClick={() => setShowGoalModal(true)}
-                      dailyExpenses={dailyExpenseRate}
-                    />
+              {/* Goal filter tabs (only when household exists) */}
+              {hasSharedGoals && partnerInfo && (
+                <div className="mb-3 flex gap-1 rounded-[var(--r)] bg-[var(--subtle)] p-1">
+                  {([
+                    { key: 'all' as const, label: 'Alles' },
+                    { key: 'personal' as const, label: 'Persoonlijk' },
+                    { key: 'shared' as const, label: 'Gedeeld' },
+                  ]).map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => setGoalFilter(key)}
+                      className={`flex-1 rounded-[var(--r-sm)] px-2 py-1 text-[11px] font-medium transition-colors ${
+                        goalFilter === key
+                          ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
+                          : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                      }`}
+                    >
+                      {key === 'shared' && <Users className="mr-1 inline h-3 w-3" />}
+                      {label}
+                    </button>
                   ))}
                 </div>
-              ) : (
-                <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-6 text-center">
-                  <p className="text-sm text-[var(--ink-3)]">
-                    Nog geen doelen. Klik op &ldquo;Nieuw doel&rdquo; om te starten.
-                  </p>
-                </div>
               )}
+
+              <div className="flex-1">
+                {filteredGoals.length > 0 ? (
+                  <div className="space-y-3">
+                    {filteredGoals.slice(0, 3).map((goal, i) => (
+                      <GoalSummaryRow
+                        key={goal.id}
+                        goal={goal}
+                        progress={filteredGoalProgresses[i]}
+                        onClick={() => setShowGoalModal(true)}
+                        dailyExpenses={dailyExpenseRate}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-6 text-center">
+                    <p className="text-sm text-[var(--ink-3)]">
+                      Nog geen doelen. Klik op &ldquo;Nieuw doel&rdquo; om te starten.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* View all goals button */}
+              <button
+                type="button"
+                onClick={() => setShowGoalModal(true)}
+                className="mt-4 w-full rounded-[var(--r)] py-2 text-center text-xs font-medium text-wil-600 transition-colors hover:bg-wil-50"
+              >
+                {filteredGoals.length > 3
+                  ? `Bekijk alle ${filteredGoals.length} doelen`
+                  : 'Alle doelen bekijken'}
+              </button>
             </div>
+          </FeatureGate>
+        </div>
+      </div>
 
-            {/* View all goals button */}
-            <button
-              type="button"
-              onClick={() => setShowGoalModal(true)}
-              className="mt-4 w-full rounded-[var(--r)] py-2 text-center text-xs font-medium text-wil-600 transition-colors hover:bg-wil-50"
-            >
-              {filteredGoals.length > 3
-                ? `Bekijk alle ${filteredGoals.length} doelen`
-                : 'Alle doelen bekijken'}
-            </button>
-          </div>
-        </FeatureGate>
-      </section>
-
-      {/* === Goal Modals === */}
+      {/* === Goal Modals (outside container) === */}
       <FeatureGate featureId="doelen_systeem" fallback="hidden">
         <GoalDetailModal
           open={showGoalModal}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   CheckCircle2,
@@ -9,6 +9,9 @@ import {
   Users,
   Briefcase,
   Sunset,
+  Trash2,
+  CalendarCheck,
+  Loader2,
   type LucideIcon,
 } from 'lucide-react'
 import { PERSONAS, PERSONA_KEYS, type PersonaKey } from '@/lib/test-personas'
@@ -624,6 +627,9 @@ export default function BeheerTestdataPage() {
         </div>
       )}
 
+      {/* Check-in beheer */}
+      <CheckinManager />
+
       {/* Fase-overgang testen */}
       <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">
         <h3 className="text-lg font-semibold text-[var(--ink)]">Fase-overgang testen</h3>
@@ -774,3 +780,181 @@ export default function BeheerTestdataPage() {
   )
 }
 
+/* ── Check-in beheer ─────────────────────────────────────────────────── */
+const MONTH_NAMES = [
+  'januari', 'februari', 'maart', 'april', 'mei', 'juni',
+  'juli', 'augustus', 'september', 'oktober', 'november', 'december',
+]
+
+function formatMonthLabel(monthKey: string): string {
+  if (monthKey.includes('-')) {
+    const [year, month] = monthKey.split('-')
+    const idx = parseInt(month, 10) - 1
+    if (idx >= 0 && idx < 12) return `${MONTH_NAMES[idx]} ${year}`
+  }
+  return monthKey
+}
+
+interface SnapshotInfo {
+  key: string
+  monthKey: string
+  savedAt: string
+  reflection: string
+}
+
+function CheckinManager() {
+  const [snapshots, setSnapshots] = useState<SnapshotInfo[]>([])
+  const [completedMonths, setCompletedMonths] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false)
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/checkins')
+      if (res.ok) {
+        const data = await res.json()
+        setSnapshots(data.snapshots || [])
+        setCompletedMonths(data.completedMonths || [])
+      }
+    } catch { /* graceful */ }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  async function handleDelete(month: string) {
+    setDeleting(month)
+    try {
+      await fetch('/api/admin/checkins', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month }),
+      })
+      await load()
+    } catch { /* graceful */ }
+    setDeleting(null)
+  }
+
+  async function handleDeleteAll() {
+    setConfirmDeleteAll(false)
+    setDeleting('all')
+    try {
+      await fetch('/api/admin/checkins', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true }),
+      })
+      await load()
+    } catch { /* graceful */ }
+    setDeleting(null)
+  }
+
+  // Extract month from snapshot key: checkin_snapshot_<uuid>_2026-03 → 2026-03
+  function monthFromKey(key: string): string {
+    const parts = key.split('_')
+    return parts[parts.length - 1] || ''
+  }
+
+  return (
+    <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-lg font-semibold text-[var(--ink)]">Check-in beheer</h3>
+          <p className="mt-1 text-sm text-[var(--ink-3)]">
+            Bekijk en verwijder check-in snapshots en maandmarkeringen.
+          </p>
+        </div>
+        {snapshots.length > 0 && (
+          <button
+            onClick={() => setConfirmDeleteAll(true)}
+            disabled={!!deleting}
+            className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
+          >
+            Alles wissen
+          </button>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 py-4">
+          <Loader2 className="h-4 w-4 animate-spin text-[var(--ink-3)]" />
+          <span className="text-sm text-[var(--ink-3)]">Laden...</span>
+        </div>
+      ) : snapshots.length === 0 ? (
+        <div className="flex items-center gap-3 rounded-lg bg-[var(--subtle)] p-4">
+          <CalendarCheck className="h-5 w-5 text-[var(--ink-4)]" />
+          <p className="text-sm text-[var(--ink-3)]">Geen check-in snapshots gevonden.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {/* Completed months summary */}
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {completedMonths.map(m => (
+              <span key={m} className="inline-flex rounded-full bg-kern-50 border border-kern-200 px-2 py-0.5 text-[10px] font-medium text-kern-700">
+                {formatMonthLabel(m)}
+              </span>
+            ))}
+          </div>
+
+          {/* Snapshot list */}
+          {snapshots.map(snap => {
+            const month = monthFromKey(snap.key)
+            return (
+              <div key={snap.key} className="flex items-center gap-3 rounded-lg border border-[var(--border-ed)] p-3">
+                <CalendarCheck className="h-4 w-4 text-kern-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[var(--ink)] capitalize">
+                    {formatMonthLabel(month)}
+                  </p>
+                  <p className="text-[11px] text-[var(--ink-3)] truncate">
+                    {snap.savedAt ? new Date(snap.savedAt).toLocaleString('nl-NL') : '—'}
+                    {snap.reflection && <> &middot; &ldquo;{snap.reflection.slice(0, 40)}{snap.reflection.length > 40 ? '...' : ''}&rdquo;</>}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDelete(month)}
+                  disabled={!!deleting}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--ink-3)] hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                  title={`Check-in ${formatMonthLabel(month)} verwijderen`}
+                >
+                  {deleting === month ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Confirm delete all */}
+      {confirmDeleteAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-md rounded-xl bg-[var(--paper)] p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-[var(--ink)]">Alle check-ins wissen?</h3>
+            <p className="mt-2 text-sm text-[var(--ink-2)]">
+              Dit verwijdert <span className="font-semibold text-red-600">alle</span> check-in snapshots, maandmarkeringen en voorkeuren. Dit kan niet ongedaan worden.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmDeleteAll(false)}
+                className="rounded-lg border border-[var(--border-md)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
+              >
+                Annuleren
+              </button>
+              <button
+                onClick={handleDeleteAll}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors"
+              >
+                Alles wissen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

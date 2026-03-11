@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   DndContext,
   closestCenter,
@@ -20,26 +21,16 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Maximize2, X, Plus, Lock } from 'lucide-react'
+import { GripVertical, X, Plus, Lock, Wand2 } from 'lucide-react'
 import { WidgetRenderer, type DashboardData } from './widget-renderer'
 import { reassignOrders } from '@/lib/widget-order'
+import { AutoDashboardWizard } from './auto-dashboard-wizard'
 import type { WidgetPref, WidgetSize, WidgetModule } from '@/lib/widget-catalog'
 import { WIDGET_CATALOG, WIDGET_FEATURE_MAP, getWidgetDef } from '@/lib/widget-catalog'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { useDashboardType } from '@/components/app/dashboard-type-provider'
 import { readBriefingContentPrefs, saveBriefingContentPrefs, type BriefingContentPrefs } from '@/lib/briefing/user-preferences'
 import { createClient } from '@/lib/supabase/client'
-
-/** Cycle to the next allowed size for a widget */
-function nextSize(currentSize: WidgetSize, widgetId: string): WidgetSize {
-  const def = getWidgetDef(widgetId)
-  const allowed = def?.sizes ?? ['quarter', 'half', 'full']
-  const cycle: WidgetSize[] = ['quarter', 'half', 'full']
-  const available = cycle.filter(s => allowed.includes(s))
-  if (available.length <= 1) return currentSize
-  const idx = available.indexOf(currentSize)
-  return available[(idx + 1) % available.length]
-}
 
 /** Human-readable size label */
 function sizeLabel(size: WidgetSize): string {
@@ -58,7 +49,7 @@ interface SortableWidgetItemProps {
   features: Record<string, boolean>
   isEditMode: boolean
   isDragging: boolean
-  onResize?: (id: string) => void
+  onResize?: (id: string, size: WidgetSize) => void
   onHide?: (id: string) => void
 }
 
@@ -72,12 +63,10 @@ function SortableWidgetItem({ pref, data, features, isEditMode, isDragging, onRe
     isDragging: isSelfDragging,
   } = useSortable({ id: pref.id })
 
-  const style = isSelfDragging
-    ? { opacity: 0, transition: undefined }
-    : {
-        transform: CSS.Transform.toString(transform),
-        transition,
-      }
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
 
   return (
     <div
@@ -90,6 +79,10 @@ function SortableWidgetItem({ pref, data, features, isEditMode, isDragging, onRe
       }
       data-testid={`widget-item-${pref.id}`}
     >
+      {/* Drop placeholder — visible where the widget was */}
+      {isSelfDragging ? (
+        <div className="h-full rounded-[var(--r-lg)] border-2 border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50" />
+      ) : (
       <div className="relative">
         {/* Edit controls — only visible in edit mode */}
         {isEditMode && (
@@ -104,17 +97,42 @@ function SortableWidgetItem({ pref, data, features, isEditMode, isDragging, onRe
             >
               <X className="h-3.5 w-3.5" />
             </button>
-            {/* Resize button */}
-            <button
-              type="button"
-              onClick={() => onResize?.(pref.id)}
-              aria-label={`Grootte wijzigen ${pref.id} widget (nu ${sizeLabel(pref.size)})`}
-              data-testid={`resize-btn-${pref.id}`}
-              title={`Grootte: ${sizeLabel(pref.size)}`}
-              className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-4)] shadow-[var(--s0)] transition-all hover:text-[var(--ink-3)] hover:shadow-[var(--s1)] active:scale-95 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0"
-            >
-              <Maximize2 className="h-3.5 w-3.5" />
-            </button>
+            {/* Size selector buttons */}
+            {(() => {
+              const def = getWidgetDef(pref.id)
+              const allowed = def?.sizes ?? (['quarter', 'half', 'full'] as WidgetSize[])
+              const allSizes: { key: WidgetSize; label: string }[] = [
+                { key: 'quarter' as WidgetSize, label: 'S' },
+                { key: 'half' as WidgetSize, label: 'M' },
+                { key: 'full' as WidgetSize, label: 'L' },
+              ]
+              const sizes = allSizes.filter(s => allowed.includes(s.key))
+              if (sizes.length <= 1) return null
+              return (
+                <div
+                  className="flex rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden"
+                  data-testid={`resize-btn-${pref.id}`}
+                >
+                  {sizes.map(s => (
+                    <button
+                      key={s.key}
+                      type="button"
+                      onClick={() => onResize?.(pref.id, s.key)}
+                      aria-label={`${pref.id} widget ${sizeLabel(s.key)}`}
+                      aria-pressed={pref.size === s.key}
+                      title={sizeLabel(s.key)}
+                      className={`flex items-center justify-center px-1.5 min-h-[44px] min-w-[32px] sm:min-h-0 sm:min-w-0 sm:h-9 sm:w-7 text-[10px] font-semibold transition-colors ${
+                        pref.size === s.key
+                          ? 'bg-[var(--ink)] text-white'
+                          : 'text-[var(--ink-4)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)]'
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              )
+            })()}
             {/* Drag handle */}
             <button
               type="button"
@@ -130,22 +148,19 @@ function SortableWidgetItem({ pref, data, features, isEditMode, isDragging, onRe
         )}
         <WidgetRenderer id={pref.id} size={pref.size} data={data} features={features} />
       </div>
+      )}
     </div>
   )
 }
 
-// ── Drop placeholder (overlay ghost) ──────────────────────────
+// ── Drag overlay (follows cursor) ─────────────────────────────
 
-function GhostCard({ pref }: { pref: WidgetPref }) {
+function DragPreview({ pref, data, features }: { pref: WidgetPref; data: DashboardData; features: Record<string, boolean> }) {
   return (
     <div
-      className={`opacity-90 scale-[1.02] rotate-[0.8deg] shadow-[var(--s2)] cursor-grabbing ${
-        pref.size === 'full' ? 'sm:col-span-2 row-span-2'
-        : pref.size === 'half' ? 'sm:col-span-2'
-        : ''
-      }`}
+      className="opacity-90 scale-[1.02] rotate-[0.8deg] shadow-[var(--s3)] cursor-grabbing ring-2 ring-kern-300 rounded-[var(--r-lg)] overflow-hidden"
     >
-      <div className="rounded-[var(--r-lg)] border border-[var(--border-md)] bg-[var(--paper)] h-full" />
+      <WidgetRenderer id={pref.id} size={pref.size} data={data} features={features} />
     </div>
   )
 }
@@ -170,6 +185,7 @@ function isWidgetAccessible(widgetId: string, features: Record<string, boolean>)
 }
 
 export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboardTypeToggle }: DraggableWidgetGridProps) {
+  const router = useRouter()
   const { features } = useFeatureAccess()
 
   // Filter out widgets that are not accessible based on feature-phase gating
@@ -181,6 +197,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [saveError, setSaveError] = useState<string | null>(null)
   const [showAddPicker, setShowAddPicker] = useState(false)
+  const [showAutoWizard, setShowAutoWizard] = useState(false)
 
   // Dashboard type toggle (only active when showDashboardTypeToggle is true)
   const { dashboardType, setDashboardType } = useDashboardType()
@@ -244,10 +261,10 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
     }
   }, [allPrefs])
 
-  const handleResize = useCallback((widgetId: string) => {
+  const handleResize = useCallback((widgetId: string, size: WidgetSize) => {
     setActiveWidgets(prev => {
       const updated = prev.map(w =>
-        w.id === widgetId ? { ...w, size: nextSize(w.size, w.id) } : w
+        w.id === widgetId ? { ...w, size } : w
       )
       scheduleSave(updated)
       return updated
@@ -277,6 +294,16 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
     })
     setShowAddPicker(false)
   }, [scheduleSave])
+
+  const handleAutoApply = useCallback(async (newPrefs: WidgetPref[]) => {
+    const reordered = reassignOrders(newPrefs)
+    setActiveWidgets(reordered)
+    await performSave(reordered)
+    setIsEditMode(false)
+    setShowAddPicker(false)
+    // Refresh server data so newly-favorited budgets appear in data.favoriteBudgets
+    router.refresh()
+  }, [performSave, router])
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id as string)
@@ -457,8 +484,8 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
       {/* Instruction banner / error banner */}
       {isEditMode && !saveError && (
         <div className="mb-3 rounded-[var(--r-sm)] border border-dashed border-kern-200 bg-kern-50/50 px-3 py-2 text-xs text-kern-700">
-          <span className="hidden sm:inline">Sleep widgets om de volgorde te wijzigen. Gebruik <Maximize2 className="inline h-3 w-3 mx-0.5" /> om de grootte aan te passen, <X className="inline h-3 w-3 mx-0.5" /> om te verbergen. Klik <strong>Gereed</strong> als je klaar bent.</span>
-          <span className="sm:hidden">Houd een widget ingedrukt om te verslepen. Tik <Maximize2 className="inline h-3 w-3 mx-0.5" /> voor grootte, <X className="inline h-3 w-3 mx-0.5" /> om te verbergen.</span>
+          <span className="hidden sm:inline">Sleep widgets om de volgorde te wijzigen. Gebruik <span className="inline-flex rounded border border-kern-200 text-[9px] font-semibold px-0.5 mx-0.5 align-text-bottom">S M L</span> om de grootte te kiezen, <X className="inline h-3 w-3 mx-0.5" /> om te verbergen. Klik <strong>Gereed</strong> als je klaar bent.</span>
+          <span className="sm:hidden">Houd een widget ingedrukt om te verslepen. Tik <span className="inline-flex rounded border border-kern-200 text-[9px] font-semibold px-0.5 mx-0.5 align-text-bottom">S M L</span> voor grootte, <X className="inline h-3 w-3 mx-0.5" /> om te verbergen.</span>
         </div>
       )}
       {saveError && (
@@ -512,20 +539,43 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
         </SortableContext>
 
         <DragOverlay>
-          {activePref ? <GhostCard pref={activePref} /> : null}
+          {activePref ? <DragPreview pref={activePref} data={data} features={features} /> : null}
         </DragOverlay>
       </DndContext>
 
-      {/* Add widget picker — only in edit mode */}
-      {isEditMode && <WidgetAddPicker
-        activeWidgets={activeWidgets}
-        features={features}
-        showPicker={showAddPicker}
-        onToggle={() => setShowAddPicker(p => !p)}
-        onAdd={handleAdd}
-        onClose={() => setShowAddPicker(false)}
-      />}
+      {/* Add widget picker + AI dashboard — only in edit mode */}
+      {isEditMode && (
+        <div className="mt-4 flex items-center gap-3">
+          <WidgetAddPicker
+            activeWidgets={activeWidgets}
+            features={features}
+            showPicker={showAddPicker}
+            onToggle={() => setShowAddPicker(p => !p)}
+            onAdd={handleAdd}
+            onClose={() => setShowAddPicker(false)}
+          />
+          <button
+            type="button"
+            onClick={() => setShowAutoWizard(true)}
+            className="flex items-center gap-1.5 rounded-[var(--r-sm)] border border-dashed border-horizon-300 px-3 py-2 text-xs text-horizon-600 hover:text-horizon-700 hover:border-horizon-400 hover:bg-horizon-50/50 transition-colors"
+            data-testid="auto-dashboard-btn"
+          >
+            <Wand2 className="h-3.5 w-3.5" />
+            Automatisch samenstellen
+          </button>
+        </div>
+      )}
+
       </>)}
+
+      {/* Wizard rendered outside conditional/DndContext to avoid fixed-positioning issues from transforms */}
+      <AutoDashboardWizard
+        open={showAutoWizard}
+        onClose={() => setShowAutoWizard(false)}
+        onApply={handleAutoApply}
+        features={features}
+        allBudgets={data.allBudgets}
+      />
     </div>
   )
 
@@ -569,7 +619,7 @@ function WidgetAddPicker({ activeWidgets, features, showPicker, onToggle, onAdd,
     .filter(g => g.widgets.length > 0)
 
   return (
-    <div className="mt-4 relative">
+    <div className="relative">
       <button
         type="button"
         onClick={onToggle}

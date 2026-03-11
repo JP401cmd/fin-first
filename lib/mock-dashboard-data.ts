@@ -92,6 +92,12 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   netWorthHistory: months.map((m, i) => ({ month: m, value: 165000 + i * 4500 })),
   savingsHistory: months.map((m, i) => ({ month: m, value: 22 + i * 1.5 })),
   expenseHistory: months.map((m, i) => ({ month: m, value: 3400 - i * 50 })),
+  budgetTypeHistory: {
+    income:  months.map(m => ({ month: m, value: 5200 })),
+    expense: months.map((m, i) => ({ month: m, value: 3400 - i * 50 })),
+    savings: months.map(m => ({ month: m, value: 800 })),
+    debt:    months.map(m => ({ month: m, value: 400 })),
+  },
 
   // Assets
   assetsByType: [
@@ -137,6 +143,15 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   favoriteBudgets: [
     { id: 'bf1', name: 'Boodschappen', icon: 'shopping-cart', budgetType: 'expense', limit: 600, spent: 485 },
     { id: 'bf2', name: 'Uit eten', icon: 'utensils', budgetType: 'expense', limit: 200, spent: 165 },
+  ],
+
+  // All budgets (for auto-dashboard wizard)
+  allBudgets: [
+    { id: 'bf1', name: 'Boodschappen', icon: 'shopping-cart', budgetType: 'expense' as const, isFavorite: true, parentId: null },
+    { id: 'bf2', name: 'Uit eten', icon: 'utensils', budgetType: 'expense' as const, isFavorite: true, parentId: null },
+    { id: 'bf3', name: 'Transport', icon: 'car', budgetType: 'expense' as const, isFavorite: false, parentId: null },
+    { id: 'bf4', name: 'Salaris', icon: 'briefcase', budgetType: 'income' as const, isFavorite: false, parentId: null },
+    { id: 'bf5', name: 'Noodfonds', icon: 'shield', budgetType: 'savings' as const, isFavorite: false, parentId: null },
   ],
 
   // Notifications
@@ -212,8 +227,8 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   ],
 
   topLifeEvents: [
-    { id: 'le1', name: 'Kinderen', year: 2028, impactType: 'negative', estimatedImpact: -800 },
-    { id: 'le2', name: 'Erfenis', year: 2035, impactType: 'positive', estimatedImpact: 50000 },
+    { id: 'le1', name: 'Kinderen', year: 2028, targetAge: 38, impactType: 'negative', estimatedImpact: -800 },
+    { id: 'le2', name: 'Erfenis', year: 2035, targetAge: 45, impactType: 'positive', estimatedImpact: 50000 },
   ],
   savingsRate6m: 27,
   budgetingActive: true,

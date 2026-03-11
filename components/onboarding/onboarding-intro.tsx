@@ -94,7 +94,7 @@ interface ModuleCardDef {
 const MODULE_CARDS: ModuleCardDef[] = [
   {
     name: 'De Kern',
-    description: 'Je financieel fundament',
+    description: 'Ken je werkelijkheid',
     icon: Shield,
     borderClass: 'border-kern-400',
     iconBgClass: 'bg-kern-100',
@@ -103,7 +103,7 @@ const MODULE_CARDS: ModuleCardDef[] = [
   },
   {
     name: 'De Wil',
-    description: 'Bewuste keuzes maken',
+    description: 'Neem de regie',
     icon: Zap,
     borderClass: 'border-wil-400',
     iconBgClass: 'bg-wil-100',
@@ -112,7 +112,7 @@ const MODULE_CARDS: ModuleCardDef[] = [
   },
   {
     name: 'De Horizon',
-    description: 'Je pad naar vrijheid',
+    description: 'Zie je vrijheid groeien',
     icon: Telescope,
     borderClass: 'border-horizon-400',
     iconBgClass: 'bg-horizon-100',

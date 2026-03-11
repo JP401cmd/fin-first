@@ -80,6 +80,12 @@ const MOCK_DATA: DashboardData = {
     { month: '2026-01', value: 3300 },
     { month: '2026-02', value: 3500 },
   ],
+  budgetTypeHistory: {
+    income:  [{ month: '2025-09', value: 5200 }, { month: '2025-10', value: 5200 }, { month: '2025-11', value: 5400 }, { month: '2025-12', value: 5200 }, { month: '2026-01', value: 5300 }, { month: '2026-02', value: 5200 }],
+    expense: [{ month: '2025-09', value: 3200 }, { month: '2025-10', value: 3400 }, { month: '2025-11', value: 3100 }, { month: '2025-12', value: 3800 }, { month: '2026-01', value: 3300 }, { month: '2026-02', value: 3500 }],
+    savings: [{ month: '2025-09', value: 800 }, { month: '2025-10', value: 750 }, { month: '2025-11', value: 900 }, { month: '2025-12', value: 600 }, { month: '2026-01', value: 850 }, { month: '2026-02', value: 800 }],
+    debt:    [{ month: '2025-09', value: 400 }, { month: '2025-10', value: 400 }, { month: '2025-11', value: 400 }, { month: '2025-12', value: 400 }, { month: '2026-01', value: 400 }, { month: '2026-02', value: 400 }],
+  },
   assetsByType: [
     { type: 'savings', value: 50000, purchaseValue: 50000, expectedReturn: 0.02 },
     { type: 'investment', value: 100000, purchaseValue: 80000, expectedReturn: 0.07 },
@@ -105,6 +111,10 @@ const MOCK_DATA: DashboardData = {
   favoriteBudgets: [
     { id: 'fav1', name: 'Boodschappen', icon: 'shopping-cart', budgetType: 'expense', limit: 600, spent: 450 },
     { id: 'fav2', name: 'Sparen', icon: 'piggy-bank', budgetType: 'savings', limit: 1500, spent: 1200 },
+  ],
+  allBudgets: [
+    { id: 'fav1', name: 'Boodschappen', icon: 'shopping-cart', budgetType: 'expense', isFavorite: true, parentId: null },
+    { id: 'fav2', name: 'Sparen', icon: 'piggy-bank', budgetType: 'savings', isFavorite: true, parentId: null },
   ],
   notifications: [
     { id: 'n1', type: 'budget', message: 'Je boodschappenbudget is 80% op', severity: 'warning', createdAt: '2026-03-07T10:00:00Z' },

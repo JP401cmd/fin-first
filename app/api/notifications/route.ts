@@ -258,7 +258,7 @@ export async function GET(request: NextRequest) {
     // ── 4. Sync warnings (stale bank accounts) ───────────────────────
 
     const { data: bankAccounts } = await supabase
-      .from('gocardless_accounts')
+      .from('bank_connection_accounts')
       .select('id, iban, last_synced_at')
       .eq('is_active', true)
 

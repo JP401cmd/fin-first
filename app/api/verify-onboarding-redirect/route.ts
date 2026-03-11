@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server'
  *
  * Tests that:
  * 1. The onboarding page checks the onboarding_completed flag
- * 2. Onboarded users get redirected to /dashboard
+ * 2. Onboarded users get redirected to /will
  * 3. The seed API rejects re-onboarding attempts
  * 4. The save-own-data API sets the flag correctly
  */
@@ -41,15 +41,15 @@ export async function GET() {
         : 'Missing onboarding_completed check',
     })
 
-    // Test 3: Page redirects to /dashboard when already onboarded
-    const hasRedirect = pageSource.includes("router.replace('/dashboard')") ||
-      pageSource.includes('router.replace("/dashboard")')
+    // Test 3: Page redirects to /will when already onboarded
+    const hasRedirect = pageSource.includes("router.replace('/will')") ||
+      pageSource.includes('router.replace("/will")')
     results.push({
-      name: 'Page redirects onboarded users to /dashboard',
+      name: 'Page redirects onboarded users to /will',
       pass: hasRedirect,
       detail: hasRedirect
-        ? 'router.replace("/dashboard") found for onboarded users'
-        : 'No redirect to /dashboard found',
+        ? 'router.replace("/will") found for onboarded users'
+        : 'No redirect to /will found',
     })
 
     // Test 4: Redirect is conditional on onboarding_completed being true

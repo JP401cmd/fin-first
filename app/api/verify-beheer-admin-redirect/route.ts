@@ -38,20 +38,20 @@ export async function GET() {
       : 'ERROR: isSuperAdmin check not found in beheer layout',
   })
 
-  // Test 3: Non-admin redirect to /dashboard
-  const hasRedirectToDashboard = beheerLayoutSrc.includes("!isAdmin") && beheerLayoutSrc.includes("redirect('/dashboard')")
+  // Test 3: Non-admin redirect to /will
+  const hasRedirectToWill = beheerLayoutSrc.includes("!isAdmin") && beheerLayoutSrc.includes("redirect('/will')")
   results.push({
-    test: 'Non-admin users are redirected to /dashboard',
-    pass: hasRedirectToDashboard,
-    detail: hasRedirectToDashboard
-      ? "Layout checks if (!isAdmin) { redirect('/dashboard') } — server-side redirect"
+    test: 'Non-admin users are redirected to /will',
+    pass: hasRedirectToWill,
+    detail: hasRedirectToWill
+      ? "Layout checks if (!isAdmin) { redirect('/will') } — server-side redirect"
       : 'ERROR: No redirect for non-admin users found',
   })
 
   // Test 4: Redirect happens before any JSX render (server-side, no flash)
   // The redirect() call is inside the async server component, before the return statement
   const redirectBeforeReturn = (() => {
-    const redirectIdx = beheerLayoutSrc.indexOf("redirect('/dashboard')")
+    const redirectIdx = beheerLayoutSrc.indexOf("redirect('/will')")
     const returnIdx = beheerLayoutSrc.indexOf('return (')
     return redirectIdx > -1 && returnIdx > -1 && redirectIdx < returnIdx
   })()
@@ -59,7 +59,7 @@ export async function GET() {
     test: 'Redirect executes before any JSX return (no admin content flash)',
     pass: redirectBeforeReturn,
     detail: redirectBeforeReturn
-      ? "redirect('/dashboard') call appears before return ( JSX — no content briefly visible"
+      ? "redirect('/will') call appears before return ( JSX — no content briefly visible"
       : 'ERROR: Redirect may occur after JSX begins rendering',
   })
 
@@ -105,7 +105,7 @@ export async function GET() {
 
   // Test 9: Admin content (h1 "Beheer", BeheerNav) only renders after auth check passes
   const adminContentAfterCheck = (() => {
-    const redirectLine = beheerLayoutSrc.indexOf("redirect('/dashboard')")
+    const redirectLine = beheerLayoutSrc.indexOf("redirect('/will')")
     const h1Line = beheerLayoutSrc.indexOf('<h1')
     const beheerNavLine = beheerLayoutSrc.indexOf('<BeheerNav')
     return redirectLine > -1 && h1Line > redirectLine && beheerNavLine > redirectLine

@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { FhinAvatar } from '@/components/app/avatars'
 import { computeCoreData, type FinancialInput, type FinancialMetrics } from '@/lib/core-metrics'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, BudgetIcon } from '@/components/app/budget-shared'
@@ -18,7 +17,7 @@ import type { Budget } from '@/lib/budget-data'
 import type { NetWorthSnapshot, EntityBalanceHistory } from '@/lib/net-worth-data'
 import {
   TrendingUp, Wallet, ShoppingCart,
-  PiggyBank, Building2, ArrowRight, Info, Camera, Download, ChevronDown, Receipt, Flag,
+  PiggyBank, Building2, ArrowRight, Info, Camera, Download, ChevronDown, Flag,
   CheckCircle2, AlertTriangle, TrendingDown, ArrowUpRight, ArrowDownRight, Minus,
 } from 'lucide-react'
 import { FeatureGate } from '@/components/app/feature-gate'
@@ -43,6 +42,10 @@ const DynBudgetsPage = dynamic(() => import('@/app/(app)/core/budgets/page'), {
 const DynAssetsPage = dynamic(() => import('@/app/(app)/core/assets/page'), {
   loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" /></div>,
 })
+const DynCashAllView = dynamic(
+  () => import('@/components/app/cash-account-view').then(m => ({ default: m.CashAccountView })),
+  { loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" /></div> },
+)
 const DynDebtsPage = dynamic(() => import('@/app/(app)/core/debts/page'), {
   loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" /></div>,
 })
@@ -100,8 +103,12 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   // Net worth kassabon state
   const [showNetWorthReceipt, setShowNetWorthReceipt] = useState(false)
   const [showFreeDaysReceipt, setShowFreeDaysReceipt] = useState(false)
-  const [assetsList, setAssetsList] = useState<Array<{name: string; current_value: number; net_worth_inclusion_pct: number}>>([])
-  const [debtsList, setDebtsList] = useState<Array<{name: string; current_balance: number; net_worth_inclusion_pct: number}>>([])
+  const [assetsList, setAssetsList] = useState<Array<{id: string; name: string; current_value: number; net_worth_inclusion_pct: number}>>([])
+  const [debtsList, setDebtsList] = useState<Array<{id: string; name: string; current_balance: number; net_worth_inclusion_pct: number}>>([])
+  const [nonCashAssets, setNonCashAssets] = useState<Array<{id: string; name: string; current_value: number; net_worth_inclusion_pct: number}>>([])
+  const [cashAccounts, setCashAccounts] = useState<Array<{name: string; balance: number}>>([])
+  const [totalNonCashAssets, setTotalNonCashAssets] = useState(0)
+  const [totalCash, setTotalCash] = useState(0)
   const [rawFinancials, setRawFinancials] = useState<{
     monthlyIncome: number; monthlyExpenses: number; totalAssets: number
     totalDebts: number; extrapolatedIncome: number; yearlyMustExpenses: number
@@ -140,11 +147,11 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           .lt('date', monthEnd),
         supabase
           .from('assets')
-          .select('name, current_value, net_worth_inclusion_pct')
+          .select('id, name, current_value, net_worth_inclusion_pct, asset_type')
           .eq('is_active', true),
         supabase
           .from('debts')
-          .select('name, current_balance, net_worth_inclusion_pct')
+          .select('id, name, current_balance, net_worth_inclusion_pct')
           .eq('is_active', true),
         supabase
           .from('transactions')
@@ -298,8 +305,26 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
 
       // Store assets/debts lists for net worth kassabon
-      setAssetsList(assetsResult.data.map(a => ({ name: a.name, current_value: Number(a.current_value), net_worth_inclusion_pct: a.net_worth_inclusion_pct ?? 100 })))
-      setDebtsList(debtsResult.data.map(d => ({ name: d.name, current_balance: Number(d.current_balance), net_worth_inclusion_pct: d.net_worth_inclusion_pct ?? 100 })))
+      setAssetsList(assetsResult.data.map(a => ({ id: a.id, name: a.name, current_value: Number(a.current_value), net_worth_inclusion_pct: a.net_worth_inclusion_pct ?? 100 })))
+      setDebtsList(debtsResult.data.map(d => ({ id: d.id, name: d.name, current_balance: Number(d.current_balance), net_worth_inclusion_pct: d.net_worth_inclusion_pct ?? 100 })))
+
+      // Split assets into cash-type and non-cash for mission control cards
+      const cashTypeAssets = assetsResult.data
+        .filter(a => a.asset_type === 'cash')
+        .map(a => ({ name: a.name, balance: Number(a.current_value) }))
+      const unlinkedBanks = (bankAccountsResult.data ?? [])
+        .map(a => ({ name: a.name, balance: Number(a.balance) }))
+      setCashAccounts([...cashTypeAssets, ...unlinkedBanks])
+
+      setNonCashAssets(
+        assetsResult.data
+          .filter(a => a.asset_type !== 'cash')
+          .map(a => ({ id: a.id, name: a.name, current_value: Number(a.current_value), net_worth_inclusion_pct: a.net_worth_inclusion_pct ?? 100 }))
+      )
+
+      const totalCashValue = cashTypeAssets.reduce((s, a) => s + a.balance, 0) + unlinkedCash
+      setTotalCash(totalCashValue)
+      setTotalNonCashAssets(totalAssets - totalCashValue)
 
       setRawFinancials({ monthlyIncome, monthlyExpenses, totalAssets, totalDebts, extrapolatedIncome, yearlyMustExpenses, yearlyRetirementExpenses })
 
@@ -735,10 +760,6 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
 
         <div className="p-4 sm:p-6 md:p-8">
           <div className="mb-3 sm:mb-6 flex items-center gap-3">
-            <FhinAvatar size={40} />
-            <p className="label-editorial text-kern-600">
-              {isHouseholdView ? 'Jullie tijdlijn naar vrijheid' : isPartnerView ? `${partnerName ?? 'Partner'}'s tijdlijn` : 'Jouw tijdlijn naar vrijheid'}
-            </p>
             {(isHouseholdView || isPartnerView) && (
               <span className="inline-flex items-center gap-1 rounded-full bg-kern-50 px-2 py-0.5 text-[10px] font-medium text-kern-700">
                 <Users className="h-3 w-3" /> {isPartnerView ? (partnerName ?? 'Partner') : 'Huishouden'}
@@ -879,143 +900,399 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       </section>
 
       {/* === Missie Controle (direct onder hero) === */}
-      <section className="mt-4 sm:mt-8" data-testid="mission-control-section">
+      <section className="mt-5 sm:mt-8" data-testid="mission-control-section">
         <div className="mb-4 flex items-center gap-2">
           <div className="h-5 w-1 rounded-full bg-kern-500" />
           <h2 className="label-editorial text-[var(--ink-2)]">Missie Controle</h2>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Cash Card */}
-          <MissionControlCard
-            href="/core/assets"
-            onClick={() => setActiveModal('cash')}
-            icon={<Wallet className="h-5 w-5 text-kern-600" />}
-            title="Cash"
-            metric={formatCurrency(rawFinancials!.monthlyIncome - rawFinancials!.monthlyExpenses)}
-            metricColor={rawFinancials!.monthlyIncome >= rawFinancials!.monthlyExpenses ? 'text-emerald-600' : 'text-red-600'}
-            status={rawFinancials!.monthlyIncome >= rawFinancials!.monthlyExpenses ? 'healthy' : 'attention'}
-            statusLabel={rawFinancials!.monthlyIncome >= rawFinancials!.monthlyExpenses ? 'Gezond' : 'Aandacht nodig'}
-            details={[
-              { label: 'Inkomen', value: formatCurrency(rawFinancials!.monthlyIncome), color: 'text-emerald-600' },
-              { label: 'Uitgaven', value: formatCurrency(rawFinancials!.monthlyExpenses), color: 'text-[var(--ink-2)]' },
-            ]}
-            cta="Bekijk transacties"
-            testId="mission-cash"
-          />
+        <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2">
 
           {/* Budgetten Card */}
-          <MissionControlCard
-            href="/core/budgets"
-            onClick={() => setActiveModal('budgets')}
-            icon={<ShoppingCart className="h-5 w-5 text-kern-600" />}
-            title="Budgetten"
-            metric={overBudgetCount > 0 ? `${overBudgetCount} over budget` : 'Op koers'}
-            metricColor={overBudgetCount > 0 ? 'text-red-600' : 'text-emerald-600'}
-            status={overBudgetCount === 0 ? 'healthy' : 'attention'}
-            statusLabel={overBudgetCount === 0 ? 'Alles op schema' : `${overBudgetCount} overschreden`}
-            details={[
-              { label: 'Uitgaven', value: formatCurrency(rawFinancials!.monthlyExpenses), color: 'text-[var(--ink-2)]' },
-              { label: 'Budgetten', value: `${budgetCount} actief`, color: 'text-[var(--ink-3)]' },
-            ]}
-            cta="Beheer budgetten"
-            testId="mission-budgetten"
-          />
+          {(() => {
+            const segments = buildSegments(overviewBudgetGroups, overviewSpending)
+            const budgetPct = totalBudgetLimit > 0 ? Math.round((totalBudgetSpent / totalBudgetLimit) * 100) : 0
+            return (
+              <button
+                type="button"
+                onClick={() => setActiveModal('budgets')}
+                data-testid="mission-budgetten"
+                className="group card-editorial flex flex-col overflow-hidden p-0 text-left"
+              >
+                <div className="flex h-1 items-stretch">
+                  <div className="w-1 bg-kern-500" />
+                  <div className="flex-1" />
+                </div>
+                <div className="p-3 sm:p-5 flex flex-col flex-1">
+                  {/* Header */}
+                  <div className="mb-2 sm:mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
+                        <ShoppingCart className="h-5 w-5 text-kern-600" />
+                      </div>
+                      <p className="text-sm font-semibold text-[var(--ink-2)]">Budgetten</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {overBudgetCount === 0 ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      ) : (
+                        <AlertTriangle className="h-4 w-4 text-kern-500" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Total */}
+                  <p className="font-mono text-2xl font-bold text-[var(--ink)]">
+                    {formatCurrency(totalBudgetSpent)} <span className="text-base font-normal text-[var(--ink-3)]">/ {formatCurrency(totalBudgetLimit)}</span>
+                  </p>
+                  <div className={`mt-1.5 mb-3 inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    overBudgetCount === 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-kern-50 text-kern-700'
+                  }`}>
+                    {overBudgetCount === 0 ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                    {overBudgetCount === 0 ? `${budgetPct}% besteed` : `${overBudgetCount} over budget`}
+                  </div>
+
+                  {/* List */}
+                  <div className="mt-auto space-y-1.5 border-t border-[var(--border-ed)] pt-2 sm:pt-3">
+                    {segments.slice(0, 5).map((seg) => {
+                      const pct = seg.limit > 0 ? Math.round((seg.spent / seg.limit) * 100) : 0
+                      const isOver = seg.spent > seg.limit && seg.limit > 0
+                      return (
+                        <div key={seg.id}>
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded" style={{ backgroundColor: typeColors(seg.budgetType).bg }}>
+                                <BudgetIcon name={seg.icon} className="h-3 w-3" />
+                              </div>
+                              <span className="truncate text-[var(--ink-2)]">{seg.name}</span>
+                            </div>
+                            <span className={`shrink-0 font-mono font-medium ${isOver ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
+                              {formatCurrency(seg.spent)} <span className="text-[var(--ink-4)]">/ {formatCurrency(seg.limit)}</span>
+                            </span>
+                          </div>
+                          <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${isOver ? 'bg-red-400' : 'bg-kern-400'}`}
+                              style={{ width: `${Math.min(pct, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {segments.length > 5 && (
+                      <p className="text-xs text-kern-600">en {segments.length - 5} meer →</p>
+                    )}
+                    {segments.length === 0 && (
+                      <p className="text-xs text-[var(--ink-4)]">Geen budgetten ingesteld</p>
+                    )}
+                  </div>
+
+                  {/* CTA */}
+                  <div className="mt-2 sm:mt-3 flex items-center justify-between">
+                    <span className="label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">Beheer budgetten</span>
+                    <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
+                  </div>
+                </div>
+              </button>
+            )
+          })()}
+
+          {/* Cash Card */}
+          {(() => {
+            const maxCashBalance = cashAccounts.length > 0 ? Math.max(...cashAccounts.map(a => Math.abs(a.balance))) : 1
+            return (
+              <button
+                type="button"
+                onClick={() => setActiveModal('cash')}
+                data-testid="mission-cash"
+                className="group card-editorial flex flex-col overflow-hidden p-0 text-left"
+              >
+                <div className="flex h-1 items-stretch">
+                  <div className="w-1 bg-kern-500" />
+                  <div className="flex-1" />
+                </div>
+                <div className="p-3 sm:p-5 flex flex-col flex-1">
+                  {/* Header */}
+                  <div className="mb-2 sm:mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
+                        <Wallet className="h-5 w-5 text-kern-600" />
+                      </div>
+                      <p className="text-sm font-semibold text-[var(--ink-2)]">Cash</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {totalCash >= 0 ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      ) : (
+                        <AlertTriangle className="h-4 w-4 text-kern-500" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Total */}
+                  <p className="font-mono text-2xl font-bold text-[var(--ink)]">
+                    {formatCurrency(totalCash)}
+                  </p>
+                  <div className={`mt-1.5 mb-3 inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    totalCash >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-kern-50 text-kern-700'
+                  }`}>
+                    {totalCash >= 0 ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                    {cashAccounts.length} {cashAccounts.length === 1 ? 'rekening' : 'rekeningen'}
+                  </div>
+
+                  {/* List */}
+                  <div className="mt-auto space-y-1.5 border-t border-[var(--border-ed)] pt-2 sm:pt-3">
+                    {cashAccounts.slice(0, 5).map((acc, i) => {
+                      const pct = maxCashBalance > 0 ? Math.round((Math.abs(acc.balance) / maxCashBalance) * 100) : 0
+                      return (
+                        <div key={i}>
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-emerald-50">
+                                <Wallet className="h-3 w-3 text-emerald-600" />
+                              </div>
+                              <span className="truncate text-[var(--ink-2)]">{acc.name}</span>
+                            </div>
+                            <span className={`shrink-0 font-mono font-medium ${acc.balance >= 0 ? 'text-[var(--ink-2)]' : 'text-red-600'}`}>
+                              {formatCurrency(acc.balance)}
+                            </span>
+                          </div>
+                          <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${acc.balance >= 0 ? 'bg-emerald-400' : 'bg-red-400'}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {cashAccounts.length > 5 && (
+                      <p className="text-xs text-kern-600">en {cashAccounts.length - 5} meer →</p>
+                    )}
+                    {cashAccounts.length === 0 && (
+                      <p className="text-xs text-[var(--ink-4)]">Geen cash-rekeningen</p>
+                    )}
+                  </div>
+
+                  {/* CTA */}
+                  <div className="mt-2 sm:mt-3 flex items-center justify-between">
+                    <span className="label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">Bekijk transacties</span>
+                    <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
+                  </div>
+                </div>
+              </button>
+            )
+          })()}
 
           {/* Assets Card */}
-          <MissionControlCard
-            href="/core/assets"
-            onClick={() => setActiveModal('assets')}
-            icon={<PiggyBank className="h-5 w-5 text-emerald-600" />}
-            title="Assets"
-            metric={formatCurrency(rawFinancials!.totalAssets)}
-            metricColor="text-emerald-600"
-            status="healthy"
-            statusLabel={
-              assetGrowthDirection === 'up' ? 'Groeiend' :
-              assetGrowthDirection === 'down' ? 'Dalend' : 'Stabiel'
-            }
-            growthDirection={assetGrowthDirection}
-            details={[
-              { label: 'Totaal', value: formatCurrency(rawFinancials!.totalAssets), color: 'text-emerald-600' },
-              { label: 'Richting', value: assetGrowthDirection === 'up' ? '↑ Omhoog' : assetGrowthDirection === 'down' ? '↓ Omlaag' : '→ Stabiel', color: assetGrowthDirection === 'up' ? 'text-emerald-600' : assetGrowthDirection === 'down' ? 'text-red-500' : 'text-[var(--ink-3)]' },
-            ]}
-            cta="Bekijk portfolio"
-            testId="mission-assets"
-          />
+          {(() => {
+            const maxAssetValue = nonCashAssets.length > 0 ? Math.max(...nonCashAssets.map(a => a.current_value)) : 1
+            return (
+              <button
+                type="button"
+                onClick={() => setActiveModal('assets')}
+                data-testid="mission-assets"
+                className="group card-editorial flex flex-col overflow-hidden p-0 text-left"
+              >
+                <div className="flex h-1 items-stretch">
+                  <div className="w-1 bg-kern-500" />
+                  <div className="flex-1" />
+                </div>
+                <div className="p-3 sm:p-5 flex flex-col flex-1">
+                  {/* Header */}
+                  <div className="mb-2 sm:mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
+                        <PiggyBank className="h-5 w-5 text-kern-600" />
+                      </div>
+                      <p className="text-sm font-semibold text-[var(--ink-2)]">Assets</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {assetGrowthDirection === 'up' && <ArrowUpRight className="h-4 w-4 text-emerald-500" />}
+                      {assetGrowthDirection === 'down' && <ArrowDownRight className="h-4 w-4 text-red-500" />}
+                      {assetGrowthDirection === 'flat' && <Minus className="h-4 w-4 text-[var(--ink-4)]" />}
+                    </div>
+                  </div>
+
+                  {/* Total */}
+                  <p className="font-mono text-2xl font-bold text-[var(--ink)]">
+                    {formatCurrency(totalNonCashAssets)}
+                  </p>
+                  <div className={`mt-1.5 mb-3 inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    assetGrowthDirection === 'down' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
+                  }`}>
+                    {assetGrowthDirection === 'up' && <><ArrowUpRight className="h-3 w-3" />Groeiend</>}
+                    {assetGrowthDirection === 'down' && <><ArrowDownRight className="h-3 w-3" />Dalend</>}
+                    {assetGrowthDirection === 'flat' && <><Minus className="h-3 w-3" />Stabiel</>}
+                  </div>
+
+                  {/* List */}
+                  <div className="mt-auto space-y-1.5 border-t border-[var(--border-ed)] pt-2 sm:pt-3">
+                    {nonCashAssets.slice(0, 5).map((asset, i) => {
+                      const pct = maxAssetValue > 0 ? Math.round((asset.current_value / maxAssetValue) * 100) : 0
+                      return (
+                        <div key={i}>
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-emerald-50">
+                                <PiggyBank className="h-3 w-3 text-emerald-600" />
+                              </div>
+                              <span className="truncate text-[var(--ink-2)]">{asset.name}</span>
+                            </div>
+                            <span className="shrink-0 font-mono font-medium text-[var(--ink-2)]">
+                              {formatCurrency(asset.current_value)}
+                            </span>
+                          </div>
+                          <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+                            <div
+                              className="h-full rounded-full bg-emerald-400 transition-all duration-500"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {nonCashAssets.length > 5 && (
+                      <p className="text-xs text-kern-600">en {nonCashAssets.length - 5} meer →</p>
+                    )}
+                    {nonCashAssets.length === 0 && (
+                      <p className="text-xs text-[var(--ink-4)]">Geen assets</p>
+                    )}
+                  </div>
+
+                  {/* CTA */}
+                  <div className="mt-2 sm:mt-3 flex items-center justify-between">
+                    <span className="label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">Bekijk portfolio</span>
+                    <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
+                  </div>
+                </div>
+              </button>
+            )
+          })()}
 
           {/* Schulden Card */}
-          <MissionControlCard
-            href="/core/debts"
-            onClick={() => setActiveModal('debts')}
-            icon={<Building2 className="h-5 w-5 text-red-500" />}
-            title="Schulden"
-            metric={rawFinancials!.totalDebts > 0 ? formatCurrency(rawFinancials!.totalDebts) : 'Schuldvrij'}
-            metricColor={rawFinancials!.totalDebts > 0 ? 'text-red-600' : 'text-emerald-600'}
-            status={rawFinancials!.totalDebts === 0 ? 'healthy' : debtProgress && debtProgress.progressPct > 50 ? 'healthy' : 'attention'}
-            statusLabel={rawFinancials!.totalDebts === 0 ? 'Schuldvrij!' : debtProgress ? `${debtProgress.progressPct.toFixed(0)}% afgelost` : 'Vrijheid terugkopen'}
-            debtProgress={debtProgress ?? undefined}
-            details={[
-              { label: 'Openstaand', value: formatCurrency(rawFinancials!.totalDebts), color: 'text-red-600' },
-              { label: 'Afgelost', value: debtProgress ? `${debtProgress.progressPct.toFixed(0)}%` : '—', color: debtProgress && debtProgress.progressPct > 0 ? 'text-emerald-600' : 'text-[var(--ink-3)]' },
-            ]}
-            cta="Beheer schulden"
-            testId="mission-schulden"
-          />
+          {(() => {
+            const maxDebtBalance = debtsList.length > 0 ? Math.max(...debtsList.map(d => d.current_balance)) : 1
+            return (
+              <button
+                type="button"
+                onClick={() => setActiveModal('debts')}
+                data-testid="mission-schulden"
+                className="group card-editorial flex flex-col overflow-hidden p-0 text-left"
+              >
+                <div className="flex h-1 items-stretch">
+                  <div className="w-1 bg-kern-500" />
+                  <div className="flex-1" />
+                </div>
+                <div className="p-3 sm:p-5 flex flex-col flex-1">
+                  {/* Header */}
+                  <div className="mb-2 sm:mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
+                        <Building2 className="h-5 w-5 text-kern-600" />
+                      </div>
+                      <p className="text-sm font-semibold text-[var(--ink-2)]">Schulden</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {rawFinancials!.totalDebts === 0 ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      ) : debtProgress && debtProgress.progressPct > 50 ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      ) : (
+                        <AlertTriangle className="h-4 w-4 text-kern-500" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Total */}
+                  <p className={`font-mono text-2xl font-bold ${rawFinancials!.totalDebts > 0 ? 'text-[var(--ink)]' : 'text-emerald-600'}`}>
+                    {rawFinancials!.totalDebts > 0 ? formatCurrency(rawFinancials!.totalDebts) : 'Schuldvrij'}
+                  </p>
+                  <div className={`mt-1.5 mb-3 inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    rawFinancials!.totalDebts === 0 ? 'bg-emerald-50 text-emerald-700' : debtProgress && debtProgress.progressPct > 50 ? 'bg-emerald-50 text-emerald-700' : 'bg-kern-50 text-kern-700'
+                  }`}>
+                    {rawFinancials!.totalDebts === 0 ? (
+                      <><CheckCircle2 className="h-3 w-3" />Schuldvrij!</>
+                    ) : debtProgress ? (
+                      <><CheckCircle2 className="h-3 w-3" />{debtProgress.progressPct.toFixed(0)}% afgelost</>
+                    ) : (
+                      <><AlertTriangle className="h-3 w-3" />Vrijheid terugkopen</>
+                    )}
+                  </div>
+
+                  {/* Payoff progress bar */}
+                  {debtProgress && debtProgress.totalOriginal > 0 && (
+                    <div className="mb-3">
+                      <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-500"
+                          style={{ width: `${debtProgress.progressPct}%` }}
+                        />
+                      </div>
+                      <p className="mt-1 text-[10px] font-mono text-[var(--ink-4)]">
+                        {formatCurrency(debtProgress.totalOriginal - debtProgress.totalCurrent)} afgelost van {formatCurrency(debtProgress.totalOriginal)}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* List */}
+                  <div className="mt-auto space-y-1.5 border-t border-[var(--border-ed)] pt-2 sm:pt-3">
+                    {debtsList.slice(0, 5).map((debt, i) => {
+                      const pct = maxDebtBalance > 0 ? Math.round((debt.current_balance / maxDebtBalance) * 100) : 0
+                      return (
+                        <div key={i}>
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-red-50">
+                                <Building2 className="h-3 w-3 text-red-500" />
+                              </div>
+                              <span className="truncate text-[var(--ink-2)]">{debt.name}</span>
+                            </div>
+                            <span className="shrink-0 font-mono font-medium text-red-600">
+                              {formatCurrency(debt.current_balance)}
+                            </span>
+                          </div>
+                          <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+                            <div
+                              className="h-full rounded-full bg-red-400 transition-all duration-500"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {debtsList.length > 5 && (
+                      <p className="text-xs text-kern-600">en {debtsList.length - 5} meer →</p>
+                    )}
+                    {debtsList.length === 0 && (
+                      <p className="text-xs text-[var(--ink-4)] flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-emerald-500" /> Geen schulden</p>
+                    )}
+                  </div>
+
+                  {/* CTA */}
+                  <div className="mt-2 sm:mt-3 flex items-center justify-between">
+                    <span className="label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">Beheer schulden</span>
+                    <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
+                  </div>
+                </div>
+              </button>
+            )
+          })()}
+
         </div>
 
-        {/* Box 3 stays as a separate gated quick link */}
-        <FeatureGate featureId="box3_belasting" fallback="hidden">
-          <div className="mt-4">
-            <Link
-              href="/core/belasting"
-              className="group card-editorial flex items-center gap-3 p-4"
-            >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
-                <Receipt className="h-5 w-5 text-kern-600" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="label-editorial text-[var(--ink-3)]">Box 3 Belasting</p>
-                <p className="text-lg font-bold text-[var(--ink)]">Berekenen</p>
-                <p className="text-xs text-[var(--ink-3)]">vermogensrendementsheffing</p>
-              </div>
-              <ArrowRight className="h-4 w-4 shrink-0 text-[var(--ink-4)] group-hover:text-kern-500" />
-            </Link>
-          </div>
-        </FeatureGate>
       </section>
-
-      {/* === Budget overzicht === */}
-      {overviewBudgetGroups.length > 0 && (
-        <section className="mt-6">
-          <div className="card-editorial p-4">
-            <div className="mb-1 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-[var(--ink-2)]">Budget overzicht</h3>
-              <Link
-                href="/core/budgets"
-                className="text-xs font-medium text-kern-600 hover:text-kern-700"
-              >
-                Bekijk budgetten →
-              </Link>
-            </div>
-            <BudgetLegendOverview
-              groups={overviewBudgetGroups}
-              spending={overviewSpending}
-              expandedGroupId={expandedOverviewGroupId}
-              onToggleGroup={(id) => setExpandedOverviewGroupId(prev => prev === id ? null : id)}
-              onNavigate={(id) => router.push(`/core/budgets?budget=${id}`)}
-            />
-          </div>
-        </section>
-      )}
 
 
       {/* === 7. Financiële Kerngetallen (Deep Dive) === */}
       <section className="mt-5 sm:mt-8">
         <div className="mb-5 flex items-end justify-between">
           <div>
-            <h2 className="label-editorial text-[var(--ink-2)]">
-              Financiële Kerngetallen
-            </h2>
+            <div className="flex items-center gap-2">
+              <div className="h-5 w-1 rounded-full bg-kern-500" />
+              <h2 className="label-editorial text-[var(--ink-2)]">
+                Financiële Kerngetallen
+              </h2>
+            </div>
             <p className="mt-1 text-sm text-[var(--ink-3)]">
               Gebaseerd op je werkelijke transacties en budgetinstellingen.
             </p>
@@ -1026,7 +1303,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2">
-          <button type="button" onClick={() => setShowIncomeReceipt(true)} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6 text-left transition-all hover:border-emerald-300 hover:shadow-sm">
+          <button type="button" onClick={() => setShowIncomeReceipt(true)} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6 text-left transition-all hover:border-kern-300 hover:shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-emerald-50">
                 <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
@@ -1034,7 +1311,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
               <KpiTooltip text="Geschat jaarinkomen gebaseerd op werkelijke transacties. Bij minder dan 12 maanden data wordt het gemiddelde geextrapoleerd naar een jaar." />
             </div>
             <p className="text-sm font-medium text-[var(--ink-3)]">Geschat Jaarinkomen</p>
-            <p className="mt-1 text-2xl font-bold text-[var(--ink)]">{formatCurrency(data.estimatedYearlyIncome)}</p>
+            <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">{formatCurrency(data.estimatedYearlyIncome)}</p>
             <FreedomTimeBadge amount={data.estimatedYearlyIncome} className="mt-1" />
             <p className="mt-1 text-xs text-[var(--ink-3)]">
               {incomeMonths < 12
@@ -1043,7 +1320,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             </p>
           </button>
 
-          <button type="button" onClick={() => setShowExpenseReceipt(true)} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6 text-left transition-all hover:border-[var(--border-md)] hover:shadow-sm">
+          <button type="button" onClick={() => setShowExpenseReceipt(true)} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6 text-left transition-all hover:border-kern-300 hover:shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-[var(--subtle)]">
                 <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6 text-[var(--ink-3)]" />
@@ -1051,7 +1328,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
               <KpiTooltip text="Jaarlijkse som van je essentiële budgetten: vaste lasten, dagelijkse uitgaven en vervoer. Dit zijn de kosten die je sowieso maakt." />
             </div>
             <p className="text-sm font-medium text-[var(--ink-3)]">Jaarlijkse Must Uitgaven</p>
-            <p className="mt-1 text-2xl font-bold text-[var(--ink)]">{formatCurrency(data.yearlyMustExpenses)}</p>
+            <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">{formatCurrency(data.yearlyMustExpenses)}</p>
             <FreedomTimeBadge amount={data.yearlyMustExpenses} className="mt-1" />
             <p className="mt-1 text-xs text-[var(--ink-3)]">essentiële kosten per jaar</p>
             <p className="mt-2 text-[11px] italic text-[var(--ink-3)]">
@@ -1068,10 +1345,10 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       <FullScreenModal
         open={activeModal === 'cash'}
         onClose={() => setActiveModal(null)}
-        title="Assets"
-        href="/core/assets"
+        title="Cash"
+        href="/core/cash"
       >
-        <DynAssetsPage />
+        <DynCashAllView embedded />
       </FullScreenModal>
       <FullScreenModal
         open={activeModal === 'budgets'}
@@ -1509,7 +1786,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 const pct = a.net_worth_inclusion_pct ?? 100
                 const effectiveValue = a.current_value * (pct / 100)
                 return (
-                  <div key={a.name} className="flex justify-between py-0.5">
+                  <div key={a.id} className="flex justify-between py-0.5">
                     <span className="font-sans text-sm text-[var(--ink-2)]">
                       {a.name}
                       {pct < 100 && (
@@ -1531,7 +1808,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                 const pct = d.net_worth_inclusion_pct ?? 100
                 const effectiveBalance = d.current_balance * (pct / 100)
                 return (
-                  <div key={d.name} className="flex justify-between py-0.5">
+                  <div key={d.id} className="flex justify-between py-0.5">
                     <span className="font-sans text-sm text-[var(--ink-2)]">
                       {d.name}
                       {pct < 100 && (
@@ -1753,8 +2030,8 @@ function BudgetSpendingSparkline({
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxWidth: 200, height: 32 }}>
         <defs>
           <linearGradient id="budget-spark-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="#fbbf24" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--color-kern-500)" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="var(--color-kern-500)" stopOpacity="0" />
           </linearGradient>
         </defs>
         {/* Budget limit line */}
@@ -1764,11 +2041,11 @@ function BudgetSpendingSparkline({
         {/* Fill under historical */}
         {histFill && <path d={histFill} fill="url(#budget-spark-fill)" />}
         {/* Historical line */}
-        {histPath && <path d={histPath} fill="none" stroke="#fbbf24" strokeWidth="1.5" />}
+        {histPath && <path d={histPath} fill="none" stroke="var(--color-kern-500)" strokeWidth="1.5" />}
         {/* Divider dot */}
-        <circle cx={x(lastHistIdx)} cy={y(data[lastHistIdx].spent)} r="2" fill="#fbbf24" />
+        <circle cx={x(lastHistIdx)} cy={y(data[lastHistIdx].spent)} r="2" fill="var(--color-kern-500)" />
         {/* Projection line (dashed) */}
-        {projPath && <path d={projPath} fill="none" stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="3,2" opacity="0.5" />}
+        {projPath && <path d={projPath} fill="none" stroke="var(--color-kern-500)" strokeWidth="1.5" strokeDasharray="3,2" opacity="0.5" />}
       </svg>
       <div className="flex justify-between text-[10px] text-kern-300/40" style={{ maxWidth: 200 }}>
         <span>-12m</span>
@@ -1848,20 +2125,20 @@ function NetWorthSparkline({
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxWidth: 200, height: 32 }}>
         <defs>
           <linearGradient id="nw-spark-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#fbbf24" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--color-kern-500)" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="var(--color-kern-500)" stopOpacity="0" />
           </linearGradient>
         </defs>
         {/* Fill under historical line */}
         {histFill && <path d={histFill} fill="url(#nw-spark-fill)" />}
         {/* Historical line */}
-        {histPath && <path d={histPath} fill="none" stroke="#fbbf24" strokeWidth="1.5" />}
+        {histPath && <path d={histPath} fill="none" stroke="var(--color-kern-500)" strokeWidth="1.5" />}
         {/* Divider dot */}
         {histPoints.length > 0 && (
-          <circle cx={dividerX} cy={y(histPoints[histPoints.length - 1].value)} r="2" fill="#fbbf24" />
+          <circle cx={dividerX} cy={y(histPoints[histPoints.length - 1].value)} r="2" fill="var(--color-kern-500)" />
         )}
         {/* Projection line (dashed) */}
-        {projPath && <path d={projPath} fill="none" stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="3,2" opacity="0.6" />}
+        {projPath && <path d={projPath} fill="none" stroke="var(--color-kern-500)" strokeWidth="1.5" strokeDasharray="3,2" opacity="0.6" />}
       </svg>
       <div className="flex justify-between text-[10px] text-kern-300/40" style={{ maxWidth: 200 }}>
         <span>-12m</span>
@@ -1894,126 +2171,6 @@ function KpiTooltip({ text }: { text: string }) {
   )
 }
 
-function MissionControlCard({
-  href,
-  onClick,
-  icon,
-  title,
-  metric,
-  metricColor,
-  status,
-  statusLabel,
-  details,
-  cta,
-  testId,
-  debtProgress: debtProg,
-  growthDirection,
-}: {
-  href: string
-  onClick?: () => void
-  icon: React.ReactNode
-  title: string
-  metric: string
-  metricColor: string
-  status: 'healthy' | 'attention'
-  statusLabel: string
-  details: { label: string; value: string; color: string }[]
-  cta: string
-  testId: string
-  debtProgress?: { totalOriginal: number; totalCurrent: number; progressPct: number }
-  growthDirection?: 'up' | 'down' | 'flat'
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick ?? (() => { window.location.href = href })}
-      data-testid={testId}
-      className="group card-editorial flex flex-col overflow-hidden p-0 text-left"
-    >
-      <div className="flex h-1 items-stretch">
-        <div className="w-1 bg-kern-500" />
-        <div className="flex-1" />
-      </div>
-      <div className="p-3 sm:p-5">
-      {/* Header: icon + title + status */}
-      <div className="mb-2 sm:mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
-            {icon}
-          </div>
-          <p className="text-sm font-semibold text-[var(--ink-2)]">{title}</p>
-        </div>
-        <div data-testid={`${testId}-status`} className="flex items-center gap-1">
-          {status === 'healthy' ? (
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-          ) : (
-            <AlertTriangle className="h-4 w-4 text-kern-500" />
-          )}
-        </div>
-      </div>
-
-      {/* Key Metric */}
-      <div className="mb-2">
-        <div className="flex items-baseline gap-2">
-          <p className={`font-mono text-2xl font-bold ${metricColor}`}>{metric}</p>
-          {growthDirection && (
-            <span className="flex items-center">
-              {growthDirection === 'up' && <ArrowUpRight className="h-4 w-4 text-emerald-500" />}
-              {growthDirection === 'down' && <ArrowDownRight className="h-4 w-4 text-red-500" />}
-              {growthDirection === 'flat' && <Minus className="h-4 w-4 text-[var(--ink-4)]" />}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Status label */}
-      <div className={`mb-2 sm:mb-3 inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${
-        status === 'healthy'
-          ? 'bg-emerald-50 text-emerald-700'
-          : 'bg-kern-50 text-kern-700'
-      }`} data-testid={`${testId}-status-label`}>
-        {status === 'healthy' ? (
-          <CheckCircle2 className="h-3 w-3" />
-        ) : (
-          <AlertTriangle className="h-3 w-3" />
-        )}
-        {statusLabel}
-      </div>
-
-      {/* Debt payoff progress bar */}
-      {debtProg && debtProg.totalOriginal > 0 && (
-        <div className="mb-3" data-testid={`${testId}-progress-bar`}>
-          <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-500"
-              style={{ width: `${debtProg.progressPct}%` }}
-            />
-          </div>
-          <p className="mt-1 text-[10px] font-mono text-[var(--ink-4)]">
-            {formatCurrency(debtProg.totalOriginal - debtProg.totalCurrent)} afgelost van {formatCurrency(debtProg.totalOriginal)}
-          </p>
-        </div>
-      )}
-
-      {/* Detail lines */}
-      <div className="mt-auto space-y-0.5 sm:space-y-1 border-t border-[var(--border-ed)] pt-2 sm:pt-3">
-        {details.map((d, i) => (
-          <div key={i} className="flex items-center justify-between text-xs">
-            <span className="text-[var(--ink-3)]">{d.label}</span>
-            <span className={`font-mono font-medium ${d.color}`}>{d.value}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* CTA */}
-      <div className="mt-2 sm:mt-3 flex items-center justify-between">
-        <span className="label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">{cta}</span>
-        <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
-      </div>
-      </div>
-    </button>
-  )
-}
 
 const EXPORT_OPTIONS = [
   { type: 'transactions', label: 'Transacties' },

@@ -39,6 +39,7 @@ import { BeslissingspatronenWidget } from './beslissingspatronen-widget'
 import { VrijheidsdagenMaandWidget } from './vrijheidsdagen-maand-widget'
 import { WilskrachtWidget } from './wilskracht-widget'
 import { BerichtenWidget } from './berichten-widget'
+import { BudgetTrendWidget } from './budget-trend-widget'
 import { getWidgetDef, WIDGET_HREFS, WIDGET_FEATURE_MAP } from '@/lib/widget-catalog'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { FireProjection, FireRange, FireCountdown } from '@/lib/horizon-data'
@@ -101,6 +102,7 @@ export interface TopLifeEvent {
   id: string
   name: string
   year: number | null
+  targetAge: number | null
   impactType: 'positive' | 'negative'
   estimatedImpact: number | null
 }
@@ -214,6 +216,13 @@ export interface DashboardData {
   savingsHistory: { month: string; value: number }[]
   // Historical monthly expenses (up to 12 monthly snapshots, ascending)
   expenseHistory: { month: string; value: number }[]
+  // Historical monthly amounts per budget type (up to 12 months, ascending)
+  budgetTypeHistory: {
+    income:  { month: string; value: number }[]
+    expense: { month: string; value: number }[]
+    savings: { month: string; value: number }[]
+    debt:    { month: string; value: number }[]
+  }
   // Asset breakdown per type
   assetsByType: { type: string; value: number; purchaseValue: number; expectedReturn: number }[]
   totalPurchaseValue: number
@@ -245,6 +254,15 @@ export interface DashboardData {
     budgetType: 'income' | 'expense' | 'savings' | 'debt' | 'archive'
     limit: number
     spent: number
+  }[]
+  // All budgets (parents + children, non-archive) for auto-dashboard wizard
+  allBudgets: {
+    id: string
+    name: string
+    icon: string
+    budgetType: 'income' | 'expense' | 'savings' | 'debt'
+    isFavorite: boolean
+    parentId: string | null
   }[]
   // New widget data fields
   notifications: Notification[]
@@ -418,6 +436,14 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
       return <WilskrachtWidget size={size} data={data} href={href} />
     case 'berichten':
       return <BerichtenWidget size={size} href={href} />
+    case 'trend_inkomen':
+      return <BudgetTrendWidget budgetType="income" size={size} data={data} href={href} />
+    case 'trend_uitgaven':
+      return <BudgetTrendWidget budgetType="expense" size={size} data={data} href={href} />
+    case 'trend_sparen':
+      return <BudgetTrendWidget budgetType="savings" size={size} data={data} href={href} />
+    case 'trend_schulden':
+      return <BudgetTrendWidget budgetType="debt" size={size} data={data} href={href} />
     default:
       return null
   }

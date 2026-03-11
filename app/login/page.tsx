@@ -39,7 +39,7 @@ function LoginForm() {
       }).catch(() => {}) // Silent fail — badges are non-critical
 
       // Redirect to the originally requested page or dashboard
-      const destination = redirectTo && redirectTo.startsWith('/') ? redirectTo : '/dashboard'
+      const destination = redirectTo && redirectTo.startsWith('/') ? redirectTo : '/will'
       router.push(destination)
     }
   }

@@ -438,6 +438,42 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultSize: 'half',
     minLevel: -2,
   },
+  {
+    id: 'trend_inkomen',
+    name: 'Inkomentrend',
+    description: 'Maandelijkse inkomstentrend',
+    module: 'kern',
+    sizes: ['quarter', 'half', 'full'],
+    defaultSize: 'half',
+    minLevel: -2,
+  },
+  {
+    id: 'trend_uitgaven',
+    name: 'Uitgaventrend',
+    description: 'Maandelijkse uitgaventrend',
+    module: 'kern',
+    sizes: ['quarter', 'half', 'full'],
+    defaultSize: 'half',
+    minLevel: -2,
+  },
+  {
+    id: 'trend_sparen',
+    name: 'Spaartrend',
+    description: 'Maandelijkse spaartrend',
+    module: 'kern',
+    sizes: ['quarter', 'half', 'full'],
+    defaultSize: 'half',
+    minLevel: -2,
+  },
+  {
+    id: 'trend_schulden',
+    name: 'Schuldtrend',
+    description: 'Maandelijkse schuldaflossingstrend',
+    module: 'kern',
+    sizes: ['quarter', 'half', 'full'],
+    defaultSize: 'half',
+    minLevel: -2,
+  },
 ]
 
 export const DEFAULT_WIDGET_PREFS: WidgetPrefs = {
@@ -463,7 +499,7 @@ export const WIDGET_HREFS: Record<string, string> = {
   voorstellen:              '/will#voorstellen',
   acties:                   '/will#acties',
   doelen:                   '/will#doelen',
-  fire_prognose:            '/horizon?modal=projections',
+  fire_prognose:            '/horizon',
   monte_carlo:              '/horizon?modal=simulations',
   levensgebeurtenissen:     '/horizon?modal=life_events',
   spaarquote:               '/core',
@@ -494,6 +530,10 @@ export const WIDGET_HREFS: Record<string, string> = {
   vrijheidsdagen_maand:    '/will',
   wilskracht:              '/will',
   berichten:               '/berichten',
+  trend_inkomen:           '/core/budgets',
+  trend_uitgaven:          '/core/budgets',
+  trend_sparen:            '/core/budgets',
+  trend_schulden:          '/core/budgets',
 }
 
 // ── Widget → Feature-phase mapping ───────────────────────────
