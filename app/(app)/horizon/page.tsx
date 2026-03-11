@@ -2029,9 +2029,9 @@ export default function HorizonPage() {
                   </div>
 
                   {/* Toelichting */}
-                  {selectedEvent.metadata?.toelichting && (
+                  {selectedEvent.metadata?.toelichting ? (
                     <p className="text-sm text-[var(--ink-2)] italic">{String(selectedEvent.metadata.toelichting)}</p>
-                  )}
+                  ) : null}
 
                   {/* Metadata details */}
                   {evCatalog?.fields && evCatalog.fields.length > 0 && (() => {
