@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { NotificationItem } from '@/components/app/notifications/notification-item'
-import { Bell, Newspaper, ChevronRight, ChevronDown, CheckCheck, Sparkles, TrendingUp, AlertCircle, Loader2, RefreshCw, MessageSquare } from 'lucide-react'
+import { Bell, Newspaper, ChevronRight, ChevronDown, CheckCheck, Sparkles, AlertCircle, Loader2, RefreshCw } from 'lucide-react'
 import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
-import { useChatContext } from '@/components/app/chat/chat-provider'
-import Link from 'next/link'
+import { Masthead } from './masthead'
+import { NewspaperFooter } from './newspaper-footer'
+import { HeroNewsArticle, NewsArticle, NewsSkeletonLoader } from './news-components'
+import { ArchiveSection } from './archive-section'
 import type { Notification } from '@/app/api/notifications/route'
 import type { NewsItem } from '@/app/api/news/route'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
@@ -98,17 +99,6 @@ function SectionHeading({ label }: { label: string }) {
   )
 }
 
-// ── Category config ──────────────────────────────────────────────────
-
-const CATEGORY_CONFIG: Record<string, { label: string; color: string; dotColor: string }> = {
-  fiscaal: { label: 'Fiscaal', color: 'bg-kern-50 text-kern-700 border-kern-200', dotColor: 'bg-kern-400' },
-  rente: { label: 'Rente', color: 'bg-blue-50 text-blue-700 border-blue-200', dotColor: 'bg-blue-400' },
-  woningmarkt: { label: 'Woningmarkt', color: 'bg-purple-50 text-purple-700 border-purple-200', dotColor: 'bg-purple-400' },
-  beleggingen: { label: 'Beleggingen', color: 'bg-wil-50 text-wil-700 border-wil-200', dotColor: 'bg-wil-400' },
-  pensioen: { label: 'Pensioen', color: 'bg-horizon-50 text-horizon-700 border-horizon-200', dotColor: 'bg-horizon-400' },
-  macro: { label: 'Macro', color: 'bg-zinc-100 text-zinc-700 border-zinc-200', dotColor: 'bg-zinc-400' },
-}
-
 // ── Collapsible day group ────────────────────────────────────────────
 
 function CollapsedDayGroup({
@@ -150,288 +140,6 @@ function CollapsedDayGroup({
         </div>
       )}
     </div>
-  )
-}
-
-// ── Category badge ───────────────────────────────────────────────────
-
-function CategoryBadge({ category }: { category: string }) {
-  const cat = CATEGORY_CONFIG[category] ?? CATEGORY_CONFIG.macro
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 ${cat.color}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${cat.dotColor}`} />
-      <span className="font-inter text-[10px] font-bold uppercase tracking-[0.06em]">
-        {cat.label}
-      </span>
-    </span>
-  )
-}
-
-// ── Format news date ─────────────────────────────────────────────────
-
-function formatNewsDate(dateStr: string): string {
-  try {
-    return new Date(dateStr).toLocaleDateString('nl-NL', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    })
-  } catch {
-    return dateStr
-  }
-}
-
-// ── Impact block ─────────────────────────────────────────────────────
-
-function ImpactBlock({ impact }: { impact: string }) {
-  return (
-    <div className="mt-3 rounded-[var(--r)] border-l-3 border-wil-400 bg-wil-50/60 px-4 py-3">
-      <div className="mb-1 flex items-center gap-1.5">
-        <TrendingUp className="h-3.5 w-3.5 text-wil-600" />
-        <span className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-wil-700">
-          Impact voor jou
-        </span>
-      </div>
-      <p className="font-source-serif text-[13px] leading-relaxed text-wil-900">
-        {impact}
-      </p>
-    </div>
-  )
-}
-
-// ── Discuss with Will button ─────────────────────────────────────────
-
-function NewsArticleActions({ item, isRead, onMarkRead }: { item: NewsItem; isRead: boolean; onMarkRead: (id: string) => void }) {
-  const { openWithMessage } = useChatContext()
-
-  const handleDiscuss = useCallback(() => {
-    onMarkRead(item.id)
-    const message = `Ik las dit nieuwsartikel:\n\n"${item.headline}"\n\n${item.summary}\n\nWat betekent dit voor mijn financiële situatie?`
-    openWithMessage(message)
-  }, [item, onMarkRead, openWithMessage])
-
-  const handleToggleRead = useCallback(() => {
-    onMarkRead(item.id)
-  }, [item.id, onMarkRead])
-
-  return (
-    <div className="mt-3 flex items-center gap-2">
-      <button
-        type="button"
-        onClick={handleDiscuss}
-        className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[var(--r-sm)] border border-wil-200 bg-wil-50 px-3 py-2 font-inter text-[11px] font-medium text-wil-700 transition-colors hover:bg-wil-100 sm:min-h-0 sm:px-2 sm:py-1"
-      >
-        <MessageSquare className="h-3 w-3" />
-        Bespreek met Will
-      </button>
-      {!isRead && (
-        <button
-          type="button"
-          onClick={handleToggleRead}
-          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[var(--r-sm)] border border-[var(--border-ed)] px-3 py-2 font-inter text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] sm:min-h-0 sm:px-2 sm:py-1"
-        >
-          <CheckCheck className="h-3 w-3" />
-          Gelezen
-        </button>
-      )}
-    </div>
-  )
-}
-
-// ── Hero news article (first item — front-page style) ───────────────
-
-function HeroNewsArticle({ item, isRead, onMarkRead }: { item: NewsItem; isRead: boolean; onMarkRead: (id: string) => void }) {
-  const firstLetter = item.summary.charAt(0)
-  const restOfSummary = item.summary.slice(1)
-
-  return (
-    <article className={`mb-8 transition-opacity duration-300 ${isRead ? 'opacity-70' : ''}`}>
-      <div className="mb-3 flex items-center gap-3">
-        <CategoryBadge category={item.category} />
-        {!isRead && (
-          <span className="h-2 w-2 rounded-full bg-wil-500" title="Nieuw" />
-        )}
-        {item.sourceContext && (
-          <span className="font-inter text-[11px] text-[var(--ink-4)]">
-            {item.sourceContext}
-          </span>
-        )}
-      </div>
-
-      <h2
-        className="font-source-serif text-2xl font-semibold leading-snug text-[var(--ink)] sm:text-3xl"
-        style={{ letterSpacing: '-0.02em' }}
-      >
-        {item.headline}
-      </h2>
-
-      <p className="mt-3 font-source-serif text-base leading-relaxed text-[var(--ink-2)] sm:text-lg">
-        <span
-          className="float-left mr-2 font-playfair text-[3.2rem] font-bold leading-[0.8] text-[var(--ink)]"
-          aria-hidden="true"
-        >
-          {firstLetter}
-        </span>
-        <span aria-label={item.summary}>{restOfSummary}</span>
-      </p>
-
-      <div className="mt-3 clear-left">
-        <span className="font-inter text-[11px] text-[var(--ink-4)]">
-          {formatNewsDate(item.date)}
-        </span>
-      </div>
-
-      <ImpactBlock impact={item.personalImpact} />
-      <NewsArticleActions item={item} isRead={isRead} onMarkRead={onMarkRead} />
-      <div className="mt-6 h-px bg-[var(--border-ed)]" />
-    </article>
-  )
-}
-
-// ── Regular news article (grid card) ────────────────────────────────
-
-function NewsArticle({ item, isRead, onMarkRead }: { item: NewsItem; isRead: boolean; onMarkRead: (id: string) => void }) {
-  return (
-    <article className={`flex flex-col rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 shadow-[var(--s0)] transition-opacity transition-shadow duration-300 hover:shadow-[var(--s1)] ${isRead ? 'opacity-70' : ''}`}>
-      <div className="mb-2.5 flex items-center gap-3">
-        <CategoryBadge category={item.category} />
-        {!isRead && (
-          <span className="h-2 w-2 rounded-full bg-wil-500" title="Nieuw" />
-        )}
-        {item.sourceContext && (
-          <span className="font-inter text-[11px] text-[var(--ink-4)]">
-            {item.sourceContext}
-          </span>
-        )}
-      </div>
-
-      <h3 className="font-source-serif text-lg font-semibold leading-snug text-[var(--ink)]">
-        {item.headline}
-      </h3>
-
-      <p className="mt-1.5 flex-1 font-source-serif text-sm leading-relaxed text-[var(--ink-2)]">
-        {item.summary}
-      </p>
-
-      <span className="mt-2 inline-block font-inter text-[11px] text-[var(--ink-4)]">
-        {formatNewsDate(item.date)}
-      </span>
-
-      <ImpactBlock impact={item.personalImpact} />
-      <NewsArticleActions item={item} isRead={isRead} onMarkRead={onMarkRead} />
-    </article>
-  )
-}
-
-// ── News skeleton loader ─────────────────────────────────────────────
-
-function NewsSkeletonLoader() {
-  return (
-    <div>
-      <div className="mb-8">
-        <div className="mb-3 flex items-center gap-3">
-          <div className="h-5 w-20 animate-pulse rounded-full bg-[var(--subtle)]" />
-          <div className="h-3 w-24 animate-pulse rounded bg-[var(--subtle)]" />
-        </div>
-        <div className="space-y-2">
-          <div className="h-7 w-full animate-pulse rounded bg-[var(--subtle)] sm:h-9" />
-          <div className="h-7 w-3/4 animate-pulse rounded bg-[var(--subtle)] sm:h-9" />
-        </div>
-        <div className="mt-3 space-y-1.5">
-          <div className="h-4 w-full animate-pulse rounded bg-[var(--subtle)]" />
-          <div className="h-4 w-5/6 animate-pulse rounded bg-[var(--subtle)]" />
-          <div className="h-4 w-2/3 animate-pulse rounded bg-[var(--subtle)]" />
-        </div>
-        <div className="mt-3 h-3 w-32 animate-pulse rounded bg-[var(--subtle)]" />
-        <div className="mt-3 rounded-[var(--r)] border-l-3 border-[var(--subtle)] bg-[var(--subtle)]/30 px-4 py-3">
-          <div className="mb-1 h-3 w-24 animate-pulse rounded bg-[var(--subtle)]" />
-          <div className="h-3 w-full animate-pulse rounded bg-[var(--subtle)]" />
-        </div>
-        <div className="mt-6 h-px bg-[var(--border-ed)]" />
-      </div>
-      <div className="news-grid-columns grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div
-            key={i}
-            className="flex flex-col rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 shadow-[var(--s0)]"
-          >
-            <div className="mb-2.5 h-5 w-20 animate-pulse rounded-full bg-[var(--subtle)]" />
-            <div className="space-y-1.5">
-              <div className="h-5 w-full animate-pulse rounded bg-[var(--subtle)]" />
-              <div className="h-5 w-2/3 animate-pulse rounded bg-[var(--subtle)]" />
-            </div>
-            <div className="mt-2 space-y-1">
-              <div className="h-3 w-full animate-pulse rounded bg-[var(--subtle)]" />
-              <div className="h-3 w-5/6 animate-pulse rounded bg-[var(--subtle)]" />
-            </div>
-            <div className="mt-2 h-3 w-24 animate-pulse rounded bg-[var(--subtle)]" />
-          </div>
-        ))}
-      </div>
-      <div className="flex items-center justify-center gap-2 py-6">
-        <Loader2 className="h-4 w-4 animate-spin text-[var(--ink-3)]" />
-        <p className="font-source-serif text-sm italic text-[var(--ink-3)]">
-          Nieuws wordt gepersonaliseerd&hellip;
-        </p>
-      </div>
-    </div>
-  )
-}
-
-// ── Newspaper masthead ───────────────────────────────────────────────
-
-function Masthead() {
-  const now = new Date()
-  const dateline = now.toLocaleDateString('nl-NL', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-  const launchDate = new Date(2026, 0, 1)
-  const editionNr = Math.max(1, Math.floor((now.getTime() - launchDate.getTime()) / 86_400_000))
-
-  return (
-    <div className="mb-6">
-      <div className="mb-3 h-[3px] bg-[var(--ink)]" />
-      <div className="flex items-center justify-between">
-        <span className="font-inter text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)]">
-          Editie {editionNr}
-        </span>
-        <span className="font-source-serif text-[12px] italic text-[var(--ink-3)]">
-          Persoonlijk financieel overzicht
-        </span>
-      </div>
-      <h1
-        className="mt-2 text-center font-playfair text-3xl font-bold tracking-tight text-[var(--ink)] sm:text-4xl md:text-[2.75rem]"
-        style={{ letterSpacing: '-0.03em' }}
-      >
-        TriFinity Berichten
-      </h1>
-      <p className="mt-1.5 text-center font-source-serif text-sm italic text-[var(--ink-2)]">
-        {dateline}
-      </p>
-      <div className="mt-3 flex items-center gap-0">
-        <div className="h-[2px] flex-1 bg-[var(--ink)]" />
-      </div>
-      <div className="mt-[3px] h-px bg-[var(--ink)]" />
-    </div>
-  )
-}
-
-// ── Newspaper footer ─────────────────────────────────────────────────
-
-function NewspaperFooter() {
-  return (
-    <footer className="mt-12">
-      <div className="h-px bg-[var(--ink)]" />
-      <div className="mt-[3px] h-[2px] bg-[var(--ink)]" />
-      <div className="flex flex-col items-center gap-4 py-6 text-center sm:flex-row sm:items-start sm:justify-between sm:text-left">
-        <p className="font-source-serif text-sm italic leading-relaxed text-[var(--ink-3)]">
-          &ldquo;Geld is opgeslagen tijd &mdash; elke euro vertegenwoordigt een stukje levenstijd.&rdquo;
-        </p>
-      </div>
-    </footer>
   )
 }
 
@@ -500,6 +208,12 @@ export function BerichtenClient({ dashboardData, temporal, userName, aiEnabled: 
   const [newsError, setNewsError] = useState<string | null>(null)
   const [newsFetched, setNewsFetched] = useState(false)
   const [readArticleIds, setReadArticleIds] = useState<Set<string>>(new Set())
+  const [refreshing, setRefreshing] = useState(false)
+  const [newsTab, setNewsTab] = useState<'current' | 'archive'>('current')
+  const [editionNr, setEditionNr] = useState<number | undefined>()
+  const [jaargang, setJaargang] = useState<number | undefined>()
+  const [refreshesRemaining, setRefreshesRemaining] = useState<number | undefined>()
+  const [generating, setGenerating] = useState(false)
 
   const fetchExtendedHistory = useCallback(async () => {
     try {
@@ -558,10 +272,22 @@ export function BerichtenClient({ dashboardData, temporal, userName, aiEnabled: 
         throw new Error(data.error ?? `HTTP ${res.status}`)
       }
       const data = await res.json()
+
+      if (data.status === 'generating') {
+        setGenerating(true)
+        setNewsLoading(false)
+        if (data.editionNr) setEditionNr(data.editionNr)
+        if (data.jaargang) setJaargang(data.jaargang)
+        return
+      }
+
       const items: NewsItem[] = data.items ?? data
       setNewsItems(items)
       setLocalNewsCache(items)
       setNewsFetched(true)
+      if (data.editionNr) setEditionNr(data.editionNr)
+      if (data.jaargang) setJaargang(data.jaargang)
+      if (data.refreshesRemaining !== undefined) setRefreshesRemaining(data.refreshesRemaining)
     } catch (err) {
       setNewsError(err instanceof Error ? err.message : 'Nieuws kon niet worden geladen')
     } finally {
@@ -571,31 +297,91 @@ export function BerichtenClient({ dashboardData, temporal, userName, aiEnabled: 
 
   const refreshNews = useCallback(async () => {
     try { localStorage.removeItem(NEWS_LOCAL_CACHE_KEY) } catch { /* noop */ }
-    setNewsItems([])
-    setNewsFetched(false)
-    setNewsLoading(true)
+    // Keep current items visible — use overlay instead of clearing
+    setRefreshing(true)
     setNewsError(null)
     try {
       const res = await fetch('/api/news?refresh=1')
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: 'Onbekende fout' }))
+        if (res.status === 429) {
+          setRefreshesRemaining(0)
+          setNewsError(data.error ?? 'Verversing limiet bereikt')
+          setRefreshing(false)
+          return
+        }
         throw new Error(data.error ?? `HTTP ${res.status}`)
       }
       const data = await res.json()
+
+      if (data.status === 'generating') {
+        setGenerating(true)
+        if (data.editionNr) setEditionNr(data.editionNr)
+        if (data.jaargang) setJaargang(data.jaargang)
+        // Don't clear refreshing — polling will handle it
+        return
+      }
+
       const items: NewsItem[] = data.items ?? data
       setNewsItems(items)
       setLocalNewsCache(items)
       setNewsFetched(true)
+      setRefreshing(false)
+      if (data.editionNr) setEditionNr(data.editionNr)
+      if (data.jaargang) setJaargang(data.jaargang)
+      if (data.refreshesRemaining !== undefined) setRefreshesRemaining(data.refreshesRemaining)
     } catch (err) {
       setNewsError(err instanceof Error ? err.message : 'Nieuws kon niet worden geladen')
-    } finally {
-      setNewsLoading(false)
+      setRefreshing(false)
     }
   }, [])
 
   useEffect(() => {
     if (aiEnabled) fetchNews()
   }, [fetchNews, aiEnabled])
+
+  // Poll for background generation — handles partial items progressively
+  useEffect(() => {
+    if (!generating) return
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/news')
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({ error: 'Onbekende fout' }))
+          throw new Error(data.error ?? `HTTP ${res.status}`)
+        }
+        const data = await res.json()
+
+        if (data.status === 'generating') {
+          // Show partial items as they arrive
+          if (data.items?.length) {
+            setNewsItems(data.items)
+            if (!newsFetched) setNewsFetched(true)
+          }
+          if (data.editionNr) setEditionNr(data.editionNr)
+          if (data.jaargang) setJaargang(data.jaargang)
+          return // Keep polling
+        }
+
+        // Generation complete — final items arrived
+        const items: NewsItem[] = data.items ?? data
+        setNewsItems(items)
+        setLocalNewsCache(items)
+        setNewsFetched(true)
+        setGenerating(false)
+        setRefreshing(false)
+        if (data.editionNr) setEditionNr(data.editionNr)
+        if (data.jaargang) setJaargang(data.jaargang)
+        if (data.refreshesRemaining !== undefined) setRefreshesRemaining(data.refreshesRemaining)
+      } catch (err) {
+        setNewsError(err instanceof Error ? err.message : 'Nieuws kon niet worden geladen')
+        setGenerating(false)
+        setRefreshing(false)
+      }
+    }
+    const interval = setInterval(poll, 2500)
+    return () => clearInterval(interval)
+  }, [generating, newsFetched])
 
   const handleMarkAsRead = useCallback((id: string) => {
     setHistory((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)))
@@ -636,7 +422,7 @@ export function BerichtenClient({ dashboardData, temporal, userName, aiEnabled: 
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
-      <Masthead />
+      <Masthead editionNr={editionNr} jaargang={jaargang} />
       <SectionAnchors />
 
       {/* ── WILL'S BRIEFING sectie (bovenaan) ──────────────────── */}
@@ -670,62 +456,145 @@ export function BerichtenClient({ dashboardData, temporal, userName, aiEnabled: 
                   <AiPrivacyIndicator size={12} />
                 </span>
                 <div className="h-px flex-1 bg-[var(--border-ed)]" />
-                {newsFetched && !newsLoading && (
+                {newsFetched && !newsLoading && !refreshing && (
                   <button
                     type="button"
                     onClick={refreshNews}
-                    disabled={newsLoading}
+                    disabled={refreshing || refreshesRemaining === 0}
                     className="flex min-h-[44px] items-center gap-1.5 rounded-[var(--r)] px-2 py-1 font-inter text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-50 sm:min-h-0"
-                    title="Ververs nieuws"
+                    title={refreshesRemaining === 0 ? 'Verversing limiet bereikt' : 'Ververs nieuws'}
                   >
                     <RefreshCw className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Ververs</span>
+                    <span className="hidden sm:inline">
+                      Ververs{refreshesRemaining !== undefined ? ` (${refreshesRemaining} over)` : ''}
+                    </span>
                   </button>
                 )}
               </div>
 
-              {newsLoading || (!newsFetched && !newsError) ? (
-                <NewsSkeletonLoader />
-              ) : newsError ? (
-                <div className="flex flex-col items-center gap-4 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-6 py-12 text-center shadow-[var(--s0)]">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--subtle)]">
-                    <AlertCircle className="h-6 w-6 text-[var(--ink-3)]" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-inter text-sm font-medium text-[var(--ink-2)]">
-                      Nieuws kon niet worden geladen
-                    </p>
-                    <p className="font-source-serif text-[13px] italic text-[var(--ink-4)]">
-                      {newsError}
-                    </p>
-                  </div>
+              {/* ── Tab bar: Huidige editie / Archief ── */}
+              {newsFetched && !newsLoading && (
+                <div className="mb-4 flex gap-1 rounded-[var(--r)] bg-[var(--subtle)] p-1" role="tablist">
                   <button
-                    type="button"
-                    onClick={() => { setNewsFetched(false); setNewsError(null) }}
-                    className="flex min-h-[44px] items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-2 font-inter text-sm font-medium text-[var(--ink)] shadow-[var(--s0)] transition-all hover:bg-[var(--subtle)] hover:shadow-[var(--s1)] active:scale-[0.98] sm:min-h-0"
+                    role="tab"
+                    aria-selected={newsTab === 'current'}
+                    onClick={() => setNewsTab('current')}
+                    className={`flex-1 rounded-[var(--r-sm)] px-2 py-1.5 text-[11px] font-semibold transition-colors ${
+                      newsTab === 'current'
+                        ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
+                        : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                    }`}
                   >
-                    <RefreshCw className="h-4 w-4" />
-                    Opnieuw proberen
+                    Huidige editie
+                  </button>
+                  <button
+                    role="tab"
+                    aria-selected={newsTab === 'archive'}
+                    onClick={() => setNewsTab('archive')}
+                    className={`flex-1 rounded-[var(--r-sm)] px-2 py-1.5 text-[11px] font-semibold transition-colors ${
+                      newsTab === 'archive'
+                        ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
+                        : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                    }`}
+                  >
+                    Archief
                   </button>
                 </div>
-              ) : newsItems.length > 0 ? (
-                <div>
-                  <HeroNewsArticle item={newsItems[0]} isRead={readArticleIds.has(newsItems[0].id)} onMarkRead={markArticleRead} />
-                  {newsItems.length > 1 && (
-                    <div className="news-grid-columns grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
-                      {newsItems.slice(1).map((item) => (
-                        <NewsArticle key={item.id} item={item} isRead={readArticleIds.has(item.id)} onMarkRead={markArticleRead} />
-                      ))}
+              )}
+
+              {newsTab === 'current' ? (
+                <>
+                  <style>{`
+                    @keyframes news-reveal {
+                      from { opacity: 0; transform: translateY(12px); }
+                      to { opacity: 1; transform: translateY(0); }
+                    }
+                  `}</style>
+
+                  {newsLoading ? (
+                    <NewsSkeletonLoader />
+                  ) : !newsFetched && !newsError && generating ? (
+                    <div className="flex flex-col items-center gap-4 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-6 py-16 text-center shadow-[var(--s0)]">
+                      <div className="relative">
+                        <Newspaper className="h-10 w-10 text-[var(--ink-4)]" />
+                        <Loader2 className="absolute -right-1 -top-1 h-4 w-4 animate-spin text-[var(--ink-3)]" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="font-inter text-sm font-medium text-[var(--ink-2)]">
+                          Will stelt je persoonlijke editie samen&hellip;
+                        </p>
+                        <p className="font-source-serif text-[13px] italic text-[var(--ink-4)]">
+                          Elk artikel wordt afgestemd op jouw financi&euml;le situatie
+                        </p>
+                      </div>
+                    </div>
+                  ) : !newsFetched && !newsError ? (
+                    <NewsSkeletonLoader />
+                  ) : newsError ? (
+                    <div className="flex flex-col items-center gap-4 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-6 py-12 text-center shadow-[var(--s0)]">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--subtle)]">
+                        <AlertCircle className="h-6 w-6 text-[var(--ink-3)]" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="font-inter text-sm font-medium text-[var(--ink-2)]">
+                          Nieuws kon niet worden geladen
+                        </p>
+                        <p className="font-source-serif text-[13px] italic text-[var(--ink-4)]">
+                          {newsError}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setNewsFetched(false); setNewsError(null) }}
+                        className="flex min-h-[44px] items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-2 font-inter text-sm font-medium text-[var(--ink)] shadow-[var(--s0)] transition-all hover:bg-[var(--subtle)] hover:shadow-[var(--s1)] active:scale-[0.98] sm:min-h-0"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                        Opnieuw proberen
+                      </button>
+                    </div>
+                  ) : newsItems.length > 0 ? (
+                    <div className="relative">
+                      {refreshing && (
+                        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[var(--r-lg)] bg-[var(--paper)]/70 backdrop-blur-[2px]">
+                          <Loader2 className="h-5 w-5 animate-spin text-[var(--ink-3)]" />
+                          <span className="ml-2 font-source-serif text-sm italic text-[var(--ink-2)]">
+                            Nieuwe editie wordt samengesteld&hellip;
+                          </span>
+                        </div>
+                      )}
+                      <div style={{ animation: 'news-reveal 0.4s ease-out both' }}>
+                        <HeroNewsArticle item={newsItems[0]} isRead={readArticleIds.has(newsItems[0].id)} onMarkRead={markArticleRead} />
+                      </div>
+                      {newsItems.length > 1 && (
+                        <div className="news-grid-columns grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+                          {newsItems.slice(1).map((item, index) => (
+                            <div
+                              key={item.id}
+                              style={{ animation: `news-reveal 0.4s ease-out ${(index + 1) * 120}ms both` }}
+                            >
+                              <NewsArticle item={item} isRead={readArticleIds.has(item.id)} onMarkRead={markArticleRead} />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {generating && (
+                        <div className="mt-4 flex items-center justify-center gap-2 py-3 text-[var(--ink-4)]">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <span className="font-source-serif text-[13px] italic">Meer artikelen worden samengesteld&hellip;</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-8 py-16 text-center shadow-[var(--s0)]">
+                      <Newspaper className="h-8 w-8 text-[var(--ink-4)]" />
+                      <p className="font-inter text-sm text-[var(--ink-3)]">
+                        Nog geen nieuws beschikbaar.
+                      </p>
                     </div>
                   )}
-                </div>
+                </>
               ) : (
-                <div className="flex flex-col items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-8 py-16 text-center shadow-[var(--s0)]">
-                  <Newspaper className="h-8 w-8 text-[var(--ink-4)]" />
-                  <p className="font-inter text-sm text-[var(--ink-3)]">
-                    Nog geen nieuws beschikbaar.
-                  </p>
-                </div>
+                <ArchiveSection />
               )}
             </div>
           </div>

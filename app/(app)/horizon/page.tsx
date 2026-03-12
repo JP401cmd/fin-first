@@ -27,7 +27,7 @@ import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import type { Debt } from '@/lib/debt-data'
 import { ActionCard } from '@/components/app/action-card'
-import { LogTimeline, EVENT_ICONS } from '@/components/app/horizon/log-timeline'
+import { EVENT_ICONS } from '@/components/app/horizon/log-timeline'
 import { ScenariosModal } from '@/components/app/horizon/scenarios-modal'
 import { SimulationsModal } from '@/components/app/horizon/simulations-modal'
 import { WithdrawalModal } from '@/components/app/horizon/withdrawal-modal'
@@ -176,7 +176,7 @@ export default function HorizonPage() {
       const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
       const sixMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 5, 1)).toISOString().split('T')[0]
 
-      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, actionsResult, childBudgetsResult, fullDebtsResult, snapshotsResult, income12Result, earliestIncomeResult, tx6mResult] = await Promise.all([
+      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, actionsResult, childBudgetsResult, fullDebtsResult, snapshotsResult, income12Result, earliestIncomeResult, tx6mResult, bankAccountsResult] = await Promise.all([
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
@@ -201,6 +201,7 @@ export default function HorizonPage() {
         supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
         // 6-month transactions for stable resilience calculation
         supabase.from('transactions').select('amount').gte('date', sixMonthsAgo).lt('date', monthEnd),
+        supabase.from('bank_accounts').select('id, name, balance').eq('is_active', true).is('linked_asset_id', null),
       ])
 
       let monthlyIncome = 0
@@ -224,8 +225,10 @@ export default function HorizonPage() {
       setAvgIncome6m(avgInc6)
       setAvgExpenses6m(avgExp6)
 
-      const totalAssets = (assetsResult.data ?? []).reduce((s, a) =>
+      const totalAssetsOnly = (assetsResult.data ?? []).reduce((s, a) =>
         s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
+      const unlinkedCash = (bankAccountsResult.data ?? []).reduce((s, a) => s + Number(a.balance), 0)
+      const totalAssets = totalAssetsOnly + unlinkedCash
       const totalDebts = (debtsResult.data ?? []).reduce((s, d) =>
         s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
       const monthlyContributions = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.monthly_contribution), 0)
@@ -1217,9 +1220,19 @@ export default function HorizonPage() {
     }
 
     if (editingEvent) {
-      await supabase.from('life_events').update(payload).eq('id', editingEvent.id)
+      const { error: updateError } = await supabase.from('life_events').update(payload).eq('id', editingEvent.id)
+      if (updateError) {
+        console.error('Failed to update life event:', updateError.message, updateError.code, updateError.details)
+        setFormErrors([`Bijwerken mislukt: ${updateError.message || updateError.code || 'Onbekende fout'}`])
+        return
+      }
     } else {
-      await supabase.from('life_events').insert(payload)
+      const { error: insertError } = await supabase.from('life_events').insert(payload)
+      if (insertError) {
+        console.error('Failed to save life event:', insertError.message, insertError.code, insertError.details)
+        setFormErrors([`Opslaan mislukt: ${insertError.message || insertError.code || 'Onbekende fout'}`])
+        return
+      }
     }
 
     setShowForm(false)
@@ -1234,14 +1247,13 @@ export default function HorizonPage() {
       setSelectedEventId(null)
       setViewModalMode('view')
     }
-    setLoading(true)
     loadData()
   }
 
   async function deleteEvent(id: string) {
     const supabase = createClient()
-    await supabase.from('life_events').delete().eq('id', id)
-    setLoading(true)
+    const { error } = await supabase.from('life_events').delete().eq('id', id)
+    if (error) console.error('Failed to delete life event:', error)
     loadData()
   }
 
@@ -1604,216 +1616,10 @@ export default function HorizonPage() {
         />
       )}
 
-
-      {/* === 5. Household FIRE Projections === */}
-      <HouseholdFireSection />
-
-      {/* === 3. Alerts === */}
-      {(hasNoDob || fireNotReachable || hasDebt) && (
-        <section className="mt-4 sm:mt-8" data-testid="horizon-alerts">
-          <h2 className="mb-3 label-editorial text-[var(--ink-2)]">
-            Aandachtspunten
-          </h2>
-          <div className="space-y-2">
-            {hasNoDob && (
-              <div className="flex items-center gap-3 rounded-[var(--r)] border border-amber-200 bg-amber-50/50 p-3">
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
-                <span className="flex-1 text-sm font-medium text-amber-700">
-                  Stel je geboortedatum in bij instellingen voor nauwkeurige leeftijdsberekeningen.
-                </span>
-              </div>
-            )}
-            {fireNotReachable && (
-              <div className="flex items-center gap-3 rounded-[var(--r)] border border-red-200 bg-red-50/50 p-3">
-                <AlertTriangle className="h-4 w-4 text-red-500" />
-                <span className="flex-1 text-sm font-medium text-red-700">
-                  Volledige vrijheid is niet haalbaar bij huidige koers. Verhoog je spaarquote of verlaag je uitgaven.
-                </span>
-              </div>
-            )}
-            {hasDebt && (
-              <div className="flex items-center gap-3 rounded-[var(--r)] border border-horizon-200 bg-horizon-50/50 p-3">
-                <Info className="h-4 w-4 text-horizon-500" />
-                <span className="flex-1 text-sm font-medium text-horizon-700">
-                  Je hebt {formatCurrency(effectiveInput?.totalDebts ?? 0)} aan schulden — dit vertraagt je pad naar volledige vrijheid.
-                </span>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-
-      {/* === 5. Resilience Trend Chart (Deep Dive) === */}
-      {resilienceSnapshots.filter(s => s.resilience_score !== null).length >= 2 && (
-        <FeatureGate featureId="veerkracht_score" fallback="hidden">
-        <section className="mt-5 sm:mt-8" data-testid="resilience-trend-section">
-          <div className="mb-3">
-            <h2 className="label-editorial text-[var(--ink-2)]">
-              <Shield className="mr-1.5 inline h-3.5 w-3.5 text-horizon-500" />
-              Veerkracht verloop
-            </h2>
-            <p className="mt-1 text-sm text-[var(--ink-3)]">
-              Je veerkrachtscore over tijd, gebaseerd op echte snapshot data
-            </p>
-          </div>
-          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 sm:p-6">
-            <ResilienceContextMessage snapshots={resilienceSnapshots} />
-            <ResilienceTrendChart snapshots={resilienceSnapshots} />
-          </div>
-        </section>
-        </FeatureGate>
-      )}
-
-      {/* === 5b. FIRE Age Trend Chart (Deep Dive) === */}
-      {(() => {
-        const fireAgeSnapshots = resilienceSnapshots.filter(s => s.fire_age !== null && s.fire_age !== undefined)
-        if (fireAgeSnapshots.length < 2) return null
-        const first = fireAgeSnapshots[0]
-        const last = fireAgeSnapshots[fireAgeSnapshots.length - 1]
-        const firstAge = first.fire_age as number
-        const lastAge = last.fire_age as number
-        const diff = Math.round((firstAge - lastAge) * 10) / 10
-        const firstMonth = new Date(first.snapshot_date).toLocaleDateString('nl-NL', { month: 'long' })
-        const lastMonth = new Date(last.snapshot_date).toLocaleDateString('nl-NL', { month: 'long' })
-        const improved = diff > 0
-
-        return (
-          <section className="mt-5 sm:mt-8" data-testid="fire-age-trend-section">
-            <div className="mb-3">
-              <h2 className="label-editorial text-[var(--ink-2)]">
-                <Hourglass className="mr-1.5 inline h-3.5 w-3.5 text-horizon-500" />
-                Je FIRE-leeftijd over tijd
-              </h2>
-              <p className="mt-1 text-sm text-[var(--ink-3)]">
-                Hoe je vrijheidsleeftijd zich ontwikkelt — lager is beter
-              </p>
-            </div>
-            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 sm:p-6">
-              {/* Contextual progress message */}
-              <div className="mb-4 rounded-[var(--r)] border border-horizon-100 bg-horizon-50 px-4 py-3" data-testid="fire-age-context-message">
-                <p className="text-sm text-horizon-800">
-                  {improved ? (
-                    <>
-                      In <span className="font-semibold">{firstMonth}</span> was je FIRE-leeftijd{' '}
-                      <span className="font-bold">{Math.round(firstAge)}</span>, nu{' '}
-                      <span className="font-bold">{Math.round(lastAge)}</span> —{' '}
-                      <span className="font-semibold text-emerald-700">
-                        je ligt {diff >= 1 ? `${Math.round(diff)} ${Math.round(diff) === 1 ? 'jaar' : 'jaar'}` : `${Math.round(diff * 12)} ${Math.round(diff * 12) === 1 ? 'maand' : 'maanden'}`} voor!
-                      </span>
-                    </>
-                  ) : diff < 0 ? (
-                    <>
-                      In <span className="font-semibold">{firstMonth}</span> was je FIRE-leeftijd{' '}
-                      <span className="font-bold">{Math.round(firstAge)}</span>, nu{' '}
-                      <span className="font-bold">{Math.round(lastAge)}</span> —{' '}
-                      <span className="font-semibold text-amber-700">
-                        {Math.abs(diff) >= 1 ? `${Math.round(Math.abs(diff))} ${Math.round(Math.abs(diff)) === 1 ? 'jaar' : 'jaar'}` : `${Math.round(Math.abs(diff) * 12)} ${Math.round(Math.abs(diff) * 12) === 1 ? 'maand' : 'maanden'}`} verschoven
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      Je FIRE-leeftijd is stabiel gebleven op{' '}
-                      <span className="font-bold">{Math.round(lastAge)} jaar</span>
-                    </>
-                  )}
-                </p>
-              </div>
-              <FireAgeTrendChart snapshots={resilienceSnapshots} />
-            </div>
-          </section>
-        )
-      })()}
-
-      {/* === 6. Verken-kaarten (Explore Cards / Primary Content) === */}
-      <section className="mt-4 sm:mt-8 space-y-3 sm:space-y-4">
-        <FeatureGate featureId="withdrawal_strategie" fallback="hidden">
-          <ExploreCard
-            onClick={() => setActiveModal('withdrawal')}
-            icon={<Landmark className="h-5 w-5 text-horizon-600" />}
-            title="Opnamestrategie"
-            value="4 strategieen"
-            subtitle="hoe je vermogen opneemt"
-          />
-        </FeatureGate>
-        <FeatureGate featureId="veerkracht_score" fallback="hidden">
-          <button
-            type="button"
-            onClick={() => setShowResilienceReceipt(true)}
-            className="group flex w-full items-center gap-3 rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 text-left transition-all hover:border-horizon-300 hover:shadow-sm"
-            data-testid="resilience-combined-card"
-          >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] group-hover:bg-horizon-50">
-              <Shield className="h-5 w-5 text-horizon-600" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-[var(--ink-3)]">Veerkracht &amp; Backtesting</p>
-              <p className="text-lg font-bold text-[var(--ink)]">
-                {snapshotResilience !== null ? snapshotResilience : resilience.total} / 100
-              </p>
-              <p className="text-xs text-[var(--ink-4)]">
-                {snapshotResilience !== null ? getResilienceLabel(snapshotResilience) : resilience.label}
-                {' · '}55 jaar marktgeschiedenis
-              </p>
-            </div>
-          </button>
-        </FeatureGate>
-      </section>
-
-      {/* === 7. Tijdlijn (Primary Content) === */}
+      {/* === Levensgebeurtenissen === */}
       <FeatureGate featureId="levensgebeurtenissen" fallback="hidden">
       <section className="mt-5 sm:mt-8">
-        <div className="mb-5">
-          <h2 className="label-editorial text-[var(--ink-2)]">
-            Jouw tijdlijn
-          </h2>
-          <p className="mt-1 text-sm text-[var(--ink-3)]">
-            Plan levensgebeurtenissen en acties, en zie hun impact op je pad naar vrijheid
-          </p>
-        </div>
-
-        {/* FIRE comparison summary */}
-        <div className="rounded-[var(--r-lg)] border border-horizon-200 bg-horizon-50 p-5">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="text-center">
-              <p className="text-xs font-medium text-horizon-600 uppercase">Basis vrijheid</p>
-              <p className="mt-1 font-mono text-3xl font-bold text-[var(--ink)]">
-                {baseFire?.fireAge != null ? `${Math.round(baseFire.fireAge)}j` : '-'}
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs font-medium text-horizon-600 uppercase">Aangepast (met events)</p>
-              <p className="mt-1 font-mono text-3xl font-bold text-[var(--ink)]">
-                {adjustedFireAge != null ? `${Math.round(adjustedFireAge)}j` : '-'}
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs font-medium text-horizon-600 uppercase">Impact</p>
-              <p className={`mt-1 text-3xl font-bold ${totalDelayMonths > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                {totalDelayMonths > 0 ? `+${totalDelayMonths} mnd` : '0 mnd'}
-              </p>
-              <p className="text-xs text-[var(--ink-3)]">door {events.length} event{events.length !== 1 ? 's' : ''}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Logarithmic Visual Timeline */}
-        {currentAge != null && (
-          <div className="mt-6 overflow-hidden rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 sm:p-6">
-            <LogTimeline
-              currentAge={currentAge}
-              baseFireAge={baseFire?.fireAge != null ? Math.round(baseFire.fireAge) : null}
-              adjustedFireAge={adjustedFireAge != null ? Math.round(adjustedFireAge) : null}
-              events={events}
-              impacts={impacts}
-              actions={actions}
-              dateOfBirth={effectiveInput?.dateOfBirth ?? null}
-            />
-          </div>
-        )}
-
-        {/* === Levensgebeurtenissen kaart === */}
-        <div className="mt-6 rounded-xl border border-zinc-200 bg-[var(--paper)] p-5">
+        <div className="rounded-xl border border-zinc-200 bg-[var(--paper)] p-5">
           {/* Header met + knop */}
           <div className="flex items-center justify-between mb-4">
             <h3 className="label-editorial text-[var(--ink-2)]">Levensgebeurtenissen</h3>
@@ -2180,6 +1986,127 @@ export default function HorizonPage() {
         })()}
       </section>
       </FeatureGate>
+
+      {/* === 5. Household FIRE Projections === */}
+      <HouseholdFireSection />
+
+
+
+      {/* === 5. Resilience Trend Chart (Deep Dive) === */}
+      {resilienceSnapshots.filter(s => s.resilience_score !== null).length >= 2 && (
+        <FeatureGate featureId="veerkracht_score" fallback="hidden">
+        <section className="mt-5 sm:mt-8" data-testid="resilience-trend-section">
+          <div className="mb-3">
+            <h2 className="label-editorial text-[var(--ink-2)]">
+              <Shield className="mr-1.5 inline h-3.5 w-3.5 text-horizon-500" />
+              Veerkracht verloop
+            </h2>
+            <p className="mt-1 text-sm text-[var(--ink-3)]">
+              Je veerkrachtscore over tijd, gebaseerd op echte snapshot data
+            </p>
+          </div>
+          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 sm:p-6">
+            <ResilienceContextMessage snapshots={resilienceSnapshots} />
+            <ResilienceTrendChart snapshots={resilienceSnapshots} />
+          </div>
+        </section>
+        </FeatureGate>
+      )}
+
+      {/* === 5b. FIRE Age Trend Chart (Deep Dive) === */}
+      {(() => {
+        const fireAgeSnapshots = resilienceSnapshots.filter(s => s.fire_age !== null && s.fire_age !== undefined)
+        if (fireAgeSnapshots.length < 2) return null
+        const first = fireAgeSnapshots[0]
+        const last = fireAgeSnapshots[fireAgeSnapshots.length - 1]
+        const firstAge = first.fire_age as number
+        const lastAge = last.fire_age as number
+        const diff = Math.round((firstAge - lastAge) * 10) / 10
+        const firstMonth = new Date(first.snapshot_date).toLocaleDateString('nl-NL', { month: 'long' })
+        const lastMonth = new Date(last.snapshot_date).toLocaleDateString('nl-NL', { month: 'long' })
+        const improved = diff > 0
+
+        return (
+          <section className="mt-5 sm:mt-8" data-testid="fire-age-trend-section">
+            <div className="mb-3">
+              <h2 className="label-editorial text-[var(--ink-2)]">
+                <Hourglass className="mr-1.5 inline h-3.5 w-3.5 text-horizon-500" />
+                Je FIRE-leeftijd over tijd
+              </h2>
+              <p className="mt-1 text-sm text-[var(--ink-3)]">
+                Hoe je vrijheidsleeftijd zich ontwikkelt — lager is beter
+              </p>
+            </div>
+            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 sm:p-6">
+              {/* Contextual progress message */}
+              <div className="mb-4 rounded-[var(--r)] border border-horizon-100 bg-horizon-50 px-4 py-3" data-testid="fire-age-context-message">
+                <p className="text-sm text-horizon-800">
+                  {improved ? (
+                    <>
+                      In <span className="font-semibold">{firstMonth}</span> was je FIRE-leeftijd{' '}
+                      <span className="font-bold">{Math.round(firstAge)}</span>, nu{' '}
+                      <span className="font-bold">{Math.round(lastAge)}</span> —{' '}
+                      <span className="font-semibold text-emerald-700">
+                        je ligt {diff >= 1 ? `${Math.round(diff)} ${Math.round(diff) === 1 ? 'jaar' : 'jaar'}` : `${Math.round(diff * 12)} ${Math.round(diff * 12) === 1 ? 'maand' : 'maanden'}`} voor!
+                      </span>
+                    </>
+                  ) : diff < 0 ? (
+                    <>
+                      In <span className="font-semibold">{firstMonth}</span> was je FIRE-leeftijd{' '}
+                      <span className="font-bold">{Math.round(firstAge)}</span>, nu{' '}
+                      <span className="font-bold">{Math.round(lastAge)}</span> —{' '}
+                      <span className="font-semibold text-amber-700">
+                        {Math.abs(diff) >= 1 ? `${Math.round(Math.abs(diff))} ${Math.round(Math.abs(diff)) === 1 ? 'jaar' : 'jaar'}` : `${Math.round(Math.abs(diff) * 12)} ${Math.round(Math.abs(diff) * 12) === 1 ? 'maand' : 'maanden'}`} verschoven
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      Je FIRE-leeftijd is stabiel gebleven op{' '}
+                      <span className="font-bold">{Math.round(lastAge)} jaar</span>
+                    </>
+                  )}
+                </p>
+              </div>
+              <FireAgeTrendChart snapshots={resilienceSnapshots} />
+            </div>
+          </section>
+        )
+      })()}
+
+      {/* === 6. Verken-kaarten (Explore Cards / Primary Content) === */}
+      <section className="mt-4 sm:mt-8 space-y-3 sm:space-y-4">
+        <FeatureGate featureId="withdrawal_strategie" fallback="hidden">
+          <ExploreCard
+            onClick={() => setActiveModal('withdrawal')}
+            icon={<Landmark className="h-5 w-5 text-horizon-600" />}
+            title="Opnamestrategie"
+            value="4 strategieen"
+            subtitle="hoe je vermogen opneemt"
+          />
+        </FeatureGate>
+        <FeatureGate featureId="veerkracht_score" fallback="hidden">
+          <button
+            type="button"
+            onClick={() => setShowResilienceReceipt(true)}
+            className="group flex w-full items-center gap-3 rounded-xl border border-zinc-200 bg-[var(--paper)] p-4 text-left transition-all hover:border-horizon-300 hover:shadow-sm"
+            data-testid="resilience-combined-card"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] group-hover:bg-horizon-50">
+              <Shield className="h-5 w-5 text-horizon-600" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-[var(--ink-3)]">Veerkracht &amp; Backtesting</p>
+              <p className="text-lg font-bold text-[var(--ink)]">
+                {snapshotResilience !== null ? snapshotResilience : resilience.total} / 100
+              </p>
+              <p className="text-xs text-[var(--ink-4)]">
+                {snapshotResilience !== null ? getResilienceLabel(snapshotResilience) : resilience.label}
+                {' · '}55 jaar marktgeschiedenis
+              </p>
+            </div>
+          </button>
+        </FeatureGate>
+      </section>
 
       {/* === 9. Acties (Primary Content) === */}
       {actions.length > 0 && (

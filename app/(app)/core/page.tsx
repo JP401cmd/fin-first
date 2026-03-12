@@ -25,6 +25,11 @@ import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { SparklineWithLabel, type SparklineDataPoint } from '@/components/app/budget-sparkline'
 import { NetWorthProjectionChart } from '@/components/app/net-worth-projection-chart'
 import { computeNetWorthProjection, type NetWorthProjectionResult } from '@/lib/net-worth-projection'
+import { BucketProjectionChart } from '@/components/app/bucket-projection-chart'
+import { BucketProjectionTable } from '@/components/app/bucket-projection-table'
+import { computeBucketProjection, type BucketProjectionResult } from '@/lib/bucket-projection'
+import type { Asset } from '@/lib/asset-data'
+import type { Debt } from '@/lib/debt-data'
 import { SpendingInsightsSection, type SpendingInsight } from '@/components/app/spending-insight-card'
 import { SnapshotComparisonView } from '@/components/app/snapshot-comparison-view'
 import { BalanceHistoryChart } from '@/components/app/balance-history-chart'
@@ -32,8 +37,6 @@ import { buildSegments, typeColors, childTypeColors } from '@/components/app/bud
 import type { BudgetWithChildren } from '@/lib/budget-data'
 import { FullScreenModal } from '@/components/app/full-screen-modal'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { usePerspective } from '@/components/app/perspective-provider'
-import { Users, EyeOff } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 const DynBudgetsPage = dynamic(() => import('@/app/(app)/core/budgets/page'), {
@@ -49,6 +52,8 @@ const DynCashAllView = dynamic(
 const DynDebtsPage = dynamic(() => import('@/app/(app)/core/debts/page'), {
   loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" /></div>,
 })
+import { usePerspective } from '@/components/app/perspective-provider'
+import { Users, EyeOff } from 'lucide-react'
 
 export default function CorePage() {
   const router = useRouter()
@@ -70,6 +75,9 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   const [overBudgetCount, setOverBudgetCount] = useState(0)
   const [budgetSparklines, setBudgetSparklines] = useState<{ id: string; name: string; icon: string; budgetType: string; data: SparklineDataPoint[] }[]>([])
   const [nwProjection, setNwProjection] = useState<NetWorthProjectionResult | null>(null)
+  const [bucketProjection, setBucketProjection] = useState<BucketProjectionResult | null>(null)
+  const [fullAssets, setFullAssets] = useState<Asset[] | null>(null)
+  const [fullDebts, setFullDebts] = useState<Debt[] | null>(null)
   const [spendingInsights, setSpendingInsights] = useState<SpendingInsight[]>([])
   const [spendingInsightsLoading, setSpendingInsightsLoading] = useState(false)
   const [spendingInsightsDataMonths, setSpendingInsightsDataMonths] = useState(0)
@@ -100,6 +108,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   const [expandedOverviewGroupId, setExpandedOverviewGroupId] = useState<string | null>(null)
   // Savings rate kassabon data
   const [savingsReceiptData, setSavingsReceiptData] = useState<{extHalfYearIncome: number; extHalfYearExpenses: number; halfYearSavings: number; rawIncome6m: number; rawExpenses6m: number}>({extHalfYearIncome: 0, extHalfYearExpenses: 0, halfYearSavings: 0, rawIncome6m: 0, rawExpenses6m: 0})
+  const [savingsBreakdown, setSavingsBreakdown] = useState<{name: string; icon: string; budgetType: string; amount6m: number}[]>([])
   // Net worth kassabon state
   const [showNetWorthReceipt, setShowNetWorthReceipt] = useState(false)
   const [showFreeDaysReceipt, setShowFreeDaysReceipt] = useState(false)
@@ -147,11 +156,11 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           .lt('date', monthEnd),
         supabase
           .from('assets')
-          .select('id, name, current_value, net_worth_inclusion_pct, asset_type')
+          .select('*')
           .eq('is_active', true),
         supabase
           .from('debts')
-          .select('id, name, current_balance, net_worth_inclusion_pct')
+          .select('id, name, current_balance, net_worth_inclusion_pct, interest_rate, monthly_payment, repayment_type, end_date, debt_type, is_active, original_amount, minimum_payment, start_date, creditor, subtype, is_tax_deductible, linked_asset_id, nhg')
           .eq('is_active', true),
         supabase
           .from('transactions')
@@ -189,7 +198,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           .gte('date', twelveMonthsAgo)
           .order('date', { ascending: true })
           .limit(1),
-        supabase.from('profiles').select('retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate').single(),
+        supabase.from('profiles').select('retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate, box3_method').single(),
         supabase.from('bank_accounts').select('id, name, balance').eq('is_active', true).is('linked_asset_id', null),
       ])
 
@@ -327,6 +336,8 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       setTotalNonCashAssets(totalAssets - totalCashValue)
 
       setRawFinancials({ monthlyIncome, monthlyExpenses, totalAssets, totalDebts, extrapolatedIncome, yearlyMustExpenses, yearlyRetirementExpenses })
+      setFullAssets(assetsResult.data as unknown as Asset[])
+      setFullDebts(debtsResult.data as unknown as Debt[])
 
       const netWorth = totalAssets - totalDebts
       const monthlySavings = monthlyIncome - monthlyExpenses
@@ -395,14 +406,16 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         setFireUnreachable(false)
       }
 
-      // Fetch budget alert data + debt progress + asset valuations + goals
-      const [budgetResult, spendingResult, snapshotResult, debtFullResult, assetValuationResult, goalsResult] = await Promise.all([
+      // Fetch budget alert data + debt progress + asset valuations + goals + 6m spending for kassabon
+      const sixMonthsAgoForBudgets = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 6, 1)).toISOString().split('T')[0]
+      const [budgetResult, spendingResult, snapshotResult, debtFullResult, assetValuationResult, goalsResult, spending6mResult] = await Promise.all([
         supabase.from('budgets').select('*'),
         supabase.from('transactions').select('budget_id, amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('net_worth_snapshots').select('*').order('snapshot_date', { ascending: true }).limit(24),
         supabase.from('debts').select('current_balance, original_amount').eq('is_active', true),
         supabase.from('valuations').select('value, valuation_date').eq('entity_type', 'asset').order('valuation_date', { ascending: false }).limit(50),
         supabase.from('goals').select('id').limit(1),
+        supabase.from('transactions').select('budget_id, amount').gte('date', sixMonthsAgoForBudgets).lt('date', monthEnd),
       ])
 
       // Set goals state for smart prioritization (Feature #255)
@@ -477,6 +490,28 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
         const parents = allBudgets.filter(b => !b.parent_id)
         const allChildren = allBudgets.filter(b => !!b.parent_id)
         setOverviewBudgetGroups(parents.map(p => ({ ...p, children: allChildren.filter(c => c.parent_id === p.id) })))
+
+        // Compute 6-month spending per parent budget for kassabon breakdown
+        if (spending6mResult.data) {
+          const spend6mMap: Record<string, number> = {}
+          for (const t of spending6mResult.data) {
+            if (t.budget_id) {
+              spend6mMap[t.budget_id] = (spend6mMap[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
+            }
+          }
+          const breakdown = parents
+            .filter(p => p.budget_type !== 'archive')
+            .map(p => {
+              const kids = allChildren.filter(c => c.parent_id === p.id)
+              const amount6m = kids.length > 0
+                ? kids.reduce((sum, c) => sum + (spend6mMap[c.id] ?? 0), 0)
+                : (spend6mMap[p.id] ?? 0)
+              return { name: p.name, icon: p.icon, budgetType: p.budget_type ?? 'expense', amount6m }
+            })
+            .filter(b => b.amount6m > 0)
+            .sort((a, b) => b.amount6m - a.amount6m)
+          setSavingsBreakdown(breakdown)
+        }
       }
 
       // Compute debt payoff progress
@@ -669,6 +704,34 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       setNwProjection(projResult)
     }
   }, [rawFinancials, fireSwr])
+
+  // Compute bucket projection when full assets/debts are available
+  useEffect(() => {
+    if (!fullAssets || !fullDebts) return
+    // Prefer kern-derived surplus (6-month savings rate × estimated monthly income)
+    // over current partial-month transactions which can be wildly skewed
+    const kernMonthlyIncome = data?.estimatedYearlyIncome
+      ? data.estimatedYearlyIncome / 12
+      : rawFinancials?.extrapolatedIncome
+        ? rawFinancials.extrapolatedIncome / 12
+        : 0
+    const surplus = savingsRate6m !== 0 && kernMonthlyIncome > 0
+      ? (savingsRate6m / 100) * kernMonthlyIncome
+      : rawFinancials
+        ? rawFinancials.monthlyIncome - rawFinancials.monthlyExpenses
+        : 0
+    const bucketResult = computeBucketProjection({
+      assets: fullAssets,
+      debts: fullDebts,
+      hasPartner: !!householdOverrides,
+      inflationRate: fireParams.inflationRate,
+      box3Method: fireParams.box3Method,
+      months: 240,
+      monthlySurplus: surplus,
+      monthlyIncome: kernMonthlyIncome > 0 ? kernMonthlyIncome : rawFinancials?.monthlyIncome,
+    })
+    setBucketProjection(bucketResult)
+  }, [fullAssets, fullDebts, fireParams, householdOverrides, rawFinancials, data, savingsRate6m])
 
   // Load balance history (per-entity snapshots) — non-blocking secondary fetch
   useEffect(() => {
@@ -867,11 +930,17 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
 
               {/* Spaarquote */}
               <div className="mt-2 flex items-center gap-1.5">
-                <p className={`font-mono text-2xl font-bold ${savingsRate6m >= 0 ? 'text-[var(--ink)]' : 'text-red-400'}`}>
-                  {savingsRate6m.toFixed(1)}%
-                </p>
-                <span className="text-sm text-[var(--ink-3)]">spaarquote</span>
-                <HeroTooltip text="Percentage van je inkomen dat je spaart over de afgelopen 6 maanden. Bij minder data wordt geëxtrapoleerd." />
+                <button
+                  type="button"
+                  onClick={() => setShowSavingsReceipt(true)}
+                  className="flex items-center gap-1.5 text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px rounded-[var(--r)] focus-visible:ring-2 focus-visible:ring-kern-300 focus-visible:outline-none"
+                >
+                  <p className={`font-mono text-2xl font-bold ${savingsRate6m >= 0 ? 'text-[var(--ink)]' : 'text-red-400'}`}>
+                    {savingsRate6m.toFixed(1)}%
+                  </p>
+                  <span className="text-sm text-[var(--ink-3)]">spaarquote</span>
+                </button>
+                <HeroTooltip text="Klik op het getal voor de volledige berekening. Percentage van je inkomen dat je spaart over de afgelopen 6 maanden. Bij minder data wordt geëxtrapoleerd." />
               </div>
               <p className="text-[10px] text-[var(--ink-4)]">
                 {savingsRateMonths < 6
@@ -912,11 +981,10 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             const segments = buildSegments(overviewBudgetGroups, overviewSpending)
             const budgetPct = totalBudgetLimit > 0 ? Math.round((totalBudgetSpent / totalBudgetLimit) * 100) : 0
             return (
-              <button
-                type="button"
+              <div
                 onClick={() => setActiveModal('budgets')}
                 data-testid="mission-budgetten"
-                className="group card-editorial flex flex-col overflow-hidden p-0 text-left"
+                className="group cursor-pointer card-editorial flex flex-col overflow-hidden p-0 text-left"
               >
                 <div className="flex h-1 items-stretch">
                   <div className="w-1 bg-kern-500" />
@@ -957,7 +1025,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                       const pct = seg.limit > 0 ? Math.round((seg.spent / seg.limit) * 100) : 0
                       const isOver = seg.spent > seg.limit && seg.limit > 0
                       return (
-                        <div key={seg.id}>
+                        <div key={seg.id} onClick={(e) => { e.stopPropagation(); setActiveModal('budgets') }} className="cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50">
                           <div className="flex items-center justify-between text-xs">
                             <div className="flex items-center gap-2 min-w-0">
                               <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded" style={{ backgroundColor: typeColors(seg.budgetType).bg }}>
@@ -992,7 +1060,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                     <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
                   </div>
                 </div>
-              </button>
+              </div>
             )
           })()}
 
@@ -1000,11 +1068,10 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           {(() => {
             const maxCashBalance = cashAccounts.length > 0 ? Math.max(...cashAccounts.map(a => Math.abs(a.balance))) : 1
             return (
-              <button
-                type="button"
+              <div
                 onClick={() => setActiveModal('cash')}
                 data-testid="mission-cash"
-                className="group card-editorial flex flex-col overflow-hidden p-0 text-left"
+                className="group cursor-pointer card-editorial flex flex-col overflow-hidden p-0 text-left"
               >
                 <div className="flex h-1 items-stretch">
                   <div className="w-1 bg-kern-500" />
@@ -1044,7 +1111,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                     {cashAccounts.slice(0, 5).map((acc, i) => {
                       const pct = maxCashBalance > 0 ? Math.round((Math.abs(acc.balance) / maxCashBalance) * 100) : 0
                       return (
-                        <div key={i}>
+                        <div key={i} onClick={(e) => { e.stopPropagation(); setActiveModal('cash') }} className="cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50">
                           <div className="flex items-center justify-between text-xs">
                             <div className="flex items-center gap-2 min-w-0">
                               <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-emerald-50">
@@ -1079,7 +1146,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                     <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
                   </div>
                 </div>
-              </button>
+              </div>
             )
           })()}
 
@@ -1087,11 +1154,10 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           {(() => {
             const maxAssetValue = nonCashAssets.length > 0 ? Math.max(...nonCashAssets.map(a => a.current_value)) : 1
             return (
-              <button
-                type="button"
+              <div
                 onClick={() => setActiveModal('assets')}
                 data-testid="mission-assets"
-                className="group card-editorial flex flex-col overflow-hidden p-0 text-left"
+                className="group cursor-pointer card-editorial flex flex-col overflow-hidden p-0 text-left"
               >
                 <div className="flex h-1 items-stretch">
                   <div className="w-1 bg-kern-500" />
@@ -1130,7 +1196,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                     {nonCashAssets.slice(0, 5).map((asset, i) => {
                       const pct = maxAssetValue > 0 ? Math.round((asset.current_value / maxAssetValue) * 100) : 0
                       return (
-                        <div key={i}>
+                        <div key={i} onClick={(e) => { e.stopPropagation(); setActiveModal('assets') }} className="cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50">
                           <div className="flex items-center justify-between text-xs">
                             <div className="flex items-center gap-2 min-w-0">
                               <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-emerald-50">
@@ -1165,7 +1231,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                     <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
                   </div>
                 </div>
-              </button>
+              </div>
             )
           })()}
 
@@ -1173,11 +1239,10 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           {(() => {
             const maxDebtBalance = debtsList.length > 0 ? Math.max(...debtsList.map(d => d.current_balance)) : 1
             return (
-              <button
-                type="button"
+              <div
                 onClick={() => setActiveModal('debts')}
                 data-testid="mission-schulden"
-                className="group card-editorial flex flex-col overflow-hidden p-0 text-left"
+                className="group cursor-pointer card-editorial flex flex-col overflow-hidden p-0 text-left"
               >
                 <div className="flex h-1 items-stretch">
                   <div className="w-1 bg-kern-500" />
@@ -1239,7 +1304,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                     {debtsList.slice(0, 5).map((debt, i) => {
                       const pct = maxDebtBalance > 0 ? Math.round((debt.current_balance / maxDebtBalance) * 100) : 0
                       return (
-                        <div key={i}>
+                        <div key={i} onClick={(e) => { e.stopPropagation(); setActiveModal('debts') }} className="cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50">
                           <div className="flex items-center justify-between text-xs">
                             <div className="flex items-center gap-2 min-w-0">
                               <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-red-50">
@@ -1274,7 +1339,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                     <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
                   </div>
                 </div>
-              </button>
+              </div>
             )
           })()}
 
@@ -1403,11 +1468,32 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           )}
           </FeatureGate>
 
-          {/* Vermogensprognose — gated by vermogensprognose_kern */}
+          {/* Vermogensprognose — per-bucket met Box 3 */}
           <FeatureGate featureId="vermogensprognose_kern" fallback="hidden">
           <section>
             <h3 className="mb-3 text-sm font-semibold text-[var(--ink-2)]">Vermogensprognose</h3>
-            {nwProjection && nwProjection.points.length >= 2 ? (
+            {bucketProjection ? (
+              <>
+                <BucketProjectionChart
+                  projection={bucketProjection}
+                  dailyExpenses={data.yearlyMustExpenses > 0 ? data.yearlyMustExpenses / 365 : undefined}
+                  fireTarget={coreSimTarget ?? data.fireTarget}
+                />
+                <BucketProjectionTable
+                  projection={bucketProjection}
+                  dailyExpenses={data.yearlyMustExpenses > 0 ? data.yearlyMustExpenses / 365 : undefined}
+                  assumptions={{
+                    inflationRate: fireParams.inflationRate,
+                    box3Method: fireParams.box3Method,
+                    incomeGrowthRate: fireParams.inflationRate,
+                    months: 240,
+                    hasPartner: !!householdOverrides,
+                    savingsRate6m: savingsRate6m,
+                    estimatedYearlyIncome: data.estimatedYearlyIncome,
+                  }}
+                />
+              </>
+            ) : nwProjection && nwProjection.points.length >= 2 ? (
               <NetWorthProjectionChart projection={nwProjection} />
             ) : (
               <p className="py-8 text-center text-sm text-[var(--ink-3)]">
@@ -1576,16 +1662,53 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             Je spaarquote laat zien welk deel van je inkomen je overhoudt. Hoe hoger dit percentage, hoe sneller je financiële vrijheid groeit.
           </div>
 
+          {/* Inkomen */}
           <div className="border-b border-dashed border-[var(--border-ed)] mb-2 pb-2 mt-2">
             <div className="flex justify-between py-0.5">
-              <span className="text-[var(--ink-2)]">Inkomen 6 mnd{savingsRateMonths < 6 ? ' (geëxtrapoleerd)' : ''}</span>
-              <span className="tabular-nums text-[var(--ink)]">{formatCurrency(savingsReceiptData.extHalfYearIncome)}</span>
+              <span className="font-medium text-[var(--ink)]">Inkomen 6 mnd{savingsRateMonths < 6 ? ' (ext.)' : ''}</span>
+              <span className="tabular-nums font-medium text-[var(--ink)]">{formatCurrency(savingsReceiptData.extHalfYearIncome)}</span>
             </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-[var(--ink-2)]">Uitgaven 6 mnd{savingsRateMonths < 6 ? ' (geëxtrapoleerd)' : ''}</span>
-              <span className="tabular-nums text-red-600">- {formatCurrency(savingsReceiptData.extHalfYearExpenses)}</span>
-            </div>
+            {savingsBreakdown.filter(b => b.budgetType === 'income').map(b => (
+              <div key={b.name} className="flex items-center justify-between py-0.5 pl-2 text-[11px]">
+                <span className="flex items-center gap-1.5 text-[var(--ink-3)]">
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded" style={{ backgroundColor: typeColors('income').bg }}>
+                    <BudgetIcon name={b.icon} className="h-2.5 w-2.5" />
+                  </span>
+                  {b.name}
+                </span>
+                <span className="tabular-nums text-[var(--ink-3)]">{formatCurrency(b.amount6m)}</span>
+              </div>
+            ))}
           </div>
+
+          {/* Uitgaven per type */}
+          {(['expense', 'savings', 'debt'] as const).map(type => {
+            const items = savingsBreakdown.filter(b => b.budgetType === type)
+            if (items.length === 0) return null
+            const typeLabel = type === 'expense' ? 'Uitgaven' : type === 'savings' ? 'Sparen' : 'Aflossingen'
+            const typeTotal = items.reduce((s, b) => s + b.amount6m, 0)
+            return (
+              <div key={type} className="border-b border-dashed border-[var(--border-ed)] mb-2 pb-2">
+                <div className="flex justify-between py-0.5">
+                  <span className="font-medium text-[var(--ink-2)]">{typeLabel}</span>
+                  <span className="tabular-nums font-medium text-red-600">- {formatCurrency(typeTotal)}</span>
+                </div>
+                {items.map(b => (
+                  <div key={b.name} className="flex items-center justify-between py-0.5 pl-2 text-[11px]">
+                    <span className="flex items-center gap-1.5 text-[var(--ink-3)]">
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded" style={{ backgroundColor: typeColors(type).bg }}>
+                        <BudgetIcon name={b.icon} className="h-2.5 w-2.5" />
+                      </span>
+                      {b.name}
+                    </span>
+                    <span className="tabular-nums text-[var(--ink-3)]">{formatCurrency(b.amount6m)}</span>
+                  </div>
+                ))}
+              </div>
+            )
+          })}
+
+          {/* Totalen */}
           <div className="flex justify-between py-1">
             <span className="font-medium text-[var(--ink-2)]">Besparing 6 mnd</span>
             <span className={`tabular-nums font-medium ${savingsReceiptData.halfYearSavings >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>

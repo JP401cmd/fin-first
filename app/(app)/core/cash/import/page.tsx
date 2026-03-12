@@ -15,6 +15,7 @@ import { detectFormat, CSV_PRESETS, type CSVPreset } from '@/lib/parsers/index'
 import type { ParsedTransaction } from '@/lib/parsers/shared'
 import { categorizeTransaction, isOwnAccountTransfer, type CategoryCorrection } from '@/lib/parsers/categorize'
 import type { Budget } from '@/lib/budget-data'
+import { linkUnmatchedTransfers } from '@/lib/transfer-matching'
 
 type Account = {
   id: string
@@ -733,6 +734,9 @@ export default function ImportPage() {
     setImportedBatchIndex(0)
     setStep(4)
     setImporting(false)
+
+    // Link transfer pairs in background (non-blocking)
+    linkUnmatchedTransfers(supabase, user!.id).catch(console.error)
 
   }
 

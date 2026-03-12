@@ -16,6 +16,7 @@ const tabs = [
   { label: 'Bank Connect', href: '/beheer/bank-connect' },
   { label: 'Tiers', href: '/beheer/tiers', activeClass: 'border-[var(--ink)] text-[var(--ink)]' },
   { label: 'Nieuws', href: '/beheer/nieuws' },
+  { label: 'AI Features', href: '/beheer/ai-features' },
   { label: 'Widgets', href: '/beheer/widgets-test' },
   { label: 'Propositie', href: '/beheer/propositie' },
 ] as const

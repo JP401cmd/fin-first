@@ -37,7 +37,7 @@ export async function GET(request: Request) {
     // Fetch transactions, existing recurrings, and budgets in parallel
     const txQuery = supabase
       .from('transactions')
-      .select('id, date, amount, description, counterparty_name, is_income, budget_id')
+      .select('id, date, amount, description, counterparty_name, is_income, budget_id, transaction_type')
       .gte('date', startDateStr)
       .order('date', { ascending: true })
 

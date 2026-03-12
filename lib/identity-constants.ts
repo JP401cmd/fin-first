@@ -1,4 +1,4 @@
-import { Wallet, RefreshCw, Lightbulb, BarChart3, ArrowUpCircle } from 'lucide-react'
+import { Wallet, RefreshCw, Lightbulb, BarChart3, ArrowUpCircle, Compass } from 'lucide-react'
 import { DEFAULT_MATRIX, FEATURES, PHASES, type FeatureDef } from '@/lib/feature-phases'
 
 // ── Temporal Balance levels ──────────────────────────────────────────
@@ -208,4 +208,5 @@ export const NOTIFICATION_TYPES = [
   { type: 'recommendation', label: 'Aanbevelingen', description: 'Financi\u00eble tips en suggesties', icon: Lightbulb },
   { type: 'insight', label: 'Inzichten', description: 'Patronen in je uitgaven', icon: BarChart3 },
   { type: 'levelup', label: 'Level-ups', description: 'Soevereiniteitsniveau wijzigingen', icon: ArrowUpCircle },
+  { type: 'horizon', label: 'Horizon', description: 'FIRE-aandachtspunten en vrijheidswaarschuwingen', icon: Compass },
 ] as const

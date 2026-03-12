@@ -25,13 +25,16 @@ export async function buildSpendingPatternsContext(supabase: SupabaseClient): Pr
       .order('sort_order', { ascending: true }),
     supabase
       .from('transactions')
-      .select('budget_id, amount, date, is_income')
+      .select('budget_id, amount, date, is_income, transaction_type')
       .gte('date', startDate)
       .not('budget_id', 'is', null),
   ])
 
   const budgets = budgetsResult.data ?? []
-  const transactions = transactionsResult.data ?? []
+  const transactions = (transactionsResult.data ?? []).filter(
+    (t) => (t as { transaction_type?: string | null }).transaction_type !== 'transfer' &&
+           (t as { transaction_type?: string | null }).transaction_type !== 'joint_transfer'
+  )
 
   if (budgets.length === 0 || transactions.length === 0) {
     return ''

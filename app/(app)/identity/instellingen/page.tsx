@@ -127,6 +127,7 @@ export default function InstellingenPage() {
   // ─ Section C: FIRE Instellingen ─
   const [expectedReturn, setExpectedReturn] = useState(7)
   const [inflationRate, setInflationRate] = useState(2)
+  const [box3Method, setBox3Method] = useState<'forfaitair' | 'werkelijk'>('forfaitair')
   const [paramSaving, setParamSaving] = useState(false)
   const [paramMessage, setParamMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [retirementMethod, setRetirementMethod] = useState<RetirementExpenseMethod>('essential_budgets')
@@ -168,7 +169,7 @@ export default function InstellingenPage() {
       const [notifData, profileData] = await Promise.all([
         supabase.from('app_settings').select('value').eq('key', `notifications_preferences_${user.id}`).maybeSingle(),
         supabase.from('profiles').select(
-          'expected_return, inflation_rate, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, module_colors, budget_colors, phase_colors, typography_theme, ai_enabled'
+          'expected_return, inflation_rate, box3_method, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, module_colors, budget_colors, phase_colors, typography_theme, ai_enabled'
         ).eq('id', user.id).single(),
       ])
 
@@ -195,6 +196,7 @@ export default function InstellingenPage() {
       if (d) {
         if (d.expected_return != null) setExpectedReturn(Math.round(d.expected_return * 1000) / 10)
         if (d.inflation_rate != null) setInflationRate(Math.round(d.inflation_rate * 1000) / 10)
+        if (d.box3_method === 'werkelijk') setBox3Method('werkelijk')
         if (d.retirement_expense_method) setRetirementMethod(d.retirement_expense_method as RetirementExpenseMethod)
         if (d.retirement_expense_custom_amount) setRetirementCustomAmount(String(d.retirement_expense_custom_amount))
         const fs = parseFireStrategy(d)
@@ -378,6 +380,7 @@ export default function InstellingenPage() {
         body: JSON.stringify({
           expected_return: expectedReturn / 100,
           inflation_rate: inflationRate / 100,
+          box3_method: box3Method,
         }),
       })
       if (!res.ok) {
@@ -391,7 +394,7 @@ export default function InstellingenPage() {
       setParamMessage({ type: 'error', text: 'Netwerkfout — probeer opnieuw' })
     }
     setParamSaving(false)
-  }, [expectedReturn, inflationRate])
+  }, [expectedReturn, inflationRate, box3Method])
 
   const saveFireSettings = useCallback(async () => {
     setFireSaving(true)
@@ -892,6 +895,52 @@ export default function InstellingenPage() {
               </span>
             )}
           </div>
+        </div>
+
+        <div className="my-6 border-t border-dashed border-[var(--border-ed)]" />
+
+        {/* Box 3 berekeningsmethode */}
+        <div className="mb-6">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Box 3 berekeningsmethode</p>
+          <p className="mb-4 font-sans text-sm text-[var(--ink-3)]">
+            Hoe wordt Box 3 belasting berekend in je vermogensprognose?
+          </p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {([
+              {
+                value: 'forfaitair' as const,
+                label: 'Forfaitair rendement',
+                subtitle: 'Wettelijk fictief rendement per vermogenscategorie (standaard)',
+              },
+              {
+                value: 'werkelijk' as const,
+                label: 'Werkelijk rendement',
+                subtitle: 'Belasting op je daadwerkelijke verwacht rendement per asset',
+              },
+            ]).map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setBox3Method(opt.value)}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors text-left ${
+                  box3Method === opt.value
+                    ? 'border-zinc-900 bg-zinc-900 text-white'
+                    : 'border-[var(--border-md)] text-[var(--ink-2)] hover:border-zinc-400'
+                }`}
+              >
+                <div className="font-semibold">{opt.label}</div>
+                <div className={`text-xs mt-0.5 ${box3Method === opt.value ? 'text-zinc-300' : 'text-[var(--ink-3)]'}`}>
+                  {opt.subtitle}
+                </div>
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 font-sans text-[11px] text-[var(--ink-3)]">
+            {box3Method === 'forfaitair'
+              ? 'Bij forfaitair rendement gebruikt de Belastingdienst een vast percentage (1,28% spaargeld, 6,00% beleggingen in 2026). Dit kan hoger of lager zijn dan je werkelijke rendement.'
+              : 'Bij werkelijk rendement wordt je daadwerkelijke rendement per asset gebruikt. Dit is nauwkeuriger maar nog niet wettelijk ingevoerd — gebruik dit voor vergelijking.'
+            }
+          </p>
         </div>
 
         <div className="my-6 border-t border-dashed border-[var(--border-ed)]" />

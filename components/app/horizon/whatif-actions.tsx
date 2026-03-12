@@ -459,7 +459,7 @@ function ScenarioSummaryKassabon({
 
       {/* Formule */}
       <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-        <p><strong className="font-semibold text-[var(--ink-3)]">Formule:</strong> Effectief inkomen = maandinkomen × (werkdagen / 5). Jaarlijks sparen = (inkomen − uitgaven) × 12 + extra inleg × 12.</p>
+        <p><strong className="font-semibold text-[var(--ink-3)]">Formule:</strong> Extra inkomen gaat 1:1 naar inleg. Spaarquote past uitgaven aan op basisinkomen. Extra inleg komt daar bovenop.</p>
       </div>
 
       {/* Footer */}

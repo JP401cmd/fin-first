@@ -19,7 +19,7 @@ export async function buildKernContext(supabase: SupabaseClient): Promise<string
       .order('sort_order', { ascending: true }),
     supabase
       .from('transactions')
-      .select('budget_id, amount, is_income')
+      .select('budget_id, amount, is_income, transaction_type')
       .gte('date', monthStart)
       .lte('date', monthEnd)
       .not('budget_id', 'is', null),
@@ -32,10 +32,12 @@ export async function buildKernContext(supabase: SupabaseClient): Promise<string
     return section('BUDGETTEN DEZE MAAND', 'Nog geen budgetten ingesteld.')
   }
 
-  // Build spending per budget_id
+  // Build spending per budget_id (exclude own-account transfers)
   const spendingByBudget: Record<string, number> = {}
   for (const t of transactions) {
     if (!t.budget_id) continue
+    if ((t as { transaction_type?: string | null }).transaction_type === 'transfer' ||
+        (t as { transaction_type?: string | null }).transaction_type === 'joint_transfer') continue
     const amt = Math.abs(Number(t.amount))
     spendingByBudget[t.budget_id] = (spendingByBudget[t.budget_id] ?? 0) + amt
   }

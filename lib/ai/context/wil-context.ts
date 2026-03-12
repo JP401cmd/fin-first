@@ -21,7 +21,7 @@ export async function buildWilContext(supabase: SupabaseClient): Promise<string>
       .order('sort_order', { ascending: true }),
     supabase
       .from('transactions')
-      .select('budget_id, amount')
+      .select('budget_id, amount, transaction_type')
       .gte('date', monthStart)
       .lt('date', monthEnd),
     supabase
@@ -68,17 +68,21 @@ export async function buildWilContext(supabase: SupabaseClient): Promise<string>
   const pastActions = pastActionsRes.data ?? []
   const pastRecommendations = pastRecsRes.data ?? []
 
-  // Calculate spending per budget from real transactions
+  // Calculate spending per budget from real transactions (exclude own-account transfers)
+  const isRealTx = (t: { transaction_type?: string | null }) =>
+    (t as { transaction_type?: string | null }).transaction_type !== 'transfer' &&
+    (t as { transaction_type?: string | null }).transaction_type !== 'joint_transfer'
+
   const spendingByBudget: Record<string, number> = {}
   for (const t of transactions) {
-    if (t.budget_id) {
+    if (t.budget_id && isRealTx(t)) {
       spendingByBudget[t.budget_id] = (spendingByBudget[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
     }
   }
 
   // Get monthly expenses for freedom-day conversion
   const totalMonthlyExpenses = transactions
-    .filter(t => Number(t.amount) < 0)
+    .filter(t => Number(t.amount) < 0 && isRealTx(t))
     .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
   const dailyExpense = totalMonthlyExpenses > 0 ? (totalMonthlyExpenses * 12) / 365 : 1
 

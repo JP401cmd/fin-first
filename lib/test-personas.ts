@@ -1,11 +1,12 @@
 /**
  * Test persona definitions for superadmin testdata seeding.
  *
- * 4 personas at different financial life stages:
+ * 5 personas at different financial life stages:
  * 1. Roos van Dijk — "In de rode cijfers" (deep in debt)
  * 2. Daan Bakker — "De starter" (young professional starting out)
  * 3. Lisa de Groot — "De 100K milestone" (family, hit 100K net worth)
  * 4. Willem Jansen — "Bijna binnen" (near financial independence)
+ * 5. Rashid Dimohammed — "De Genieter" (no budgets, no transactions, check-in based)
  */
 
 import { BUDGET_SLUGS } from '@/lib/budget-data'
@@ -29,7 +30,7 @@ function monthsAgo(months: number, day = 1): string {
 
 // ── Types ─────────────────────────────────────────────────────
 
-export type PersonaKey = 'roos' | 'daan' | 'lisa' | 'willem'
+export type PersonaKey = 'roos' | 'daan' | 'lisa' | 'willem' | 'rashid'
 
 export type SovereigntyPhase = 'recovery' | 'stability' | 'momentum' | 'mastery'
 
@@ -54,6 +55,16 @@ export interface PersonaProfile {
   date_of_birth: string
   household_type: string
   temporal_balance: number
+  // FIRE parameters
+  expected_return?: number        // bijv. 0.07
+  inflation_rate?: number         // bijv. 0.02
+  fire_end_strategy?: 'perpetual' | 'legacy' | 'deplete'
+  fire_end_age?: number           // 60–120
+  fire_legacy_amount?: number     // alleen bij 'legacy'
+  retirement_expense_method?: 'essential_budgets' | 'custom_amount' | 'current_income'
+  retirement_expense_custom_amount?: number
+  // Widget dashboard
+  widget_prefs?: { widgets: { id: string; enabled: boolean; size: 'quarter' | 'half' | 'full'; order: number }[] }
 }
 
 export interface PersonaBankAccount {
@@ -320,6 +331,20 @@ export function makeBudgets(overrides: Record<string, number>): PersonaBudget[] 
   return base
 }
 
+// ── Helper: generate widget preferences ───────────────────────
+
+function makeWidgetPrefs(
+  enabled: (string | { id: string; size: 'quarter' | 'half' | 'full' })[],
+): { widgets: { id: string; enabled: boolean; size: 'quarter' | 'half' | 'full'; order: number }[] } {
+  return {
+    widgets: enabled.map((w, i) => {
+      const id = typeof w === 'string' ? w : w.id
+      const size = typeof w === 'string' ? 'half' as const : w.size
+      return { id, enabled: true, size, order: i }
+    }),
+  }
+}
+
 // ── Helper: generate monthly recurring transactions ───────────
 
 function generateMonthlyTransactions(
@@ -514,15 +539,15 @@ const roosData: PersonaData = {
   meta: {
     name: 'Roos van Dijk',
     subtitle: 'In de rode cijfers',
-    description: 'Na een scheiding en jarenlang onbewust consumeren zit Roos diep in de schulden. Uitgaven overstijgen zijn inkomen.',
+    description: 'Na een scheiding en jarenlang onbewust consumeren zit Roos diep in de schulden. Uitgaven overstijgen haar inkomen.',
     color: 'red',
     avatarColor: '#EF4444',
     netWorth: -15000,
     income: 2800,
     expenses: 3200,
-    backgroundStory: 'Na haar scheiding in 2024 raakte Roos het financieel overzicht kwijt. Jarenlang emotioneel kopen en nu twee schulden — een creditcard op 14% rente en een persoonlijke lening — vreten aan haar maandelijks inkomen als logistiek medewerker. Elke maand loopt ze €400 tekort.',
-    challenges: ['Uitgaven overstijgen inkomen met €400/mnd', 'Creditcard schuld van €4.800 op 14% rente', 'Geen noodfonds aanwezig'],
-    currentSituation: 'Diep in de rode cijfers — netto vermogen -€15.000 met drie actieve schulden.',
+    backgroundStory: 'Na haar scheiding in 2024 raakte Roos het financieel overzicht volledig kwijt. Jarenlang emotioneel kopen — bezorgmaaltijden als troost, kleding als afleiding — en nu drie schulden die samen bijna twee jaar van haar levenstijd vertegenwoordigen. Als logistiek medewerker verdient ze €2.800, maar geeft ze €3.200 uit. Elke maand verliest ze 4 dagen vrijheid.',
+    challenges: ['Uitgaven overstijgen inkomen met €400/mnd — elke maand 4 vrijheidsdagen verlies', 'Creditcard schuld van €4.800 op 14% rente vreet aan haar toekomst', 'Geen noodfonds — één tegenslag betekent meer schulden'],
+    currentSituation: 'Diep in de rode cijfers — netto vermogen -€15.000 met drie actieve schulden. Haar financiële klok loopt achteruit.',
     firstGoal: 'Noodfonds aanleggen en uit de schulden komen',
     sovereignty: 'recovery',
   },
@@ -531,6 +556,15 @@ const roosData: PersonaData = {
     date_of_birth: '1986-03-15',
     household_type: 'solo',
     temporal_balance: 1,
+    expected_return: 0.07,
+    inflation_rate: 0.02,
+    fire_end_strategy: 'deplete',
+    fire_end_age: 85,
+    retirement_expense_method: 'current_income',
+    widget_prefs: makeWidgetPrefs([
+      'netto_vermogen', { id: 'schulden', size: 'full' }, 'cash_flow',
+      'budgetten', 'acties', 'spaarquote', 'vrijheidsdagen_maand',
+    ]),
   },
   bank_accounts: [
     { name: 'Betaalrekening ING', iban: 'NL91INGB0001234567', bank_name: 'ING', account_type: 'checking', balance: 245, is_active: true, sort_order: 0 },
@@ -627,20 +661,22 @@ const roosData: PersonaData = {
     },
   ],
   net_worth_snapshots: [
-    { monthsAgo: 14, total_assets: 4400, total_debts: 10800, net_worth: -6400 },
-    { monthsAgo: 13, total_assets: 4300, total_debts: 11500, net_worth: -7200 },
-    { monthsAgo: 12, total_assets: 4200, total_debts: 12200, net_worth: -8000 },
-    { monthsAgo: 11, total_assets: 4100, total_debts: 13300, net_worth: -9200 },
-    { monthsAgo: 10, total_assets: 4050, total_debts: 14600, net_worth: -10550 },
-    { monthsAgo: 9, total_assets: 4000, total_debts: 15800, net_worth: -11800 },
-    { monthsAgo: 8, total_assets: 3950, total_debts: 16900, net_worth: -12950 },
-    { monthsAgo: 7, total_assets: 3900, total_debts: 17500, net_worth: -13600 },
-    { monthsAgo: 6, total_assets: 3850, total_debts: 18200, net_worth: -14350 },
-    { monthsAgo: 5, total_assets: 3800, total_debts: 19500, net_worth: -15700 },
-    { monthsAgo: 4, total_assets: 3700, total_debts: 20200, net_worth: -16500 },
-    { monthsAgo: 3, total_assets: 3600, total_debts: 20800, net_worth: -17200 },
-    { monthsAgo: 2, total_assets: 3550, total_debts: 21000, net_worth: -17450 },
-    { monthsAgo: 1, total_assets: 3500, total_debts: 21800, net_worth: -18300 },
+    // Consistente neerwaartse spiraal: ~€300/mnd netto verslechtering
+    // (overspending €400 - effectieve schuldaflossing €187 + asset depreciatie €100)
+    { monthsAgo: 14, total_assets: 4900, total_debts: 15900, net_worth: -11000 },
+    { monthsAgo: 13, total_assets: 4800, total_debts: 16100, net_worth: -11300 },
+    { monthsAgo: 12, total_assets: 4700, total_debts: 16400, net_worth: -11700 },
+    { monthsAgo: 11, total_assets: 4600, total_debts: 16700, net_worth: -12100 },
+    { monthsAgo: 10, total_assets: 4500, total_debts: 17000, net_worth: -12500 },
+    { monthsAgo: 9, total_assets: 4400, total_debts: 17300, net_worth: -12900 },
+    { monthsAgo: 8, total_assets: 4300, total_debts: 17500, net_worth: -13200 },
+    { monthsAgo: 7, total_assets: 4200, total_debts: 17800, net_worth: -13600 },
+    { monthsAgo: 6, total_assets: 4100, total_debts: 18000, net_worth: -13900 },
+    { monthsAgo: 5, total_assets: 4000, total_debts: 18200, net_worth: -14200 },
+    { monthsAgo: 4, total_assets: 3900, total_debts: 18400, net_worth: -14500 },
+    { monthsAgo: 3, total_assets: 3800, total_debts: 18600, net_worth: -14800 },
+    { monthsAgo: 2, total_assets: 3700, total_debts: 18700, net_worth: -15000 },
+    { monthsAgo: 1, total_assets: 3600, total_debts: 18600, net_worth: -15000 },
     { monthsAgo: 0, total_assets: 3500, total_debts: 18500, net_worth: -15000 },
   ],
 }
@@ -653,42 +689,72 @@ const daanTransactions: PersonaTransactionTemplate[] = [
   ...generateMonthlyTransactions(15, [
     // Inkomen
     { day: 25, amount: 3400, description: 'Salaris', counterparty_name: 'TechFlow BV', counterparty_iban: 'NL91ABNA0417164300', budgetSlug: S.SALARIS_UITKERING, is_income: true },
-    // Vaste lasten
-    { day: 1, amount: -650, description: 'Huur kamer', counterparty_name: 'Hoofdhuurder M. Peters', counterparty_iban: 'NL39RABO0300065264', budgetSlug: S.HUUR_HYPOTHEEK, is_income: false },
-    { day: 1, amount: -75, description: 'Energie bijdrage', counterparty_name: 'Hoofdhuurder M. Peters', counterparty_iban: 'NL39RABO0300065264', budgetSlug: S.GAS_WATER_LICHT, is_income: false },
+    // Vaste lasten (eigen studio Amsterdam)
+    { day: 1, amount: -950, description: 'Huur studio', counterparty_name: 'Woningcorporatie De Alliantie', counterparty_iban: 'NL39RABO0300065264', budgetSlug: S.HUUR_HYPOTHEEK, is_income: false },
+    { day: 1, amount: -150, description: 'Energie', counterparty_name: 'Vattenfall', counterparty_iban: 'NL20INGB0001234567', budgetSlug: S.GAS_WATER_LICHT, is_income: false },
     { day: 1, amount: -130, description: 'Zorgverzekering', counterparty_name: 'Zilveren Kruis', counterparty_iban: 'NL93ABNA0585927836', budgetSlug: S.VERZEKERINGEN_WONEN, is_income: false },
-    // Vervoer (OV)
-    { day: 1, amount: -35, description: 'NS Flex abonnement', counterparty_name: 'NS Reizigers', counterparty_iban: null, budgetSlug: S.BRANDSTOF_OV, is_income: false },
-    // Leuke dingen (zuinig)
-    { day: 7, amount: -12.99, description: 'Netflix', counterparty_name: 'Netflix', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
-    { day: 15, amount: -29.90, description: 'Basic-Fit', counterparty_name: 'Basic-Fit', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
-    { day: 10, amount: -35, description: 'Uit eten met vrienden', counterparty_name: 'Cafe De Buren', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false, jitterPct: 0.25 },
+    { day: 5, amount: -20, description: 'Gemeentelijke belasting', counterparty_name: 'Gemeente Amsterdam', counterparty_iban: 'NL45BNGH0285000522', budgetSlug: S.GEMEENTELIJKE_LASTEN, is_income: false },
+    // Vervoer
+    { day: 1, amount: -60, description: 'NS Flex abonnement', counterparty_name: 'NS Reizigers', counterparty_iban: null, budgetSlug: S.BRANDSTOF_OV, is_income: false },
+    { day: 1, amount: -19.50, description: 'Swapfiets', counterparty_name: 'Swapfiets', counterparty_iban: null, budgetSlug: S.FIETS_DEELVERVOER, is_income: false },
     // Huishouden
-    { day: 15, amount: -20, description: 'Kruidvat', counterparty_name: 'Kruidvat', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false, jitterPct: 0.20 },
-    // Sparen (bewust)
-    { day: 1, amount: -500, description: 'Sparen noodfonds', counterparty_name: 'Spaarrekening', counterparty_iban: 'NL11RABO0100000002', budgetSlug: S.SPAREN_NOODBUFFER, is_income: false },
-    { day: 1, amount: -200, description: 'Meesman indexbeleggen', counterparty_name: 'Meesman', counterparty_iban: 'NL15RABO0300000003', budgetSlug: S.INVESTEREN_FIRE, is_income: false },
+    { day: 10, amount: -35, description: 'Kruidvat', counterparty_name: 'Kruidvat', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false, jitterPct: 0.20 },
+    { day: 25, amount: -25, description: 'HEMA', counterparty_name: 'HEMA', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false, jitterPct: 0.25 },
+    // Uit eten & horeca (groot deel van budget)
+    { day: 5, amount: -100, description: 'Uit eten met vrienden', counterparty_name: 'Restaurant De Buren', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false, jitterPct: 0.25 },
+    { day: 12, amount: -85, description: 'Uit eten', counterparty_name: 'Wagamama', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false, jitterPct: 0.25 },
+    { day: 20, amount: -80, description: 'Borrel en snacks', counterparty_name: 'Cafe Thijssen', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false, jitterPct: 0.30 },
+    { day: 27, amount: -65, description: 'Uber Eats bestelling', counterparty_name: 'Uber Eats', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false, jitterPct: 0.30 },
+    // Vrije tijd & sport
+    { day: 7, amount: -15.99, description: 'Netflix', counterparty_name: 'Netflix', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
+    { day: 7, amount: -10.99, description: 'Spotify', counterparty_name: 'Spotify', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
+    { day: 15, amount: -44.90, description: 'Basic-Fit', counterparty_name: 'Basic-Fit', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
+    { day: 22, amount: -14.99, description: 'PlayStation Plus', counterparty_name: 'Sony PlayStation', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
+    { day: 18, amount: -45, description: 'Padel met collega\'s', counterparty_name: 'Padel City Amsterdam', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false, jitterPct: 0.20 },
+    // Kleding & lifestyle
+    { day: 20, amount: -95, description: 'Kleding', counterparty_name: 'Zara', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false, jitterPct: 0.30 },
+    { day: 8, amount: -55, description: 'Sneakers & accessoires', counterparty_name: 'JD Sports', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false, jitterPct: 0.30 },
+    // Sparen (minimaal)
+    { day: 1, amount: -140, description: 'Sparen noodfonds', counterparty_name: 'Spaarrekening', counterparty_iban: 'NL11RABO0100000002', budgetSlug: S.SPAREN_NOODBUFFER, is_income: false },
+    { day: 1, amount: -100, description: 'Meesman indexbeleggen', counterparty_name: 'Meesman', counterparty_iban: 'NL15RABO0300000003', budgetSlug: S.INVESTEREN_FIRE, is_income: false },
     { day: 1, amount: -100, description: 'Aflossing studielening DUO', counterparty_name: 'DUO', counterparty_iban: 'NL86INGB0002445588', budgetSlug: S.SCHULDEN_AFLOSSINGEN, is_income: false },
   ]),
-  ...generateGroceryTransactions(15, 55, 15), // Low grocery spending
+  ...generateGroceryTransactions(15, 95, 20), // Hogere boodschappen, kookt weinig
   // Irregular/seasonal transactions
   ...generateIrregularTransactions([
+    // Bonus
     { monthsAgo: 1, day: 15, amount: 1700, description: 'Bonus Q4 TechFlow', counterparty_name: 'TechFlow BV', counterparty_iban: 'NL91ABNA0417164300', budgetSlug: S.OVERIGE_INKOMSTEN, is_income: true },
-    { monthsAgo: 4, day: 8, amount: -24.95, description: 'Boek: De weg naar FIRE', counterparty_name: 'Bol.com', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
-    { monthsAgo: 6, day: 12, amount: -89, description: 'Udemy cursus Python', counterparty_name: 'Udemy', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
-    { monthsAgo: 9, day: 5, amount: -18.50, description: 'Nieuwe binnenband fiets', counterparty_name: 'Halfords', counterparty_iban: null, budgetSlug: S.FIETS_DEELVERVOER, is_income: false },
-    { monthsAgo: 7, day: 1, amount: -580, description: 'Vakantie Portugal vlucht', counterparty_name: 'TAP Air Portugal', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
-    { monthsAgo: 7, day: 8, amount: -320, description: 'Vakantie Portugal hostel + eten', counterparty_name: 'Booking.com', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
-    { monthsAgo: 2, day: 20, amount: -45, description: 'Kerstcadeau ouders', counterparty_name: 'Bol.com', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
-    { monthsAgo: 10, day: 25, amount: -35, description: 'Tandarts controle', counterparty_name: 'Tandarts Amsterdam', counterparty_iban: null, budgetSlug: S.MEDISCHE_KOSTEN, is_income: false },
-    { monthsAgo: 5, day: 14, amount: -65, description: 'Nieuwe hardloopschoenen', counterparty_name: 'Decathlon', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
-    { monthsAgo: 3, day: 28, amount: -29, description: 'Sinterklaas cadeautjes', counterparty_name: 'Bol.com', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
-    { monthsAgo: 11, day: 10, amount: -15, description: 'Boek: Rich Dad Poor Dad', counterparty_name: 'Bol.com', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
-    { monthsAgo: 8, day: 22, amount: -42, description: 'Verjaardag vriend restaurant', counterparty_name: 'Restaurant Happyhappyjoyjoy', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false },
-    // Uitgebreide periode (jan–mrt 2025)
-    { monthsAgo: 12, day: 20, amount: -18.95, description: 'Boek: The Psychology of Money', counterparty_name: 'Bol.com', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
+    // Vakantie (groot deel van uitgaven)
+    { monthsAgo: 7, day: 1, amount: -480, description: 'Vlucht Ibiza', counterparty_name: 'Transavia', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
+    { monthsAgo: 7, day: 5, amount: -520, description: 'Airbnb Ibiza', counterparty_name: 'Airbnb', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
+    { monthsAgo: 7, day: 8, amount: -350, description: 'Uitgaan Ibiza', counterparty_name: 'iDEAL betaling buitenland', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
+    { monthsAgo: 3, day: 12, amount: -280, description: 'Skiweekend Oostenrijk bus', counterparty_name: 'SnowExpress', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
+    { monthsAgo: 3, day: 14, amount: -320, description: 'Skiweekend Oostenrijk accommodatie', counterparty_name: 'Booking.com', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
+    { monthsAgo: 10, day: 18, amount: -200, description: 'Weekendje Brussel', counterparty_name: 'Booking.com', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
+    { monthsAgo: 5, day: 20, amount: -180, description: 'Weekendje Antwerpen', counterparty_name: 'Booking.com', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
+    { monthsAgo: 9, day: 5, amount: -250, description: 'Lowlands festival ticket', counterparty_name: 'Lowlands', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
+    // Vrije tijd (concerts, events)
+    { monthsAgo: 2, day: 8, amount: -95, description: 'Concert Ziggo Dome', counterparty_name: 'Ticketmaster', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
+    { monthsAgo: 6, day: 15, amount: -65, description: 'Concert Paradiso', counterparty_name: 'Paradiso', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
+    { monthsAgo: 4, day: 22, amount: -45, description: 'Escape room met vrienden', counterparty_name: 'Escape Room Amsterdam', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
+    { monthsAgo: 11, day: 10, amount: -35, description: 'Bioscoop IMAX', counterparty_name: 'Pathe', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
+    { monthsAgo: 8, day: 25, amount: -55, description: 'F1 kijken kroeg + eten', counterparty_name: 'Sports Bar Amsterdam', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false },
+    // Kleding & shopping (extra naast maandelijks)
+    { monthsAgo: 4, day: 8, amount: -180, description: 'Nike Air Max', counterparty_name: 'Nike', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
+    { monthsAgo: 2, day: 20, amount: -250, description: 'Winterjas', counterparty_name: 'Scotch & Soda', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
+    { monthsAgo: 8, day: 12, amount: -120, description: 'Festival outfit', counterparty_name: 'Weekday', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
+    { monthsAgo: 12, day: 15, amount: -160, description: 'Sneakers', counterparty_name: 'JD Sports', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
+    // Medisch
+    { monthsAgo: 10, day: 25, amount: -45, description: 'Tandarts controle', counterparty_name: 'Tandarts Amsterdam', counterparty_iban: null, budgetSlug: S.MEDISCHE_KOSTEN, is_income: false },
+    { monthsAgo: 4, day: 15, amount: -35, description: 'Fysiotherapie', counterparty_name: 'FysioFit Amsterdam', counterparty_iban: null, budgetSlug: S.MEDISCHE_KOSTEN, is_income: false },
+    // Vervoer (incidenteel)
+    { monthsAgo: 9, day: 20, amount: -25, description: 'Uber rit', counterparty_name: 'Uber', counterparty_iban: null, budgetSlug: S.BRANDSTOF_OV, is_income: false },
+    { monthsAgo: 6, day: 28, amount: -35, description: 'Uber rit festival', counterparty_name: 'Uber', counterparty_iban: null, budgetSlug: S.BRANDSTOF_OV, is_income: false },
+    { monthsAgo: 1, day: 18, amount: -18, description: 'Nieuwe binnenband fiets', counterparty_name: 'Halfords', counterparty_iban: null, budgetSlug: S.FIETS_DEELVERVOER, is_income: false },
+    // Cadeaus & diversen
+    { monthsAgo: 2, day: 20, amount: -65, description: 'Kerstcadeau ouders', counterparty_name: 'Bol.com', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
+    { monthsAgo: 3, day: 28, amount: -45, description: 'Sinterklaas cadeautjes', counterparty_name: 'Bol.com', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
     { monthsAgo: 13, day: 14, amount: -35, description: 'Valentijnsdag cadeau vriendin', counterparty_name: 'Rituals', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
-    { monthsAgo: 14, day: 1, amount: -15, description: 'Nieuwjaarsduik donatie', counterparty_name: 'Rode Kruis', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
   ]),
 ]
 
@@ -696,31 +762,40 @@ const daanData: PersonaData = {
   meta: {
     name: 'Daan Bakker',
     subtitle: 'De starter',
-    description: 'Software developer, 2 jaar aan het werk. Leest over FIRE, spaart bewust. Doel: noodfonds van 10.000 vullen.',
+    description: 'Software developer, 2 jaar aan het werk. Geniet van het leven in Amsterdam, spaart minimaal. Bouwt elke maand 3 vrijheidsdagen op.',
     color: 'teal',
     avatarColor: '#14B8A6',
-    netWorth: -2300,
+    netWorth: -8700,
     income: 3400,
-    expenses: 2100,
-    backgroundStory: 'Daan werkt twee jaar als developer bij een startup en ontdekte via Reddit de FIRE-beweging. Hij woont bewust goedkoop in een gedeeld huis en spaart €500/mnd voor zijn noodfonds. Zijn enige schuld is een DUO-lening op 0,46%.',
-    challenges: ['Noodfonds nog niet vol (62%)', 'Studielening van €13.900 bij DUO', 'Eerste beleggingsportefeuille opbouwen'],
-    currentSituation: 'Positieve cashflow van €1.300/mnd, spaart en belegt bewust.',
-    firstGoal: 'Noodfonds van €10.000 volledig vullen',
+    expenses: 3060,
+    backgroundStory: 'Daan werkt twee jaar als developer bij een startup in Amsterdam. Hij woont in een eigen studio en geniet volop van het stadsleven — uit eten, festivals, weekendjes weg. Hij kent het FIRE-concept via Reddit maar vindt het nu nog te vroeg om agressief te sparen. Met slechts €340/mnd aan sparen en aflossingen gaat 90% van zijn inkomen naar uitgaven. Zijn enige schuld — een DUO-lening — lost hij minimaal af.',
+    challenges: ['90% van inkomen gaat naar uitgaven — nauwelijks spaarbuffer', 'Noodfonds nog mager (€2.000) — minder dan 1 maand buffer', 'Studielening van €13.900 bij DUO — wordt nauwelijks afgelost'],
+    currentSituation: 'Leeft van salaris tot salaris — €340/mnd cashflow voor sparen en schulden. Geniet nu van het leven maar bouwt weinig vrijheid op.',
+    firstGoal: 'Noodfonds van €5.000 opbouwen voor 2 maanden buffer',
     sovereignty: 'stability',
   },
   profile: {
     full_name: 'Daan Bakker',
     date_of_birth: '2000-01-22',
     household_type: 'solo',
-    temporal_balance: 3,
+    temporal_balance: 1,
+    expected_return: 0.07,
+    inflation_rate: 0.02,
+    fire_end_strategy: 'perpetual',
+    fire_end_age: 90,
+    retirement_expense_method: 'essential_budgets',
+    widget_prefs: makeWidgetPrefs([
+      'netto_vermogen', 'cash_flow', 'spaarquote', 'doelen',
+      { id: 'fire_prognose', size: 'full' }, 'acties', 'trend_sparen', 'jouw_pad',
+    ]),
   },
   bank_accounts: [
-    { name: 'Betaalrekening ING', iban: 'NL91INGB0001234567', bank_name: 'ING', account_type: 'checking', balance: 1850, is_active: true, sort_order: 0 },
-    { name: 'Spaarrekening ING', iban: 'NL11INGB0001234568', bank_name: 'ING', account_type: 'savings', balance: 6200, is_active: true, sort_order: 1 },
+    { name: 'Betaalrekening ING', iban: 'NL91INGB0001234567', bank_name: 'ING', account_type: 'checking', balance: 850, is_active: true, sort_order: 0 },
+    { name: 'Spaarrekening ING', iban: 'NL11INGB0001234568', bank_name: 'ING', account_type: 'savings', balance: 2000, is_active: true, sort_order: 1 },
   ],
   assets: [
-    { name: 'Spaarrekening noodfonds', asset_type: 'savings', current_value: 6200, purchase_value: 0, purchase_date: '2024-06-01', expected_return: 2.8, monthly_contribution: 500, institution: 'ING', subtype: 'vrij_opneembaar', risk_profile: 'laag', is_liquid: true },
-    { name: 'Meesman Wereldwijd Totaal', asset_type: 'investment', current_value: 5400, purchase_value: 4800, purchase_date: '2024-09-01', expected_return: 7, monthly_contribution: 200, institution: 'Meesman', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'MEESMAN-WWT' },
+    { name: 'Spaarrekening noodfonds', asset_type: 'savings', current_value: 2000, purchase_value: 0, purchase_date: '2024-06-01', expected_return: 2.8, monthly_contribution: 140, institution: 'ING', subtype: 'vrij_opneembaar', risk_profile: 'laag', is_liquid: true },
+    { name: 'Meesman Wereldwijd Totaal', asset_type: 'investment', current_value: 2350, purchase_value: 2100, purchase_date: '2024-09-01', expected_return: 7, monthly_contribution: 100, institution: 'Meesman', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'MEESMAN-WWT' },
   ],
   debts: [
     { name: 'Studielening DUO', debt_type: 'student_loan', original_amount: 14000, current_balance: 13900, interest_rate: 0.46, minimum_payment: 0, monthly_payment: 100, start_date: '2024-01-01', creditor: 'DUO', subtype: 'nieuw_stelsel', draagkrachtmeting_date: '2026-09-01' },
@@ -728,43 +803,44 @@ const daanData: PersonaData = {
   budgets: makeBudgets({
     [S.INKOMEN]: 3400, [S.SALARIS_UITKERING]: 3400,
     [S.TOESLAGEN_KINDERBIJSLAG]: 0, [S.TERUGGAVE_BELASTING]: 0, [S.OVERIGE_INKOMSTEN]: 0,
-    [S.VASTE_LASTEN_WONEN]: 855, [S.HUUR_HYPOTHEEK]: 650, [S.GAS_WATER_LICHT]: 75,
-    [S.VERZEKERINGEN_WONEN]: 130, [S.GEMEENTELIJKE_LASTEN]: 0,
-    [S.DAGELIJKSE_UITGAVEN]: 280, [S.BOODSCHAPPEN]: 220, [S.HUISHOUDEN_VERZORGING]: 20,
-    [S.KINDEREN_SCHOOL]: 0, [S.MEDISCHE_KOSTEN]: 40,
-    [S.VERVOER]: 55, [S.BRANDSTOF_OV]: 35, [S.AUTO_VASTE_LASTEN]: 0,
-    [S.AUTO_ONDERHOUD]: 0, [S.FIETS_DEELVERVOER]: 20,
-    [S.LEUKE_DINGEN]: 200, [S.UIT_ETEN_HORECA]: 60, [S.VRIJE_TIJD_SPORT]: 50,
-    [S.VAKANTIE]: 60, [S.KLEDING_OVERIGE]: 30,
-    [S.SPAREN_SCHULDEN]: 700, [S.SPAREN_NOODBUFFER]: 500, [S.INVESTEREN_FIRE]: 200,
+    [S.VASTE_LASTEN_WONEN]: 1250, [S.HUUR_HYPOTHEEK]: 950, [S.GAS_WATER_LICHT]: 150,
+    [S.VERZEKERINGEN_WONEN]: 130, [S.GEMEENTELIJKE_LASTEN]: 20,
+    [S.DAGELIJKSE_UITGAVEN]: 500, [S.BOODSCHAPPEN]: 380, [S.HUISHOUDEN_VERZORGING]: 60,
+    [S.KINDEREN_SCHOOL]: 0, [S.MEDISCHE_KOSTEN]: 60,
+    [S.VERVOER]: 110, [S.BRANDSTOF_OV]: 60, [S.AUTO_VASTE_LASTEN]: 0,
+    [S.AUTO_ONDERHOUD]: 0, [S.FIETS_DEELVERVOER]: 50,
+    [S.LEUKE_DINGEN]: 1200, [S.UIT_ETEN_HORECA]: 400, [S.VRIJE_TIJD_SPORT]: 300,
+    [S.VAKANTIE]: 250, [S.KLEDING_OVERIGE]: 250,
+    [S.SPAREN_SCHULDEN]: 240, [S.SPAREN_NOODBUFFER]: 140, [S.INVESTEREN_FIRE]: 100,
     [S.SCHULDEN_AFLOSSINGEN_PARENT]: 100, [S.SCHULDEN_AFLOSSINGEN]: 100, [S.EXTRA_AFLOSSING_HYPOTHEEK]: 0,
   }),
   transactions: daanTransactions,
   goals: [
-    { name: 'Noodfonds 10.000', description: 'Een noodfonds van 10.000 opbouwen voor 6 maanden buffer', goal_type: 'savings', target_value: 10000, current_value: 6200, target_date: monthsAgo(-8), icon: 'ShieldCheck', color: 'teal', is_completed: false },
-    { name: 'Eerste 25K belegd', description: 'Een beleggingsportefeuille van 25.000 opbouwen', goal_type: 'net_worth', target_value: 25000, current_value: 5400, target_date: monthsAgo(-60), icon: 'TrendingUp', color: 'emerald', is_completed: false },
+    { name: 'Noodfonds 5.000', description: 'Een noodfonds van 5.000 opbouwen voor 2 maanden buffer', goal_type: 'savings', target_value: 5000, current_value: 2000, target_date: monthsAgo(-20), icon: 'ShieldCheck', color: 'teal', is_completed: false },
+    { name: 'Eerste 10K belegd', description: 'Een beleggingsportefeuille van 10.000 opbouwen', goal_type: 'net_worth', target_value: 10000, current_value: 2350, target_date: monthsAgo(-60), icon: 'TrendingUp', color: 'emerald', is_completed: false },
   ],
   life_events: [
     { name: 'Eerste baan gestart', event_type: 'career_change', target_age: 24, target_date: '2024-02-01', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 3400, duration_months: 0, icon: 'Briefcase', is_active: false, sort_order: 0 },
-    { name: 'Eigen woning kopen', event_type: 'move', target_age: 30, target_date: '2030-01-01', one_time_cost: 25000, monthly_cost_change: 200, monthly_income_change: 0, duration_months: 0, icon: 'Home', is_active: true, sort_order: 1 },
+    { name: 'Eigen woning kopen', event_type: 'move', target_age: 32, target_date: '2032-01-01', one_time_cost: 25000, monthly_cost_change: 200, monthly_income_change: 0, duration_months: 0, icon: 'Home', is_active: true, sort_order: 1 },
     { name: 'AOW', event_type: 'aow', target_age: 67, target_date: '2067-01-01', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 1380, duration_months: 0, icon: 'Landmark', is_active: true, sort_order: 2, is_indexed: true },
   ],
   recommendations: [
     {
-      title: 'Verhoog DUO aflossing strategisch',
-      description: 'Je studielening heeft slechts 0.46% rente. Het is slimmer om het minimumbedrag te betalen en extra geld te beleggen voor hoger rendement.',
-      recommendation_type: 'debt_acceleration',
-      euro_impact_monthly: 0,
-      euro_impact_yearly: 0,
-      freedom_days_per_year: 2,
-      related_budget_slug: null,
-      priority_score: 2,
+      title: 'Verlaag je uitgavenratio naar 80%',
+      description: 'Je geeft momenteel 90% van je inkomen uit. Door 10% te verschuiven van lifestyle naar sparen bouw je 5x sneller een buffer op en koop je 8 extra vrijheidsdagen per maand.',
+      recommendation_type: 'expense_reduction',
+      euro_impact_monthly: 340,
+      euro_impact_yearly: 4080,
+      freedom_days_per_year: 45,
+      related_budget_slug: S.LEUKE_DINGEN,
+      priority_score: 5,
       status: 'pending',
       suggested_actions: [
-        { title: 'Verlaag DUO aflossing naar 0', description: 'Vraag uitstel aan bij DUO en beleg het verschil', freedom_days_impact: 2 },
+        { title: 'Halveer uit-eten budget', description: 'Kook vaker zelf — bespaar €200/mnd op horeca', freedom_days_impact: 22, euro_impact_monthly: 200 },
+        { title: 'Beperk impulsaankopen kleding', description: 'Stel een wachtperiode van 48 uur in voor aankopen >€50', freedom_days_impact: 11, euro_impact_monthly: 100 },
       ],
       actions: [
-        { source: 'ai', title: 'Bekijk DUO aflossingsopties', description: 'Log in op Mijn DUO en bekijk of je de aflossing kunt verlagen', freedom_days_impact: 2, euro_impact_monthly: 100, status: 'open', priority_score: 2 },
+        { source: 'ai', title: 'Stel een maandelijks uitgavenplafond in', description: 'Zet een automatische waarschuwing bij 80% van je budget', freedom_days_impact: 45, euro_impact_monthly: 340, status: 'open', priority_score: 5 },
       ],
     },
     {
@@ -787,30 +863,31 @@ const daanData: PersonaData = {
     },
   ],
   net_worth_snapshots: [
-    { monthsAgo: 14, total_assets: 1000, total_debts: 14000, net_worth: -13000 },
-    { monthsAgo: 13, total_assets: 1700, total_debts: 14000, net_worth: -12300 },
-    { monthsAgo: 12, total_assets: 2400, total_debts: 13900, net_worth: -11500 },
-    { monthsAgo: 11, total_assets: 3100, total_debts: 14000, net_worth: -10900 },
-    { monthsAgo: 10, total_assets: 3800, total_debts: 14000, net_worth: -10200 },
-    { monthsAgo: 9, total_assets: 4500, total_debts: 14000, net_worth: -9500 },
-    { monthsAgo: 8, total_assets: 5200, total_debts: 14000, net_worth: -8800 },
-    { monthsAgo: 7, total_assets: 5900, total_debts: 14000, net_worth: -8100 },
-    { monthsAgo: 6, total_assets: 6500, total_debts: 14000, net_worth: -7500 },
-    { monthsAgo: 5, total_assets: 7200, total_debts: 14000, net_worth: -6800 },
-    { monthsAgo: 4, total_assets: 8000, total_debts: 14000, net_worth: -6000 },
-    { monthsAgo: 3, total_assets: 8900, total_debts: 13980, net_worth: -5080 },
-    { monthsAgo: 2, total_assets: 9800, total_debts: 13960, net_worth: -4160 },
-    { monthsAgo: 1, total_assets: 10700, total_debts: 13940, net_worth: -3240 },
-    { monthsAgo: 0, total_assets: 11600, total_debts: 13900, net_worth: -2300 },
+    // Assets groeien ~€350/mnd (140 sparen + 100 beleggen + rendement), DUO daalt ~€95/mnd
+    { monthsAgo: 14, total_assets: 300, total_debts: 14000, net_worth: -13700 },
+    { monthsAgo: 13, total_assets: 650, total_debts: 14000, net_worth: -13350 },
+    { monthsAgo: 12, total_assets: 1000, total_debts: 14000, net_worth: -13000 },
+    { monthsAgo: 11, total_assets: 1350, total_debts: 13990, net_worth: -12640 },
+    { monthsAgo: 10, total_assets: 1700, total_debts: 13980, net_worth: -12280 },
+    { monthsAgo: 9, total_assets: 2050, total_debts: 13970, net_worth: -11920 },
+    { monthsAgo: 8, total_assets: 2400, total_debts: 13960, net_worth: -11560 },
+    { monthsAgo: 7, total_assets: 2750, total_debts: 13950, net_worth: -11200 },
+    { monthsAgo: 6, total_assets: 3100, total_debts: 13940, net_worth: -10840 },
+    { monthsAgo: 5, total_assets: 3450, total_debts: 13935, net_worth: -10485 },
+    { monthsAgo: 4, total_assets: 3800, total_debts: 13930, net_worth: -10130 },
+    { monthsAgo: 3, total_assets: 4150, total_debts: 13920, net_worth: -9770 },
+    { monthsAgo: 2, total_assets: 4500, total_debts: 13910, net_worth: -9410 },
+    { monthsAgo: 1, total_assets: 4850, total_debts: 13900, net_worth: -9050 },
+    { monthsAgo: 0, total_assets: 5200, total_debts: 13900, net_worth: -8700 },
   ],
   valuations: [
-    { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 14, value: 400 },
-    { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 12, value: 1200 },
-    { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 8, value: 2200 },
-    { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 6, value: 2900 },
-    { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 4, value: 3800 },
-    { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 2, value: 4600 },
-    { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 0, value: 5400 },
+    { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 14, value: 200 },
+    { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 12, value: 500 },
+    { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 8, value: 1000 },
+    { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 6, value: 1350 },
+    { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 4, value: 1700 },
+    { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 2, value: 2050 },
+    { assetName: 'Meesman Wereldwijd Totaal', entity_type: 'asset', monthsAgo: 0, value: 2350 },
   ],
   holdings: [
     {
@@ -818,17 +895,16 @@ const daanData: PersonaData = {
       ticker: 'MEESMAN-WWT',
       isin: null,
       name: 'Meesman Wereldwijd Totaal',
-      units: 42.5,
-      avg_purchase_price: 112.59,
-      current_price: 127.06,
+      units: 18.5,
+      avg_purchase_price: 113.51,
+      current_price: 127.03,
       purchase_date_monthsAgo: 14,
       transactions: [
-        { type: 'buy', units: 3.5, price_per_unit: 105, total_amount: 367.50, monthsAgo: 14, notes: 'Eerste inleg' },
-        { type: 'buy', units: 8, price_per_unit: 108, total_amount: 864, monthsAgo: 11, notes: null },
-        { type: 'buy', units: 12, price_per_unit: 110, total_amount: 1320, monthsAgo: 8, notes: null },
-        { type: 'buy', units: 9.5, price_per_unit: 114, total_amount: 1083, monthsAgo: 5, notes: null },
-        { type: 'buy', units: 9.5, price_per_unit: 118, total_amount: 1121, monthsAgo: 2, notes: null },
-        { type: 'dividend', units: 0, price_per_unit: 0, total_amount: 42.30, monthsAgo: 1, notes: 'Jaarlijks dividend' },
+        { type: 'buy', units: 1.5, price_per_unit: 105, total_amount: 157.50, monthsAgo: 14, notes: 'Eerste inleg' },
+        { type: 'buy', units: 3.5, price_per_unit: 108, total_amount: 378, monthsAgo: 11, notes: null },
+        { type: 'buy', units: 5, price_per_unit: 112, total_amount: 560, monthsAgo: 8, notes: null },
+        { type: 'buy', units: 4.5, price_per_unit: 116, total_amount: 522, monthsAgo: 5, notes: null },
+        { type: 'buy', units: 4, price_per_unit: 120, total_amount: 480, monthsAgo: 2, notes: null },
       ],
     },
   ],
@@ -899,15 +975,15 @@ const lisaData: PersonaData = {
   meta: {
     name: 'Lisa de Groot',
     subtitle: 'De 100K milestone',
-    description: 'Projectmanager, getrouwd, 2 kinderen. Na jaren hard werken net 100K netto vermogen bereikt.',
+    description: 'Projectmanager, getrouwd, 2 kinderen. Na jaren discipline net de magische €100K grens doorbroken — 3 jaar en 4 maanden vrijheid opgebouwd.',
     color: 'amber',
     avatarColor: '#D4A843',
     netWorth: 100000,
     income: 5200,
     expenses: 4000,
-    backgroundStory: 'Lisa werkt als projectmanager bij de gemeente en is getrouwd met een leraar. Na tien jaar spaardiscipline hebben zij en haar man net de €100K grens overschreden. Met twee kinderen balanceert ze gezinskosten met gerichte investeringen.',
-    challenges: ['Balanceren van gezinskosten met beleggingsgroei', 'Studiefonds voor kinderen opbouwen (€8K van €40K)', 'Hypotheek optioneel versneld aflossen'],
-    currentSituation: 'Solide momentum — netto vermogen €100.000, investeert €400/mnd.',
+    backgroundStory: 'Lisa werkt als projectmanager bij de gemeente en is getrouwd met een leraar. Na tien jaar spaardiscipline hebben zij en haar man net de €100K grens doorbroken — het magische omslagpunt waar compound interest merkbaar wordt. Met twee kinderen balanceert ze kinderopvang en schoolkosten met €400/mnd Meesman-beleggingen. Elke maand koopt ze 3,5 dag vrijheid voor het hele gezin.',
+    challenges: ['Balanceren van gezinskosten met beleggingsgroei — kinderopvang kost €350/mnd', 'Studiefonds voor kinderen opbouwen (€8K van €40K doel)', 'Hypotheek optioneel versneld aflossen vs. meer beleggen'],
+    currentSituation: 'Solide momentum — netto vermogen €100.000, investeert €400/mnd. Het compounding effect begint zichtbaar te worden.',
     firstGoal: 'Netto vermogen naar €250.000 en studiefonds starten',
     sovereignty: 'momentum',
   },
@@ -916,6 +992,16 @@ const lisaData: PersonaData = {
     date_of_birth: '1981-07-08',
     household_type: 'gezin',
     temporal_balance: 3,
+    expected_return: 0.07,
+    inflation_rate: 0.02,
+    fire_end_strategy: 'legacy',
+    fire_end_age: 90,
+    fire_legacy_amount: 100000,
+    retirement_expense_method: 'essential_budgets',
+    widget_prefs: makeWidgetPrefs([
+      'netto_vermogen', 'cash_flow', { id: 'fire_prognose', size: 'full' }, 'doelen',
+      'assets', 'holdings', 'budgetten', 'monte_carlo', 'trend_sparen', 'acties',
+    ]),
   },
   bank_accounts: [
     { name: 'Gezamenlijke rekening Rabo', iban: 'NL39RABO0300065264', bank_name: 'Rabobank', account_type: 'checking', balance: 3200, is_active: true, sort_order: 0 },
@@ -929,7 +1015,7 @@ const lisaData: PersonaData = {
     { name: 'Auto Toyota Corolla', asset_type: 'vehicle', current_value: 8000, purchase_value: 24000, purchase_date: '2022-03-01', expected_return: -12, monthly_contribution: 0, institution: '', subtype: 'auto_eigendom', depreciation_rate: 12 },
   ],
   debts: [
-    { name: 'Hypotheek woning Utrecht', debt_type: 'mortgage', original_amount: 320000, current_balance: 350000, interest_rate: 2.9, minimum_payment: 1100, monthly_payment: 1100, start_date: '2015-06-01', creditor: 'Rabobank', subtype: 'annuiteit', is_tax_deductible: true, nhg: false, linked_asset_name: 'Woning Utrecht' },
+    { name: 'Hypotheek woning Utrecht', debt_type: 'mortgage', original_amount: 385000, current_balance: 350000, interest_rate: 2.9, minimum_payment: 1100, monthly_payment: 1100, start_date: '2015-06-01', creditor: 'Rabobank', subtype: 'annuiteit', is_tax_deductible: true, nhg: false, linked_asset_name: 'Woning Utrecht' },
   ],
   budgets: makeBudgets({
     [S.INKOMEN]: 5200, [S.SALARIS_UITKERING]: 4200,
@@ -1009,20 +1095,23 @@ const lisaData: PersonaData = {
     },
   ],
   net_worth_snapshots: [
-    { monthsAgo: 14, total_assets: 415000, total_debts: 350000, net_worth: 65000 },
-    { monthsAgo: 13, total_assets: 417500, total_debts: 350000, net_worth: 67500 },
-    { monthsAgo: 12, total_assets: 420000, total_debts: 350000, net_worth: 70000 },
-    { monthsAgo: 11, total_assets: 422500, total_debts: 350000, net_worth: 72500 },
-    { monthsAgo: 10, total_assets: 425000, total_debts: 350000, net_worth: 75000 },
-    { monthsAgo: 9, total_assets: 427500, total_debts: 350000, net_worth: 77500 },
-    { monthsAgo: 8, total_assets: 430000, total_debts: 350000, net_worth: 80000 },
-    { monthsAgo: 7, total_assets: 433000, total_debts: 350000, net_worth: 83000 },
-    { monthsAgo: 6, total_assets: 435500, total_debts: 350000, net_worth: 85500 },
-    { monthsAgo: 5, total_assets: 437500, total_debts: 350000, net_worth: 87500 },
-    { monthsAgo: 4, total_assets: 440000, total_debts: 350000, net_worth: 90000 },
-    { monthsAgo: 3, total_assets: 443000, total_debts: 350000, net_worth: 93000 },
-    { monthsAgo: 2, total_assets: 445500, total_debts: 350000, net_worth: 95500 },
-    { monthsAgo: 1, total_assets: 447800, total_debts: 350000, net_worth: 97800 },
+    // Assets +€2.700/mnd (sparen + beleggen + rendement + woningwaarde)
+    // Hypotheek -€300/mnd principal (annuiteit 2.9%)
+    // Netto vermogen +€3.000/mnd
+    { monthsAgo: 14, total_assets: 412000, total_debts: 354000, net_worth: 58000 },
+    { monthsAgo: 13, total_assets: 414500, total_debts: 353700, net_worth: 60800 },
+    { monthsAgo: 12, total_assets: 417000, total_debts: 353400, net_worth: 63600 },
+    { monthsAgo: 11, total_assets: 419500, total_debts: 353100, net_worth: 66400 },
+    { monthsAgo: 10, total_assets: 422000, total_debts: 352800, net_worth: 69200 },
+    { monthsAgo: 9, total_assets: 424500, total_debts: 352500, net_worth: 72000 },
+    { monthsAgo: 8, total_assets: 427000, total_debts: 352200, net_worth: 74800 },
+    { monthsAgo: 7, total_assets: 430000, total_debts: 351900, net_worth: 78100 },
+    { monthsAgo: 6, total_assets: 433000, total_debts: 351600, net_worth: 81400 },
+    { monthsAgo: 5, total_assets: 436000, total_debts: 351300, net_worth: 84700 },
+    { monthsAgo: 4, total_assets: 439000, total_debts: 351000, net_worth: 88000 },
+    { monthsAgo: 3, total_assets: 442000, total_debts: 350700, net_worth: 91300 },
+    { monthsAgo: 2, total_assets: 444500, total_debts: 350400, net_worth: 94100 },
+    { monthsAgo: 1, total_assets: 447000, total_debts: 350200, net_worth: 96800 },
     { monthsAgo: 0, total_assets: 450000, total_debts: 350000, net_worth: 100000 },
   ],
   valuations: [
@@ -1119,15 +1208,15 @@ const willemData: PersonaData = {
   meta: {
     name: 'Willem Jansen',
     subtitle: 'Bijna binnen',
-    description: 'Senior consultant, hypotheek afbetaald, kinderen het huis uit. Passief inkomen dekt bijna zijn uitgaven.',
+    description: 'Senior consultant, hypotheek afbetaald, kinderen het huis uit. Netto vermogen €1,46M — zijn investeerbaar vermogen nadert het infinity-punt.',
     color: 'purple',
     avatarColor: '#8B5CB8',
-    netWorth: 1135000,
+    netWorth: 1457000,
     income: 6500,
     expenses: 3000,
-    backgroundStory: 'Willem werkt al 30 jaar als senior consultant en heeft in 2024 zijn hypotheek volledig afgelost. Zijn kinderen staan op eigen benen. Met een portefeuille van €420.000 en ABP-pensioen van €285.000 ziet hij 2028 als vroegpensioen.',
-    challenges: ['Asset allocatie optimaliseren voor pensioenovergang', 'Opnamestrategie bepalen na FIRE', 'Portefeuille naar €500K brengen'],
-    currentSituation: 'Aan de rand van volledige vrijheid — ~85% vrijheidspercentage, vroegpensioen in 2028.',
+    backgroundStory: 'Willem werkt al 30 jaar als senior consultant en heeft in 2024 zijn hypotheek volledig afgelost. Zijn kinderen staan op eigen benen. Met een beleggingsportefeuille van €420.000, ABP-pensioen van €285.000 en een afbetaalde woning van €650.000 is zijn totale vermogen €1,46M. Maar het gaat hem om de vraag: dekt zijn investeerbaar vermogen (€705K) zijn jaarlijkse uitgaven van €36K? Bij de Nederlandse SWR is hij op ~78%. Nog even doorzetten richting 2028.',
+    challenges: ['Asset allocatie optimaliseren voor de pensioenovergang', 'Opnamestrategie bepalen — deplete vs. perpetual portfolio', 'Investeerbaar vermogen naar €900K voor volledige FIRE'],
+    currentSituation: 'Aan de rand van volledige vrijheid — investeerbaar vermogen €705K van de benodigde €900K. Vroegpensioen gepland in 2028.',
     firstGoal: 'Volledige financiële onafhankelijkheid (365 vrijheidsdagen)',
     sovereignty: 'mastery',
   },
@@ -1136,6 +1225,16 @@ const willemData: PersonaData = {
     date_of_birth: '1968-11-30',
     household_type: 'samen',
     temporal_balance: 4,
+    expected_return: 0.06,
+    inflation_rate: 0.02,
+    fire_end_strategy: 'deplete',
+    fire_end_age: 95,
+    retirement_expense_method: 'custom_amount',
+    retirement_expense_custom_amount: 3000,
+    widget_prefs: makeWidgetPrefs([
+      'netto_vermogen', { id: 'fire_prognose', size: 'full' }, 'passief_inkomen', 'monte_carlo',
+      'holdings', 'backtesting_score', 'vrijheidsmijlpalen', 'box3_drag', 'acties', 'veerkracht_score',
+    ]),
   },
   bank_accounts: [
     { name: 'Betaalrekening ABN AMRO', iban: 'NL02ABNA0450884700', bank_name: 'ABN AMRO', account_type: 'checking', balance: 8500, is_active: true, sort_order: 0 },
@@ -1215,21 +1314,23 @@ const willemData: PersonaData = {
     },
   ],
   net_worth_snapshots: [
-    { monthsAgo: 14, total_assets: 1355000, total_debts: 0, net_worth: 885000 },
-    { monthsAgo: 13, total_assets: 1362000, total_debts: 0, net_worth: 902000 },
-    { monthsAgo: 12, total_assets: 1370000, total_debts: 0, net_worth: 920000 },
-    { monthsAgo: 11, total_assets: 1378000, total_debts: 0, net_worth: 938000 },
-    { monthsAgo: 10, total_assets: 1385000, total_debts: 0, net_worth: 955000 },
-    { monthsAgo: 9, total_assets: 1393000, total_debts: 0, net_worth: 973000 },
-    { monthsAgo: 8, total_assets: 1400000, total_debts: 0, net_worth: 990000 },
-    { monthsAgo: 7, total_assets: 1408000, total_debts: 0, net_worth: 1010000 },
-    { monthsAgo: 6, total_assets: 1415000, total_debts: 0, net_worth: 1030000 },
-    { monthsAgo: 5, total_assets: 1420000, total_debts: 0, net_worth: 1050000 },
-    { monthsAgo: 4, total_assets: 1430000, total_debts: 0, net_worth: 1065000 },
-    { monthsAgo: 3, total_assets: 1440000, total_debts: 0, net_worth: 1085000 },
-    { monthsAgo: 2, total_assets: 1448000, total_debts: 0, net_worth: 1100000 },
-    { monthsAgo: 1, total_assets: 1455000, total_debts: 0, net_worth: 1118000 },
-    { monthsAgo: 0, total_assets: 1457000, total_debts: 0, net_worth: 1135000 },
+    // Schuldenvrij — net_worth = total_assets
+    // Groei ~€7.300/mnd (€2.500 inleg + rendement + woningwaarde + pensioenopbouw)
+    { monthsAgo: 14, total_assets: 1355000, total_debts: 0, net_worth: 1355000 },
+    { monthsAgo: 13, total_assets: 1362000, total_debts: 0, net_worth: 1362000 },
+    { monthsAgo: 12, total_assets: 1370000, total_debts: 0, net_worth: 1370000 },
+    { monthsAgo: 11, total_assets: 1378000, total_debts: 0, net_worth: 1378000 },
+    { monthsAgo: 10, total_assets: 1385000, total_debts: 0, net_worth: 1385000 },
+    { monthsAgo: 9, total_assets: 1393000, total_debts: 0, net_worth: 1393000 },
+    { monthsAgo: 8, total_assets: 1400000, total_debts: 0, net_worth: 1400000 },
+    { monthsAgo: 7, total_assets: 1408000, total_debts: 0, net_worth: 1408000 },
+    { monthsAgo: 6, total_assets: 1415000, total_debts: 0, net_worth: 1415000 },
+    { monthsAgo: 5, total_assets: 1420000, total_debts: 0, net_worth: 1420000 },
+    { monthsAgo: 4, total_assets: 1430000, total_debts: 0, net_worth: 1430000 },
+    { monthsAgo: 3, total_assets: 1440000, total_debts: 0, net_worth: 1440000 },
+    { monthsAgo: 2, total_assets: 1448000, total_debts: 0, net_worth: 1448000 },
+    { monthsAgo: 1, total_assets: 1455000, total_debts: 0, net_worth: 1455000 },
+    { monthsAgo: 0, total_assets: 1457000, total_debts: 0, net_worth: 1457000 },
   ],
   valuations: [
     { assetName: 'DEGIRO beleggingsportefeuille', entity_type: 'asset', monthsAgo: 14, value: 340000 },
@@ -1269,6 +1370,192 @@ const willemData: PersonaData = {
 }
 
 // ══════════════════════════════════════════════════════════════
+// Persona 5 — Rashid Dimohammed ("De Genieter")
+// Uniek: GEEN budgetten, GEEN transacties — puur check-in gebaseerd
+// ══════════════════════════════════════════════════════════════
+
+const rashidData: PersonaData = {
+  meta: {
+    name: 'Rashid Dimohammed',
+    subtitle: 'De Genieter',
+    description: 'Freelance IT-consultant, financieel bewust maar niet micro-managerend. Geniet van het leven met €250K netto vermogen — zonder budgetten of transacties.',
+    color: 'orange',
+    avatarColor: '#E07A5F',
+    netWorth: 250000,
+    income: 5500,
+    expenses: 4200,
+    backgroundStory: 'Rashid is een freelance IT-consultant die goed verdient maar niet van spreadsheets en categorieën houdt. Hij heeft een pragmatische kijk op geld: genoeg opzijzetten voor de toekomst, maar ook nu genieten. Hij is 10 jaar geleden begonnen met beleggen op advies van een vriend en heeft zijn portefeuille langzaam laten groeien. Zijn huis kocht hij 3 jaar geleden — de hypotheek is daarom nog hoog. De studielening sleept hij bewust mee vanwege de lage rente. Rashid houdt van reizen, lekker eten en goede wijn.',
+    challenges: ['Geen grip op waar z\'n geld precies naartoe gaat (geen budgettering)', 'Hypotheek/waarde ratio nog hoog (95%)', 'Studielening nog open', 'Wil meer sparen maar niet ten koste van levensstijl'],
+    currentSituation: 'Financieel stabiel met positieve cashflow, maar geen gedetailleerd inzicht in uitgavenpatronen. Gebruikt de app puur voor vermogensoverzicht en maandelijkse check-ins.',
+    firstGoal: '€500K netto vermogen',
+    sovereignty: 'momentum',
+  },
+  profile: {
+    full_name: 'Rashid Dimohammed',
+    date_of_birth: '1983-09-14',
+    household_type: 'solo',
+    temporal_balance: 2,
+    expected_return: 0.07,
+    inflation_rate: 0.02,
+    fire_end_strategy: 'deplete',
+    fire_end_age: 90,
+    retirement_expense_method: 'current_income',
+    widget_prefs: makeWidgetPrefs([
+      'netto_vermogen', 'fire_prognose', 'vrijheidsscenarios', 'acties', 'doelen',
+    ]),
+  },
+  bank_accounts: [
+    { name: 'Betaalrekening ING', iban: 'NL91INGB0006543210', bank_name: 'ING', account_type: 'checking', balance: 40000, is_active: true, sort_order: 0 },
+    { name: 'Spaarrekening ING', iban: 'NL91INGB0006543211', bank_name: 'ING', account_type: 'savings', balance: 20000, is_active: true, sort_order: 1 },
+  ],
+  assets: [
+    { name: 'Spaarrekening', asset_type: 'savings', current_value: 20000, purchase_value: 20000, purchase_date: '2018-01-01', expected_return: 2.8, monthly_contribution: 0, institution: 'ING', subtype: 'vrij_opneembaar', risk_profile: 'laag', is_liquid: true },
+    { name: 'Beleggingsrekening DEGIRO', asset_type: 'investment', current_value: 170000, purchase_value: 130000, purchase_date: '2016-01-01', expected_return: 7, monthly_contribution: 800, institution: 'DEGIRO', subtype: 'etf', risk_profile: 'middel' },
+    { name: 'Eigen woning', asset_type: 'eigen_huis', current_value: 650000, purchase_value: 630000, purchase_date: '2023-03-01', expected_return: 3, monthly_contribution: 0, institution: '' },
+    { name: 'Auto (Audi A4)', asset_type: 'vehicle', current_value: 24000, purchase_value: 38000, purchase_date: '2022-06-01', expected_return: -15, monthly_contribution: 0, institution: '', subtype: 'auto_eigendom', depreciation_rate: 15 },
+  ],
+  debts: [
+    {
+      name: 'Hypotheek', debt_type: 'mortgage', original_amount: 630000, current_balance: 620000,
+      interest_rate: 3.8, minimum_payment: 2100, monthly_payment: 2100,
+      start_date: '2023-03-01', creditor: 'Rabobank',
+      is_tax_deductible: true, repayment_type: 'annuiteit',
+      linked_asset_name: 'Eigen woning',
+    },
+    {
+      name: 'Studielening DUO', debt_type: 'student_loan', original_amount: 42000, current_balance: 34000,
+      interest_rate: 0.46, minimum_payment: 180, monthly_payment: 180,
+      start_date: '2007-09-01', creditor: 'DUO',
+      subtype: 'oud_stelsel', draagkrachtmeting_date: '2025-09-01',
+    },
+  ],
+  budgets: [],       // Kern van Rashid: GEEN budgettering
+  transactions: [],  // Geen transacties — check-in gebaseerd
+  goals: [
+    { name: '€500K netto vermogen', description: 'Half miljoen netto vermogen bereiken — een grote mijlpaal richting financiële vrijheid', goal_type: 'net_worth', target_value: 500000, current_value: 250000, target_date: '2033-12-31', icon: 'Mountain', color: 'amber', is_completed: false },
+    { name: 'Sabbatical fonds', description: '6 maanden reizen — een sabbatical fonds opbouwen om de wereld te ontdekken', goal_type: 'savings', target_value: 30000, current_value: 8000, target_date: '2028-06-30', icon: 'Plane', color: 'teal', is_completed: false },
+  ],
+  life_events: [
+    { name: 'Sabbatical (6 mnd reizen)', event_type: 'career', target_age: 45, target_date: '2028-09-14', one_time_cost: 5000, monthly_cost_change: 2000, monthly_income_change: -5500, duration_months: 6, icon: 'Plane', is_active: true, sort_order: 0 },
+    { name: 'Freelance tarief omhoog', event_type: 'career', target_age: 47, target_date: '2030-09-14', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 500, duration_months: 0, icon: 'TrendingUp', is_active: true, sort_order: 1 },
+    { name: 'AOW', event_type: 'aow', target_age: 67, target_date: '2050-09-14', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 1350, duration_months: 0, icon: 'Landmark', is_active: true, sort_order: 2, is_indexed: true },
+  ],
+  recommendations: [
+    {
+      title: 'Start met budgetteren',
+      description: 'Je hebt geen inzicht in waar je geld naartoe gaat. Door budgetten aan te maken krijg je grip op je uitgaven en kun je makkelijker €400/maand extra sparen.',
+      recommendation_type: 'budget_optimization',
+      euro_impact_monthly: 400,
+      euro_impact_yearly: 4800,
+      freedom_days_per_year: 10,
+      related_budget_slug: null,
+      priority_score: 4,
+      status: 'pending',
+      suggested_actions: [
+        { title: 'Maak je eerste budgetten aan in De Kern', freedom_days_impact: 5, euro_impact_monthly: 200 },
+        { title: 'Koppel je bankrekening voor automatisch inzicht', freedom_days_impact: 5, euro_impact_monthly: 200 },
+      ],
+      actions: [
+        { source: 'ai', title: 'Maak je eerste budgetten aan', description: 'Ga naar De Kern → Budgetten en stel je eerste categorieën in. Begin simpel: vaste lasten, boodschappen en leuke dingen.', freedom_days_impact: 5, euro_impact_monthly: 200, status: 'open', priority_score: 4 },
+        { source: 'ai', title: 'Koppel je ING rekening', description: 'Koppel je betaalrekening voor automatische transactie-import, zodat je zonder moeite inzicht krijgt.', freedom_days_impact: 5, euro_impact_monthly: 200, status: 'open', priority_score: 4 },
+      ],
+    },
+    {
+      title: 'Noodbuffer aanvullen naar 6 maanden',
+      description: 'Als freelancer heb je een grotere buffer nodig. Met €4.200/mnd uitgaven is 6 maanden = €25.200. Je hebt nu €20.000 op je spaarrekening.',
+      recommendation_type: 'savings_boost',
+      euro_impact_monthly: 0,
+      euro_impact_yearly: 0,
+      freedom_days_per_year: 0,
+      related_budget_slug: null,
+      priority_score: 3,
+      status: 'pending',
+      suggested_actions: [
+        { title: 'Verhoog spaarrekening naar €25.200', freedom_days_impact: 0 },
+      ],
+      actions: [
+        { source: 'ai', title: 'Zet maandelijks €500 extra opzij', description: 'Stel een automatische overboeking in van je betaalrekening naar je spaarrekening.', freedom_days_impact: 0, euro_impact_monthly: 0, status: 'open', priority_score: 3 },
+      ],
+    },
+    {
+      title: 'Studielening versneld aflossen',
+      description: 'Je studielening heeft slechts 0,46% rente. Versneld aflossen levert weinig op — maar het geeft mentale rust en verlaagt je schuldenlast.',
+      recommendation_type: 'debt_acceleration',
+      euro_impact_monthly: 0,
+      euro_impact_yearly: 200,
+      freedom_days_per_year: 0,
+      related_budget_slug: null,
+      priority_score: 2,
+      status: 'pending',
+      suggested_actions: [
+        { title: 'Verhoog maandelijkse aflossing met €100', freedom_days_impact: 0, euro_impact_monthly: 0 },
+      ],
+      actions: [
+        { source: 'ai', title: 'Overweeg extra aflossing', description: 'De rente is laag, dus financieel is het slimmer om te beleggen. Maar als je mentale rust wilt, kun je €100/mnd extra aflossen.', freedom_days_impact: 0, euro_impact_monthly: 0, status: 'open', priority_score: 2 },
+      ],
+    },
+  ],
+  net_worth_snapshots: [
+    // Stabiele groei ~€2.300/mnd: beleggingsrendement + hypotheekaflossing
+    // total_assets ≈ spaar (20K) + belegging (groeiend) + woning (groeiend) + auto (dalend) + checking (40K)
+    // total_debts = hypotheek (dalend) + studielening (dalend)
+    { monthsAgo: 14, total_assets: 872000, total_debts: 657000, net_worth: 215000 },
+    { monthsAgo: 13, total_assets: 875000, total_debts: 656500, net_worth: 218500 },
+    { monthsAgo: 12, total_assets: 878000, total_debts: 656000, net_worth: 222000 },
+    { monthsAgo: 11, total_assets: 881000, total_debts: 655500, net_worth: 225500 },
+    { monthsAgo: 10, total_assets: 884000, total_debts: 655000, net_worth: 229000 },
+    { monthsAgo: 9, total_assets:  887500, total_debts: 654500, net_worth: 233000 },
+    { monthsAgo: 8, total_assets:  890500, total_debts: 654000, net_worth: 236500 },
+    { monthsAgo: 7, total_assets:  893000, total_debts: 653500, net_worth: 239500 },
+    { monthsAgo: 6, total_assets:  895500, total_debts: 653000, net_worth: 242500 },
+    { monthsAgo: 5, total_assets:  897000, total_debts: 652500, net_worth: 244500 },
+    { monthsAgo: 4, total_assets:  899000, total_debts: 652200, net_worth: 246800 },
+    { monthsAgo: 3, total_assets:  900500, total_debts: 652000, net_worth: 248500 },
+    { monthsAgo: 2, total_assets:  901500, total_debts: 651700, net_worth: 249800 },
+    { monthsAgo: 1, total_assets:  903000, total_debts: 653500, net_worth: 249500 },
+    { monthsAgo: 0, total_assets:  904000, total_debts: 654000, net_worth: 250000 },
+  ],
+  valuations: [
+    // DEGIRO portefeuille: 14 maandelijkse snapshots (€142K → €170K)
+    { assetName: 'Beleggingsrekening DEGIRO', entity_type: 'asset', monthsAgo: 14, value: 142000 },
+    { assetName: 'Beleggingsrekening DEGIRO', entity_type: 'asset', monthsAgo: 12, value: 148000 },
+    { assetName: 'Beleggingsrekening DEGIRO', entity_type: 'asset', monthsAgo: 10, value: 152000 },
+    { assetName: 'Beleggingsrekening DEGIRO', entity_type: 'asset', monthsAgo: 8, value: 157000 },
+    { assetName: 'Beleggingsrekening DEGIRO', entity_type: 'asset', monthsAgo: 6, value: 160000 },
+    { assetName: 'Beleggingsrekening DEGIRO', entity_type: 'asset', monthsAgo: 4, value: 163000 },
+    { assetName: 'Beleggingsrekening DEGIRO', entity_type: 'asset', monthsAgo: 2, value: 166000 },
+    { assetName: 'Beleggingsrekening DEGIRO', entity_type: 'asset', monthsAgo: 0, value: 170000 },
+    // Woning: 4 kwartaalwaarderingen (€635K → €650K)
+    { assetName: 'Eigen woning', entity_type: 'asset', monthsAgo: 12, value: 635000 },
+    { assetName: 'Eigen woning', entity_type: 'asset', monthsAgo: 9, value: 640000 },
+    { assetName: 'Eigen woning', entity_type: 'asset', monthsAgo: 6, value: 645000 },
+    { assetName: 'Eigen woning', entity_type: 'asset', monthsAgo: 0, value: 650000 },
+  ],
+  holdings: [
+    {
+      assetName: 'Beleggingsrekening DEGIRO',
+      ticker: null,
+      isin: 'NL0011225305',
+      name: 'Northern Trust World Custom ESG Index',
+      units: 950,
+      avg_purchase_price: 136,
+      current_price: 178.95,
+      purchase_date_monthsAgo: 36,
+      transactions: [
+        { type: 'buy', units: 300, price_per_unit: 128.00, total_amount: 38400, monthsAgo: 36, notes: 'Eerste grote inleg' },
+        { type: 'buy', units: 200, price_per_unit: 132.00, total_amount: 26400, monthsAgo: 30, notes: null },
+        { type: 'buy', units: 150, price_per_unit: 138.00, total_amount: 20700, monthsAgo: 24, notes: null },
+        { type: 'buy', units: 100, price_per_unit: 142.00, total_amount: 14200, monthsAgo: 18, notes: null },
+        { type: 'buy', units: 100, price_per_unit: 148.00, total_amount: 14800, monthsAgo: 12, notes: null },
+        { type: 'buy', units: 100, price_per_unit: 155.00, total_amount: 15500, monthsAgo: 6, notes: 'Maandelijkse inleg opgehoogd' },
+        { type: 'dividend', units: 0, price_per_unit: 0, total_amount: 1200, monthsAgo: 9, notes: 'Halfjaarlijks dividend' },
+        { type: 'dividend', units: 0, price_per_unit: 0, total_amount: 1350, monthsAgo: 3, notes: 'Halfjaarlijks dividend' },
+      ],
+    },
+  ],
+}
+
+// ══════════════════════════════════════════════════════════════
 // Export
 // ══════════════════════════════════════════════════════════════
 
@@ -1277,6 +1564,7 @@ export const PERSONAS: Record<PersonaKey, PersonaData> = {
   daan: daanData,
   lisa: lisaData,
   willem: willemData,
+  rashid: rashidData,
 }
 
-export const PERSONA_KEYS: PersonaKey[] = ['roos', 'daan', 'lisa', 'willem']
+export const PERSONA_KEYS: PersonaKey[] = ['roos', 'daan', 'lisa', 'willem', 'rashid']

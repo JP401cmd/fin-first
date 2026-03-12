@@ -224,21 +224,43 @@ export default function WhatIfPage() {
     if (!input || !overrides || !baseline) return null
 
     // Apply income from slider, adjusted proportionally by work days (5 = full-time)
-    const adjustedIncome = overrides.monthlyIncome * (overrides.workDaysPerWeek / 5)
+    const effectiveIncome = overrides.monthlyIncome * (overrides.workDaysPerWeek / 5)
+    const baselineEffectiveIncome = baseline.monthlyIncome * (baseline.workDaysPerWeek / 5)
 
-    // Apply savings rate to derive expenses
-    const adjustedExpenses = adjustedIncome * (1 - overrides.savingsRate / 100)
+    // Savings rate changes adjust expenses on BASELINE income (lifestyle adjustment)
+    // Income changes do NOT affect expenses — all extra income goes 1:1 to savings
+    const savingsRateExpenseDelta = baselineEffectiveIncome * ((overrides.savingsRate - baseline.savingsRate) / 100)
+    const adjustedExpenses = Math.max(0, input.monthlyExpenses - savingsRateExpenseDelta)
 
     // Monthly contributions = base + extra
     const adjustedContributions = input.monthlyContributions + overrides.extraContribution
 
     return {
       ...input,
-      monthlyIncome: adjustedIncome,
+      monthlyIncome: effectiveIncome,
       monthlyExpenses: adjustedExpenses,
       monthlyContributions: adjustedContributions,
       expectedReturn: overrides.expectedReturn / 100,
     }
+  }, [input, overrides, baseline])
+
+  // ── Delta-based annual savings (matches horizon at entry) ──
+  const whatIfAnnualSavings_sim = useMemo(() => {
+    if (!input || !overrides || !baseline) return 0
+    const baseAnnualSavings = (input.monthlyContributions ?? 0) * 12
+    const effectiveIncome = overrides.monthlyIncome * (overrides.workDaysPerWeek / 5)
+    const baselineEffectiveIncome = baseline.monthlyIncome * (baseline.workDaysPerWeek / 5)
+
+    // 1. Income delta: ALL extra income → savings (1:1)
+    const incomeDelta = effectiveIncome - baselineEffectiveIncome
+
+    // 2. Savings rate delta: applied to BASELINE income (lifestyle adjustment)
+    const savingsRateDelta = baselineEffectiveIncome * ((overrides.savingsRate - baseline.savingsRate) / 100)
+
+    // 3. Extra monthly contribution
+    const extraDelta = overrides.extraContribution ?? 0
+
+    return Math.max(0, baseAnnualSavings + (incomeDelta + savingsRateDelta + extraDelta) * 12)
   }, [input, overrides, baseline])
 
   // ── Run baseline simulation ──────────────────────────────
@@ -283,9 +305,8 @@ export default function WhatIfPage() {
     const yearlyExpenses = whatIfInput.yearlyMustExpenses > 0 ? whatIfInput.yearlyMustExpenses : 0
     if (yearlyExpenses <= 0) return null
 
-    // Use what-if savings: income adjusted by sliders
-    const adjustedSavings = (whatIfInput.monthlyIncome - whatIfInput.monthlyExpenses) * 12
-    const annualSavings = Math.max(0, adjustedSavings) + (overrides?.extraContribution ?? 0) * 12
+    // Delta-based savings: identical to horizon at entry, continuous delta on slider change
+    const annualSavings = whatIfAnnualSavings_sim
     const grossReturn = whatIfInput.expectedReturn ?? userGrossReturn
     const strategyForSim = fireStrategy ?? { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 }
     const cashflows = lifeEventsToCashflows(activeEvents)
@@ -304,7 +325,7 @@ export default function WhatIfPage() {
     )
 
     return { result, cashflows }
-  }, [whatIfInput, activeEvents, fireStrategy, overrides?.extraContribution, userGrossReturn, userInflation])
+  }, [whatIfInput, activeEvents, fireStrategy, whatIfAnnualSavings_sim, userGrossReturn, userInflation])
 
   // ── Impact computation (per-event FIRE delta) ──────────────
   const computeImpact = useCallback((eventId: string) => {
@@ -320,8 +341,7 @@ export default function WhatIfPage() {
     const yearlyExpenses = whatIfInput.yearlyMustExpenses > 0 ? whatIfInput.yearlyMustExpenses : 0
     if (yearlyExpenses <= 0) return null
 
-    const adjustedSavings = (whatIfInput.monthlyIncome - whatIfInput.monthlyExpenses) * 12
-    const annualSavings = Math.max(0, adjustedSavings) + (overrides?.extraContribution ?? 0) * 12
+    const annualSavings = whatIfAnnualSavings_sim
     const grossReturn = whatIfInput.expectedReturn ?? userGrossReturn
     const strategyForSim = fireStrategy ?? { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 }
 
@@ -353,7 +373,7 @@ export default function WhatIfPage() {
     }
 
     return { event, fireAgeWith, fireAgeWithout, deltaMonths, totalCost }
-  }, [whatIfInput, events, activeEvents, fireStrategy, overrides?.extraContribution, userGrossReturn, userInflation])
+  }, [whatIfInput, events, activeEvents, fireStrategy, whatIfAnnualSavings_sim, userGrossReturn, userInflation])
 
   // ── Derived values for display ───────────────────────────
   const currentAge = input?.dateOfBirth ? ageAtDate(input.dateOfBirth) : null
@@ -364,12 +384,8 @@ export default function WhatIfPage() {
     : null
 
   // Annual savings for scenario summary
-  const whatIfAnnualSavings = whatIfInput
-    ? Math.max(0, (whatIfInput.monthlyIncome - whatIfInput.monthlyExpenses) * 12) + (overrides?.extraContribution ?? 0) * 12
-    : 0
-  const baselineAnnualSavings = input
-    ? Math.max(0, (input.monthlyIncome - input.monthlyExpenses) * 12)
-    : 0
+  const whatIfAnnualSavings = whatIfAnnualSavings_sim
+  const baselineAnnualSavings = (input?.monthlyContributions ?? 0) * 12
 
   // ── Scenario key for SimChart animation replay ─────────
   const scenarioKey = useMemo(() => {
@@ -566,7 +582,7 @@ export default function WhatIfPage() {
                 targetEndPortfolio={simResult.targetEndPortfolio}
                 baselineRows={baselineSim?.result.rows}
                 baselineFireAge={baselineFireAge}
-                dailyExpenseRate={whatIfInput ? whatIfInput.monthlyExpenses / 30 : undefined}
+                dailyExpenseRate={input ? input.yearlyMustExpenses / 365 : undefined}
               />
               {events.length > 0 && (
                 <EventsTimeline

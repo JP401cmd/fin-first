@@ -174,6 +174,93 @@ You: I'll create that feature now.
 [calls feature_create with appropriate parameters]
 You: Done! I've added "S3 Sync Integration" to your backlog. It's now visible on the kanban board.
 
+## AI Background Generation Pattern — Progressive Loading
+
+All AI-powered endpoints use a **fire-and-forget background generation + polling** pattern with **incremental item delivery**. Items appear on screen as soon as they're individually ready — the client does NOT wait for the full batch.
+
+### Server-side (API route)
+
+```
+Module-level Maps (survive across requests within the same process):
+- activeGenerations/activeCompositions: Map<userId, StateObject>
+  StateObject: { items/cards: [], complete: boolean, startedAt, ... }
+- generationErrors/compositionErrors: Map<userId, errorMessage>
+
+Flow:
+1. Auth + validate request
+2. Cleanup stale entries (>2 min) + completed results (>5 min for briefing)
+3. If generation running:
+   - If complete → return final items (news: delete from Map; briefing: keep for TTL)
+   - If incomplete → return { status: 'generating'/'composing', items: [...partial...] }
+4. If error from previous run → return error, clear entry
+5. If cached result → return items
+6. Prepare context synchronously (sanitize, load model) — errors returned directly
+7. Create state object, store in Map
+8. Start generation as fire-and-forget async IIFE:
+   - News: streamObject({ output: 'array' }) + elementStream → push each item to state
+   - Briefing: streamText + fullStream → push each tool-call card to state
+9. Return { status: 'generating'/'composing', items: [] } immediately
+
+Key: the state object is a mutable reference — background IIFE pushes items,
+GET handler reads the same object. No race conditions because Node.js is single-threaded
+between await points.
+```
+
+**News specifics:**
+- Uses `streamObject` with `output: 'array'` + `elementStream` (NOT `generateObject`)
+- Each element is PII-filtered as it arrives
+- `state.complete = true` after stream ends, then cache to DB
+
+**Briefing specifics:**
+- Uses `streamText` with tool calls; each `tool-call` part becomes a card
+- Per-card: `maskPIIInObject` + `validateCardHrefs` applied immediately
+- `validateBriefingLayout` runs ONCE at the end (reorders rows, needs all cards)
+- Completed state stays in Map for `RESULT_TTL_MS` (5 min) for poll pickup
+
+### Client-side (React component)
+
+```
+State: generating/polling (boolean)
+
+Flow:
+1. Check local cache (sessionStorage/localStorage) → render if fresh
+2. POST/GET to API → if { status: 'generating'/'composing' }, set polling=true
+3. useEffect polls GET every 2.5s while polling is true
+4. Each poll: if partial items arrived → setItems(data.items), render immediately
+5. When complete (no status field / type: 'done') → final setItems, stop polling, cache
+6. React key reconciliation ensures existing items don't re-animate
+
+Navigate-away resilience:
+- Server generation continues regardless of client connection
+- On return: local cache may be populated → instant render
+- If still generating: polling resumes, picks up partial or complete items
+```
+
+### Stagger animation
+
+CSS `@keyframes` + per-item `animation-delay` — always active (not gated by state):
+- News: `news-reveal` keyframes always in DOM, 120ms delay per item index
+- Briefing: built-in `--stagger` CSS variable in BriefingCardGrid (80ms per card)
+
+New items entering the DOM get their entrance animation automatically.
+Existing items (already rendered) are not affected thanks to React's stable key reconciliation.
+
+### Currently applied in
+
+| Endpoint | Server | Client |
+|----------|--------|--------|
+| News | `app/api/news/route.ts` | `components/berichten/berichten-client.tsx` |
+| Briefing | `app/api/briefing/compose/route.ts` | `components/daishboard/daishboard.tsx` |
+
+### When building new AI endpoints
+
+1. Use module-level `Map`s with state objects (not just timestamps) for generation state
+2. Never block the HTTP response on AI completion
+3. Push items to the state object incrementally as they stream in
+4. Client polls GET endpoint; each poll returns current partial items
+5. Always include error tracking (`generationErrors` Map) + stale cleanup (2 min timeout)
+6. Use always-on CSS `@keyframes` animation — React key reconciliation handles the rest
+
 ## Guidelines
 
 1. Be concise and helpful

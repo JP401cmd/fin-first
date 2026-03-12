@@ -23,13 +23,13 @@ export async function buildBudgetInsightsContext(supabase: SupabaseClient): Prom
       .order('sort_order', { ascending: true }),
     supabase
       .from('transactions')
-      .select('budget_id, amount, is_income')
+      .select('budget_id, amount, is_income, transaction_type')
       .gte('date', monthStart)
       .lte('date', monthEnd)
       .not('budget_id', 'is', null),
     supabase
       .from('transactions')
-      .select('budget_id, amount, date, is_income')
+      .select('budget_id, amount, date, is_income, transaction_type')
       .gte('date', twelveMonthsAgo)
       .lte('date', monthEnd)
       .not('budget_id', 'is', null),
@@ -39,7 +39,7 @@ export async function buildBudgetInsightsContext(supabase: SupabaseClient): Prom
       .eq('year', now.getFullYear()),
     supabase
       .from('transactions')
-      .select('amount')
+      .select('amount, transaction_type')
       .eq('is_income', true)
       .gte('date', threeMonthsAgo)
       .lte('date', monthEnd),
@@ -59,24 +59,28 @@ export async function buildBudgetInsightsContext(supabase: SupabaseClient): Prom
 
   if (budgets.length === 0) return ''
 
+  // Filter out own-account transfers
+  const isRealTx = (t: { transaction_type?: string | null }) =>
+    t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
+
   // Build spending maps
   const currentSpending: Record<string, number> = {}
   for (const t of currentTx) {
-    if (!t.budget_id || t.is_income) continue
+    if (!t.budget_id || t.is_income || !isRealTx(t)) continue
     currentSpending[t.budget_id] = (currentSpending[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
   }
 
   // Build 12-month average spending per budget
   const historicalByBudget: Record<string, number[]> = {}
   for (const t of historicalTx) {
-    if (!t.budget_id || t.is_income) continue
+    if (!t.budget_id || t.is_income || !isRealTx(t)) continue
     if (!historicalByBudget[t.budget_id]) historicalByBudget[t.budget_id] = []
     historicalByBudget[t.budget_id].push(Math.abs(Number(t.amount)))
   }
   // Group by month per budget to get monthly totals
   const monthlyByBudget: Record<string, Record<string, number>> = {}
   for (const t of historicalTx) {
-    if (!t.budget_id || t.is_income) continue
+    if (!t.budget_id || t.is_income || !isRealTx(t)) continue
     const month = t.date.slice(0, 7)
     if (!monthlyByBudget[t.budget_id]) monthlyByBudget[t.budget_id] = {}
     monthlyByBudget[t.budget_id][month] = (monthlyByBudget[t.budget_id][month] ?? 0) + Math.abs(Number(t.amount))
@@ -95,7 +99,7 @@ export async function buildBudgetInsightsContext(supabase: SupabaseClient): Prom
 
   // Calculate daily expense rate from 12 months of expense transactions
   const totalExpenses = historicalTx
-    .filter(t => !t.is_income)
+    .filter(t => !t.is_income && isRealTx(t))
     .reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
   const distinctMonths = new Set(historicalTx.map(t => t.date.slice(0, 7))).size
   const avgMonthlyExpenses = distinctMonths > 0 ? totalExpenses / distinctMonths : 0
@@ -210,8 +214,9 @@ export async function buildBudgetInsightsContext(supabase: SupabaseClient): Prom
   }
 
   // === 10.5: Dekkingsgraad waarschuwing ===
-  const avgMonthlyIncome = incomeTx.length > 0
-    ? incomeTx.reduce((s, t) => s + Math.abs(Number(t.amount)), 0) / 3
+  const realIncomeTx = incomeTx.filter(isRealTx)
+  const avgMonthlyIncome = realIncomeTx.length > 0
+    ? realIncomeTx.reduce((s, t) => s + Math.abs(Number(t.amount)), 0) / 3
     : 0
   if (avgMonthlyIncome > 0) {
     const totalAllocated = childBudgets

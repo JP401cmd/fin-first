@@ -29,10 +29,13 @@ function monthsAgoDate(months: number): string {
 // ── Helper: delete from table ─────────────────────────────────
 
 async function deleteTable(supabase: SupabaseClient, table: string, userId: string): Promise<number> {
-  const { count } = await supabase
+  const { count, error } = await supabase
     .from(table)
     .delete({ count: 'exact' })
     .eq('user_id', userId)
+  if (error) {
+    console.warn(`[seed] Delete from ${table} failed: ${error.message}`)
+  }
   return count ?? 0
 }
 
@@ -109,6 +112,15 @@ export async function deleteAllUserData(
   }
   onProgress?.('Transacties & acties verwijderen...', 'batch2', 'delete', batch2Results.reduce((a, b) => a + b, 0))
 
+  // Batch 2b: Bank connection tables (FK chain: bank_sync_log → bank_connection_accounts → bank_connections/bank_accounts)
+  // Must be deleted before bank_accounts (batch 3) because bank_connection_accounts.bank_account_id has ON DELETE NO ACTION
+  const syncLogResult = await deleteTable(supabase, 'bank_sync_log', userId)
+  summary.bank_sync_log = syncLogResult
+  const connAccountsResult = await deleteTable(supabase, 'bank_connection_accounts', userId)
+  summary.bank_connection_accounts = connAccountsResult
+  const connectionsResult = await deleteTable(supabase, 'bank_connections', userId)
+  summary.bank_connections = connectionsResult
+
   // Batch 3: parent tables
   const batch3Results = await Promise.all([
     deleteTable(supabase, 'recommendations', userId),
@@ -121,7 +133,8 @@ export async function deleteAllUserData(
   for (let i = 0; i < batch3Tables.length; i++) {
     summary[batch3Tables[i]] = batch3Results[i]
   }
-  onProgress?.('Hoofdtabellen verwijderen...', 'batch3', 'delete', batch3Results.reduce((a, b) => a + b, 0))
+  onProgress?.('Hoofdtabellen verwijderen...', 'batch3', 'delete',
+    syncLogResult + connAccountsResult + connectionsResult + batch3Results.reduce((a, b) => a + b, 0))
 
   return summary
 }
@@ -140,24 +153,70 @@ export async function seedPersonaData(
 
   // ── Profile (quick, do first) ───────────────────────────────
 
+  const profileData: Record<string, unknown> = {
+    id: userId,
+    full_name: persona.profile.full_name,
+    date_of_birth: persona.profile.date_of_birth,
+    household_type: persona.profile.household_type,
+    temporal_balance: persona.profile.temporal_balance,
+    updated_at: new Date().toISOString(),
+  }
+
+  // FIRE parameters (optional, per-persona)
+  if (persona.profile.expected_return != null) profileData.expected_return = persona.profile.expected_return
+  if (persona.profile.inflation_rate != null) profileData.inflation_rate = persona.profile.inflation_rate
+  if (persona.profile.fire_end_strategy) profileData.fire_end_strategy = persona.profile.fire_end_strategy
+  if (persona.profile.fire_end_age != null) profileData.fire_end_age = persona.profile.fire_end_age
+  if (persona.profile.fire_legacy_amount != null) profileData.fire_legacy_amount = persona.profile.fire_legacy_amount
+  if (persona.profile.retirement_expense_method) profileData.retirement_expense_method = persona.profile.retirement_expense_method
+  if (persona.profile.retirement_expense_custom_amount != null) profileData.retirement_expense_custom_amount = persona.profile.retirement_expense_custom_amount
+
+  // Widget dashboard preferences (optional, per-persona)
+  if (persona.profile.widget_prefs) profileData.widget_prefs = persona.profile.widget_prefs
+
   const { error: profileError } = await supabase
     .from('profiles')
-    .upsert({
-      id: userId,
-      full_name: persona.profile.full_name,
-      date_of_birth: persona.profile.date_of_birth,
-      household_type: persona.profile.household_type,
-      temporal_balance: persona.profile.temporal_balance,
-      updated_at: new Date().toISOString(),
-    })
+    .upsert(profileData)
   if (profileError) throw new Error(`Profiel update mislukt: ${profileError.message}`)
   summary.profiles = 1
 
-  // ── Phase 1: Independent inserts (parallel) ─────────────────
+  // ── Phase 1a: Cash assets first (bank_accounts need their IDs) ──
 
-  const accountRows = persona.bank_accounts.map((a) => ({
+  const cashAssetRows = persona.bank_accounts.map((ba) => ({
+    user_id: userId,
+    name: ba.name,
+    asset_type: 'cash' as const,
+    current_value: ba.balance,
+    purchase_value: ba.balance,
+    expected_return: 0,
+    monthly_contribution: 0,
+    institution: ba.bank_name,
+    account_number: ba.iban,
+    is_active: ba.is_active,
+    sort_order: ba.sort_order,
+    ownership: 'personal',
+    net_worth_inclusion_pct: 100,
+    is_liquid: true,
+    subtype: ba.account_type,
+    has_budget_tracking: true,
+  }))
+
+  let cashAssetIds: string[] = []
+  if (cashAssetRows.length > 0) {
+    const { data: cashAssets, error: cashErr } = await supabase
+      .from('assets')
+      .insert(cashAssetRows)
+      .select('id')
+    if (cashErr) throw new Error(`Cash assets insert mislukt: ${cashErr.message}`)
+    cashAssetIds = (cashAssets ?? []).map((a) => a.id)
+  }
+
+  // ── Phase 1b: Independent inserts (parallel) ─────────────────
+
+  const accountRows = persona.bank_accounts.map((a, i) => ({
     user_id: userId,
     ...a,
+    linked_asset_id: cashAssetIds[i] ?? null,
   }))
 
   const assetRows = persona.assets.map((a, i) => ({
@@ -243,7 +302,7 @@ export async function seedPersonaData(
   const primaryAccountId = insertedAccounts?.[0]?.id
 
   summary.bank_accounts = insertedAccounts?.length ?? 0
-  summary.assets = insertedAssets?.length ?? 0
+  summary.assets = (insertedAssets?.length ?? 0) + cashAssetIds.length
   summary.goals = goalsResult.data?.length ?? 0
   summary.life_events = eventsResult.data?.length ?? 0
   summary.net_worth_snapshots = snapshotsResult.data?.length ?? 0

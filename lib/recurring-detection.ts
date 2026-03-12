@@ -370,6 +370,7 @@ export interface TransactionForDetection {
   counterparty_name: string | null
   is_income: boolean
   budget_id: string | null
+  transaction_type?: string | null
 }
 
 /**
@@ -386,10 +387,16 @@ export function detectRecurringTransactions(
 ): DetectedRecurring[] {
   if (transactions.length < 3) return []
 
+  // Filter out own-account transfers — they're not recurring expenses/income
+  const filtered = transactions.filter(
+    t => t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
+  )
+  if (filtered.length < 3) return []
+
   // Step 1: Group by normalized counterparty name
   const groups = new Map<string, TransactionForDetection[]>()
 
-  for (const tx of transactions) {
+  for (const tx of filtered) {
     const name = tx.counterparty_name || tx.description
     if (!name || name.trim().length < 2) continue
 

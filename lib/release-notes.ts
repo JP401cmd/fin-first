@@ -44,6 +44,159 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'fin_prod_0.84',
+    date: '2026-03-12',
+    title:
+      'Vermogensprognose per bucket, nieuwsarchief, eigen-overboekingenfilter & vereenvoudigde onboarding',
+    sections: [
+      {
+        module: 'De Kern — Vermogen & Cash',
+        color: 'amber',
+        items: [
+          {
+            title: 'Vermogensprognose per vermogenscategorie met Box 3',
+            description:
+              'Nieuw gestapeld-areagrafiek op de Kern-pagina: vermogen uitgesplitst per assettype (spaargeld, beleggingen, vastgoed) met individuele rendementen, schuldaflosschema\'s en maandelijkse Box 3-belastingdruk. Inclusief detailtabel met aannames, kosten en mijlpalen.',
+          },
+          {
+            title: 'Spaarquote kassabon met categorieën',
+            description:
+              'De spaarquote in de hero-sectie is nu klikbaar en opent een kassabon met uitsplitsing per budgettype (uitgaven, sparen, aflossingen) over 6 maanden, inclusief iconen en kleuren.',
+          },
+          {
+            title: 'Eigen overboekingen uitgefilterd',
+            description:
+              'Transacties met type \'transfer\' of \'joint_transfer\' worden nu overal uitgefilterd uit inkomen/uitgaven-berekeningen: dashboard, budgetten, spaarquote, AI-context, notificaties en abonnementsherkenning.',
+          },
+          {
+            title: 'Batch-beoordeling van overboekingen',
+            description:
+              'De TransferConfirmSheet verwerkt nu een lijst transacties achter elkaar. Nieuwe optie "Nee, echte uitgave" leidt naar budgetselectie met opslaan van categorisatieregel voor toekomstige transacties.',
+          },
+          {
+            title: 'Automatische transfer-pair linking na import',
+            description:
+              'Na bankimport worden ongelinkte transfers automatisch gekoppeld op basis van bedrag (tegengesteld teken), datum (±1 dag) en IBAN-kruismatch.',
+          },
+          {
+            title: 'Bankconnectiestatus per rekening',
+            description:
+              'Op de individuele rekeningpagina wordt de TrueLayer-connectiestatus nu gefilterd op de betreffende rekening. Niet-gekoppelde rekeningen tonen een duidelijke status met directe link naar Bank Connect.',
+          },
+          {
+            title: 'Interactieve hover op missiekaarten',
+            description:
+              'De vier missiekaarten (budgetten, cash, assets, schulden) hebben nu klikbare regelitems met hover-feedback. Kaarten omgezet van button naar div voor correcte geneste klikacties.',
+          },
+        ],
+      },
+      {
+        module: 'De Horizon — Projecties & Scenario\'s',
+        color: 'purple',
+        items: [
+          {
+            title: 'Realistischer What-If spaarmodel',
+            description:
+              'Het What-If-model werkt nu delta-gebaseerd: extra inkomen boven het basisinkomen gaat 1:1 naar sparen, terwijl de spaarquote-slider alleen de levensstandaard aanpast op het basisinkomen. Geeft realistischere scenario\'s bij parttime of loonsverhoging.',
+          },
+          {
+            title: 'Bankrekeningen in Horizon-vermogen',
+            description:
+              'Ongelinkte bankrekeningen worden nu meegeteld in het totale vermogen op de Horizon-pagina, zodat cashposities niet meer ontbreken in FIRE-berekeningen.',
+          },
+          {
+            title: 'Foutafhandeling levensgebeurtenissen',
+            description:
+              'Bij het opslaan, bijwerken of verwijderen van levensgebeurtenissen worden database-fouten nu afgevangen en als leesbare foutmelding in het formulier getoond.',
+          },
+          {
+            title: 'Horizon-notificaties',
+            description:
+              'Drie FIRE-aandachtspunten als notificatie: ontbrekende geboortedatum, openstaande schulden en FIRE niet haalbaar bij huidige koers. Met directe links naar de relevante pagina.',
+          },
+        ],
+      },
+      {
+        module: 'Berichten — Nieuwssysteem',
+        color: 'rose',
+        items: [
+          {
+            title: 'Progressieve nieuwsgeneratie',
+            description:
+              'De News API is omgebouwd naar streamObject met elementStream: artikelen verschijnen op het scherm zodra ze individueel klaar zijn via polling elke 2,5 seconde, met staggered reveal-animatie.',
+          },
+          {
+            title: 'Nieuwsarchief met edities',
+            description:
+              'Bij elke verversing wordt de huidige editie gearchiveerd met editienummer en jaargang. Nieuwe tab "Archief" toont eerdere edities met overzichtskaart per editie.',
+          },
+          {
+            title: 'Direct vs. relevant impacttype',
+            description:
+              'Nieuwsitems hebben nu een impactType-veld: \'direct\' voor artikelen met concrete euro-bedragen of vrijheidstijd, en \'relevant\' voor achtergrondartikelen. Direct-impact komt eerst.',
+          },
+          {
+            title: 'Verversingslimieten',
+            description:
+              'Instelbaar maximum (standaard 3 per week) voor nieuwsverversingen. Resterende verversingen worden getoond naast de ververs-knop. Configureerbaar via beheer.',
+          },
+          {
+            title: 'Deduplicatie van nieuwskoppen',
+            description:
+              'Koppen van de afgelopen 2 maanden worden meegegeven aan het AI-model om herhaling van dezelfde onderwerpen te voorkomen.',
+          },
+          {
+            title: 'Masthead met jaargang en editienummer',
+            description:
+              'De krantenkop toont nu het werkelijke editienummer en jaargang uit de database. Nieuwscomponenten zijn opgesplitst in aparte bestanden (Masthead, Footer, HeroArticle, etc.).',
+          },
+        ],
+      },
+      {
+        module: 'Dashboard — AI Briefing',
+        color: 'blue',
+        items: [
+          {
+            title: 'Briefing via achtergrondgeneratie',
+            description:
+              'De briefing compose API is omgebouwd van SSE-streaming naar fire-and-forget + polling. Kaarten verschijnen progressief via polling elke 2,5 seconde. Resilient tegen navigatie en verbindingsverlies.',
+          },
+          {
+            title: 'Chat-deduplicatie bij navigatie',
+            description:
+              'Deduplicatiefilter op chatberichten voorkomt dat de useChat-store tijdelijke duplicaten toont bij snelle paginatransities.',
+          },
+        ],
+      },
+      {
+        module: 'Platform — Instellingen & Onboarding',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Box 3-berekeningsmethode als instelling',
+            description:
+              'Keuze tussen forfaitair rendement (wettelijk fictief) en werkelijk rendement per asset in Instellingen. Doorgespeeld naar FIRE-parameters en de vermogensprognose-engine.',
+          },
+          {
+            title: 'Onboarding vereenvoudigd naar 1 stap',
+            description:
+              'Van 5 stappen naar 1: kies maximaal 2 focusgebieden (budgetten, vermogen, FIRE, doelen, of totaaloverzicht). Dashboard wordt automatisch samengesteld.',
+          },
+          {
+            title: 'Admin-pagina voor AI Features',
+            description:
+              'Nieuwe beheer-sectie voor AI-instellingen zoals nieuwsverversingslimieten, bereikbaar via /beheer/ai-features.',
+          },
+          {
+            title: 'Vijfde testpersona: Rashid "De Genieter"',
+            description:
+              'Nieuwe persona voor check-in gebaseerd gebruik. Alle persona\'s verrijkt met FIRE-parameters, widget-voorkeuren en realistischere transactiepatronen. Data-wissen handelt nu ook banksync-tabellen af.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: 'fin_prod_0.83',
     date: '2026-03-11',
     title:

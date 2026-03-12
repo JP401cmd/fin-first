@@ -57,20 +57,24 @@ export async function buildRecommendationContext(supabase: SupabaseClient): Prom
 
   const { data: transactions } = await supabase
     .from('transactions')
-    .select('budget_id, amount, date, is_income')
+    .select('budget_id, amount, date, is_income, transaction_type')
     .gte('date', getMonthsAgoDate(3))
 
   const { data: txForSubscriptions } = await supabase
     .from('transactions')
-    .select('id, date, amount, description, counterparty_name, is_income, budget_id')
+    .select('id, date, amount, description, counterparty_name, is_income, budget_id, transaction_type')
     .gte('date', getMonthsAgoDate(12))
     .order('date', { ascending: true })
+
+  // Filter out own-account transfers
+  const isRealTx = (t: { transaction_type?: string | null }) =>
+    t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
 
   if (budgets && transactions) {
     // Aggregate spending per budget over last 3 months
     const spendingMap = new Map<string, number>()
     for (const tx of transactions) {
-      if (tx.is_income || !tx.budget_id) continue
+      if (tx.is_income || !tx.budget_id || !isRealTx(tx)) continue
       const current = spendingMap.get(tx.budget_id) || 0
       spendingMap.set(tx.budget_id, current + Math.abs(Number(tx.amount)))
     }
@@ -182,6 +186,7 @@ export async function buildRecommendationContext(supabase: SupabaseClient): Prom
         counterparty_name: t.counterparty_name ?? null,
         is_income: t.is_income ?? false,
         budget_id: t.budget_id ?? null,
+        transaction_type: t.transaction_type ?? null,
       })),
       [],
       [],
@@ -215,7 +220,7 @@ export async function buildRecommendationContext(supabase: SupabaseClient): Prom
       let dailyExpense = 30 // default fallback
       if (transactions) {
         const totalSpent = transactions
-          .filter(t => !t.is_income)
+          .filter(t => !t.is_income && isRealTx(t))
           .reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
         const monthlyAvg = totalSpent / 3
         if (monthlyAvg > 0) dailyExpense = (monthlyAvg * 12) / 365

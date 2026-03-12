@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
-import type { BriefingCardSpec, BriefingComposeResponse, BriefingSSEEvent, TemporalContext, PreviousBriefingSummary, BriefingLongTermMemory, CardModule } from '@/lib/briefing/types'
+import type { BriefingCardSpec, BriefingComposeResponse, TemporalContext, PreviousBriefingSummary, BriefingLongTermMemory, CardModule } from '@/lib/briefing/types'
 import { condenseDashboardData } from '@/lib/briefing/condense'
 import { getVisitedFeaturesLocal } from '@/components/app/discover-carousel'
 import { logCardEngagement } from '@/lib/briefing/engagement'
@@ -157,37 +157,13 @@ function readCache(currentHash: string): BriefingComposeResponse | null {
   return null
 }
 
-/** Parse SSE text buffer into events, returns remaining unparsed text */
-function parseSSEBuffer(buffer: string, onEvent: (event: BriefingSSEEvent) => void): string {
-  const lines = buffer.split('\n')
-  let remaining = ''
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-
-    // If this is the last line and doesn't end with a newline, it's incomplete
-    if (i === lines.length - 1 && !buffer.endsWith('\n')) {
-      remaining = line
-      break
-    }
-
-    if (line.startsWith('data: ')) {
-      try {
-        const data = JSON.parse(line.slice(6)) as BriefingSSEEvent
-        onEvent(data)
-      } catch { /* malformed JSON, skip */ }
-    }
-  }
-
-  return remaining
-}
-
 export function DAIshboard({ data, temporal, userName, aiEnabled = true }: Props) {
   const [cards, setCards] = useState<BriefingCardSpec[]>([])
   const [composedAt, setComposedAt] = useState('')
   const [composing, setComposing] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [polling, setPolling] = useState(false)
   const controllerRef = useRef<AbortController | null>(null)
   const hasFetchedRef = useRef(false)
 
@@ -266,63 +242,23 @@ export function DAIshboard({ data, temporal, userName, aiEnabled = true }: Props
     })
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        if (!res.body) throw new Error('No response body')
+        const result = await res.json()
 
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-        const streamedCards: BriefingCardSpec[] = []
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          buffer += decoder.decode(value, { stream: true })
-          buffer = parseSSEBuffer(buffer, (event) => {
-            switch (event.type) {
-              case 'card':
-                streamedCards.push(event.spec)
-                setCards([...streamedCards])
-                break
-              case 'done':
-                setComposedAt(event.composedAt)
-                setComposing(false)
-                setRefreshing(false)
-                // Cache the complete response with data hash
-                try {
-                  const cacheData: CachedBriefing = {
-                    cards: streamedCards,
-                    composedAt: event.composedAt,
-                    source: 'ai',
-                    dataHash,
-                  }
-                  sessionStorage.setItem(CACHE_KEY, JSON.stringify(cacheData))
-                } catch { /* quota */ }
-                // Save briefing summary for next-briefing continuity
-                saveBriefingSummary(streamedCards, event.composedAt)
-                // Update long-term memory in localStorage
-                updateLongTermMemory(streamedCards, event.composedAt, data)
-                // Update seasonal snapshot for year-over-year comparisons
-                updateSeasonalSnapshot(temporal.month, temporal.year, data.monthlyExpenses ?? 0, data.monthlyIncome ?? 0)
-                break
-              case 'error':
-                setError(event.message)
-                setComposing(false)
-                setRefreshing(false)
-                break
-            }
-          })
+        if (result.status === 'composing') {
+          setPolling(true)
+          return
         }
 
-        // If stream ended without a done event, mark composing as false
-        if (streamedCards.length > 0) {
+        // Direct error from preparation phase
+        if (result.type === 'error' || result.error) {
+          setError(result.message ?? result.error ?? 'AI compositie mislukt')
           setComposing(false)
           setRefreshing(false)
         }
       })
       .catch(err => {
         if (err.name === 'AbortError') return
-        console.error('[DAIshboard] Stream failed:', err)
+        console.error('[DAIshboard] Compose request failed:', err)
         setError('Verbinding met Will mislukt. Probeer het opnieuw.')
         setComposing(false)
         setRefreshing(false)
@@ -344,14 +280,74 @@ export function DAIshboard({ data, temporal, userName, aiEnabled = true }: Props
     }
   }, [streamFromAI, aiEnabled])
 
+  // Poll for background composition — handles partial cards progressively
+  useEffect(() => {
+    if (!polling) return
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/briefing/compose')
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const result = await res.json()
+
+        if (result.status === 'composing') {
+          // Show partial cards as they arrive
+          if (result.cards?.length && result.cards.length > cards.length) {
+            setCards(result.cards)
+          }
+          return // Keep polling
+        }
+
+        if (result.type === 'done') {
+          // Final set (layout-validated, possibly reordered)
+          setCards(result.cards)
+          setComposedAt(result.composedAt)
+          setComposing(false)
+          setRefreshing(false)
+          setPolling(false)
+          // Cache the complete response with data hash
+          try {
+            const cacheData: CachedBriefing = {
+              cards: result.cards,
+              composedAt: result.composedAt,
+              source: 'ai',
+              dataHash,
+            }
+            sessionStorage.setItem(CACHE_KEY, JSON.stringify(cacheData))
+          } catch { /* quota */ }
+          // Save briefing summary for next-briefing continuity
+          saveBriefingSummary(result.cards, result.composedAt)
+          // Update long-term memory in localStorage
+          updateLongTermMemory(result.cards, result.composedAt, data)
+          // Update seasonal snapshot for year-over-year comparisons
+          updateSeasonalSnapshot(temporal.month, temporal.year, data.monthlyExpenses ?? 0, data.monthlyIncome ?? 0)
+        } else if (result.type === 'error') {
+          setError(result.message)
+          setComposing(false)
+          setRefreshing(false)
+          setPolling(false)
+        }
+      } catch (err) {
+        console.error('[DAIshboard] Poll failed:', err)
+        setError('Verbinding met Will mislukt. Probeer het opnieuw.')
+        setComposing(false)
+        setRefreshing(false)
+        setPolling(false)
+      }
+    }
+    const interval = setInterval(poll, 2500)
+    return () => clearInterval(interval)
+  }, [polling, data, dataHash, temporal, cards.length])
+
   const handleRefresh = useCallback(() => {
     try { sessionStorage.removeItem(CACHE_KEY) } catch { /* ignore */ }
+    setPolling(false)
     streamFromAI(true)
   }, [streamFromAI])
 
   const handleRetry = useCallback(() => {
     setError(null)
     setCards([])
+    setPolling(false)
     streamFromAI()
   }, [streamFromAI])
 

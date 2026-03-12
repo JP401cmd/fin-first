@@ -18,11 +18,13 @@
  *    Altijd gebruiken wanneer profiel beschikbaar is.
  */
 import { DEFAULT_RETURN, INFLATION, BOX3_DRAG } from '@/lib/horizon-data'
+import type { Box3Method } from './bucket-projection'
 
 export interface FireParams {
   grossReturn: number    // bijv. 0.07
   inflationRate: number  // bijv. 0.02
   effectiveSwr: number   // grossReturn - BOX3_DRAG - inflationRate
+  box3Method: Box3Method // 'forfaitair' | 'werkelijk'
 }
 
 /**
@@ -33,9 +35,11 @@ export interface FireParams {
 export function resolveFireParams(profile: {
   expected_return?: number | null
   inflation_rate?: number | null
+  box3_method?: string | null
 }): FireParams {
   const grossReturn = profile.expected_return ?? DEFAULT_RETURN
   const inflationRate = profile.inflation_rate ?? INFLATION
   const effectiveSwr = Math.max(0.001, grossReturn - BOX3_DRAG - inflationRate)
-  return { grossReturn, inflationRate, effectiveSwr }
+  const box3Method: Box3Method = (profile.box3_method === 'werkelijk') ? 'werkelijk' : 'forfaitair'
+  return { grossReturn, inflationRate, effectiveSwr, box3Method }
 }

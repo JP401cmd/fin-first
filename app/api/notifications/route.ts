@@ -13,6 +13,7 @@ export type NotificationType =
   | 'badge'
   | 'levelup'
   | 'partner_transaction'
+  | 'horizon'
 
 export type Notification = {
   id: string
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
     const defaultPrefs: Record<string, boolean> = {
       budget: true, streak: true, sync: true,
       recommendation: true, insight: true, badge: true, levelup: true,
-      partner_transaction: true,
+      partner_transaction: true, horizon: true,
     }
     const prefs: Record<string, boolean> = prefsRes.data?.value
       ? { ...defaultPrefs, ...JSON.parse(prefsRes.data.value) }
@@ -113,7 +114,7 @@ export async function GET(request: NextRequest) {
         .eq('user_id', user.id),
       supabase
         .from('transactions')
-        .select('budget_id, amount')
+        .select('budget_id, amount, transaction_type')
         .eq('user_id', user.id)
         .gte('date', monthStart.toISOString().split('T')[0])
         .lt('date', monthEnd.toISOString().split('T')[0])
@@ -163,7 +164,9 @@ export async function GET(request: NextRequest) {
 
       function getSpent(budgetId: string): number {
         return transactions
-          .filter((t) => t.budget_id === budgetId)
+          .filter((t) => t.budget_id === budgetId &&
+            (t as { transaction_type?: string | null }).transaction_type !== 'transfer' &&
+            (t as { transaction_type?: string | null }).transaction_type !== 'joint_transfer')
           .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
       }
 
@@ -365,7 +368,7 @@ export async function GET(request: NextRequest) {
             // Fetch recent partner transactions (last 7 days, shared or owned by partner)
             const { data: partnerTxs } = await supabase
               .from('transactions')
-              .select('id, description, amount, date, budget_id, ownership, is_income')
+              .select('id, description, amount, date, budget_id, ownership, is_income, transaction_type')
               .eq('user_id', partnerMember.user_id)
               .gte('date', cutoffDate.toISOString().split('T')[0])
               .order('date', { ascending: false })
@@ -374,19 +377,21 @@ export async function GET(request: NextRequest) {
             // Also get shared transactions by current user's partner
             const { data: sharedTxs } = await supabase
               .from('transactions')
-              .select('id, description, amount, date, budget_id, ownership, is_income')
+              .select('id, description, amount, date, budget_id, ownership, is_income, transaction_type')
               .eq('ownership', 'shared')
               .eq('user_id', partnerMember.user_id)
               .gte('date', cutoffDate.toISOString().split('T')[0])
               .order('date', { ascending: false })
               .limit(50)
 
-            // Merge and deduplicate
+            // Merge, deduplicate, and filter out own-account transfers
             const allPartnerTxs = [...(partnerTxs || []), ...(sharedTxs || [])]
             const seenTxIds = new Set<string>()
             const uniquePartnerTxs = allPartnerTxs.filter(tx => {
               if (seenTxIds.has(tx.id)) return false
               seenTxIds.add(tx.id)
+              const txType = (tx as { transaction_type?: string | null }).transaction_type
+              if (txType === 'transfer' || txType === 'joint_transfer') return false
               return true
             })
 
@@ -403,10 +408,13 @@ export async function GET(request: NextRequest) {
               }
             }
 
-            // Compute daily expenses for freedom time calculation
+            // Compute daily expenses for freedom time calculation (exclude transfers)
             const dailyExpenses = monthEnd && monthStart
               ? (() => {
                   const totalExpenses = (txRes.data ?? [])
+                    .filter(t =>
+                      (t as { transaction_type?: string | null }).transaction_type !== 'transfer' &&
+                      (t as { transaction_type?: string | null }).transaction_type !== 'joint_transfer')
                     .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
                   const daysInMonth = Math.ceil((monthEnd.getTime() - monthStart.getTime()) / 86_400_000)
                   return totalExpenses / Math.max(daysInMonth, 1)
@@ -489,6 +497,99 @@ export async function GET(request: NextRequest) {
     } catch (err) {
       console.error('Partner transaction notification error:', err)
       // Non-critical — continue without partner notifications
+    }
+
+    // ── 7. Horizon alerts (FIRE aandachtspunten) ─────────────────────
+
+    try {
+      const [profileRes, debtsRes, assetsRes] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('date_of_birth')
+          .eq('id', user.id)
+          .maybeSingle(),
+        supabase
+          .from('debts')
+          .select('current_balance')
+          .eq('is_active', true),
+        supabase
+          .from('assets')
+          .select('current_value')
+          .eq('user_id', user.id),
+      ])
+
+      const dateOfBirth = profileRes.data?.date_of_birth
+      const totalDebts = (debtsRes.data ?? []).reduce((sum, d) => sum + Math.abs(Number(d.current_balance ?? 0)), 0)
+      const totalAssets = (assetsRes.data ?? []).reduce((sum, a) => sum + Number(a.current_value ?? 0), 0)
+
+      // Alert: no date of birth set
+      if (!dateOfBirth) {
+        const id = 'horizon_no_dob'
+        notifications.push({
+          id,
+          type: 'horizon',
+          priority: 3,
+          title: 'Geboortedatum niet ingesteld',
+          description: 'Stel je geboortedatum in bij instellingen voor nauwkeurige leeftijds- en vrijheidsberekeningen.',
+          icon: 'Calendar',
+          color: 'amber',
+          createdAt: now,
+          read: readIds.includes(id),
+          actionUrl: '/identity/profiel',
+          aiContext: 'Ik heb mijn geboortedatum nog niet ingesteld. Waarom is dat belangrijk voor mijn FIRE-berekeningen?',
+        })
+      }
+
+      // Alert: has debts
+      if (totalDebts > 0) {
+        const id = 'horizon_has_debt'
+        const debtFormatted = totalDebts.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 })
+        notifications.push({
+          id,
+          type: 'horizon',
+          priority: 3,
+          title: `${debtFormatted} aan openstaande schulden`,
+          description: 'Schulden vertragen je pad naar volledige vrijheid. Bekijk je aflosstrategie.',
+          icon: 'TrendingDown',
+          color: 'purple',
+          createdAt: now,
+          read: readIds.includes(id),
+          actionUrl: '/core/debts',
+          aiContext: `Ik heb ${debtFormatted} aan schulden. Wat is de impact op mijn financiële vrijheid en hoe kan ik dit het beste aanpakken?`,
+        })
+      }
+
+      // Alert: FIRE not reachable (simple check: no monthly savings or net worth negative)
+      if (dateOfBirth) {
+        // Compute monthly income/expenses from budgets for a rough savings check
+        const monthlyIncome = (budgetsRes.data ?? [])
+          .filter(b => b.budget_type === 'income' && !b.parent_id)
+          .reduce((sum, b) => sum + Number(b.default_limit ?? 0), 0)
+        const monthlyExpenses = (budgetsRes.data ?? [])
+          .filter(b => b.budget_type === 'expense' && !b.parent_id)
+          .reduce((sum, b) => sum + Number(b.default_limit ?? 0), 0)
+        const monthlySavings = monthlyIncome - monthlyExpenses
+        const netWorth = totalAssets - totalDebts
+
+        if (monthlySavings <= 0 && netWorth < monthlyExpenses * 12 * 25) {
+          const id = 'horizon_fire_unreachable'
+          notifications.push({
+            id,
+            type: 'horizon',
+            priority: 2,
+            title: 'Volledige vrijheid niet haalbaar bij huidige koers',
+            description: 'Verhoog je spaarquote of verlaag je uitgaven om je pad naar financiële vrijheid te versnellen.',
+            icon: 'AlertTriangle',
+            color: 'red',
+            createdAt: now,
+            read: readIds.includes(id),
+            actionUrl: '/horizon',
+            aiContext: 'Mijn FIRE-doel is niet haalbaar bij mijn huidige inkomsten en uitgaven. Wat kan ik doen?',
+          })
+        }
+      }
+    } catch (err) {
+      console.error('Horizon notification error:', err)
     }
 
     // Sort by priority (lower = higher priority)

@@ -160,7 +160,7 @@ export function CashAccountView({
 
   // Transfer detection state
   const [ownIbans, setOwnIbans] = useState<Set<string>>(new Set())
-  const [confirmTransferTx, setConfirmTransferTx] = useState<Transaction | null>(null)
+  const [reviewTransferTxs, setReviewTransferTxs] = useState<Transaction[]>([])
 
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
@@ -333,11 +333,17 @@ export function CashAccountView({
       if (!enabled) return
 
       const supabase = createClient()
-      const { data } = await supabase
+      let query = supabase
         .from('bank_connection_accounts')
         .select('*, bank_connections(provider_name, provider_logo, token_expires_at, status)')
         .eq('is_active', true)
-        .order('iban', { ascending: true })
+
+      // Bij individuele rekening: toon alleen relevante connectie
+      if (accountId) {
+        query = query.eq('bank_account_id', accountId)
+      }
+
+      const { data } = await query.order('iban', { ascending: true })
 
       if (data) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -346,7 +352,7 @@ export function CashAccountView({
     } catch {
       // Silently fail — Bank Connect is optional
     }
-  }, [])
+  }, [accountId])
 
   const loadCashFlowForecast = useCallback(async () => {
     try {
@@ -945,13 +951,28 @@ export function CashAccountView({
                   onReauthorize={() => router.push('/core/cash/connect')}
                 />
               ))}
-              <Link
-                href="/core/cash/connect"
-                className="flex items-center justify-center gap-2 rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] px-4 py-3 text-sm font-medium text-[var(--ink-2)] transition-colors hover:border-kern-300 hover:bg-kern-50 hover:text-kern-700"
-              >
-                <Plus className="h-4 w-4" />
-                Bank koppelen
-              </Link>
+              {!isCombined && gcAccounts.length === 0 ? (
+                <div className="rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] px-4 py-6 text-center">
+                  <Link2 className="mx-auto mb-2 h-6 w-6 text-[var(--ink-4)]" />
+                  <p className="text-sm font-medium text-[var(--ink-2)]">Nog niet gekoppeld</p>
+                  <p className="mt-1 text-xs text-[var(--ink-3)]">Koppel deze rekening via TrueLayer om automatisch transacties te importeren.</p>
+                  <Link
+                    href="/core/cash/connect"
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-kern-700"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Bank koppelen
+                  </Link>
+                </div>
+              ) : (isCombined || gcAccounts.length > 0) && (
+                <Link
+                  href="/core/cash/connect"
+                  className="flex items-center justify-center gap-2 rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] px-4 py-3 text-sm font-medium text-[var(--ink-2)] transition-colors hover:border-kern-300 hover:bg-kern-50 hover:text-kern-700"
+                >
+                  <Plus className="h-4 w-4" />
+                  Bank koppelen
+                </Link>
+              )}
             </div>
           )}
         </section>
@@ -962,7 +983,9 @@ export function CashAccountView({
         const pendingTransfers = transactions.filter(
           (t) =>
             t.transaction_type !== 'transfer' &&
-            t.counterparty_iban &&
+            t.transaction_type !== 'joint_transfer' &&
+            !t.budget_id &&
+            !!t.counterparty_iban &&
             isOwnAccountTransfer(t.counterparty_iban, ownIbans)
         )
         if (pendingTransfers.length === 0) return null
@@ -970,10 +993,7 @@ export function CashAccountView({
           <div className="mt-3 sm:mt-6">
             <PendingTransferBanner
               count={pendingTransfers.length}
-              onReview={() => {
-                const first = pendingTransfers[0]
-                if (first) setConfirmTransferTx(first)
-              }}
+              onReview={() => setReviewTransferTxs(pendingTransfers)}
             />
           </div>
         )
@@ -1449,7 +1469,7 @@ export function CashAccountView({
                       const amount = Number(tx.amount)
                       const isPositive = amount > 0
                       const isTransfer = tx.transaction_type === 'transfer'
-                      const isPendingTransfer = !isTransfer && !!tx.counterparty_iban && isOwnAccountTransfer(tx.counterparty_iban, ownIbans)
+                      const isPendingTransfer = !isTransfer && tx.transaction_type !== 'joint_transfer' && !tx.budget_id && !!tx.counterparty_iban && isOwnAccountTransfer(tx.counterparty_iban, ownIbans)
                       const isSplitTx = !!tx.is_split
                       const isExpanded = expandedSplitId === tx.id
                       const loadedSplits = splitsByTxId[tx.id]
@@ -1459,7 +1479,7 @@ export function CashAccountView({
                         <div
                           onClick={() => {
                             if (isPendingTransfer) {
-                              setConfirmTransferTx(tx)
+                              setReviewTransferTxs([tx])
                             } else if (!isTransfer) {
                               setEditTransaction(tx)
                               setShowForm(true)
@@ -1672,18 +1692,24 @@ export function CashAccountView({
       )}
 
       {/* Transfer confirm sheet */}
-      {confirmTransferTx && (
+      {reviewTransferTxs.length > 0 && (
         <TransferConfirmSheet
-          transaction={confirmTransferTx}
-          matchedAccount={(() => {
-            const iban = confirmTransferTx.counterparty_iban?.replace(/\s/g, '').toUpperCase() ?? ''
-            const acc = allAccounts.find((a) => a.iban?.replace(/\s/g, '').toUpperCase() === iban)
-            return acc ? { name: acc.name, iban: acc.iban } : null
-          })()}
-          onClose={() => setConfirmTransferTx(null)}
+          transactions={reviewTransferTxs}
+          matchedAccounts={new Map(
+            reviewTransferTxs
+              .filter(rtx => rtx.counterparty_iban)
+              .map(rtx => {
+                const iban = rtx.counterparty_iban!.replace(/\s/g, '').toUpperCase()
+                const acc = allAccounts.find(a => a.iban?.replace(/\s/g, '').toUpperCase() === iban)
+                return [rtx.id, acc ? { name: acc.name, iban: acc.iban } : null] as const
+              })
+              .filter((entry): entry is readonly [string, { name: string; iban: string | null }] => entry[1] !== null)
+          )}
+          budgetGroups={budgetGroups.filter(g => g.parent.budget_type !== 'archive')}
+          onClose={() => setReviewTransferTxs([])}
           onConfirmed={() => {
             loadTransactions()
-            setConfirmTransferTx(null)
+            setReviewTransferTxs([])
           }}
         />
       )}

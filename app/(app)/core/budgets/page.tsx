@@ -596,7 +596,7 @@ export default function BudgetsPage() {
   const overschredenInzichten = childBudgetsFlat
     .filter(b => {
       const lim = getEffectiveLimit(b)
-      return lim > 0 && (spending[b.id] ?? 0) >= lim
+      return lim > 0 && (spending[b.id] ?? 0) > lim
     })
     .map(b => {
       const lim = getEffectiveLimit(b)

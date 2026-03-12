@@ -13,7 +13,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('expected_return, inflation_rate')
+    .select('expected_return, inflation_rate, box3_method')
     .eq('id', user.id)
     .single()
 
@@ -24,6 +24,7 @@ export async function GET() {
   return NextResponse.json({
     expected_return: data?.expected_return ?? 0.07,
     inflation_rate: data?.inflation_rate ?? 0.02,
+    box3_method: data?.box3_method ?? 'forfaitair',
   })
 }
 
@@ -37,7 +38,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
-  let body: { expected_return?: unknown; inflation_rate?: unknown }
+  let body: { expected_return?: unknown; inflation_rate?: unknown; box3_method?: unknown }
   try {
     body = await request.json()
   } catch {
@@ -54,18 +55,34 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Inflatie moet tussen 0% en 8% liggen' }, { status: 400 })
   }
 
+  // Validate box3_method if provided
+  const box3Method = body.box3_method as string | undefined
+  if (box3Method !== undefined && box3Method !== 'forfaitair' && box3Method !== 'werkelijk') {
+    return NextResponse.json({ error: 'Box 3 methode moet "forfaitair" of "werkelijk" zijn' }, { status: 400 })
+  }
+
+  const updateData: Record<string, unknown> = {
+    id: user.id,
+    expected_return: expectedReturn,
+    inflation_rate: inflationRate,
+    updated_at: new Date().toISOString(),
+  }
+  if (box3Method !== undefined) {
+    updateData.box3_method = box3Method
+  }
+
   const { error } = await supabase
     .from('profiles')
-    .upsert({
-      id: user.id,
-      expected_return: expectedReturn,
-      inflation_rate: inflationRate,
-      updated_at: new Date().toISOString(),
-    })
+    .upsert(updateData)
 
   if (error) {
     return NextResponse.json({ error: 'Fout bij opslaan parameters' }, { status: 500 })
   }
 
-  return NextResponse.json({ success: true, expected_return: expectedReturn, inflation_rate: inflationRate })
+  return NextResponse.json({
+    success: true,
+    expected_return: expectedReturn,
+    inflation_rate: inflationRate,
+    box3_method: box3Method ?? 'forfaitair',
+  })
 }

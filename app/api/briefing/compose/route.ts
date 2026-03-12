@@ -4,10 +4,10 @@ import { getModel } from '@/lib/ai/config'
 import { buildBriefingSystemPrompt, briefingTools } from '@/lib/ai/dna/briefing'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
+import { NextResponse } from 'next/server'
 import type {
   BriefingCardSpec,
   BriefingComposeRequest,
-  BriefingSSEEvent,
 } from '@/lib/briefing/types'
 import { validateBriefingLayout } from '@/lib/briefing/validate-layout'
 import { validateCardHrefs } from '@/lib/briefing/validate-hrefs'
@@ -66,29 +66,81 @@ function toolCallToCardSpec(toolName: string, input: Record<string, unknown>): B
   }
 }
 
-function encodeSSE(event: BriefingSSEEvent): string {
-  return `data: ${JSON.stringify(event)}\n\n`
+// ── Background composition tracker ───────────────────────────────────
+
+interface CompositionState {
+  cards: BriefingCardSpec[]
+  complete: boolean
+  composedAt: string
+  startedAt: number
+  completedAt: number
 }
+
+const activeCompositions = new Map<string, CompositionState>()
+const compositionErrors = new Map<string, string>()    // userId → error message
+const COMPOSITION_TIMEOUT_MS = 120_000                 // 2 min — auto-cleanup
+const RESULT_TTL_MS = 5 * 60 * 1000                   // 5 min — completed results cleanup
+
+function cleanupStaleCompositions() {
+  const now = Date.now()
+  for (const [userId, state] of activeCompositions) {
+    if (!state.complete && now - state.startedAt > COMPOSITION_TIMEOUT_MS) {
+      activeCompositions.delete(userId)
+    }
+    if (state.complete && now - state.completedAt > RESULT_TTL_MS) {
+      activeCompositions.delete(userId)
+    }
+  }
+}
+
+// ── GET handler — poll for composition status/results ────────────────
+
+export async function GET() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  cleanupStaleCompositions()
+
+  if (compositionErrors.has(user.id)) {
+    const message = compositionErrors.get(user.id)!
+    compositionErrors.delete(user.id)
+    return NextResponse.json({ type: 'error', message })
+  }
+
+  if (activeCompositions.has(user.id)) {
+    const state = activeCompositions.get(user.id)!
+    if (state.complete) {
+      return NextResponse.json({ type: 'done', cards: state.cards, composedAt: state.composedAt })
+    }
+    return NextResponse.json({ status: 'composing', cards: state.cards })
+  }
+
+  return NextResponse.json({ status: 'idle' })
+}
+
+// ── POST handler — start background composition ─────────────────────
 
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // If composition is already running, return status immediately
+    if (activeCompositions.has(user.id)) {
+      return NextResponse.json({ status: 'composing' })
     }
 
     const body = await request.json() as BriefingComposeRequest & { userPreferences?: string; briefingFrequency?: 'daily' | 'weekly' | 'monthly' | 'rare' }
     const { dataSummary, temporal, phase, level, previousBriefing, longTermMemory, userPreferences, phaseTransition, briefingFrequency } = body
 
     if (!dataSummary || !temporal) {
-      return new Response(JSON.stringify({ error: 'Missing dataSummary or temporal' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      })
+      return NextResponse.json({ error: 'Missing dataSummary or temporal' }, { status: 400 })
     }
 
     // Load editorial directives + briefing preferences from app_settings
@@ -173,84 +225,69 @@ export async function POST(request: Request) {
       sanitizedDataSummary = sanitizeForAI(dataSummary, sanitizeOpts)
     } catch (err) {
       console.error('[briefing/compose] Sanitization failed — AI call blocked (fail-safe):', err)
-      return new Response(JSON.stringify({ error: 'De AI-assistent is tijdelijk niet beschikbaar vanwege een beveiligingscontrole. Probeer het later opnieuw.' }), {
-        status: 503,
-        headers: { 'Content-Type': 'application/json' },
-      })
+      return NextResponse.json(
+        { error: 'De AI-assistent is tijdelijk niet beschikbaar vanwege een beveiligingscontrole. Probeer het later opnieuw.' },
+        { status: 503 },
+      )
     }
 
-    // Create a ReadableStream that emits SSE events as tool calls complete
-    const encoder = new TextEncoder()
-    const stream = new ReadableStream({
-      async start(controller) {
-        try {
-          const result = streamText({
-            model,
-            system: systemPrompt,
-            prompt: sanitizedDataSummary,
-            tools: briefingTools,
-            toolChoice: 'required',
-            maxOutputTokens: 2000,
-            abortSignal: request.signal,
-          })
+    // Clear any previous state for this user
+    activeCompositions.delete(user.id)
+    compositionErrors.delete(user.id)
 
-          // Collect all cards from the AI stream
-          const collectedCards: BriefingCardSpec[] = []
-          for await (const part of result.fullStream) {
-            if (part.type === 'tool-call') {
-              const input = 'args' in part ? part.args : 'input' in part ? part.input : null
-              const card = input ? toolCallToCardSpec(part.toolName, input as Record<string, unknown>) : null
-              if (card) {
-                collectedCards.push(card)
-              }
+    // ── Fire-and-forget background composition ───────────────────
+
+    const state: CompositionState = {
+      cards: [],
+      complete: false,
+      composedAt: '',
+      startedAt: Date.now(),
+      completedAt: 0,
+    }
+    activeCompositions.set(user.id, state)
+
+    const generation = (async () => {
+      try {
+        const result = streamText({
+          model,
+          system: systemPrompt,
+          prompt: sanitizedDataSummary,
+          tools: briefingTools,
+          toolChoice: 'required',
+          maxOutputTokens: 2000,
+        })
+
+        for await (const part of result.fullStream) {
+          if (part.type === 'tool-call') {
+            const input = 'args' in part ? part.args : 'input' in part ? part.input : null
+            const card = input ? toolCallToCardSpec(part.toolName, input as Record<string, unknown>) : null
+            if (card) {
+              const filtered = maskPIIInObject(card)
+              const [hrefValidated] = validateCardHrefs([filtered])
+              state.cards.push(hrefValidated)
             }
           }
-
-          // PII output filter — mask any IBANs/BSNs that slip through in AI output
-          const piiFilteredCards = collectedCards.map(maskPIIInObject)
-
-          // Validate hrefs (correct hallucinated routes) then layout
-          const hrefValidatedCards = validateCardHrefs(piiFilteredCards)
-          const validatedCards = validateBriefingLayout(hrefValidatedCards)
-
-          // Emit all validated cards in order
-          for (const card of validatedCards) {
-            const event: BriefingSSEEvent = { type: 'card', spec: card }
-            controller.enqueue(encoder.encode(encodeSSE(event)))
-          }
-
-          // Stream complete — send done event
-          const doneEvent: BriefingSSEEvent = {
-            type: 'done',
-            composedAt: new Date().toISOString(),
-          }
-          controller.enqueue(encoder.encode(encodeSSE(doneEvent)))
-          controller.close()
-        } catch (err) {
-          // Stream an error event so the frontend can show retry
-          const message = err instanceof Error ? err.message : 'AI compositie mislukt'
-          console.error('[briefing/compose] Streaming error:', err)
-          const errorEvent: BriefingSSEEvent = { type: 'error', message }
-          try {
-            controller.enqueue(encoder.encode(encodeSSE(errorEvent)))
-          } catch { /* controller may be closed */ }
-          controller.close()
         }
-      },
-    })
 
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      },
-    })
+        // Final layout validation on the complete set (reorders/optimizes row filling)
+        state.cards = validateBriefingLayout(state.cards)
+        state.complete = true
+        state.composedAt = new Date().toISOString()
+        state.completedAt = Date.now()
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'AI compositie mislukt'
+        console.error('[briefing/compose] Background composition failed:', err)
+        compositionErrors.set(user.id, errMsg)
+        activeCompositions.delete(user.id)
+      }
+    })()
+
+    // Prevent unhandled rejection warning (errors captured in compositionErrors)
+    generation.catch(() => {})
+
+    return NextResponse.json({ status: 'composing' })
   } catch (error) {
     console.error('[briefing/compose] Error:', error)
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

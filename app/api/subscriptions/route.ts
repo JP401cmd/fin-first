@@ -23,7 +23,7 @@ export async function GET() {
     const [txResult, recurringResult, budgetResult] = await Promise.all([
       supabase
         .from('transactions')
-        .select('id, date, amount, description, counterparty_name, is_income, budget_id')
+        .select('id, date, amount, description, counterparty_name, is_income, budget_id, transaction_type')
         .gte('date', startDateStr)
         .order('date', { ascending: true }),
       supabase
@@ -84,6 +84,7 @@ export async function GET() {
         counterparty_name: t.counterparty_name ?? null,
         is_income: t.is_income ?? false,
         budget_id: t.budget_id ?? null,
+        transaction_type: t.transaction_type ?? null,
       })),
       existingRecurrings,
       budgets,

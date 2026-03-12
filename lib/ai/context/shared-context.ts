@@ -30,7 +30,7 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
       .eq('is_active', true),
     supabase
       .from('transactions')
-      .select('amount, is_income, date')
+      .select('amount, is_income, date, transaction_type')
       .gte('date', getMonthsAgoDate(12))
       .order('date', { ascending: false }),
     supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -54,11 +54,16 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
   const totalDebts = debts.reduce((s, d) => s + Number(d.current_balance), 0)
 
   // Calculate average monthly income and expenses from recent transactions
-  const monthsOfData = Math.max(1, getDistinctMonths(transactions))
-  const totalIncome = transactions
+  // Filter out own-account transfers — they inflate income/expense totals
+  const realTransactions = transactions.filter(
+    (t) => (t as { transaction_type?: string | null }).transaction_type !== 'transfer' &&
+           (t as { transaction_type?: string | null }).transaction_type !== 'joint_transfer'
+  )
+  const monthsOfData = Math.max(1, getDistinctMonths(realTransactions))
+  const totalIncome = realTransactions
     .filter((t) => t.is_income)
     .reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
-  const totalExpenses = transactions
+  const totalExpenses = realTransactions
     .filter((t) => !t.is_income)
     .reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
 

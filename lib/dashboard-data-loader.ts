@@ -42,6 +42,10 @@ import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { mergeWidgetPrefs, type WidgetSize } from '@/lib/widget-catalog'
 
+/** Filter out own-account transfers from income/expense calculations */
+const isRealTx = (t: { transaction_type?: string | null }) =>
+  t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
+
 // ── Result type ────────────────────────────────────────────────
 
 export interface DashboardDataResult {
@@ -92,7 +96,7 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     badgesResult, userBadgesResult, userStreaksResult, nextStepCompletionsResult,
     expenseTx12Result,
   ] = await Promise.all([
-    supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
+    supabase.from('transactions').select('amount, budget_id, transaction_type').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('id, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
     supabase.from('debts').select('id, current_balance, debt_type, net_worth_inclusion_pct, is_tax_deductible, linked_asset_id').eq('is_active', true),
     supabase.from('profiles').select('date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate').single(),
@@ -107,17 +111,17 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     supabase.from('goals').select('id, name, goal_type, current_value, target_value, target_date, color, icon').eq('is_completed', false).order('sort_order', { ascending: true }),
     supabase.from('recurring_transactions').select('id, name, amount, frequency, budget_id').eq('is_active', true),
     supabase.from('net_worth_snapshots').select('snapshot_date, net_worth, fire_age, savings_rate').gte('snapshot_date', twelveMonthsAgo).order('snapshot_date', { ascending: true }).limit(12),
-    supabase.from('transactions').select('amount, date, budget_id').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
+    supabase.from('transactions').select('amount, date, budget_id, transaction_type').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
     supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
-    supabase.from('transactions').select('amount').lt('amount', 0).gte('date', prev3MonthStart).lt('date', monthStart),
+    supabase.from('transactions').select('amount, transaction_type').lt('amount', 0).gte('date', prev3MonthStart).lt('date', monthStart),
     supabase.from('bank_accounts').select('id, balance').eq('is_active', true).is('linked_asset_id', null),
     supabase.from('budgets').select('id, name, icon, budget_type, default_limit, interval, parent_id, is_favorite').eq('is_favorite', true),
-    supabase.from('transactions').select('amount').gte('date', prevMonthStart).lt('date', monthStart),
+    supabase.from('transactions').select('amount, transaction_type').gte('date', prevMonthStart).lt('date', monthStart),
     supabase.from('badges').select('id, slug, name, icon, category, criteria_type, sort_order'),
     supabase.from('user_badges').select('id, badge_id, earned_at'),
     supabase.from('user_streaks').select('id, streak_type, current_count, longest_count, last_activity_date'),
     supabase.from('next_step_completions').select('step_key, dismissed'),
-    supabase.from('transactions').select('amount, date, budget_id').lt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
+    supabase.from('transactions').select('amount, date, budget_id, transaction_type').lt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
   ])
 
   // Fetch budgeting_active separately (column may not exist yet before migration)
@@ -133,6 +137,7 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
   let monthlyIncome = 0
   let monthlyExpenses = 0
   for (const tx of txResult.data ?? []) {
+    if (!isRealTx(tx)) continue
     const amt = Number(tx.amount)
     if (amt > 0) monthlyIncome += amt
     else monthlyExpenses += Math.abs(amt)
@@ -142,6 +147,7 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
   let prevMonthIncome = 0
   let prevMonthExpenses = 0
   for (const tx of prevMonthTxResult.data ?? []) {
+    if (!isRealTx(tx)) continue
     const amt = Number(tx.amount)
     if (amt > 0) prevMonthIncome += amt
     else prevMonthExpenses += Math.abs(amt)
@@ -292,7 +298,7 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
       })),
   ]
 
-  const last12Income = income12Result.data?.reduce((s, t) => s + Number(t.amount), 0) ?? 0
+  const last12Income = (income12Result.data ?? []).filter(isRealTx).reduce((s, t) => s + Number(t.amount), 0)
   let extrapolatedIncome = last12Income
   const earliestIncomeDateD = earliestIncomeResult.data?.[0]?.date
   if (earliestIncomeDateD && last12Income > 0) {
@@ -311,12 +317,12 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     .toISOString().split('T')[0]
 
   const income6m = (income12Result.data ?? [])
-    .filter(t => (t as { date: string }).date >= sixMonthsAgo)
+    .filter(t => isRealTx(t) && (t as { date: string }).date >= sixMonthsAgo)
     .reduce((s, t) => s + Number(t.amount), 0)
 
   const expenses6m = Math.abs(
     (expenseTx12Result.data ?? [])
-      .filter(t => (t as { date: string }).date >= sixMonthsAgo)
+      .filter(t => isRealTx(t) && (t as { date: string }).date >= sixMonthsAgo)
       .reduce((s, t) => s + Number(t.amount), 0)
   )
 
@@ -483,7 +489,7 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     const dt = (d as { debt_type?: string }).debt_type
     return dt != null && consumerDebtTypes.includes(dt) && Number(d.current_balance) > 0
   })
-  const sovMonthlyExp = (sovereigntyTxResult.data ?? []).reduce((s, t) => s + Math.abs(Number(t.amount)), 0) / 3
+  const sovMonthlyExp = (sovereigntyTxResult.data ?? []).filter(isRealTx).reduce((s, t) => s + Math.abs(Number(t.amount)), 0) / 3
   const sovYearlyExp = sovMonthlyExp * 12
   const sovFireTarget = sovYearlyExp > 0 ? sovYearlyExp / NL_SWR : 0
   const sovFreedomPct = sovFireTarget > 0 ? (netWorth / sovFireTarget) * 100 : 0
@@ -532,7 +538,7 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
 
   // Expense history: aggregate negative transactions per month (absolute values)
   const expenseByMonth = new Map<string, number>()
-  for (const tx of (expenseTx12Result.data ?? []) as { amount: number; date: string }[]) {
+  for (const tx of ((expenseTx12Result.data ?? []) as { amount: number; date: string; transaction_type?: string | null }[]).filter(isRealTx)) {
     const month = (tx.date as string).slice(0, 7) // "YYYY-MM"
     expenseByMonth.set(month, (expenseByMonth.get(month) ?? 0) + Math.abs(Number(tx.amount)))
   }
@@ -545,8 +551,8 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     income: new Map(), expense: new Map(), savings: new Map(), debt: new Map(),
   }
   const allHistTx = [
-    ...((income12Result.data ?? []) as { amount: number; date: string; budget_id?: string | null }[]),
-    ...((expenseTx12Result.data ?? []) as { amount: number; date: string; budget_id?: string | null }[]),
+    ...((income12Result.data ?? []) as { amount: number; date: string; budget_id?: string | null; transaction_type?: string | null }[]).filter(isRealTx),
+    ...((expenseTx12Result.data ?? []) as { amount: number; date: string; budget_id?: string | null; transaction_type?: string | null }[]).filter(isRealTx),
   ]
   for (const tx of allHistTx) {
     if (!tx.budget_id) continue

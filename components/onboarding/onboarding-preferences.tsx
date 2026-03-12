@@ -1,25 +1,11 @@
 'use client'
 
-import { useState } from 'react'
 import {
-  BarChart3,
-  CreditCard,
+  Wallet,
   TrendingUp,
   Flame,
-  CalendarCheck,
-  CalendarDays,
-  Calendar,
-  Shield,
-  Zap,
-  Telescope,
-  Sparkles,
-  EyeOff,
-  PiggyBank,
-  Wallet,
   Target,
-  LineChart,
-  Briefcase,
-  Award,
+  BarChart3,
   Check,
 } from 'lucide-react'
 import type { LucideProps } from 'lucide-react'
@@ -27,287 +13,84 @@ import { FinnAvatar } from '@/components/app/avatars'
 import { SpeechBubble } from './speech-bubble'
 import { StepProgress } from './step-progress'
 import { WIDGET_CATALOG, type WidgetPrefs, type WidgetPref } from '@/lib/widget-catalog'
+import { buildDashboardLayout, type FocusChoice, type AutoDashboardAnswers } from '@/lib/auto-dashboard-builder'
 
 // ── Types ────────────────────────────────────────────────────
 
-export type MainGoal = 'overzicht' | 'schulden' | 'vermogen' | 'fire'
-export type ActivityLevel = 'dagelijks' | 'wekelijks' | 'maandelijks'
-export type ModuleInterest = 'kern' | 'wil' | 'horizon'
-export type DashboardCategory = 'vermogen' | 'budgetten' | 'doelen' | 'fire' | 'beleggingen' | 'voortgang'
-
 export interface PreferencesData {
-  mainGoal: MainGoal | null
-  activityLevel: ActivityLevel | null
-  modules: ModuleInterest[]
-  aiInsights: boolean | null
-  dashboardCategories: DashboardCategory[]
+  focuses: FocusChoice[]
 }
 
-export const INITIAL_PREFERENCES: PreferencesData = {
-  mainGoal: null,
-  activityLevel: null,
-  modules: [],
-  aiInsights: null,
-  dashboardCategories: [],
-}
+export const INITIAL_PREFERENCES: PreferencesData = { focuses: [] }
+export const DEFAULT_PREFERENCES: PreferencesData = { focuses: ['overview'] }
 
-export const DEFAULT_PREFERENCES: PreferencesData = {
-  mainGoal: 'overzicht',
-  activityLevel: 'wekelijks',
-  modules: ['kern', 'wil', 'horizon'],
-  aiInsights: true,
-  dashboardCategories: ['vermogen', 'budgetten', 'doelen', 'fire', 'beleggingen', 'voortgang'],
-}
+// ── Focus options ───────────────────────────────────────────
 
-// ── Question definitions ─────────────────────────────────────
-
-interface CardOption<T extends string> {
-  id: T
+interface FocusOption {
+  id: FocusChoice
   label: string
   description: string
   icon: React.ComponentType<LucideProps>
 }
 
-const GOAL_OPTIONS: CardOption<MainGoal>[] = [
-  { id: 'overzicht', label: 'Financieel overzicht', description: 'Grip op mijn inkomsten en uitgaven', icon: BarChart3 },
-  { id: 'schulden', label: 'Schulden afbetalen', description: 'Mijn schulden zo snel mogelijk aflossen', icon: CreditCard },
-  { id: 'vermogen', label: 'Vermogen opbouwen', description: 'Sparen en investeren voor de toekomst', icon: TrendingUp },
-  { id: 'fire', label: 'Financiële vrijheid', description: 'Niet meer hoeven werken voor geld', icon: Flame },
+const FOCUS_OPTIONS: FocusOption[] = [
+  { id: 'budget_cashflow', label: 'Budgetten & cashflow', description: 'Grip op inkomsten, uitgaven en abonnementen', icon: Wallet },
+  { id: 'assets_investments', label: 'Vermogen & beleggen', description: 'Bezittingen, portefeuille en rendement', icon: TrendingUp },
+  { id: 'fire_freedom', label: 'FIRE & vrijheid', description: 'Vrijheidsprojecties, simulaties en mijlpalen', icon: Flame },
+  { id: 'goals_actions', label: 'Doelen & acties', description: 'Financiële doelen en concrete stappen', icon: Target },
+  { id: 'overview', label: 'Totaaloverzicht', description: 'Een breed dashboard met de belangrijkste metrics', icon: BarChart3 },
 ]
 
-const ACTIVITY_OPTIONS: CardOption<ActivityLevel>[] = [
-  { id: 'dagelijks', label: 'Dagelijks', description: 'Elke dag even checken', icon: CalendarCheck },
-  { id: 'wekelijks', label: 'Wekelijks', description: 'Een keer per week bijwerken', icon: CalendarDays },
-  { id: 'maandelijks', label: 'Maandelijks', description: 'Eens per maand bekijken', icon: Calendar },
-]
-
-const MODULE_OPTIONS: CardOption<ModuleInterest>[] = [
-  { id: 'kern', label: 'De Kern', description: 'Vermogen, budgetten, schulden, kas', icon: Shield },
-  { id: 'wil', label: 'De Wil', description: 'Acties, doelen, aanbevelingen', icon: Zap },
-  { id: 'horizon', label: 'De Horizon', description: 'Vrijheidsprojecties, simulaties, scenario\'s', icon: Telescope },
-]
-
-const AI_OPTIONS: CardOption<'ja' | 'nee'>[] = [
-  { id: 'ja', label: 'Ja, graag', description: 'Persoonlijke AI-inzichten en tips', icon: Sparkles },
-  { id: 'nee', label: 'Nee, liever niet', description: 'Alleen mijn eigen data tonen', icon: EyeOff },
-]
-
-const DASHBOARD_OPTIONS: CardOption<DashboardCategory>[] = [
-  { id: 'vermogen', label: 'Vermogen', description: 'Netto vermogen en bezittingen', icon: PiggyBank },
-  { id: 'budgetten', label: 'Budgetten', description: 'Budgetten en uitgaven', icon: Wallet },
-  { id: 'doelen', label: 'Doelen', description: 'Financiele doelen en voortgang', icon: Target },
-  { id: 'fire', label: 'Vrijheidsprognose', description: 'Wanneer bereik je financiële vrijheid?', icon: Flame },
-  { id: 'beleggingen', label: 'Beleggingen', description: 'Portefeuille en rendement', icon: LineChart },
-  { id: 'voortgang', label: 'Voortgang', description: 'Badges, streaks en niveau', icon: Award },
-]
-
-const SPEECH_BUBBLES: Record<number, string> = {
-  0: 'Iedereen heeft een ander startpunt en een andere bestemming. Wat is het belangrijkste doel voor jou op dit moment? Zo stem ik je dashboard af op wat jij écht nodig hebt.',
-  1: 'Sommige mensen checken dagelijks hun voortgang, anderen doen het één keer per maand. Wat past bij jou? Dit bepaalt hoe vaak je updates en samenvattingen krijgt.',
-  2: 'Er zijn drie perspectieven op je financiën: je fundament, je keuzes, en je toekomst. Kies welke je het meest aanspreken — je kunt dit later altijd aanpassen.',
-  3: 'Ik kan je persoonlijke tips en patronen laten zien op basis van je gegevens. Handig als je wilt leren van je eigen financiële gedrag. Geen zorgen: je data blijft privé.',
-  4: 'Bijna klaar! Welke categorieën wil je op je startpagina zien? Kies er zoveel als je wilt — je kunt dit later altijd wijzigen in je instellingen.',
-}
-
-// ── Preference → Widget mapping ──────────────────────────────
-
-const GOAL_WIDGETS: Record<MainGoal, string[]> = {
-  overzicht: ['netto_vermogen', 'cash_flow', 'budgetten', 'spaarquote', 'maandoverzicht'],
-  schulden: ['schulden', 'acties', 'volgende_stap', 'netto_vermogen', 'cash_flow'],
-  vermogen: ['netto_vermogen', 'assets', 'spaarquote', 'holdings', 'vrijheidsvoortgang'],
-  fire: ['fire_prognose', 'vrijheidsscenarios', 'sim_vermogenspad', 'passief_inkomen', 'netto_vermogen'],
-}
-
-const ACTIVITY_WIDGETS: Record<ActivityLevel, string[]> = {
-  dagelijks: ['agenda', 'meldingen', 'streaks', 'badges', 'volgende_stap'],
-  wekelijks: ['maandoverzicht', 'meldingen', 'agenda'],
-  maandelijks: ['maandoverzicht'],
-}
-
-const MODULE_WIDGETS: Record<ModuleInterest, string[]> = {
-  kern: ['netto_vermogen', 'cash_flow', 'budgetten', 'spaarquote', 'abonnementen', 'noodfonds', 'terugkerende_transacties', 'nibud_benchmark', 'belasting_box3'],
-  wil: ['acties', 'voorstellen', 'doelen', 'volgende_stap'],
-  horizon: ['fire_prognose', 'vrijheidsscenarios', 'sim_vermogenspad', 'passief_inkomen', 'veerkracht_score', 'vrijheidsmijlpalen', 'backtesting_score', 'box3_drag', 'levensgebeurtenissen'],
-}
-
-const CATEGORY_WIDGETS: Record<DashboardCategory, string[]> = {
-  vermogen: ['netto_vermogen', 'assets'],
-  budgetten: ['budgetten', 'nibud_benchmark', 'terugkerende_transacties'],
-  doelen: ['doelen', 'vrijheidsvoortgang', 'volgende_stap'],
-  fire: ['fire_prognose', 'vrijheidsscenarios', 'sim_vermogenspad'],
-  beleggingen: ['holdings', 'passief_inkomen', 'box3_drag'],
-  voortgang: ['jouw_pad', 'badges', 'streaks'],
-}
-
-// No hard cap — user decides how many widgets to enable
-
-const BASELINE_WIDGETS = ['netto_vermogen', 'cash_flow', 'jouw_pad', 'vrijheidsvoortgang'] as const
+// ── Widget prefs builder (uses auto-dashboard-builder) ──────
 
 export function buildWidgetPrefsFromPreferences(prefs: PreferencesData): WidgetPrefs {
-  // Collect widgets in priority order (baseline → goal → activity → module → AI → category)
-  // Each widget is added once; duplicates are skipped via the seen set.
-  const ordered: string[] = []
-  const seen = new Set<string>()
+  const focuses = prefs.focuses.length > 0 ? prefs.focuses : ['overview' as FocusChoice]
 
-  function add(id: string) {
-    if (!seen.has(id)) {
-      seen.add(id)
-      ordered.push(id)
-    }
+  const answers: AutoDashboardAnswers = {
+    focuses,
+    modulePreference: 'balanced',
+    gridSize: 'medium',
+    detailLevel: 'balanced',
+    selectedBudgetFavIds: [],
   }
 
-  // 1. Always-on baseline widgets (always kept)
-  for (const id of BASELINE_WIDGETS) add(id)
+  const enabledPrefs = buildDashboardLayout(answers, WIDGET_CATALOG, {}, [])
+  const enabledIds = new Set(enabledPrefs.map(p => p.id))
 
-  // 2. Goal-driven widgets
-  if (prefs.mainGoal) {
-    for (const id of GOAL_WIDGETS[prefs.mainGoal]) add(id)
-  }
-
-  // 3. Activity-driven widgets
-  if (prefs.activityLevel) {
-    for (const id of ACTIVITY_WIDGETS[prefs.activityLevel]) add(id)
-  }
-
-  // 4. Module-driven widgets
-  for (const mod of prefs.modules) {
-    for (const id of MODULE_WIDGETS[mod]) add(id)
-  }
-
-  // 5. AI insights
-  if (prefs.aiInsights) {
-    add('ai_inzicht')
-  }
-
-  // 6. Dashboard category widgets
-  for (const cat of prefs.dashboardCategories) {
-    for (const id of CATEGORY_WIDGETS[cat]) add(id)
-  }
-
-  // All selected widgets are enabled — no cap
-  const enabledSet = new Set(ordered)
-
-  // Build ordered widget prefs from catalog
-  // Enabled widgets first (in catalog order), disabled widgets after
-  const enabled: WidgetPref[] = []
+  // Add disabled catalog widgets to produce a complete WidgetPrefs object
   const disabled: WidgetPref[] = []
-
   for (const def of WIDGET_CATALOG) {
-    const isEnabled = enabledSet.has(def.id)
-    const pref: WidgetPref = {
-      id: def.id,
-      enabled: isEnabled,
-      size: def.defaultSize,
-      order: 0, // will be set below
-    }
-    if (isEnabled) {
-      enabled.push(pref)
-    } else {
-      disabled.push(pref)
+    if (!enabledIds.has(def.id)) {
+      disabled.push({ id: def.id, enabled: false, size: def.defaultSize, order: 0 })
     }
   }
 
-  // Assign order: enabled first, then disabled
-  const all = [...enabled, ...disabled]
+  const all = [...enabledPrefs, ...disabled]
   for (let i = 0; i < all.length; i++) {
-    all[i].order = i
+    all[i] = { ...all[i], order: i }
   }
 
   return { widgets: all }
 }
 
-// ── Single-select card ──────────────────────────────────────
+// ── Speech bubble text ──────────────────────────────────────
 
-function SelectCard<T extends string>({
-  option,
-  selected,
-  onSelect,
-}: {
-  option: CardOption<T>
-  selected: boolean
-  onSelect: (id: T) => void
-}) {
-  const Icon = option.icon
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(option.id)}
-      className={`group w-full min-h-[48px] rounded-xl border-2 p-4 text-left transition-all active:scale-[0.99] ${
-        selected
-          ? 'border-wil-500 bg-wil-50/60 shadow-sm'
-          : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)] hover:shadow-md'
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <div
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors ${
-            selected ? 'bg-wil-100' : 'bg-[var(--subtle)] group-hover:bg-[var(--border-ed)]'
-          }`}
-        >
-          <Icon className={`h-5 w-5 ${selected ? 'text-wil-600' : 'text-[var(--ink-3)]'}`} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h3 className={`text-sm font-semibold ${selected ? 'text-wil-900' : 'text-[var(--ink)]'}`}>
-            {option.label}
-          </h3>
-          <p className="mt-0.5 text-xs text-[var(--ink-3)]">{option.description}</p>
-        </div>
-        {selected && (
-          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-wil-500">
-            <Check className="h-3.5 w-3.5 text-white" />
-          </div>
-        )}
-      </div>
-    </button>
-  )
-}
-
-// ── Multi-select card ───────────────────────────────────────
-
-function MultiSelectCard<T extends string>({
-  option,
-  selected,
-  onToggle,
-}: {
-  option: CardOption<T>
-  selected: boolean
-  onToggle: (id: T) => void
-}) {
-  const Icon = option.icon
-  return (
-    <button
-      type="button"
-      onClick={() => onToggle(option.id)}
-      className={`group w-full min-h-[48px] rounded-xl border-2 p-4 text-left transition-all active:scale-[0.99] ${
-        selected
-          ? 'border-wil-500 bg-wil-50/60 shadow-sm'
-          : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)] hover:shadow-md'
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <div
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors ${
-            selected ? 'bg-wil-100' : 'bg-[var(--subtle)] group-hover:bg-[var(--border-ed)]'
-          }`}
-        >
-          <Icon className={`h-5 w-5 ${selected ? 'text-wil-600' : 'text-[var(--ink-3)]'}`} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h3 className={`text-sm font-semibold ${selected ? 'text-wil-900' : 'text-[var(--ink)]'}`}>
-            {option.label}
-          </h3>
-          <p className="mt-0.5 text-xs text-[var(--ink-3)]">{option.description}</p>
-        </div>
-        <div
-          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-            selected ? 'border-wil-500 bg-wil-500' : 'border-[var(--border-ed)]'
-          }`}
-        >
-          {selected && <Check className="h-3.5 w-3.5 text-white" />}
-        </div>
-      </div>
-    </button>
-  )
+function getSpeechText(focuses: FocusChoice[]): string {
+  if (focuses.length === 0) {
+    return 'Bijna klaar! Kies maximaal twee onderwerpen die je het meest interesseren. Zo stel ik een dashboard samen dat past bij jouw situatie.'
+  }
+  if (focuses.includes('overview')) {
+    return 'Een breed overzicht — goed plan! Dan zorg ik voor een gebalanceerd dashboard met de belangrijkste metrics uit alle modules.'
+  }
+  const labels: Record<FocusChoice, string> = {
+    budget_cashflow: 'budgetten en cashflow',
+    assets_investments: 'vermogen en beleggen',
+    fire_freedom: 'financiële vrijheid',
+    goals_actions: 'doelen en acties',
+    overview: 'totaaloverzicht',
+  }
+  const chosen = focuses.map(f => labels[f]).join(' en ')
+  return `Goede keuze! Ik richt je dashboard in met extra aandacht voor ${chosen}. De rest blijft beschikbaar in je instellingen.`
 }
 
 // ── Main Component ──────────────────────────────────────────
@@ -325,45 +108,26 @@ export function OnboardingPreferences({
   onBack: () => void
   saving?: boolean
 }) {
-  const [questionIndex, setQuestionIndex] = useState(0)
-
   function handleSkipDefaults() {
     onChange(DEFAULT_PREFERENCES)
     onNext()
   }
 
-  // Check if current question has a valid answer
-  function canProceed(): boolean {
-    switch (questionIndex) {
-      case 0: return data.mainGoal !== null
-      case 1: return data.activityLevel !== null
-      case 2: return data.modules.length > 0
-      case 3: return data.aiInsights !== null
-      case 4: return data.dashboardCategories.length > 0
-      default: return false
+  function handleToggleFocus(id: FocusChoice) {
+    const current = data.focuses
+    if (current.includes(id)) {
+      onChange({ ...data, focuses: current.filter(f => f !== id) })
+    } else if (current.length < 2) {
+      onChange({ ...data, focuses: [...current, id] })
     }
   }
 
-  function handleNext() {
-    if (questionIndex < 4) {
-      setQuestionIndex(questionIndex + 1)
-    } else {
-      onNext()
-    }
-  }
-
-  function handleBack() {
-    if (questionIndex > 0) {
-      setQuestionIndex(questionIndex - 1)
-    } else {
-      onBack()
-    }
-  }
+  const canProceed = data.focuses.length > 0
 
   return (
     <div className="pb-20 sm:pb-0">
       <button
-        onClick={handleBack}
+        onClick={onBack}
         className="mb-6 flex min-h-[44px] items-center gap-1 text-sm text-[var(--ink-3)] hover:text-[var(--ink)] active:text-[var(--ink)] transition-colors duration-150"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -378,37 +142,19 @@ export function OnboardingPreferences({
 
       <p className="label-editorial mb-2 text-[var(--ink-4)]">Voorkeuren</p>
 
-      {/* Question progress dots */}
-      <div className="mb-6 flex items-center justify-center gap-2">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <div
-            key={i}
-            className={`h-2 rounded-full transition-all duration-300 ${
-              i === questionIndex
-                ? 'w-6 bg-wil-500'
-                : i < questionIndex
-                  ? 'w-2 bg-wil-300'
-                  : 'w-2 bg-[var(--border-ed)]'
-            }`}
-          />
-        ))}
-      </div>
-
-      {/* Will speech bubble */}
+      {/* Speech bubble */}
       <div className="mb-6 sm:mb-8 flex items-start gap-3">
         <div className="shrink-0"><FinnAvatar size={48} /></div>
         <SpeechBubble>
-          {SPEECH_BUBBLES[questionIndex]}
-          {questionIndex === 0 && (
-            <span className="mt-1 block text-xs text-[var(--ink-4)]">
-              Je kunt dit ook later aanpassen in Instellingen.
-            </span>
-          )}
+          {getSpeechText(data.focuses)}
+          <span className="mt-1 block text-xs text-[var(--ink-4)]">
+            Je kunt dit later altijd aanpassen in Instellingen.
+          </span>
         </SpeechBubble>
       </div>
 
-      {/* Skip with defaults link — only on first question */}
-      {questionIndex === 0 && !saving && (
+      {/* Skip with defaults link */}
+      {!saving && (
         <button
           type="button"
           onClick={handleSkipDefaults}
@@ -418,125 +164,73 @@ export function OnboardingPreferences({
         </button>
       )}
 
-      {/* Question 1: Hoofddoel */}
-      {questionIndex === 0 && (
-        <div className="space-y-3">
-          <h2 className="mb-4 font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">Wat is je hoofddoel?</h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-            {GOAL_OPTIONS.map((opt) => (
-              <SelectCard
+      {/* Focus selection */}
+      <div className="space-y-3">
+        <h2 className="mb-4 font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">
+          Wat vind je belangrijk?
+        </h2>
+        <p className="text-sm text-[var(--ink-3)]">Kies maximaal 2 onderwerpen</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+          {FOCUS_OPTIONS.map((opt) => {
+            const selected = data.focuses.includes(opt.id)
+            const atMax = !selected && data.focuses.length >= 2
+            const Icon = opt.icon
+            return (
+              <button
                 key={opt.id}
-                option={opt}
-                selected={data.mainGoal === opt.id}
-                onSelect={(id) => onChange({ ...data, mainGoal: id })}
-              />
-            ))}
-          </div>
+                type="button"
+                onClick={() => handleToggleFocus(opt.id)}
+                disabled={atMax}
+                className={`group w-full min-h-[48px] rounded-xl border-2 p-4 text-left transition-all active:scale-[0.99] ${
+                  selected
+                    ? 'border-wil-500 bg-wil-50/60 shadow-sm'
+                    : atMax
+                      ? 'border-[var(--border-ed)] bg-[var(--paper)] opacity-50 cursor-not-allowed'
+                      : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)] hover:shadow-md'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                      selected ? 'bg-wil-100' : 'bg-[var(--subtle)] group-hover:bg-[var(--border-ed)]'
+                    }`}
+                  >
+                    <Icon className={`h-5 w-5 ${selected ? 'text-wil-600' : 'text-[var(--ink-3)]'}`} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className={`text-sm font-semibold ${selected ? 'text-wil-900' : 'text-[var(--ink)]'}`}>
+                      {opt.label}
+                    </h3>
+                    <p className="mt-0.5 text-xs text-[var(--ink-3)]">{opt.description}</p>
+                  </div>
+                  <div
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                      selected ? 'border-wil-500 bg-wil-500' : 'border-[var(--border-ed)]'
+                    }`}
+                  >
+                    {selected && <Check className="h-3.5 w-3.5 text-white" />}
+                  </div>
+                </div>
+              </button>
+            )
+          })}
         </div>
-      )}
-
-      {/* Question 2: Activiteit */}
-      {questionIndex === 1 && (
-        <div className="space-y-3">
-          <h2 className="mb-4 font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">Hoe actief wil je bezig zijn?</h2>
-          <div className="grid grid-cols-1 gap-3">
-            {ACTIVITY_OPTIONS.map((opt) => (
-              <SelectCard
-                key={opt.id}
-                option={opt}
-                selected={data.activityLevel === opt.id}
-                onSelect={(id) => onChange({ ...data, activityLevel: id })}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Question 3: Modules (multi-select) */}
-      {questionIndex === 2 && (
-        <div className="space-y-3">
-          <h2 className="mb-4 font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">Welke modules interesseren je?</h2>
-          <div className="grid grid-cols-1 gap-3">
-            {MODULE_OPTIONS.map((opt) => (
-              <MultiSelectCard
-                key={opt.id}
-                option={opt}
-                selected={data.modules.includes(opt.id)}
-                onToggle={(id) => {
-                  const next = data.modules.includes(id)
-                    ? data.modules.filter((m) => m !== id)
-                    : [...data.modules, id]
-                  onChange({ ...data, modules: next })
-                }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Question 4: AI inzichten */}
-      {questionIndex === 3 && (
-        <div className="space-y-3">
-          <h2 className="mb-4 font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">Wil je AI-inzichten?</h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-            {AI_OPTIONS.map((opt) => (
-              <SelectCard
-                key={opt.id}
-                option={opt}
-                selected={
-                  (opt.id === 'ja' && data.aiInsights === true) ||
-                  (opt.id === 'nee' && data.aiInsights === false)
-                }
-                onSelect={(id) => onChange({ ...data, aiInsights: id === 'ja' })}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Question 5: Dashboard categorieën (multi-select) */}
-      {questionIndex === 4 && (
-        <div className="space-y-3">
-          <h2 className="mb-4 font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">Welke categorieën wil je op je startpagina zien?</h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-            {DASHBOARD_OPTIONS.map((opt) => (
-              <MultiSelectCard
-                key={opt.id}
-                option={opt}
-                selected={data.dashboardCategories.includes(opt.id)}
-                onToggle={(id) => {
-                  const next = data.dashboardCategories.includes(id)
-                    ? data.dashboardCategories.filter((c) => c !== id)
-                    : [...data.dashboardCategories, id]
-                  onChange({ ...data, dashboardCategories: next })
-                }}
-              />
-            ))}
-          </div>
-          <p className="mt-3 text-xs text-[var(--ink-4)]">
-            Je kunt dit later altijd wijzigen in je instellingen.
-          </p>
-        </div>
-      )}
+      </div>
 
       {/* Sticky navigation */}
       <div className="fixed bottom-0 left-0 right-0 z-10 flex gap-3 border-t border-[var(--border-ed)] bg-[var(--paper)]/95 px-4 pb-[env(safe-area-inset-bottom,12px)] pt-3 backdrop-blur-sm sm:static sm:mt-8 sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-none">
         <button
-          onClick={handleBack}
+          onClick={onBack}
           className="flex-1 min-h-[44px] rounded-xl border border-[var(--border-ed)] px-4 py-3 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] active:bg-[var(--subtle)] transition-colors duration-150"
         >
           Terug
         </button>
         <button
-          onClick={handleNext}
-          disabled={!canProceed() || saving}
+          onClick={onNext}
+          disabled={!canProceed || saving}
           className="flex-1 min-h-[44px] rounded-xl bg-wil-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-wil-700 active:bg-wil-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {saving
-            ? 'Opslaan...'
-            : questionIndex < 4
-              ? 'Volgende'
-              : 'Opslaan & starten'}
+          {saving ? 'Opslaan...' : 'Opslaan & starten'}
         </button>
       </div>
     </div>

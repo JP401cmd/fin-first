@@ -136,10 +136,21 @@ export function ChatPanel() {
     [],
   )
 
-  const { messages, sendMessage, status, error, clearError, regenerate } = useChat({
+  const { messages: rawMessages, sendMessage, status, error, clearError, regenerate } = useChat({
     id: 'chat-will',
     transport,
   })
+
+  // Deduplicate messages by ID — the useChat store can produce transient
+  // duplicates during rapid re-renders (e.g. dreamgate page transition).
+  const messages = useMemo(() => {
+    const seen = new Set<string>()
+    return rawMessages.filter(msg => {
+      if (seen.has(msg.id)) return false
+      seen.add(msg.id)
+      return true
+    })
+  }, [rawMessages])
 
   const isStreaming = status === 'streaming' || status === 'submitted'
   const hasError = status === 'error' || !!error

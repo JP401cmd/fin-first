@@ -152,6 +152,10 @@ export const BOX3_TOOLTIPS: Record<string, string> = {
 export function classifyAsset(asset: Asset): { category: Box3Category; exclusionReason: string | null; note: string | null } {
   const type = asset.asset_type as AssetType
 
+  if (type === 'cash') {
+    return { category: 'spaargeld', exclusionReason: null, note: null }
+  }
+
   if (type === 'eigen_huis') {
     return { category: null, exclusionReason: 'Eigen woning valt onder Box 1', note: null }
   }
