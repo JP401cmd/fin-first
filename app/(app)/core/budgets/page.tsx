@@ -52,7 +52,7 @@ function localDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-export default function BudgetsPage() {
+export default function BudgetsPage({ initialBudgetId }: { initialBudgetId?: string } = {}) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { perspective } = usePerspective()
@@ -439,6 +439,16 @@ export default function BudgetsPage() {
       router.replace('/core/budgets', { scroll: false })
     }
   }, [loading, budgets, searchParams, router])
+
+  // Open modal from initialBudgetId prop (embedded in core page modal)
+  useEffect(() => {
+    if (!initialBudgetId || loading || budgets.length === 0) return
+    const exists = budgets.some(b => b.id === initialBudgetId || b.children.some(c => c.id === initialBudgetId))
+    if (exists) {
+      setSelectedBudgetId(initialBudgetId)
+      setModalStep('detail')
+    }
+  }, [initialBudgetId, loading, budgets])
 
   function openBudgetModal(id: string) {
     setSelectedBudgetId(id)

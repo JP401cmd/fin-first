@@ -25,13 +25,12 @@ const MODULE_KICKER: Record<WidgetModule, string> = {
 }
 
 // ── Fixed heights (match grid: quarter/half = 1 row, full = 2 rows) ──
-// quarter = 1col × 1row = 160px
-// half    = 2col × 1row = 160px (wide but compact)
-// full    = 2col × 2row = 160×2 + 16(gap) = 336px
+// Mobile: 140px rows, 12px gap → full = 140×2 + 12 = 296px
+// Desktop (sm+): 160px rows, 16px gap → full = 160×2 + 16 = 336px
 const SIZE_HEIGHT: Record<WidgetSize, string> = {
-  quarter: 'h-[160px]',
-  half:    'h-[160px]',
-  full:    'h-[336px]',
+  quarter: 'h-[140px] sm:h-[160px]',
+  half:    'h-[140px] sm:h-[160px]',
+  full:    'h-[296px] sm:h-[336px]',
 }
 
 // ── WidgetShell ───────────────────────────────────────────────

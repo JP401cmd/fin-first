@@ -18,9 +18,11 @@ type ActionBoardProps = {
   partnerInfo?: { partnerId: string; partnerName: string } | null
   /** Current user ID for distinguishing own vs partner-assigned actions */
   currentUserId?: string | null
+  /** Increment to trigger showing the add form from parent */
+  addTrigger?: number
 }
 
-export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, currentUserId }: ActionBoardProps) {
+export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, currentUserId, addTrigger }: ActionBoardProps) {
   const [actions, setActions] = useState<Action[]>(initialActions)
   useEffect(() => { setActions(initialActions) }, [initialActions])
   const [showForm, setShowForm] = useState(false)
@@ -28,6 +30,13 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
   const [showModalCompleted, setShowModalCompleted] = useState(false)
   const [showModalRejected, setShowModalRejected] = useState(false)
   const { triggerAnimation } = useFreedomDaysAnimation()
+
+  // Allow parent to trigger showing the add form via counter prop
+  useEffect(() => {
+    if (addTrigger && addTrigger > 0) {
+      setShowForm(true)
+    }
+  }, [addTrigger])
 
   async function handleAssign(actionId: string, partnerId: string | null) {
     const res = await fetch(`/api/ai/actions/${actionId}/assign`, {

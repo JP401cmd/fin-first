@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Wallet, Zap, Compass, Lock } from 'lucide-react'
+import { Wallet, Zap, Compass } from 'lucide-react'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 
 const tabs = [
@@ -27,30 +27,29 @@ export function BottomNav() {
   const pathname = usePathname()
   const { needsActivation } = useFeatureAccess()
 
-  // Always show all tabs for discoverability
-  const visibleTabs = tabs
+  const visibleTabs = needsActivation
+    ? tabs.filter(t => !t.requiresActivation)
+    : tabs
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t-2 border-[var(--border-md)] bg-[var(--paper)]/90 backdrop-blur-md safe-bottom md:hidden">
       <div className="flex items-center justify-around" style={{ height: 'var(--bottom-nav-height)' }}>
         {visibleTabs.map((tab) => {
           const isActive = pathname.startsWith(tab.href)
-          const isLocked = tab.requiresActivation && needsActivation
           const Icon = tab.icon
           return (
             <Link
               key={tab.href}
               href={tab.href}
               className={`tap-highlight relative flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium uppercase tracking-[0.06em] transition-colors ${
-                isActive ? activeColors[tab.color] : isLocked ? 'text-[var(--ink-4)] opacity-70' : 'text-[var(--ink-3)]'
+                tab.requiresActivation ? 'animate-nav-reveal' : ''
+              } ${
+                isActive ? activeColors[tab.color] : 'text-[var(--ink-3)]'
               }`}
             >
               <span className={`absolute top-1.5 h-4 w-12 rounded-full transition-opacity duration-200 ${pillColors[tab.color]} ${isActive ? 'opacity-40' : 'opacity-0'}`} />
               <Icon className="relative h-5 w-5" />
-              <span className="relative flex items-center gap-0.5">
-                {tab.label}
-                {isLocked && <Lock className="h-2.5 w-2.5 opacity-50" />}
-              </span>
+              <span className="relative">{tab.label}</span>
             </Link>
           )
         })}

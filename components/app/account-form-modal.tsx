@@ -13,6 +13,7 @@ export type Account = {
   balance: number
   is_active: boolean
   sort_order: number
+  linked_asset_id?: string | null
 }
 
 export const ACCOUNT_TYPES = [

@@ -7,6 +7,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Plus, Upload, ArrowUpRight, ArrowDownLeft,
   Wallet, Tag, Settings2, X, Repeat, Search, Filter, RotateCcw,
   Link2, ArrowLeftRight, HelpCircle, GitFork, Pencil, Sparkles, ArrowLeft,
+  MoreVertical, Unlink, Save,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { isOwnAccountTransfer } from '@/lib/parsers/categorize'
@@ -34,7 +35,7 @@ import { Users, TrendingUp, TrendingDown, Minus, Shield } from 'lucide-react'
 import { SettlementOverview } from '@/components/app/settlement-overview'
 import { UncategorizedTransactionsBanner } from '@/components/app/uncategorized-transactions-banner'
 import { AICategorizeSheet } from '@/components/app/ai-categorize-sheet'
-import { AccountFormModal, type Account } from '@/components/app/account-form-modal'
+import { AccountFormModal, ACCOUNT_TYPES, type Account } from '@/components/app/account-form-modal'
 
 type Transaction = {
   id: string
@@ -174,6 +175,15 @@ export function CashAccountView({
     myName: string
     partnerName: string
   } | null>(null)
+
+  // Settings menu & asset edit state
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false)
+  const [showAssetEdit, setShowAssetEdit] = useState(false)
+  const [linkedAsset, setLinkedAsset] = useState<{
+    id: string; name: string; current_value: number; institution: string | null;
+    account_number: string | null; subtype: string | null; net_worth_inclusion_pct: number
+  } | null>(null)
+  const [assetSaving, setAssetSaving] = useState(false)
 
   const hasActiveFilters = filterSearch !== '' || filterType !== 'all' || filterBudgetId !== 'all'
 
@@ -751,6 +761,95 @@ export function CashAccountView({
     loadAccount()
   }
 
+  // Load linked asset for this bank account
+  const loadLinkedAsset = useCallback(async () => {
+    if (!account?.linked_asset_id) { setLinkedAsset(null); return }
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('assets')
+      .select('id, name, current_value, institution, account_number, subtype, net_worth_inclusion_pct')
+      .eq('id', account.linked_asset_id)
+      .maybeSingle()
+    setLinkedAsset(data)
+  }, [account?.linked_asset_id])
+
+  useEffect(() => { loadLinkedAsset() }, [loadLinkedAsset])
+
+  async function handleSaveAsset(formData: {
+    name: string; current_value: number; iban: string; bank_name: string;
+    subtype: string; net_worth_inclusion_pct: number
+  }) {
+    if (!linkedAsset || !account) return
+    setAssetSaving(true)
+    const supabase = createClient()
+    await supabase.from('assets').update({
+      name: formData.name,
+      current_value: formData.current_value,
+      account_number: formData.iban || null,
+      institution: formData.bank_name || null,
+      subtype: formData.subtype || null,
+      net_worth_inclusion_pct: formData.net_worth_inclusion_pct,
+    }).eq('id', linkedAsset.id)
+    // Sync bank_account too
+    await supabase.from('bank_accounts').update({
+      name: formData.name,
+      iban: formData.iban || null,
+      bank_name: formData.bank_name || null,
+      account_type: formData.subtype || 'checking',
+      balance: formData.current_value,
+    }).eq('id', account.id)
+    setAssetSaving(false)
+    setShowAssetEdit(false)
+    loadAccount()
+    loadLinkedAsset()
+  }
+
+  async function handleDisconnectTracking() {
+    if (!linkedAsset || !account) return
+    if (!confirm('Weet je zeker dat je transacties wilt loskoppelen? De rekening wordt weer een gewone asset.')) return
+    const supabase = createClient()
+    // 1. Update asset: has_budget_tracking = false
+    await supabase.from('assets').update({ has_budget_tracking: false }).eq('id', linkedAsset.id)
+    // 2. Check transaction count
+    const { count } = await supabase
+      .from('transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('account_id', account.id)
+    if (count === 0) {
+      await supabase.from('bank_accounts').delete().eq('id', account.id)
+    } else {
+      await supabase.from('bank_accounts').update({ linked_asset_id: null }).eq('id', account.id)
+    }
+    // 3. Sync budgeting_active
+    const { data: { user } } = await supabase.auth.getUser()
+    let trackingAssets: { id: string }[] | null = null
+    if (user) {
+      const { data } = await supabase
+        .from('assets')
+        .select('id')
+        .eq('asset_type', 'cash')
+        .eq('has_budget_tracking', true)
+        .eq('is_active', true)
+      trackingAssets = data
+      await supabase
+        .from('profiles')
+        .update({ budgeting_active: (trackingAssets?.length ?? 0) > 0 })
+        .eq('id', user.id)
+    }
+    // 4. Navigate — if budgeting is now off and estimates are missing, prompt user
+    if (user && (trackingAssets?.length ?? 0) === 0) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('net_monthly_income, estimated_monthly_expenses')
+        .eq('id', user.id)
+        .single()
+      const needsEstimates = !profile?.net_monthly_income || !profile?.estimated_monthly_expenses
+      router.push(needsEstimates ? '/core?showEstimates=true' : '/core/assets')
+    } else {
+      router.push('/core/assets')
+    }
+  }
+
   async function detectPatterns() {
     if (!accountId) return
     setDetectingPatterns(true)
@@ -845,13 +944,29 @@ export function CashAccountView({
                   </span>
                 )}
                 {!isCombined && (
-                  <button
-                    onClick={() => setShowAccountForm(true)}
-                    className="rounded-[var(--r)] p-1.5 text-[var(--ink-3)] hover:bg-kern-100 hover:text-kern-600"
-                    title="Rekening bewerken"
-                  >
-                    <Settings2 className="h-4 w-4" />
-                  </button>
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowSettingsMenu(v => !v)}
+                      className="rounded-[var(--r)] p-1.5 text-[var(--ink-3)] hover:bg-kern-100 hover:text-kern-600"
+                      title="Instellingen"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </button>
+                    {showSettingsMenu && (
+                      <>
+                        <div className="fixed inset-0 z-30" onClick={() => setShowSettingsMenu(false)} />
+                        <div className="absolute left-0 top-full z-40 mt-1 w-56 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] py-1 shadow-lg">
+                          <button
+                            onClick={() => { setShowSettingsMenu(false); setShowAssetEdit(true) }}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+                          >
+                            <Settings2 className="h-4 w-4" />
+                            Rekening bewerken
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
               {!isCombined && (
@@ -1680,15 +1795,28 @@ export function CashAccountView({
         />
       )}
 
-      {/* Account form modal (edit only) */}
-      {showAccountForm && (
-        <AccountFormModal
-          account={account}
-          canDelete={false}
-          onSave={saveAccount}
-          onDelete={() => {}}
-          onClose={() => setShowAccountForm(false)}
-        />
+      {/* Asset edit modal */}
+      {showAssetEdit && linkedAsset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowAssetEdit(false)}>
+          <div
+            className="w-full max-w-lg rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-[var(--ink)]">Rekening bewerken</h3>
+              <button onClick={() => setShowAssetEdit(false)} className="rounded-[var(--r)] p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <AssetEditForm
+              asset={linkedAsset}
+              saving={assetSaving}
+              onSave={handleSaveAsset}
+              onCancel={() => setShowAssetEdit(false)}
+              onDisconnect={() => { setShowAssetEdit(false); handleDisconnectTracking() }}
+            />
+          </div>
+        </div>
       )}
 
       {/* Transfer confirm sheet */}
@@ -1819,6 +1947,157 @@ export function CashAccountView({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/** Lightweight inline form for editing the linked asset */
+function AssetEditForm({
+  asset,
+  saving,
+  onSave,
+  onCancel,
+  onDisconnect,
+}: {
+  asset: { id: string; name: string; current_value: number; institution: string | null; account_number: string | null; subtype: string | null; net_worth_inclusion_pct: number }
+  saving: boolean
+  onSave: (data: { name: string; current_value: number; iban: string; bank_name: string; subtype: string; net_worth_inclusion_pct: number }) => void
+  onCancel: () => void
+  onDisconnect: () => void
+}) {
+  const [name, setName] = useState(asset.name)
+  const [currentValue, setCurrentValue] = useState(String(asset.current_value))
+  const [iban, setIban] = useState(asset.account_number ?? '')
+  const [bankName, setBankName] = useState(asset.institution ?? '')
+  const [subtype, setSubtype] = useState(asset.subtype ?? 'checking')
+  const [nwPct, setNwPct] = useState(String(asset.net_worth_inclusion_pct ?? 100))
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false)
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Naam</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Huidig saldo</label>
+          <input
+            type="number"
+            value={currentValue}
+            onChange={(e) => setCurrentValue(e.target.value)}
+            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm font-mono tabular-nums"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">IBAN</label>
+          <input
+            value={iban}
+            onChange={(e) => setIban(e.target.value)}
+            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+            placeholder="NL00 BANK 0000 0000 00"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Bank naam</label>
+          <input
+            value={bankName}
+            onChange={(e) => setBankName(e.target.value)}
+            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Type</label>
+          <select
+            value={subtype}
+            onChange={(e) => setSubtype(e.target.value)}
+            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+          >
+            {ACCOUNT_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Net worth inclusie %</label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            value={nwPct}
+            onChange={(e) => setNwPct(e.target.value)}
+            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm font-mono tabular-nums"
+          />
+        </div>
+      </div>
+
+      {/* Transacties loskoppelen */}
+      <div className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
+        {!confirmDisconnect ? (
+          <button
+            type="button"
+            onClick={() => setConfirmDisconnect(true)}
+            className="flex items-center gap-2 text-sm text-red-600 hover:text-red-700"
+          >
+            <Unlink className="h-3.5 w-3.5" />
+            Budgetteren uitschakelen
+          </button>
+        ) : (
+          <div>
+            <p className="text-xs text-[var(--ink-2)]">
+              De rekening wordt weer een gewone asset zonder transacties en budgetten.
+            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onDisconnect}
+                className="rounded-[var(--r)] bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+              >
+                Bevestigen
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDisconnect(false)}
+                className="rounded-[var(--r)] border border-[var(--border-md)] px-3 py-1.5 text-xs text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+              >
+                Annuleren
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-end gap-2 pt-2">
+        <button
+          onClick={onCancel}
+          className="rounded-[var(--r)] border border-[var(--border-md)] px-4 py-2 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+        >
+          Annuleren
+        </button>
+        <button
+          onClick={() => onSave({
+            name,
+            current_value: Number(currentValue) || 0,
+            iban,
+            bank_name: bankName,
+            subtype,
+            net_worth_inclusion_pct: Number(nwPct) ?? 100,
+          })}
+          disabled={saving || !name.trim()}
+          className="inline-flex items-center gap-2 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+        >
+          <Save className="h-4 w-4" />
+          {saving ? 'Opslaan...' : 'Opslaan'}
+        </button>
+      </div>
     </div>
   )
 }

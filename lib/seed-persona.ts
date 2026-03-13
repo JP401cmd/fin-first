@@ -171,6 +171,13 @@ export async function seedPersonaData(
   if (persona.profile.retirement_expense_method) profileData.retirement_expense_method = persona.profile.retirement_expense_method
   if (persona.profile.retirement_expense_custom_amount != null) profileData.retirement_expense_custom_amount = persona.profile.retirement_expense_custom_amount
 
+  // Profile income/expense estimates
+  if (persona.profile.net_monthly_income != null) profileData.net_monthly_income = persona.profile.net_monthly_income
+  if (persona.profile.estimated_monthly_expenses != null) profileData.estimated_monthly_expenses = persona.profile.estimated_monthly_expenses
+
+  // Budgeting active — derived from whether persona has budgets
+  profileData.budgeting_active = persona.budgets.length > 0
+
   // Widget dashboard preferences (optional, per-persona)
   if (persona.profile.widget_prefs) profileData.widget_prefs = persona.profile.widget_prefs
 
@@ -198,7 +205,7 @@ export async function seedPersonaData(
     net_worth_inclusion_pct: 100,
     is_liquid: true,
     subtype: ba.account_type,
-    has_budget_tracking: true,
+    has_budget_tracking: persona.budgets.length > 0,
   }))
 
   let cashAssetIds: string[] = []

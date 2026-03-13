@@ -99,7 +99,7 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     supabase.from('transactions').select('amount, budget_id, transaction_type').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('id, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
     supabase.from('debts').select('id, current_balance, debt_type, net_worth_inclusion_pct, is_tax_deductible, linked_asset_id').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate').single(),
+    supabase.from('profiles').select('date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active').single(),
     supabase.from('budgets').select('id, default_limit, interval').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
     supabase.from('actions')
       .select('id, title, status, freedom_days_impact, priority_score, due_date, source, completed_at, recommendation:recommendations(recommendation_type)')
@@ -116,7 +116,7 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     supabase.from('transactions').select('amount, transaction_type').lt('amount', 0).gte('date', prev3MonthStart).lt('date', monthStart),
     supabase.from('bank_accounts').select('id, balance').eq('is_active', true).is('linked_asset_id', null),
     supabase.from('budgets').select('id, name, icon, budget_type, default_limit, interval, parent_id, is_favorite').eq('is_favorite', true),
-    supabase.from('transactions').select('amount, transaction_type').gte('date', prevMonthStart).lt('date', monthStart),
+    supabase.from('transactions').select('amount, transaction_type, budget_id').gte('date', prevMonthStart).lt('date', monthStart),
     supabase.from('badges').select('id, slug, name, icon, category, criteria_type, sort_order'),
     supabase.from('user_badges').select('id, badge_id, earned_at'),
     supabase.from('user_streaks').select('id, streak_type, current_count, longest_count, last_activity_date'),
@@ -124,14 +124,8 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     supabase.from('transactions').select('amount, date, budget_id, transaction_type').lt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
   ])
 
-  // Fetch budgeting_active separately (column may not exist yet before migration)
-  let budgetingActive = true
-  try {
-    const { data: ba } = await supabase.from('profiles').select('budgeting_active').single()
-    if (ba && typeof (ba as Record<string, unknown>).budgeting_active === 'boolean') {
-      budgetingActive = (ba as Record<string, unknown>).budgeting_active as boolean
-    }
-  } catch { /* column not yet migrated — default to true */ }
+  // Read budgeting_active from the profile query (already fetched above)
+  const budgetingActive = (profileResult.data as Record<string, unknown> | null)?.budgeting_active !== false
 
   // Core calculations
   let monthlyIncome = 0
@@ -142,6 +136,12 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     if (amt > 0) monthlyIncome += amt
     else monthlyExpenses += Math.abs(amt)
   }
+
+  // Fallback to profile estimates for users without transactions
+  const profileMonthlyIncome = Number(profileResult.data?.net_monthly_income ?? 0)
+  const profileMonthlyExpenses = Number(profileResult.data?.estimated_monthly_expenses ?? 0)
+  const effectiveMonthlyIncome = monthlyIncome > 0 ? monthlyIncome : profileMonthlyIncome
+  const effectiveMonthlyExpenses = monthlyExpenses > 0 ? monthlyExpenses : profileMonthlyExpenses
 
   // Previous month income/expenses for cashflow comparison widget
   let prevMonthIncome = 0
@@ -230,6 +230,30 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     expense: { limit: budgetLimits.expense, spent: budgetSpent.expense },
     savings: { limit: budgetLimits.savings, spent: budgetSpent.savings },
     debt:    { limit: budgetLimits.debt,    spent: budgetSpent.debt },
+  }
+
+  // ── Savings-budget ID set (for spaarquote correction) ─────
+  const savingsBudgetIds = new Set<string>()
+  for (const [id, type] of budgetTypeMap) {
+    if (type === 'savings') savingsBudgetIds.add(id)
+  }
+
+  // Current month: savings-budget spend (absolute)
+  let monthlySavingsBudgetSpent = 0
+  for (const tx of txResult.data ?? []) {
+    const bid = (tx as { budget_id?: string | null }).budget_id
+    if (bid && savingsBudgetIds.has(bid)) {
+      monthlySavingsBudgetSpent += Math.abs(Number(tx.amount))
+    }
+  }
+
+  // Previous month: savings-budget spend (absolute)
+  let prevMonthSavingsBudgetSpent = 0
+  for (const tx of prevMonthTxResult.data ?? []) {
+    const bid = (tx as { budget_id?: string | null }).budget_id
+    if (bid && savingsBudgetIds.has(bid)) {
+      prevMonthSavingsBudgetSpent += Math.abs(Number(tx.amount))
+    }
   }
 
   // Favorite budgets: compute limit + spent for each
@@ -326,6 +350,18 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
       .reduce((s, t) => s + Number(t.amount), 0)
   )
 
+  // 6-month savings-budget spend (for spaarquote correction)
+  let savingsBudgetSpent6m = 0
+  for (const tx of (expenseTx12Result.data ?? [])) {
+    if (!isRealTx(tx)) continue
+    const d = (tx as { date: string }).date
+    if (d < sixMonthsAgo) continue
+    const bid = (tx as { budget_id?: string | null }).budget_id
+    if (bid && savingsBudgetIds.has(bid)) {
+      savingsBudgetSpent6m += Math.abs(Number(tx.amount))
+    }
+  }
+
   let dataMonths6 = 6
   if (earliestIncomeDateD) {
     const earliest = new Date(earliestIncomeDateD)
@@ -336,10 +372,16 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
   }
   const extIncome6 = dataMonths6 < 6 ? (income6m / dataMonths6) * 6 : income6m
   const extExpenses6 = dataMonths6 < 6 ? (expenses6m / dataMonths6) * 6 : expenses6m
+  const extSavingsBudget6 = dataMonths6 < 6 ? (savingsBudgetSpent6m / dataMonths6) * 6 : savingsBudgetSpent6m
 
-  const savingsRate6m = extIncome6 > 0
-    ? ((extIncome6 - extExpenses6) / extIncome6) * 100
+  let savingsRate6m = extIncome6 > 0
+    ? ((extIncome6 - extExpenses6 + extSavingsBudget6) / extIncome6) * 100
     : 0
+
+  // Fallback savings rate from profile estimates for users without transactions
+  if (savingsRate6m === 0 && effectiveMonthlyIncome > 0 && effectiveMonthlyExpenses > 0) {
+    savingsRate6m = Math.round(((effectiveMonthlyIncome - effectiveMonthlyExpenses) / effectiveMonthlyIncome) * 100)
+  }
 
   const fireParams = resolveFireParams(profileResult.data ?? {})
   const fireSwr = fireParams.effectiveSwr
@@ -349,15 +391,16 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     yearlyMustExpenses,
     extrapolatedIncome,
     profileResult.data?.retirement_expense_custom_amount,
+    profileMonthlyExpenses * 12,
   )
 
-  const yearlyExpenses = monthlyExpenses * 12
+  const yearlyExpenses = effectiveMonthlyExpenses * 12
   const fireTarget = computeFireTarget(computeEffectiveExpenses(yearlyRetirementExpenses, yearlyExpenses), fireSwr)
   const freedomPct = computeFreedomPercentage(netWorth, fireTarget)
 
   // FIRE projection
   const horizonInput: FinancialInput = {
-    totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
+    totalAssets, totalDebts, monthlyIncome: effectiveMonthlyIncome, monthlyExpenses: effectiveMonthlyExpenses,
     monthlyContributions, yearlyMustExpenses: yearlyRetirementExpenses,
     dateOfBirth: profileResult.data?.date_of_birth ?? null,
   }
@@ -380,7 +423,7 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
         currentAge,
         fireStrategy.endAge,
         netWorth,
-        yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses : monthlyExpenses * 12,
+        yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses : effectiveMonthlyExpenses * 12,
         monthlyContributions * 12,
         fireParams.grossReturn,
         'nl_box3',
@@ -424,7 +467,7 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
   const rawDebts = debtsResult.data ?? []
   if (rawAssets.length > 0) {
     try {
-      const dailyExp = yearlyMustExpenses > 0 ? yearlyMustExpenses / 365 : (monthlyExpenses > 0 ? monthlyExpenses / 30 : 0)
+      const dailyExp = yearlyMustExpenses > 0 ? yearlyMustExpenses / 365 : (effectiveMonthlyExpenses > 0 ? effectiveMonthlyExpenses / 30 : 0)
       const box3Result = calculateBox3({
         assets: rawAssets as unknown as Asset[],
         debts: rawDebts as unknown as Debt[],
@@ -469,10 +512,10 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     })
 
   // Daily expenses for freedom-time calculations
-  const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 0
+  const dailyExpenses = effectiveMonthlyExpenses > 0 ? effectiveMonthlyExpenses / 30 : 0
 
   // Vermogensgroei deze maand (net cash flow this month: income - expenses)
-  const monthlyGrowth = monthlyIncome - monthlyExpenses
+  const monthlyGrowth = effectiveMonthlyIncome - effectiveMonthlyExpenses
   const growthDays = dailyExpenses > 0
     ? calculateFreedomTime(Math.abs(monthlyGrowth), dailyExpenses)
     : null
@@ -769,7 +812,7 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
 
   // ── AI Insights: derived from financial data (no DB table) ──
   const aiInsights: AiInsight[] = []
-  if (savingsRate6m !== 0 || (monthlyIncome > 0 && monthlyExpenses > 0)) {
+  if (savingsRate6m !== 0 || (effectiveMonthlyIncome > 0 && effectiveMonthlyExpenses > 0)) {
     if (savingsRate6m >= 50) {
       aiInsights.push({
         id: 'insight-high-savings',
@@ -786,8 +829,8 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
       })
     }
   }
-  if (totalRecurringAmount > 0 && monthlyIncome > 0) {
-    const recurringPct = (totalRecurringAmount / monthlyIncome) * 100
+  if (totalRecurringAmount > 0 && effectiveMonthlyIncome > 0) {
+    const recurringPct = (totalRecurringAmount / effectiveMonthlyIncome) * 100
     if (recurringPct > 60) {
       aiInsights.push({
         id: 'insight-high-recurring',
@@ -906,8 +949,8 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
       return type === 'savings' || type === 'checking' || type === 'cash'
     })
     .reduce((s, a) => s + Number(a.current_value), 0) + unlinkedCash
-  const targetEmergencyAmount = monthlyExpenses * TARGET_EMERGENCY_MONTHS
-  const emergencyMonthsCovered = monthlyExpenses > 0 ? liquidAssets / monthlyExpenses : 0
+  const targetEmergencyAmount = effectiveMonthlyExpenses * TARGET_EMERGENCY_MONTHS
+  const emergencyMonthsCovered = effectiveMonthlyExpenses > 0 ? liquidAssets / effectiveMonthlyExpenses : 0
   const emergencyFund = {
     currentAmount: Math.round(liquidAssets * 100) / 100,
     targetAmount: Math.round(targetEmergencyAmount * 100) / 100,
@@ -971,8 +1014,8 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
             totalDebts: totalDebts + partnerDebts,
             // Combined monthly expenses/income: use user's tracked expenses
             // (these represent the household's tracked expenses from the user's bank accounts)
-            monthlyExpenses,
-            monthlyIncome,
+            monthlyExpenses: effectiveMonthlyExpenses,
+            monthlyIncome: effectiveMonthlyIncome,
           }
 
           // Partner-only perspective: show partner's individual data
@@ -981,8 +1024,8 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
             totalAssets: partnerAssets,
             totalDebts: partnerDebts,
             // Use partner's tracked income/expenses if available, otherwise approximate
-            monthlyExpenses: partnerMonthlyExpenses > 0 ? partnerMonthlyExpenses : monthlyExpenses,
-            monthlyIncome: partnerMonthlyIncome > 0 ? partnerMonthlyIncome : monthlyIncome,
+            monthlyExpenses: partnerMonthlyExpenses > 0 ? partnerMonthlyExpenses : effectiveMonthlyExpenses,
+            monthlyIncome: partnerMonthlyIncome > 0 ? partnerMonthlyIncome : effectiveMonthlyIncome,
           }
         }
       }
@@ -1160,8 +1203,8 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     netWorth,
     totalAssets,
     totalDebts,
-    monthlyIncome,
-    monthlyExpenses,
+    monthlyIncome: effectiveMonthlyIncome,
+    monthlyExpenses: effectiveMonthlyExpenses,
     monthlyContributions,
     yearlyMustExpenses,
     budgetTotals,
@@ -1177,7 +1220,7 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     recentRejectedActions: [],
     sovereigntyLevel,
     currentPhaseId,
-    monthsCovered: monthlyExpenses > 0 ? netWorth / monthlyExpenses : 0,
+    monthsCovered: effectiveMonthlyExpenses > 0 ? netWorth / effectiveMonthlyExpenses : 0,
     hasConsumerDebt,
     recommendations: (recsResult.data ?? []).filter(r => (r as { status: string }).status === 'pending').length,
     goals: (goalsResult.data ?? []).length,
@@ -1228,6 +1271,9 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     topRecommendations,
     topLifeEvents,
     savingsRate6m: Math.round(savingsRate6m * 10) / 10,
+    monthlySavingsBudgetSpent: Math.round(monthlySavingsBudgetSpent * 100) / 100,
+    savingsBudgetSpent6m: Math.round(savingsBudgetSpent6m * 100) / 100,
+    prevMonthSavingsBudgetSpent: Math.round(prevMonthSavingsBudgetSpent * 100) / 100,
     budgetingActive,
     householdOverrides,
     partnerOverrides,

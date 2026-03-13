@@ -20,15 +20,25 @@ type RecommendationListProps = {
   initialRecommendations: Recommendation[]
   /** When true, hides the internal header (icon + title + count + description). Used when parent renders a unified column header. */
   hideHeader?: boolean
+  /** Increment to trigger generation from parent */
+  generateTrigger?: number
 }
 
-export function RecommendationList({ initialRecommendations, hideHeader }: RecommendationListProps) {
+export function RecommendationList({ initialRecommendations, hideHeader, generateTrigger }: RecommendationListProps) {
   const [recommendations, setRecommendations] = useState<Recommendation[]>(initialRecommendations)
   useEffect(() => { setRecommendations(initialRecommendations) }, [initialRecommendations])
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null)
   const [showAll, setShowAll] = useState(false)
+
+  // Allow parent to trigger generation via counter prop
+  useEffect(() => {
+    if (generateTrigger && generateTrigger > 0) {
+      generateRecommendations()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generateTrigger])
 
   async function generateRecommendations() {
     setIsGenerating(true)

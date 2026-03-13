@@ -111,7 +111,13 @@ export function SessionMonitor() {
   useEffect(() => {
     const originalFetch = window.fetch
     window.fetch = async (...args) => {
-      const response = await originalFetch(...args)
+      let response: Response
+      try {
+        response = await originalFetch(...args)
+      } catch (err) {
+        // Network errors (Failed to fetch) — pass through, not a session issue
+        throw err
+      }
 
       // Only intercept our own API calls, not Supabase auth calls
       const url = typeof args[0] === 'string' ? args[0] : (args[0] as Request)?.url ?? ''

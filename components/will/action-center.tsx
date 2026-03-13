@@ -66,6 +66,8 @@ export function ActionCenter({
   const { dailyExpenseRate } = useDailyExpenseRate()
   const { features } = useFeatureAccess()
   const doelenEnabled = features.doelen_systeem !== false
+  const [generateTrigger, setGenerateTrigger] = useState(0)
+  const [addTrigger, setAddTrigger] = useState(0)
 
   // Filter goals by ownership
   const hasSharedGoals = goals.some(g => g.ownership === 'shared')
@@ -203,14 +205,23 @@ export function ActionCenter({
               activeTab !== 'inzicht' ? 'hidden lg:block' : ''
             }`}
           >
-            <div className="mb-4 flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-wil-500" />
-              <h3 className="label-editorial text-[var(--ink-2)]">Inzicht</h3>
-              <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--subtle)] px-1.5 font-mono text-[10px] font-bold tabular-nums text-[var(--ink-3)]">
-                {pendingCount}
-              </span>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-wil-500" />
+                <h3 className="label-editorial text-[var(--ink-2)]">Inzicht</h3>
+                <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--subtle)] px-1.5 font-mono text-[10px] font-bold tabular-nums text-[var(--ink-3)]">
+                  {pendingCount}
+                </span>
+              </div>
+              <button
+                onClick={() => setGenerateTrigger(t => t + 1)}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-transparent px-2.5 py-1.5 text-xs font-medium text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] hover:bg-[var(--subtle)]"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Analyseren</span>
+              </button>
             </div>
-            <RecommendationList initialRecommendations={recommendations} hideHeader />
+            <RecommendationList initialRecommendations={recommendations} hideHeader generateTrigger={generateTrigger} />
           </div>
 
           {/* Column 2: Actie */}
@@ -220,18 +231,28 @@ export function ActionCenter({
               activeTab !== 'actie' ? 'hidden lg:block' : ''
             }`}
           >
-            <div className="mb-4 flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-wil-500" />
-              <h3 className="label-editorial text-[var(--ink-2)]">Actie</h3>
-              <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--subtle)] px-1.5 font-mono text-[10px] font-bold tabular-nums text-[var(--ink-3)]">
-                {openActionCount ?? 0}
-              </span>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-wil-500" />
+                <h3 className="label-editorial text-[var(--ink-2)]">Actie</h3>
+                <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--subtle)] px-1.5 font-mono text-[10px] font-bold tabular-nums text-[var(--ink-3)]">
+                  {openActionCount ?? 0}
+                </span>
+              </div>
+              <button
+                onClick={() => setAddTrigger(t => t + 1)}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-transparent px-2.5 py-1.5 text-xs font-medium text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] hover:bg-[var(--subtle)]"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Nieuwe actie</span>
+              </button>
             </div>
             <ActionBoard
               initialActions={actions}
               partnerInfo={partnerInfo}
               currentUserId={currentUserId}
               onCancellationOpen={onCancellationOpen}
+              addTrigger={addTrigger}
             />
           </div>
 

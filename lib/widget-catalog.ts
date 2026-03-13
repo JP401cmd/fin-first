@@ -573,6 +573,23 @@ for (const widget of WIDGET_CATALOG) {
   }
 }
 
+/** Widgets that require budgeting to be active (hidden when budgetingActive = false) */
+export const BUDGET_WIDGETS = new Set([
+  'cash_flow',
+  'budgetten',
+  'spaarquote',
+  'terugkerende_transacties',
+  'nibud_benchmark',
+  'abonnementen',
+  'noodfonds',
+  'trend_inkomen',
+  'trend_uitgaven',
+  'trend_sparen',
+  'trend_schulden',
+  'maandoverzicht',
+  'huishouden_activiteit',
+])
+
 /** Allowed sizes for dynamic budget_fav:* widgets */
 export const BUDGET_FAV_SIZES: WidgetSize[] = ['quarter', 'half', 'full']
 

@@ -338,7 +338,7 @@ export default function GidsPage() {
               howSteps={[
                 { icon: Wallet, text: 'Voeg je bankrekeningen toe' },
                 { icon: CreditCard, text: 'Registreer bezittingen en schulden' },
-                { icon: PieChart, text: 'Stel budgetten in' },
+                { icon: PieChart, text: 'Schat je maanduitgaven of stel budgetten in' },
               ]}
               statusLines={
                 progress
@@ -355,7 +355,7 @@ export default function GidsPage() {
               valueSentence="Je ziet voor het eerst je complete financiële plaatje in vrijheidstijd."
               ctaLabel="Bekijk je vermogen"
               ctaHref="/core"
-              isComplete={!!(progress?.steps.hasAssets && progress?.steps.hasBudgets)}
+              isComplete={!!progress?.steps.hasAssets}
             />
 
             {/* Stap 2: Begrijp je patronen */}
@@ -525,6 +525,9 @@ export default function GidsPage() {
             </GuideFeature>
             <GuideFeature title="Budgetten">
               Vier weergaven voor je maandelijkse uitgaven: lijst, categorie, kalender en vergelijking met NIBUD-normen. Overschrijdingen kosten vrijheidsdagen; besparingen leveren ze op.
+            </GuideFeature>
+            <GuideFeature title="Budgetteren is optioneel">
+              Je hoeft niet elke transactie bij te houden om grip te krijgen op je toekomst. Vul alleen je geschatte maanduitgaven in en TriFinity berekent je vrijheidsdoel, FIRE-pad en aanbevelingen. De AI past zich automatisch aan en focust op vermogensgroei, spaarquote en langetermijnstrategie. Wil je later toch dieper duiken? Zet budgetteren gewoon aan.
             </GuideFeature>
             <GuideFeature title="Schulden">
               Beheer je hypotheek, studieleningen, persoonlijke leningen en creditcardschuld. Vergelijk aflossingsstrategieën (sneeuwbal vs. lawine) en zie hoeveel vrijheidstijd elke betaling oplevert.

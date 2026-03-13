@@ -15,7 +15,7 @@ export default function PropositiePage() {
         <p className="font-display text-xl font-bold leading-snug text-[var(--ink)]">
           TriFinity brengt je financiële leven samen op één plek en begeleidt je bij elke stap
           &mdash; van financieel inzicht naar gepersonaliseerde acties tot financiële
-          onafhankelijkheid.
+          onafhankelijkheid. Zonder dat je elke transactie hoeft bij te houden.
         </p>
       </section>
 
@@ -101,7 +101,7 @@ export default function PropositiePage() {
                 ['Assets', 'Spaargeld, beleggingen, vastgoed, crypto, pensioen'],
                 ['Schulden', 'Hypotheek, leningen, creditcard, studieschuld'],
                 ['Transacties', 'Bankimport (MT940/CAMT.053/CSV), automatisch gecategoriseerd'],
-                ['Budgetteren', 'Budgetten per categorie, maandoverzichten, trends'],
+                ['Budgetteren (optioneel)', 'Budgetten per categorie, maandoverzichten, trends — of werk met geschatte maanduitgaven'],
                 ['Belastingpositie', 'Box 3 berekening, vermogensrendementsheffing'],
                 ['Holdings', 'Beleggingsportefeuille: verdeling, rendement, allocatie'],
               ].map(([name, desc]) => (
@@ -229,7 +229,7 @@ export default function PropositiePage() {
                 ['Filosofie', 'Geld is opgeslagen tijd'],
                 [
                   'Propositie',
-                  'Begeleidt je bij elke stap van financieel inzicht naar gepersonaliseerde acties tot financiële onafhankelijkheid',
+                  'Begeleidt je bij elke stap van financieel inzicht naar financiële onafhankelijkheid — zonder dat je elke transactie hoeft bij te houden',
                 ],
                 [
                   'Emotioneel frame',

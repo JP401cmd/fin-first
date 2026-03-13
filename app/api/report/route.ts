@@ -204,11 +204,28 @@ export async function GET(request: Request) {
       value: Number(s.net_worth),
     }))
 
+    // Build savings-budget ID set (for spaarquote correction)
+    const savingsBudgetIds = new Set<string>()
+    const budgetTypeMap = new Map<string, string>()
+    for (const b of allBudgets) {
+      budgetTypeMap.set(b.id, b.budget_type)
+    }
+    for (const b of allBudgets) {
+      if (b.parent_id) {
+        const parentType = budgetTypeMap.get(b.parent_id)
+        if (parentType) budgetTypeMap.set(b.id, parentType)
+      }
+    }
+    for (const [id, type] of budgetTypeMap) {
+      if (type === 'savings') savingsBudgetIds.add(id)
+    }
+
     // Income & expenses from transactions
     // Build monthly overview
-    const monthSet = new Map<string, { income: number; expenses: number }>()
+    const monthSet = new Map<string, { income: number; expenses: number; savingsBudgetSpent: number }>()
     let totalIncome = 0
     let totalExpenses = 0
+    let totalSavingsBudgetSpent = 0
 
     for (const tx of transactions) {
       const amt = Number(tx.amount)
@@ -216,7 +233,7 @@ export async function GET(request: Request) {
       const monthKey = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`
 
       if (!monthSet.has(monthKey)) {
-        monthSet.set(monthKey, { income: 0, expenses: 0 })
+        monthSet.set(monthKey, { income: 0, expenses: 0, savingsBudgetSpent: 0 })
       }
       const m = monthSet.get(monthKey)!
       if (amt > 0) {
@@ -225,6 +242,11 @@ export async function GET(request: Request) {
       } else {
         m.expenses += Math.abs(amt)
         totalExpenses += Math.abs(amt)
+        // Track savings-budget spend separately
+        if (tx.budget_id && savingsBudgetIds.has(tx.budget_id)) {
+          m.savingsBudgetSpent += Math.abs(amt)
+          totalSavingsBudgetSpent += Math.abs(amt)
+        }
       }
     }
 
@@ -237,18 +259,18 @@ export async function GET(request: Request) {
           label: MONTH_NAMES_NL[m - 1] || month,
           income: Math.round(data.income),
           expenses: Math.round(data.expenses),
-          savings: Math.round(data.income - data.expenses),
+          savings: Math.round(data.income - data.expenses + data.savingsBudgetSpent),
         }
       })
 
-    // Savings rate per month
+    // Savings rate per month (savings budgets count as saving, not expense)
     const savingsRateByPeriod = monthlyOverview.map(m => ({
       month: m.month,
       label: m.label,
       rate: m.income > 0 ? Math.round((m.savings / m.income) * 1000) / 10 : 0,
     }))
 
-    const totalSaved = Math.round(totalIncome - totalExpenses)
+    const totalSaved = Math.round(totalIncome - totalExpenses + totalSavingsBudgetSpent)
     const savingsRate = totalIncome > 0 ? Math.round((totalSaved / totalIncome) * 1000) / 10 : null
 
     const monthsWithData = monthlyOverview.filter(m => m.income > 0 || m.expenses > 0)
@@ -498,7 +520,7 @@ export async function GET(request: Request) {
 
     if (previousPeriods.length > 0) {
       type HistSnapshotRow = { net_worth: number; snapshot_date: string }
-      type HistTxRow = { amount: number }
+      type HistTxRow = { amount: number; budget_id: string | null }
 
       const histFetches = previousPeriods.flatMap(p => [
         supabase
@@ -510,7 +532,7 @@ export async function GET(request: Request) {
           .limit(1),
         supabase
           .from('transactions')
-          .select('amount')
+          .select('amount, budget_id')
           .gte('date', p.from)
           .lt('date', p.to),
       ])
@@ -528,14 +550,20 @@ export async function GET(request: Request) {
         const histNetWorthEnd = snapshots.length > 0 ? Math.round(Number(snapshots[0].net_worth)) : null
         let histIncome = 0
         let histExpenses = 0
+        let histSavingsBudgetSpent = 0
         for (const tx of txs) {
           const amt = Number(tx.amount)
           if (amt > 0) histIncome += amt
-          else histExpenses += Math.abs(amt)
+          else {
+            histExpenses += Math.abs(amt)
+            if (tx.budget_id && savingsBudgetIds.has(tx.budget_id)) {
+              histSavingsBudgetSpent += Math.abs(amt)
+            }
+          }
         }
         histIncome = Math.round(histIncome)
         histExpenses = Math.round(histExpenses)
-        const histSaved = histIncome - histExpenses
+        const histSaved = histIncome - histExpenses + Math.round(histSavingsBudgetSpent)
         const histSavingsRate = histIncome > 0 ? Math.round((histSaved / histIncome) * 1000) / 10 : null
         const histFirePct = fireTarget > 0 && histNetWorthEnd != null
           ? Math.round(Math.min((histNetWorthEnd / fireTarget) * 100, 100) * 10) / 10

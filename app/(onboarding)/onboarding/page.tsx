@@ -70,6 +70,8 @@ const initialState: State = {
     household_type: 'solo',
     number_of_children: 0,
     net_monthly_income: '',
+    estimated_monthly_expenses: '',
+    budgettering_mode: '',
     expected_return: 0.07,
     inflation_rate: 0.02,
     retirement_expense_method: 'essential_budgets',
@@ -152,7 +154,7 @@ export default function OnboardingPage() {
         .single()
 
       if (profile?.onboarding_completed) {
-        router.replace('/will')
+        router.replace('/core')
         return
       }
       setLoading(false)
@@ -199,14 +201,15 @@ export default function OnboardingPage() {
       // Build widget prefs from user preferences
       const widgetPrefs = buildWidgetPrefsFromPreferences(preferences)
 
-      // Determine budgettering mode
-      const hasBudgetAmounts = Object.values(budgetAmounts).some((v) => v > 0)
-      const budgetteringMode = hasBudgetAmounts ? 'manual' : 'none'
+      // Determine budgettering mode from user's explicit choice in identity step
+      const budgetteringMode = state.identity.budgettering_mode === 'none' ? 'none' : 'manual'
 
       const body: Record<string, unknown> = {
         identity: {
           ...identity,
           net_monthly_income: Number(identity.net_monthly_income),
+          estimated_monthly_expenses: identity.estimated_monthly_expenses ? Number(identity.estimated_monthly_expenses) : undefined,
+          budgettering_mode: undefined, // strip from identity — not a profile field
           retirement_custom_amount: identity.retirement_custom_amount ? Number(identity.retirement_custom_amount) : undefined,
           fire_legacy_amount: identity.fire_legacy_amount ? Number(identity.fire_legacy_amount) : undefined,
           fire_end_age: identity.fire_end_strategy === 'deplete' ? identity.fire_end_age : undefined,
@@ -455,7 +458,7 @@ export default function OnboardingPage() {
           )}
 
           {state.step === 'success' && (
-            <OnboardingSuccess onDashboard={() => router.push('/will')} />
+            <OnboardingSuccess onDashboard={() => router.push('/core')} />
           )}
         </StepTransition>
       </div>

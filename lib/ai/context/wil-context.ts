@@ -7,7 +7,7 @@ import { getNibudHouseholdType, getNibudReferences, calculateBenchmarks } from '
  * active recommendations and open actions.
  * Uses real Supabase data.
  */
-export async function buildWilContext(supabase: SupabaseClient): Promise<string> {
+export async function buildWilContext(supabase: SupabaseClient, budgetingActive = true): Promise<string> {
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
@@ -84,66 +84,74 @@ export async function buildWilContext(supabase: SupabaseClient): Promise<string>
   const totalMonthlyExpenses = transactions
     .filter(t => Number(t.amount) < 0 && isRealTx(t))
     .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
-  const dailyExpense = totalMonthlyExpenses > 0 ? (totalMonthlyExpenses * 12) / 365 : 1
-
-  // Identify optimization opportunities (non-essential child budgets with spending)
-  const parentBudgets = budgets.filter(b => !b.parent_id)
-  const nonEssentialParentIds = new Set(
-    parentBudgets
-      .filter(b => !b.is_essential && b.budget_type !== 'income' && b.budget_type !== 'savings' && b.budget_type !== 'debt')
-      .map(b => b.id)
-  )
-
-  const opportunities: string[] = []
-  for (const child of budgets.filter(b => b.parent_id)) {
-    if (!nonEssentialParentIds.has(child.parent_id ?? '')) continue
-    const spent = spendingByBudget[child.id] ?? 0
-    if (spent > 0) {
-      opportunities.push(`${child.name}: ${formatCurrency(spent)}/mnd (= ${formatCurrency(spent * 12)}/jaar richting FIRE-doel)`)
-    }
-  }
 
   const parts: string[] = []
 
-  if (opportunities.length > 0) {
-    parts.push(section('OPTIMALISATIEKANSEN', 'Niet-essentiële uitgaven deze maand:\n' + bulletList(opportunities)))
-  }
-
-  // NIBUD benchmark for Wil context
+  // NIBUD benchmark for Wil context — fetch profile for household type and expense fallback
   const { data: { user } } = await supabase.auth.getUser()
+  let profileEstExpenses = 0
   if (user) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('household_type, number_of_children, children_ages')
+      .select('household_type, number_of_children, children_ages, estimated_monthly_expenses')
       .eq('id', user.id)
       .single()
 
-    if (profile) {
-      const householdType = getNibudHouseholdType(profile)
-      const references = await getNibudReferences(supabase, householdType)
+    profileEstExpenses = Number(profile?.estimated_monthly_expenses ?? 0)
 
-      if (references.length > 0) {
-        // Build spending-by-slug from this month's transactions
-        const spendingBySlug: Record<string, number> = {}
-        for (const child of budgets.filter(b => b.slug)) {
-          const spent = spendingByBudget[child.id] ?? 0
-          if (spent > 0 && child.slug) {
-            spendingBySlug[child.slug] = (spendingBySlug[child.slug] ?? 0) + spent
-          }
+    if (budgetingActive) {
+      const dailyExpense = totalMonthlyExpenses > 0
+        ? (totalMonthlyExpenses * 12) / 365
+        : (profileEstExpenses > 0 ? (profileEstExpenses * 12) / 365 : 0)
+
+      // Identify optimization opportunities (non-essential child budgets with spending)
+      const parentBudgets = budgets.filter(b => !b.parent_id)
+      const nonEssentialParentIds = new Set(
+        parentBudgets
+          .filter(b => !b.is_essential && b.budget_type !== 'income' && b.budget_type !== 'savings' && b.budget_type !== 'debt')
+          .map(b => b.id)
+      )
+
+      const opportunities: string[] = []
+      for (const child of budgets.filter(b => b.parent_id)) {
+        if (!nonEssentialParentIds.has(child.parent_id ?? '')) continue
+        const spent = spendingByBudget[child.id] ?? 0
+        if (spent > 0) {
+          opportunities.push(`${child.name}: ${formatCurrency(spent)}/mnd (= ${formatCurrency(spent * 12)}/jaar richting FIRE-doel)`)
         }
+      }
 
-        const benchmarks = calculateBenchmarks(references, spendingBySlug, dailyExpense)
-        const aboveNorm = benchmarks.filter(b => b.delta > 0 && b.freedom_days_potential > 0)
+      if (opportunities.length > 0) {
+        parts.push(section('OPTIMALISATIEKANSEN', 'Niet-essentiële uitgaven deze maand:\n' + bulletList(opportunities)))
+      }
 
-        if (aboveNorm.length > 0) {
-          const lines = aboveNorm.slice(0, 5).map(b =>
-            `${b.nibud_category_name}: ${formatCurrency(b.user_spending)}/mnd vs NIBUD ${formatCurrency(b.voorbeeld_amount ?? b.basis_amount)}/mnd (+${formatCurrency(b.delta)}, ~${b.freedom_days_potential} dagen/jaar)`
-          )
-          const total = aboveNorm.reduce((s, b) => s + b.freedom_days_potential, 0)
-          parts.push(section(
-            'NIBUD BENCHMARK (boven norm)',
-            bulletList(lines) + `\nTotaal potentieel: ~${total} vrijheidsdagen/jaar`,
-          ))
+      if (profile) {
+        const householdType = getNibudHouseholdType(profile)
+        const references = await getNibudReferences(supabase, householdType)
+
+        if (references.length > 0) {
+          // Build spending-by-slug from this month's transactions
+          const spendingBySlug: Record<string, number> = {}
+          for (const child of budgets.filter(b => b.slug)) {
+            const spent = spendingByBudget[child.id] ?? 0
+            if (spent > 0 && child.slug) {
+              spendingBySlug[child.slug] = (spendingBySlug[child.slug] ?? 0) + spent
+            }
+          }
+
+          const benchmarks = calculateBenchmarks(references, spendingBySlug, dailyExpense)
+          const aboveNorm = benchmarks.filter(b => b.delta > 0 && b.freedom_days_potential > 0)
+
+          if (aboveNorm.length > 0) {
+            const lines = aboveNorm.slice(0, 5).map(b =>
+              `${b.nibud_category_name}: ${formatCurrency(b.user_spending)}/mnd vs NIBUD ${formatCurrency(b.voorbeeld_amount ?? b.basis_amount)}/mnd (+${formatCurrency(b.delta)}, ~${b.freedom_days_potential} dagen/jaar)`
+            )
+            const total = aboveNorm.reduce((s, b) => s + b.freedom_days_potential, 0)
+            parts.push(section(
+              'NIBUD BENCHMARK (boven norm)',
+              bulletList(lines) + `\nTotaal potentieel: ~${total} vrijheidsdagen/jaar`,
+            ))
+          }
         }
       }
     }

@@ -17,6 +17,8 @@ export interface IdentityData {
   household_type: HouseholdType
   number_of_children: number
   net_monthly_income: string
+  estimated_monthly_expenses: string
+  budgettering_mode: 'none' | 'yes' | ''
   // FIRE parameters
   expected_return: number
   inflation_rate: number
@@ -356,6 +358,62 @@ export function OnboardingIdentity({
           ) : (
             <p id="ob-income-hint" className="mt-1 text-xs text-[var(--ink-4)]">Huishouden netto-inkomen (samen als je samenwoont).</p>
           )}
+        </div>
+
+        {/* Budgettering mode */}
+        <div>
+          <span className="mb-2 block text-sm font-medium text-[var(--ink-2)]">
+            Wil je budgetten instellen?
+          </span>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+            {([
+              { mode: 'yes' as const, label: 'Ja, ik wil budgetteren', desc: 'Stel budgetten in de volgende stap in' },
+              { mode: 'none' as const, label: 'Nee, niet nu', desc: 'Je kunt dit later alsnog doen' },
+            ]).map(({ mode, label, desc }) => {
+              const isSelected = data.budgettering_mode === mode
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => onChange({ ...data, budgettering_mode: mode })}
+                  className={`flex min-h-[56px] items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-all active:scale-[0.98] ${
+                    isSelected
+                      ? 'border-wil-500 bg-wil-50 shadow-sm'
+                      : 'border-[var(--border-ed)] bg-[var(--subtle)] hover:border-[var(--border-md)] hover:bg-[var(--paper)]'
+                  }`}
+                >
+                  <div>
+                    <p className={`text-sm font-semibold ${isSelected ? 'text-wil-700' : 'text-[var(--ink-2)]'}`}>{label}</p>
+                    <p className={`text-xs ${isSelected ? 'text-wil-600' : 'text-[var(--ink-3)]'}`}>{desc}</p>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Estimated monthly expenses — shown when budgettering is 'none' */}
+          <div className={`overflow-hidden transition-all duration-300 ${data.budgettering_mode === 'none' ? 'max-h-40 opacity-100 mt-4' : 'max-h-0 opacity-0'}`}>
+            <label htmlFor="ob-estimated-expenses" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
+              Wat zijn je geschatte maandelijkse uitgaven?
+            </label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]">&euro;</span>
+              <input
+                id="ob-estimated-expenses"
+                type="text"
+                inputMode="decimal"
+                value={data.estimated_monthly_expenses}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9.,]/g, '')
+                  onChange({ ...data, estimated_monthly_expenses: val })
+                }}
+                placeholder="0"
+                autoComplete="off"
+                className="w-full rounded-xl bg-[var(--subtle)] py-2.5 pr-3 pl-7 text-base text-[var(--ink)] outline-none border border-[var(--border-ed)] focus:border-wil-500 focus:ring-1 focus:ring-wil-500 sm:text-sm"
+              />
+            </div>
+            <p className="mt-1 text-xs text-[var(--ink-4)]">Een ruwe schatting is voldoende — dit helpt bij het berekenen van je vrijheidsdoel</p>
+          </div>
         </div>
       </div>
 

@@ -111,6 +111,9 @@ const mockData: DashboardData = {
   topRecommendations: [],
   topLifeEvents: [],
   savingsRate6m: 27,
+  monthlySavingsBudgetSpent: 0,
+  savingsBudgetSpent6m: 0,
+  prevMonthSavingsBudgetSpent: 0,
   budgetingActive: true,
   householdOverrides: null,
   partnerOverrides: null,
@@ -165,12 +168,12 @@ describe('DraggableWidgetGrid', () => {
     )
 
     const item = screen.getByTestId('widget-item-fire_prognose')
-    expect(item.className).toContain('sm:col-span-2')
+    expect(item.className).toContain('col-span-2')
     expect(item.className).toContain('row-span-2')
     expect(item.className).not.toContain('col-span-4')
   })
 
-  it('applies sm:col-span-2 to half-size widgets (2 cols wide, 1 row)', () => {
+  it('applies col-span-2 to half-size widgets (2 cols wide, 1 row)', () => {
     const prefs = makePrefs(['netto_vermogen'], ['half'])
     render(
       <DraggableWidgetGrid
@@ -181,7 +184,7 @@ describe('DraggableWidgetGrid', () => {
     )
 
     const item = screen.getByTestId('widget-item-netto_vermogen')
-    expect(item.className).toContain('sm:col-span-2')
+    expect(item.className).toContain('col-span-2')
     expect(item.className).not.toContain('row-span-2')
   })
 

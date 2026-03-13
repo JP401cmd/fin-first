@@ -44,6 +44,98 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'fin_prod_0.85',
+    date: '2026-03-13',
+    title:
+      'Optionele budgettering, multi-view vermogensprognose, cash-overzicht & AI zonder budgetdata',
+    sections: [
+      {
+        module: 'De Kern — Vermogen & Cash',
+        color: 'amber',
+        items: [
+          {
+            title: 'Budgettering aan/uit per rekening',
+            description:
+              'Nieuw toggle has_budget_tracking op elke cashrekening. Via het instellingenmenu kun je per rekening bepalen of transacties meetellen in budgetoverzichten. Bij uitschakelen van de laatste trackingrekening wordt automatisch budgeting_active=false gezet met bevestigingsdialoog.',
+          },
+          {
+            title: 'Multi-view vermogensprognose',
+            description:
+              'De bucket projection chart heeft nu 4 switchbare views: Nominaal vs Reëel (netto vermogen in huidige euro\'s vs koopkracht), Opbouw (gestapeld per assettype), Inkomen & Spaarquote (projectie van inkomen en spaargedrag), en Box 3 Belasting (jaarlijkse belastingdruk nominaal en reëel). Smooth slide-animaties tussen views met contextberichten per view.',
+          },
+          {
+            title: 'Nieuw cash-overzicht component',
+            description:
+              'Compleet herontworpen cash-overzicht met liquiditeitshero en vrijheidstijd-badge, rekeningengrid met saldobalken, maand-voor-maand geldstroomoverzicht met inkomen per rekening en uitgaven per budget, netto resultaat, en quick-action knoppen voor import, bankconnect en overboekingen. Kassabon-modals voor gedetailleerde inspectie.',
+          },
+          {
+            title: 'Asset-instellingenmenu',
+            description:
+              'Gekoppelde assets hebben nu een instellingenmenu met directe bewerkingsmogelijkheden: naam, waarde, IBAN, bank, type, netto-vermogen inclusiepercentage, en de budget-tracking toggle.',
+          },
+          {
+            title: 'Spaarquote-berekening gecorrigeerd',
+            description:
+              'Transacties gekoppeld aan spaardoelen (budget_type=savings) worden nu correct als sparen geteld in plaats van als uitgave. Doorwerking in dashboard, core-pagina, rapportages en widgets.',
+          },
+        ],
+      },
+      {
+        module: 'De Wil — Acties & Aanbevelingen',
+        color: 'teal',
+        items: [
+          {
+            title: 'AI-context zonder budgetdata',
+            description:
+              'Wanneer budgettering uit staat, skippen buildWilContext en buildRecommendationContext alle budget-specifieke secties. Systeemprompts bevatten een GEEN BUDGETTERING-instructie: AI stelt geen budget-optimalisaties voor maar focust op vermogensgroei, schulden, spaarquote en beleggingen.',
+          },
+          {
+            title: 'Profiel-schattingen als fallback',
+            description:
+              'Bij ontbrekende transactiedata gebruikt het systeem estimated_monthly_expenses uit het profiel voor NIBUD-benchmarks, pensioenberekeningen en AI-context.',
+          },
+        ],
+      },
+      {
+        module: 'Onboarding',
+        color: 'blue',
+        items: [
+          {
+            title: 'Budgetteringskeuze bij onboarding',
+            description:
+              'Nieuwe stap: Wil je budgetten instellen? met opties Ja en Niet nu. Bij Niet nu wordt gevraagd naar geschatte maandelijkse uitgaven als fallback. budgeting_mode bepaalt welke features actief worden.',
+          },
+          {
+            title: 'Redirect naar De Kern',
+            description:
+              'Na succesvolle onboarding wordt nu doorgestuurd naar /core in plaats van /will, zodat gebruikers direct hun complete financiële overzicht zien.',
+          },
+        ],
+      },
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Navigatie-activering met animatie',
+            description:
+              'Navigatie-items die requiresActivation zijn worden verborgen totdat de gebruiker features activeert. Bij activering verschijnen ze met een nav-reveal animatie. Respecteert prefers-reduced-motion.',
+          },
+          {
+            title: 'Budgettering aan/uit architectuur',
+            description:
+              'Twee-laags systeem: gebruikersniveau (budgeting_active) en rekeningniveau (has_budget_tracking) met auto-sync bij opslaan of verwijderen van cash-assets. 18 budget-gerelateerde widgets worden automatisch verborgen wanneer budgettering uit staat.',
+          },
+          {
+            title: 'Databasemigratie estimated_monthly_expenses',
+            description:
+              'Nieuwe kolom profiles.estimated_monthly_expenses (numeric, nullable) voor gebruikers zonder transactietracking. Rapportage-endpoint verbeterd met per-maand tracking van spaardoel-transacties en correcte spaarquote.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: 'fin_prod_0.84',
     date: '2026-03-12',
     title:

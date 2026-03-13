@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bell, Lock } from 'lucide-react'
+import { Bell } from 'lucide-react'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
@@ -34,7 +34,9 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
   const { needsActivation } = useFeatureAccess()
   const { unreadCount, openModal } = useNotifications()
 
-  const navItems = staticNavItems
+  const navItems = needsActivation
+    ? staticNavItems.filter(i => !i.requiresActivation)
+    : staticNavItems
 
   // Close dropdown on click outside or Escape
   useEffect(() => {
@@ -66,23 +68,19 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
           <nav className="hidden items-center gap-1 md:flex">
             {navItems.map((item) => {
               const isActive = pathname.startsWith(item.href)
-              const isLocked = item.requiresActivation && needsActivation
               return (
                 <Link
                   key={item.label}
                   href={item.href}
                   className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors border-b-3 ${
+                    item.requiresActivation ? 'animate-nav-reveal' : ''
+                  } ${
                     isActive
                       ? `${activeClasses[item.color]}`
-                      : isLocked
-                        ? 'text-[var(--ink-4)] border-transparent hover:text-[var(--ink-3)]'
-                        : `text-[var(--ink-3)] border-transparent ${hoverClasses[item.color]}`
+                      : `text-[var(--ink-3)] border-transparent ${hoverClasses[item.color]}`
                   }`}
                 >
-                  <span className="flex items-center gap-1">
-                    {item.label}
-                    {isLocked && <Lock className="h-2.5 w-2.5 opacity-50" />}
-                  </span>
+                  {item.label}
                 </Link>
               )
             })}

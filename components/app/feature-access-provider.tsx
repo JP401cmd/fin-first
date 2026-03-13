@@ -4,7 +4,6 @@ import { createContext, useContext, useState, type ReactNode } from 'react'
 import type { FeatureAccessData } from '@/lib/compute-feature-access'
 import { FEATURES, DEFAULT_MATRIX } from '@/lib/feature-phases'
 import { PhaseTransitionModal } from '@/components/app/phase-transition-modal'
-import { ActivationButton } from '@/components/app/activation-button'
 
 type FeatureAccessContextValue = FeatureAccessData & {
   needsActivation: boolean
@@ -55,9 +54,6 @@ export function FeatureAccessProvider({
           newPhase={phaseTransition.newPhase}
           onClose={() => setShowTransitionModal(false)}
         />
-      )}
-      {needsActivation && !showTransitionModal && (
-        <ActivationButton data={data} />
       )}
     </FeatureAccessContext.Provider>
   )

@@ -40,7 +40,7 @@ import { VrijheidsdagenMaandWidget } from './vrijheidsdagen-maand-widget'
 import { WilskrachtWidget } from './wilskracht-widget'
 import { BerichtenWidget } from './berichten-widget'
 import { BudgetTrendWidget } from './budget-trend-widget'
-import { getWidgetDef, WIDGET_HREFS, WIDGET_FEATURE_MAP } from '@/lib/widget-catalog'
+import { getWidgetDef, WIDGET_HREFS, WIDGET_FEATURE_MAP, BUDGET_WIDGETS } from '@/lib/widget-catalog'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { FireProjection, FireRange, FireCountdown } from '@/lib/horizon-data'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
@@ -282,6 +282,10 @@ export interface DashboardData {
   topLifeEvents: TopLifeEvent[]
   // 6-month rolling average savings rate (%)
   savingsRate6m: number
+  // Savings-budget amounts (for spaarquote correction)
+  monthlySavingsBudgetSpent: number
+  savingsBudgetSpent6m: number
+  prevMonthSavingsBudgetSpent: number
   // Whether user actively chose to budget during onboarding
   budgetingActive: boolean
   // Household perspective overrides (null if no household)
@@ -338,6 +342,9 @@ interface WidgetRendererProps {
 }
 
 export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps) {
+  // Hide budget-related widgets when budgeting is off
+  if (!data.budgetingActive && (BUDGET_WIDGETS.has(id) || id.startsWith('budget_fav:'))) return null
+
   // Handle dynamic favorite budget widgets
   if (id.startsWith('budget_fav:')) {
     const budgetId = id.slice('budget_fav:'.length)

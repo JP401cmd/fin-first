@@ -10,6 +10,7 @@ const bodySchema = z.object({
     household_type: z.enum(['solo', 'samen', 'gezin']),
     number_of_children: z.number().int().min(0).default(0),
     net_monthly_income: z.number().positive(),
+    estimated_monthly_expenses: z.number().positive().optional(),
     // FIRE parameters (optional, with sensible defaults)
     expected_return: z.number().min(0.01).max(0.20).optional(),
     inflation_rate: z.number().min(0).max(0.10).optional(),
@@ -121,6 +122,8 @@ export async function POST(req: Request) {
       budgeting_active: budgetteringMode !== 'none',
       updated_at: new Date().toISOString(),
     }
+    // Add estimated monthly expenses if provided
+    if (identity.estimated_monthly_expenses != null) profileData.estimated_monthly_expenses = identity.estimated_monthly_expenses
     // Add FIRE parameters if provided
     if (identity.expected_return != null) profileData.expected_return = identity.expected_return
     if (identity.inflation_rate != null) profileData.inflation_rate = identity.inflation_rate

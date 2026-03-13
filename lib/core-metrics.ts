@@ -58,13 +58,15 @@ export function computeFreedomTime(
   }
 }
 
-/** Savings rate as percentage of income. */
+/** Savings rate as percentage of income.
+ *  savingsBudgetSpent: absolute amount spent on savings-type budgets (counted as saving, not expense). */
 export function computeSavingsRate(
   monthlyIncome: number,
   monthlyExpenses: number,
+  savingsBudgetSpent = 0,
 ): number {
   if (monthlyIncome <= 0) return 0
-  return ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100
+  return ((monthlyIncome - monthlyExpenses + savingsBudgetSpent) / monthlyIncome) * 100
 }
 
 // ── Input: raw financial data from DB ────────────────────────

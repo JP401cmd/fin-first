@@ -37,7 +37,7 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
       if (!user) return { data: null }
       return supabase
         .from('profiles')
-        .select('full_name, temporal_balance, household_type, date_of_birth, retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate')
+        .select('full_name, temporal_balance, household_type, date_of_birth, retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active')
         .eq('id', user.id)
         .single()
     }),
@@ -70,6 +70,12 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
   const monthlyIncome = Math.round(totalIncome / monthsOfData)
   const monthlyExpenses = Math.round(totalExpenses / monthsOfData)
 
+  // Fallback to profile estimates for users without transactions
+  const profileMonthlyIncome = Number(profile?.net_monthly_income ?? 0)
+  const profileMonthlyExpenses = Number(profile?.estimated_monthly_expenses ?? 0)
+  const effectiveMonthlyIncome = monthlyIncome > 0 ? monthlyIncome : profileMonthlyIncome
+  const effectiveMonthlyExpenses = monthlyExpenses > 0 ? monthlyExpenses : profileMonthlyExpenses
+
   const last12Income = totalIncome  // already summed over the now-12-month window
   const extrapolatedYearlyIncome = monthsOfData > 0 ? (last12Income / monthsOfData) * 12 : 0
 
@@ -85,6 +91,7 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     yearlyMustExpenses,
     extrapolatedYearlyIncome,
     profile?.retirement_expense_custom_amount,
+    profileMonthlyExpenses * 12,
   )
   const monthlyRetirementExpenses = yearlyRetirementExpenses > 0 ? Math.round(yearlyRetirementExpenses / 12) : 0
 
@@ -111,7 +118,7 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
 
   const fireParams = resolveFireParams(profile ?? {})
   const coreInput: FinancialInput = {
-    totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
+    totalAssets, totalDebts, monthlyIncome: effectiveMonthlyIncome, monthlyExpenses: effectiveMonthlyExpenses,
     yearlyMustExpenses: yearlyRetirementExpenses, monthlyContributions: 0, dateOfBirth: null,
   }
   const core = computeCoreData(coreInput, fireParams.effectiveSwr)
@@ -122,14 +129,15 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     `Vrijheids-%: ${formatPercentage(core.freedomPercentage)}`,
     `FIRE-doel: ${formatCurrency(core.fireTarget)}`,
     `Verwachte FIRE-datum: ${core.expectedFireDate || 'onbekend'}`,
-    `Maandinkomen: ${formatCurrency(monthlyIncome)} | Maanduitgaven: ${formatCurrency(monthlyExpenses)}`,
+    `Maandinkomen: ${formatCurrency(effectiveMonthlyIncome)} | Maanduitgaven: ${formatCurrency(effectiveMonthlyExpenses)}`,
     monthlyMustExpenses > 0 ? `Must-uitgaven (essentieel): ${formatCurrency(monthlyMustExpenses)}/mnd` : null,
     monthlyRetirementExpenses > 0 ? `Jaarlijkse uitgave na retirement: ${formatCurrency(monthlyRetirementExpenses)}/mnd (methode: ${profile?.retirement_expense_method ?? 'essential_budgets'}) — basis voor FIRE & vrijheidsdagen` : null,
-    `Spaarquote: ${formatPercentage(core.savingsRate)}`,
+    `Spaarquote: ${formatPercentage(core.savingsRate)} (bewust sparen telt mee als besparing, niet als uitgave)`,
     `Dagen vrijheid verdiend per maand: ${core.daysWonPerMonth}`,
     `Vrije dagen per jaar (passief inkomen): ${core.freeDaysPerYear}`,
     `Autonomiescore: ${core.autonomyScore}`,
     `Dagelijkse uitgaven: ${formatCurrency(Math.round(core.yearlyExpenses / 365))}`,
+    `Budgettering: ${profile?.budgeting_active !== false ? 'actief' : 'NIET actief — gebruiker budgetteert niet. Doe GEEN budget-gerelateerde voorstellen.'}`,
   ]
 
   return identitySection + section('FINANCIEEL OVERZICHT', (lines.filter(Boolean) as string[]).join('\n'))

@@ -75,4 +75,11 @@ Wanneer NIBUD benchmarks in de context staan:
 
 == OUTPUT ==
 Genereer gestructureerde JSON met titel, beschrijving, type, impact in euro's en vrijheidsdagen, en concrete acties.
+
+== GEEN BUDGETTERING ==
+Als de context vermeldt dat de gebruiker NIET budgetteert:
+- Genereer GEEN budget_optimization voorstellen
+- Focus op: asset_reallocation, debt_acceleration, income_increase, savings_boost
+- Gebruik profielschattingen (geschatte maanduitgaven) i.p.v. budgetcategorieën
+- NIBUD-vergelijkingen zijn niet beschikbaar — baseer besparingsadvies op totale geschatte uitgaven
 `

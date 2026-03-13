@@ -1,7 +1,7 @@
 'use client'
 
-import { CashAccountView } from '@/components/app/cash-account-view'
+import { CashOverview } from '@/components/app/cash-overview'
 
 export default function CashAllPage() {
-  return <CashAccountView backHref="/core/assets" backLabel="Assets" />
+  return <CashOverview />
 }

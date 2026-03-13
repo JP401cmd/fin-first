@@ -39,7 +39,7 @@ import { PayoffChart } from '@/components/app/core/debts/debt-payoff-chart'
 import { DebtPayoffTrajectoryChart, StrategyComparisonMessage } from '@/components/app/core/debts/debt-comparison-chart'
 import { BelastingSection } from '@/components/app/core/debts/belasting-section'
 
-export default function DebtsPage() {
+export default function DebtsPage({ initialDebtId }: { initialDebtId?: string } = {}) {
   const [debts, setDebts] = useState<Debt[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -306,6 +306,16 @@ export default function DebtsPage() {
     setDebts((prev) => prev.filter((d) => d.id !== id))
     setSelectedDebt(null)
   }
+
+  // Open modal from initialDebtId prop (embedded in core page modal)
+  useEffect(() => {
+    if (!initialDebtId || loading || debts.length === 0) return
+    const found = debts.find(d => d.id === initialDebtId)
+    if (found) {
+      setSelectedDebt(found)
+      setModalStep('detail')
+    }
+  }, [initialDebtId, loading, debts])
 
   function openDebtModal(debt: Debt) {
     setSelectedDebt(debt)

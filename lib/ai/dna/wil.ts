@@ -70,6 +70,13 @@ Je ontvangt geanonimiseerde financiele data (geen namen, IBANs, adressen).
 Als je onverhoopt PII detecteert: NEGEER deze en gebruik ze NIET in je output.
 Refereer aan de gebruiker als je/jij, nooit bij naam.
 Noem nooit specifieke banken, werkgevers of adressen in je output.
+
+== GEEN BUDGETTERING ==
+Als de context vermeldt dat de gebruiker NIET budgetteert:
+- Stel GEEN budget-optimalisatie acties voor (geen "verlaag budget X", "bespaar op categorie Y")
+- Stel GEEN NIBUD-vergelijkingen voor
+- Focus op: vermogensgroei, schulden aflossen, spaarquote, beleggingen, inkomen verhogen
+- Je mag WEL vragen of de gebruiker wil beginnen met budgetteren als inzicht-tip, maar dring niet aan
 `
 
 /**

@@ -180,7 +180,7 @@ export default function HorizonPage() {
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate').single(),
+        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses').single(),
         supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
         supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         supabase
@@ -212,6 +212,12 @@ export default function HorizonPage() {
         else monthlyExpenses += Math.abs(amt)
       }
 
+      // Fallback to profile estimates for users without transactions
+      const profileMonthlyIncome = Number(profileResult.data?.net_monthly_income ?? 0)
+      const profileMonthlyExpenses = Number(profileResult.data?.estimated_monthly_expenses ?? 0)
+      const effectiveMonthlyIncome = monthlyIncome > 0 ? monthlyIncome : profileMonthlyIncome
+      const effectiveMonthlyExpenses = monthlyExpenses > 0 ? monthlyExpenses : profileMonthlyExpenses
+
       // 6-month average income/expenses for stable resilience calculation
       let totalIncome6m = 0
       let totalExpenses6m = 0
@@ -220,8 +226,8 @@ export default function HorizonPage() {
         if (amt > 0) totalIncome6m += amt
         else totalExpenses6m += Math.abs(amt)
       }
-      const avgInc6 = totalIncome6m / 6
-      const avgExp6 = totalExpenses6m / 6
+      const avgInc6 = totalIncome6m > 0 ? totalIncome6m / 6 : effectiveMonthlyIncome
+      const avgExp6 = totalExpenses6m > 0 ? totalExpenses6m / 6 : effectiveMonthlyExpenses
       setAvgIncome6m(avgInc6)
       setAvgExpenses6m(avgExp6)
 
@@ -258,6 +264,7 @@ export default function HorizonPage() {
         yearlyMustExpenses,
         extrapolatedIncome,
         profileResult.data?.retirement_expense_custom_amount,
+        profileMonthlyExpenses * 12,
       )
 
       const dob = profileResult.data?.date_of_birth ?? null
@@ -282,7 +289,7 @@ export default function HorizonPage() {
       setMonthlyDividendIncome(dividendMonthly)
 
       const horizonInput: FinancialInput = {
-        totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
+        totalAssets, totalDebts, monthlyIncome: effectiveMonthlyIncome, monthlyExpenses: effectiveMonthlyExpenses,
         monthlyContributions, yearlyMustExpenses: yearlyRetirementExpenses, dateOfBirth: dob,
       }
 

@@ -35,7 +35,7 @@ import { CashAccountView } from '@/components/app/cash-account-view'
 
 type Mortgage = { id: string; name: string; current_balance: number; linked_asset_id: string | null }
 
-export default function AssetsPage() {
+export default function AssetsPage({ initialAssetId }: { initialAssetId?: string } = {}) {
   const router = useRouter()
   const [assets, setAssets] = useState<Asset[]>([])
   const [mortgages, setMortgages] = useState<Mortgage[]>([])
@@ -51,6 +51,7 @@ export default function AssetsPage() {
   const [valuations, setValuations] = useState<Record<string, Valuation[]>>({})
   const [dailyExpenses, setDailyExpenses] = useState(0)
   const [showCashModal, setShowCashModal] = useState(false)
+  const [budgetingActive, setBudgetingActive] = useState(true)
   const seedingRef = useRef(false)
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
@@ -114,7 +115,7 @@ export default function AssetsPage() {
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
         const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
 
-        const [mortgageResult, txResult, bankLinksResult] = await Promise.all([
+        const [mortgageResult, txResult, bankLinksResult, profileBaResult] = await Promise.all([
           supabase
             .from('debts')
             .select('id, name, current_balance, linked_asset_id')
@@ -131,11 +132,16 @@ export default function AssetsPage() {
             .select('id, linked_asset_id, balance')
             .not('linked_asset_id', 'is', null)
             .eq('is_active', true),
+          supabase
+            .from('profiles')
+            .select('budgeting_active')
+            .single(),
         ])
 
         if (signal?.aborted) return // Discard stale results after parallel queries
 
         if (mortgageResult.data) setMortgages(mortgageResult.data as Mortgage[])
+        setBudgetingActive(profileBaResult.data?.budgeting_active !== false)
 
         // Build linked bank account map (asset_id → bank_account)
         const linksMap = new Map<string, { id: string; linked_asset_id: string }>(
@@ -269,10 +275,41 @@ export default function AssetsPage() {
 
   async function deleteAsset(id: string) {
     const supabase = createClient()
+    // Check if this is a cash asset before deleting (for budgeting_active sync)
+    const deletedAsset = assets.find(a => a.id === id)
     await supabase.from('assets').delete().eq('id', id)
     setAssets((prev) => prev.filter((a) => a.id !== id))
     setSelectedAsset(null)
+
+    // After delete: sync budgeting_active if deleted asset was a cash type
+    if (deletedAsset?.asset_type === 'cash') {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: trackingAssets } = await supabase
+          .from('assets')
+          .select('id')
+          .eq('asset_type', 'cash')
+          .eq('has_budget_tracking', true)
+          .eq('is_active', true)
+
+        const hasAnyBudgetTracking = (trackingAssets?.length ?? 0) > 0
+        await supabase
+          .from('profiles')
+          .update({ budgeting_active: hasAnyBudgetTracking })
+          .eq('id', user.id)
+      }
+    }
   }
+
+  // Open modal from initialAssetId prop (embedded in core page modal)
+  useEffect(() => {
+    if (!initialAssetId || loading || assets.length === 0) return
+    const found = assets.find(a => a.id === initialAssetId)
+    if (found) {
+      setSelectedAsset(found)
+      setModalStep('detail')
+    }
+  }, [initialAssetId, loading, assets])
 
   function openAssetModal(asset: Asset) {
     setSelectedAsset(asset)
@@ -499,7 +536,7 @@ export default function AssetsPage() {
               {/* Group header */}
               <div className="flex items-center gap-2 pt-4 pb-1.5">
                 <span style={{ color: groupColor }}><BudgetIcon name={groupIcon} className="h-4 w-4" /></span>
-                {isCash ? (
+                {isCash && budgetingActive && group.assets.some(a => linkedBankAccounts.has(a.id)) ? (
                   <button
                     onClick={() => setShowCashModal(true)}
                     className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)] hover:text-kern-600 transition-colors cursor-pointer"
@@ -530,7 +567,7 @@ export default function AssetsPage() {
                     <div
                       key={asset.id}
                       className={`flex cursor-pointer items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 transition-colors ${
-                        isCash ? 'hover:border-emerald-200 hover:bg-emerald-50/30' : 'hover:border-kern-200 hover:bg-kern-50/30'
+                        hasBudget ? 'hover:border-emerald-200 hover:bg-emerald-50/30' : 'hover:border-kern-200 hover:bg-kern-50/30'
                       }`}
                       onClick={() => handleAssetClick(asset)}
                     >
@@ -551,7 +588,7 @@ export default function AssetsPage() {
                           )}
                         </p>
                         <p className="truncate text-xs text-[var(--ink-3)]">
-                          {isCash
+                          {hasBudget
                             ? [
                                 asset.subtype && ASSET_SUBTYPE_LABELS.cash?.[asset.subtype],
                                 asset.account_number,
@@ -619,7 +656,7 @@ export default function AssetsPage() {
                         )}
                       </div>
                       {/* Mini sparkline for non-cash asset cards */}
-                      {!isCash && (() => {
+                      {!hasBudget && (() => {
                         const assetVals = valuations[asset.id]
                         if (assetVals && assetVals.length >= 2) {
                           const sorted = [...assetVals].sort((a, b) => a.valuation_date.localeCompare(b.valuation_date))
@@ -630,11 +667,11 @@ export default function AssetsPage() {
                       <div className="shrink-0 text-right">
                         <p className="text-sm font-semibold text-[var(--ink)]">{formatCurrency(value)}</p>
                         {dailyExpenses > 0 && value > 0 && (
-                          <p className={`text-[10px] ${isCash ? 'text-emerald-500/70' : 'text-kern-500/70'}`} data-testid="asset-card-freedom">
+                          <p className={`text-[10px] ${hasBudget ? 'text-emerald-500/70' : 'text-kern-500/70'}`} data-testid="asset-card-freedom">
                             {formatFreedomTimeString(calculateFreedomTime(value, dailyExpenses), 'short', true)} vrijheid
                           </p>
                         )}
-                        {!isCash && purchase > 0 && (
+                        {!hasBudget && purchase > 0 && (
                           <p className={`text-xs font-medium ${returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                             {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}%
                           </p>
@@ -672,12 +709,19 @@ export default function AssetsPage() {
           onClose={() => setModalStep('detail')}
           onSaved={() => {
             setModalStep('detail')
-            loadAssets().then(() => {
+            loadAssets().then(async () => {
               // Refresh selectedAsset with updated data
               const supabase = createClient()
-              supabase.from('assets').select('*').eq('id', selectedAsset.id).single().then(({ data }) => {
-                if (data) setSelectedAsset(data as Asset)
-              })
+              const [assetRes, profileRes] = await Promise.all([
+                supabase.from('assets').select('*').eq('id', selectedAsset.id).single(),
+                supabase.from('profiles').select('budgeting_active, net_monthly_income, estimated_monthly_expenses').single(),
+              ])
+              if (assetRes.data) setSelectedAsset(assetRes.data as Asset)
+              const nowInactive = profileRes.data?.budgeting_active === false
+              setBudgetingActive(!nowInactive)
+              if (nowInactive && (!profileRes.data?.net_monthly_income || !profileRes.data?.estimated_monthly_expenses)) {
+                router.push('/core?showEstimates=true')
+              }
             })
           }}
         />
@@ -715,7 +759,15 @@ export default function AssetsPage() {
             setShowForm(false)
             setEditAsset(null)
             setNewAssetType(null)
-            loadAssets()
+            loadAssets().then(async () => {
+              const supabase = createClient()
+              const { data } = await supabase.from('profiles').select('budgeting_active, net_monthly_income, estimated_monthly_expenses').single()
+              const nowInactive = data?.budgeting_active === false
+              setBudgetingActive(!nowInactive)
+              if (nowInactive && (!data?.net_monthly_income || !data?.estimated_monthly_expenses)) {
+                router.push('/core?showEstimates=true')
+              }
+            })
           }}
         />
       )}
@@ -2116,6 +2168,9 @@ function AssetForm({
   const isEdit = !!asset
   const [hasActiveHoldings, setHasActiveHoldings] = useState(false)
   const [holdingsCount, setHoldingsCount] = useState(0)
+  // Budget tracking confirmation state
+  const [showBudgetConfirm, setShowBudgetConfirm] = useState(false)
+  const [otherTrackingCount, setOtherTrackingCount] = useState<number | null>(null)
 
   const [name, setName] = useState(asset?.name ?? '')
   const [assetType, setAssetType] = useState<AssetType>(asset?.asset_type ?? defaultType ?? 'savings')
@@ -2136,6 +2191,23 @@ function AssetForm({
         .catch(() => { /* non-critical */ })
     }
   }, [isEdit, asset])
+
+  // Query how many OTHER cash assets have budget tracking (for last-account confirmation)
+  useEffect(() => {
+    if (isEdit && asset?.asset_type === 'cash' && asset.has_budget_tracking) {
+      const supabase = createClient()
+      supabase
+        .from('assets')
+        .select('id')
+        .eq('asset_type', 'cash')
+        .eq('has_budget_tracking', true)
+        .eq('is_active', true)
+        .neq('id', asset.id)
+        .then(({ data }) => {
+          setOtherTrackingCount(data?.length ?? 0)
+        })
+    }
+  }, [isEdit, asset?.id, asset?.asset_type, asset?.has_budget_tracking])
   const [purchaseDate, setPurchaseDate] = useState(asset?.purchase_date ?? '')
   const [expectedReturn, setExpectedReturn] = useState(String(asset?.expected_return ?? TYPICAL_RETURNS.savings))
   const [monthlyContribution, setMonthlyContribution] = useState(String(asset?.monthly_contribution ?? '0'))
@@ -2308,9 +2380,6 @@ function AssetForm({
       depreciation_rate: depreciationRate ? Number(depreciationRate) : null,
       address_postcode: addressPostcode || null,
       address_house_number: addressHouseNumber || null,
-      expiry_date: expiryDate || null,
-      beneficiary: beneficiary || null,
-      linked_asset_id: subtype === 'dga_lening' ? (linkedAssetId || null) : null,
       // Household fields
       ownership: ownership,
       household_id: ownership === 'shared' ? householdId : null,
@@ -2325,7 +2394,8 @@ function AssetForm({
     let assetId: string | undefined
 
     if (isEdit && asset) {
-      await supabase.from('assets').update(row).eq('id', asset.id)
+      const { error: updateErr } = await supabase.from('assets').update(row).eq('id', asset.id)
+      if (updateErr) { console.error('ASSET UPDATE FAILED:', updateErr); setSaving(false); return }
       assetId = asset.id
 
       // Auto-track valuation when current_value changes
@@ -2375,6 +2445,44 @@ function AssetForm({
           balance: Number(currentValue) || 0,
         }).eq('id', existingBA.id)
       }
+    }
+
+    // Cleanup linked bank_account when budget tracking is turned OFF
+    if (isCashType && !hasBudgetTracking && isEdit && asset?.has_budget_tracking && assetId) {
+      const { data: linkedBA } = await supabase
+        .from('bank_accounts')
+        .select('id')
+        .eq('linked_asset_id', assetId)
+        .maybeSingle()
+
+      if (linkedBA) {
+        const { count } = await supabase
+          .from('transactions')
+          .select('id', { count: 'exact', head: true })
+          .eq('account_id', linkedBA.id)
+
+        if (count === 0) {
+          await supabase.from('bank_accounts').delete().eq('id', linkedBA.id)
+        } else {
+          await supabase.from('bank_accounts').update({ linked_asset_id: null }).eq('id', linkedBA.id)
+        }
+      }
+    }
+
+    // After save: sync budgeting_active with has_budget_tracking status
+    if (isCashType) {
+      const { data: trackingAssets } = await supabase
+        .from('assets')
+        .select('id')
+        .eq('asset_type', 'cash')
+        .eq('has_budget_tracking', true)
+        .eq('is_active', true)
+
+      const hasAnyBudgetTracking = (trackingAssets?.length ?? 0) > 0
+      await supabase
+        .from('profiles')
+        .update({ budgeting_active: hasAnyBudgetTracking })
+        .eq('id', user.id)
     }
 
     setSaving(false)
@@ -2580,20 +2688,67 @@ function AssetForm({
 
           {/* Budget tracking toggle (cash only) */}
           {assetType === 'cash' && (
-            <label className="flex items-start gap-3 rounded-[var(--r)] border border-emerald-200 bg-emerald-50/30 p-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={hasBudgetTracking}
-                onChange={(e) => setHasBudgetTracking(e.target.checked)}
-                className="mt-0.5 rounded border-[var(--border-md)]"
-              />
-              <div>
-                <span className="text-sm font-medium text-[var(--ink)]">Budgetten & transacties</span>
-                <p className="text-xs text-[var(--ink-3)]">
-                  Schakel in om transacties te importeren, budgetcategorieën te koppelen, en cashflow te voorspellen.
-                </p>
-              </div>
-            </label>
+            <>
+              <label className="flex items-start gap-3 rounded-[var(--r)] border border-emerald-200 bg-emerald-50/30 p-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={hasBudgetTracking}
+                  onChange={(e) => {
+                    const wantsToDisable = !e.target.checked && hasBudgetTracking
+                    // If disabling and this is the last tracking account, show confirmation
+                    if (wantsToDisable && otherTrackingCount === 0) {
+                      setShowBudgetConfirm(true)
+                      return
+                    }
+                    setShowBudgetConfirm(false)
+                    setHasBudgetTracking(e.target.checked)
+                  }}
+                  className="mt-0.5 rounded border-[var(--border-md)]"
+                />
+                <div>
+                  <span className="text-sm font-medium text-[var(--ink)]">Budgetten & transacties</span>
+                  <p className="text-xs text-[var(--ink-3)]">
+                    Schakel in om transacties te importeren, budgetcategorieën te koppelen, en cashflow te voorspellen.
+                  </p>
+                </div>
+              </label>
+
+              {/* Confirmation warning when disabling last budget tracking account */}
+              {showBudgetConfirm && (
+                <div className="rounded-[var(--r)] border border-amber-300 bg-amber-50 p-3">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                    <div>
+                      <p className="text-sm font-medium text-amber-800">
+                        Weet je het zeker? Dit is je laatste rekening met budgetteren.
+                      </p>
+                      <p className="mt-1 text-xs text-amber-700">
+                        Als je dit uitschakelt, worden budgetfuncties in de hele app gedeactiveerd. Je kunt dit altijd weer inschakelen.
+                      </p>
+                      <div className="mt-3 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setHasBudgetTracking(false)
+                            setShowBudgetConfirm(false)
+                          }}
+                          className="rounded-[var(--r)] bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700"
+                        >
+                          Ja, uitschakelen
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowBudgetConfirm(false)}
+                          className="rounded-[var(--r)] border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100"
+                        >
+                          Annuleer
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* Type-specific fields */}

@@ -51,12 +51,12 @@ export function OnboardingSuccess({ onDashboard }: { onDashboard: () => void }) 
         <div className="h-0.5 flex-1 bg-horizon-300" />
       </div>
 
-      {/* Dashboard button — prominent, full-width mobile, bg-wil-600 rounded-xl */}
+      {/* Dashboard button — navigates to De Kern as starting point */}
       <button
         onClick={onDashboard}
-        className="mt-6 min-h-[48px] w-full max-w-xs rounded-xl bg-wil-600 px-8 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-wil-700 hover:shadow-md active:bg-wil-800 active:shadow-none sm:w-auto sm:min-w-[200px]"
+        className="mt-6 min-h-[48px] w-full max-w-xs rounded-xl bg-kern-600 px-8 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-kern-700 hover:shadow-md active:bg-kern-800 active:shadow-none sm:w-auto sm:min-w-[200px]"
       >
-        Ga naar De Wil
+        Bekijk De Kern
       </button>
     </div>
   )

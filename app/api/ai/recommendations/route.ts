@@ -41,15 +41,16 @@ export async function POST() {
     return new Response('Unauthorized', { status: 401 })
   }
 
-  const context = await buildRecommendationContext(supabase)
-
-  // Fetch budgets + profile for freedom_days validation
+  // Fetch budgets + profile for freedom_days validation and budgeting_active check
   const [{ data: budgets }, { data: profile }] = await Promise.all([
     supabase.from('budgets').select('slug, is_essential'),
-    supabase.from('profiles').select('retirement_expense_method').eq('id', user.id).single(),
+    supabase.from('profiles').select('retirement_expense_method, budgeting_active').eq('id', user.id).single(),
   ])
   const budgetMap = new Map((budgets ?? []).map(b => [b.slug, b.is_essential]))
   const usesEssentialBudgets = (profile?.retirement_expense_method ?? 'essential_budgets') === 'essential_budgets'
+  const budgetingActive = profile?.budgeting_active !== false
+
+  const context = await buildRecommendationContext(supabase, budgetingActive)
 
   let model
   try {

@@ -12,8 +12,8 @@ interface Props {
 }
 
 export function SpaarquoteWidget({ size, data, href }: Props) {
-  const { monthlyIncome, monthlyExpenses } = data
-  const savings = monthlyIncome - monthlyExpenses
+  const { monthlyIncome, monthlyExpenses, monthlySavingsBudgetSpent } = data
+  const savings = monthlyIncome - monthlyExpenses + monthlySavingsBudgetSpent
   const rate = data.savingsRate6m
   const isPositive = rate >= 0
 
@@ -49,8 +49,8 @@ export function SpaarquoteWidget({ size, data, href }: Props) {
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
 
   // ── Vorige maand vergelijking ──
-  const { prevMonthIncome, prevMonthExpenses } = data
-  const prevSavings = prevMonthIncome - prevMonthExpenses
+  const { prevMonthIncome, prevMonthExpenses, prevMonthSavingsBudgetSpent } = data
+  const prevSavings = prevMonthIncome - prevMonthExpenses + prevMonthSavingsBudgetSpent
   const prevRate = prevMonthIncome > 0 ? (prevSavings / prevMonthIncome) * 100 : 0
   const delta = rate - prevRate
   const hasPrevData = prevMonthIncome > 0

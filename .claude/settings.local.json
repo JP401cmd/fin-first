@@ -155,7 +155,16 @@
       "Bash(find \"C:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\" -type f \\\\\\( -name \"*.sql\" -o -name \"*schema*\" \\\\\\) 2>/dev/null | head -10)",
       "Bash(head -150 \"/c/Users/janpa/cd/development/fin/app/\\(app\\)/horizon/page.tsx\")",
       "Bash(grep -rn \"lifeEventsToCashflows\\\\\\(\\\\[\\\\]\\\\\\)\" \"/c/Users/janpa/cd/development/fin\" 2>/dev/null | head -5)",
-      "Bash(ls -la \"app/\\(app\\)/beheer/ai-features/\")"
+      "Bash(ls -la \"app/\\(app\\)/beheer/ai-features/\")",
+      "Bash(find /c/Users/janpa/cd/development/fin/app -type d -name \"\\(app\\)\" | head -1 | xargs ls -la)",
+      "Bash(head -200 /c/Users/janpa/cd/development/fin/app/\\\\\\(app\\\\\\)/horizon/page.tsx | tail -100)",
+      "Bash(ls -la /c/Users/janpa/cd/development/fin/app/\\\\\\(app\\\\\\)/ | head -30)",
+      "Bash(wc -l lib/dashboard-data-loader.ts app/\\\\\\(app\\\\\\)/core/page.tsx)",
+      "Bash(ls -la \"app/\\(app\\)/core/page.tsx\" 2>&1 | head -5)",
+      "Bash(wc -l \"C:/Users/janpa/cd/development/fin/app/\\(app\\)/core/page.tsx\")",
+      "Bash(find /c/Users/janpa/cd/development/fin/app -type d -name \"\\(app\\)\" | head -5)",
+      "Bash(ls /c/Users/janpa/cd/development/fin/app/\\\\\\(app\\\\\\)/ | grep -E \"page|dashboard\")",
+      "Bash(ls /c/Users/janpa/cd/development/fin/app/\\\\\\(app\\\\\\)/core/)"
     ]
   },
   "enableAllProjectMcpServers": true,

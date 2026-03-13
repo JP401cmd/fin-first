@@ -26,7 +26,7 @@ import { WidgetRenderer, type DashboardData } from './widget-renderer'
 import { reassignOrders } from '@/lib/widget-order'
 import { AutoDashboardWizard } from './auto-dashboard-wizard'
 import type { WidgetPref, WidgetSize, WidgetModule } from '@/lib/widget-catalog'
-import { WIDGET_CATALOG, WIDGET_FEATURE_MAP, getWidgetDef } from '@/lib/widget-catalog'
+import { WIDGET_CATALOG, WIDGET_FEATURE_MAP, BUDGET_WIDGETS, getWidgetDef } from '@/lib/widget-catalog'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { useDashboardType } from '@/components/app/dashboard-type-provider'
 import { readBriefingContentPrefs, saveBriefingContentPrefs, type BriefingContentPrefs } from '@/lib/briefing/user-preferences'
@@ -73,8 +73,8 @@ function SortableWidgetItem({ pref, data, features, isEditMode, isDragging, onRe
       ref={setNodeRef}
       style={style}
       className={
-        pref.size === 'full' ? 'sm:col-span-2 row-span-2'
-        : pref.size === 'half' ? 'sm:col-span-2'
+        pref.size === 'full' ? 'col-span-2 row-span-2'
+        : pref.size === 'half' ? 'col-span-2'
         : ''
       }
       data-testid={`widget-item-${pref.id}`}
@@ -522,7 +522,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
         }}
       >
         <SortableContext items={ids} strategy={rectSortingStrategy} disabled={!isEditMode}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 auto-rows-[160px] gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 auto-rows-[140px] sm:auto-rows-[160px] gap-3 sm:gap-4">
             {activeWidgets.map(pref => (
               <SortableWidgetItem
                 key={pref.id}
@@ -549,6 +549,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
           <WidgetAddPicker
             activeWidgets={activeWidgets}
             features={features}
+            budgetingActive={data.budgetingActive}
             showPicker={showAddPicker}
             onToggle={() => setShowAddPicker(p => !p)}
             onAdd={handleAdd}
@@ -603,15 +604,17 @@ const MODULE_DOT_COLORS: Record<WidgetModule, string> = {
 interface WidgetAddPickerProps {
   activeWidgets: WidgetPref[]
   features: Record<string, boolean>
+  budgetingActive: boolean
   showPicker: boolean
   onToggle: () => void
   onAdd: (id: string) => void
   onClose: () => void
 }
 
-function WidgetAddPicker({ activeWidgets, features, showPicker, onToggle, onAdd, onClose }: WidgetAddPickerProps) {
+function WidgetAddPicker({ activeWidgets, features, budgetingActive, showPicker, onToggle, onAdd, onClose }: WidgetAddPickerProps) {
   const availableWidgets = WIDGET_CATALOG.filter(
     w => !activeWidgets.some(a => a.id === w.id)
+      && (budgetingActive || !BUDGET_WIDGETS.has(w.id))
   )
 
   const grouped = MODULE_ORDER

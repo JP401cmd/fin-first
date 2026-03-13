@@ -261,6 +261,44 @@ Existing items (already rendered) are not affected thanks to React's stable key 
 5. Always include error tracking (`generationErrors` Map) + stale cleanup (2 min timeout)
 6. Use always-on CSS `@keyframes` animation — React key reconciliation handles the rest
 
+## Budgettering Aan/Uit Architectuur
+
+Budgettering is optioneel. Niet alle gebruikers loggen transacties of gebruiken budgetten (bijv. Rashid — puur vermogensoverzicht). Het systeem heeft twee lagen:
+
+### Twee lagen van budgetteringscontrole
+
+1. **Gebruikersniveau:** `profiles.budgeting_active` (boolean, default `true`)
+   - Gezet bij onboarding (`budgetteringMode !== 'none'`)
+   - Toggle: `GET/PUT /api/budgeting-active`
+   - **Wordt automatisch gesynchroniseerd** met `assets.has_budget_tracking` status
+
+2. **Rekeningniveau:** `assets.has_budget_tracking` (boolean, per cash-asset)
+   - Beheert of transacties van die rekening in budgetoverzichten verschijnen
+   - Toggle zit in de asset-edit form (`app/(app)/core/assets/page.tsx`)
+   - Wanneer de laatste rekening met tracking wordt uitgeschakeld → bevestigingsdialoog + `budgeting_active = false`
+
+### Auto-sync regel
+Na elke save/delete van een cash-asset: tel `assets` met `type='cash' AND has_budget_tracking=true AND is_active=true`. Als count=0 → `budgeting_active=false`. Als count>0 → `budgeting_active=true`.
+
+### Profiel-schattingen als fallback
+Gebruikers zonder transacties/budgetten gebruiken profielschattingen:
+- `profiles.net_monthly_income` (gezet bij onboarding)
+- `profiles.estimated_monthly_expenses` (gevraagd bij onboarding als `budgetteringMode='none'`)
+
+Fallback-logica: als `monthlyIncome=0 && monthlyExpenses=0`, gebruik profielschattingen. Actief in: `dashboard-data-loader.ts`, `core/page.tsx`, `horizon/page.tsx`, `shared-context.ts`.
+
+### AI-gedrag bij `budgeting_active = false`
+- `builder.ts` skipt: `buildKernContext`, `buildSpendingPatternsContext`, `buildBudgetInsightsContext`
+- `buildWilContext` en `buildRecommendationContext` ontvangen `budgetingActive` param → skippen budget-specifieke secties
+- Systeemprompts (`wil.ts`, `recommendations.ts`) bevatten "GEEN BUDGETTERING" instructie → AI stelt geen `budget_optimization` voor
+- Focus verschuift naar: vermogensgroei, schulden, spaarquote, beleggingen, inkomen
+
+### Bij nieuwe features: checklist
+- [ ] Gebruikt de feature budgetdata? → Check `budgeting_active` en handle gracefully
+- [ ] Nieuwe AI context? → Accepteer `budgetingActive` param, skip budget-secties als `false`
+- [ ] Nieuwe berekening met `monthlyIncome/Expenses`? → Implementeer profielfallback
+- [ ] Nieuwe widget? → Overweeg `WidgetEmpty` state voor geen-budget gebruikers
+
 ## Guidelines
 
 1. Be concise and helpful

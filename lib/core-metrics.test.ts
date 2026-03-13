@@ -104,4 +104,14 @@ describe('computeSavingsRate', () => {
   it('returns 100 when expenses are 0', () => {
     expect(computeSavingsRate(5000, 0)).toBe(100)
   })
+
+  it('includes savingsBudgetSpent in rate (savings budgets count as saving, not expense)', () => {
+    // Income 1000, expenses 900 (includes 200 savings budget), savingsBudgetSpent 200
+    // Rate = (1000 - 900 + 200) / 1000 * 100 = 30%
+    expect(computeSavingsRate(1000, 900, 200)).toBe(30)
+  })
+
+  it('defaults savingsBudgetSpent to 0 (backward compatible)', () => {
+    expect(computeSavingsRate(5000, 3000)).toBe(40)
+  })
 })

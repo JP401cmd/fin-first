@@ -63,6 +63,9 @@ export interface PersonaProfile {
   fire_legacy_amount?: number     // alleen bij 'legacy'
   retirement_expense_method?: 'essential_budgets' | 'custom_amount' | 'current_income'
   retirement_expense_custom_amount?: number
+  // Profile income/expense estimates (for users without budgets/transactions)
+  net_monthly_income?: number
+  estimated_monthly_expenses?: number
   // Widget dashboard
   widget_prefs?: { widgets: { id: string; enabled: boolean; size: 'quarter' | 'half' | 'full'; order: number }[] }
 }
@@ -794,7 +797,6 @@ const daanData: PersonaData = {
     { name: 'Spaarrekening ING', iban: 'NL11INGB0001234568', bank_name: 'ING', account_type: 'savings', balance: 2000, is_active: true, sort_order: 1 },
   ],
   assets: [
-    { name: 'Spaarrekening noodfonds', asset_type: 'savings', current_value: 2000, purchase_value: 0, purchase_date: '2024-06-01', expected_return: 2.8, monthly_contribution: 140, institution: 'ING', subtype: 'vrij_opneembaar', risk_profile: 'laag', is_liquid: true },
     { name: 'Meesman Wereldwijd Totaal', asset_type: 'investment', current_value: 2350, purchase_value: 2100, purchase_date: '2024-09-01', expected_return: 7, monthly_contribution: 100, institution: 'Meesman', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'MEESMAN-WWT' },
   ],
   debts: [
@@ -1009,7 +1011,6 @@ const lisaData: PersonaData = {
     { name: 'Eigen betaalrekening', iban: 'NL91INGB0001234567', bank_name: 'ING', account_type: 'checking', balance: 850, is_active: true, sort_order: 2 },
   ],
   assets: [
-    { name: 'Spaarrekening gezin', asset_type: 'savings', current_value: 15000, purchase_value: 0, purchase_date: '2019-01-01', expected_return: 2.5, monthly_contribution: 200, institution: 'Rabobank', subtype: 'vrij_opneembaar', risk_profile: 'laag', is_liquid: true },
     { name: 'Meesman Wereldwijd Totaal', asset_type: 'investment', current_value: 42000, purchase_value: 33600, purchase_date: '2020-03-01', expected_return: 7, monthly_contribution: 400, institution: 'Meesman', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'MEESMAN-WWT' },
     { name: 'Woning Utrecht', asset_type: 'eigen_huis', current_value: 385000, purchase_value: 285000, purchase_date: '2015-06-01', expected_return: 3.5, monthly_contribution: 0, institution: '', woz_value: 385000, address_postcode: '3581 KP', address_house_number: '24' },
     { name: 'Auto Toyota Corolla', asset_type: 'vehicle', current_value: 8000, purchase_value: 24000, purchase_date: '2022-03-01', expected_return: -12, monthly_contribution: 0, institution: '', subtype: 'auto_eigendom', depreciation_rate: 12 },
@@ -1242,7 +1243,6 @@ const willemData: PersonaData = {
     { name: 'Gezamenlijke rekening', iban: 'NL39RABO0300065264', bank_name: 'Rabobank', account_type: 'checking', balance: 4200, is_active: true, sort_order: 2 },
   ],
   assets: [
-    { name: 'Spaarrekening', asset_type: 'savings', current_value: 45000, purchase_value: 0, purchase_date: '2010-01-01', expected_return: 3.2, monthly_contribution: 500, institution: 'ABN AMRO', subtype: 'vrij_opneembaar', risk_profile: 'laag', is_liquid: true },
     { name: 'DEGIRO beleggingsportefeuille', asset_type: 'investment', current_value: 420000, purchase_value: 280000, purchase_date: '2008-01-01', expected_return: 7, monthly_contribution: 2500, institution: 'DEGIRO', subtype: 'etf', risk_profile: 'middel', ticker_symbol: 'VWRL' },
     { name: 'Pensioenfonds ABP', asset_type: 'retirement', current_value: 285000, purchase_value: 0, purchase_date: '1995-01-01', expected_return: 5.5, monthly_contribution: 0, institution: 'ABP', subtype: 'uitkeringsregeling', risk_profile: 'laag', tax_benefit: true, retirement_provider_type: 'bedrijfspensioenfonds' },
     { name: 'Woning Wassenaar', asset_type: 'eigen_huis', current_value: 650000, purchase_value: 380000, purchase_date: '2002-06-01', expected_return: 3.5, monthly_contribution: 0, institution: '', woz_value: 720000, address_postcode: '2242 PJ', address_house_number: '8' },
@@ -1400,6 +1400,8 @@ const rashidData: PersonaData = {
     fire_end_strategy: 'deplete',
     fire_end_age: 90,
     retirement_expense_method: 'current_income',
+    net_monthly_income: 5500,
+    estimated_monthly_expenses: 4200,
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'fire_prognose', 'vrijheidsscenarios', 'acties', 'doelen',
     ]),
@@ -1409,7 +1411,6 @@ const rashidData: PersonaData = {
     { name: 'Spaarrekening ING', iban: 'NL91INGB0006543211', bank_name: 'ING', account_type: 'savings', balance: 20000, is_active: true, sort_order: 1 },
   ],
   assets: [
-    { name: 'Spaarrekening', asset_type: 'savings', current_value: 20000, purchase_value: 20000, purchase_date: '2018-01-01', expected_return: 2.8, monthly_contribution: 0, institution: 'ING', subtype: 'vrij_opneembaar', risk_profile: 'laag', is_liquid: true },
     { name: 'Beleggingsrekening DEGIRO', asset_type: 'investment', current_value: 170000, purchase_value: 130000, purchase_date: '2016-01-01', expected_return: 7, monthly_contribution: 800, institution: 'DEGIRO', subtype: 'etf', risk_profile: 'middel' },
     { name: 'Eigen woning', asset_type: 'eigen_huis', current_value: 650000, purchase_value: 630000, purchase_date: '2023-03-01', expected_return: 3, monthly_contribution: 0, institution: '' },
     { name: 'Auto (Audi A4)', asset_type: 'vehicle', current_value: 24000, purchase_value: 38000, purchase_date: '2022-06-01', expected_return: -15, monthly_contribution: 0, institution: '', subtype: 'auto_eigendom', depreciation_rate: 15 },

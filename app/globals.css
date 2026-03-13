@@ -1043,3 +1043,35 @@ body {
 .slider-touch--neutral::-moz-range-progress {
   background: #52525b;
 }
+
+/* ── Navigation reveal animation (post-activation) ──────── */
+@keyframes nav-reveal {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-nav-reveal {
+  animation: nav-reveal 400ms cubic-bezier(.22,1,.36,1) both;
+}
+
+/* ── Roadmap modal slide transitions ─────────────────────── */
+@keyframes roadmap-slide-in-right {
+  from { transform: translateX(24px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+@keyframes roadmap-slide-in-left {
+  from { transform: translateX(-24px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+.roadmap-step-forward {
+  animation: roadmap-slide-in-right 280ms cubic-bezier(.22,1,.36,1) both;
+}
+.roadmap-step-back {
+  animation: roadmap-slide-in-left 280ms cubic-bezier(.22,1,.36,1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-nav-reveal,
+  .roadmap-step-forward,
+  .roadmap-step-back {
+    animation: none !important;
+  }
+}

@@ -112,16 +112,21 @@ export function computeRetirementExpenses(
   yearlyMustExpenses: number,
   yearlyIncome: number,
   customAmount?: number | null,
+  estimatedYearlyExpenses?: number,
 ): number {
   switch (method) {
     case 'custom_amount': {
       const amt = Number(customAmount ?? 0)
-      return amt > 0 ? amt : yearlyMustExpenses
+      return amt > 0 ? amt : (estimatedYearlyExpenses ?? yearlyMustExpenses)
     }
     case 'current_income':
-      return yearlyIncome > 0 ? yearlyIncome : yearlyMustExpenses
+      return yearlyIncome > 0
+        ? yearlyIncome
+        : (estimatedYearlyExpenses ?? yearlyMustExpenses)
     case 'essential_budgets':
     default:
-      return yearlyMustExpenses
+      return yearlyMustExpenses > 0
+        ? yearlyMustExpenses
+        : (estimatedYearlyExpenses ?? 0)
   }
 }

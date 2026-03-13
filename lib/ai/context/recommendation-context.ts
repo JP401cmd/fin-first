@@ -16,21 +16,23 @@ const TEMPORAL_LABELS: Record<number, string> = {
  * Build the full financial context for AI recommendation generation.
  * Uses real Supabase data for budgets, transactions, assets, debts, profile, and feedback.
  */
-export async function buildRecommendationContext(supabase: SupabaseClient): Promise<string> {
+export async function buildRecommendationContext(supabase: SupabaseClient, budgetingActive = true): Promise<string> {
   const parts: string[] = []
 
   // User identity/profile
   let temporalBalance = 3
+  let profileEstimatedMonthlyExpenses = 0
   const { data: { user } } = await supabase.auth.getUser()
   if (user) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('full_name, date_of_birth, household_type, temporal_balance')
+      .select('full_name, date_of_birth, household_type, temporal_balance, estimated_monthly_expenses')
       .eq('id', user.id)
       .single()
 
     if (profile) {
       temporalBalance = profile.temporal_balance ?? 3
+      profileEstimatedMonthlyExpenses = Number(profile.estimated_monthly_expenses ?? 0)
       const age = profile.date_of_birth
         ? Math.floor((Date.now() - new Date(profile.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
         : null
@@ -70,7 +72,7 @@ export async function buildRecommendationContext(supabase: SupabaseClient): Prom
   const isRealTx = (t: { transaction_type?: string | null }) =>
     t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
 
-  if (budgets && transactions) {
+  if (budgets && transactions && budgetingActive) {
     // Aggregate spending per budget over last 3 months
     const spendingMap = new Map<string, number>()
     for (const tx of transactions) {
@@ -116,7 +118,7 @@ export async function buildRecommendationContext(supabase: SupabaseClient): Prom
     if (user) {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('household_type, number_of_children, children_ages')
+        .select('household_type, number_of_children, children_ages, estimated_monthly_expenses')
         .eq('id', user.id)
         .single()
 
@@ -138,7 +140,11 @@ export async function buildRecommendationContext(supabase: SupabaseClient): Prom
 
           // Calculate daily expense for freedom-day conversion
           const totalMonthlySpending = Object.values(spendingBySlug).reduce((s, v) => s + v, 0)
-          const dailyExpense = totalMonthlySpending > 0 ? (totalMonthlySpending * 12) / 365 : 1
+          // Fallback to profile estimate instead of hardcoded 1
+          const profileEstExpenses = Number(profile?.estimated_monthly_expenses ?? 0)
+          const dailyExpense = totalMonthlySpending > 0
+            ? (totalMonthlySpending * 12) / 365
+            : (profileEstExpenses > 0 ? (profileEstExpenses * 12) / 365 : 0)
 
           const benchmarks = calculateBenchmarks(references, spendingBySlug, dailyExpense)
           const householdLabel: Record<string, string> = {
@@ -217,7 +223,7 @@ export async function buildRecommendationContext(supabase: SupabaseClient): Prom
       const totalMonthly = detectedSubs.reduce((s, sub) => s + toMonthly(sub), 0)
 
       // Calculate daily expense from 3-month transaction data for freedom-day conversion
-      let dailyExpense = 30 // default fallback
+      let dailyExpense = profileEstimatedMonthlyExpenses > 0 ? (profileEstimatedMonthlyExpenses * 12) / 365 : 30
       if (transactions) {
         const totalSpent = transactions
           .filter(t => !t.is_income && isRealTx(t))

@@ -164,8 +164,8 @@ export default async function AppLayout({
                   <DashboardTypeProvider>
                     <div className="min-h-screen bg-[var(--bg)]" data-app-root style={allVars as React.CSSProperties}>
                       <ChatLayoutWrapper>
-                        <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
                         <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} needsActivation={needsActivation}>
+                          <AppHeader email={user.email ?? ''} role={profile?.role ?? 'user'} />
                           <DailyExpenseProvider>
                             <main className="pb-20 md:pb-0">{children}</main>
                             <BottomNav />
