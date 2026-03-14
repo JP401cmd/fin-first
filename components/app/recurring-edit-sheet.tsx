@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Trash2, Save } from 'lucide-react'
+import { Trash2, Save } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { type RecurringTransaction, FREQUENCY_LABELS } from '@/lib/recurring-data'
 import { type Budget } from '@/lib/budget-data'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 
 interface RecurringEditSheetProps {
   recurring: RecurringTransaction
@@ -72,29 +73,8 @@ export function RecurringEditSheet({ recurring, budgets, onClose, onSaved }: Rec
   )
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40" />
-      <div
-        className="relative w-full max-w-lg overflow-y-auto rounded-t-[var(--r-lg)] bg-[var(--paper)] p-5 sm:rounded-[var(--r-lg)]"
-        style={{ maxHeight: '90dvh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
-              Terugkerende boeking
-            </p>
-            <h2 className="mt-0.5 text-base font-semibold text-[var(--ink)]">Bewerken</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded-[var(--r-sm)] p-1.5 text-[var(--ink-4)] hover:bg-[var(--subtle)] hover:text-[var(--ink-3)]"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
+    <BottomSheet open={true} onClose={onClose} title="Terugkerende boeking bewerken" size="lg">
+      <div className="p-5">
         <div className="space-y-3">
           {/* Naam */}
           <div>
@@ -276,12 +256,12 @@ export function RecurringEditSheet({ recurring, budgets, onClose, onSaved }: Rec
                 className="flex items-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
               >
                 <Save className="h-3.5 w-3.5" />
-                {saving ? 'Opslaan…' : 'Opslaan'}
+                {saving ? 'Opslaan...' : 'Opslaan'}
               </button>
             </>
           )}
         </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }

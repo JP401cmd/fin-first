@@ -36,6 +36,8 @@ export async function POST() {
     assets: assetsRes.data ?? [],
     debts: debtsRes.data ?? [],
     transactions: txRes.data ?? [],
+    activeSubscriptions: [],
+    userFeaturePrefs: null,
     matrixJson: matrixRes.data?.value ?? null,
   })
 

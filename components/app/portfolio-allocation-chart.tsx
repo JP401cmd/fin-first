@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Target, ArrowRightLeft, BarChart3, Globe, Briefcase, Edit3, X, Check, Info } from 'lucide-react'
+import { Target, ArrowRightLeft, BarChart3, Globe, Briefcase, Edit3, Check, Info } from 'lucide-react'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { formatCurrency } from '@/components/app/budget-shared'
 import {
@@ -200,23 +201,11 @@ function TargetEditor({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-md rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-        data-testid="target-editor-modal"
-      >
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-lg font-bold text-[var(--ink)]">Doelverdeling instellen</h3>
-            <p className="text-xs text-[var(--ink-3)] mt-0.5">
-              {VIEW_MODE_LABELS[mode]} — percentages moeten optellen tot 100%
-            </p>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+    <BottomSheet open={true} onClose={onClose} title="Doelverdeling instellen" size="sm">
+      <div className="p-5" data-testid="target-editor-modal">
+        <p className="text-xs text-[var(--ink-3)] mb-4">
+          {VIEW_MODE_LABELS[mode]} — percentages moeten optellen tot 100%
+        </p>
 
         <div className="space-y-2 max-h-72 overflow-y-auto">
           {allKeys.map((key) => (
@@ -267,7 +256,7 @@ function TargetEditor({
           </button>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }
 

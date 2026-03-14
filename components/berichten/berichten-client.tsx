@@ -203,6 +203,7 @@ export function BerichtenClient({ dashboardData, temporal, userName, aiEnabled: 
   const [loading, setLoading] = useState(true)
   const [aiEnabled] = useState(initialAiEnabled)
   const [meldingenExpanded, setMeldingenExpanded] = useState(false)
+  const [briefingExpanded, setBriefingExpanded] = useState(false)
   const [newsItems, setNewsItems] = useState<NewsItem[]>([])
   const [newsLoading, setNewsLoading] = useState(false)
   const [newsError, setNewsError] = useState<string | null>(null)
@@ -425,15 +426,43 @@ export function BerichtenClient({ dashboardData, temporal, userName, aiEnabled: 
       <Masthead editionNr={editionNr} jaargang={jaargang} />
       <SectionAnchors />
 
-      {/* ── WILL'S BRIEFING sectie (bovenaan) ──────────────────── */}
+      {/* ── WILL'S BRIEFING sectie (ingeklapt, vernieuwen bij uitklappen) ── */}
       <section id="sectie-briefing" className="scroll-mt-4 mb-8">
         <SectionHeading label="Will's Briefing" />
-        <DAIshboard
-          data={dashboardData}
-          temporal={temporal}
-          userName={userName}
-          aiEnabled={aiEnabled}
-        />
+        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setBriefingExpanded(!briefingExpanded)}
+            className="flex w-full min-h-[44px] items-center justify-between px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]/50"
+          >
+            <div className="flex items-center gap-2">
+              {briefingExpanded ? (
+                <ChevronDown className="h-3.5 w-3.5 text-[var(--ink-3)]" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5 text-[var(--ink-3)]" />
+              )}
+              <Sparkles className="h-3.5 w-3.5 text-[var(--ink-3)]" />
+              <span className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                Will&apos;s Briefing
+              </span>
+              {!briefingExpanded && (
+                <span className="font-source-serif text-[11px] italic text-[var(--ink-4)]">
+                  — Klik om te openen
+                </span>
+              )}
+            </div>
+          </button>
+          {briefingExpanded && (
+            <div className="border-t border-[var(--border-ed)]">
+              <DAIshboard
+                data={dashboardData}
+                temporal={temporal}
+                userName={userName}
+                aiEnabled={aiEnabled}
+              />
+            </div>
+          )}
+        </div>
       </section>
 
       {/* ── FINANCIEEL NIEUWS sectie ──────────────────────────── */}

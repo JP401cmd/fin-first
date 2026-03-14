@@ -78,6 +78,15 @@ export function FeaturePhaseMatrix() {
     setMessage(null)
   }
 
+  function handleEnableAll() {
+    const allOn: FeaturePhaseMatrix = {}
+    for (const feat of FEATURES) {
+      allOn[feat.id] = { recovery: true, stability: true, momentum: true, mastery: true }
+    }
+    setMatrix(allOn)
+    setMessage(null)
+  }
+
   if (!loaded) {
     return (
       <div className="animate-pulse space-y-3">
@@ -163,12 +172,20 @@ export function FeaturePhaseMatrix() {
       </div>
 
       <div className="mt-4 flex items-center justify-between">
-        <button
-          onClick={handleReset}
-          className="rounded-lg border border-[var(--border-md)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
-        >
-          Standaardwaarden herstellen
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleEnableAll}
+            className="rounded-lg border border-green-300 bg-green-50 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-100 transition-colors"
+          >
+            Alles aan
+          </button>
+          <button
+            onClick={handleReset}
+            className="rounded-lg border border-[var(--border-md)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
+          >
+            Standaardwaarden herstellen
+          </button>
+        </div>
         <button
           onClick={handleSave}
           disabled={saving}

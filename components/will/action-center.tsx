@@ -16,6 +16,7 @@ import { BudgetIcon } from '@/components/app/budget-shared'
 import { useDailyExpenseRate } from '@/components/app/freedom-time-label'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
+import { isFeatureAccessible } from '@/lib/compute-feature-access'
 import type { Recommendation, Action } from '@/lib/recommendation-data'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
 
@@ -65,7 +66,7 @@ export function ActionCenter({
   const [activeTab, setActiveTab] = useState<'inzicht' | 'actie' | 'resultaat'>('actie')
   const { dailyExpenseRate } = useDailyExpenseRate()
   const { features } = useFeatureAccess()
-  const doelenEnabled = features.doelen_systeem !== false
+  const doelenEnabled = isFeatureAccessible(features, 'doelen_systeem')
   const [generateTrigger, setGenerateTrigger] = useState(0)
   const [addTrigger, setAddTrigger] = useState(0)
 
@@ -184,7 +185,7 @@ export function ActionCenter({
                 onClick={() => setActiveTab(tab.key)}
                 role="tab"
                 aria-selected={activeTab === tab.key}
-                className={`flex-1 rounded-[var(--r-sm)] px-2 py-1.5 text-[11px] font-semibold transition-colors ${
+                className={`flex-1 rounded-[var(--r-sm)] px-2 py-2 text-[11px] font-semibold transition-colors ${
                   activeTab === tab.key
                     ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
                     : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'

@@ -6,6 +6,7 @@ import { buildSharedContext } from '@/lib/ai/context/shared-context'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
 import { NextResponse } from 'next/server'
+import { checkTierGate } from '@/lib/require-tier'
 
 // ── Cache TTL ────────────────────────────────────────────────────────
 
@@ -301,6 +302,11 @@ export async function GET(request: Request) {
 
   if (!user) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  }
+
+  const tierGate = await checkTierGate(supabase, user.id, 'ai')
+  if (tierGate) {
+    return NextResponse.json({ error: tierGate.error }, { status: 403 })
   }
 
   const url = new URL(request.url)

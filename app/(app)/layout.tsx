@@ -57,11 +57,11 @@ export default async function AppLayout({
   const dateStr = threeMonthsAgo.toISOString().split('T')[0]
 
   const [profileRes, assetsRes, debtsRes, txRes, matrixRes] = await Promise.all([
-    supabase.from('profiles').select('role, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme').eq('id', user.id).single(),
-    supabase.from('assets').select('current_value').eq('is_active', true),
-    supabase.from('debts').select('current_balance, debt_type').eq('is_active', true),
-    supabase.from('transactions').select('amount, is_income').gte('date', dateStr),
-    supabase.from('app_settings').select('value').eq('key', 'feature_phase_matrix').maybeSingle(),
+    supabase.from('profiles').select('role, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme, active_subscriptions, feature_preferences').eq('id', user.id).single(),
+    supabase.from('assets').select('current_value').eq('user_id', user.id).eq('is_active', true),
+    supabase.from('debts').select('current_balance, debt_type').eq('user_id', user.id).eq('is_active', true),
+    supabase.from('transactions').select('amount, is_income').eq('user_id', user.id).gte('date', dateStr),
+    supabase.from('app_settings').select('value').eq('key', 'unified_feature_matrix').maybeSingle(),
   ])
 
   const profile = profileRes.data
@@ -74,7 +74,9 @@ export default async function AppLayout({
     assets: assetsRes.data ?? [],
     debts: debtsRes.data ?? [],
     transactions: txRes.data ?? [],
+    activeSubscriptions: (profile?.active_subscriptions as string[]) ?? [],
     matrixJson: matrixRes.data?.value ?? null,
+    userFeaturePrefs: (profile?.feature_preferences as Record<string, boolean>) ?? null,
   })
 
   // ── Phase transition detection ──────────────────────────

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
+import { isFeatureAccessible } from '@/lib/compute-feature-access'
 
 export interface DiscoverItem {
   id: string
@@ -149,8 +150,8 @@ export function DiscoverCarousel({ module }: DiscoverCarouselProps) {
   const items = DISCOVER_ITEMS.filter(item => {
     // Only show features at or below user's sovereignty level
     if (item.minLevel > level) return false
-    // Only show features that are accessible (not explicitly false)
-    if (features[item.id] === false) return false
+    // Only show features that are accessible
+    if (!isFeatureAccessible(features, item.id)) return false
     // Filter by module if specified
     if (module && item.module === module) return false // Don't show current module's features
     return true

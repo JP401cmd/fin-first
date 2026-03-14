@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { Lock, Unlock, Shield, ChevronDown } from 'lucide-react'
-import { computeFeatureAccess, type FeatureAccessData } from '@/lib/compute-feature-access'
+import { computeFeatureAccess, isFeatureAccessible, type FeatureAccessData } from '@/lib/compute-feature-access'
 import { PHASES, FEATURES, DEFAULT_MATRIX, computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { FeatureGate, LockedFeatureCard } from '@/components/app/feature-gate'
 import { FeatureAccessProvider } from '@/components/app/feature-access-provider'
@@ -49,11 +49,11 @@ export default function TestFeatureGatingPage() {
       { amount: -sc.expenses, is_income: false },
       { amount: -sc.expenses, is_income: false },
     ]
-    return computeFeatureAccess({ assets, debts, transactions, matrixJson: null })
+    return computeFeatureAccess({ assets, debts, transactions, activeSubscriptions: [], userFeaturePrefs: null, matrixJson: null })
   }, [sc])
 
-  const accessibleCount = Object.values(featureAccess.features).filter(Boolean).length
-  const lockedCount = Object.values(featureAccess.features).filter(v => !v).length
+  const accessibleCount = Object.values(featureAccess.features).filter(v => v.accessible).length
+  const lockedCount = Object.values(featureAccess.features).filter(v => !v.accessible).length
 
   return (
     <FeatureAccessProvider data={featureAccess} needsActivation={false}>
@@ -135,7 +135,7 @@ export default function TestFeatureGatingPage() {
                 </thead>
                 <tbody>
                   {FEATURES.map(feat => {
-                    const isAccessible = featureAccess.features[feat.id] === true
+                    const isAccessible = isFeatureAccessible(featureAccess.features, feat.id)
                     const matrixRow = DEFAULT_MATRIX[feat.id] || {}
                     return (
                       <tr key={feat.id} className="border-t border-zinc-100 hover:bg-zinc-50/50" data-testid={`feature-row-${feat.id}`}>

@@ -2,6 +2,7 @@
 // Static definition of all dashboard widgets.
 
 import { PHASES, DEFAULT_MATRIX } from '@/lib/feature-phases'
+import { WIDGET_TO_FEATURE } from '@/lib/feature-registry'
 
 export type WidgetSize = 'quarter' | 'half' | 'full'
 export type WidgetModule = 'kern' | 'wil' | 'horizon' | 'cross'
@@ -536,31 +537,12 @@ export const WIDGET_HREFS: Record<string, string> = {
   trend_schulden:          '/core/budgets',
 }
 
-// ── Widget → Feature-phase mapping ───────────────────────────
-// Maps widget catalog ids to feature-phase matrix ids.
-// Single source of truth for which feature controls which widget.
+// ── Widget → Feature mapping ─────────────────────────────────
+// Maps widget catalog ids to unified feature ids.
+// Generated from feature-registry.ts WIDGET_TO_FEATURE.
 // Widgets NOT in this map are always available (no feature gating).
 
-export const WIDGET_FEATURE_MAP: Record<string, string> = {
-  assets:               'widget_assets',
-  belasting_box3:       'widget_belasting',
-  holdings:             'widget_holdings',
-  monte_carlo:          'widget_monte_carlo',
-  voorstellen:          'widget_voorstellen',
-  doelen:               'doelen_systeem',
-  fire_prognose:        'fire_projecties',
-  levensgebeurtenissen: 'levensgebeurtenissen',
-  veerkracht_score:     'veerkracht_score',
-  vrijheidsscenarios:   'widget_vrijheidsscenarios',
-  sim_vermogenspad:     'widget_sim_vermogenspad',
-  passief_inkomen:      'widget_passief_inkomen',
-  box3_drag:            'widget_box3_drag',
-  vrijheidsmijlpalen:  'widget_vrijheidsmijlpalen',
-  backtesting_score:    'widget_backtesting_score',
-  ai_inzicht:           'widget_ai_inzicht',
-  nibud_benchmark:      'nibud_benchmark',
-  beslissingspatronen:  'beslissingspatronen',
-}
+export const WIDGET_FEATURE_MAP: Record<string, string> = WIDGET_TO_FEATURE
 
 // ── Sync minLevel & requiredPhase from matrix ────────────────
 // Override hardcoded values with derived values from DEFAULT_MATRIX

@@ -5,6 +5,7 @@ import { getModel, AIConfigError } from '@/lib/ai/config'
 import { RECOMMENDATIONS_SYSTEM_PROMPT } from '@/lib/ai/dna/recommendations'
 import { buildRecommendationContext } from '@/lib/ai/context/recommendation-context'
 import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
+import { checkTierGate } from '@/lib/require-tier'
 
 const recommendationSchema = z.object({
   recommendations: z.array(z.object({
@@ -39,6 +40,11 @@ export async function POST() {
 
   if (!user) {
     return new Response('Unauthorized', { status: 401 })
+  }
+
+  const tierGate = await checkTierGate(supabase, user.id, 'ai')
+  if (tierGate) {
+    return new Response(JSON.stringify({ error: tierGate.error }), { status: 403, headers: { 'Content-Type': 'application/json' } })
   }
 
   // Fetch budgets + profile for freedom_days validation and budgeting_active check

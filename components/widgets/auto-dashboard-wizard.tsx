@@ -12,6 +12,7 @@ import {
   type AutoDashboardAnswers,
 } from '@/lib/auto-dashboard-builder'
 import { WIDGET_CATALOG, type WidgetPref } from '@/lib/widget-catalog'
+import type { FeatureAccessMap } from '@/lib/compute-feature-access'
 import type { DashboardData } from './widget-renderer'
 
 // ── Props ────────────────────────────────────────────────────
@@ -20,7 +21,7 @@ interface AutoDashboardWizardProps {
   open: boolean
   onClose: () => void
   onApply: (prefs: WidgetPref[]) => void
-  features: Record<string, boolean>
+  features: FeatureAccessMap
   allBudgets: DashboardData['allBudgets']
 }
 

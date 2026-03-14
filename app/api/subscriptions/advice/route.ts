@@ -2,6 +2,7 @@ import { generateObject } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { getModel, AIConfigError } from '@/lib/ai/config'
+import { checkTierGate } from '@/lib/require-tier'
 
 const TEMPORAL_HINTS: Record<number, string> = {
   1: 'De gebruiker is een Levensgenieter (level 1). Wees zacht — adviseer alleen eliminatie bij echte overlappen, niet bij comfortdiensten.',
@@ -61,6 +62,11 @@ export async function POST(req: Request) {
 
   if (!user) {
     return new Response('Unauthorized', { status: 401 })
+  }
+
+  const tierGate = await checkTierGate(supabase, user.id, 'ai')
+  if (tierGate) {
+    return new Response(JSON.stringify({ error: tierGate.error }), { status: 403, headers: { 'Content-Type': 'application/json' } })
   }
 
   const body = await req.json() as {

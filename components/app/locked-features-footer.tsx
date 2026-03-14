@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Lock, ChevronRight, Sparkles } from 'lucide-react'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { FEATURES, PHASES, DEFAULT_MATRIX } from '@/lib/feature-phases'
+import { isFeatureAccessible, getFeatureAccess } from '@/lib/compute-feature-access'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 
 /** Map feature IDs to module pages where they're gated */
@@ -76,7 +77,7 @@ export function LockedFeaturesFooter({ module, featureIds }: LockedFeaturesFoote
   // Get locked features for this module (or use explicit featureIds for sub-pages)
   const moduleFeatureIds = featureIds ?? MODULE_FEATURES[module] ?? []
   const lockedFeatures = moduleFeatureIds
-    .filter(id => features[id] === false)
+    .filter(id => !isFeatureAccessible(features, id))
     .map(id => {
       const def = FEATURES.find(f => f.id === id)
       const unlockPhase = getUnlockPhase(id)

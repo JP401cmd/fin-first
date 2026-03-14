@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Plus, Upload, ArrowUpRight, ArrowDownLeft,
-  Wallet, Tag, Settings2, X, Repeat, Search, Filter, RotateCcw,
+  Wallet, Tag, Settings2, Repeat, Search, Filter, RotateCcw,
   Link2, ArrowLeftRight, HelpCircle, GitFork, Pencil, Sparkles, ArrowLeft,
   MoreVertical, Unlink, Save,
 } from 'lucide-react'
@@ -36,6 +36,7 @@ import { SettlementOverview } from '@/components/app/settlement-overview'
 import { UncategorizedTransactionsBanner } from '@/components/app/uncategorized-transactions-banner'
 import { AICategorizeSheet } from '@/components/app/ai-categorize-sheet'
 import { AccountFormModal, ACCOUNT_TYPES, type Account } from '@/components/app/account-form-modal'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 
 type Transaction = {
   id: string
@@ -1796,18 +1797,9 @@ export function CashAccountView({
       )}
 
       {/* Asset edit modal */}
-      {showAssetEdit && linkedAsset && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowAssetEdit(false)}>
-          <div
-            className="w-full max-w-lg rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-[var(--ink)]">Rekening bewerken</h3>
-              <button onClick={() => setShowAssetEdit(false)} className="rounded-[var(--r)] p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      {linkedAsset && (
+        <BottomSheet open={showAssetEdit} onClose={() => setShowAssetEdit(false)} title="Rekening bewerken" size="md">
+          <div className="p-5">
             <AssetEditForm
               asset={linkedAsset}
               saving={assetSaving}
@@ -1816,7 +1808,7 @@ export function CashAccountView({
               onDisconnect={() => { setShowAssetEdit(false); handleDisconnectTracking() }}
             />
           </div>
-        </div>
+        </BottomSheet>
       )}
 
       {/* Transfer confirm sheet */}
@@ -1884,69 +1876,48 @@ export function CashAccountView({
       )}
 
       {/* Detect patronen modal */}
-      {showDetectModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
-          onClick={() => setShowDetectModal(false)}
-        >
-          <div className="absolute inset-0 bg-black/40" />
-          <div
-            className="relative w-full max-w-lg overflow-y-auto rounded-t-[var(--r-lg)] bg-[var(--paper)] p-5 sm:rounded-[var(--r-lg)]"
-            style={{ maxHeight: '90dvh' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">Automatisch detecteren</p>
-                <h2 className="mt-0.5 text-base font-semibold text-[var(--ink)]">Gevonden patronen</h2>
-              </div>
-              <button
-                onClick={() => setShowDetectModal(false)}
-                className="rounded-[var(--r-sm)] p-1.5 text-[var(--ink-4)] hover:bg-[var(--subtle)] hover:text-[var(--ink-3)]"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+      <BottomSheet open={showDetectModal} onClose={() => setShowDetectModal(false)} title="Gevonden patronen" size="lg">
+        <div className="p-5">
+          <p className="mb-4 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">Automatisch detecteren</p>
 
-            {detectedPatterns.length === 0 ? (
-              <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] py-8 text-center">
-                <p className="text-sm text-[var(--ink-3)]">Geen nieuwe patronen gevonden</p>
-                <p className="mt-1 text-xs text-[var(--ink-4)]">Voeg meer transacties toe om patronen te ontdekken</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {detectedPatterns.map((p, idx) => (
-                  <div key={idx} className="flex items-center gap-3 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-[var(--ink)]">{p.counterpartyName}</p>
-                      <p className="mt-0.5 font-sans text-xs text-[var(--ink-3)]">{p.frequency} · dag {p.dayOfMonth ?? p.dayOfWeek}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-mono text-sm font-medium tabular-nums text-[var(--ink)]">{formatCurrency(Math.abs(p.averageAmount))}</p>
-                      <p className="font-sans text-[10px] text-[var(--ink-4)]">{p.isIncome ? 'inkomsten' : 'uitgave'}</p>
-                    </div>
-                    <button
-                      onClick={() => acceptPattern(p)}
-                      className="shrink-0 rounded-[var(--r)] bg-kern-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-kern-700"
-                    >
-                      Toevoegen
-                    </button>
+          {detectedPatterns.length === 0 ? (
+            <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] py-8 text-center">
+              <p className="text-sm text-[var(--ink-3)]">Geen nieuwe patronen gevonden</p>
+              <p className="mt-1 text-xs text-[var(--ink-4)]">Voeg meer transacties toe om patronen te ontdekken</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {detectedPatterns.map((p, idx) => (
+                <div key={idx} className="flex items-center gap-3 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-[var(--ink)]">{p.counterpartyName}</p>
+                    <p className="mt-0.5 font-sans text-xs text-[var(--ink-3)]">{p.frequency} · dag {p.dayOfMonth ?? p.dayOfWeek}</p>
                   </div>
-                ))}
-              </div>
-            )}
-
-            <div className="mt-4 text-right">
-              <button
-                onClick={() => setShowDetectModal(false)}
-                className="rounded-[var(--r)] border border-[var(--border-md)] px-4 py-2 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-              >
-                Sluiten
-              </button>
+                  <div className="text-right">
+                    <p className="font-mono text-sm font-medium tabular-nums text-[var(--ink)]">{formatCurrency(Math.abs(p.averageAmount))}</p>
+                    <p className="font-sans text-[10px] text-[var(--ink-4)]">{p.isIncome ? 'inkomsten' : 'uitgave'}</p>
+                  </div>
+                  <button
+                    onClick={() => acceptPattern(p)}
+                    className="shrink-0 rounded-[var(--r)] bg-kern-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-kern-700"
+                  >
+                    Toevoegen
+                  </button>
+                </div>
+              ))}
             </div>
+          )}
+
+          <div className="mt-4 text-right">
+            <button
+              onClick={() => setShowDetectModal(false)}
+              className="rounded-[var(--r)] border border-[var(--border-md)] px-4 py-2 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+            >
+              Sluiten
+            </button>
           </div>
         </div>
-      )}
+      </BottomSheet>
     </div>
   )
 }

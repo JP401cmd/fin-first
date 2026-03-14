@@ -5,6 +5,7 @@ import { getModel, AIConfigError } from '@/lib/ai/config'
 import { RECOMMENDATIONS_SYSTEM_PROMPT } from '@/lib/ai/dna/recommendations'
 import { buildRecommendationContext } from '@/lib/ai/context/recommendation-context'
 import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
+import { checkTierGate } from '@/lib/require-tier'
 
 // ── Schema (same as main recommendations endpoint) ─────────
 
@@ -71,6 +72,11 @@ export async function POST() {
 
   if (!user) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const tierGate = await checkTierGate(supabase, user.id, 'ai')
+  if (tierGate) {
+    return Response.json({ error: tierGate.error }, { status: 403 })
   }
 
   cleanupStale()
@@ -192,6 +198,11 @@ export async function GET() {
 
   if (!user) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const tierGateGet = await checkTierGate(supabase, user.id, 'ai')
+  if (tierGateGet) {
+    return Response.json({ error: tierGateGet.error }, { status: 403 })
   }
 
   cleanupStale()

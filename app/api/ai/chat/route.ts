@@ -7,6 +7,7 @@ import { getTools } from '@/lib/ai/tools'
 import { WHATIF_PROMPT } from '@/lib/ai/dna/wil'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
+import { checkTierGate } from '@/lib/require-tier'
 
 /* AI response timeout in milliseconds (60 seconds) */
 const AI_TIMEOUT_MS = 60_000
@@ -17,6 +18,11 @@ export async function POST(req: Request) {
 
   if (!user) {
     return new Response('Unauthorized', { status: 401 })
+  }
+
+  const tierGate = await checkTierGate(supabase, user.id, 'ai')
+  if (tierGate) {
+    return new Response(JSON.stringify({ error: tierGate.error }), { status: 403, headers: { 'Content-Type': 'application/json' } })
   }
 
   const { messages, domain = 'wil', context: chatContext, scenarioContext } = await req.json() as {

@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import type { NibudBenchmark } from '@/lib/nibud/types'
-import { BarChart3, ArrowRight, X, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
+import { BarChart3, ArrowRight, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 
 type BenchmarkResponse = {
   household_type: string
@@ -164,104 +165,88 @@ function NibudDetailModal({
 }) {
   const [showBelow, setShowBelow] = useState(false)
 
-  if (!open) return null
-
   const aboveNorm = data.benchmarks.filter(b => b.delta > 0 && b.user_spending > 0)
   const atOrBelow = data.benchmarks.filter(b => b.delta <= 0 && b.user_spending > 0)
   const noData = data.benchmarks.filter(b => b.user_spending === 0)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-2xl overflow-y-auto rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl"
-        style={{ maxHeight: '90vh' }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-6 py-4">
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--ink)]">Budget Gezondheidscheck</h2>
-            <p className="text-sm text-[var(--ink-3)]">
-              NIBUD-referentie {data.year} voor {data.household_label.toLowerCase()}
-            </p>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={onRefresh}
-              disabled={refreshing}
-              className="rounded-lg p-1.5 text-[var(--ink-3)] transition-colors hover:bg-wil-50 hover:text-wil-600 disabled:opacity-50"
-              title="Verversen"
-            >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            </button>
-            <button onClick={onClose} className="rounded-lg p-1.5 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+    <BottomSheet open={open} onClose={onClose} title="Budget Gezondheidscheck" size="lg">
+      <div className="space-y-5 px-5 py-5">
+        {/* Subheading + refresh */}
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-[var(--ink-3)]">
+            NIBUD-referentie {data.year} voor {data.household_label.toLowerCase()}
+          </p>
+          <button
+            onClick={onRefresh}
+            disabled={refreshing}
+            className="rounded-lg p-1.5 text-[var(--ink-3)] transition-colors hover:bg-wil-50 hover:text-wil-600 disabled:opacity-50"
+            title="Verversen"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
         </div>
 
-        <div className="space-y-5 px-6 py-5">
-          {/* Total potential banner */}
-          {data.total_freedom_days_potential > 0 && (
-            <div className="rounded-[var(--r-lg)] bg-wil-50 p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-wil-800">
-                  Totaal potentieel bij NIBUD-niveau:
-                </p>
-                <span className="text-xl font-bold text-wil-700">+{data.total_freedom_days_potential} dagen/jaar</span>
-              </div>
+        {/* Total potential banner */}
+        {data.total_freedom_days_potential > 0 && (
+          <div className="rounded-[var(--r-lg)] bg-wil-50 p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-wil-800">
+                Totaal potentieel bij NIBUD-niveau:
+              </p>
+              <span className="text-xl font-bold text-wil-700">+{data.total_freedom_days_potential} dagen/jaar</span>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Above norm — with budget adjustment */}
-          {aboveNorm.length > 0 && (
-            <div>
-              <h3 className="mb-3 text-xs font-semibold tracking-[0.12em] text-[var(--ink-3)] uppercase">
-                Optimalisatiekansen ({aboveNorm.length})
-              </h3>
-              <div className="space-y-2">
-                {aboveNorm.map(b => (
-                  <DetailRow key={b.nibud_category_key} benchmark={b} />
+        {/* Above norm — with budget adjustment */}
+        {aboveNorm.length > 0 && (
+          <div>
+            <h3 className="mb-3 text-xs font-semibold tracking-[0.12em] text-[var(--ink-3)] uppercase">
+              Optimalisatiekansen ({aboveNorm.length})
+            </h3>
+            <div className="space-y-2">
+              {aboveNorm.map(b => (
+                <DetailRow key={b.nibud_category_key} benchmark={b} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* At or below norm */}
+        {atOrBelow.length > 0 && (
+          <div>
+            <button
+              onClick={() => setShowBelow(!showBelow)}
+              className="flex w-full items-center gap-2 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-4 py-2.5 text-sm text-[var(--ink-3)] transition-colors hover:bg-zinc-100"
+            >
+              {showBelow ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              <span>
+                <span className="font-medium text-wil-600">{atOrBelow.length}</span>{' '}
+                {atOrBelow.length === 1 ? 'categorie' : 'categorien'} op of onder NIBUD-niveau
+              </span>
+            </button>
+            {showBelow && (
+              <div className="mt-2 space-y-2">
+                {atOrBelow.map(b => (
+                  <DetailRow key={b.nibud_category_key} benchmark={b} compact />
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        )}
 
-          {/* At or below norm */}
-          {atOrBelow.length > 0 && (
-            <div>
-              <button
-                onClick={() => setShowBelow(!showBelow)}
-                className="flex w-full items-center gap-2 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-4 py-2.5 text-sm text-[var(--ink-3)] transition-colors hover:bg-zinc-100"
-              >
-                {showBelow ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                <span>
-                  <span className="font-medium text-wil-600">{atOrBelow.length}</span>{' '}
-                  {atOrBelow.length === 1 ? 'categorie' : 'categorien'} op of onder NIBUD-niveau
-                </span>
-              </button>
-              {showBelow && (
-                <div className="mt-2 space-y-2">
-                  {atOrBelow.map(b => (
-                    <DetailRow key={b.nibud_category_key} benchmark={b} compact />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {noData.length > 0 && (
-            <p className="text-xs text-[var(--ink-3)]">
-              {noData.length} NIBUD-{noData.length === 1 ? 'categorie heeft' : 'categorien hebben'} nog geen budgetlimiet ingesteld.
-            </p>
-          )}
-
-          <p className="text-[10px] leading-relaxed text-[var(--ink-4)]">
-            Referentiebedragen zijn indicatief. De check vergelijkt jouw ingestelde budgetten met NIBUD-normen — jouw situatie kan bewust anders zijn.
+        {noData.length > 0 && (
+          <p className="text-xs text-[var(--ink-3)]">
+            {noData.length} NIBUD-{noData.length === 1 ? 'categorie heeft' : 'categorien hebben'} nog geen budgetlimiet ingesteld.
           </p>
-        </div>
+        )}
+
+        <p className="text-[10px] leading-relaxed text-[var(--ink-4)]">
+          Referentiebedragen zijn indicatief. De check vergelijkt jouw ingestelde budgetten met NIBUD-normen — jouw situatie kan bewust anders zijn.
+        </p>
       </div>
-    </div>
+    </BottomSheet>
   )
 }
 

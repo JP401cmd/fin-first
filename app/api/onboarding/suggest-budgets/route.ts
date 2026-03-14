@@ -1,6 +1,7 @@
 import { generateObject } from 'ai'
 import { createClient } from '@/lib/supabase/server'
 import { getModel, AIConfigError } from '@/lib/ai/config'
+import { checkTierGate } from '@/lib/require-tier'
 import {
   budgetSuggestionSchema,
   buildBudgetSuggestionPrompt,
@@ -12,6 +13,11 @@ export async function POST(req: Request) {
 
   if (!user) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const tierGate = await checkTierGate(supabase, user.id, 'ai')
+  if (tierGate) {
+    return Response.json({ error: tierGate.error }, { status: 403 })
   }
 
   const body = await req.json()

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { Shield, Lock, Unlock, CheckCircle, XCircle, ChevronRight } from 'lucide-react'
-import { computeFeatureAccess, type FeatureAccessData } from '@/lib/compute-feature-access'
+import { computeFeatureAccess, isFeatureAccessible, type FeatureAccessData } from '@/lib/compute-feature-access'
 import { PHASES, FEATURES, DEFAULT_MATRIX, computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { FeatureAccessProvider } from '@/components/app/feature-access-provider'
@@ -38,7 +38,7 @@ function computeForScenario(sc: typeof SCENARIOS[0]): FeatureAccessData {
     { amount: -sc.expenses, is_income: false },
     { amount: -sc.expenses, is_income: false },
   ]
-  return computeFeatureAccess({ assets, debts, transactions, matrixJson: null })
+  return computeFeatureAccess({ assets, debts, transactions, activeSubscriptions: [], userFeaturePrefs: null, matrixJson: null })
 }
 
 export default function TestSovereigntyGatingPage() {
@@ -75,7 +75,7 @@ export default function TestSovereigntyGatingPage() {
   const mismatches: string[] = []
   for (const feat of FEATURES) {
     const expected = DEFAULT_MATRIX[feat.id]?.[featureAccess.phase] ?? false
-    const actual = featureAccess.features[feat.id] ?? false
+    const actual = isFeatureAccessible(featureAccess.features, feat.id)
     if (expected !== actual) mismatches.push(feat.id)
   }
   tests.push({
@@ -92,9 +92,9 @@ export default function TestSovereigntyGatingPage() {
     const recoveryLocked = ['box3_belasting', 'asset_allocatie', 'monte_carlo', 'withdrawal_strategie']
     tests.push({
       name: 'Recovery: correct features unlocked/locked',
-      pass: recoveryUnlocked.every(id => featureAccess.features[id] === true) &&
-            recoveryLocked.every(id => featureAccess.features[id] === false),
-      detail: `Unlocked: ${recoveryUnlocked.filter(id => featureAccess.features[id]).join(', ')} | Locked: ${recoveryLocked.filter(id => !featureAccess.features[id]).join(', ')}`,
+      pass: recoveryUnlocked.every(id => isFeatureAccessible(featureAccess.features, id)) &&
+            recoveryLocked.every(id => !isFeatureAccessible(featureAccess.features, id)),
+      detail: `Unlocked: ${recoveryUnlocked.filter(id => isFeatureAccessible(featureAccess.features, id)).join(', ')} | Locked: ${recoveryLocked.filter(id => !isFeatureAccessible(featureAccess.features, id)).join(', ')}`,
     })
   }
 
@@ -102,8 +102,8 @@ export default function TestSovereigntyGatingPage() {
   if (featureAccess.phase === 'mastery') {
     tests.push({
       name: 'Mastery: withdrawal_strategie unlocked',
-      pass: featureAccess.features.withdrawal_strategie === true,
-      detail: `withdrawal_strategie: ${featureAccess.features.withdrawal_strategie}`,
+      pass: isFeatureAccessible(featureAccess.features, 'withdrawal_strategie'),
+      detail: `withdrawal_strategie: ${isFeatureAccessible(featureAccess.features, 'withdrawal_strategie')}`,
     })
   }
 
@@ -126,8 +126,8 @@ export default function TestSovereigntyGatingPage() {
       : crossResults.filter(r => !r.levelOk || !r.phaseOk).map(r => r.scenario).join(', '),
   })
 
-  const accessible = FEATURES.filter(f => featureAccess.features[f.id] === true)
-  const locked = FEATURES.filter(f => featureAccess.features[f.id] === false)
+  const accessible = FEATURES.filter(f => isFeatureAccessible(featureAccess.features, f.id))
+  const locked = FEATURES.filter(f => !isFeatureAccessible(featureAccess.features, f.id))
   const allPass = tests.every(t => t.pass)
 
   const PHASE_BG: Record<string, string> = {

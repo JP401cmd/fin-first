@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { X, Plus, Trash2, Tag } from 'lucide-react'
+import { Plus, Trash2, Tag } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { type Budget } from '@/lib/budget-data'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 
 type CategoryRule = {
   id: string
@@ -79,29 +80,8 @@ export function CategoryRulesSheet({ budgets, onClose }: CategoryRulesSheetProps
   const getBudgetName = (id: string) => budgets.find((b) => b.id === id)?.name ?? '—'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40" />
-      <div
-        className="relative w-full max-w-lg overflow-y-auto rounded-t-[var(--r-lg)] bg-[var(--paper)] p-5 sm:rounded-[var(--r-lg)]"
-        style={{ maxHeight: '90dvh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
-              Automatisch categoriseren
-            </p>
-            <h2 className="mt-0.5 text-base font-semibold text-[var(--ink)]">Categorisatieregels</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded-[var(--r-sm)] p-1.5 text-[var(--ink-4)] hover:bg-[var(--subtle)] hover:text-[var(--ink-3)]"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
+    <BottomSheet open={true} onClose={onClose} title="Categorisatieregels" size="lg">
+      <div className="p-5">
         {/* Uitleg */}
         <div className="mb-4 rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/50 px-3 py-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
           Regels koppelen tegenpartijen of omschrijvingen automatisch aan een budget.
@@ -217,6 +197,6 @@ export function CategoryRulesSheet({ budgets, onClose }: CategoryRulesSheetProps
           )}
         </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }

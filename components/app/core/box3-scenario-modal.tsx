@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { X, ArrowRightLeft, GitCompare } from 'lucide-react'
+import { ArrowRightLeft, GitCompare } from 'lucide-react'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import { formatCurrency } from '@/lib/format'
 import {
   calculateBox3,
@@ -24,20 +25,7 @@ export function Box3ScenarioModal({
   const [tab, setTab] = useState<'shift' | 'compare'>('shift')
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 transition-[right] duration-300" style={{ right: 'var(--chat-sidebar-width, 0px)' }} onClick={onClose}>
-      <div
-        className="w-full max-w-xl rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl overflow-y-auto"
-        style={{ maxHeight: '90vh' }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-6 py-4">
-          <h3 className="text-lg font-bold text-[var(--ink)]">Wat-als scenario&apos;s</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
+    <BottomSheet open={true} onClose={onClose} title="Wat-als scenario's" size="lg">
         {/* Tabs */}
         <div className="flex border-b border-[var(--border-ed)] px-6">
           <button
@@ -68,8 +56,7 @@ export function Box3ScenarioModal({
             <CompareTab input={input} result={result} />
           )}
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   )
 }
 

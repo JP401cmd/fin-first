@@ -135,6 +135,8 @@ export async function GET() {
       assets: [],
       debts: [],
       transactions: [],
+      activeSubscriptions: [],
+      userFeaturePrefs: null,
       matrixJson: null,
     })
 
@@ -246,6 +248,8 @@ export async function GET() {
         assets: [],
         debts: [],
         transactions: [],
+        activeSubscriptions: [],
+        userFeaturePrefs: null,
         matrixJson: null,
       })
 

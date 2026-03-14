@@ -27,6 +27,7 @@ import { reassignOrders } from '@/lib/widget-order'
 import { AutoDashboardWizard } from './auto-dashboard-wizard'
 import type { WidgetPref, WidgetSize, WidgetModule } from '@/lib/widget-catalog'
 import { WIDGET_CATALOG, WIDGET_FEATURE_MAP, BUDGET_WIDGETS, getWidgetDef } from '@/lib/widget-catalog'
+import { isFeatureAccessible, type FeatureAccessMap } from '@/lib/compute-feature-access'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { useDashboardType } from '@/components/app/dashboard-type-provider'
 import { readBriefingContentPrefs, saveBriefingContentPrefs, type BriefingContentPrefs } from '@/lib/briefing/user-preferences'
@@ -46,7 +47,7 @@ function sizeLabel(size: WidgetSize): string {
 interface SortableWidgetItemProps {
   pref: WidgetPref
   data: DashboardData
-  features: Record<string, boolean>
+  features: FeatureAccessMap
   isEditMode: boolean
   isDragging: boolean
   onResize?: (id: string, size: WidgetSize) => void
@@ -155,7 +156,7 @@ function SortableWidgetItem({ pref, data, features, isEditMode, isDragging, onRe
 
 // ── Drag overlay (follows cursor) ─────────────────────────────
 
-function DragPreview({ pref, data, features }: { pref: WidgetPref; data: DashboardData; features: Record<string, boolean> }) {
+function DragPreview({ pref, data, features }: { pref: WidgetPref; data: DashboardData; features: FeatureAccessMap }) {
   return (
     <div
       className="opacity-90 scale-[1.02] rotate-[0.8deg] shadow-[var(--s3)] cursor-grabbing ring-2 ring-kern-300 rounded-[var(--r-lg)] overflow-hidden"
@@ -176,12 +177,12 @@ interface DraggableWidgetGridProps {
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
-/** Check if a widget is accessible based on feature-phase gating */
-function isWidgetAccessible(widgetId: string, features: Record<string, boolean>): boolean {
+/** Check if a widget is accessible based on feature gating */
+function isWidgetAccessible(widgetId: string, features: FeatureAccessMap): boolean {
   const featureId = WIDGET_FEATURE_MAP[widgetId]
   // Widgets not in WIDGET_FEATURE_MAP are always available
   if (!featureId) return true
-  return features[featureId] !== false
+  return isFeatureAccessible(features, featureId)
 }
 
 export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboardTypeToggle }: DraggableWidgetGridProps) {
@@ -603,7 +604,7 @@ const MODULE_DOT_COLORS: Record<WidgetModule, string> = {
 
 interface WidgetAddPickerProps {
   activeWidgets: WidgetPref[]
-  features: Record<string, boolean>
+  features: FeatureAccessMap
   budgetingActive: boolean
   showPicker: boolean
   onToggle: () => void

@@ -5,6 +5,7 @@ import { buildCategorySpending, patternsToInsights, detectSeasonalPatterns, dete
 import { generateText } from 'ai'
 import { getModel } from '@/lib/ai/config'
 import type { ReportData, ReportConfig, HistoricalPeriodSummary } from '@/lib/report-data'
+import { checkTierGate } from '@/lib/require-tier'
 
 const MONTH_LABELS_NL: Record<number, string> = {
   0: 'jan', 1: 'feb', 2: 'mrt', 3: 'apr', 4: 'mei', 5: 'jun',
@@ -81,6 +82,11 @@ export async function GET(request: Request) {
 
     if (authError || !user) {
       return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
+    }
+
+    const tierGate = await checkTierGate(supabase, user.id, 'ai')
+    if (tierGate) {
+      return Response.json({ error: tierGate.error }, { status: 403 })
     }
 
     const url = new URL(request.url)
@@ -704,6 +710,11 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
     }
 
+    const tierGate = await checkTierGate(supabase, user.id, 'ai')
+    if (tierGate) {
+      return Response.json({ error: tierGate.error }, { status: 403 })
+    }
+
     const body = await request.json()
     const { name, period_type, date_from, date_to, use_ai } = body
 
@@ -743,6 +754,11 @@ export async function DELETE(request: Request) {
 
     if (authError || !user) {
       return Response.json({ error: 'Niet ingelogd' }, { status: 401 })
+    }
+
+    const tierGate = await checkTierGate(supabase, user.id, 'ai')
+    if (tierGate) {
+      return Response.json({ error: tierGate.error }, { status: 403 })
     }
 
     const url = new URL(request.url)

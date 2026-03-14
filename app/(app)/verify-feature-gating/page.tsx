@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Shield, Lock, Unlock, CheckCircle, XCircle, AlertCircle, RefreshCw } from 'lucide-react'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { FeatureGate, LockedFeatureCard } from '@/components/app/feature-gate'
+import { isFeatureAccessible } from '@/lib/compute-feature-access'
 import { PHASES, FEATURES, DEFAULT_MATRIX } from '@/lib/feature-phases'
 
 /**
@@ -48,7 +49,7 @@ export default function VerifyFeatureGatingPage() {
   // Verify all features match expectations
   const accessMismatches = FEATURES.filter(f => {
     const expected = DEFAULT_MATRIX[f.id]?.[featureAccess.phase] ?? false
-    const actual = featureAccess.features[f.id] ?? false
+    const actual = isFeatureAccessible(featureAccess.features, f.id)
     return expected !== actual
   })
 
@@ -184,8 +185,8 @@ export default function VerifyFeatureGatingPage() {
               <div>
                 <p className="font-medium">Features map has {Object.keys(featureAccess.features).length} entries</p>
                 <p className="text-xs opacity-75">
-                  Accessible: {Object.values(featureAccess.features).filter(Boolean).length},
-                  Locked: {Object.values(featureAccess.features).filter(v => !v).length}
+                  Accessible: {Object.values(featureAccess.features).filter(v => v.accessible).length},
+                  Locked: {Object.values(featureAccess.features).filter(v => !v.accessible).length}
                 </p>
               </div>
             </div>
@@ -248,7 +249,7 @@ export default function VerifyFeatureGatingPage() {
               </thead>
               <tbody>
                 {FEATURES.map(feat => {
-                  const isAccessible = featureAccess.features[feat.id] === true
+                  const isAccessible = isFeatureAccessible(featureAccess.features, feat.id)
                   const matrixRow = DEFAULT_MATRIX[feat.id] || {}
                   return (
                     <tr key={feat.id} className="border-t border-[var(--border-ed)] hover:bg-[var(--subtle)]/50" data-testid={`matrix-row-${feat.id}`}>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
   ASSET_TYPE_LABELS,
   ASSET_TYPE_FIELDS,
@@ -179,16 +180,13 @@ export function MiniAssetForm({
       </button>
 
       {/* Modal */}
-      {editingIndex !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={() => setEditingIndex(null)}>
-          <div
-            className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-[var(--paper)] p-4 shadow-xl sm:p-6 [&_input]:text-base [&_input]:sm:text-sm [&_select]:text-base [&_select]:sm:text-sm"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="mb-4 text-lg font-semibold text-[var(--ink)]">
-              {editingIndex === -1 ? 'Bezitting toevoegen' : 'Bezitting bewerken'}
-            </h3>
-
+      <BottomSheet
+        open={editingIndex !== null}
+        onClose={() => setEditingIndex(null)}
+        title={editingIndex === -1 ? 'Bezitting toevoegen' : 'Bezitting bewerken'}
+        size="md"
+      >
+        <div className="p-4 sm:p-5 [&_input]:text-base [&_input]:sm:text-sm [&_select]:text-base [&_select]:sm:text-sm">
             <div className="space-y-3">
               {/* Type */}
               <div>
@@ -608,9 +606,8 @@ export function MiniAssetForm({
                 {editingIndex === -1 ? 'Toevoegen' : 'Opslaan'}
               </button>
             </div>
-          </div>
         </div>
-      )}
+      </BottomSheet>
     </div>
   )
 }

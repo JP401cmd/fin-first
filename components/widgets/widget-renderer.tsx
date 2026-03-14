@@ -41,6 +41,8 @@ import { WilskrachtWidget } from './wilskracht-widget'
 import { BerichtenWidget } from './berichten-widget'
 import { BudgetTrendWidget } from './budget-trend-widget'
 import { getWidgetDef, WIDGET_HREFS, WIDGET_FEATURE_MAP, BUDGET_WIDGETS } from '@/lib/widget-catalog'
+import { isFeatureAccessible } from '@/lib/compute-feature-access'
+import type { FeatureAccessMap } from '@/lib/compute-feature-access'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { FireProjection, FireRange, FireCountdown } from '@/lib/horizon-data'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
@@ -336,9 +338,9 @@ interface WidgetRendererProps {
   id: string
   size: WidgetSize
   data: DashboardData
-  /** Feature-phase access map — keys are feature ids, values are access booleans.
-   *  Widgets listed in WIDGET_FEATURE_MAP are hidden when their feature is false. */
-  features: Record<string, boolean>
+  /** Feature access map — keys are feature ids, values are access results.
+   *  Widgets listed in WIDGET_FEATURE_MAP are hidden when their feature is not accessible. */
+  features: FeatureAccessMap
 }
 
 export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps) {
@@ -356,9 +358,9 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
   const def = getWidgetDef(id)
   if (!def) return null
 
-  // Feature-phase gating: if widget maps to a feature, check access
+  // Feature gating: if widget maps to a feature, check access
   const featureId = WIDGET_FEATURE_MAP[id]
-  if (featureId && features[featureId] === false) return null
+  if (featureId && !isFeatureAccessible(features, featureId)) return null
 
   const href = WIDGET_HREFS[id]
 

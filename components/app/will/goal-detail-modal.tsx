@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { X, Plus, Check, ChevronDown, ChevronUp, Trash2, BarChart3, Users } from 'lucide-react'
+import { Plus, Check, ChevronDown, ChevronUp, Trash2, BarChart3, Users } from 'lucide-react'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
 import {
   type Goal, type GoalType, GOAL_TYPE_LABELS, GOAL_TYPE_META,
@@ -144,6 +145,8 @@ export function GoalDetailModal({
   }
 
   function handleClose() {
+    setShowForm(false)
+    setEditGoal(null)
     onGoalsChanged()
     onClose()
   }
@@ -154,41 +157,28 @@ export function GoalDetailModal({
   const activeGoals = goals.filter(g => !g.is_completed && filterFn(g))
   const completedGoals = goals.filter(g => g.is_completed && filterFn(g))
 
-  if (!open) return null
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 transition-[right] duration-300" style={{ right: 'var(--chat-sidebar-width, 0px)' }}>
-      <div className="w-full max-w-2xl overflow-y-auto rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl" style={{ maxHeight: '90vh' }}>
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-6 py-4">
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--ink)]">Alle doelen</h2>
-            <p className="text-sm text-[var(--ink-3)]">
-              {goals.length === 0
-                ? 'Stel je eerste financiele doel en volg je voortgang.'
-                : `${completedGoals.length} van ${goals.length} doelen bereikt`}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => { setEditGoal(null); setShowForm(true) }}
-              className="inline-flex items-center gap-2 rounded-lg bg-wil-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-wil-700"
-            >
-              <Plus className="h-4 w-4" />
-              Nieuw doel
-            </button>
-            <button
-              onClick={handleClose}
-              className="rounded-lg p-1.5 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+    <>
+      <BottomSheet open={open} onClose={handleClose} title="Alle doelen" size="lg">
+        {/* Sub-header */}
+        <div className="flex items-center justify-between px-5 pb-3 pt-1">
+          <p className="text-sm text-[var(--ink-3)]">
+            {goals.length === 0
+              ? 'Stel je eerste financiele doel en volg je voortgang.'
+              : `${completedGoals.length} van ${goals.length} doelen bereikt`}
+          </p>
+          <button
+            onClick={() => { setEditGoal(null); setShowForm(true) }}
+            className="inline-flex items-center gap-2 rounded-lg bg-wil-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-wil-700"
+          >
+            <Plus className="h-4 w-4" />
+            Nieuw doel
+          </button>
         </div>
 
         {/* Filter tabs */}
         {hasSharedGoals && !loading && goals.length > 0 && (
-          <div className="border-b border-[var(--border-ed)] px-6 py-2">
+          <div className="border-b border-[var(--border-ed)] px-5 py-2">
             <div className="flex gap-1 rounded-lg bg-[var(--subtle)] p-1">
               {([
                 { key: 'all' as const, label: 'Alle' },
@@ -212,7 +202,7 @@ export function GoalDetailModal({
         )}
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-5">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-wil-500 border-t-transparent" />
@@ -294,26 +284,24 @@ export function GoalDetailModal({
             </>
           )}
         </div>
-      </div>
+      </BottomSheet>
 
       {/* GoalForm sub-modal */}
       {showForm && (
-        <div className="z-[60]">
-          <GoalForm
-            goal={editGoal ?? undefined}
-            assets={assets}
-            debts={debts}
-            onClose={() => { setShowForm(false); setEditGoal(null) }}
-            onSaved={() => {
-              setShowForm(false)
-              setEditGoal(null)
-              loadData()
-              onGoalsChanged()
-            }}
-          />
-        </div>
+        <GoalForm
+          goal={editGoal ?? undefined}
+          assets={assets}
+          debts={debts}
+          onClose={() => { setShowForm(false); setEditGoal(null) }}
+          onSaved={() => {
+            setShowForm(false)
+            setEditGoal(null)
+            loadData()
+            onGoalsChanged()
+          }}
+        />
       )}
-    </div>
+    </>
   )
 }
 

@@ -4,6 +4,9 @@ import { useState, useEffect, type ReactNode } from 'react'
 import { Lock, Sparkles } from 'lucide-react'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { FEATURES, PHASES, DEFAULT_MATRIX } from '@/lib/feature-phases'
+import { isFeatureAccessible, getFeatureAccess } from '@/lib/compute-feature-access'
+import { UNIFIED_FEATURES } from '@/lib/feature-registry'
+import { LEGACY_FEATURE_MAP } from '@/lib/feature-phases'
 
 type FeatureGateProps = {
   featureId: string
@@ -41,13 +44,29 @@ const PHASE_BAR_COLORS: Record<string, string> = {
   amber: 'bg-amber-400',
 }
 
+/** Tier accent colors for TierLockedCard */
+const TIER_ACCENT: Record<string, { border: string; bg: string; text: string; icon: string }> = {
+  connected: { border: 'border-kern-300', bg: 'bg-kern-50', text: 'text-kern-700', icon: 'text-kern-500' },
+  ai:        { border: 'border-horizon-300', bg: 'bg-horizon-50', text: 'text-horizon-700', icon: 'text-horizon-500' },
+}
+
+const TIER_LABELS: Record<string, string> = {
+  connected: 'Connected',
+  ai: 'AI',
+}
+
 export function FeatureGate({ featureId, fallback = 'hidden', children }: FeatureGateProps) {
   const { features, phase: currentPhase, newlyUnlockedFeatures } = useFeatureAccess()
 
-  // Fail-open: features not in the map are shown
-  if (features[featureId] !== false) {
+  // Use isFeatureAccessible for backward compat (supports legacy IDs)
+  const accessible = isFeatureAccessible(features, featureId)
+  const accessResult = getFeatureAccess(features, featureId)
+
+  if (accessible) {
     // Wrap in spotlight animation if this feature was just unlocked by a phase transition
-    const isNewlyUnlocked = newlyUnlockedFeatures.includes(featureId)
+    // Resolve the canonical feature ID for spotlight tracking
+    const canonicalId = LEGACY_FEATURE_MAP[featureId] ?? featureId
+    const isNewlyUnlocked = newlyUnlockedFeatures.includes(canonicalId) || newlyUnlockedFeatures.includes(featureId)
     if (isNewlyUnlocked) {
       return <NewFeatureSpotlight featureId={featureId}>{children}</NewFeatureSpotlight>
     }
@@ -58,13 +77,60 @@ export function FeatureGate({ featureId, fallback = 'hidden', children }: Featur
     return null
   }
 
-  // Locked features are intentionally hidden per design — no locked cards shown
+  // Show TierLockedCard for tier-locked features with 'locked' fallback
+  if (fallback === 'locked' && accessResult?.reason === 'tier_locked' && accessResult.requiredTier) {
+    return <TierLockedCard featureId={featureId} requiredTier={accessResult.requiredTier} />
+  }
+
+  // User-disabled features are hidden (user chose to disable)
+  if (accessResult?.reason === 'user_disabled') {
+    return null
+  }
+
+  // Locked features without specific tier lock are hidden per design
   if (fallback === 'locked') {
     return null
   }
 
   // Custom fallback
   return <>{fallback}</>
+}
+
+/**
+ * TierLockedCard — shows when a feature requires a higher commercial tier.
+ * Lock icon + feature name + "Upgrade naar [Tier]" CTA.
+ */
+export function TierLockedCard({ featureId, requiredTier }: { featureId: string; requiredTier: string }) {
+  // Resolve feature label from unified features or legacy
+  const canonicalId = LEGACY_FEATURE_MAP[featureId] ?? featureId
+  const featureDef = UNIFIED_FEATURES.find(f => f.id === canonicalId)
+    ?? FEATURES.find(f => f.id === featureId)
+  const accent = TIER_ACCENT[requiredTier] ?? TIER_ACCENT.ai
+  const tierLabel = TIER_LABELS[requiredTier] ?? requiredTier
+
+  return (
+    <div
+      className={`rounded-[var(--r-lg)] border border-dashed ${accent.border} ${accent.bg}/60 p-6 opacity-80`}
+      data-testid="tier-locked-card"
+      aria-disabled="true"
+    >
+      <div className="flex flex-col items-center gap-3 text-center">
+        <div className={`flex h-10 w-10 items-center justify-center rounded-full ${accent.bg}`}>
+          <Lock className={`h-5 w-5 ${accent.icon}`} />
+        </div>
+        <p className="text-sm font-medium text-[var(--ink-2)]">
+          {featureDef?.label ?? featureId}
+        </p>
+        <p className="text-xs text-[var(--ink-3)]">
+          {featureDef?.description ?? 'Deze functie vereist een hoger abonnement.'}
+        </p>
+        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${accent.text} ${accent.bg}`}>
+          <Lock className="h-3 w-3" />
+          Vereist {tierLabel} abonnement
+        </span>
+      </div>
+    </div>
+  )
 }
 
 /**

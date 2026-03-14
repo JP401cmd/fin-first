@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Edit3, RefreshCw, Trash2, AlertTriangle, Users } from 'lucide-react'
+import { Edit3, RefreshCw, Trash2, AlertTriangle, Users } from 'lucide-react'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import {
@@ -96,30 +97,19 @@ export function DebtDetailModal({
   const linkedAsset = debt.linked_asset_id ? userAssets.find((a) => a.id === debt.linked_asset_id) : null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-lg overflow-y-auto rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl"
-        style={{ maxHeight: '90vh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center gap-3 border-b border-[var(--border-ed)] px-6 py-4">
+    <BottomSheet open={true} onClose={onClose} title={debt.name} size="xl">
+        {/* Subheader with icon and type info */}
+        <div className="flex items-center gap-3 border-b border-[var(--border-ed)] px-6 py-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)] bg-kern-50">
             <BudgetIcon name={icon} className="h-5 w-5 text-kern-600" />
           </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="font-semibold text-[var(--ink)]">{debt.name}</h2>
-            <p className="text-xs text-[var(--ink-3)]">
-              {DEBT_TYPE_LABELS[debt.debt_type]}
-              {debt.subtype && DEBT_SUBTYPE_LABELS[debt.debt_type]?.[debt.subtype]
-                ? ` \u2022 ${DEBT_SUBTYPE_LABELS[debt.debt_type]![debt.subtype]}`
-                : ''}
-              {debt.creditor ? ` \u2022 ${debt.creditor}` : ''}
-            </p>
-          </div>
-          <button onClick={onClose} className="rounded-[var(--r)] p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
-            <X className="h-5 w-5" />
-          </button>
+          <p className="text-xs text-[var(--ink-3)]">
+            {DEBT_TYPE_LABELS[debt.debt_type]}
+            {debt.subtype && DEBT_SUBTYPE_LABELS[debt.debt_type]?.[debt.subtype]
+              ? ` \u2022 ${DEBT_SUBTYPE_LABELS[debt.debt_type]![debt.subtype]}`
+              : ''}
+            {debt.creditor ? ` \u2022 ${debt.creditor}` : ''}
+          </p>
         </div>
 
         {/* Balance highlight */}
@@ -358,7 +348,6 @@ export function DebtDetailModal({
             </button>
           )}
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   )
 }

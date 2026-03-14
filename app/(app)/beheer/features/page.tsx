@@ -1,5 +1,5 @@
-import { FeaturePhaseMatrix } from '@/components/app/admin/feature-phase-matrix'
+import { redirect } from 'next/navigation'
 
 export default function BeheerFeaturesPage() {
-  return <FeaturePhaseMatrix />
+  redirect('/beheer/toegang')
 }

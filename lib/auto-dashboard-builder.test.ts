@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildDashboardLayout, GRID_TARGET_CELLS, type AutoDashboardAnswers, type GridSize } from './auto-dashboard-builder'
 import { WIDGET_CATALOG, WIDGET_FEATURE_MAP } from './widget-catalog'
+import type { FeatureAccessMap, FeatureAccessResult } from './compute-feature-access'
 
 /** Count cells: full=4, half=2, quarter=1 */
 function countCells(prefs: { size: string }[]): number {
@@ -11,7 +12,12 @@ function countCells(prefs: { size: string }[]): number {
   }, 0)
 }
 
-const ALL_FEATURES_ENABLED: Record<string, boolean> = {}
+/** Helper to create a FeatureAccessResult */
+function accessible(value: boolean): FeatureAccessResult {
+  return { accessible: value, reason: value ? 'accessible' : 'tier_locked', defaultEnabled: value }
+}
+
+const ALL_FEATURES_ENABLED: FeatureAccessMap = {}
 const NO_FAVS: { id: string; name: string }[] = []
 
 describe('buildDashboardLayout', () => {
@@ -70,10 +76,10 @@ describe('buildDashboardLayout', () => {
   })
 
   it('excludes feature-gated widgets when locked', () => {
-    const lockedFeatures: Record<string, boolean> = {
-      fire_projecties: false,
-      widget_monte_carlo: false,
-      widget_assets: false,
+    const lockedFeatures: FeatureAccessMap = {
+      fire_projecties: accessible(false),
+      widget_monte_carlo: accessible(false),
+      widget_assets: accessible(false),
     }
     const answers: AutoDashboardAnswers = {
       focuses: ['fire_freedom'],
@@ -186,9 +192,9 @@ describe('buildDashboardLayout', () => {
   })
 
   it('works when many features are locked (low sovereignty)', () => {
-    const allLocked: Record<string, boolean> = {}
+    const allLocked: FeatureAccessMap = {}
     for (const featureId of Object.values(WIDGET_FEATURE_MAP)) {
-      allLocked[featureId] = false
+      allLocked[featureId] = accessible(false)
     }
     const answers: AutoDashboardAnswers = {
       focuses: ['overview'],
@@ -203,7 +209,7 @@ describe('buildDashboardLayout', () => {
     for (const pref of prefs) {
       const featureId = WIDGET_FEATURE_MAP[pref.id]
       if (featureId) {
-        expect(allLocked[featureId]).not.toBe(false)
+        expect(allLocked[featureId]?.accessible).not.toBe(false)
       }
     }
   })

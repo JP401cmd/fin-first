@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { Building2, X, Plus, Trash2 } from 'lucide-react'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
 
 export type Account = {
@@ -99,23 +100,7 @@ export function AccountFormModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-md rounded-[var(--r-lg)] bg-[var(--paper)] p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-5 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-kern-600" />
-            <h2 className="text-lg font-bold text-[var(--ink)]">
-              {account ? 'Rekening bewerken' : 'Nieuwe rekening'}
-            </h2>
-          </div>
-          <button onClick={onClose} className="rounded-[var(--r)] p-1.5 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
+    <BottomSheet open={true} onClose={onClose} title={account ? 'Rekening bewerken' : 'Nieuwe rekening'} size="md">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-[var(--ink-2)]">Naam *</label>
@@ -284,7 +269,6 @@ export function AccountFormModal({
             </div>
           </div>
         </form>
-      </div>
-    </div>
+    </BottomSheet>
   )
 }

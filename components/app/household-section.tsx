@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Users, Mail, UserPlus, LogOut, Clock, Check, X, AlertTriangle, Copy } from 'lucide-react'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 
 type HouseholdStatus = {
   has_household: boolean
@@ -531,38 +532,33 @@ export function HouseholdSection() {
       )}
 
       {/* Leave confirmation dialog */}
-      {showLeaveDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-md rounded-[var(--r-lg)] bg-[var(--paper)] p-6 shadow-xl" data-testid="leave-dialog">
-            <div className="flex items-start gap-3 mb-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100">
-                <AlertTriangle className="h-5 w-5 text-red-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-[var(--ink)]">Huishouden verlaten?</h3>
-                <p className="mt-1 text-sm text-[var(--ink-2)]">
-                  Je gedeelde items worden weer persoonlijk. Je partner behoudt toegang tot hun eigen items.
-                </p>
-              </div>
+      <BottomSheet open={showLeaveDialog} onClose={() => setShowLeaveDialog(false)} title="Huishouden verlaten" size="sm">
+        <div className="p-5" data-testid="leave-dialog">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
             </div>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowLeaveDialog(false)}
-                className="rounded-lg border border-[var(--border-md)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
-              >
-                Annuleren
-              </button>
-              <button
-                onClick={handleLeave}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors"
-                data-testid="confirm-leave-btn"
-              >
-                Verlaten
-              </button>
-            </div>
+            <p className="text-sm text-[var(--ink-2)]">
+              Je gedeelde items worden weer persoonlijk. Je partner behoudt toegang tot hun eigen items.
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setShowLeaveDialog(false)}
+              className="rounded-lg border border-[var(--border-md)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
+            >
+              Annuleren
+            </button>
+            <button
+              onClick={handleLeave}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors"
+              data-testid="confirm-leave-btn"
+            >
+              Verlaten
+            </button>
           </div>
         </div>
-      )}
+      </BottomSheet>
     </section>
   )
 }

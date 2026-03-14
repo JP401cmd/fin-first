@@ -2,6 +2,7 @@ import { generateObject } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { getModel, AIConfigError } from '@/lib/ai/config'
+import { checkTierGate } from '@/lib/require-tier'
 
 const CHILD_SLUGS = [
   'salaris-uitkering',
@@ -103,6 +104,11 @@ export async function POST(req: Request) {
 
   if (!user) {
     return new Response('Unauthorized', { status: 401 })
+  }
+
+  const tierGate = await checkTierGate(supabase, user.id, 'ai')
+  if (tierGate) {
+    return new Response(JSON.stringify({ error: tierGate.error }), { status: 403, headers: { 'Content-Type': 'application/json' } })
   }
 
   let body: { transactions: RequestTransaction[] }

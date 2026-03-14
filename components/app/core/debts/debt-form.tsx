@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { X, AlertTriangle, Building2 } from 'lucide-react'
+import { AlertTriangle, Building2 } from 'lucide-react'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/components/app/budget-shared'
 import {
@@ -220,20 +221,8 @@ export function DebtForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-lg rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-[var(--ink)]">
-            {isEdit ? 'Schuld bewerken' : 'Nieuwe schuld'}
-          </h3>
-          <button onClick={onClose} className="rounded-[var(--r)] p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
+    <BottomSheet open={true} onClose={onClose} title={isEdit ? 'Schuld bewerken' : 'Nieuwe schuld'} size="lg">
+      <div className="p-6">
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -709,6 +698,6 @@ export function DebtForm({
           </button>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }

@@ -22,6 +22,8 @@ export async function GET() {
       assets: [],
       debts: [],
       transactions: [],
+      activeSubscriptions: [],
+      userFeaturePrefs: null,
       matrixJson: null,
     })
     results['compute_empty_user'] = {
@@ -42,6 +44,8 @@ export async function GET() {
         { amount: -1000, is_income: false },
         { amount: -1000, is_income: false },
       ],
+      activeSubscriptions: [],
+      userFeaturePrefs: null,
       matrixJson: null,
     })
     // 15000 / (1000/mo) = 15 months covered, freedom% = 15000 / (12000/0.04) = 5%
@@ -64,6 +68,8 @@ export async function GET() {
         { amount: -2000, is_income: false },
         { amount: -2000, is_income: false },
       ],
+      activeSubscriptions: [],
+      userFeaturePrefs: null,
       matrixJson: null,
     })
     // monthlyExpenses = 2000, netWorth = 100000
@@ -87,6 +93,8 @@ export async function GET() {
         { amount: -500, is_income: false },
         { amount: -500, is_income: false },
       ],
+      activeSubscriptions: [],
+      userFeaturePrefs: null,
       matrixJson: null,
     })
     // netWorth = 1000 - 5000 = -4000, hasConsumerDebt = true => level -2

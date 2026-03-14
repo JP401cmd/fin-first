@@ -11,6 +11,7 @@ import {
 import { FfinAvatar } from '@/components/app/avatars'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { formatCurrency } from '@/lib/format'
+import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import type { FeatureAccessData } from '@/lib/compute-feature-access'
 
 // ── Phase styling ──────────────────────────────────────────
@@ -141,6 +142,7 @@ function KernCheckRow({ label, value }: { label: string; value: string }) {
 
 export function RoadmapModal({ data, open, onClose }: RoadmapModalProps) {
   const router = useRouter()
+  const { clearActivation } = useFeatureAccess()
   const [stepIdx, setStepIdx] = useState(0)
   const [direction, setDirection] = useState<'forward' | 'back'>('forward')
   const [activating, setActivating] = useState(false)
@@ -183,6 +185,7 @@ export function RoadmapModal({ data, open, onClose }: RoadmapModalProps) {
     try {
       const res = await fetch('/api/activate', { method: 'POST' })
       if (!res.ok) throw new Error('Activation failed')
+      clearActivation()
       router.refresh()
       onClose()
       router.push('/will')

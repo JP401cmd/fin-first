@@ -1,6 +1,7 @@
-import { Target, X } from 'lucide-react'
+import { Target } from 'lucide-react'
 import { useState } from 'react'
 import type { PersonaMeta, SovereigntyPhase } from '@/lib/test-personas'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 
 const PHASE_COLORS: Record<SovereigntyPhase, { bg: string; border: string; text: string; accent: string; badge: string }> = {
   recovery:  { bg: 'bg-[var(--color-phase-recovery-50)]',  border: 'border-[var(--color-phase-recovery-200)]',  text: 'text-[var(--color-phase-recovery-700)]',  accent: 'bg-[var(--color-phase-recovery-600)]',  badge: 'bg-[var(--color-phase-recovery-100)] text-[var(--color-phase-recovery-700)]' },
@@ -38,120 +39,102 @@ export function PersonaCard({ meta, onSelect, showCta, disabled }: PersonaCardPr
   const firstName = meta.name.split(' ')[0]
   const [showDetail, setShowDetail] = useState(false)
 
-  const detailModal = showDetail && (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center"
-      onClick={() => setShowDetail(false)}
-    >
-      <div
-        className="mx-0 w-full max-w-lg overflow-hidden rounded-t-2xl bg-[var(--paper)] shadow-2xl sm:mx-4 sm:rounded-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Modal header */}
-        <div className={`h-1 w-full ${colors.accent}`} />
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-ed)]">
-          <div>
-            <p className="label-editorial text-[var(--ink-3)]">{meta.subtitle}</p>
-            <h2 className="font-display text-xl font-bold text-[var(--ink)]">{meta.name}</h2>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className={`inline-flex items-center rounded-[var(--r-sm)] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${colors.badge}`}>
-              {SOVEREIGNTY_LABEL[meta.sovereignty]}
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowDetail(false)}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-3)] hover:bg-[var(--subtle)] transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
+  const detailModal = (
+    <BottomSheet open={showDetail} onClose={() => setShowDetail(false)} title={meta.name} size="md">
+      {/* Colour accent */}
+      <div className={`h-1 w-full ${colors.accent}`} />
 
-        {/* Modal body */}
-        <div className="max-h-[70vh] overflow-y-auto p-5 space-y-5">
-          {/* Financial stats */}
-          <div className="rounded-lg border border-dashed border-[var(--border-ed)] bg-[var(--subtle)] p-4">
-            <p className="label-editorial mb-3 text-[var(--ink-3)]">Financieel overzicht</p>
-            <div className="grid grid-cols-3 gap-3 text-center">
-              <div>
-                <p className="label-editorial text-[var(--ink-3)]">Vermogen</p>
-                <p className={`font-mono text-base font-semibold tabular-nums ${meta.netWorth < 0 ? 'text-[var(--color-phase-recovery-700)]' : 'text-[var(--color-phase-momentum-700)]'}`}>
-                  {formatCurrency(meta.netWorth)}
-                </p>
-              </div>
-              <div>
-                <p className="label-editorial text-[var(--ink-3)]">Inkomen</p>
-                <p className="font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
-                  {formatCurrency(meta.income)}
-                </p>
-              </div>
-              <div>
-                <p className="label-editorial text-[var(--ink-3)]">Uitgaven</p>
-                <p className="font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
-                  {formatCurrency(meta.expenses)}
-                </p>
-              </div>
-            </div>
-          </div>
+      {/* Subtitle + sovereignty badge */}
+      <div className="flex items-center justify-between px-5 pt-3">
+        <p className="label-editorial text-[var(--ink-3)]">{meta.subtitle}</p>
+        <span className={`inline-flex items-center rounded-[var(--r-sm)] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${colors.badge}`}>
+          {SOVEREIGNTY_LABEL[meta.sovereignty]}
+        </span>
+      </div>
 
-          {/* Background story */}
-          <div>
-            <p className="label-editorial mb-1.5 text-[var(--ink-3)]">Achtergrond</p>
-            <p className="font-serif text-sm italic leading-relaxed text-[var(--ink-2)]">
-              {meta.backgroundStory}
-            </p>
-          </div>
-
-          {/* Current situation */}
-          {meta.currentSituation && (
+      {/* Modal body */}
+      <div className="p-5 space-y-5">
+        {/* Financial stats */}
+        <div className="rounded-lg border border-dashed border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+          <p className="label-editorial mb-3 text-[var(--ink-3)]">Financieel overzicht</p>
+          <div className="grid grid-cols-3 gap-3 text-center">
             <div>
-              <p className="label-editorial mb-1.5 text-[var(--ink-3)]">Huidige situatie</p>
-              <p className="font-serif text-sm leading-relaxed text-[var(--ink-2)]">
-                {meta.currentSituation}
+              <p className="label-editorial text-[var(--ink-3)]">Vermogen</p>
+              <p className={`font-mono text-base font-semibold tabular-nums ${meta.netWorth < 0 ? 'text-[var(--color-phase-recovery-700)]' : 'text-[var(--color-phase-momentum-700)]'}`}>
+                {formatCurrency(meta.netWorth)}
               </p>
             </div>
-          )}
-
-          {/* All challenges */}
-          {meta.challenges.length > 0 && (
             <div>
-              <p className="label-editorial mb-1.5 text-[var(--ink-3)]">Uitdagingen</p>
-              <ul className="space-y-1.5">
-                {meta.challenges.map((challenge, i) => (
-                  <li key={i} className="flex items-start gap-2 font-serif text-sm text-[var(--ink-2)]">
-                    <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${colors.accent}`} />
-                    <span>{challenge}</span>
-                  </li>
-                ))}
-              </ul>
+              <p className="label-editorial text-[var(--ink-3)]">Inkomen</p>
+              <p className="font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
+                {formatCurrency(meta.income)}
+              </p>
             </div>
-          )}
-
-          {/* First goal */}
-          <div className="flex items-start gap-2">
-            <Target className={`mt-0.5 h-4 w-4 shrink-0 ${colors.text}`} />
             <div>
-              <p className="label-editorial mb-0.5 text-[var(--ink-3)]">Eerste doel</p>
-              <p className="font-serif text-sm italic text-[var(--ink-2)]">{meta.firstGoal}</p>
+              <p className="label-editorial text-[var(--ink-3)]">Uitgaven</p>
+              <p className="font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
+                {formatCurrency(meta.expenses)}
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Modal footer */}
-        {!showCta && onSelect && (
-          <div className="border-t border-[var(--border-ed)] p-4">
-            <button
-              type="button"
-              onClick={() => { setShowDetail(false); onSelect() }}
-              className={`w-full rounded-[var(--r)] px-4 py-3 text-sm font-medium text-white transition-colors ${colors.accent}`}
-            >
-              Selecteer {firstName}
-            </button>
+        {/* Background story */}
+        <div>
+          <p className="label-editorial mb-1.5 text-[var(--ink-3)]">Achtergrond</p>
+          <p className="font-serif text-sm italic leading-relaxed text-[var(--ink-2)]">
+            {meta.backgroundStory}
+          </p>
+        </div>
+
+        {/* Current situation */}
+        {meta.currentSituation && (
+          <div>
+            <p className="label-editorial mb-1.5 text-[var(--ink-3)]">Huidige situatie</p>
+            <p className="font-serif text-sm leading-relaxed text-[var(--ink-2)]">
+              {meta.currentSituation}
+            </p>
           </div>
         )}
+
+        {/* All challenges */}
+        {meta.challenges.length > 0 && (
+          <div>
+            <p className="label-editorial mb-1.5 text-[var(--ink-3)]">Uitdagingen</p>
+            <ul className="space-y-1.5">
+              {meta.challenges.map((challenge, i) => (
+                <li key={i} className="flex items-start gap-2 font-serif text-sm text-[var(--ink-2)]">
+                  <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${colors.accent}`} />
+                  <span>{challenge}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* First goal */}
+        <div className="flex items-start gap-2">
+          <Target className={`mt-0.5 h-4 w-4 shrink-0 ${colors.text}`} />
+          <div>
+            <p className="label-editorial mb-0.5 text-[var(--ink-3)]">Eerste doel</p>
+            <p className="font-serif text-sm italic text-[var(--ink-2)]">{meta.firstGoal}</p>
+          </div>
+        </div>
       </div>
-    </div>
+
+      {/* Modal footer */}
+      {!showCta && onSelect && (
+        <div className="border-t border-[var(--border-ed)] p-4">
+          <button
+            type="button"
+            onClick={() => { setShowDetail(false); onSelect() }}
+            className={`w-full rounded-[var(--r)] px-4 py-3 text-sm font-medium text-white transition-colors ${colors.accent}`}
+          >
+            Selecteer {firstName}
+          </button>
+        </div>
+      )}
+    </BottomSheet>
   )
 
   const content = (

@@ -1,0 +1,206 @@
+<h2>AI Dashboard Builder — Compleet Ontwerp</h2>
+<p class="subtitle">Scoring-gebaseerde widget selectie met 4-staps wizard</p>
+
+<div class="section">
+  <h3>1. Wizard Flow</h3>
+  <div class="mockup">
+    <div class="mockup-header">BottomSheet Wizard — 4 stappen</div>
+    <div class="mockup-body" style="padding: 1.5rem;">
+
+      <!-- Step indicator -->
+      <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 1.5rem;">
+        <div style="width: 40px; height: 4px; border-radius: 2px; background: #f59e0b;"></div>
+        <div style="width: 40px; height: 4px; border-radius: 2px; background: #d1d5db;"></div>
+        <div style="width: 40px; height: 4px; border-radius: 2px; background: #d1d5db;"></div>
+        <div style="width: 40px; height: 4px; border-radius: 2px; background: #d1d5db;"></div>
+      </div>
+
+      <!-- Question -->
+      <div style="text-align: center; margin-bottom: 1rem;">
+        <h3 style="margin: 0 0 4px;">Wat is je belangrijkste focus?</h3>
+        <p style="color: #888; font-size: 0.85em; margin: 0;">Dit bepaalt welke widgets prominent op je dashboard komen. Kies maximaal 2.</p>
+      </div>
+
+      <!-- Options -->
+      <div style="display: flex; flex-direction: column; gap: 8px; max-width: 400px; margin: 0 auto;">
+        <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 2px solid #f59e0b; border-radius: 10px; background: #fffbeb; cursor: pointer;">
+          <span style="font-size: 1.2em;">🏦</span>
+          <div>
+            <div style="font-weight: 600; font-size: 0.9em;">Grip op uitgaven & budgetten</div>
+            <div style="color: #888; font-size: 0.75em;">Budgetten, cashflow, vaste lasten</div>
+          </div>
+          <span style="margin-left: auto; color: #f59e0b;">✓</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 1px solid #e5e7eb; border-radius: 10px; cursor: pointer;">
+          <span style="font-size: 1.2em;">📈</span>
+          <div>
+            <div style="font-weight: 600; font-size: 0.9em;">Vermogensgroei & beleggen</div>
+            <div style="color: #888; font-size: 0.75em;">Assets, holdings, trends</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 1px solid #e5e7eb; border-radius: 10px; cursor: pointer;">
+          <span style="font-size: 1.2em;">🔥</span>
+          <div>
+            <div style="font-weight: 600; font-size: 0.9em;">FIRE / financiële vrijheid</div>
+            <div style="color: #888; font-size: 0.75em;">FIRE prognose, scenario's, mijlpalen</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 1px solid #e5e7eb; border-radius: 10px; cursor: pointer;">
+          <span style="font-size: 1.2em;">🎯</span>
+          <div>
+            <div style="font-weight: 600; font-size: 0.9em;">Doelen & acties bijhouden</div>
+            <div style="color: #888; font-size: 0.75em;">Acties, doelen, wilskracht</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 1px solid #e5e7eb; border-radius: 10px; cursor: pointer;">
+          <span style="font-size: 1.2em;">📊</span>
+          <div>
+            <div style="font-weight: 600; font-size: 0.9em;">Totaaloverzicht</div>
+            <div style="color: #888; font-size: 0.75em;">Een beetje van alles</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem; max-width: 400px; margin-left: auto; margin-right: auto;">
+        <div style="background: #111; color: white; padding: 8px 24px; border-radius: 8px; font-size: 0.85em; font-weight: 500;">
+          Volgende →
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>2. Scoring Systeem</h3>
+  <div class="mockup">
+    <div class="mockup-header">lib/ai-dashboard-builder.ts</div>
+    <div class="mockup-body" style="padding: 1rem; font-size: 0.8em; line-height: 1.6;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div>
+          <strong>Input</strong>
+          <ul style="padding-left: 16px; margin: 4px 0;">
+            <li>focus: string[] (max 2)</li>
+            <li>module: 'kern' | 'wil' | 'horizon' | 'balanced'</li>
+            <li>detail: 'compact' | 'balanced' | 'detailed'</li>
+            <li>favBudgets: string[]</li>
+            <li>sovereigntyLevel: number</li>
+          </ul>
+        </div>
+        <div>
+          <strong>Output</strong>
+          <ul style="padding-left: 16px; margin: 4px 0;">
+            <li>WidgetPref[] die exact 16 cellen vult</li>
+            <li>Elke pref: { id, enabled, size, order }</li>
+          </ul>
+        </div>
+      </div>
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 12px 0;">
+      <strong>Score-berekening per widget:</strong>
+      <div style="background: #f8fafc; padding: 8px 12px; border-radius: 6px; margin-top: 6px; font-family: monospace; font-size: 0.85em;">
+        score = focusBonus(widget, focus) × 3<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+ moduleBonus(widget, module) × 2<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+ popularityBase(widget)<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- levelPenalty(widget, sovLevel)
+      </div>
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 12px 0;">
+      <strong>Formaat-toewijzing op basis van detail:</strong>
+      <table style="width: 100%; border-collapse: collapse; margin-top: 6px;">
+        <tr style="border-bottom: 1px solid #e5e7eb;">
+          <th style="text-align: left; padding: 4px 8px;">Detail</th>
+          <th style="text-align: left; padding: 4px 8px;">Full (4c)</th>
+          <th style="text-align: left; padding: 4px 8px;">Half (2c)</th>
+          <th style="text-align: left; padding: 4px 8px;">Quarter (1c)</th>
+        </tr>
+        <tr style="border-bottom: 1px solid #e5e7eb;">
+          <td style="padding: 4px 8px;">Compact</td>
+          <td style="padding: 4px 8px;">0</td>
+          <td style="padding: 4px 8px;">4</td>
+          <td style="padding: 4px 8px;">8</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #e5e7eb;">
+          <td style="padding: 4px 8px;">Gebalanceerd</td>
+          <td style="padding: 4px 8px;">1</td>
+          <td style="padding: 4px 8px;">4</td>
+          <td style="padding: 4px 8px;">4</td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 8px;">Uitgebreid</td>
+          <td style="padding: 4px 8px;">2</td>
+          <td style="padding: 4px 8px;">2</td>
+          <td style="padding: 4px 8px;">4</td>
+        </tr>
+      </table>
+      <div style="color: #888; font-size: 0.85em; margin-top: 8px;">
+        Totaal altijd = 16 cellen. Budget-favorieten nemen quarter-slots in.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>3. Voorbeeld Grid Layout</h3>
+  <p class="subtitle">Focus: FIRE + Grip — Module: Gebalanceerd — Detail: Gebalanceerd</p>
+  <div class="mockup">
+    <div class="mockup-header">4×4 Dashboard</div>
+    <div class="mockup-body" style="padding: 1rem;">
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 60px; gap: 6px;">
+        <!-- Row 1-2: full widget (fire_prognose) -->
+        <div style="grid-column: span 2; grid-row: span 2; background: linear-gradient(135deg, #a855f7, #7c3aed); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75em; font-weight: 600; padding: 8px; text-align: center;">
+          🔥 FIRE Prognose<br><span style="font-weight: 400; opacity: 0.8; font-size: 0.85em;">full</span>
+        </div>
+        <!-- Row 1: half widget -->
+        <div style="grid-column: span 2; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7em; font-weight: 600;">
+          💰 Netto Vermogen <span style="font-weight: 400; opacity: 0.8; font-size: 0.85em;">half</span>
+        </div>
+        <!-- Row 2 -->
+        <div style="grid-column: span 2; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7em; font-weight: 600;">
+          📊 Cashflow <span style="font-weight: 400; opacity: 0.8; font-size: 0.85em;">half</span>
+        </div>
+        <!-- Row 3 -->
+        <div style="grid-column: span 2; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7em; font-weight: 600;">
+          🏦 Budgetten <span style="font-weight: 400; opacity: 0.8; font-size: 0.85em;">half</span>
+        </div>
+        <div style="background: #14b8a6; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.6em; font-weight: 600; text-align: center;">
+          🎯 Acties<br>quarter
+        </div>
+        <div style="background: #a855f7; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.6em; font-weight: 600; text-align: center;">
+          📈 Scenario's<br>quarter
+        </div>
+        <!-- Row 4 -->
+        <div style="grid-column: span 2; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7em; font-weight: 600;">
+          💵 Spaarquote <span style="font-weight: 400; opacity: 0.8; font-size: 0.85em;">half</span>
+        </div>
+        <div style="background: #6b7280; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.6em; font-weight: 600; text-align: center;">
+          🏷️ Boodsch.<br>budget_fav
+        </div>
+        <div style="background: #6b7280; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.6em; font-weight: 600; text-align: center;">
+          🍽️ Horeca<br>budget_fav
+        </div>
+      </div>
+      <div style="margin-top: 12px; font-size: 0.75em; color: #888;">
+        Totaal: 1×full (4) + 4×half (8) + 4×quarter (4) = <strong>16 cellen</strong> ✓
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>4. Bestanden</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px;">
+      <div style="font-weight: 600; color: #16a34a; font-size: 0.85em; margin-bottom: 4px;">✚ Nieuw</div>
+      <div style="font-family: monospace; font-size: 0.75em; line-height: 1.6;">
+        lib/ai-dashboard-builder.ts<br>
+        components/widgets/ai-dashboard-wizard.tsx
+      </div>
+    </div>
+    <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px;">
+      <div style="font-weight: 600; color: #2563eb; font-size: 0.85em; margin-bottom: 4px;">✎ Wijzigen</div>
+      <div style="font-family: monospace; font-size: 0.75em; line-height: 1.6;">
+        components/widgets/draggable-widget-grid.tsx<br>
+        <span style="color: #888;">(AI knop in edit-modus + apply handler)</span>
+      </div>
+    </div>
+  </div>
+</div>

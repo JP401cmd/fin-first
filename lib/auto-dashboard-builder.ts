@@ -3,6 +3,7 @@
 // Deterministic client-side logic — no AI/API calls.
 
 import { WIDGET_CATALOG, WIDGET_FEATURE_MAP, type WidgetDef, type WidgetPref, type WidgetSize } from './widget-catalog'
+import { isFeatureAccessible, type FeatureAccessMap } from './compute-feature-access'
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -139,7 +140,7 @@ interface ScoredWidget {
 function scoreWidgets(
   catalog: WidgetDef[],
   answers: AutoDashboardAnswers,
-  features: Record<string, boolean>,
+  features: FeatureAccessMap,
 ): ScoredWidget[] {
   // Build set of boosted widget IDs from selected focuses
   const boostedIds = new Set<string>()
@@ -156,7 +157,7 @@ function scoreWidgets(
 
     // Filter: skip if widget is feature-gated and locked
     const featureId = WIDGET_FEATURE_MAP[def.id]
-    if (featureId && features[featureId] === false) continue
+    if (featureId && !isFeatureAccessible(features, featureId)) continue
 
     // Focus bonus: +1 per focus that includes this widget (max 2)
     const focusBonus = answers.focuses.reduce(
@@ -195,7 +196,7 @@ function scoreWidgets(
 export function buildDashboardLayout(
   answers: AutoDashboardAnswers,
   catalog: WidgetDef[],
-  features: Record<string, boolean>,
+  features: FeatureAccessMap,
   favoriteBudgets: { id: string; name: string }[],
 ): WidgetPref[] {
   const TARGET_CELLS = GRID_TARGET_CELLS[answers.gridSize]

@@ -5,6 +5,7 @@ import { buildBriefingSystemPrompt, briefingTools } from '@/lib/ai/dna/briefing'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
 import { NextResponse } from 'next/server'
+import { checkTierGate } from '@/lib/require-tier'
 import type {
   BriefingCardSpec,
   BriefingComposeRequest,
@@ -102,6 +103,11 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const tierGate = await checkTierGate(supabase, user.id, 'ai')
+  if (tierGate) {
+    return NextResponse.json({ error: tierGate.error }, { status: 403 })
+  }
+
   cleanupStaleCompositions()
 
   if (compositionErrors.has(user.id)) {
@@ -129,6 +135,11 @@ export async function POST(request: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const tierGate = await checkTierGate(supabase, user.id, 'ai')
+    if (tierGate) {
+      return NextResponse.json({ error: tierGate.error }, { status: 403 })
     }
 
     // If composition is already running, return status immediately

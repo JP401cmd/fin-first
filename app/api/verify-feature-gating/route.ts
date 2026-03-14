@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeFeatureAccess } from '@/lib/compute-feature-access'
+import { computeFeatureAccess, isFeatureAccessible } from '@/lib/compute-feature-access'
 import { PHASES, FEATURES, DEFAULT_MATRIX, computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 
 /**
@@ -37,6 +37,8 @@ export async function GET() {
     assets: assetsRes.data ?? [],
     debts: debtsRes.data ?? [],
     transactions: txRes.data ?? [],
+    activeSubscriptions: [],
+    userFeaturePrefs: null,
     matrixJson: matrixRes.data?.value ?? null,
   })
 
@@ -70,7 +72,7 @@ export async function GET() {
   const matrixMismatches: string[] = []
   for (const feat of FEATURES) {
     const expected = DEFAULT_MATRIX[feat.id]?.[featureAccess.phase] ?? false
-    const actual = featureAccess.features[feat.id] ?? false
+    const actual = isFeatureAccessible(featureAccess.features, feat.id)
     if (expected !== actual) {
       matrixMismatches.push(`${feat.id}: expected=${expected}, actual=${actual}`)
     }
@@ -105,26 +107,26 @@ export async function GET() {
   const recoveryUnlocked = ['budget_optimalisatie', 'schulden_aflosplan', 'nibud_benchmark']
   const recoveryLocked = ['box3_belasting', 'asset_allocatie', 'monte_carlo', 'withdrawal_strategie']
   const recoveryCorrect = featureAccess.phase !== 'recovery' || (
-    recoveryUnlocked.every(id => featureAccess.features[id] === true) &&
-    recoveryLocked.every(id => featureAccess.features[id] === false)
+    recoveryUnlocked.every(id => isFeatureAccessible(featureAccess.features, id)) &&
+    recoveryLocked.every(id => !isFeatureAccessible(featureAccess.features, id))
   )
   tests.push({
     name: 'Recovery phase feature gating correct (if in recovery)',
     pass: recoveryCorrect,
     detail: featureAccess.phase === 'recovery'
-      ? `Unlocked: ${recoveryUnlocked.filter(id => featureAccess.features[id]).join(', ')}, Locked: ${recoveryLocked.filter(id => !featureAccess.features[id]).join(', ')}`
+      ? `Unlocked: ${recoveryUnlocked.filter(id => isFeatureAccessible(featureAccess.features, id)).join(', ')}, Locked: ${recoveryLocked.filter(id => !isFeatureAccessible(featureAccess.features, id)).join(', ')}`
       : `Skipped (current phase: ${featureAccess.phase})`,
   })
 
   // Test 8: Mastery-only features locked in non-mastery phases
   const masteryOnlyFeature = 'withdrawal_strategie'
   const masteryOnlyCorrect = featureAccess.phase === 'mastery'
-    ? featureAccess.features[masteryOnlyFeature] === true
-    : featureAccess.features[masteryOnlyFeature] === false
+    ? isFeatureAccessible(featureAccess.features, masteryOnlyFeature)
+    : !isFeatureAccessible(featureAccess.features, masteryOnlyFeature)
   tests.push({
     name: 'Mastery-only feature (withdrawal_strategie) correctly gated',
     pass: masteryOnlyCorrect,
-    detail: `Phase: ${featureAccess.phase}, withdrawal_strategie: ${featureAccess.features[masteryOnlyFeature]}`,
+    detail: `Phase: ${featureAccess.phase}, withdrawal_strategie: ${isFeatureAccessible(featureAccess.features, masteryOnlyFeature)}`,
   })
 
   // Test 9: computeSovereigntyLevel pure function works correctly

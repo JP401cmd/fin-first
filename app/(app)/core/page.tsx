@@ -55,6 +55,7 @@ const DynDebtsPage = dynamic(() => import('@/app/(app)/core/debts/page'), {
   loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" /></div>,
 })
 import { usePerspective } from '@/components/app/perspective-provider'
+import { KernMissionControl } from '@/components/app/core/kern-mission-control'
 import { Users, EyeOff } from 'lucide-react'
 
 export default function CorePage() {
@@ -94,6 +95,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   const [totalBudgetSpent, setTotalBudgetSpent] = useState(0)
   const [budgetSpendingHistory, setBudgetSpendingHistory] = useState<{ label: string; spent: number; isProjection: boolean }[]>([])
   const [showBudgetModal, setShowBudgetModal] = useState(false)
+  const [heroExpanded, setHeroExpanded] = useState(false)
   const [coreSimTarget, setCoreSimTarget] = useState<number | null>(null)
   // Modal state
   const [activeModal, setActiveModal] = useState<{ type: 'cash' | 'budgets' | 'assets' | 'debts'; itemId?: string } | null>(null)
@@ -878,12 +880,12 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+    <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-8">
       {/* === 1. Hero (Gradient) === */}
       <section data-testid="kern-hero" className="card-editorial overflow-hidden">
         <div className="h-1.5 bg-kern-500" />
 
-        <div className="p-4 sm:p-6 md:p-8">
+        <div className="p-3 sm:p-6 md:p-8">
           <div className="mb-3 sm:mb-6 flex items-center gap-3">
             {(isHouseholdView || isPartnerView) && (
               <span className="inline-flex items-center gap-1 rounded-full bg-kern-50 px-2 py-0.5 text-[10px] font-medium text-kern-700">
@@ -948,7 +950,91 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             </>
           )}
 
-          <div className="grid grid-cols-1 gap-3 sm:gap-5 sm:grid-cols-3">
+          {/* Compact 2-stat row — mobile only */}
+          <div className="flex gap-3 sm:hidden mb-3">
+            <button
+              type="button"
+              onClick={() => setShowSavingsReceipt(true)}
+              className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] p-2.5 text-left transition-all hover:border-kern-300"
+            >
+              <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Spaarquote</p>
+              <p className={`font-mono text-xl font-bold ${savingsRate6m >= 0 ? 'text-[var(--ink)]' : 'text-red-400'}`}>{savingsRate6m.toFixed(1)}%</p>
+              <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
+                {savingsRateMonths < 6 ? `${savingsRateMonths}m data` : '6m'}
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowFreeDaysReceipt(true)}
+              className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] p-2.5 text-left transition-all hover:border-kern-300"
+            >
+              <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Vrije dagen</p>
+              <p className="font-mono text-xl font-bold text-[var(--ink)]">{data.freeDaysPerYear}/jaar</p>
+              <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">passief inkomen</p>
+            </button>
+          </div>
+
+          {/* Expandable detail — mobile only */}
+          <div className="sm:hidden">
+            <button
+              type="button"
+              onClick={() => setHeroExpanded(!heroExpanded)}
+              className="flex w-full items-center justify-between py-2 text-xs text-[var(--ink-3)]"
+            >
+              <span>Meer kerngetallen</span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${heroExpanded ? 'rotate-180' : ''}`} />
+            </button>
+            {heroExpanded && (
+              <div className="grid grid-cols-1 gap-3 animate-fade-up">
+                <button
+                  type="button"
+                  onClick={() => setShowNetWorthReceipt(true)}
+                  className="w-full cursor-pointer text-left rounded-[var(--r)] transition-all hover:shadow-[var(--s1)]"
+                >
+                  <p className="label-editorial text-[var(--ink-3)]">
+                    {isHouseholdView ? 'Netto vermogen — Huishouden' : isPartnerView ? `Netto vermogen — ${partnerName ?? 'Partner'}` : 'Netto vermogen'}
+                  </p>
+                  <p className="mt-1 font-mono text-2xl font-bold text-[var(--ink)]">{formatCurrency(effectiveNetWorth)}</p>
+                  <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]">
+                    dat is {effectiveFreedomYears > 0 ? `${effectiveFreedomYears} jaar en ` : ''}{effectiveFreedomMonths} maanden vrijheid
+                  </p>
+                </button>
+                <button type="button" onClick={() => setShowProjectionModal(true)} className="w-full cursor-pointer text-left">
+                  <NetWorthSparkline snapshots={snapshots} projection={nwProjection} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBudgetModal(true)}
+                  className="w-full cursor-pointer text-left"
+                >
+                  <p className="label-editorial text-[var(--ink-3)]">Deze maand</p>
+                  {totalBudgetLimit > 0 && (
+                    <div className="mt-2">
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-sm text-[var(--ink-3)]">Budget</span>
+                        <span className={`text-sm font-mono font-semibold ${totalBudgetSpent <= totalBudgetLimit ? 'text-kern-600' : 'text-red-400'}`}>
+                          {Math.round((totalBudgetSpent / totalBudgetLimit) * 100)}%
+                        </span>
+                      </div>
+                      <div className="mt-1 h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${totalBudgetSpent <= totalBudgetLimit ? 'bg-gradient-to-r from-kern-600 via-kern-400 to-kern-300' : 'bg-red-400'}`}
+                          style={{ width: `${Math.min((totalBudgetSpent / totalBudgetLimit) * 100, 100)}%` }}
+                        />
+                      </div>
+                      <p className="mt-0.5 text-[10px] font-mono text-[var(--ink-4)]">
+                        {formatCurrency(totalBudgetSpent)} / {formatCurrency(totalBudgetLimit)}
+                      </p>
+                    </div>
+                  )}
+                  <BudgetSpendingSparkline data={budgetSpendingHistory} budgetLimit={totalBudgetLimit} />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Full 3-col layout — desktop only */}
+          <div className="hidden sm:grid sm:grid-cols-3 sm:gap-5">
             <div>
               <button
                 type="button"
@@ -988,8 +1074,6 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
               data-testid="hero-deze-maand"
             >
               <p className="label-editorial text-[var(--ink-3)]">Deze maand</p>
-
-              {/* Budget voortgang */}
               {totalBudgetLimit > 0 && (
                 <div className="mt-2">
                   <div className="flex items-baseline justify-between">
@@ -1009,14 +1093,10 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                   </p>
                 </div>
               )}
-
-              {/* Budget spending sparkline (-12m + 6m prognose) */}
               <BudgetSpendingSparkline data={budgetSpendingHistory} budgetLimit={totalBudgetLimit} />
             </button>
             <div data-testid="hero-kerngetallen">
               <p className="label-editorial text-[var(--ink-3)]">Kerngetallen</p>
-
-              {/* Spaarquote */}
               <div className="mt-2 flex items-center gap-1.5">
                 <button
                   type="button"
@@ -1035,8 +1115,6 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
                   ? `${savingsRateMonths} maand${savingsRateMonths > 1 ? 'en' : ''} data`
                   : 'laatste 6 maanden'}
               </p>
-
-              {/* Vrije dagen per jaar */}
               <div className="mt-3">
                 <div className="flex items-center gap-1.5">
                   <button
@@ -1057,408 +1135,33 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       </section>
 
       {/* === Missie Controle (direct onder hero) === */}
-      <section className="mt-5 sm:mt-8" data-testid="mission-control-section">
-        <div className="mb-4 flex items-center gap-2">
+      <section className="mt-4 sm:mt-8" data-testid="mission-control-section">
+        <div className="mb-3 sm:mb-4 flex items-center gap-2">
           <div className="h-5 w-1 rounded-full bg-kern-500" />
           <h2 className="label-editorial text-[var(--ink-2)]">Missie Controle</h2>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2">
-
-          {/* Budgetten Card */}
-          {budgetingActive && (() => {
-            const segments = buildSegments(overviewBudgetGroups, overviewSpending)
-            const budgetPct = totalBudgetLimit > 0 ? Math.round((totalBudgetSpent / totalBudgetLimit) * 100) : 0
-            return (
-              <div
-                onClick={() => setActiveModal({ type: 'budgets' })}
-                data-testid="mission-budgetten"
-                className="group cursor-pointer card-editorial flex flex-col overflow-hidden p-0 text-left"
-              >
-                <div className="flex h-1 items-stretch">
-                  <div className="w-1 bg-kern-500" />
-                  <div className="flex-1" />
-                </div>
-                <div className="p-3 sm:p-5 flex flex-col flex-1">
-                  {/* Header */}
-                  <div className="mb-2 sm:mb-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
-                        <ShoppingCart className="h-5 w-5 text-kern-600" />
-                      </div>
-                      <p className="text-sm font-semibold text-[var(--ink-2)]">Budgetten</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {overBudgetCount === 0 ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                      ) : (
-                        <AlertTriangle className="h-4 w-4 text-kern-500" />
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Total */}
-                  <p className="font-mono text-2xl font-bold text-[var(--ink)]">
-                    {formatCurrency(totalBudgetSpent)} <span className="text-base font-normal text-[var(--ink-3)]">/ {formatCurrency(totalBudgetLimit)}</span>
-                  </p>
-                  <div className={`mt-1.5 mb-3 inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    overBudgetCount === 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-kern-50 text-kern-700'
-                  }`}>
-                    {overBudgetCount === 0 ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                    {overBudgetCount === 0 ? `${budgetPct}% besteed` : `${overBudgetCount} over budget`}
-                  </div>
-
-                  {/* List */}
-                  <div className="mt-auto space-y-1.5 border-t border-[var(--border-ed)] pt-2 sm:pt-3">
-                    {segments.slice(0, 5).map((seg) => {
-                      const pct = seg.limit > 0 ? Math.round((seg.spent / seg.limit) * 100) : 0
-                      const isOver = seg.spent > seg.limit && seg.limit > 0
-                      return (
-                        <div key={seg.id} onClick={(e) => { e.stopPropagation(); setActiveModal({ type: 'budgets', itemId: seg.id }) }} className="cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50">
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded" style={{ backgroundColor: typeColors(seg.budgetType).bg }}>
-                                <BudgetIcon name={seg.icon} className="h-3 w-3" />
-                              </div>
-                              <span className="truncate text-[var(--ink-2)]">{seg.name}</span>
-                            </div>
-                            <span className={`shrink-0 font-mono font-medium ${isOver ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
-                              {formatCurrency(seg.spent)} <span className="text-[var(--ink-4)]">/ {formatCurrency(seg.limit)}</span>
-                            </span>
-                          </div>
-                          <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
-                            <div
-                              className={`h-full rounded-full transition-all duration-500 ${isOver ? 'bg-red-400' : 'bg-kern-400'}`}
-                              style={{ width: `${Math.min(pct, 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                      )
-                    })}
-                    {segments.length > 5 && (
-                      <p className="text-xs text-kern-600">en {segments.length - 5} meer →</p>
-                    )}
-                    {segments.length === 0 && (
-                      <p className="text-xs text-[var(--ink-4)]">Geen budgetten ingesteld</p>
-                    )}
-                  </div>
-
-                  {/* CTA */}
-                  <div className="mt-2 sm:mt-3 flex items-center justify-between">
-                    <span className="label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">Beheer budgetten</span>
-                    <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
-                  </div>
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* Cash Card — only when budgeting is active */}
-          {budgetingActive && (() => {
-            const maxCashBalance = cashAccounts.length > 0 ? Math.max(...cashAccounts.map(a => Math.abs(a.balance))) : 1
-            return (
-              <div
-                onClick={() => setActiveModal({ type: 'cash' })}
-                data-testid="mission-cash"
-                className="group cursor-pointer card-editorial flex flex-col overflow-hidden p-0 text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px"
-              >
-                <div className="flex h-1 items-stretch">
-                  <div className="w-1 bg-kern-500" />
-                  <div className="flex-1" />
-                </div>
-                <div className="p-3 sm:p-5 flex flex-col flex-1">
-                  {/* Header */}
-                  <div className="mb-2 sm:mb-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
-                        <Wallet className="h-5 w-5 text-kern-600" />
-                      </div>
-                      <p className="text-sm font-semibold text-[var(--ink-2)]">Cash</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {totalCash >= 0 ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                      ) : (
-                        <AlertTriangle className="h-4 w-4 text-kern-500" />
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Total */}
-                  <p className="font-mono text-2xl font-bold text-[var(--ink)]">
-                    {formatCurrency(totalCash)}
-                  </p>
-                  <div className={`mt-1.5 mb-3 inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    totalCash >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-kern-50 text-kern-700'
-                  }`}>
-                    {totalCash >= 0 ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                    {cashAccounts.length} {cashAccounts.length === 1 ? 'rekening' : 'rekeningen'}
-                  </div>
-
-                  {/* List */}
-                  <div className="mt-auto space-y-1.5 border-t border-[var(--border-ed)] pt-2 sm:pt-3">
-                    {cashAccounts.slice(0, 5).map((acc) => {
-                      const pct = maxCashBalance > 0 ? Math.round((Math.abs(acc.balance) / maxCashBalance) * 100) : 0
-                      return (
-                        <div key={acc.id} className="rounded-md -mx-1 px-1 py-0.5">
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-emerald-50">
-                                <Wallet className="h-3 w-3 text-emerald-600" />
-                              </div>
-                              <span className="truncate text-[var(--ink-2)]">{acc.name}</span>
-                              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700 border border-emerald-200">
-                                <BarChart3 className="h-2.5 w-2.5" /> Transacties
-                              </span>
-                            </div>
-                            <span className={`shrink-0 font-mono font-medium ${acc.balance >= 0 ? 'text-[var(--ink-2)]' : 'text-red-600'}`}>
-                              {formatCurrency(acc.balance)}
-                            </span>
-                          </div>
-                          <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
-                            <div
-                              className={`h-full rounded-full transition-all duration-500 ${acc.balance >= 0 ? 'bg-emerald-400' : 'bg-red-400'}`}
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                        </div>
-                      )
-                    })}
-                    {cashAccounts.length > 5 && (
-                      <p className="text-xs text-kern-600">en {cashAccounts.length - 5} meer →</p>
-                    )}
-                    {cashAccounts.length === 0 && (
-                      <p className="text-xs text-[var(--ink-4)]">Geen cash-rekeningen</p>
-                    )}
-                  </div>
-
-                  {/* CTA */}
-                  <div className="mt-2 sm:mt-3 flex items-center justify-between">
-                    <span className="label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">Bekijk overzicht</span>
-                    <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
-                  </div>
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* Assets Card — merges cash when budgeting is off */}
-          {(() => {
-            // Merge cash into asset list when budgeting is off
-            const cashFromAssets = !budgetingActive
-              ? cashAccounts
-                  .filter(a => a.source === 'asset')
-                  .map(a => ({ id: a.id, name: a.name, value: a.balance, isCash: true }))
-              : []
-            const nonCashItems = nonCashAssets.map(a => ({ id: a.id, name: a.name, value: a.current_value, isCash: false }))
-            const allItems = [...nonCashItems, ...cashFromAssets].sort((a, b) => b.value - a.value)
-
-            const heroTotal = budgetingActive
-              ? totalNonCashAssets
-              : totalNonCashAssets + cashFromAssets.reduce((s, a) => s + a.value, 0)
-
-            const maxValue = allItems.length > 0 ? Math.max(...allItems.map(a => Math.abs(a.value))) : 1
-
-            return (
-              <div
-                onClick={() => setActiveModal({ type: 'assets' })}
-                data-testid="mission-assets"
-                className="group cursor-pointer card-editorial flex flex-col overflow-hidden p-0 text-left"
-              >
-                <div className="flex h-1 items-stretch">
-                  <div className="w-1 bg-kern-500" />
-                  <div className="flex-1" />
-                </div>
-                <div className="p-3 sm:p-5 flex flex-col flex-1">
-                  {/* Header */}
-                  <div className="mb-2 sm:mb-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
-                        <PiggyBank className="h-5 w-5 text-kern-600" />
-                      </div>
-                      <p className="text-sm font-semibold text-[var(--ink-2)]">Assets</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {assetGrowthDirection === 'up' && <ArrowUpRight className="h-4 w-4 text-emerald-500" />}
-                      {assetGrowthDirection === 'down' && <ArrowDownRight className="h-4 w-4 text-red-500" />}
-                      {assetGrowthDirection === 'flat' && <Minus className="h-4 w-4 text-[var(--ink-4)]" />}
-                    </div>
-                  </div>
-
-                  {/* Total */}
-                  <p className="font-mono text-2xl font-bold text-[var(--ink)]">
-                    {formatCurrency(heroTotal)}
-                  </p>
-                  <div className={`mt-1.5 mb-3 inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    assetGrowthDirection === 'down' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
-                  }`}>
-                    {assetGrowthDirection === 'up' && <><ArrowUpRight className="h-3 w-3" />Groeiend</>}
-                    {assetGrowthDirection === 'down' && <><ArrowDownRight className="h-3 w-3" />Dalend</>}
-                    {assetGrowthDirection === 'flat' && <><Minus className="h-3 w-3" />Stabiel</>}
-                  </div>
-
-                  {/* List */}
-                  <div className="mt-auto space-y-1.5 border-t border-[var(--border-ed)] pt-2 sm:pt-3">
-                    {allItems.slice(0, 5).map((item) => {
-                      const pct = maxValue > 0 ? Math.round((Math.abs(item.value) / maxValue) * 100) : 0
-                      return (
-                        <div key={item.id} onClick={(e) => { e.stopPropagation(); setActiveModal({ type: 'assets', itemId: item.id }) }} className="cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50">
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded ${
-                                item.isCash ? 'bg-kern-50' : 'bg-emerald-50'
-                              }`}>
-                                {item.isCash
-                                  ? <Wallet className="h-3 w-3 text-kern-600" />
-                                  : <PiggyBank className="h-3 w-3 text-emerald-600" />}
-                              </div>
-                              <span className="truncate text-[var(--ink-2)]">{item.name}</span>
-                            </div>
-                            <span className={`shrink-0 font-mono font-medium ${
-                              item.value >= 0 ? 'text-[var(--ink-2)]' : 'text-red-600'
-                            }`}>{formatCurrency(item.value)}</span>
-                          </div>
-                          <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
-                            <div className={`h-full rounded-full transition-all duration-500 ${
-                              item.isCash ? 'bg-kern-400' : 'bg-emerald-400'
-                            }`} style={{ width: `${pct}%` }} />
-                          </div>
-                        </div>
-                      )
-                    })}
-                    {allItems.length > 5 && (
-                      <p className="text-xs text-kern-600">en {allItems.length - 5} meer →</p>
-                    )}
-                    {allItems.length === 0 && (
-                      <p className="text-xs text-[var(--ink-4)]">Geen assets</p>
-                    )}
-                  </div>
-
-                  {/* CTA */}
-                  <div className="mt-2 sm:mt-3 flex items-center justify-between">
-                    <span className="label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">Bekijk portfolio</span>
-                    <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
-                  </div>
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* Schulden Card */}
-          {(() => {
-            const maxDebtBalance = debtsList.length > 0 ? Math.max(...debtsList.map(d => d.current_balance)) : 1
-            return (
-              <div
-                onClick={() => setActiveModal({ type: 'debts' })}
-                data-testid="mission-schulden"
-                className="group cursor-pointer card-editorial flex flex-col overflow-hidden p-0 text-left"
-              >
-                <div className="flex h-1 items-stretch">
-                  <div className="w-1 bg-kern-500" />
-                  <div className="flex-1" />
-                </div>
-                <div className="p-3 sm:p-5 flex flex-col flex-1">
-                  {/* Header */}
-                  <div className="mb-2 sm:mb-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
-                        <Building2 className="h-5 w-5 text-kern-600" />
-                      </div>
-                      <p className="text-sm font-semibold text-[var(--ink-2)]">Schulden</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {rawFinancials!.totalDebts === 0 ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                      ) : debtProgress && debtProgress.progressPct > 50 ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                      ) : (
-                        <AlertTriangle className="h-4 w-4 text-kern-500" />
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Total */}
-                  <p className={`font-mono text-2xl font-bold ${rawFinancials!.totalDebts > 0 ? 'text-[var(--ink)]' : 'text-emerald-600'}`}>
-                    {rawFinancials!.totalDebts > 0 ? formatCurrency(rawFinancials!.totalDebts) : 'Schuldvrij'}
-                  </p>
-                  <div className={`mt-1.5 mb-3 inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    rawFinancials!.totalDebts === 0 ? 'bg-emerald-50 text-emerald-700' : debtProgress && debtProgress.progressPct > 50 ? 'bg-emerald-50 text-emerald-700' : 'bg-kern-50 text-kern-700'
-                  }`}>
-                    {rawFinancials!.totalDebts === 0 ? (
-                      <><CheckCircle2 className="h-3 w-3" />Schuldvrij!</>
-                    ) : debtProgress ? (
-                      <><CheckCircle2 className="h-3 w-3" />{debtProgress.progressPct.toFixed(0)}% afgelost</>
-                    ) : (
-                      <><AlertTriangle className="h-3 w-3" />Vrijheid terugkopen</>
-                    )}
-                  </div>
-
-                  {/* Payoff progress bar */}
-                  {debtProgress && debtProgress.totalOriginal > 0 && (
-                    <div className="mb-3">
-                      <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-500"
-                          style={{ width: `${debtProgress.progressPct}%` }}
-                        />
-                      </div>
-                      <p className="mt-1 text-[10px] font-mono text-[var(--ink-4)]">
-                        {formatCurrency(debtProgress.totalOriginal - debtProgress.totalCurrent)} afgelost van {formatCurrency(debtProgress.totalOriginal)}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* List */}
-                  <div className="mt-auto space-y-1.5 border-t border-[var(--border-ed)] pt-2 sm:pt-3">
-                    {debtsList.slice(0, 5).map((debt, i) => {
-                      const pct = maxDebtBalance > 0 ? Math.round((debt.current_balance / maxDebtBalance) * 100) : 0
-                      return (
-                        <div key={debt.id} onClick={(e) => { e.stopPropagation(); setActiveModal({ type: 'debts', itemId: debt.id }) }} className="cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50">
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-red-50">
-                                <Building2 className="h-3 w-3 text-red-500" />
-                              </div>
-                              <span className="truncate text-[var(--ink-2)]">{debt.name}</span>
-                            </div>
-                            <span className="shrink-0 font-mono font-medium text-red-600">
-                              {formatCurrency(debt.current_balance)}
-                            </span>
-                          </div>
-                          <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
-                            <div
-                              className="h-full rounded-full bg-red-400 transition-all duration-500"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                        </div>
-                      )
-                    })}
-                    {debtsList.length > 5 && (
-                      <p className="text-xs text-kern-600">en {debtsList.length - 5} meer →</p>
-                    )}
-                    {debtsList.length === 0 && (
-                      <p className="text-xs text-[var(--ink-4)] flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-emerald-500" /> Geen schulden</p>
-                    )}
-                  </div>
-
-                  {/* CTA */}
-                  <div className="mt-2 sm:mt-3 flex items-center justify-between">
-                    <span className="label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">Beheer schulden</span>
-                    <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
-                  </div>
-                </div>
-              </div>
-            )
-          })()}
-
-        </div>
-
+        <KernMissionControl
+          budgetingActive={budgetingActive}
+          overviewBudgetGroups={overviewBudgetGroups}
+          overviewSpending={overviewSpending}
+          totalBudgetSpent={totalBudgetSpent}
+          totalBudgetLimit={totalBudgetLimit}
+          overBudgetCount={overBudgetCount}
+          cashAccounts={cashAccounts}
+          totalCash={totalCash}
+          nonCashAssets={nonCashAssets}
+          totalNonCashAssets={totalNonCashAssets}
+          assetGrowthDirection={assetGrowthDirection}
+          debtsList={debtsList}
+          rawTotalDebts={rawFinancials!.totalDebts}
+          debtProgress={debtProgress}
+          onCardClick={(type, itemId) => setActiveModal({ type, itemId })}
+        />
       </section>
 
-
       {/* === 7. Financiële Kerngetallen (Deep Dive) === */}
-      <section className="mt-5 sm:mt-8">
-        <div className="mb-5 flex items-end justify-between">
+      <section className="mt-4 sm:mt-8">
+        <div className="mb-3 sm:mb-5 flex items-end justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="h-5 w-1 rounded-full bg-kern-500" />
@@ -1484,11 +1187,28 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
           </FeatureGate>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2">
-          <button type="button" onClick={() => setShowIncomeReceipt(true)} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6 text-left transition-all hover:border-kern-300 hover:shadow-sm">
+        {/* Compact on mobile */}
+        <div className="flex gap-3 sm:hidden">
+          <button onClick={() => setShowIncomeReceipt(true)}
+            className="flex-1 card-editorial p-3 text-left">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Jaarinkomen</p>
+            <p className="mt-1 font-mono text-lg font-bold tabular-nums text-[var(--ink)]">{formatCurrency(data.estimatedYearlyIncome)}</p>
+            <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">{incomeMonths < 12 ? `${incomeMonths}m data` : '12m'}</p>
+          </button>
+          <button onClick={() => setShowExpenseReceipt(true)}
+            className="flex-1 card-editorial p-3 text-left">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Must uitgaven</p>
+            <p className="mt-1 font-mono text-lg font-bold tabular-nums text-[var(--ink)]">{formatCurrency(data.yearlyMustExpenses)}</p>
+            <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">per jaar</p>
+          </button>
+        </div>
+
+        {/* Full cards on desktop */}
+        <div className="hidden sm:grid sm:grid-cols-2 sm:gap-4">
+          <button type="button" onClick={() => setShowIncomeReceipt(true)} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 text-left transition-all hover:border-kern-300 hover:shadow-sm">
             <div className="mb-3 flex items-center justify-between">
-              <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-emerald-50">
-                <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-emerald-50">
+                <TrendingUp className="h-6 w-6 text-emerald-600" />
               </div>
               <KpiTooltip text="Geschat jaarinkomen gebaseerd op werkelijke transacties. Bij minder dan 12 maanden data wordt het gemiddelde geextrapoleerd naar een jaar." />
             </div>
@@ -1502,10 +1222,10 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             </p>
           </button>
 
-          <button type="button" onClick={() => setShowExpenseReceipt(true)} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6 text-left transition-all hover:border-kern-300 hover:shadow-sm">
+          <button type="button" onClick={() => setShowExpenseReceipt(true)} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 text-left transition-all hover:border-kern-300 hover:shadow-sm">
             <div className="mb-3 flex items-center justify-between">
-              <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-[var(--subtle)]">
-                <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6 text-[var(--ink-3)]" />
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r-lg)] bg-[var(--subtle)]">
+                <ShoppingCart className="h-6 w-6 text-[var(--ink-3)]" />
               </div>
               <KpiTooltip text="Jaarlijkse som van je essentiële budgetten: vaste lasten, dagelijkse uitgaven en vervoer. Dit zijn de kosten die je sowieso maakt." />
             </div>

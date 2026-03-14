@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ModuleNavConfig, DomainColor } from '@/lib/navigation'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
+import { isFeatureAccessible } from '@/lib/compute-feature-access'
 
 const colorStyles: Record<DomainColor, { active: string; hover: string; border: string }> = {
   amber: {
@@ -36,7 +37,7 @@ export function ModuleNav({ config }: { config: ModuleNavConfig }) {
   const { features } = useFeatureAccess()
 
   const visibleItems = config.items.filter(
-    item => !item.featureId || features[item.featureId] !== false
+    item => !item.featureId || isFeatureAccessible(features, item.featureId)
   )
 
   return (

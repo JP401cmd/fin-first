@@ -8,8 +8,8 @@ type BottomSheetProps = {
   onClose: () => void
   title?: string
   children: ReactNode
-  /** Desktop max-width: 'sm' (448px) | 'md' (512px, default) | 'lg' (640px) | 'xl' (768px) */
-  size?: 'sm' | 'md' | 'lg' | 'xl'
+  /** Desktop max-width: 'sm' (448px) | 'md' (512px, default) | 'lg' (640px) | 'xl' (768px) | 'full' (1024px) */
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'
 }
 
 const sizeClasses = {
@@ -17,6 +17,7 @@ const sizeClasses = {
   md: 'md:max-w-lg',
   lg: 'md:max-w-xl',
   xl: 'md:max-w-3xl',
+  full: 'md:max-w-5xl',
 } as const
 
 export function BottomSheet({ open, onClose, title, children, size = 'md' }: BottomSheetProps) {

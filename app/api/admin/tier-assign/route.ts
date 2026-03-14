@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { isSuperAdmin } from '@/lib/admin'
-import type { CommercialTier } from '@/lib/tier-config'
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -10,7 +9,7 @@ function getServiceClient() {
   return createServiceClient(url, serviceKey)
 }
 
-/** POST — assign a user to a tier */
+/** POST — assign subscriptions to a user */
 export async function POST(req: Request) {
   const supabase = await createClient()
 
@@ -24,46 +23,85 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json()
-  const { userId, tier } = body as { userId: string; tier: CommercialTier }
 
-  if (!userId || !tier || !['gratis', 'connected', 'ai'].includes(tier)) {
-    return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
-  }
+  // Support both old format (email + tier) and new format (email + subscriptions)
+  const email = body.email as string | undefined
+  const userId = body.userId as string | undefined
+  const subscriptions = body.subscriptions as string[] | undefined
+  const legacyTier = body.tier as string | undefined
 
   const service = getServiceClient()
 
-  // Get current tier
+  // Resolve user ID from email if needed
+  let targetUserId = userId
+  if (!targetUserId && email) {
+    const { data: usersData } = await service.auth.admin.listUsers()
+    const authUser = usersData?.users?.find(
+      (u) => u.email?.toLowerCase() === email.toLowerCase()
+    )
+    if (!authUser) {
+      return NextResponse.json({ error: 'Gebruiker niet gevonden' }, { status: 404 })
+    }
+    targetUserId = authUser.id
+  }
+
+  if (!targetUserId) {
+    return NextResponse.json({ error: 'userId of email is vereist' }, { status: 400 })
+  }
+
+  // Get current state
   const { data: profile } = await service
     .from('profiles')
-    .select('commercial_tier')
-    .eq('id', userId)
+    .select('active_subscriptions, commercial_tier')
+    .eq('id', targetUserId)
     .maybeSingle()
 
   if (!profile) {
     return NextResponse.json({ error: 'Gebruiker niet gevonden' }, { status: 404 })
   }
 
-  const oldTier = profile.commercial_tier as string
+  const oldSubs = (profile.active_subscriptions as string[]) ?? []
 
-  // Update tier
+  // Determine new subscriptions
+  let newSubs: string[]
+  if (subscriptions !== undefined) {
+    // New format: explicit subscriptions array
+    const validSubs = ['connected', 'ai']
+    newSubs = subscriptions.filter(s => validSubs.includes(s))
+  } else if (legacyTier) {
+    // Legacy format: single tier → convert to subscriptions
+    if (legacyTier === 'ai') newSubs = ['ai']
+    else if (legacyTier === 'connected') newSubs = ['connected']
+    else newSubs = []
+  } else {
+    return NextResponse.json({ error: 'subscriptions of tier is vereist' }, { status: 400 })
+  }
+
+  // Update subscriptions
   const { error: updateError } = await service
     .from('profiles')
-    .update({ commercial_tier: tier })
-    .eq('id', userId)
+    .update({
+      active_subscriptions: newSubs,
+      // Keep commercial_tier in sync for backward compat
+      commercial_tier: newSubs.includes('ai') ? 'ai' : newSubs.includes('connected') ? 'connected' : 'gratis',
+    })
+    .eq('id', targetUserId)
 
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 })
   }
 
   // Log the assignment
+  const oldLabel = oldSubs.length === 0 ? 'gratis' : oldSubs.join('+')
+  const newLabel = newSubs.length === 0 ? 'gratis' : newSubs.join('+')
   await service.from('tier_assignments_log').insert({
-    target_user: userId,
+    target_user: targetUserId,
     assigned_by: adminUser.id,
-    old_tier: oldTier,
-    new_tier: tier,
+    old_tier: oldLabel,
+    new_tier: newLabel,
   })
 
-  return NextResponse.json({ success: true, oldTier, newTier: tier })
+  return NextResponse.json({ success: true, oldSubscriptions: oldSubs, newSubscriptions: newSubs })
 }
 
 /** GET — recent assignment log + user lookup by email */
@@ -96,7 +134,7 @@ export async function GET(req: Request) {
 
     const { data: profile } = await service
       .from('profiles')
-      .select('id, full_name, commercial_tier')
+      .select('id, full_name, active_subscriptions, commercial_tier')
       .eq('id', authUser.id)
       .maybeSingle()
 
@@ -106,6 +144,7 @@ export async function GET(req: Request) {
             id: profile.id,
             email: authUser.email,
             name: profile.full_name,
+            subscriptions: (profile.active_subscriptions as string[]) ?? [],
             currentTier: profile.commercial_tier,
           }
         : null,

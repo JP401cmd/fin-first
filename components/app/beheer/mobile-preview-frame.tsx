@@ -4,7 +4,6 @@ import { type ReactNode, useState, useEffect, useRef, useCallback } from 'react'
 import { useMobilePreview, DEVICE_PRESETS } from './mobile-preview-provider'
 
 const NAV_ROUTES = [
-  { label: 'Wil', path: '/will' },
   { label: 'Kern', path: '/core' },
   { label: 'Wil', path: '/will' },
   { label: 'Horizon', path: '/horizon' },

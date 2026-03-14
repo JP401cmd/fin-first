@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Save, Users } from 'lucide-react'
+import { Save, Users } from 'lucide-react'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
 import {
   GOAL_TYPE_LABELS, GOAL_COLORS, GOAL_TYPE_META, GOAL_TYPE_ICONS,
@@ -163,20 +164,7 @@ export function GoalForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg overflow-y-auto rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl" style={{ maxHeight: '90vh' }}>
-        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-6 py-4">
-          <h2 className="text-lg font-semibold text-[var(--ink)]">
-            {isEdit ? 'Doel bewerken' : 'Nieuw doel'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
+    <BottomSheet open={true} onClose={onClose} title={isEdit ? 'Doel bewerken' : 'Nieuw doel'} size="lg">
         <form onSubmit={handleSubmit} className="p-6">
           {error && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -453,7 +441,6 @@ export function GoalForm({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </BottomSheet>
   )
 }

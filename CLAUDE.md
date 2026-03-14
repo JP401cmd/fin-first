@@ -299,6 +299,53 @@ Fallback-logica: als `monthlyIncome=0 && monthlyExpenses=0`, gebruik profielscha
 - [ ] Nieuwe berekening met `monthlyIncome/Expenses`? → Implementeer profielfallback
 - [ ] Nieuwe widget? → Overweeg `WidgetEmpty` state voor geen-budget gebruikers
 
+## BottomSheet als standaard modal
+
+**ALLE modals in de applicatie gebruiken het `<BottomSheet>` component** uit `components/app/bottom-sheet.tsx`. Dit is de enige toegestane manier om modals/dialogen te tonen.
+
+### Waarom
+- **Mobiel:** schuift van onderen omhoog, bijna volledig scherm, wegvegen naar beneden
+- **Desktop:** gecentreerd dialoog met max-width
+- Ingebouwde features: body scroll lock, focus trap, Escape-toets, backdrop click, drag handle (mobiel), `animate-sheet-enter` animatie
+
+### Gebruik
+
+```tsx
+import { BottomSheet } from '@/components/app/bottom-sheet'
+
+<BottomSheet
+  open={isOpen}
+  onClose={() => setIsOpen(false)}
+  title="Modal titel"
+  size="md"  // sm | md | lg | xl | full
+>
+  {/* content */}
+</BottomSheet>
+```
+
+### Sizes
+| Size | Desktop max-width | Gebruik |
+|------|-------------------|---------|
+| `sm` | 384px | Bevestigingsdialogen, kleine formulieren |
+| `md` | 512px (default) | Standaard formulieren, details |
+| `lg` | 640px | Lijsten, grotere formulieren |
+| `xl` | 768px | Detailweergaven met veel content |
+| `full` | 1024px | Volledige overzichten (bijv. FullScreenModal) |
+
+### Regels
+- **NOOIT** custom `fixed inset-0` overlays maken — gebruik altijd `<BottomSheet>`
+- Geen eigen close button nodig — BottomSheet heeft er een in de header
+- Geen eigen body scroll lock / Escape handler / focus trap nodig — BottomSheet regelt dit
+- Voor conditioneel gerenderde componenten (parent doet `{show && <Component />}`): gebruik `open={true}`
+- Voor componenten met eigen state: gebruik `open={stateVar}` direct
+
+### Uitzonderingen
+Alleen deze componenten hebben een eigen overlay (vanwege speciale animaties):
+- `PhaseTransitionModal` — fase-transitie viering met confetti/sparkles
+- `LevelUpCelebration` — level-up viering met confetti
+- `ShareDialog` — deelkaarten met speciale share-UI (z-index 90)
+- `ActivationButton` — eenmalige activatie flow
+
 ## Guidelines
 
 1. Be concise and helpful

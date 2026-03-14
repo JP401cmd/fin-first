@@ -34,7 +34,7 @@ export function Masthead({ editionNr, jaargang, dateline }: MastheadProps) {
         className="mt-2 text-center font-playfair text-3xl font-bold tracking-tight text-[var(--ink)] sm:text-4xl md:text-[2.75rem]"
         style={{ letterSpacing: '-0.03em' }}
       >
-        TriFinity Berichten
+        TriFinity Post
       </h1>
       <p className="mt-1.5 text-center font-source-serif text-sm italic text-[var(--ink-2)]">
         {displayDateline}

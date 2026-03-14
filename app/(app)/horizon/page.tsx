@@ -118,6 +118,7 @@ export default function HorizonPage() {
   const [showFireTargetReceipt, setShowFireTargetReceipt] = useState(false)
   const [showResilienceReceipt, setShowResilienceReceipt] = useState(false)
   const [showSwrReceipt, setShowSwrReceipt] = useState(false)
+  const [horizonHeroExpanded, setHorizonHeroExpanded] = useState(false)
 
   // Deep-link: open modal via ?modal= URL param (from dashboard widgets)
   const searchParams = useSearchParams()
@@ -1296,12 +1297,12 @@ export default function HorizonPage() {
   const hasDebt = (effectiveInput?.totalDebts ?? 0) > 0
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+    <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-8">
       {/* === 1. Hero + Simulatie (één gecombineerd blok) === */}
       <section data-testid="horizon-hero" className="card-editorial overflow-hidden">
         <div className="h-1.5 bg-horizon-500" />
 
-        <div className="p-4 sm:p-6 md:p-8">
+        <div className="p-3 sm:p-6 md:p-8">
           {/* Header rij: kicker + Details pill */}
           <div className="mb-3 sm:mb-6 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -1332,8 +1333,22 @@ export default function HorizonPage() {
             )}
           </div>
 
-          {/* 4-kolom stat grid */}
-          <div className="mb-3 sm:mb-5 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+          {/* Mobile: Primary number */}
+          <div className="sm:hidden mb-3">
+            <button type="button" onClick={() => setShowFireAgeReceipt(true)} className="text-left">
+              <span className="font-display text-[36px] font-bold tracking-tight text-[var(--ink)]">
+                {hasPerspectiveHero
+                  ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '-')
+                  : simResult?.fireAgeFractional != null
+                    ? simResult.fireAgeFractional.toFixed(1)
+                    : fire.fireAge !== null ? Math.round(fire.fireAge) : '-'}
+              </span>
+              <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">vrijheidsleeftijd</span>
+            </button>
+          </div>
+
+          {/* Desktop: 4-col stat grid */}
+          <div className="hidden sm:grid sm:grid-cols-4 gap-3 mb-5">
             {/* Vrijheidsleeftijd */}
             <button
               type="button"
@@ -1421,7 +1436,7 @@ export default function HorizonPage() {
           </div>
 
           {/* Voortgangsbalk */}
-          <div className="mb-4 sm:mb-6">
+          <div className="mb-3 sm:mb-6">
             <div className="h-[5px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-horizon-600 via-horizon-400 to-horizon-300 transition-all duration-1000"
@@ -1437,6 +1452,65 @@ export default function HorizonPage() {
               </span>
               <span>100%</span>
             </div>
+          </div>
+
+          {/* Mobile: 2 compact stats + expandable */}
+          <div className="sm:hidden mb-3">
+            <div className="flex gap-3 mb-3">
+              <button
+                type="button"
+                onClick={() => setShowFireTargetReceipt(true)}
+                className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] p-2.5 text-left transition-all hover:border-horizon-300"
+              >
+                <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Doelbedrag</p>
+                <p className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
+                  {hasPerspectiveHero
+                    ? formatCurrency(perspectiveHero!.fireTarget)
+                    : formatCurrency(simResult?.requiredFirePortfolio ?? fire.fireTarget)}
+                </p>
+                <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">benodigd</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCountdownReceipt(true)}
+                className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] p-2.5 text-left transition-all hover:border-horizon-300"
+              >
+                <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Aftellen</p>
+                <p className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
+                  {hasPerspectiveHero
+                    ? (perspectiveHero!.countdownDays > 0 ? perspectiveHero!.countdownDays.toLocaleString('nl-NL') : '0')
+                    : effectiveCountdown.countdownDays > 0 ? effectiveCountdown.countdownDays.toLocaleString('nl-NL') : '0'}
+                </p>
+                <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">dagen</p>
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setHorizonHeroExpanded(!horizonHeroExpanded)}
+              className="flex w-full items-center justify-between py-2 text-xs text-[var(--ink-3)]"
+            >
+              <span>Meer details</span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${horizonHeroExpanded ? 'rotate-180' : ''}`} />
+            </button>
+            {horizonHeroExpanded && (
+              <div className="animate-fade-up">
+                <button
+                  type="button"
+                  onClick={() => setShowSwrReceipt(true)}
+                  className="w-full rounded-[var(--r)] border border-[var(--border-ed)] p-2.5 text-left transition-all hover:border-horizon-300"
+                >
+                  <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Opnamerate</p>
+                  <p className="font-mono text-xl font-bold tabular-nums text-[var(--ink)]">
+                    {simResult?.implicitWithdrawalRate != null
+                      ? `${(simResult.implicitWithdrawalRate * 100).toFixed(2)}%`
+                      : `${(fireSwr * 100).toFixed(2)}%`}
+                  </p>
+                  <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">
+                    {simResult?.implicitWithdrawalRate != null ? 'impliciet' : 'ingesteld'}
+                  </p>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Grafiekgedeelte — alleen zichtbaar als simResult beschikbaar is */}

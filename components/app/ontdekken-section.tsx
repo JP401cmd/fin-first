@@ -6,6 +6,7 @@ import { Sparkles, Lock } from 'lucide-react'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { DISCOVER_ITEMS, getVisitedFeaturesLocal, markFeatureVisitedLocal, type DiscoverItem } from '@/components/app/discover-carousel'
 import { DEFAULT_MATRIX, PHASES } from '@/lib/feature-phases'
+import { isFeatureAccessible } from '@/lib/compute-feature-access'
 
 /* ── Constants ─────────────────────── */
 
@@ -53,7 +54,7 @@ export function OntdekkenSection() {
   const availableItems = DISCOVER_ITEMS
     .filter(item => {
       if (item.minLevel > level) return false
-      if (features[item.id] === false) return false
+      if (!isFeatureAccessible(features, item.id)) return false
       if (visited.has(item.id)) return false
       return true
     })
@@ -74,7 +75,7 @@ export function OntdekkenSection() {
           // Must be above current level but within reach (next 2 levels)
           if (item.minLevel <= level) return false // already available
           if (item.minLevel > level + 2) return false // too far away
-          if (features[item.id] !== false) return false // already accessible via feature-gate
+          if (isFeatureAccessible(features, item.id)) return false // already accessible via feature-gate
           const unlockPhase = getUnlockPhase(item.id)
           return unlockPhase === nextPhase.id || item.minLevel === level + 1
         })

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X } from 'lucide-react'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/components/app/budget-shared'
 
@@ -67,18 +67,8 @@ export function ValuationModal({
   const label = entityType === 'asset' ? 'Herwaarderen' : 'Saldo bijwerken'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-md rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-[var(--ink)]">{label}</h3>
-          <button onClick={onClose} className="rounded-[var(--r)] p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
+    <BottomSheet open={true} onClose={onClose} title={label} size="md">
+      <div className="p-6">
         <p className="mb-4 text-sm text-[var(--ink-3)]">{entityName}</p>
 
         <div className="space-y-3">
@@ -133,6 +123,6 @@ export function ValuationModal({
           </button>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }
