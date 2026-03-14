@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { ReportConfig } from '@/lib/report-data'
-import { FileText, Trash2, Eye, Sparkles, CheckCircle2, Scale } from 'lucide-react'
+import { FileText, Trash2, Eye, Sparkles, CheckCircle2, Scale, BarChart3 } from 'lucide-react'
 
 type PeriodType = 'month' | 'quarter' | 'year'
 
@@ -89,6 +89,10 @@ export default function RapportagesPage() {
   const [configsLoading, setConfigsLoading] = useState(true)
   const [useAi, setUseAi] = useState(false)
   const [balansDate, setBalansDate] = useState(new Date().toISOString().split('T')[0])
+  const [budgetMonth, setBudgetMonth] = useState(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  })
 
   // Set default selection when period type changes
   useEffect(() => {
@@ -345,6 +349,38 @@ export default function RapportagesPage() {
         >
           <Scale className="h-4 w-4" />
           Genereer balans
+        </button>
+      </div>
+
+      {/* Budgetrapport */}
+      <div className="mt-6 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-[var(--s0)]">
+        <p className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)] mb-1">
+          Budgetrapport
+        </p>
+        <p className="font-source-serif text-[12px] italic leading-snug text-[var(--ink-2)] mb-4">
+          Maandelijks overzicht van je budgetten — besteed vs. begroot met trends en vrijheidstijd.
+        </p>
+
+        <div className="mb-4">
+          <label className="mb-1.5 block font-inter text-xs text-[var(--ink-2)]">Maand</label>
+          <select
+            value={budgetMonth}
+            onChange={(e) => setBudgetMonth(e.target.value)}
+            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-inter text-sm text-[var(--ink)] outline-none transition-colors focus:border-kern-400"
+          >
+            {getMonthOptions().map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => router.push(`/rapportages/budget?month=${budgetMonth}`)}
+          className="flex w-full items-center justify-center gap-2 rounded-[var(--r)] bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)]"
+        >
+          <BarChart3 className="h-4 w-4" />
+          Genereer budgetrapport
         </button>
       </div>
 

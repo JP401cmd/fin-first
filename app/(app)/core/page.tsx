@@ -6,7 +6,6 @@ import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, BudgetIcon } from '@/components/app/budget-shared'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { shouldAlert } from '@/lib/budget-alerts'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { ageAtDate, type LifeEvent } from '@/lib/horizon-data'
 import { DEFAULT_RETURN, INFLATION } from '@/lib/constants'
@@ -18,7 +17,7 @@ import type { NetWorthSnapshot, EntityBalanceHistory } from '@/lib/net-worth-dat
 import {
   TrendingUp, Wallet, ShoppingCart, BarChart3,
   PiggyBank, Building2, ArrowRight, Info, Camera, Download, ChevronDown, Flag,
-  CheckCircle2, AlertTriangle, TrendingDown, ArrowUpRight, ArrowDownRight, Minus, Pencil, X, Sparkles,
+  CheckCircle2, AlertTriangle, TrendingDown, ArrowUpRight, ArrowDownRight, Minus, Pencil, Sparkles,
 } from 'lucide-react'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
@@ -54,6 +53,7 @@ const DynCashOverview = dynamic(
 const DynDebtsPage = dynamic(() => import('@/app/(app)/core/debts/page'), {
   loading: () => <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" /></div>,
 })
+
 import { usePerspective } from '@/components/app/perspective-provider'
 import { KernMissionControl } from '@/components/app/core/kern-mission-control'
 import { Users, EyeOff } from 'lucide-react'
@@ -66,7 +66,6 @@ export default function CorePage() {
   const [data, setData] = useState<FinancialMetrics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [alertBudgets, setAlertBudgets] = useState<{ budget: Budget; spent: number; limit: number }[]>([])
   const [snapshots, setSnapshots] = useState<NetWorthSnapshot[]>([])
   const [snapshotLoading, setSnapshotLoading] = useState(false)
   const [incomeMonths, setIncomeMonths] = useState(12)
@@ -97,7 +96,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
   const [showBudgetModal, setShowBudgetModal] = useState(false)
   const [heroExpanded, setHeroExpanded] = useState(false)
   const [coreSimTarget, setCoreSimTarget] = useState<number | null>(null)
-  // Modal state
+  // Mission Control modal state
   const [activeModal, setActiveModal] = useState<{ type: 'cash' | 'budgets' | 'assets' | 'debts'; itemId?: string } | null>(null)
   const [showProjectionModal, setShowProjectionModal] = useState(false)
   // Kassabon modal state
@@ -459,25 +458,6 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
             spendMap[t.budget_id] = (spendMap[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
           }
         }
-        const triggered = (budgetResult.data as Budget[])
-          .filter(b => !b.parent_id) // only parent budgets
-          .map(b => {
-            const children = (budgetResult.data as Budget[]).filter(c => c.parent_id === b.id)
-            const spent = children.length > 0
-              ? children.reduce((sum, c) => sum + (spendMap[c.id] ?? 0), 0)
-              : (spendMap[b.id] ?? 0)
-            const limit = children.length > 0
-              ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
-              : Number(b.default_limit)
-            return { budget: b as Budget, spent, limit }
-          })
-          .filter(({ spent, limit, budget }) => {
-            const bt = (budget.budget_type ?? 'expense') as 'income' | 'expense' | 'savings' | 'debt'
-            return shouldAlert(spent, limit, Number(budget.alert_threshold), bt)
-          })
-          .slice(0, 5)
-        setAlertBudgets(triggered)
-
         // Compute over-budget count for mission control card
         const expenseParents = (budgetResult.data as Budget[])
           .filter(b => !b.parent_id && (b.budget_type === 'expense'))
@@ -1428,47 +1408,27 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       </FullScreenModal>
 
       {/* === Schattingen Modal === */}
-      {showEstimatesModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowEstimatesModal(false)}>
-          <div
-            className="w-full max-w-md rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-xl"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="estimates-modal-title"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="mb-1 flex items-start justify-between gap-3">
-              <h3 id="estimates-modal-title" className="text-lg font-semibold text-[var(--ink)]">Financiële schattingen</h3>
-              <button
-                type="button"
-                onClick={() => setShowEstimatesModal(false)}
-                className="rounded-[var(--r)] p-1.5 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <p className="text-sm text-[var(--ink-3)]">
-              Pas je geschatte maandinkomen en uitgaven aan. Deze worden gebruikt voor berekeningen wanneer budgettering uit staat.
-            </p>
-            <EstimatesForm
-              initialIncome={profileIncome}
-              initialExpenses={profileExpenses}
-              onSave={async (income, expenses) => {
-                const supabase = createClient()
-                const { data: { user } } = await supabase.auth.getUser()
-                if (!user) return
-                await supabase.from('profiles').update({
-                  net_monthly_income: income,
-                  estimated_monthly_expenses: expenses,
-                }).eq('id', user.id)
-                setShowEstimatesModal(false)
-                loadData()
-              }}
-              onCancel={() => setShowEstimatesModal(false)}
-            />
-          </div>
-        </div>
-      )}
+      <BottomSheet open={showEstimatesModal} onClose={() => setShowEstimatesModal(false)} title="Financiële schattingen" size="md">
+        <p className="text-sm text-[var(--ink-3)]">
+          Pas je geschatte maandinkomen en uitgaven aan. Deze worden gebruikt voor berekeningen wanneer budgettering uit staat.
+        </p>
+        <EstimatesForm
+          initialIncome={profileIncome}
+          initialExpenses={profileExpenses}
+          onSave={async (income, expenses) => {
+            const supabase = createClient()
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+            await supabase.from('profiles').update({
+              net_monthly_income: income,
+              estimated_monthly_expenses: expenses,
+            }).eq('id', user.id)
+            setShowEstimatesModal(false)
+            loadData()
+          }}
+          onCancel={() => setShowEstimatesModal(false)}
+        />
+      </BottomSheet>
 
       {/* === Kassabon Modal: Inkomen === */}
       <BottomSheet open={showIncomeReceipt} onClose={() => setShowIncomeReceipt(false)} title="Kassabon: Geschat Jaarinkomen">

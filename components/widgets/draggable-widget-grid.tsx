@@ -413,7 +413,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
                     : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
                 }`}
               >
-                AI Briefing
+                Briefing
               </button>
             </div>
           )}

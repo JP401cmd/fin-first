@@ -3,9 +3,9 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
-  ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, X, Pencil, Save, Trash2,
+  ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, Pencil, Save, Trash2,
   GitFork, CircleDot, AlertTriangle, CheckCircle2, Heart,
-  TrendingUp, AlertCircle, BarChart3, EyeOff, MessageCircle,
+  TrendingUp, AlertCircle, BarChart3, EyeOff, MessageCircle, FileText,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getDefaultBudgets, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
@@ -50,6 +50,137 @@ type Goal = {
 
 function localDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+type HubAlert = { name: string; spent: number; limit: number; pct: number; severity: 'over' | 'bijna' }
+
+function BudgetHub({
+  hubAlertsVisible,
+  hubAlertsExtra,
+  dekkingsgraad,
+  opSchemaCount,
+  expenseParentCount,
+  formatCurrency: fmt,
+  openWithMessage,
+  totalIncome,
+}: {
+  hubAlertsVisible: HubAlert[]
+  hubAlertsExtra: number
+  dekkingsgraad: number
+  opSchemaCount: number
+  expenseParentCount: number
+  formatCurrency: (n: number) => string
+  openWithMessage: (message: string) => void
+  totalIncome: number
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const { dailyExpenseRate, loading: rateLoading, source } = useDailyExpenseRate()
+  const hasFreedomData = !rateLoading && source === 'transactions' && dailyExpenseRate > 0
+
+  const overCount = hubAlertsVisible.filter(a => a.severity === 'over').length
+  const bijnaCount = hubAlertsVisible.filter(a => a.severity === 'bijna').length + hubAlertsExtra
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)]">
+      {/* Kleur-accent bovenaan — editorial pattern */}
+      <div className="h-1 bg-wil-500" />
+      {/* Header — clickable to toggle */}
+      <button
+        type="button"
+        onClick={() => setExpanded(v => !v)}
+        className="flex w-full items-center justify-between px-4 py-2.5 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-wil-50 px-2 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-[0.08em] text-wil-700">Will</span>
+          <span className="font-sans text-xs font-semibold text-[var(--ink-2)]">Budgetanalyse</span>
+          {!expanded && (overCount > 0 || bijnaCount > 0) && (
+            <span className="font-sans text-[11px] text-[var(--ink-3)]">
+              — {overCount > 0 && <span className="text-red-600">{overCount} overschreden</span>}
+              {overCount > 0 && bijnaCount > 0 && ', '}
+              {bijnaCount > 0 && <span className="text-amber-600">{bijnaCount} bijna vol</span>}
+            </span>
+          )}
+        </div>
+        <ChevronDown className={`h-4 w-4 text-[var(--ink-3)] transition-transform ${expanded ? 'rotate-180' : ''}`} />
+      </button>
+
+      {expanded && (
+      <>
+      <div className="border-t border-[var(--border-ed)] px-4 py-3">
+        {/* Alerts sectie */}
+        {hubAlertsVisible.length > 0 && (
+          <div className="space-y-2">
+            {hubAlertsVisible.map(alert => {
+              const overAmount = alert.severity === 'over' ? alert.spent - alert.limit : 0
+              const freedomTime = hasFreedomData && overAmount >= 100
+                ? eurToFreedomTime(overAmount, dailyExpenseRate)
+                : null
+
+              return (
+                <div key={alert.name} className="flex items-start gap-2">
+                  <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
+                    alert.severity === 'over' ? 'bg-red-500' : 'bg-amber-400'
+                  }`} />
+                  <div>
+                    <p className="font-serif text-[13px] italic leading-snug text-[var(--ink-2)]">
+                      <strong className="not-italic font-semibold">{alert.name}</strong>
+                      {alert.severity === 'over'
+                        ? <> — {alert.pct}% vol <span className="text-[var(--ink-3)]">({fmt(alert.spent)} van {fmt(alert.limit)})</span></>
+                        : <> is bijna vol — {alert.pct}% <span className="text-[var(--ink-3)]">({fmt(alert.spent)} van {fmt(alert.limit)})</span></>
+                      }
+                    </p>
+                    {freedomTime && (
+                      <p className="text-[12px] italic text-[var(--ink-3)]">
+                        {fmt(overAmount)} over — {freedomTime.formattedDagen} ingeleverd
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+            {hubAlertsExtra > 0 && (
+              <p className="text-[11px] italic text-[var(--ink-3)] pl-3.5">
+                en {hubAlertsExtra} meer…
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Inzichten sectie */}
+        {totalIncome > 0 && (
+          <div className={`space-y-1 ${hubAlertsVisible.length > 0 ? 'mt-3 border-t border-[var(--border-ed)] pt-3' : ''}`}>
+            <div className="flex items-start gap-2">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ink-4)]" />
+              <p className="font-serif text-[13px] italic leading-snug text-[var(--ink-2)]">
+                Dekkingsgraad: <strong className="not-italic font-semibold">{dekkingsgraad.toFixed(0)}%</strong> van inkomen toegewezen
+              </p>
+            </div>
+            {expenseParentCount > 0 && (
+              <div className="flex items-start gap-2">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ink-4)]" />
+                <p className="font-serif text-[13px] italic leading-snug text-[var(--ink-2)]">
+                  <strong className="not-italic font-semibold">{opSchemaCount}</strong> van {expenseParentCount} budgetten op schema
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Vraag Will knop */}
+        <div className={`${hubAlertsVisible.length > 0 || totalIncome > 0 ? 'mt-3 border-t border-[var(--border-ed)] pt-2' : ''}`}>
+          <button
+            type="button"
+            onClick={() => openWithMessage('Analyseer mijn budgetten en geef me de belangrijkste inzichten over overschreden en bijna-volle categorieën')}
+            className="min-h-[44px] px-0 font-sans text-[11px] italic text-wil-600 hover:underline"
+          >
+            Vraag Will voor uitgebreide analyse →
+          </button>
+        </div>
+      </div>
+      </>
+      )}
+    </div>
+  )
 }
 
 export default function BudgetsPage({ initialBudgetId }: { initialBudgetId?: string } = {}) {
@@ -626,6 +757,22 @@ export default function BudgetsPage({ initialBudgetId }: { initialBudgetId?: str
     })
   const hasAIInsights = overschredenInzichten.length > 0 || bijnaVolInzichten.length > 0
 
+  // G3-hub: compute op-schema count for expense parent budgets
+  const expenseParentCount = expenseBudgets.length
+  const opSchemaCount = expenseBudgets.filter(b => {
+    const lim = getParentEffectiveLimit(b)
+    const spent = getParentSpent(b)
+    return lim > 0 && spent <= lim
+  }).length
+
+  // G3-hub: combined alert list (overschreden first, then bijna vol), max 5
+  const hubAlerts = [
+    ...overschredenInzichten.map(i => ({ ...i, severity: 'over' as const })),
+    ...bijnaVolInzichten.map(i => ({ ...i, severity: 'bijna' as const })),
+  ]
+  const hubAlertsVisible = hubAlerts.slice(0, 5)
+  const hubAlertsExtra = hubAlerts.length - hubAlertsVisible.length
+
   // F2-09: beschikbaar per sub-budget (effectieve limiet incl. rollover − uitgegeven)
   const beschikbaarMap: Record<string, number> = {}
   for (const group of budgets) {
@@ -642,16 +789,16 @@ export default function BudgetsPage({ initialBudgetId }: { initialBudgetId?: str
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 sm:py-8">
         {/* Month selector skeleton */}
-        <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
-          <div className="mb-6 flex items-center justify-between gap-2">
+        <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-6">
+          <div className="mb-3 sm:mb-6 flex items-center justify-between gap-2">
             <div className="h-9 w-9 animate-pulse rounded-lg bg-[var(--subtle)]" />
             <div className="h-6 w-36 animate-pulse rounded-md bg-[var(--subtle)]" />
             <div className="h-9 w-9 animate-pulse rounded-lg bg-[var(--subtle)]" />
             <div className="ml-auto hidden h-8 w-36 animate-pulse rounded-[var(--r)] bg-[var(--subtle)] sm:block" />
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:gap-4 sm:grid-cols-4">
             {[1,2,3,4].map(i => (
               <div key={i} className="flex flex-col items-center gap-2">
                 <div className="h-3 w-16 animate-pulse rounded bg-[var(--subtle)]" />
@@ -663,7 +810,7 @@ export default function BudgetsPage({ initialBudgetId }: { initialBudgetId?: str
         </section>
 
         {/* View mode toggle skeleton */}
-        <div className="mt-6 flex items-center gap-2">
+        <div className="mt-2 sm:mt-6 flex items-center gap-2">
           {[1,2,3,4].map(i => (
             <div key={i} className="h-8 w-20 animate-pulse rounded-[var(--r)] bg-[var(--subtle)]" />
           ))}
@@ -722,7 +869,7 @@ export default function BudgetsPage({ initialBudgetId }: { initialBudgetId?: str
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+    <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 sm:py-8">
       {/* Privacy notice for hidden budget data (Feature #537) */}
       {perspective === 'household' && hiddenCategories.includes('budgets') && (
         <div className="mb-4">
@@ -730,60 +877,70 @@ export default function BudgetsPage({ initialBudgetId }: { initialBudgetId?: str
         </div>
       )}
       {/* Month selector */}
-      <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
-        <div className="mb-6 flex items-center justify-between gap-2">
+      <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-6">
+        <div className="mb-3 sm:mb-6 flex items-center justify-between gap-2">
           <button
             onClick={prevMonth}
-            className="rounded-lg p-2 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
+            className="rounded-lg p-1.5 sm:p-2 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
-          <h2 className="text-lg font-semibold capitalize text-[var(--ink)]">
+          <h2 className="text-base sm:text-lg font-semibold capitalize text-[var(--ink)]">
             {monthLabel}
           </h2>
           <button
             onClick={nextMonth}
-            className="rounded-lg p-2 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
+            className="rounded-lg p-1.5 sm:p-2 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
           >
             <ChevronRight className="h-5 w-5" />
           </button>
-          <button
-            type="button"
-            onClick={copyFromLastMonth}
-            disabled={copyingMonth}
-            title="Kopieer budgetbedragen van vorige maand"
-            className="ml-auto hidden sm:inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-50"
-          >
-            {copyingMonth ? (
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border border-[var(--ink-3)] border-t-transparent" />
-            ) : (
-              <Save className="h-3.5 w-3.5" />
-            )}
-            Kopieer vorige maand
-          </button>
+          <div className="ml-auto hidden sm:flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => router.push(`/rapportages/budget?month=${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`)}
+              className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 font-inter text-xs text-[var(--ink-2)] transition-all hover:shadow-[var(--s0)] hover:-translate-y-px hover:text-[var(--ink)]"
+            >
+              <FileText className="h-3 w-3" />
+              Rapport
+            </button>
+            <button
+              type="button"
+              onClick={copyFromLastMonth}
+              disabled={copyingMonth}
+              title="Kopieer budgetbedragen van vorige maand"
+              className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-50"
+            >
+              {copyingMonth ? (
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border border-[var(--ink-3)] border-t-transparent" />
+              ) : (
+                <Save className="h-3.5 w-3.5" />
+              )}
+              Kopieer vorige maand
+            </button>
+          </div>
         </div>
 
         {/* Totals split: Income / Expenses / Savings / Debt — budget limits as primary */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 text-center sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-4 text-center sm:grid-cols-4">
           <div>
             <p className="text-xs font-medium text-emerald-600 uppercase">Inkomen</p>
-            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalIncome)}</p>
+            <p className="mt-0.5 sm:mt-1 text-lg sm:text-xl font-bold text-[var(--ink)]">{formatCurrency(totalIncome)}</p>
             <p className="text-xs text-[var(--ink-3)]">{formatCurrency(totalIncomeActual)} ontvangen</p>
           </div>
           <div>
             <p className="text-xs font-medium text-kern-600 uppercase">Uitgaven</p>
-            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalExpenseBudget)}</p>
+            <p className="mt-0.5 sm:mt-1 text-lg sm:text-xl font-bold text-[var(--ink)]">{formatCurrency(totalExpenseBudget)}</p>
             <p className="text-xs text-[var(--ink-3)]">{formatCurrency(totalExpenseSpent)} besteed</p>
           </div>
           <div>
             <p className="text-xs font-medium text-wil-600 uppercase">Sparen</p>
-            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalSavingsBudget)}</p>
+            <p className="mt-0.5 sm:mt-1 text-lg sm:text-xl font-bold text-[var(--ink)]">{formatCurrency(totalSavingsBudget)}</p>
             <p className="text-xs text-[var(--ink-3)]">{formatCurrency(totalSavingsActual)} gespaard</p>
             <p className="text-[10px] text-wil-500/70">vrijheid opbouwen</p>
           </div>
           <div>
             <p className="text-xs font-medium text-red-600 uppercase">Schulden</p>
-            <p className="mt-1 text-xl font-bold text-[var(--ink)]">{formatCurrency(totalDebtBudget)}</p>
+            <p className="mt-0.5 sm:mt-1 text-lg sm:text-xl font-bold text-[var(--ink)]">{formatCurrency(totalDebtBudget)}</p>
             <p className="text-xs text-[var(--ink-3)]">{formatCurrency(totalDebtActual)} afgelost</p>
             <p className="text-[10px] text-red-500/70">vrijheid terugkopen</p>
           </div>
@@ -792,10 +949,10 @@ export default function BudgetsPage({ initialBudgetId }: { initialBudgetId?: str
         {/* Te Verdelen + Dekkingsgraad */}
         {/* FeatureGate: budget_optimalisatie — Te Verdelen allocatie bar + tools */}
         <FeatureGate featureId="budget_optimalisatie" fallback="hidden">
-          <div className={`mt-4 flex items-center justify-between gap-3 rounded-lg border px-4 py-3 ${teVerdelen >= 0 ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
+          <div className={`mt-3 sm:mt-4 flex items-center justify-between gap-2 sm:gap-3 rounded-lg border px-3 sm:px-4 py-2 sm:py-3 ${teVerdelen >= 0 ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
             <div>
               <p className={`text-[10px] font-semibold uppercase tracking-wider ${teVerdelen >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>Te Verdelen</p>
-              <p className={`mt-0.5 font-mono text-lg font-bold ${teVerdelen >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+              <p className={`mt-0.5 font-mono text-base sm:text-lg font-bold ${teVerdelen >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
                 {teVerdelen >= 0 ? '' : '–'}{formatCurrency(Math.abs(teVerdelen))}
               </p>
               <p className={`text-[11px] ${teVerdelen >= 0 ? 'text-emerald-600/70' : 'text-red-600/70'}`}>
@@ -834,53 +991,24 @@ export default function BudgetsPage({ initialBudgetId }: { initialBudgetId?: str
         />
       </section>
 
-      {/* G3: Will AI Budget Insights kaart — gated by budget_optimalisatie */}
+      {/* G3: Budget Hub — unified alerts + inzichten, gated by budget_optimalisatie */}
       <FeatureGate featureId="budget_optimalisatie" fallback="hidden">
-      {hasAIInsights && (
-        <div className="mt-4 overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)]">
-          {/* Kleur-accent bovenaan — editorial pattern */}
-          <div className="h-1 bg-wil-500" />
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-4 py-2.5">
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-wil-50 px-2 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-[0.08em] text-wil-700">Will</span>
-              <span className="font-sans text-xs font-semibold text-[var(--ink-2)]">Budgetanalyse</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => openWithMessage('Analyseer mijn budgetten en geef me de belangrijkste inzichten over overschreden en bijna-volle categorieën')}
-              className="min-h-[44px] px-2 font-sans text-[11px] italic text-wil-600 hover:underline"
-            >
-              Vraag Will →
-            </button>
-          </div>
-          {/* Inzichten */}
-          <div className="space-y-2 px-4 py-3">
-            {overschredenInzichten.slice(0, 2).map(inzicht => (
-              <div key={inzicht.name} className="flex items-start gap-2">
-                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
-                <p className="font-serif text-[13px] italic leading-snug text-[var(--ink-2)]">
-                  <strong className="not-italic font-semibold">{inzicht.name}</strong> is {inzicht.pct}% vol —{' '}
-                  <span className="text-[var(--ink-3)]">{formatCurrency(inzicht.spent)} van {formatCurrency(inzicht.limit)}</span>
-                </p>
-              </div>
-            ))}
-            {bijnaVolInzichten.slice(0, Math.max(0, 2 - Math.min(overschredenInzichten.length, 2))).map(inzicht => (
-              <div key={inzicht.name} className="flex items-start gap-2">
-                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-wil-400" />
-                <p className="font-serif text-[13px] italic leading-snug text-[var(--ink-2)]">
-                  <strong className="not-italic font-semibold">{inzicht.name}</strong> is bijna vol — {inzicht.pct}%{' '}
-                  <span className="text-[var(--ink-3)]">({formatCurrency(inzicht.spent)} van {formatCurrency(inzicht.limit)})</span>
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
+      {(hasAIInsights || expenseParentCount > 0) && (
+        <BudgetHub
+          hubAlertsVisible={hubAlertsVisible}
+          hubAlertsExtra={hubAlertsExtra}
+          dekkingsgraad={dekkingsgraad}
+          opSchemaCount={opSchemaCount}
+          expenseParentCount={expenseParentCount}
+          formatCurrency={formatCurrency}
+          openWithMessage={openWithMessage}
+          totalIncome={totalIncome}
+        />
       )}
       </FeatureGate>
 
       {/* View toggle + New budget button */}
-      <div className="mt-3 sm:mt-6 flex items-center justify-between">
+      <div className="mt-2 sm:mt-6 flex items-center justify-between">
         <div className="flex items-center gap-0.5 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-0.5">
           <button
             onClick={() => toggleViewMode('tree')}
@@ -1189,24 +1317,7 @@ function BudgetAllocationModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-lg overflow-y-auto rounded-2xl bg-[var(--paper)] shadow-xl"
-        style={{ maxHeight: '85vh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-6 py-4">
-          <h2 className="text-lg font-semibold text-[var(--ink)]">Budgetplan instellen</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
+    <BottomSheet open={true} onClose={onClose} title="Budgetplan instellen" size="md">
         <div className="space-y-5 px-6 py-4">
           {/* Inkomen referentie (readonly) */}
           <div className="flex items-center justify-between rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-4 py-3">
@@ -1273,8 +1384,7 @@ function BudgetAllocationModal({
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   )
 }
 
@@ -1629,29 +1739,20 @@ function BudgetDetailModal({
 
   return (
     <>
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-lg overflow-y-auto rounded-2xl bg-[var(--paper)] shadow-xl"
-        style={{ maxHeight: '90vh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className={`flex items-center gap-3 border-b border-[var(--border-ed)] bg-gradient-to-r ${colors.headerGradient} px-6 py-4`}>
+    <BottomSheet open={true} onClose={onClose} title={budget.name} size="lg">
+        {/* Header accent */}
+        <div className={`flex items-center gap-3 bg-gradient-to-r ${colors.headerGradient} px-6 py-4`}>
           <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${colors.bgDark}`}>
             <BudgetIcon name={budget.icon} className={`h-5 w-5 ${colors.text}`} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h2 className="font-semibold text-[var(--ink)]">{budget.name}</h2>
               {perspective === 'household' && budget.ownership === 'shared' && (
                 <OwnershipBadge ownership="shared" />
               )}
             </div>
             {budget.description && <p className="truncate text-xs text-[var(--ink-3)]">{budget.description}</p>}
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
-            <X className="h-5 w-5" />
-          </button>
         </div>
 
         {/* Spending summary */}
@@ -2646,8 +2747,7 @@ function BudgetDetailModal({
             Archiveren
           </button>
         </div>
-      </div>
-    </div>
+    </BottomSheet>
     {txToEdit && (
       <TransactionForm
         transaction={txToEdit}
@@ -2918,27 +3018,16 @@ function BudgetEditModal({
 
   return (
     <>
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={handleClose}>
-      <div
-        className="w-full max-w-lg overflow-y-auto rounded-2xl bg-[var(--paper)] shadow-xl"
-        style={{ maxHeight: '90vh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-6 py-4">
-          <h2 className="text-lg font-semibold text-[var(--ink)]">Budget bewerken</h2>
-          <div className="flex items-center gap-1">
-            <button type="button" onClick={() => setIsFavorite(!isFavorite)}
-              className={`rounded-lg p-1.5 transition-colors ${
-                isFavorite ? 'text-red-500 hover:text-red-600' : 'text-[var(--ink-4)] hover:text-[var(--ink-3)]'
-              }`}
-              title={isFavorite ? 'Verwijder uit favorieten' : 'Markeer als favoriet'}
-            >
-              <Heart className={`h-5 w-5 ${isFavorite ? 'fill-current' : ''}`} />
-            </button>
-            <button onClick={handleClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+    <BottomSheet open={true} onClose={handleClose} title="Budget bewerken" size="lg">
+        <div className="flex justify-end px-6 pt-3">
+          <button type="button" onClick={() => setIsFavorite(!isFavorite)}
+            className={`rounded-lg p-1.5 transition-colors ${
+              isFavorite ? 'text-red-500 hover:text-red-600' : 'text-[var(--ink-4)] hover:text-[var(--ink-3)]'
+            }`}
+            title={isFavorite ? 'Verwijder uit favorieten' : 'Markeer als favoriet'}
+          >
+            <Heart className={`h-5 w-5 ${isFavorite ? 'fill-current' : ''}`} />
+          </button>
         </div>
 
         <div className="space-y-4 px-6 py-4">
@@ -3295,8 +3384,7 @@ function BudgetEditModal({
             {saving ? 'Opslaan...' : 'Opslaan'}
           </button>
         </div>
-      </div>
-    </div>
+    </BottomSheet>
 
     {showCreateGoal && (
       <GoalForm
@@ -3483,19 +3571,7 @@ function BudgetCreateModal({
 
   return (
     <>
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={handleClose}>
-      <div
-        className="w-full max-w-lg overflow-y-auto rounded-2xl bg-[var(--paper)] shadow-xl"
-        style={{ maxHeight: '90vh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-6 py-4">
-          <h2 className="text-lg font-semibold text-[var(--ink)]">Nieuw budget</h2>
-          <button onClick={handleClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
+    <BottomSheet open={true} onClose={handleClose} title="Nieuw budget" size="lg">
         <div className="space-y-4 px-6 py-4">
           {/* Unsaved changes close confirmation */}
           {showCloseConfirm && (
@@ -3843,8 +3919,7 @@ function BudgetCreateModal({
             {saving ? 'Opslaan...' : 'Opslaan'}
           </button>
         </div>
-      </div>
-    </div>
+    </BottomSheet>
 
     {showCreateGoal && (
       <GoalForm

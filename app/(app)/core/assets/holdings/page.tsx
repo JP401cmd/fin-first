@@ -8,6 +8,7 @@ import PortfolioAllocationVisualization, { type HoldingForAllocation } from '@/c
 import { BenchmarkComparisonChart } from '@/components/app/benchmark-comparison-chart'
 import { TIME_PERIODS, type TimePeriod, type ComparisonResult } from '@/lib/benchmark-comparison'
 import DividendTracker from '@/components/app/dividend-tracker'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -777,23 +778,11 @@ function ManualPriceOverrideModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-md rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-        data-testid="manual-override-modal"
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-[var(--ink)]">Prijs handmatig bijwerken</h3>
-            <p className="text-xs text-[var(--ink-3)] mt-0.5">
-              {holding.name} {holding.ticker ? `(${holding.ticker})` : ''}
-            </p>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+    <BottomSheet open={true} onClose={onClose} title="Prijs handmatig bijwerken" size="sm">
+      <div className="p-5" data-testid="manual-override-modal">
+        <p className="mb-4 text-xs text-[var(--ink-3)]">
+          {holding.name} {holding.ticker ? `(${holding.ticker})` : ''}
+        </p>
 
         {/* Stale price notice */}
         <div className="mb-4 flex items-start gap-2 rounded-lg border border-kern-200 bg-kern-50 p-3">
@@ -877,7 +866,7 @@ function ManualPriceOverrideModal({
           </button>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }
 
@@ -1109,18 +1098,8 @@ function HoldingForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-lg rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-[var(--ink)]">Nieuwe holding</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
+    <BottomSheet open={true} onClose={onClose} title="Nieuwe holding" size="md">
+      <div className="p-5">
         {error && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
             <p className="text-xs text-red-600">{error}</p>
@@ -1306,7 +1285,7 @@ function HoldingForm({
           </button>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }
 
@@ -1537,19 +1516,8 @@ function HoldingEditForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={handleClose}>
-      <div
-        className="w-full max-w-lg rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-        data-testid="holding-edit-modal"
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-[var(--ink)]">Holding bewerken</h3>
-          <button onClick={handleClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]" data-testid="holding-edit-close-btn">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
+    <BottomSheet open={true} onClose={handleClose} title="Holding bewerken" size="md">
+      <div className="p-5" data-testid="holding-edit-modal">
         {/* Unsaved changes close confirmation */}
         {showCloseConfirm && (
           <div className="mb-4 rounded-lg border border-orange-300 bg-orange-50 p-3" data-testid="unsaved-changes-warning">
@@ -1780,7 +1748,7 @@ function HoldingEditForm({
           </button>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }
 
@@ -1900,21 +1868,8 @@ function HoldingTransactionForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-lg rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-6 pt-5 pb-3">
-          <div>
-            <h3 className="text-lg font-bold text-[var(--ink)]">Transactie registreren</h3>
-            <p className="text-xs text-[var(--ink-3)]">{holding.name} {holding.ticker ? `(${holding.ticker})` : ''}</p>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+    <BottomSheet open={true} onClose={onClose} title="Transactie registreren" size="md">
+      <p className="px-5 -mt-2 pb-3 text-xs text-[var(--ink-3)]">{holding.name} {holding.ticker ? `(${holding.ticker})` : ''}</p>
 
         {/* Tabs */}
         <div className="flex border-b border-[var(--border-ed)] px-6">
@@ -2170,7 +2125,6 @@ function HoldingTransactionForm({
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   )
 }

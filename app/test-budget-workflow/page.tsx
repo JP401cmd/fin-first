@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getDefaultBudgets, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
 import { formatCurrency } from '@/components/app/budget-shared'
-import { BudgetAlert, shouldAlert } from '@/components/app/budget-alert'
+import { shouldAlert } from '@/lib/budget-alerts'
 
 /**
  * Test page for Feature #82: End-to-end budget management workflow
@@ -301,42 +301,11 @@ export default function TestBudgetWorkflowPage() {
             })}
           </div>
 
-          {/* Budget Alert Demos */}
-          <h2 className="text-lg font-semibold text-zinc-900 mb-4">Budget Alert Components</h2>
-          <div className="space-y-2 mb-8">
-            <p className="text-xs text-zinc-500 mb-2">Demo alerts showing all alert levels:</p>
-            <BudgetAlert
-              budgetName="Boodschappen (85% - warning)"
-              budgetId="demo-1"
-              spent={340}
-              limit={400}
-              threshold={80}
-              budgetType="expense"
-            />
-            <BudgetAlert
-              budgetName="Uit eten (105% - danger)"
-              budgetId="demo-2"
-              spent={105}
-              limit={100}
-              threshold={80}
-              budgetType="expense"
-            />
-            <BudgetAlert
-              budgetName="Vakantie (125% - critical)"
-              budgetId="demo-3"
-              spent={125}
-              limit={100}
-              threshold={80}
-              budgetType="expense"
-            />
-            <BudgetAlert
-              budgetName="Sparen (50% - behind target)"
-              budgetId="demo-4"
-              spent={50}
-              limit={100}
-              threshold={80}
-              budgetType="savings"
-            />
+          {/* Budget Alert Demos — verplaatst naar Budget Hub op /core/budgets */}
+          <div className="mb-8 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+            <p className="text-sm text-zinc-500 italic">
+              Budget alert componenten zijn verplaatst naar de Budget Hub op /core/budgets.
+            </p>
           </div>
 
           {/* Workflow Steps */}

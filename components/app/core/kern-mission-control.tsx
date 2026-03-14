@@ -2,12 +2,12 @@
 
 import { useState, Fragment } from 'react'
 import {
-  ShoppingCart, Wallet, PiggyBank, Building2,
-  ArrowRight, ChevronRight, BarChart3,
+  ShoppingCart, Wallet, PiggyBank, Building2, TrendingUp,
+  ArrowRight, BarChart3,
   CheckCircle2, AlertTriangle,
   ArrowUpRight, ArrowDownRight, Minus,
 } from 'lucide-react'
-import { formatCurrency, BudgetIcon } from '@/components/app/budget-shared'
+import { formatCurrency, type BudgetType } from '@/components/app/budget-shared'
 import { buildSegments, typeColors } from '@/components/app/budget-donut'
 import type { BudgetWithChildren } from '@/lib/budget-data'
 
@@ -37,6 +37,7 @@ interface KernMissionControlProps {
 type TabKey = 'budgets' | 'cash' | 'assets' | 'debts'
 
 const MOBILE_ITEMS = 3
+const DESKTOP_ITEMS = 4
 
 export function KernMissionControl({
   budgetingActive,
@@ -59,6 +60,22 @@ export function KernMissionControl({
   const segments = buildSegments(overviewBudgetGroups, overviewSpending)
   const budgetPct = totalBudgetLimit > 0 ? Math.round((totalBudgetSpent / totalBudgetLimit) * 100) : 0
 
+  // Group budgets by type for the card summary
+  const budgetTypeSummaries = (() => {
+    const map = new Map<string, { spent: number; limit: number }>()
+    const order = ['income', 'expense', 'savings', 'debt']
+    const labels: Record<string, string> = { income: 'Inkomen', expense: 'Uitgaven', savings: 'Sparen', debt: 'Schulden' }
+    for (const seg of segments) {
+      const existing = map.get(seg.budgetType) || { spent: 0, limit: 0 }
+      existing.spent += seg.spent
+      existing.limit += seg.limit
+      map.set(seg.budgetType, existing)
+    }
+    return order
+      .filter(t => map.has(t))
+      .map(t => ({ type: t as BudgetType, label: labels[t] || t, ...map.get(t)! }))
+  })()
+
   // Merge cash into assets when budgeting is off
   const cashFromAssets = !budgetingActive
     ? cashAccounts.filter(a => a.source === 'asset').map(a => ({ id: a.id, name: a.name, value: a.balance, isCash: true }))
@@ -75,7 +92,7 @@ export function KernMissionControl({
     ...(budgetingActive ? [
       {
         key: 'budgets' as const,
-        label: 'Budgetten',
+        label: 'Budg.',
         metric: totalBudgetLimit > 0 ? `${budgetPct}%` : '\u2014',
         subtitle: overBudgetCount > 0 ? `${overBudgetCount} over` : 'op schema',
       },
@@ -138,22 +155,16 @@ export function KernMissionControl({
       <div className="h-[3px] w-full bg-kern-500" />
 
       {/* Pipeline header */}
-      <div className="border-b border-[var(--border-ed)] px-4 py-4 sm:px-5">
+      <div className="border-b border-[var(--border-ed)] px-4 py-4 sm:px-5 lg:hidden">
         <div className="flex items-center justify-between">
           {tabs.map((tab, i) => (
             <Fragment key={tab.key}>
-              {i > 0 && (
-                <div className="flex shrink-0 items-center text-[var(--ink-4)]">
-                  <div className="h-px w-3 bg-[var(--border-md)] sm:w-6" />
-                  <ChevronRight className="h-3 w-3" />
-                </div>
-              )}
               <div className="flex-1 text-center animate-fade-up" style={{ '--stagger': `${i * 80}ms` } as React.CSSProperties}>
                 <p className="label-editorial text-kern-600">{tab.label}</p>
-                <p className="mt-1 font-mono text-base font-bold tabular-nums text-[var(--ink)] sm:text-xl">
+                <p className="mt-1 font-mono text-xs font-bold tabular-nums text-[var(--ink)] sm:text-xl">
                   {tab.metric}
                 </p>
-                <p className="font-serif text-[11px] italic text-[var(--ink-3)] sm:text-xs">
+                <p className="font-serif text-[10px] italic text-[var(--ink-3)] sm:text-xs">
                   {tab.subtitle}
                 </p>
               </div>
@@ -197,7 +208,7 @@ export function KernMissionControl({
         {budgetingActive && (
           <div
             onClick={() => onCardClick('budgets')}
-            className={`group cursor-pointer p-4 sm:p-5 ${getBorderClasses('budgets')} ${activeTab !== 'budgets' ? 'hidden lg:block' : ''}`}
+            className={`group cursor-pointer p-3 sm:p-5 ${getBorderClasses('budgets')} ${activeTab !== 'budgets' ? 'hidden lg:block' : ''}`}
           >
             <div className="mb-2 sm:mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -224,35 +235,39 @@ export function KernMissionControl({
             </div>
 
             <div className="space-y-1.5 border-t border-[var(--border-ed)] pt-2 sm:pt-3">
-              {segments.slice(0, MOBILE_ITEMS).map((seg) => {
-                const pct = seg.limit > 0 ? Math.round((seg.spent / seg.limit) * 100) : 0
-                const isOver = seg.spent > seg.limit && seg.limit > 0
+              {budgetTypeSummaries.map((ts) => {
+                const pct = ts.limit > 0 ? Math.round((ts.spent / ts.limit) * 100) : 0
+                const isOver = ts.spent > ts.limit && ts.limit > 0
+                const tc = typeColors(ts.type)
                 return (
-                  <div key={seg.id} onClick={(e) => { e.stopPropagation(); onCardClick('budgets', seg.id) }} className="cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50">
+                  <div key={ts.type} onClick={(e) => { e.stopPropagation(); onCardClick('budgets') }} className="cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50">
                     <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded" style={{ backgroundColor: typeColors(seg.budgetType).bg }}>
-                          <BudgetIcon name={seg.icon} className="h-3 w-3" />
+                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded" style={{ backgroundColor: tc.bg }}>
+                          {ts.type === 'income' && <TrendingUp className="h-3 w-3" style={{ color: tc.text }} />}
+                          {ts.type === 'expense' && <ShoppingCart className="h-3 w-3" style={{ color: tc.text }} />}
+                          {ts.type === 'savings' && <PiggyBank className="h-3 w-3" style={{ color: tc.text }} />}
+                          {ts.type === 'debt' && <Building2 className="h-3 w-3" style={{ color: tc.text }} />}
                         </div>
-                        <span className="truncate text-[var(--ink-2)]">{seg.name}</span>
+                        <span className="truncate font-medium text-[var(--ink-2)]">{ts.label}</span>
                       </div>
-                      <span className={`shrink-0 font-mono font-medium ${isOver ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
-                        {formatCurrency(seg.spent)} <span className="text-[var(--ink-4)]">/ {formatCurrency(seg.limit)}</span>
-                      </span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className={`font-mono font-medium ${isOver ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
+                          {formatCurrency(ts.spent)} <span className="text-[var(--ink-4)]">/ {formatCurrency(ts.limit)}</span>
+                        </span>
+                        <span className={`font-mono font-bold ${isOver ? 'text-red-600' : 'text-[var(--ink-3)]'}`}>{pct}%</span>
+                      </div>
                     </div>
                     <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${isOver ? 'bg-red-400' : 'bg-kern-400'}`}
-                        style={{ width: `${Math.min(pct, 100)}%` }}
+                        className={`h-full rounded-full transition-all duration-500 ${isOver ? 'bg-red-400' : ''}`}
+                        style={{ width: `${Math.min(pct, 100)}%`, ...(!isOver ? { backgroundColor: tc.spent } : {}) }}
                       />
                     </div>
                   </div>
                 )
               })}
-              {segments.length > MOBILE_ITEMS && (
-                <p className="text-xs text-kern-600">en {segments.length - MOBILE_ITEMS} meer &rarr;</p>
-              )}
-              {segments.length === 0 && (
+              {budgetTypeSummaries.length === 0 && (
                 <p className="text-xs text-[var(--ink-4)]">Geen budgetten ingesteld</p>
               )}
             </div>
@@ -270,7 +285,7 @@ export function KernMissionControl({
           return (
             <div
               onClick={() => onCardClick('cash')}
-              className={`group cursor-pointer p-4 sm:p-5 ${getBorderClasses('cash')} ${activeTab !== 'cash' ? 'hidden lg:block' : ''}`}
+              className={`group cursor-pointer p-3 sm:p-5 ${getBorderClasses('cash')} ${activeTab !== 'cash' ? 'hidden lg:block' : ''}`}
             >
               <div className="mb-2 sm:mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -295,10 +310,10 @@ export function KernMissionControl({
               </div>
 
               <div className="space-y-1.5 border-t border-[var(--border-ed)] pt-2 sm:pt-3">
-                {cashAccounts.slice(0, MOBILE_ITEMS).map((acc) => {
+                {cashAccounts.slice(0, DESKTOP_ITEMS).map((acc, idx) => {
                   const pct = maxCashBalance > 0 ? Math.round((Math.abs(acc.balance) / maxCashBalance) * 100) : 0
                   return (
-                    <div key={acc.id} className="rounded-md -mx-1 px-1 py-0.5">
+                    <div key={acc.id} className={`rounded-md -mx-1 px-1 py-0.5 ${idx >= MOBILE_ITEMS ? 'hidden lg:block' : ''}`}>
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-emerald-50">
@@ -323,7 +338,7 @@ export function KernMissionControl({
                   )
                 })}
                 {cashAccounts.length > MOBILE_ITEMS && (
-                  <p className="text-xs text-kern-600">en {cashAccounts.length - MOBILE_ITEMS} meer &rarr;</p>
+                  <p className={`text-xs text-kern-600 ${cashAccounts.length <= DESKTOP_ITEMS ? 'lg:hidden' : ''}`}>en <span className="lg:hidden">{cashAccounts.length - MOBILE_ITEMS}</span><span className="hidden lg:inline">{cashAccounts.length - DESKTOP_ITEMS}</span> meer &rarr;</p>
                 )}
                 {cashAccounts.length === 0 && (
                   <p className="text-xs text-[var(--ink-4)]">Geen cash-rekeningen</p>
@@ -344,7 +359,7 @@ export function KernMissionControl({
           return (
             <div
               onClick={() => onCardClick('assets')}
-              className={`group cursor-pointer p-4 sm:p-5 ${getBorderClasses('assets')} ${activeTab !== 'assets' ? 'hidden lg:block' : ''}`}
+              className={`group cursor-pointer p-3 sm:p-5 ${getBorderClasses('assets')} ${activeTab !== 'assets' ? 'hidden lg:block' : ''}`}
             >
               <div className="mb-2 sm:mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -368,10 +383,10 @@ export function KernMissionControl({
               </div>
 
               <div className="space-y-1.5 border-t border-[var(--border-ed)] pt-2 sm:pt-3">
-                {allAssetItems.slice(0, MOBILE_ITEMS).map((item) => {
+                {allAssetItems.slice(0, DESKTOP_ITEMS).map((item, idx) => {
                   const pct = maxValue > 0 ? Math.round((Math.abs(item.value) / maxValue) * 100) : 0
                   return (
-                    <div key={item.id} onClick={(e) => { e.stopPropagation(); onCardClick('assets', item.id) }} className="cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50">
+                    <div key={item.id} onClick={(e) => { e.stopPropagation(); onCardClick('assets', item.id) }} className={`cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50 ${idx >= MOBILE_ITEMS ? 'hidden lg:block' : ''}`}>
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded ${item.isCash ? 'bg-kern-50' : 'bg-emerald-50'}`}>
@@ -392,7 +407,7 @@ export function KernMissionControl({
                   )
                 })}
                 {allAssetItems.length > MOBILE_ITEMS && (
-                  <p className="text-xs text-kern-600">en {allAssetItems.length - MOBILE_ITEMS} meer &rarr;</p>
+                  <p className={`text-xs text-kern-600 ${allAssetItems.length <= DESKTOP_ITEMS ? 'lg:hidden' : ''}`}>en <span className="lg:hidden">{allAssetItems.length - MOBILE_ITEMS}</span><span className="hidden lg:inline">{allAssetItems.length - DESKTOP_ITEMS}</span> meer &rarr;</p>
                 )}
                 {allAssetItems.length === 0 && (
                   <p className="text-xs text-[var(--ink-4)]">Geen assets</p>
@@ -413,7 +428,7 @@ export function KernMissionControl({
           return (
             <div
               onClick={() => onCardClick('debts')}
-              className={`group cursor-pointer p-4 sm:p-5 ${getBorderClasses('debts')} ${activeTab !== 'debts' ? 'hidden lg:block' : ''}`}
+              className={`group cursor-pointer p-3 sm:p-5 ${getBorderClasses('debts')} ${activeTab !== 'debts' ? 'hidden lg:block' : ''}`}
             >
               <div className="mb-2 sm:mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -461,10 +476,10 @@ export function KernMissionControl({
               )}
 
               <div className="space-y-1.5 border-t border-[var(--border-ed)] pt-2 sm:pt-3">
-                {debtsList.slice(0, MOBILE_ITEMS).map((debt) => {
+                {debtsList.slice(0, DESKTOP_ITEMS).map((debt, idx) => {
                   const pct = maxDebtBalance > 0 ? Math.round((debt.current_balance / maxDebtBalance) * 100) : 0
                   return (
-                    <div key={debt.id} onClick={(e) => { e.stopPropagation(); onCardClick('debts', debt.id) }} className="cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50">
+                    <div key={debt.id} onClick={(e) => { e.stopPropagation(); onCardClick('debts', debt.id) }} className={`cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50 ${idx >= MOBILE_ITEMS ? 'hidden lg:block' : ''}`}>
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-red-50">
@@ -486,7 +501,7 @@ export function KernMissionControl({
                   )
                 })}
                 {debtsList.length > MOBILE_ITEMS && (
-                  <p className="text-xs text-kern-600">en {debtsList.length - MOBILE_ITEMS} meer &rarr;</p>
+                  <p className={`text-xs text-kern-600 ${debtsList.length <= DESKTOP_ITEMS ? 'lg:hidden' : ''}`}>en <span className="lg:hidden">{debtsList.length - MOBILE_ITEMS}</span><span className="hidden lg:inline">{debtsList.length - DESKTOP_ITEMS}</span> meer &rarr;</p>
                 )}
                 {debtsList.length === 0 && (
                   <p className="text-xs text-[var(--ink-4)] flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-emerald-500" /> Geen schulden</p>

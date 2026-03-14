@@ -6,6 +6,7 @@ import {
   Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2, BarChart3, ChevronDown, ChevronUp, Briefcase, AlertCircle, AlertTriangle, LinkIcon,
 } from 'lucide-react'
 import Link from 'next/link'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
@@ -880,33 +881,22 @@ function AssetDetailModal({
   const availableDebts = allDebts.filter(d => !d.linked_asset_id)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-lg overflow-y-auto rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl"
-        style={{ maxHeight: '90vh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center gap-3 border-b border-[var(--border-ed)] px-6 py-4">
+    <BottomSheet open={true} onClose={onClose} title={asset.name} size="lg">
+        {/* Subheader */}
+        <div className="flex items-center gap-3 px-6 pb-2">
           <div
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--r)]"
             style={{ backgroundColor: color + '15' }}
           >
             <BudgetIcon name={icon} className="h-5 w-5" />
           </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="font-semibold text-[var(--ink)]">{asset.name}</h2>
-            <p className="text-xs text-[var(--ink-3)]">
-              {ASSET_TYPE_LABELS[asset.asset_type]}
-              {asset.subtype && ASSET_SUBTYPE_LABELS[asset.asset_type]?.[asset.subtype]
-                ? ` \u2022 ${ASSET_SUBTYPE_LABELS[asset.asset_type]![asset.subtype]}`
-                : ''}
-              {asset.institution ? ` \u2022 ${asset.institution}` : ''}
-            </p>
-          </div>
-          <button onClick={onClose} className="rounded-[var(--r)] p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
-            <X className="h-5 w-5" />
-          </button>
+          <p className="text-xs text-[var(--ink-3)]">
+            {ASSET_TYPE_LABELS[asset.asset_type]}
+            {asset.subtype && ASSET_SUBTYPE_LABELS[asset.asset_type]?.[asset.subtype]
+              ? ` \u2022 ${ASSET_SUBTYPE_LABELS[asset.asset_type]![asset.subtype]}`
+              : ''}
+            {asset.institution ? ` \u2022 ${asset.institution}` : ''}
+          </p>
         </div>
 
         {/* Value highlight */}
@@ -1270,8 +1260,7 @@ function AssetDetailModal({
             </button>
           )}
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   )
 }
 
@@ -2490,21 +2479,8 @@ function AssetForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-lg rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-[var(--ink)]">
-            {isEdit ? 'Asset bewerken' : 'Nieuwe asset'}
-          </h3>
-          <button onClick={onClose} className="rounded-[var(--r)] p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="space-y-3">
+    <BottomSheet open={true} onClose={onClose} title={isEdit ? 'Asset bewerken' : 'Nieuwe asset'} size="lg">
+        <div className="space-y-3 px-6">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Naam</label>
@@ -3018,12 +2994,12 @@ function AssetForm({
         </div>
 
         {validationError && (
-          <div className="mt-3 rounded-[var(--r)] border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700" data-testid="asset-validation-error">
+          <div className="mx-6 mt-3 rounded-[var(--r)] border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700" data-testid="asset-validation-error">
             {validationError}
           </div>
         )}
 
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-5 flex justify-end gap-2 px-6 pb-6">
           <button
             onClick={onClose}
             className="rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
@@ -3038,8 +3014,7 @@ function AssetForm({
             {saving ? 'Opslaan...' : isEdit ? 'Bijwerken' : 'Toevoegen'}
           </button>
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   )
 }
 
@@ -3127,18 +3102,8 @@ function ValuationModal({
   const label = entityType === 'asset' ? 'Herwaarderen' : 'Saldo bijwerken'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-md rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-[var(--ink)]">{label}</h3>
-          <button onClick={onClose} className="rounded-[var(--r)] p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
+    <BottomSheet open={true} onClose={onClose} title={label} size="md">
+        <div className="px-6">
         <p className="mb-4 text-sm text-[var(--ink-3)]">{entityName}</p>
 
         {/* Warning when holdings are active */}
@@ -3202,8 +3167,8 @@ function ValuationModal({
             {saving ? 'Opslaan...' : 'Opslaan'}
           </button>
         </div>
-      </div>
-    </div>
+        </div>
+    </BottomSheet>
   )
 }
 

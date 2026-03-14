@@ -1,9 +1,9 @@
 'use client'
 
-import { useRef, useLayoutEffect, useState, useCallback, useEffect } from 'react'
+import { useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { BudgetIcon, formatCurrency, getTypeColors, type BudgetType } from '@/components/app/budget-shared'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
-import { useDailyExpenseRate, eurToFreedomTime } from '@/components/app/freedom-time-label'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 interface BudgetTreeProps {
@@ -22,8 +22,6 @@ function ChildBar({
   beschikbaar,
   budgetType,
   onNavigate,
-  onHover,
-  isHovered,
   hasEntered,
   rowIndex,
 }: {
@@ -32,12 +30,9 @@ function ChildBar({
   beschikbaar?: number
   budgetType: BudgetType
   onNavigate: (id: string) => void
-  onHover: (id: string | null) => void
-  isHovered: boolean
   hasEntered: boolean
   rowIndex: number
 }) {
-  // Use effective limit (incl. rollover carry) when available, otherwise fall back to default
   const limit = beschikbaar !== undefined ? beschikbaar + spent : Number(child.default_limit)
   const pct = limit > 0 ? (spent / limit) * 100 : 0
   const overBudget = spent > limit && limit > 0
@@ -55,307 +50,83 @@ function ChildBar({
 
   return (
     <div
-      className={`group flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 transition-colors ${
-        isHovered ? 'bg-zinc-100' : 'hover:bg-[var(--subtle)]'
-      }`}
+      className="group cursor-pointer rounded-lg px-3 py-2 transition-colors hover:bg-[var(--subtle)]"
       onClick={() => onNavigate(child.id)}
-      onMouseEnter={() => onHover(child.id)}
-      onMouseLeave={() => onHover(null)}
       data-child-id={child.id}
       style={{
         animation: hasEntered ? `fadeUp 0.4s ease-out ${rowIndex * 60}ms both` : 'none',
         opacity: hasEntered ? undefined : 0,
       }}
     >
-      {/* Icon */}
-      <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${colors.bg}`}>
-        <BudgetIcon name={child.icon} className={`h-3.5 w-3.5 ${colors.textLight}`} />
-      </div>
-
-      {/* Name */}
-      <span className="w-28 shrink-0 truncate text-xs font-medium text-[var(--ink-2)] lg:w-36">
-        {child.name}
-      </span>
-
-      {/* Bar track */}
-      <div className="relative flex-1" style={{ minHeight: 14 }}>
-        {/* Background track */}
-        <div className="absolute inset-y-1 left-0 right-0 rounded-full bg-zinc-100" />
-
-        {/* Fill */}
-        <div
-          className="absolute inset-y-1 left-0 rounded-full"
-          style={{
-            width: hasEntered ? `${Math.min(pct, 100)}%` : '0%',
-            backgroundColor: fillColorHex,
-            transition: hasEntered
-              ? `width 500ms cubic-bezier(.22,1,.36,1) ${150 + rowIndex * 60}ms`
-              : 'none',
-          }}
-        />
-
-        {/* Over-budget extension */}
-        {overBudget && (
-          <div
-            className="absolute inset-y-1 rounded-r-full bg-red-500/70"
-            style={{
-              left: '100%',
-              width: hasEntered ? `${overPct}%` : '0%',
-              transition: hasEntered
-                ? `width 500ms cubic-bezier(.22,1,.36,1) ${200 + rowIndex * 60}ms`
-                : 'none',
-            }}
-          />
-        )}
-
-        {/* Alert threshold marker */}
-        {alertThreshold > 0 && alertThreshold < 100 && (
-          <div
-            className="absolute top-0 bottom-0 w-px border-l border-dashed border-zinc-400"
-            style={{ left: `${alertThreshold}%`, marginTop: -2, marginBottom: -2 }}
-          />
-        )}
-
-        {/* Limit boundary (the "fence") */}
-        <div
-          className={`absolute top-0 bottom-0 ${
-            isHard ? 'w-0.5' : 'w-0.5 border-l border-dashed'
-          }`}
-          style={{
-            left: '100%',
-            marginTop: -2,
-            marginBottom: -2,
-            backgroundColor: isHard ? (overBudget ? '#ef4444' : colors.hex) : undefined,
-            borderColor: !isHard ? (overBudget ? '#ef4444' : colors.hex) : undefined,
-          }}
-        />
-      </div>
-
-      {/* Amount label + beschikbaar + freedom days */}
-      <div className="w-28 shrink-0 text-right lg:w-32">
-        <span className="text-xs text-[var(--ink-3)]">
-          <span className={`font-medium ${overBudget ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
+      {/* Row 1: icon + name + amount */}
+      <div className="flex items-center gap-2.5">
+        <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${colors.bg}`}>
+          <BudgetIcon name={child.icon} className={`h-3 w-3 ${colors.textLight}`} />
+        </div>
+        <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--ink-2)]">
+          {child.name}
+        </span>
+        <span className="shrink-0 font-mono text-xs tabular-nums">
+          <span className={overBudget ? 'text-red-600' : 'text-[var(--ink-2)]'}>
             {formatCurrency(spent)}
           </span>
           <span className="text-[var(--ink-3)]"> / {formatCurrency(limit)}</span>
         </span>
-        {beschikbaar !== undefined && !overBudget && (
-          <p className={`text-[10px] tabular-nums ${
-            beschikbaar <= 0
-              ? 'text-[var(--ink-4)]'
-              : 'text-[var(--hor-t)]'
-          }`}>
-            {formatCurrency(Math.max(0, beschikbaar))} vrij
-          </p>
-        )}
-        <FreedomDaysLabel spent={spent} limit={limit} overBudget={overBudget} />
       </div>
-    </div>
-  )
-}
 
-/** Tiny inline label showing remaining budget as freedom days */
-function FreedomDaysLabel({ spent, limit, overBudget }: { spent: number; limit: number; overBudget: boolean }) {
-  const { dailyExpenseRate, loading, source } = useDailyExpenseRate()
-  if (loading || source === 'none' || dailyExpenseRate <= 0) return null
-
-  const remaining = limit - spent
-  if (overBudget) {
-    const overAmount = spent - limit
-    // Only show freedom time for amounts >= €100 (per spec: avoid clutter for small amounts)
-    if (overAmount < 100) return null
-    const freedom = eurToFreedomTime(overAmount, dailyExpenseRate)
-    return (
-      <p className="text-[11px] italic text-[var(--ink-3)]" data-testid="freedom-days-over">
-        <span className="text-red-500">{formatCurrency(overAmount)} te veel — {freedom.formattedDagen} ingeleverd</span>
-      </p>
-    )
-  }
-
-  // Only show freedom time for amounts >= €100 (per spec: avoid clutter for small amounts)
-  if (remaining < 100) return null
-  const freedom = eurToFreedomTime(remaining, dailyExpenseRate)
-  return (
-    <p className="text-[11px] italic text-[var(--ink-3)]" data-testid="freedom-days-remaining">
-      nog {freedom.formattedDagen} deze maand
-    </p>
-  )
-}
-
-/* ── ParentNode ──────────────────────────────────────────────── */
-
-function ParentNode({
-  parent,
-  totalSpent,
-  totalLimit,
-  budgetType,
-  onNavigate,
-  hasEntered,
-}: {
-  parent: Budget
-  totalSpent: number
-  totalLimit: number
-  budgetType: BudgetType
-  onNavigate: (id: string) => void
-  hasEntered: boolean
-}) {
-  const colors = getTypeColors(budgetType)
-  const pct = totalLimit > 0 ? Math.min(Math.round((totalSpent / totalLimit) * 100), 100) : 0
-
-  return (
-    <div
-      className="flex w-40 cursor-pointer flex-col items-center gap-2 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 shadow-[var(--s0)] transition-shadow hover:shadow-md"
-      onClick={() => onNavigate(parent.id)}
-      data-parent-id={parent.id}
-      style={{
-        animation: hasEntered ? 'fadeUp 0.4s ease-out both' : 'none',
-        opacity: hasEntered ? undefined : 0,
-      }}
-    >
-      <div className={`flex h-10 w-10 items-center justify-center rounded-full ${colors.bgDark}`}>
-        <BudgetIcon name={parent.icon} className={`h-5 w-5 ${colors.text}`} />
-      </div>
-      <p className="w-full truncate text-center text-xs font-semibold text-zinc-800">
-        {parent.name}
-      </p>
-      <p className="text-xs text-[var(--ink-3)]">
-        <span className="font-medium text-[var(--ink-2)]">{formatCurrency(totalSpent)}</span>
-        <span className="text-[var(--ink-3)]"> / {formatCurrency(totalLimit)}</span>
-      </p>
-      {/* Mini progress bar */}
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
-        <div
-          className="h-full rounded-full"
-          style={{
-            width: hasEntered ? `${pct}%` : '0%',
-            backgroundColor: totalSpent > totalLimit ? '#ef4444' : pct > 80 ? colors.barHexWarn : colors.barHex,
-            transition: hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1) 150ms' : 'none',
-          }}
-        />
-      </div>
-    </div>
-  )
-}
-
-/* ── BezierConnectors ────────────────────────────────────────── */
-
-function BezierConnectors({
-  containerRef,
-  parentId,
-  childIds,
-  hoveredChild,
-  budgetType,
-  spending,
-  budgets,
-  hasEntered,
-}: {
-  containerRef: React.RefObject<HTMLDivElement | null>
-  parentId: string
-  childIds: string[]
-  hoveredChild: string | null
-  budgetType: BudgetType
-  spending: Record<string, number>
-  budgets: Budget[]
-  hasEntered: boolean
-}) {
-  const [paths, setPaths] = useState<
-    { d: string; childId: string; overBudget: boolean; pathIndex: number }[]
-  >([])
-  const [svgSize, setSvgSize] = useState({ w: 0, h: 0 })
-  const colors = getTypeColors(budgetType)
-
-  const measure = useCallback(() => {
-    const container = containerRef.current
-    if (!container) return
-
-    const rect = container.getBoundingClientRect()
-    setSvgSize({ w: rect.width, h: rect.height })
-
-    const parentEl = container.querySelector(`[data-parent-id="${parentId}"]`)
-    if (!parentEl) return
-
-    const pRect = parentEl.getBoundingClientRect()
-    const px = pRect.right - rect.left
-    const py = pRect.top + pRect.height / 2 - rect.top
-
-    const newPaths: { d: string; childId: string; overBudget: boolean; pathIndex: number }[] = []
-
-    for (const childId of childIds) {
-      const childEl = container.querySelector(`[data-child-id="${childId}"]`)
-      if (!childEl) continue
-
-      const cRect = childEl.getBoundingClientRect()
-      const cx = cRect.left - rect.left
-      const cy = cRect.top + cRect.height / 2 - rect.top
-
-      const dx = cx - px
-      const cp1x = px + dx * 0.6
-      const cp2x = cx - dx * 0.6
-
-      const d = `M ${px} ${py} C ${cp1x} ${py}, ${cp2x} ${cy}, ${cx} ${cy}`
-
-      const budget = budgets.find((b) => b.id === childId)
-      const spent = spending[childId] ?? 0
-      const limit = budget ? Number(budget.default_limit) : 0
-      const overBudget = spent > limit && limit > 0
-
-      newPaths.push({ d, childId, overBudget, pathIndex: newPaths.length })
-    }
-
-    setPaths(newPaths)
-  }, [containerRef, parentId, childIds, spending, budgets])
-
-  useLayoutEffect(() => {
-    measure()
-  }, [measure])
-
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
-
-    let rafId: number | null = null
-    const observer = new ResizeObserver(() => {
-      if (rafId !== null) cancelAnimationFrame(rafId)
-      rafId = requestAnimationFrame(() => { measure(); rafId = null })
-    })
-    observer.observe(container)
-    return () => {
-      observer.disconnect()
-      if (rafId !== null) cancelAnimationFrame(rafId)
-    }
-  }, [containerRef, measure])
-
-  if (paths.length === 0 || svgSize.w === 0) return null
-
-  return (
-    <svg
-      className="pointer-events-none absolute inset-0"
-      width={svgSize.w}
-      height={svgSize.h}
-      style={{ overflow: 'visible' }}
-    >
-      {paths.map(({ d, childId, overBudget, pathIndex }) => {
-        const isActive = hoveredChild === childId
-        return (
-          <path
-            key={childId}
-            d={d}
-            fill="none"
-            stroke={overBudget ? '#ef4444' : colors.hex}
-            strokeWidth={isActive ? 2 : 1.5}
-            opacity={isActive ? 0.8 : 0.3}
-            pathLength={1}
-            strokeDasharray="1"
-            strokeDashoffset={hasEntered ? 0 : 1}
+      {/* Row 2: progress bar (aligned with name, after icon column) */}
+      <div className="mt-1.5 pl-[30px]">
+        <div className="relative h-1.5 w-full rounded-full bg-zinc-100">
+          {/* Fill */}
+          <div
+            className="absolute inset-y-0 left-0 rounded-full"
             style={{
+              width: hasEntered ? `${Math.min(pct, 100)}%` : '0%',
+              backgroundColor: fillColorHex,
               transition: hasEntered
-                ? `stroke-dashoffset 600ms cubic-bezier(.22,1,.36,1) ${80 + pathIndex * 80}ms, opacity 200ms ease`
+                ? `width 500ms cubic-bezier(.22,1,.36,1) ${150 + rowIndex * 60}ms`
                 : 'none',
             }}
           />
-        )
-      })}
-    </svg>
+
+          {/* Over-budget extension */}
+          {overBudget && (
+            <div
+              className="absolute inset-y-0 rounded-r-full bg-red-500/70"
+              style={{
+                left: '100%',
+                width: hasEntered ? `${overPct}%` : '0%',
+                transition: hasEntered
+                  ? `width 500ms cubic-bezier(.22,1,.36,1) ${200 + rowIndex * 60}ms`
+                  : 'none',
+              }}
+            />
+          )}
+
+          {/* Alert threshold marker */}
+          {alertThreshold > 0 && alertThreshold < 100 && (
+            <div
+              className="absolute top-0 bottom-0 w-px border-l border-dashed border-zinc-400"
+              style={{ left: `${alertThreshold}%`, marginTop: -2, marginBottom: -2 }}
+            />
+          )}
+
+          {/* Limit boundary (the "fence") */}
+          <div
+            className={`absolute top-0 bottom-0 ${
+              isHard ? 'w-0.5' : 'w-0.5 border-l border-dashed'
+            }`}
+            style={{
+              left: '100%',
+              marginTop: -2,
+              marginBottom: -2,
+              backgroundColor: isHard ? (overBudget ? '#ef4444' : colors.hex) : undefined,
+              borderColor: !isHard ? (overBudget ? '#ef4444' : colors.hex) : undefined,
+            }}
+          />
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -374,14 +145,14 @@ function TreeGroup({
   budgetType: BudgetType
   onNavigate: (id: string) => void
 }) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [hoveredChild, setHoveredChild] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(false)
   const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 900 })
+
+  const colors = getTypeColors(budgetType)
 
   const totalSpent = parent.children.length > 0
     ? parent.children.reduce((sum, c) => sum + (spending[c.id] ?? 0), 0)
     : (spending[parent.id] ?? 0)
-  // Use effective limit from beschikbaarMap when available (incl. rollover carry)
   const totalLimit = parent.children.length > 0
     ? parent.children.reduce((sum, c) =>
         sum + (beschikbaarMap?.[c.id] !== undefined
@@ -391,71 +162,115 @@ function TreeGroup({
         ? beschikbaarMap[parent.id] + (spending[parent.id] ?? 0)
         : Number(parent.default_limit))
 
-  const childIds = parent.children.map((c) => c.id)
+  const pct = totalLimit > 0 ? Math.round((totalSpent / totalLimit) * 100) : 0
+  const overBudget = totalSpent > totalLimit && totalLimit > 0
+  const isWarning = pct >= 70 && pct < 100
 
+  const fillPct = Math.min(pct, 100)
+  const fillColor = overBudget ? '#ef4444' : isWarning ? colors.barHexWarn : colors.barHex
+
+  // No children — show single compact card (no expand)
   if (parent.children.length === 0) {
-    const beschikbaar = beschikbaarMap?.[parent.id]
-    // No children — show single card
     return (
       <div
         ref={inViewRef}
-        className="flex cursor-pointer items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 transition-shadow hover:shadow-md"
+        className="cursor-pointer rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 transition-shadow hover:shadow-[var(--s0)]"
         onClick={() => onNavigate(parent.id)}
         style={{
           animation: hasEntered ? 'fadeUp 0.4s ease-out both' : 'none',
           opacity: hasEntered ? undefined : 0,
         }}
       >
-        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${getTypeColors(budgetType).bg}`}>
-          <BudgetIcon name={parent.icon} className={`h-5 w-5 ${getTypeColors(budgetType).text}`} />
+        <div className="flex items-center gap-3">
+          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${colors.bgDark}`}>
+            <BudgetIcon name={parent.icon} className={`h-4 w-4 ${colors.text}`} />
+          </div>
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--ink)]">
+            {parent.name}
+          </span>
+          {/* Percentage badge */}
+          <span className={`shrink-0 rounded-full bg-[var(--subtle)] px-2 py-0.5 text-xs font-medium ${
+            overBudget ? 'text-red-600' : isWarning ? `text-[${colors.barHexWarn}]` : 'text-[var(--ink-3)]'
+          }`}>
+            {pct}%
+          </span>
+          <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink-3)]">
+            <span className={overBudget ? 'text-red-600' : 'text-[var(--ink-2)]'}>{formatCurrency(totalSpent)}</span>
+            {' / '}{formatCurrency(totalLimit)}
+          </span>
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-medium text-[var(--ink)]">{parent.name}</p>
-          <p className="text-xs text-[var(--ink-3)]">
-            {formatCurrency(totalSpent)} / {formatCurrency(totalLimit)}
-          </p>
-          {beschikbaar !== undefined && totalSpent <= totalLimit && (
-            <p className={`text-[10px] tabular-nums ${
-              beschikbaar <= 0 ? 'text-[var(--ink-4)]' : 'text-[var(--hor-t)]'
-            }`}>
-              {formatCurrency(Math.max(0, beschikbaar))} vrij
-            </p>
-          )}
+        {/* Progress bar */}
+        <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-zinc-100">
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: hasEntered ? `${fillPct}%` : '0%',
+              backgroundColor: fillColor,
+              transition: hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1) 150ms' : 'none',
+            }}
+          />
         </div>
       </div>
     )
   }
 
+  // Has children — collapsible group
   return (
-    <div ref={inViewRef} className="mb-6">
-      {/* Desktop: tree layout */}
-      <div ref={containerRef} className="relative hidden items-start gap-6 md:flex">
-        {/* SVG overlay */}
-        <BezierConnectors
-          containerRef={containerRef}
-          parentId={parent.id}
-          childIds={childIds}
-          hoveredChild={hoveredChild}
-          budgetType={budgetType}
-          spending={spending}
-          budgets={parent.children}
-          hasEntered={hasEntered}
+    <div
+      ref={inViewRef}
+      className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] transition-shadow hover:shadow-[var(--s0)]"
+      style={{
+        animation: hasEntered ? 'fadeUp 0.4s ease-out both' : 'none',
+        opacity: hasEntered ? undefined : 0,
+      }}
+    >
+      {/* Collapsed header row — always visible */}
+      <div
+        className="flex cursor-pointer items-center gap-3 p-3"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${colors.bgDark}`}>
+          <BudgetIcon name={parent.icon} className={`h-4 w-4 ${colors.text}`} />
+        </div>
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--ink)]">
+          {parent.name}
+        </span>
+        {/* Percentage badge */}
+        <span className={`shrink-0 rounded-full bg-[var(--subtle)] px-2 py-0.5 text-xs font-medium ${
+          overBudget ? 'text-red-600' : isWarning ? `text-[${colors.barHexWarn}]` : 'text-[var(--ink-3)]'
+        }`}>
+          {pct}%
+        </span>
+        {/* Amount */}
+        <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink-3)]">
+          <span className={overBudget ? 'text-red-600' : 'text-[var(--ink-2)]'}>{formatCurrency(totalSpent)}</span>
+          {' / '}{formatCurrency(totalLimit)}
+        </span>
+        {/* Chevron */}
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${
+            expanded ? 'rotate-180' : ''
+          }`}
         />
+      </div>
 
-        {/* Parent node (left) */}
-        <div className="shrink-0 pt-2">
-          <ParentNode
-            parent={parent}
-            totalSpent={totalSpent}
-            totalLimit={totalLimit}
-            budgetType={budgetType}
-            onNavigate={onNavigate}
-            hasEntered={hasEntered}
+      {/* Progress bar under header */}
+      <div className="px-3 pb-3">
+        <div className="h-1 w-full overflow-hidden rounded-full bg-zinc-100">
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: hasEntered ? `${fillPct}%` : '0%',
+              backgroundColor: fillColor,
+              transition: hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1) 150ms' : 'none',
+            }}
           />
         </div>
+      </div>
 
-        {/* Children (right) */}
-        <div className="min-w-0 flex-1 space-y-0.5">
+      {/* Children — shown when expanded */}
+      {expanded && (
+        <div className="border-t border-[var(--border-ed)] py-1">
           {parent.children.map((child, index) => (
             <ChildBar
               key={child.id}
@@ -464,55 +279,12 @@ function TreeGroup({
               beschikbaar={beschikbaarMap?.[child.id]}
               budgetType={budgetType}
               onNavigate={onNavigate}
-              onHover={setHoveredChild}
-              isHovered={hoveredChild === child.id}
               hasEntered={hasEntered}
               rowIndex={index}
             />
           ))}
         </div>
-      </div>
-
-      {/* Mobile: stacked layout */}
-      <div className="md:hidden">
-        {/* Parent as header */}
-        <div
-          className={`flex cursor-pointer items-center gap-3 rounded-t-xl border border-[var(--border-ed)] bg-gradient-to-r p-3 ${getTypeColors(budgetType).headerGradient}`}
-          onClick={() => onNavigate(parent.id)}
-          style={{
-            animation: hasEntered ? 'fadeUp 0.4s ease-out both' : 'none',
-            opacity: hasEntered ? undefined : 0,
-          }}
-        >
-          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${getTypeColors(budgetType).bgDark}`}>
-            <BudgetIcon name={parent.icon} className={`h-5 w-5 ${getTypeColors(budgetType).text}`} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-zinc-800">{parent.name}</p>
-            <p className="text-xs text-[var(--ink-3)]">
-              {formatCurrency(totalSpent)} / {formatCurrency(totalLimit)}
-            </p>
-          </div>
-        </div>
-
-        {/* Children indented */}
-        <div className="rounded-b-xl border border-t-0 border-[var(--border-ed)] bg-[var(--paper)]">
-          {parent.children.map((child, index) => (
-            <ChildBar
-              key={child.id}
-              child={child}
-              spent={spending[child.id] ?? 0}
-              beschikbaar={beschikbaarMap?.[child.id]}
-              budgetType={budgetType}
-              onNavigate={onNavigate}
-              onHover={() => {}}
-              isHovered={false}
-              hasEntered={hasEntered}
-              rowIndex={index}
-            />
-          ))}
-        </div>
-      </div>
+      )}
     </div>
   )
 }

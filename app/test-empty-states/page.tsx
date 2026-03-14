@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { TrendingUp, CheckCircle2, Wallet, AlertTriangle } from 'lucide-react'
-import { BudgetAlert, shouldAlert } from '@/components/app/budget-alert'
+import { shouldAlert } from '@/lib/budget-alerts'
 
 /**
  * Test page that renders all empty state variants AND budget alert thresholds.
@@ -147,54 +147,14 @@ export default function TestEmptyStatesPage() {
             </div>
           </section>
 
-          {/* Visual alert rendering */}
+          {/* Visual alert rendering — verplaatst naar Budget Hub */}
           <section className="mb-8">
             <h2 className="text-lg font-semibold text-zinc-700 mb-3">Visual Alert Levels</h2>
-            <div className="space-y-3">
-              <div>
-                <p className="text-xs font-medium text-zinc-500 mb-1">Warning (80-99%): Nearing limit</p>
-                <BudgetAlert
-                  budgetName="Boodschappen"
-                  budgetId="test-warning"
-                  spent={480}
-                  limit={500}
-                  threshold={80}
-                  budgetType="expense"
-                />
-              </div>
-              <div>
-                <p className="text-xs font-medium text-zinc-500 mb-1">Danger (100-119%): Over budget</p>
-                <BudgetAlert
-                  budgetName="Horeca"
-                  budgetId="test-danger"
-                  spent={510}
-                  limit={500}
-                  threshold={80}
-                  budgetType="expense"
-                />
-              </div>
-              <div>
-                <p className="text-xs font-medium text-zinc-500 mb-1">Critical (120%+): Significantly over</p>
-                <BudgetAlert
-                  budgetName="Kleding"
-                  budgetId="test-critical"
-                  spent={625}
-                  limit={500}
-                  threshold={80}
-                  budgetType="expense"
-                />
-              </div>
-              <div>
-                <p className="text-xs font-medium text-zinc-500 mb-1">Savings alert: Under target</p>
-                <BudgetAlert
-                  budgetName="Noodfonds"
-                  budgetId="test-savings"
-                  spent={45}
-                  limit={100}
-                  threshold={80}
-                  budgetType="savings"
-                />
-              </div>
+            <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+              <p className="text-sm text-zinc-500 italic">
+                Budget alert componenten zijn verplaatst naar de Budget Hub op /core/budgets.
+                De shouldAlert() logica hierboven test nog steeds de drempelwaarden.
+              </p>
             </div>
           </section>
 

@@ -24,6 +24,9 @@ export function BottomSheet({ open, onClose, title, children, size = 'md' }: Bot
   const sheetRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<Element | null>(null)
   const titleId = useId()
+  const dragStartY = useRef(0)
+  const dragCurrentY = useRef(0)
+  const isDragging = useRef(false)
 
   // Lock body scroll when open
   useEffect(() => {
@@ -86,6 +89,35 @@ export function BottomSheet({ open, onClose, title, children, size = 'md' }: Bot
     if (e.target === e.currentTarget) onClose()
   }, [onClose])
 
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    dragStartY.current = e.touches[0].clientY
+    dragCurrentY.current = 0
+    isDragging.current = true
+    if (sheetRef.current) {
+      sheetRef.current.style.transition = 'none'
+    }
+  }, [])
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging.current || !sheetRef.current) return
+    const deltaY = Math.max(0, e.touches[0].clientY - dragStartY.current)
+    sheetRef.current.style.transform = `translateY(${deltaY}px)`
+    dragCurrentY.current = deltaY
+    if (deltaY > 0) e.preventDefault()
+  }, [])
+
+  const handleTouchEnd = useCallback(() => {
+    if (!isDragging.current || !sheetRef.current) return
+    isDragging.current = false
+    if (dragCurrentY.current > 100) {
+      onClose()
+    } else {
+      sheetRef.current.style.transition = ''
+      sheetRef.current.style.transform = ''
+    }
+    dragCurrentY.current = 0
+  }, [onClose])
+
   if (!open) return null
 
   return (
@@ -99,16 +131,21 @@ export function BottomSheet({ open, onClose, title, children, size = 'md' }: Bot
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
-        className={`w-full max-h-[92vh] overflow-y-auto bg-[var(--paper)] rounded-t-[var(--r-lg)] shadow-[var(--s2)] md:mx-4 ${sizeClasses[size]} md:rounded-[var(--r-lg)] safe-bottom animate-sheet-enter`}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className={`flex w-full max-h-[92vh] flex-col bg-[var(--paper)] rounded-t-[var(--r-lg)] shadow-[var(--s2)] md:mx-4 ${sizeClasses[size]} md:rounded-[var(--r-lg)] safe-bottom animate-sheet-enter`}
       >
         {/* Drag handle — mobile only */}
-        <div className="flex justify-center pt-3 md:hidden">
+        <div
+          className="flex shrink-0 justify-center py-3 cursor-grab md:hidden"
+          onTouchStart={handleTouchStart}
+        >
           <div className="h-1 w-10 rounded-full bg-[var(--border-md)]" />
         </div>
 
         {/* Header */}
         {title && (
-          <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-5 py-4">
+          <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-ed)] px-5 py-4">
             <h3 id={titleId} className="font-semibold text-[var(--ink)]">{title}</h3>
             <button
               onClick={onClose}
@@ -120,7 +157,10 @@ export function BottomSheet({ open, onClose, title, children, size = 'md' }: Bot
           </div>
         )}
 
-        {children}
+        {/* Scrollable content area */}
+        <div className="min-h-0 flex-1 overflow-y-auto" style={{ overscrollBehaviorY: 'contain' }}>
+          {children}
+        </div>
       </div>
     </div>
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import { BudgetAlert, shouldAlert } from '@/components/app/budget-alert'
+import { shouldAlert } from '@/lib/budget-alerts'
 import { CheckCircle2 } from 'lucide-react'
 
 /**
@@ -66,50 +66,10 @@ export default function TestBudgetAlertsPage() {
       <section className="mb-8">
         <h2 className="text-lg font-semibold text-zinc-700 mb-3">Visual Alert Levels</h2>
         <div className="space-y-3">
-          <div>
-            <p className="text-xs font-medium text-zinc-500 mb-1">Warning (80-99%): Nearing limit</p>
-            <BudgetAlert
-              budgetName="Boodschappen"
-              budgetId="test-warning"
-              spent={480}
-              limit={500}
-              threshold={80}
-              budgetType="expense"
-            />
-          </div>
-          <div>
-            <p className="text-xs font-medium text-zinc-500 mb-1">Danger (100-119%): Over budget</p>
-            <BudgetAlert
-              budgetName="Horeca"
-              budgetId="test-danger"
-              spent={510}
-              limit={500}
-              threshold={80}
-              budgetType="expense"
-            />
-          </div>
-          <div>
-            <p className="text-xs font-medium text-zinc-500 mb-1">Critical (120%+): Significantly over</p>
-            <BudgetAlert
-              budgetName="Kleding"
-              budgetId="test-critical"
-              spent={625}
-              limit={500}
-              threshold={80}
-              budgetType="expense"
-            />
-          </div>
-          <div>
-            <p className="text-xs font-medium text-zinc-500 mb-1">Savings alert: Under target</p>
-            <BudgetAlert
-              budgetName="Noodfonds"
-              budgetId="test-savings"
-              spent={45}
-              limit={100}
-              threshold={80}
-              budgetType="savings"
-            />
-          </div>
+          <p className="text-sm text-zinc-500 italic">
+            Budget alerts zijn verplaatst naar de Budget Hub op /core/budgets.
+            De shouldAlert() logica hierboven test nog steeds de drempelwaarden.
+          </p>
         </div>
       </section>
 
