@@ -54,6 +54,17 @@ export function MeldingenWidget({ size, data, href }: Props) {
     )
   }
 
+  // ── Mini: unread count ──
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="cross" size="mini" kicker="Meldingen" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {count} nieuw
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter: teller met urgentie-kleur badge, rode dot bij kritiek ──
   if (size === 'quarter') {
     const badgeColor = critical > 0

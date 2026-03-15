@@ -53,6 +53,9 @@ export function SimChart({
   baselineFireAge,
   dailyExpenseRate,
   householdOverlays,
+  visibleMinAge,
+  visibleMaxAge,
+  aowAgeFractional,
 }: {
   rows: SimRow[]
   fireAge: number | null
@@ -74,6 +77,11 @@ export function SimChart({
   dailyExpenseRate?: number
   /** Optional partner trajectories for household perspective */
   householdOverlays?: HouseholdPartnerOverlay[]
+  /** Zoomed visible range (optional — defaults to full range) */
+  visibleMinAge?: number
+  visibleMaxAge?: number
+  /** AOW pension age as fractional value (e.g. 67.25 for 67j+3m) */
+  aowAgeFractional?: number
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
   const [hoveredCfId, setHoveredCfId] = useState<string | null>(null)
@@ -96,8 +104,8 @@ export function SimChart({
   const innerW = W - PAD.left - PAD.right
   const innerH = H - PAD.top - PAD.bottom
 
-  const minAge = currentAge
-  const maxAge = endAge
+  const minAge = visibleMinAge ?? currentAge
+  const maxAge = visibleMaxAge ?? endAge
 
   // Build all path points from rows
   const allPts: [number, number][] = []
@@ -117,23 +125,28 @@ export function SimChart({
     }
   }
 
-  const baselineMax = baselinePts.length > 0
-    ? Math.max(...baselinePts.map(([, v]) => v))
+  // Filter points to visible range for Y-axis rescaling
+  const inRange = ([age]: [number, number]) => age >= minAge - 1 && age <= maxAge + 1
+  const visibleAllPts = allPts.filter(inRange)
+  const visibleBaselinePts = baselinePts.filter(inRange)
+
+  const baselineMax = visibleBaselinePts.length > 0
+    ? Math.max(...visibleBaselinePts.map(([, v]) => v))
     : 0
   const overlayMax = scenarioOverlays?.length
-    ? Math.max(...scenarioOverlays.flatMap(o => o.points.map(([, v]) => v)))
+    ? Math.max(...scenarioOverlays.flatMap(o => o.points.filter(inRange).map(([, v]) => v)))
     : 0
   const mcMax = monteCarloOverlay
     ? Math.max(...monteCarloOverlay.p75.filter((_, i) => {
         const age = monteCarloOverlay.startAge + i
-        return age >= currentAge && age <= endAge
+        return age >= minAge && age <= maxAge
       }))
     : 0
   const hhMax = householdOverlays?.length
-    ? Math.max(...householdOverlays.flatMap(o => o.points.map(([, v]) => v)))
+    ? Math.max(...householdOverlays.flatMap(o => o.points.filter(inRange).map(([, v]) => v)))
     : 0
-  const rawMax = allPts.length > 0
-    ? Math.max(...allPts.map(([, v]) => v), fireTarget ?? 0, baselineMax, overlayMax, mcMax, hhMax)
+  const rawMax = visibleAllPts.length > 0
+    ? Math.max(...visibleAllPts.map(([, v]) => v), fireTarget ?? 0, baselineMax, overlayMax, mcMax, hhMax)
     : Math.max(1, overlayMax, mcMax, hhMax)
   const maxVal = Math.max(rawMax, 1) * 1.08
 
@@ -214,7 +227,7 @@ export function SimChart({
   }))
 
   const totalAgeSpan = maxAge - minAge
-  const xStep = totalAgeSpan <= 40 ? 5 : 10
+  const xStep = totalAgeSpan <= 10 ? 1 : totalAgeSpan <= 20 ? 2 : totalAgeSpan <= 40 ? 5 : 10
   const xTickAges: number[] = []
   for (let a = Math.ceil(minAge / xStep) * xStep; a <= maxAge; a += xStep) {
     xTickAges.push(a)
@@ -298,7 +311,7 @@ export function SimChart({
 
   return (
     <div ref={ref}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 220 }} aria-hidden="true">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 220 }} overflow="hidden" aria-hidden="true">
         {/* Grid lines */}
         {yTicks.map(({ val, y }) => (
           <line key={val} x1={PAD.left} x2={PAD.left + innerW} y1={y} y2={y}
@@ -403,6 +416,41 @@ export function SimChart({
         {xFire !== null && fireAgeFractional !== null && fireAgeFractional > minAge && fireAgeFractional < maxAge && (
           <line x1={xFire} x2={xFire} y1={PAD.top} y2={PAD.top + innerH}
             stroke={COLOR_OPBOUW} strokeWidth={1.5} strokeDasharray="4 2" opacity={0.85} />
+        )}
+
+        {/* AOW pensioenleeftijd dashed vertical */}
+        {aowAgeFractional != null && aowAgeFractional > minAge && aowAgeFractional < maxAge && (
+          <>
+            <line
+              x1={PAD.left + xScale(aowAgeFractional)}
+              x2={PAD.left + xScale(aowAgeFractional)}
+              y1={PAD.top} y2={PAD.top + innerH}
+              stroke="var(--ink-3, #8a8680)" strokeWidth={1.2} strokeDasharray="3 3" opacity={0.6}
+            />
+            <text
+              x={PAD.left + xScale(aowAgeFractional) - 4}
+              y={PAD.top + 14}
+              textAnchor="end"
+              fontSize={8}
+              fill="var(--ink-3, #8a8680)"
+              fontFamily="var(--font-inter, sans-serif)"
+              fontWeight={600}
+            >
+              AOW
+            </text>
+            <text
+              x={PAD.left + xScale(aowAgeFractional) - 4}
+              y={PAD.top + 23}
+              textAnchor="end"
+              fontSize={7}
+              fill="var(--ink-4, #bbb8b0)"
+              fontFamily="var(--font-dm-mono, monospace)"
+            >
+              {aowAgeFractional % 1 === 0
+                ? `${aowAgeFractional}`
+                : `${Math.floor(aowAgeFractional)}+${Math.round((aowAgeFractional % 1) * 12)}m`}
+            </text>
+          </>
         )}
 
         {/* Baseline ghost-line (what-if mode) — solid gray reference */}

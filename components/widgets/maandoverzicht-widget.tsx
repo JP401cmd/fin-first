@@ -48,6 +48,17 @@ export function MaandoverzichtWidget({ size, data, href }: Props) {
   const { netWorthDelta, freedomDaysWon, savingsRate, budgetScore, prevMonthComparison } = monthSummary
   const deltaPositive = netWorthDelta >= 0
 
+  // ── Mini: net month balance with color ──────────────
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="kern" size="mini" kicker="Maandoverzicht" href={href}>
+        <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${deltaPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+          {deltaPositive ? '+' : ''}{formatCurrency(netWorthDelta)}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter: netto resultaat + vrijheidsdagen ──────────────
   if (size === 'quarter') {
     return (

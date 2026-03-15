@@ -186,6 +186,16 @@ export function CashFlowWidget({ size, data, href }: Props) {
     )
   }
 
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="kern" size="mini" kicker="Cashflow Maand" href={href}>
+        <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+          {isPositive ? '+' : ''}{formatCurrency(cashFlow)}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   const dailyExp = monthlyExpenses / 30
   const freedomDays = dailyExp > 0 && Math.abs(cashFlow) > 0
     ? Math.round(Math.abs(cashFlow) / dailyExp)

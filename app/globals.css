@@ -581,6 +581,13 @@ body {
 .animate-sheet-enter {
   animation: sheet-enter 280ms cubic-bezier(.22,1,.36,1) both;
 }
+@media (prefers-reduced-motion: reduce) {
+  .animate-sheet-enter {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+}
 
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(12px); }

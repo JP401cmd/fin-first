@@ -87,6 +87,17 @@ export function BerichtenWidget({ size, href }: Props) {
     )
   }
 
+  // ── Mini: new article count ──
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="cross" size="mini" kicker="Berichten" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {news.length} nieuw
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter: edition + 1 headline + category dot ──
   if (size === 'quarter') {
     const item = news[0]

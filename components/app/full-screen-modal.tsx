@@ -27,10 +27,8 @@ export function FullScreenModal({ open, onClose, title, href, children }: FullSc
         </Link>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto">
-        {children}
-      </div>
+      {/* Content — BottomSheet already provides overflow-y-auto wrapper */}
+      {children}
     </BottomSheet>
   )
 }

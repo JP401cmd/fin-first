@@ -37,6 +37,17 @@ export function VrijheidsvoortgangWidget({ size, data, href }: Props) {
         : cd.fireDate
   })()
 
+  // ── Mini-size: freedom percentage ────
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="cross" size="mini" kicker="Vrijheidsvoortgang" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {effectivePct.toFixed(1)}%
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter-size: big percentage + compact progress bar + FIRE date ────
   if (size === 'quarter') {
     return (

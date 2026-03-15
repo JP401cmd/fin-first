@@ -48,6 +48,17 @@ export function AiInzichtWidget({ size, data, href }: Props) {
   const latest = aiInsights[0]
   const colors = MODULE_COLORS[latest.module] ?? { bg: 'bg-gray-50', text: 'text-gray-600', dot: 'bg-gray-400' }
 
+  // ── Mini: insights count ──
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="cross" size="mini" kicker="AI Inzicht" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {aiInsights.length} {aiInsights.length === 1 ? 'inzicht' : 'inzichten'}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // Quarter: lightbulb icon + 1-line tip (truncated) + module-color dot
   if (size === 'quarter') {
     return (

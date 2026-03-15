@@ -56,6 +56,17 @@ export function StreaksWidget({ size, data, href }: Props) {
     )
   }
 
+  // ── Mini: current best streak count ──
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="cross" size="mini" kicker="Streaks" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {bestStreak.currentCount} dagen
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // Quarter: fire emoji + longest active streak + type label
   if (size === 'quarter') {
     return (

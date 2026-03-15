@@ -21,6 +21,17 @@ export function PassiefInkomenWidget({ size, data, href }: Props) {
   const dailyExp = monthlyExpenses > 0 ? monthlyExpenses / 30 : target / 30
   const freedomDays = dailyExp > 0 ? current / dailyExp : 0
 
+  // ── Mini-size: passive income amount ──────────────────
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="horizon" size="mini" kicker="Passief Inkomen" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {formatCurrency(current)}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter-size: compact bedrag + /mnd + percentage ──
   if (size === 'quarter') {
     return (

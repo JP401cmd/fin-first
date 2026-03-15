@@ -29,6 +29,17 @@ export function BelastingBox3Widget({ size, data, href }: Props) {
     ? Math.round(estimatedTax / dailyExp)
     : 0
 
+  // ── Mini-size ────────────────────────────────────────────
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="kern" size="mini" kicker="Box 3 Belasting" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {formatCurrency(estimatedTax)}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter-size ──────────────────────────────────────────
   if (size === 'quarter') {
     return (

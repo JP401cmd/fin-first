@@ -5,6 +5,7 @@ import { AlertTriangle, TrendingUp, TableProperties, ChevronDown, ChevronUp } fr
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { SimChart } from '@/components/app/horizon/sim-chart'
+import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
 import { formatCurrency } from '@/lib/format'
 import { formatFireAge } from '@/lib/horizon-data'
 import type { SimResult, SimCashflow } from '@/lib/fire-simulation'
@@ -234,17 +235,23 @@ export function SimChartModal({
         <div>
           <p className="label-editorial text-[var(--ink-3)] mb-2">VERMOGENSGRAFIEK</p>
           <div className="overflow-hidden rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] p-3">
-            <SimChart
-              rows={rows}
-              fireAge={fireAge}
-              fireAgeFractional={fireAgeFractional}
-              currentAge={resolvedCurrentAge}
-              endAge={displayEndAge}
-              cashflows={cashflows}
-              forModal
-              strategy={strategy}
-              targetEndPortfolio={targetEndPortfolio}
-            />
+            <ZoomableChartContainer currentAge={resolvedCurrentAge} endAge={displayEndAge}>
+              {(visibleMin, visibleMax) => (
+                <SimChart
+                  rows={rows}
+                  fireAge={fireAge}
+                  fireAgeFractional={fireAgeFractional}
+                  currentAge={resolvedCurrentAge}
+                  endAge={displayEndAge}
+                  cashflows={cashflows}
+                  forModal
+                  strategy={strategy}
+                  targetEndPortfolio={targetEndPortfolio}
+                  visibleMinAge={visibleMin}
+                  visibleMaxAge={visibleMax}
+                />
+              )}
+            </ZoomableChartContainer>
             <div className="mt-2 flex flex-wrap gap-3 text-[10px] font-sans text-[var(--ink-4)]">
               <span className="flex items-center gap-1">
                 <span className="inline-block h-2 w-4 rounded-sm bg-horizon-600/70" /> Opbouwfase

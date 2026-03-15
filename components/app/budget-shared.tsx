@@ -42,6 +42,11 @@ export { _formatCurrency as formatCurrency, _formatCurrencyDecimals as formatCur
 
 export type BudgetType = 'income' | 'expense' | 'savings' | 'debt' | 'archive'
 
+/** Over budget is semantically positive for income, savings, and debt (earned/saved/repaid more than planned) */
+export function isOverPositive(budgetType: BudgetType): boolean {
+  return budgetType === 'income' || budgetType === 'savings' || budgetType === 'debt'
+}
+
 export function formatRollover(amount: number, type: string): string {
   if (amount <= 0) return ''
   const formatted = _formatCurrency(amount)
@@ -180,4 +185,63 @@ const TYPE_COLORS: Record<BudgetType, {
 
 export function getTypeColors(budgetType: BudgetType) {
   return TYPE_COLORS[budgetType] ?? TYPE_COLORS.expense
+}
+
+/* ── Progress bar segment computation ─────────────────────── */
+
+export interface BarSegments {
+  /** Fill 1: 0 → min(rawPct, threshold) in barHex */
+  normalPct: number
+  normalColor: string
+  /** Fill 2: threshold → min(rawPct, 100) in barHexWarn */
+  warnPct: number
+  warnLeft: number
+  warnColor: string
+  /** Extension: limitPosition → limitPosition + extensionPct */
+  extensionPct: number
+  extensionLeft: number
+  extensionColor: string
+  /** Marker positions (scaled when overbudget) */
+  limitPosition: number
+  alertPosition: number
+  /** Bij >105%: alles in overColor */
+  isFullyOver: boolean
+  overColor: string
+}
+
+export function computeBarSegments(
+  spent: number,
+  limit: number,
+  threshold: number,
+  colors: { barHex: string; barHexWarn: string },
+  overPositive: boolean,
+): BarSegments {
+  const rawPct = limit > 0 ? (spent / limit) * 100 : 0
+  const overColor = overPositive ? '#10b981' : '#ef4444'
+  const isFullyOver = rawPct > 105
+
+  // When overbudget, scale everything so 105% fits within the track
+  const hasExtension = rawPct > 100
+  const scale = hasExtension ? 100 / 105 : 1
+
+  const normalPct = Math.min(rawPct, threshold) * scale
+  const warnLeft = threshold * scale
+  const warnPct = Math.max(0, Math.min(rawPct, 100) - threshold) * scale
+  const extensionPct = (hasExtension ? Math.min(rawPct - 100, 5) : 0) * scale
+  const extensionLeft = 100 * scale
+
+  return {
+    normalPct,
+    normalColor: isFullyOver ? overColor : colors.barHex,
+    warnPct,
+    warnLeft,
+    warnColor: isFullyOver ? overColor : colors.barHexWarn,
+    extensionPct,
+    extensionLeft,
+    extensionColor: overColor,
+    limitPosition: 100 * scale,
+    alertPosition: threshold * scale,
+    isFullyOver,
+    overColor,
+  }
 }

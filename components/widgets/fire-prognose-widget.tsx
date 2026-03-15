@@ -17,6 +17,22 @@ export function FirePrognoseWidget({ size, data, href }: Props) {
   const isReached = cd.fireDate === 'Bereikt!'
   const isNotFeasible = cd.fireDate === 'Niet haalbaar'
 
+  // ── Mini-size: single FIRE year or status ───────────────────
+  if (size === 'mini') {
+    const miniLabel = isReached
+      ? 'Bereikt!'
+      : isNotFeasible
+        ? '—'
+        : cd.fireDate
+    return (
+      <WidgetShell module="horizon" size="mini" kicker="FIRE Prognose" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {miniLabel}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter-size: compact countdown + FIRE leeftijd ─────────
   if (size === 'quarter') {
     return (

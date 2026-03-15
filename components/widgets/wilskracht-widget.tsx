@@ -29,6 +29,17 @@ export function WilskrachtWidget({ size, data, href }: WilskrachtWidgetProps) {
 
   const label = WILLPOWER_LABELS[willpowerScore] ?? ''
 
+  // ── Mini-size: willpower score letter ────
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="wil" size="mini" kicker="Wilskracht" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {willpowerScore} — {label}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   if (size === 'quarter') {
     return (
       <WidgetShell module="wil" size={size} kicker="Wilskracht" href={href}>

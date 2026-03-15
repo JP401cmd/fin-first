@@ -25,6 +25,17 @@ export function BadgesWidget({ size, data, href }: Props) {
   const pct = total > 0 ? (earned / total) * 100 : 0
   const nearPct = nearestBadge ? Math.round(nearestBadge.progress * 100) : 0
 
+  // ── Mini: earned count ──
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="cross" size="mini" kicker="Badges" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {earned} verdiend
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter: laatst verdiende badge icoon + 'X/Y verdiend' teller ──
   if (size === 'quarter') {
     return (

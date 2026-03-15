@@ -7,7 +7,7 @@ import {
   CheckCircle2, AlertTriangle,
   ArrowUpRight, ArrowDownRight, Minus,
 } from 'lucide-react'
-import { formatCurrency, type BudgetType } from '@/components/app/budget-shared'
+import { formatCurrency, isOverPositive, type BudgetType } from '@/components/app/budget-shared'
 import { buildSegments, typeColors } from '@/components/app/budget-donut'
 import type { BudgetWithChildren } from '@/lib/budget-data'
 
@@ -238,6 +238,7 @@ export function KernMissionControl({
               {budgetTypeSummaries.map((ts) => {
                 const pct = ts.limit > 0 ? Math.round((ts.spent / ts.limit) * 100) : 0
                 const isOver = ts.spent > ts.limit && ts.limit > 0
+                const overPos = isOver && isOverPositive(ts.type)
                 const tc = typeColors(ts.type)
                 return (
                   <div key={ts.type} onClick={(e) => { e.stopPropagation(); onCardClick('budgets') }} className="cursor-pointer rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-kern-50">
@@ -252,16 +253,16 @@ export function KernMissionControl({
                         <span className="truncate font-medium text-[var(--ink-2)]">{ts.label}</span>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
-                        <span className={`font-mono font-medium ${isOver ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
+                        <span className={`font-mono font-medium ${isOver ? (overPos ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}`}>
                           {formatCurrency(ts.spent)} <span className="text-[var(--ink-4)]">/ {formatCurrency(ts.limit)}</span>
                         </span>
-                        <span className={`font-mono font-bold ${isOver ? 'text-red-600' : 'text-[var(--ink-3)]'}`}>{pct}%</span>
+                        <span className={`font-mono font-bold ${isOver ? (overPos ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-3)]'}`}>{pct}%</span>
                       </div>
                     </div>
                     <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${isOver ? 'bg-red-400' : ''}`}
-                        style={{ width: `${Math.min(pct, 100)}%`, ...(!isOver ? { backgroundColor: tc.spent } : {}) }}
+                        className={`h-full rounded-full transition-all duration-500 ${isOver ? (overPos ? 'bg-emerald-400' : 'bg-red-400') : ''}`}
+                        style={{ width: `${Math.min(pct, 100)}%`, ...(!isOver ? { backgroundColor: pct >= 80 ? tc.text : tc.spent } : {}) }}
                       />
                     </div>
                   </div>

@@ -32,8 +32,9 @@ const MODULE_GROUPS: { key: WidgetModule; label: string; dotClass: string; barCl
   { key: 'cross',   label: 'Cross-Module',  dotClass: 'bg-neutral-400', barClass: 'bg-neutral-400' },
 ]
 
-const SIZES: WidgetSize[] = ['quarter', 'half', 'full']
+const SIZES: WidgetSize[] = ['mini', 'quarter', 'half', 'full']
 const SIZE_LABELS: Record<WidgetSize, string> = {
+  mini: 'Mini',
   quarter: 'Quarter',
   half: 'Half',
   full: 'Full',
@@ -44,7 +45,7 @@ const DYNAMIC_WIDGETS = MOCK_DASHBOARD_DATA.favoriteBudgets.map(b => ({
   id: `budget_fav:${b.id}`,
   name: `Budget Favoriet: ${b.name}`,
   description: `Dynamische widget voor budget "${b.name}"`,
-  sizes: ['quarter', 'half', 'full'] as WidgetSize[],
+  sizes: ['mini', 'quarter', 'half', 'full'] as WidgetSize[],
   defaultSize: 'quarter' as WidgetSize,
   minLevel: -2,
   module: 'kern' as WidgetModule,
@@ -139,12 +140,14 @@ function WidgetTestRow({ def }: WidgetTestRowProps) {
       {/* Dashboard-style grid (same as /dashboard) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 auto-rows-[160px] gap-4">
         {SIZES.map(size => {
-          const supported = def.sizes.includes(size)
+          const supported = size === 'mini' || def.sizes.includes(size)
           const spanClass = size === 'full' ? 'sm:col-span-2 row-span-2'
             : size === 'half' ? 'sm:col-span-2'
             : ''
+          // Mini gets a fixed height override since the grid uses 160px rows
+          const miniStyle = size === 'mini' ? { height: '64px' } : undefined
           return (
-            <div key={size} className={`relative ${spanClass}`}>
+            <div key={size} className={`relative ${spanClass}`} style={miniStyle}>
               <span className="absolute top-1 left-2 z-10 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
                 {SIZE_LABELS[size]}
               </span>

@@ -59,6 +59,17 @@ export function AgendaWidget({ size, data, href }: Props) {
     )
   }
 
+  // ── Mini: event count ──
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="kern" size="mini" kicker="Agenda" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {upcomingEvents.length} events
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter: next event with relative time ─────────────────
   if (size === 'quarter') {
     const next = upcomingEvents[0]

@@ -19,6 +19,17 @@ export function Box3DragWidget({ size, data, href }: Props) {
 
   const pctOfAssets = totalAssets > 0 ? (annualDrag / totalAssets) * 100 : 0
 
+  // ── Mini-size: box3 drag amount in red ────────────────
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="horizon" size="mini" kicker="Box 3 Drag" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-red-600 leading-none truncate">
+          {formatCurrency(annualDrag)}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter-size: jaarlijks bedrag + vrijheidsdagen ──
   if (size === 'quarter') {
     return (

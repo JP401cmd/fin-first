@@ -48,6 +48,17 @@ export function VolgendeStapWidget({ size, data, href }: Props) {
 
   const first = active[0]
 
+  // ── Mini-size: short action label ──
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="wil" size="mini" kicker="Volgende Stap" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {first.title}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter-size: icon + 1-line action text ──────────────────
   if (size === 'quarter') {
     return (

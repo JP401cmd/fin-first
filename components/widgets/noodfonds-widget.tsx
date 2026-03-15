@@ -31,6 +31,17 @@ export function NoodfondsWidget({ size, data, href }: Props) {
     : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
 
+  // ── Mini-size ────────────────────────────────────────────
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="kern" size="mini" kicker="Noodfonds" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {monthsCovered.toFixed(1)} mnd
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter: compact months + mini progress bar ──
   if (size === 'quarter') {
     return (

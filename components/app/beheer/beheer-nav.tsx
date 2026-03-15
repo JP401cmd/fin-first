@@ -18,6 +18,7 @@ const tabs = [
   { label: 'AI Features', href: '/beheer/ai-features' },
   { label: 'Widgets', href: '/beheer/widgets-test' },
   { label: 'Propositie', href: '/beheer/propositie' },
+  { label: 'AOW-leeftijd', href: '/beheer/aow-leeftijd' },
 ] as const
 
 export function BeheerNav() {

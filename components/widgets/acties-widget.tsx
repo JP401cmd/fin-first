@@ -56,6 +56,17 @@ export function ActiesWidget({ size, data, href }: Props) {
   const top = size === 'full' ? topOpenActions.slice(0, 6) : topOpenActions.slice(0, 3)
   const roundedDays = Math.round(totalFreedomDaysOpen)
 
+  // ── Mini-size: open actions count ────
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="wil" size="mini" kicker="Acties" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {openActions} open
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter-size: stacked KPIs ────
   if (size === 'quarter') {
     return (

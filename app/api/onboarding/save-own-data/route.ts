@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { getDefaultBudgets } from '@/lib/budget-data'
 import { NL_AOW_AGE, NL_AOW_MONTHLY } from '@/lib/horizon-data'
+import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 
 const bodySchema = z.object({
   identity: z.object({
@@ -280,12 +281,25 @@ export async function POST(req: Request) {
       if (debtErr) throw new Error(`Schulden opslaan mislukt: ${debtErr.message}`)
     }
 
-    // 6. Seed default AOW life event
+    // 6. Seed default AOW life event (leeftijd uit aow_leeftijd tabel)
+    let aowTargetAge = NL_AOW_AGE
+    try {
+      const { data: aowRows } = await supabase
+        .from('aow_leeftijd')
+        .select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source')
+        .order('birth_date_from', { ascending: true })
+      if (aowRows && aowRows.length > 0) {
+        const aow = lookupAowAge(aowRows as AowLeeftijdRow[], identity.date_of_birth)
+        aowTargetAge = Math.ceil(aow.fractional)
+      }
+    } catch {
+      // Fallback to NL_AOW_AGE
+    }
     await supabase.from('life_events').insert({
       user_id: user.id,
       name: 'AOW',
       event_type: 'aow',
-      target_age: NL_AOW_AGE,
+      target_age: aowTargetAge,
       monthly_income_change: NL_AOW_MONTHLY,
       monthly_cost_change: 0,
       one_time_cost: 0,

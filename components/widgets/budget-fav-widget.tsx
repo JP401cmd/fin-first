@@ -2,6 +2,7 @@
 
 import { WidgetShell } from './widget-shell'
 import { formatCurrency } from '@/lib/format'
+import { isOverPositive, computeBarSegments, type BudgetType } from '@/components/app/budget-shared'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { WidgetSize } from '@/lib/widget-catalog'
 
@@ -18,6 +19,7 @@ export function BudgetFavWidget({ size, budget }: { size: WidgetSize; budget: Fa
   const { ref, hasEntered } = useInViewAnimation({ duration: 600 })
   const pct = budget.limit > 0 ? Math.min(budget.spent / budget.limit, 1) : 0
   const isOver = budget.spent > budget.limit && budget.limit > 0
+  const overPositive = isOver && isOverPositive(budget.budgetType as BudgetType)
   const cssType = budget.budgetType === 'archive' ? 'other' : budget.budgetType
 
   const remaining = Math.max(budget.limit - budget.spent, 0)
@@ -36,7 +38,19 @@ export function BudgetFavWidget({ size, budget }: { size: WidgetSize; budget: Fa
   const sw = size === 'full' ? 9 : size === 'half' ? 6 : 7
   const circ = 2 * Math.PI * r
   const trackColor = `color-mix(in srgb, var(--color-${cssType}-300) 35%, transparent)`
-  const fillColor = isOver ? '#ef4444' : `var(--color-${cssType}-500)`
+  const fillColor = isOver ? (overPositive ? '#10b981' : '#ef4444') : `var(--color-${cssType}-500)`
+  const barSeg = computeBarSegments(budget.spent, budget.limit, 80, { barHex: `var(--color-${cssType}-400)`, barHexWarn: `var(--color-${cssType}-600)` }, overPositive)
+
+  // ── Mini: compact spent / limit ──
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="kern" size="mini" kicker={budget.name} href={`/core/budgets?budget=${budget.id}`}>
+        <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${isOver ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink)]'}`}>
+          {formatCurrency(budget.spent)} / {formatCurrency(budget.limit)}
+        </p>
+      </WidgetShell>
+    )
+  }
 
   // ── Full: vertical layout — ring on top, details below ──
   if (size === 'full') {
@@ -57,7 +71,7 @@ export function BudgetFavWidget({ size, budget }: { size: WidgetSize; budget: Fa
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <p className={`font-mono text-2xl font-semibold tabular-nums leading-tight ${isOver ? 'text-red-600' : 'text-[var(--ink)]'}`}>
+              <p className={`font-mono text-2xl font-semibold tabular-nums leading-tight ${isOver ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink)]'}`}>
                 {Math.round(pct * 100)}%
               </p>
               <p className="font-mono text-[10px] text-[var(--ink-4)] tabular-nums leading-normal">
@@ -72,10 +86,12 @@ export function BudgetFavWidget({ size, budget }: { size: WidgetSize; budget: Fa
             <div className="flex justify-center">
               <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
                 isOver
-                  ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400'
+                  ? (overPositive
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                    : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400')
                   : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
               }`}>
-                {isOver ? 'Over budget' : 'Op schema'}
+                {isOver ? (overPositive ? 'Doel bereikt' : 'Over budget') : 'Op schema'}
               </div>
             </div>
 
@@ -87,14 +103,26 @@ export function BudgetFavWidget({ size, budget }: { size: WidgetSize; budget: Fa
             </div>
 
             {/* Progress bar */}
-            <div className="h-2 rounded-full overflow-hidden" style={{ background: trackColor }}>
+            <div className="relative h-2 overflow-hidden rounded-full" style={{ background: trackColor }}>
+              {/* Fill 1 — normaal */}
               <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{
-                  width: `${Math.min(pct * 100, 100)}%`,
-                  background: fillColor,
-                }}
+                className="absolute inset-y-0 left-0 rounded-l-full transition-all duration-500"
+                style={{ width: `${barSeg.normalPct}%`, background: barSeg.normalColor }}
               />
+              {/* Fill 2 — waarschuwing */}
+              {barSeg.warnPct > 0 && (
+                <div
+                  className="absolute inset-y-0 rounded-r-full transition-all duration-500"
+                  style={{ left: `${barSeg.warnLeft}%`, width: `${barSeg.warnPct}%`, background: barSeg.warnColor, transitionDelay: '30ms' }}
+                />
+              )}
+              {/* Extension */}
+              {barSeg.extensionPct > 0 && (
+                <div
+                  className="absolute inset-y-0 rounded-r-full transition-all duration-500"
+                  style={{ left: `${barSeg.extensionLeft}%`, width: `${barSeg.extensionPct}%`, background: barSeg.extensionColor, opacity: 0.7, transitionDelay: '80ms' }}
+                />
+              )}
             </div>
 
             {/* Daily averages */}
@@ -107,7 +135,7 @@ export function BudgetFavWidget({ size, budget }: { size: WidgetSize; budget: Fa
               </div>
               <div>
                 <p className="text-[10px] text-[var(--ink-3)] uppercase tracking-wide">Nog beschikbaar</p>
-                <p className={`font-mono text-sm tabular-nums ${isOver ? 'text-red-600' : 'text-emerald-600'}`}>
+                <p className={`font-mono text-sm tabular-nums ${isOver ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-emerald-600'}`}>
                   {isOver ? '€ 0' : formatCurrency(remainingPerDay)}<span className="text-[var(--ink-4)]">/dag</span>
                 </p>
               </div>
@@ -115,9 +143,11 @@ export function BudgetFavWidget({ size, budget }: { size: WidgetSize; budget: Fa
 
             {/* Remaining + days left */}
             <div className="flex items-baseline justify-between border-t border-[var(--border-ed)] pt-2">
-              <p className={`font-mono text-xs tabular-nums ${isOver ? 'text-red-600' : 'text-emerald-600'}`}>
+              <p className={`font-mono text-xs tabular-nums ${isOver ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-emerald-600'}`}>
                 {isOver
-                  ? `${formatCurrency(budget.spent - budget.limit)} over budget`
+                  ? (overPositive
+                    ? `${formatCurrency(budget.spent - budget.limit)} boven doel`
+                    : `${formatCurrency(budget.spent - budget.limit)} over budget`)
                   : `${formatCurrency(remaining)} over`}
               </p>
               <p className="text-[10px] text-[var(--ink-4)]">
@@ -149,7 +179,7 @@ export function BudgetFavWidget({ size, budget }: { size: WidgetSize; budget: Fa
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <p className={`font-mono text-lg font-semibold tabular-nums leading-tight ${isOver ? 'text-red-600' : 'text-[var(--ink)]'}`}>
+              <p className={`font-mono text-lg font-semibold tabular-nums leading-tight ${isOver ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink)]'}`}>
                 {Math.round(pct * 100)}%
               </p>
             </div>
@@ -162,19 +192,33 @@ export function BudgetFavWidget({ size, budget }: { size: WidgetSize; budget: Fa
             </p>
 
             {/* Progress bar */}
-            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: trackColor }}>
+            <div className="relative h-1.5 overflow-hidden rounded-full" style={{ background: trackColor }}>
+              {/* Fill 1 — normaal */}
               <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{
-                  width: `${Math.min(pct * 100, 100)}%`,
-                  background: fillColor,
-                }}
+                className="absolute inset-y-0 left-0 rounded-l-full transition-all duration-500"
+                style={{ width: `${barSeg.normalPct}%`, background: barSeg.normalColor }}
               />
+              {/* Fill 2 — waarschuwing */}
+              {barSeg.warnPct > 0 && (
+                <div
+                  className="absolute inset-y-0 rounded-r-full transition-all duration-500"
+                  style={{ left: `${barSeg.warnLeft}%`, width: `${barSeg.warnPct}%`, background: barSeg.warnColor, transitionDelay: '30ms' }}
+                />
+              )}
+              {/* Extension */}
+              {barSeg.extensionPct > 0 && (
+                <div
+                  className="absolute inset-y-0 rounded-r-full transition-all duration-500"
+                  style={{ left: `${barSeg.extensionLeft}%`, width: `${barSeg.extensionPct}%`, background: barSeg.extensionColor, opacity: 0.7, transitionDelay: '80ms' }}
+                />
+              )}
             </div>
 
-            <p className={`font-mono text-xs tabular-nums ${isOver ? 'text-red-600' : 'text-emerald-600'}`}>
+            <p className={`font-mono text-xs tabular-nums ${isOver ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-emerald-600'}`}>
               {isOver
-                ? `${formatCurrency(budget.spent - budget.limit)} over budget`
+                ? (overPositive
+                  ? `${formatCurrency(budget.spent - budget.limit)} boven doel`
+                  : `${formatCurrency(budget.spent - budget.limit)} over budget`)
                 : `${formatCurrency(remaining)} over · nog ${daysLeft}d`}
             </p>
           </div>
@@ -200,7 +244,7 @@ export function BudgetFavWidget({ size, budget }: { size: WidgetSize; budget: Fa
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <p className={`font-mono text-lg font-semibold tabular-nums leading-tight ${isOver ? 'text-red-600' : 'text-[var(--ink)]'}`}>
+            <p className={`font-mono text-lg font-semibold tabular-nums leading-tight ${isOver ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink)]'}`}>
               {Math.round(pct * 100)}%
             </p>
             <p className="font-mono text-[9px] text-[var(--ink-3)] tabular-nums leading-normal mt-0.5 text-center">

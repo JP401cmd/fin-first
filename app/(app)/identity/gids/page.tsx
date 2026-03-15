@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ChevronDown, LayoutDashboard, Landmark, Zap, Compass, BookOpen, MessageSquare, Sparkles, Lock, Receipt, CheckCircle2, ArrowRight, Wallet, CreditCard, PieChart, Upload, RefreshCw, Target, type LucideIcon } from 'lucide-react'
+import { ChevronDown, LayoutDashboard, Landmark, Zap, Compass, BookOpen, MessageSquare, Sparkles, Lock, Receipt, CheckCircle2, ArrowRight, Wallet, CreditCard, PieChart, Upload, RefreshCw, Target, TrendingUp, BarChart3, ClipboardCheck, MoreHorizontal, Newspaper, LineChart, ArrowDownToLine, Clock, Users, User, Settings, Bell, FileText, Smartphone, type LucideIcon } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { createClient } from '@/lib/supabase/client'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
@@ -478,149 +478,614 @@ export default function GidsPage() {
 
       <p className="label-editorial text-[var(--ink-3)] mb-3">De onderdelen</p>
 
-      {/* Onderdelen — accordion 2-koloms grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-        {/* Dashboard */}
-        <GuideAccordion
-          id="dashboard"
-          icon={<LayoutDashboard className="h-4 w-4" />}
-          title="Dashboard"
-          tagline="Alles in één oogopslag"
-          color="var(--ink-2)"
-          open={guideSection === 'dashboard'}
-          onToggle={() => setGuideSection(guideSection === 'dashboard' ? null : 'dashboard')}
-        >
-          <p className="mb-3 text-[12px] text-[var(--ink-3)]">
-            Je startpagina met een samenvatting van alle drie de modules.
-          </p>
-          <div className="space-y-2">
-            <GuideFeature title="Modulekaarten">
-              Drie kaarten bovenaan tonen de kernmetric van elke module — je financiële fundament, openstaande acties en je FIRE-countdown. Tik op een kaart om naar de module te gaan.
-            </GuideFeature>
-            <GuideFeature title="Widgets">
-              Onder de modulekaarten vind je aanpasbare widgets — compacte inzichtkaarten die je kunt toevoegen, verwijderen en herschikken. Er zijn meer dan 25 widgets beschikbaar. Beheer ze via Identiteit → Instellingen → Widgets.
-            </GuideFeature>
-            <GuideFeature title="Jouw Pad">
-              Een speciale widget die je soevereiniteitsniveau toont — van Herstel tot Meesterschap. Naarmate je financiële gezondheid groeit, ontgrendel je automatisch nieuwe functies.
-            </GuideFeature>
-          </div>
-        </GuideAccordion>
+      {/* ── De Kern ── */}
+      <div id="guide-kern" className="mb-6 scroll-mt-24">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="h-2 w-2 rounded-full bg-kern-500" />
+          <p className="label-editorial text-kern-600">De Kern</p>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+          <GuideAccordion
+            id="kern-budgetteren"
+            icon={<PieChart className="h-4 w-4" />}
+            title="Budgetteren"
+            tagline="Budgetplan, doeltypes, analyse en rapportage"
+            color="var(--color-kern-700)"
+            open={guideSection === 'kern-budgetteren'}
+            onToggle={() => setGuideSection(guideSection === 'kern-budgetteren' ? null : 'kern-budgetteren')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Budgetplan instellen">
+                Je begint met een standaard budgetplan van 6 hoofdcategorieën en 24 subcategorieën. Je kunt limieten aanpassen, categorieën toevoegen of verwijderen en de hiërarchie reorganiseren. Per budget kies je het interval (maandelijks, per kwartaal of jaarlijks), het limiettype (zacht waarschuwt, hard blokkeert) en een alertdrempel (standaard 80%). Optioneel stel je een maximumbedrag per losse transactie in.
+              </GuideFeature>
+              <GuideFeature title="Budgettypes">
+                Elk budget heeft een type dat bepaalt hoe het wordt gemeten. <strong className="text-[var(--ink)]">Inkomsten</strong> — salaris, toeslagen, teruggaven. <strong className="text-[var(--ink)]">Uitgaven</strong> — maandelijkse bestedingen per categorie. <strong className="text-[var(--ink)]">Sparen</strong> — noodfonds, beleggingen, pensioen. <strong className="text-[var(--ink)]">Schulden</strong> — aflossingen op leningen en hypotheek. <strong className="text-[var(--ink)]">Verborgen</strong> — interne overboekingen tussen eigen rekeningen die niet meetellen in de analyse.
+              </GuideFeature>
+              <GuideFeature title="Doeltypes">
+                Subcategorieën kunnen een doeltype krijgen dat bepaalt hoe het budget zich gedraagt. <strong className="text-[var(--ink)]">Vaste maandlast</strong> — toont of je inkomen deze dekt of tekortschiet. <strong className="text-[var(--ink)]">Bestedingslimiet</strong> — melding wanneer je de drempel nadert. <strong className="text-[var(--ink)]">Spaardoel</strong> — koppelt aan een doel uit De Wil met doelbedrag en einddatum. <strong className="text-[var(--ink)]">Maandelijkse reservering</strong> — overschot schuift automatisch door naar volgende maand. <strong className="text-[var(--ink)]">Periodieke last</strong> — voor jaarlijkse of halfjaarlijkse kosten, je reserveert maandelijks een deel.
+              </GuideFeature>
+              <GuideFeature title="Overschotbeheer">
+                Wat gebeurt er met geld dat je niet uitgeeft? Per budget kies je: <strong className="text-[var(--ink)]">Reset</strong> — het overschot verdwijnt, het budget begint volgende maand op nul. <strong className="text-[var(--ink)]">Doorschuiven</strong> — het overschot telt op bij de limiet van volgende maand. <strong className="text-[var(--ink)]">Beleggen</strong> — het overschot wordt automatisch overgeheveld naar je beleggingsbudget. Bij het doeltype &lsquo;maandelijkse reservering&rsquo; wordt doorschuiven automatisch ingeschakeld.
+              </GuideFeature>
+              <GuideFeature title="Essentieel vs. niet-essentieel">
+                Elk budget is gemarkeerd als essentieel of niet-essentieel. Essentiële uitgaven zijn je basisbehoeften — wonen, boodschappen, verzekeringen, vervoer, sparen, schulden. Niet-essentiële zijn keuzevrijheid — uit eten, hobby&apos;s, vakantie, kleding. Dit onderscheid is cruciaal: je FIRE-berekening gebruikt je essentiële uitgaven om te bepalen hoeveel vermogen je nodig hebt voor volledige vrijheid. Besparen op niet-essentieel brengt je FIRE-datum direct dichterbij.
+              </GuideFeature>
+              <GuideFeature title="Verbinding met transacties">
+                Na het importeren van transacties koppelt TriFinity ze aan je budgetten. De AI categoriseert automatisch op basis van 24 herkenbare patronen en geeft een betrouwbaarheidsscore. Je kunt suggesties accepteren of handmatig toewijzen. Maak regels aan voor terugkerende tegenpartijen zodat toekomstige transacties vanzelf in de juiste categorie vallen. Inkomsten worden aan inkomstbudgetten gekoppeld, uitgaven aan bestedingscategorieën.
+              </GuideFeature>
+              <GuideFeature title="Budgetanalyse">
+                Drie weergaven voor je budgetten. <strong className="text-[var(--ink)]">Boomweergave</strong> — hiërarchisch overzicht van hoofd- en subcategorieën met voortgangsbalken en gezondheidsindicatoren. <strong className="text-[var(--ink)]">Donutweergave</strong> — cirkeldiagram met de verdeling van je uitgaven per type. <strong className="text-[var(--ink)]">Sparkline-weergave</strong> — mini-trendlijnen over 6 maanden per categorie zodat je patronen herkent. Tik op een categorie voor het detailvenster met dekkingsgraad, variantie-analyse, prognose op basis van gewogen gemiddelden, vergelijking met vorige maand en een gezondheidsscore.
+              </GuideFeature>
+              <GuideFeature title="Meldingen">
+                Bij elke budgetcategorie stel je een alertdrempel in (standaard 80% van het limiet). Bij uitgaven ontvang je een waarschuwing zodra je de drempel nadert en een overschrijdingsmelding wanneer je erover gaat. Bij spaar- en schuldbudgetten werkt het omgekeerd: je krijgt een alert als je achterloopt op je doel. Elke melding toont de impact in vrijheidsdagen wanneer het bedrag boven €100 ligt.
+              </GuideFeature>
+              <GuideFeature title="Budgetrapportage">
+                Het maandelijkse budgetrapport geeft een compleet overzicht: scorecard met besteed percentage en 6-maanden sparkline, statusverdeling (op koers, let op, overschreden), en per categorie een detailregel met limiet, besteding, trend en gezondheid. Essentiële en niet-essentiële uitgaven worden apart opgeteld. Het rapport bevat ook het doorschuif-effect per budget, vergelijking met vorige maand en 3-maandsgemiddelde, jaar-tot-nu totalen, en de impact van je budgetprestaties uitgedrukt in gewonnen of verloren vrijheidsdagen.
+              </GuideFeature>
+              <GuideFeature title="Budget is optioneel">
+                Je hoeft niet elke transactie bij te houden. Vul alleen je geschatte maanduitgaven in en TriFinity berekent je vrijheidsdoel, FIRE-pad en aanbevelingen op basis daarvan. De AI past zich automatisch aan en focust op vermogensgroei, spaarquote en langetermijnstrategie. Zet budgetteren later gewoon aan als je dieper wilt duiken.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
 
-        {/* De Kern */}
-        <GuideAccordion
-          id="kern"
-          icon={<Landmark className="h-4 w-4" />}
-          title="De Kern"
-          tagline="Je financiële fundament"
-          color="var(--color-kern-700)"
-          open={guideSection === 'kern'}
-          onToggle={() => setGuideSection(guideSection === 'kern' ? null : 'kern')}
-        >
-          <p className="mb-3 text-[12px] text-[var(--ink-3)]">
-            Hier staat alles wat je hebt en wat er binnenkomt en uitgaat — vertaald naar vrijheidstijd.
-          </p>
-          <div className="space-y-2">
-            <GuideFeature title="Assets">
-              Al je bezittingen op één plek — beleggingsportefeuille, spaargeld, crypto, vastgoed, pensioenfondsen, deelnemingen. Elke asset draagt bij aan je totale vrijheidstijd.
-            </GuideFeature>
-            <GuideFeature title="Budgetten">
-              Vier weergaven voor je maandelijkse uitgaven: lijst, categorie, kalender en vergelijking met NIBUD-normen. Overschrijdingen kosten vrijheidsdagen; besparingen leveren ze op.
-            </GuideFeature>
-            <GuideFeature title="Budgetteren is optioneel">
-              Je hoeft niet elke transactie bij te houden om grip te krijgen op je toekomst. Vul alleen je geschatte maanduitgaven in en TriFinity berekent je vrijheidsdoel, FIRE-pad en aanbevelingen. De AI past zich automatisch aan en focust op vermogensgroei, spaarquote en langetermijnstrategie. Wil je later toch dieper duiken? Zet budgetteren gewoon aan.
-            </GuideFeature>
-            <GuideFeature title="Schulden">
-              Beheer je hypotheek, studieleningen, persoonlijke leningen en creditcardschuld. Vergelijk aflossingsstrategieën (sneeuwbal vs. lawine) en zie hoeveel vrijheidstijd elke betaling oplevert.
-            </GuideFeature>
-            <GuideFeature title="Belasting">
-              Automatische Box 3 berekening op basis van je bezittingen en schulden. Vergelijk belastingjaren, simuleer fiscaal partnerschap en ontvang optimalisatietips.
-            </GuideFeature>
-          </div>
-        </GuideAccordion>
+          <GuideAccordion
+            id="kern-cash"
+            icon={<Wallet className="h-4 w-4" />}
+            title="Cash rekeningen"
+            tagline="Bankrekeningen, transacties en import"
+            color="var(--color-kern-700)"
+            open={guideSection === 'kern-cash'}
+            onToggle={() => setGuideSection(guideSection === 'kern-cash' ? null : 'kern-cash')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Bankrekeningen">
+                Voeg je betaal- en spaarrekeningen toe. Elke rekening draagt bij aan je netto vermogen en vrijheidstijd.
+              </GuideFeature>
+              <GuideFeature title="Transacties importeren">
+                Importeer transacties via MT940, CSV of OFX bestanden. TriFinity categoriseert ze automatisch en toont je uitgavenpatronen.
+              </GuideFeature>
+              <GuideFeature title="Sankey-diagram">
+                Visualiseer de stroom van je geld — van inkomen via categorieën naar individuele uitgaven. Zie in één oogopslag waar je vrijheidstijd naartoe gaat.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
 
-        {/* De Wil */}
-        <GuideAccordion
-          id="wil"
-          icon={<Zap className="h-4 w-4" />}
-          title="De Wil"
-          tagline="Wat je nu kunt doen"
-          color="var(--color-wil-700)"
-          open={guideSection === 'wil'}
-          onToggle={() => setGuideSection(guideSection === 'wil' ? null : 'wil')}
-        >
-          <p className="mb-3 text-[12px] text-[var(--ink-3)]">
-            De module die je financiën omzet in concrete acties. Elke voltooide actie levert vrijheidsdagen op.
-          </p>
-          <div className="space-y-2">
-            <GuideFeature title="Aanbevelingen">
-              Gepersonaliseerde suggesties op basis van je data — bespaartips, schuld-optimalisatie, beleggingskansen. Accepteer een aanbeveling om er een actie van te maken.
-            </GuideFeature>
-            <GuideFeature title="Acties">
-              Je persoonlijke takenlijst voor financiële verbetering. Elke actie toont de geschatte vrijheidstijd-impact. Rond ze af om je FIRE-datum dichterbij te brengen.
-            </GuideFeature>
-            <GuideFeature title="Doelen">
-              Stel spaardoelen in — vakantie, noodfonds, grote aankoop. Volg je voortgang en zie hoeveel vrijheidsdagen elk doel kost of oplevert.
-            </GuideFeature>
-            <GuideFeature title="NIBUD-vergelijking">
-              Vergelijk je uitgaven per categorie met de NIBUD-richtlijnen. Zie of je boven of onder de norm zit en hoeveel vrijheidsdagen je zou winnen bij NIBUD-niveau.
-            </GuideFeature>
-          </div>
-        </GuideAccordion>
+          <GuideAccordion
+            id="kern-vermogensbeheer"
+            icon={<TrendingUp className="h-4 w-4" />}
+            title="Vermogensbeheer"
+            tagline="Bezittingen, holdings en waardering"
+            color="var(--color-kern-700)"
+            open={guideSection === 'kern-vermogensbeheer'}
+            onToggle={() => setGuideSection(guideSection === 'kern-vermogensbeheer' ? null : 'kern-vermogensbeheer')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Bezittingen">
+                Registreer al je bezittingen — spaargeld, beleggingen, crypto, vastgoed, pensioenfondsen, deelnemingen en overig. Elk type heeft eigen velden en waarderingslogica.
+              </GuideFeature>
+              <GuideFeature title="Holdings en beleggingen">
+                Volg individuele beleggingsposities met koersen, rendementen en allocatie. Bekijk je portfolio-opbouw en spreiding.
+              </GuideFeature>
+              <GuideFeature title="Waarderingsgeschiedenis">
+                Houd de waardeontwikkeling van je bezittingen bij over tijd. Handmatige snapshots en automatische berekeningen geven een compleet beeld.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
 
-        {/* De Horizon */}
-        <GuideAccordion
-          id="horizon"
-          icon={<Compass className="h-4 w-4" />}
-          title="De Horizon"
-          tagline="Je pad naar vrijheid"
-          color="var(--color-horizon-700)"
-          open={guideSection === 'horizon'}
-          onToggle={() => setGuideSection(guideSection === 'horizon' ? null : 'horizon')}
-        >
-          <p className="mb-3 text-[12px] text-[var(--ink-3)]">
-            Kijk verder dan vandaag — wanneer wordt werken optioneel?
-          </p>
-          <div className="space-y-2">
-            <GuideFeature title="FIRE-projectie">
-              Je persoonlijke FIRE-berekening: wanneer dekt je vermogen je uitgaven? Met pessimistisch, verwacht en optimistisch scenario. Zie je verwachte FIRE-leeftijd en het pad ernaartoe.
-            </GuideFeature>
-            <GuideFeature title="Levensgebeurtenissen">
-              Voeg toekomstige gebeurtenissen toe — kinderen, verhuizing, pensioen, erfenis. Elk event verschuift je FIRE-datum. Zie het totale effect in het vermogensverloop.
-            </GuideFeature>
-            <GuideFeature title="Monte Carlo simulatie">
-              1.000 willekeurige marktscenario&apos;s laten zien hoe robuust je plan is. Je backtestscore toont het slagingspercentage: het percentage scenario&apos;s waarin je FIRE-plan standhoudt.
-            </GuideFeature>
-            <GuideFeature title="What-if droomruimte">
-              Experimenteer met alternatieve toekomsten via vijf schuifbalken en snelpresets. Beschrijf je dromen aan Will — hij vertaalt ze naar concrete levensgebeurtenissen met FIRE-impact.
-            </GuideFeature>
-          </div>
-        </GuideAccordion>
+          <GuideAccordion
+            id="kern-schuldenbeheer"
+            icon={<CreditCard className="h-4 w-4" />}
+            title="Schuldenbeheer"
+            tagline="Aflossing, strategieën en simulatie"
+            color="var(--color-kern-700)"
+            open={guideSection === 'kern-schuldenbeheer'}
+            onToggle={() => setGuideSection(guideSection === 'kern-schuldenbeheer' ? null : 'kern-schuldenbeheer')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Schulden registreren">
+                Beheer je hypotheek, studieleningen, persoonlijke leningen, creditcardschuld en doorlopend krediet. Elk type heeft eigen renteberekening en looptijd.
+              </GuideFeature>
+              <GuideFeature title="Aflossingsstrategieën">
+                Vergelijk sneeuwbal (kleinste schuld eerst) en lawine (hoogste rente eerst). Zie het verschil in totale rentekosten en vrijheidstijd.
+              </GuideFeature>
+              <GuideFeature title="Schuldafbouw-simulatie">
+                Simuleer hoeveel sneller je schuldenvrij bent bij extra aflossingen. Elke euro extra aflossen is vrijheidstijd die je terugkoopt.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
 
-        {/* Will — AI assistent (full-width) */}
-        <GuideAccordion
-          id="will-assistent"
-          icon={<MessageSquare className="h-4 w-4" />}
-          title="Will"
-          tagline="Je persoonlijke financiële assistent"
-          color="var(--color-wil-700)"
-          open={guideSection === 'will-assistent'}
-          onToggle={() => setGuideSection(guideSection === 'will-assistent' ? null : 'will-assistent')}
-        >
-          <p className="mb-3 text-[12px] text-[var(--ink-3)]">
-            Will is je enige begeleider in TriFinity — bereikbaar via de chatknop rechtsonder op elke pagina.
-          </p>
-          <div className="space-y-2">
-            <GuideFeature title="De Kern">
-              &ldquo;Dit is wat je hebt.&rdquo; Will analyseert je vermogen, budgetten en schulden. Hij vertaalt droge cijfers naar vrijheidstijd en wijst op kansen die je misschien over het hoofd ziet.
-            </GuideFeature>
-            <GuideFeature title="De Wil">
-              &ldquo;Dit kun je nu doen.&rdquo; Will stelt concrete acties voor, helpt bij het prioriteren en houdt je gemotiveerd op je pad naar financiële vrijheid.
-            </GuideFeature>
-            <GuideFeature title="De Horizon">
-              &ldquo;Dit is waar je naartoe gaat.&rdquo; Will rekent scenario&apos;s door en laat zien hoe keuzes van vandaag je toekomst veranderen.
-            </GuideFeature>
-          </div>
-        </GuideAccordion>
+          <GuideAccordion
+            id="kern-nettovermogen"
+            icon={<BarChart3 className="h-4 w-4" />}
+            title="Netto vermogen"
+            tagline="Vermogensgrafiek en snapshots"
+            color="var(--color-kern-700)"
+            open={guideSection === 'kern-nettovermogen'}
+            onToggle={() => setGuideSection(guideSection === 'kern-nettovermogen' ? null : 'kern-nettovermogen')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Nettovermogen-grafiek">
+                Zie je totale vermogen (bezittingen minus schulden) over tijd in een overzichtelijke grafiek. Elke stijging is vrijheidstijd die je opbouwt.
+              </GuideFeature>
+              <GuideFeature title="Snapshots">
+                Maak handmatige momentopnames of laat TriFinity ze automatisch genereren. Vergelijk periodes en ontdek trends in je vermogensgroei.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+
+          <GuideAccordion
+            id="kern-belasting"
+            icon={<Receipt className="h-4 w-4" />}
+            title="Belasting"
+            tagline="Box 3 berekening en optimalisatie"
+            color="var(--color-kern-700)"
+            open={guideSection === 'kern-belasting'}
+            onToggle={() => setGuideSection(guideSection === 'kern-belasting' ? null : 'kern-belasting')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Box 3 berekening">
+                Automatische berekening van je vermogensrendementsheffing op basis van je bezittingen en schulden. Altijd up-to-date met de huidige fiscale parameters.
+              </GuideFeature>
+              <GuideFeature title="Fiscaal partnerschap">
+                Simuleer het effect van fiscaal partnerschap op je Box 3 belasting. Verdeel de grondslag optimaal over twee partners.
+              </GuideFeature>
+              <GuideFeature title="Belastingjaren vergelijken">
+                Bekijk je Box 3 belasting over meerdere jaren. Ontdek trends en ontvang tips om je belastingdruk te verlagen.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+
+          <GuideAccordion
+            id="kern-checkin"
+            icon={<ClipboardCheck className="h-4 w-4" />}
+            title="Checkin"
+            tagline="Maandelijkse financiële check-in"
+            color="var(--color-kern-700)"
+            open={guideSection === 'kern-checkin'}
+            onToggle={() => setGuideSection(guideSection === 'kern-checkin' ? null : 'kern-checkin')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Maandelijkse check-in">
+                Een gestructureerd moment om je financiën te evalueren. Bekijk aandachtspunten, budget review en voortgang ten opzichte van vorige maand.
+              </GuideFeature>
+              <GuideFeature title="Gespreksstarters">
+                Will bereidt contextbewuste gespreksonderwerpen voor op basis van je recente financiële veranderingen — ideaal als startpunt voor reflectie.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+
+          <GuideAccordion
+            id="kern-overig"
+            icon={<MoreHorizontal className="h-4 w-4" />}
+            title="Overig"
+            tagline="Toekomstige Kern-features"
+            color="var(--color-kern-700)"
+            open={guideSection === 'kern-overig'}
+            onToggle={() => setGuideSection(guideSection === 'kern-overig' ? null : 'kern-overig')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Binnenkort meer">
+                Hier komen toekomstige uitbreidingen van De Kern — nieuwe inzichten, koppelingen en analyses rondom je financiële fundament.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+        </div>
+      </div>
+
+      {/* ── De Wil ── */}
+      <div id="guide-wil" className="mb-6 scroll-mt-24">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="h-2 w-2 rounded-full bg-wil-500" />
+          <p className="label-editorial text-wil-600">De Wil</p>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+          <GuideAccordion
+            id="wil-widgets"
+            icon={<LayoutDashboard className="h-4 w-4" />}
+            title="Widgets overzicht"
+            tagline="Dashboard aanpassen en herschikken"
+            color="var(--color-wil-700)"
+            open={guideSection === 'wil-widgets'}
+            onToggle={() => setGuideSection(guideSection === 'wil-widgets' ? null : 'wil-widgets')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Widget-grid">
+                Je dashboard bestaat uit aanpasbare widgets — compacte inzichtkaarten die je financiële situatie samenvatten. Er zijn meer dan 25 widgets beschikbaar.
+              </GuideFeature>
+              <GuideFeature title="Aanpassen en herschikken">
+                Voeg widgets toe, verwijder ze of sleep ze naar een andere positie. Beheer je widgetvoorkeuren via Identiteit → Instellingen → Widgets.
+              </GuideFeature>
+              <GuideFeature title="Jouw Pad">
+                Een speciale widget die je soevereiniteitsniveau toont — van Herstel tot Meesterschap. Naarmate je financiële gezondheid groeit, ontgrendel je automatisch nieuwe functies.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+
+          <GuideAccordion
+            id="wil-briefing"
+            icon={<Newspaper className="h-4 w-4" />}
+            title="Briefing"
+            tagline="Dagelijkse AI-samenvatting"
+            color="var(--color-wil-700)"
+            open={guideSection === 'wil-briefing'}
+            onToggle={() => setGuideSection(guideSection === 'wil-briefing' ? null : 'wil-briefing')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Dagelijkse briefing">
+                Elke dag genereert Will een persoonlijke briefing op basis van je financiële data — veranderingen, aandachtspunten en motivatie in één overzicht.
+              </GuideFeature>
+              <GuideFeature title="Briefingkaarten">
+                De briefing bestaat uit kaarten per onderwerp: vermogensupdate, budgetcheck, marktnieuws en actiepunten. Alles afgestemd op jouw situatie.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+
+          <GuideAccordion
+            id="wil-voorstellen"
+            icon={<Sparkles className="h-4 w-4" />}
+            title="Voorstellen"
+            tagline="AI-aanbevelingen met vrijheidstijd-impact"
+            color="var(--color-wil-700)"
+            open={guideSection === 'wil-voorstellen'}
+            onToggle={() => setGuideSection(guideSection === 'wil-voorstellen' ? null : 'wil-voorstellen')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Vijf soorten aanbevelingen">
+                Bespaartips, schuld-optimalisatie, beleggingskansen, inkomensmogelijkheden en gedragsaanpassingen. Elke aanbeveling toont de geschatte vrijheidsdagen-impact.
+              </GuideFeature>
+              <GuideFeature title="Accepteren, uitstellen of afwijzen">
+                Kies wat je met een voorstel doet. Accepteren maakt er een actie van. Uitstellen bewaart het voor later. Afwijzen verwijdert het van je lijst.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+
+          <GuideAccordion
+            id="wil-acties"
+            icon={<Zap className="h-4 w-4" />}
+            title="Acties"
+            tagline="Kanban-bord voor financiële stappen"
+            color="var(--color-wil-700)"
+            open={guideSection === 'wil-acties'}
+            onToggle={() => setGuideSection(guideSection === 'wil-acties' ? null : 'wil-acties')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Actiebord">
+                Je persoonlijke kanban-bord met drie kolommen: open, uitgesteld en voltooid. Sleep acties tussen kolommen of markeer ze als afgerond.
+              </GuideFeature>
+              <GuideFeature title="Vrijheidsdagen winnen">
+                Elke voltooide actie levert vrijheidsdagen op. Rond ze af om je FIRE-datum dichterbij te brengen en je voortgang tastbaar te maken.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+
+          <GuideAccordion
+            id="wil-doelen"
+            icon={<Target className="h-4 w-4" />}
+            title="Doelen"
+            tagline="Spaardoelen en voortgang"
+            color="var(--color-wil-700)"
+            open={guideSection === 'wil-doelen'}
+            onToggle={() => setGuideSection(guideSection === 'wil-doelen' ? null : 'wil-doelen')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Spaardoelen instellen">
+                Maak doelen aan voor vakantie, noodfonds, grote aankoop of iets anders. Koppel ze aan een asset of schuld om automatisch voortgang bij te houden.
+              </GuideFeature>
+              <GuideFeature title="Voortgang volgen">
+                Zie per doel hoeveel je al gespaard hebt, hoeveel je nog nodig hebt en hoeveel vrijheidsdagen het doel je kost of oplevert.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+
+          <GuideAccordion
+            id="wil-abonnementen"
+            icon={<RefreshCw className="h-4 w-4" />}
+            title="Abonnementen"
+            tagline="Terugkerende kosten en opzegadvies"
+            color="var(--color-wil-700)"
+            open={guideSection === 'wil-abonnementen'}
+            onToggle={() => setGuideSection(guideSection === 'wil-abonnementen' ? null : 'wil-abonnementen')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Terugkerende kosten">
+                TriFinity detecteert automatisch terugkerende uitgaven in je transacties — abonnementen, lidmaatschappen en vaste lasten die stilletjes vrijheidstijd kosten.
+              </GuideFeature>
+              <GuideFeature title="Opzegadvies">
+                Krijg inzicht in welke abonnementen je het minst gebruikt en hoeveel vrijheidsdagen je zou winnen door ze op te zeggen.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+
+          <GuideAccordion
+            id="wil-overig"
+            icon={<MoreHorizontal className="h-4 w-4" />}
+            title="Overig"
+            tagline="Toekomstige Wil-features"
+            color="var(--color-wil-700)"
+            open={guideSection === 'wil-overig'}
+            onToggle={() => setGuideSection(guideSection === 'wil-overig' ? null : 'wil-overig')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Binnenkort meer">
+                Hier komen toekomstige uitbreidingen van De Wil — nieuwe manieren om actie te ondernemen en je financiële vrijheid te versnellen.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+        </div>
+      </div>
+
+      {/* ── De Horizon ── */}
+      <div id="guide-horizon" className="mb-6 scroll-mt-24">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="h-2 w-2 rounded-full bg-horizon-500" />
+          <p className="label-editorial text-horizon-600">De Horizon</p>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+          <GuideAccordion
+            id="horizon-grafiek"
+            icon={<LineChart className="h-4 w-4" />}
+            title="Netto vermogen grafiek met levensgebeurtenissen"
+            tagline="FIRE-projectie, scenario's en Monte Carlo"
+            color="var(--color-horizon-700)"
+            open={guideSection === 'horizon-grafiek'}
+            onToggle={() => setGuideSection(guideSection === 'horizon-grafiek' ? null : 'horizon-grafiek')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="FIRE-projectie">
+                Je persoonlijke berekening: wanneer dekt je vermogen je uitgaven? Met pessimistisch, verwacht en optimistisch scenario. Zie je verwachte FIRE-leeftijd en het vermogenspad over 30 jaar.
+              </GuideFeature>
+              <GuideFeature title="Levensgebeurtenissen">
+                Voeg toekomstige gebeurtenissen toe — kinderen, verhuizing, pensioen, erfenis. Elk event verschuift je FIRE-datum. Kies uit een catalogus of maak eigen events.
+              </GuideFeature>
+              <GuideFeature title="Scenario's vergelijken">
+                Drie scenario&apos;s — drifter, koershouder en optimizer — laten zien hoe verschillende levensstijlen je vrijheidsdatum beïnvloeden.
+              </GuideFeature>
+              <GuideFeature title="Monte Carlo simulatie">
+                1.000 willekeurige marktscenario&apos;s tonen hoe robuust je plan is. Je backtestscore geeft het slagingspercentage: het aandeel scenario&apos;s waarin je FIRE-plan standhoudt.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+
+          <GuideAccordion
+            id="horizon-droomscenario"
+            icon={<MessageSquare className="h-4 w-4" />}
+            title="Droomscenario"
+            tagline="What-If builder en AI-chat"
+            color="var(--color-horizon-700)"
+            open={guideSection === 'horizon-droomscenario'}
+            onToggle={() => setGuideSection(guideSection === 'horizon-droomscenario' ? null : 'horizon-droomscenario')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="What-If builder">
+                Experimenteer met alternatieve toekomsten via vijf schuifbalken en snelpresets. Zie direct het effect op je FIRE-datum en vermogenspad.
+              </GuideFeature>
+              <GuideFeature title="AI-chat met Will">
+                Beschrijf je dromen aan Will — hij vertaalt ze naar concrete levensgebeurtenissen met FIRE-impact. Vraag om een reality-check of verken scenario&apos;s in gesprek.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+
+          <GuideAccordion
+            id="horizon-onttrekking"
+            icon={<ArrowDownToLine className="h-4 w-4" />}
+            title="Onttrekkingsstrategie"
+            tagline="Hoe je vermogen opneemt na FIRE"
+            color="var(--color-horizon-700)"
+            open={guideSection === 'horizon-onttrekking'}
+            onToggle={() => setGuideSection(guideSection === 'horizon-onttrekking' ? null : 'horizon-onttrekking')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Strategieën">
+                Kies uit vier onttrekkingsmethoden: de klassieke 4%-regel, dynamische onttrekking, vloer-plafondmethode of bucket-strategie. Elk past bij een ander risicoprofiel.
+              </GuideFeature>
+              <GuideFeature title="Simulatie">
+                Zie hoe lang je vermogen meegaat bij elke strategie en hoeveel flexibiliteit je hebt in slechte marktjaren.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+
+          <GuideAccordion
+            id="horizon-overig"
+            icon={<MoreHorizontal className="h-4 w-4" />}
+            title="Overig"
+            tagline="Toekomstige Horizon-features"
+            color="var(--color-horizon-700)"
+            open={guideSection === 'horizon-overig'}
+            onToggle={() => setGuideSection(guideSection === 'horizon-overig' ? null : 'horizon-overig')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Binnenkort meer">
+                Hier komen toekomstige uitbreidingen van De Horizon — nieuwe simulaties, projecties en tools om je toekomst te verkennen.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+        </div>
+      </div>
+
+      {/* ── Algemeen ── */}
+      <div className="mb-6 sm:mb-8">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="h-2 w-2 rounded-full bg-[var(--ink-3)]" />
+          <p className="label-editorial text-[var(--ink-2)]">Algemeen</p>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+          <GuideAccordion
+            id="alg-vrijheid"
+            icon={<Clock className="h-4 w-4" />}
+            title="Vrijheidsinsteek"
+            tagline="De filosofie achter TriFinity"
+            color="var(--ink-2)"
+            open={guideSection === 'alg-vrijheid'}
+            onToggle={() => setGuideSection(guideSection === 'alg-vrijheid' ? null : 'alg-vrijheid')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Geld is opgeslagen tijd">
+                Elke euro die je verdient, spaart of uitgeeft vertegenwoordigt een stukje levenstijd. TriFinity vertaalt al je financiële gegevens naar vrijheidstijd.
+              </GuideFeature>
+              <GuideFeature title="Vrijheidsdagen en vrijheidsgetal">
+                Je vrijheidsgetal is het aantal dagen dat je kunt leven zonder te werken. Het vrijheidspercentage toont hoe dicht je bij volledige financiële onafhankelijkheid bent.
+              </GuideFeature>
+              <GuideFeature title="Bedragen vertalen naar tijd">
+                Elk bedrag boven €100 toont automatisch het equivalent in vrijheidstijd. Zo wordt elke financiële beslissing een bewuste keuze over je levenstijd.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+
+          <GuideAccordion
+            id="alg-post"
+            icon={<Newspaper className="h-4 w-4" />}
+            title="TriFinity Post"
+            tagline="AI-nieuwsfeed met persoonlijke context"
+            color="var(--ink-2)"
+            open={guideSection === 'alg-post'}
+            onToggle={() => setGuideSection(guideSection === 'alg-post' ? null : 'alg-post')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Gepersonaliseerd financieel nieuws">
+                Will selecteert financieel nieuws dat relevant is voor jouw situatie en vertaalt het naar persoonlijke impact en vrijheidstijd.
+              </GuideFeature>
+              <GuideFeature title="Context-aware analyse">
+                Elk nieuwsitem bevat een analyse van wat het voor jou betekent — op basis van je vermogen, beleggingen en FIRE-plan.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+
+          <GuideAccordion
+            id="alg-will"
+            icon={<MessageSquare className="h-4 w-4" />}
+            title="Will"
+            tagline="Je persoonlijke financiële assistent"
+            color="var(--ink-2)"
+            open={guideSection === 'alg-will'}
+            onToggle={() => setGuideSection(guideSection === 'alg-will' ? null : 'alg-will')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Drie persoonlijkheden">
+                Will past zich aan per module: FHIN (De Kern) analyseert je data, FINN (De Wil) zet je aan tot actie en FFIN (De Horizon) helpt je dromen en plannen.
+              </GuideFeature>
+              <GuideFeature title="Context-aware per pagina">
+                Will weet altijd waar je bent en welke data relevant is. Open de chat rechtsonder op elke pagina voor hulp die past bij wat je aan het doen bent.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+
+          <GuideAccordion
+            id="alg-huishouden"
+            icon={<Users className="h-4 w-4" />}
+            title="Huishouden / partner"
+            tagline="Gedeeld financieel beheer"
+            color="var(--ink-2)"
+            open={guideSection === 'alg-huishouden'}
+            onToggle={() => setGuideSection(guideSection === 'alg-huishouden' ? null : 'alg-huishouden')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Partner uitnodigen">
+                Nodig je partner uit voor een gedeeld huishouden. Beheer samen je financiën met respect voor individuele privacy.
+              </GuideFeature>
+              <GuideFeature title="Kostenverdeling en perspectief">
+                Verdeel kosten, vergelijk individuele bijdragen en wissel van perspectief tussen persoonlijk en huishouden.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+
+          <GuideAccordion
+            id="alg-profiel"
+            icon={<User className="h-4 w-4" />}
+            title="Profiel instellingen"
+            tagline="Persoonlijke gegevens en soevereiniteit"
+            color="var(--ink-2)"
+            open={guideSection === 'alg-profiel'}
+            onToggle={() => setGuideSection(guideSection === 'alg-profiel' ? null : 'alg-profiel')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Persoonlijke gegevens">
+                Je naam, geboortedatum, inkomen en huishoudprofiel. Deze gegevens vormen de basis voor alle berekeningen.
+              </GuideFeature>
+              <GuideFeature title="Soevereiniteitsniveaus">
+                Van Herstel tot Meesterschap — je niveau wordt automatisch berekend op basis van je financiële gezondheid en ontgrendelt progressief nieuwe functies.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+
+          <GuideAccordion
+            id="alg-instellingen"
+            icon={<Settings className="h-4 w-4" />}
+            title="App instellingen"
+            tagline="Widgets, FIRE-parameters en weergave"
+            color="var(--ink-2)"
+            open={guideSection === 'alg-instellingen'}
+            onToggle={() => setGuideSection(guideSection === 'alg-instellingen' ? null : 'alg-instellingen')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Widgets beheer">
+                Kies welke widgets je op je dashboard wilt zien en in welke volgorde. Meer dan 25 widgets beschikbaar.
+              </GuideFeature>
+              <GuideFeature title="FIRE-parameters">
+                Stel je verwacht rendement en inflatiepercentage in. Deze parameters beïnvloeden al je FIRE-berekeningen en projecties.
+              </GuideFeature>
+              <GuideFeature title="Weergave en data">
+                Pas de weergave aan, exporteer je data en beheer je notificatievoorkeuren.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+
+          <GuideAccordion
+            id="alg-meldingen"
+            icon={<Bell className="h-4 w-4" />}
+            title="Meldingen"
+            tagline="Alerts, mijlpalen en detectie"
+            color="var(--ink-2)"
+            open={guideSection === 'alg-meldingen'}
+            onToggle={() => setGuideSection(guideSection === 'alg-meldingen' ? null : 'alg-meldingen')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Budget-alerts">
+                Ontvang meldingen wanneer je een budgetgrens nadert of overschrijdt. Blijf op de hoogte zonder constant te checken.
+              </GuideFeature>
+              <GuideFeature title="Mijlpalen en anomalieën">
+                Vier automatische mijlpalen in je vermogensgroei en ontvang waarschuwingen bij ongebruikelijke transacties of patronen.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+
+          <GuideAccordion
+            id="alg-rapporten"
+            icon={<FileText className="h-4 w-4" />}
+            title="Rapporten"
+            tagline="Balans, budget en jaaroverzicht"
+            color="var(--ink-2)"
+            open={guideSection === 'alg-rapporten'}
+            onToggle={() => setGuideSection(guideSection === 'alg-rapporten' ? null : 'alg-rapporten')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Balansrapport">
+                Een overzicht van al je bezittingen en schulden op een peildatum — je persoonlijke balans in vrijheidstijd.
+              </GuideFeature>
+              <GuideFeature title="Budgetrapport en jaaroverzicht">
+                Gedetailleerde rapportages van je uitgaven per categorie en een jaarlijks totaaloverzicht met trends en hoogtepunten.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+
+          <GuideAccordion
+            id="alg-mobiel"
+            icon={<Smartphone className="h-4 w-4" />}
+            title="Mobiel"
+            tagline="App-ervaring op je telefoon"
+            color="var(--ink-2)"
+            open={guideSection === 'alg-mobiel'}
+            onToggle={() => setGuideSection(guideSection === 'alg-mobiel' ? null : 'alg-mobiel')}
+          >
+            <div className="space-y-2">
+              <GuideFeature title="Mobiele navigatie">
+                Op mobiel gebruik je de bottom navigation om snel tussen modules te wisselen. Alle touch targets zijn minimaal 44px voor comfortabel gebruik.
+              </GuideFeature>
+              <GuideFeature title="Responsive ervaring">
+                Alle pagina&apos;s en modals zijn geoptimaliseerd voor kleine schermen. BottomSheets schuiven van onderen omhoog en kunnen worden weggeveegd.
+              </GuideFeature>
+            </div>
+          </GuideAccordion>
+        </div>
       </div>
 
       {/* Veelgestelde vragen */}

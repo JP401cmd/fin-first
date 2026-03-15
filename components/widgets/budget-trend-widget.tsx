@@ -186,6 +186,22 @@ export function BudgetTrendWidget({ budgetType, size, data, href }: Props) {
     : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
 
+  // ── Mini ─────────────────────────────────────────────────
+  if (size === 'mini') {
+    const trendColor = momDelta != null
+      ? (isUp ? 'text-emerald-600' : 'text-red-600')
+      : 'text-[var(--ink)]'
+    const trendArrow = momDelta != null ? (isUp ? '↑ ' : '↓ ') : ''
+
+    return (
+      <WidgetShell module="kern" size="mini" kicker={config.kicker} href={href}>
+        <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${trendColor}`}>
+          {trendArrow}{formatCurrency(current.value)}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter ────────────────────────────────────────────────
   if (size === 'quarter') {
     return (

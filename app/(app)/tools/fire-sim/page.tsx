@@ -18,6 +18,7 @@ import {
 } from '@/lib/fire-simulation'
 import { Info, ChevronDown, ChevronUp, TableProperties, Plus, Trash2, Pencil } from 'lucide-react'
 import { SimChart } from '@/components/app/horizon/sim-chart'
+import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
 
 // ── ID generator ───────────────────────────────────────────────────────────
 
@@ -594,14 +595,20 @@ export default function FireSimPage() {
                 </span>
               </div>
             </div>
-            <SimChart
-              rows={result.rows}
-              fireAge={result.fireAge}
-              fireAgeFractional={result.fireAgeFractional}
-              currentAge={currentAge}
-              endAge={safeEndAge}
-              cashflows={cashflows}
-            />
+            <ZoomableChartContainer currentAge={currentAge} endAge={safeEndAge}>
+              {(visibleMin, visibleMax) => (
+                <SimChart
+                  rows={result.rows}
+                  fireAge={result.fireAge}
+                  fireAgeFractional={result.fireAgeFractional}
+                  currentAge={currentAge}
+                  endAge={safeEndAge}
+                  cashflows={cashflows}
+                  visibleMinAge={visibleMin}
+                  visibleMaxAge={visibleMax}
+                />
+              )}
+            </ZoomableChartContainer>
           </div>
 
           {/* KPI grid */}

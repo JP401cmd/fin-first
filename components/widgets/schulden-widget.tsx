@@ -12,6 +12,16 @@ interface Props {
 export function SchuldenWidget({ size, data, href }: Props) {
   const { totalDebts, totalAssets, monthlyExpenses, budgetTotals } = data
 
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="kern" size="mini" kicker="Schulden" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-red-600 leading-none truncate">
+          {formatCurrency(totalDebts)}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   const dailyExp = monthlyExpenses / 30
   const freedomTime = dailyExp > 0 && totalDebts > 0
     ? calculateFreedomTime(totalDebts, dailyExp)

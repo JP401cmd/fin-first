@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { X, ArrowUp, Star, Sparkles, Zap } from 'lucide-react'
+import { useScrollLock } from '@/lib/hooks/use-scroll-lock'
 
 // ── Level metadata ─────────────────────────────────────────────
 
@@ -209,6 +210,9 @@ export function LevelUpCelebration({ oldLevel, newLevel, onClose }: LevelUpCeleb
   const levelInfo = LEVEL_NAMES[newLevel] ?? { name: `Level ${newLevel}`, nameNl: `Niveau ${newLevel}`, icon: '⬆️' }
   const oldLevelInfo = LEVEL_NAMES[oldLevel] ?? { name: `Level ${oldLevel}`, nameNl: `Niveau ${oldLevel}`, icon: '📍' }
 
+  // Lock body scroll (component is conditionally rendered by parent)
+  useScrollLock(true)
+
   // Entry animation sequence
   useEffect(() => {
     const t1 = setTimeout(() => setPhase('show'), 100)
@@ -245,6 +249,7 @@ export function LevelUpCelebration({ oldLevel, newLevel, onClose }: LevelUpCeleb
         phase === 'exit' ? 'bg-black/0' :
         'bg-black/60'
       }`}
+      style={{ right: 'var(--chat-sidebar-width, 0px)' }}
       onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"

@@ -13,10 +13,15 @@ export function EventsTimeline({
   events,
   currentAge,
   endAge,
+  visibleMinAge,
+  visibleMaxAge,
 }: {
   events: LifeEvent[]
   currentAge: number
   endAge: number
+  /** Zoomed visible range (optional — defaults to full range) */
+  visibleMinAge?: number
+  visibleMaxAge?: number
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerW, setContainerW] = useState(600)
@@ -33,9 +38,13 @@ export function EventsTimeline({
     return () => observer.disconnect()
   }, [])
 
-  // Filter to events with a target_age within chart range
+  // Use zoomed range if provided, else full range
+  const rangeMin = visibleMinAge ?? currentAge
+  const rangeMax = visibleMaxAge ?? endAge
+
+  // Filter to events with a target_age within visible range
   const visibleEvents = events
-    .filter(e => e.target_age != null && e.target_age >= currentAge && e.target_age <= endAge)
+    .filter(e => e.target_age != null && e.target_age >= rangeMin && e.target_age <= rangeMax)
     .sort((a, b) => (a.target_age ?? 0) - (b.target_age ?? 0))
 
   if (visibleEvents.length === 0) return null
@@ -48,7 +57,7 @@ export function EventsTimeline({
   const Y_LINE = 26
 
   const xScale = (age: number) =>
-    endAge > currentAge ? PAD.left + ((age - currentAge) / (endAge - currentAge)) * innerW : PAD.left
+    rangeMax > rangeMin ? PAD.left + ((age - rangeMin) / (rangeMax - rangeMin)) * innerW : PAD.left
 
   // Determine if event is net positive (income) or net negative (cost)
   function eventDirection(ev: LifeEvent): 'income' | 'expense' {

@@ -58,6 +58,16 @@ export function HoldingsWidget({ size, data, href }: Props) {
     ? investmentAssets.reduce((s, a) => s + a.value * (a.expectedReturn ?? 0), 0) / totalInvestments
     : null
 
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="kern" size="mini" kicker="Beleggingen" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {formatCurrency(totalInvestments)}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter-size: compact amount + positions + freedom time ────
   if (size === 'quarter') {
     return (

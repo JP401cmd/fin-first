@@ -4,6 +4,7 @@ import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { isOverPositive, computeBarSegments } from '@/components/app/budget-shared'
 import type { DashboardData } from './widget-renderer'
 import { TrendingUp, ShoppingCart, PiggyBank, CreditCard, LayoutGrid, Sparkles } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -96,8 +97,9 @@ function BudgetRow({ config, limit, spent, hasEntered }: BudgetRowProps) {
   const hasData    = limit > 0
   const pct        = progressPct(spent, limit)
   const overBudget = hasData && spent > limit
+  const overPositive = isOverPositive(config.key as 'income' | 'expense' | 'savings' | 'debt')
   const pctLabel   = hasData ? `${Math.round(pct)}%` : '—'
-  const fillColor  = overBudget ? barWarnVar : barFillVar
+  const seg = computeBarSegments(spent, limit, 80, { barHex: barFillVar, barHexWarn: barWarnVar }, overPositive)
 
   return (
     <div className="space-y-1">
@@ -112,24 +114,50 @@ function BudgetRow({ config, limit, spent, hasEntered }: BudgetRowProps) {
         </span>
       </div>
 
-      {/* Laag 2: voortgangsbalk — track neutraal, fill via inline style (CSS-variabelen) */}
-      <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--border-ed)]">
+      {/* Laag 2: voortgangsbalk — track neutraal, 2 fill segmenten + extensie */}
+      <div className="relative h-2 w-full overflow-hidden rounded-full bg-[var(--border-ed)]">
+        {/* Fill 1 — normaal */}
         <div
-          className="h-full rounded-full"
+          className="absolute inset-y-0 left-0 rounded-l-full"
           style={{
-            width:           hasEntered ? `${pct}%` : '0%',
-            backgroundColor: hasData ? fillColor : 'transparent',
-            transition:      hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1)' : 'none',
+            width: hasEntered ? `${seg.normalPct}%` : '0%',
+            backgroundColor: hasData ? seg.normalColor : 'transparent',
+            transition: hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1)' : 'none',
           }}
         />
+        {/* Fill 2 — waarschuwing */}
+        {seg.warnPct > 0 && (
+          <div
+            className="absolute inset-y-0 rounded-r-full"
+            style={{
+              left: `${seg.warnLeft}%`,
+              width: hasEntered ? `${seg.warnPct}%` : '0%',
+              backgroundColor: seg.warnColor,
+              transition: hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1) 30ms' : 'none',
+            }}
+          />
+        )}
+        {/* Extension */}
+        {seg.extensionPct > 0 && (
+          <div
+            className="absolute inset-y-0 rounded-r-full"
+            style={{
+              left: `${seg.extensionLeft}%`,
+              width: hasEntered ? `${seg.extensionPct}%` : '0%',
+              backgroundColor: seg.extensionColor,
+              opacity: 0.7,
+              transition: hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1) 80ms' : 'none',
+            }}
+          />
+        )}
       </div>
 
       {/* Laag 3: €spent · percentage · budget €limit */}
       <div className="flex items-center justify-between gap-1">
-        <span className={`font-mono tabular-nums text-[10px] ${overBudget ? 'text-red-500 font-semibold' : 'text-[var(--ink-3)]'}`}>
+        <span className={`font-mono tabular-nums text-[10px] ${overBudget ? (overPositive ? 'text-emerald-600 font-semibold' : 'text-red-500 font-semibold') : 'text-[var(--ink-3)]'}`}>
           {hasData ? formatCurrency(spent) : '—'}
         </span>
-        <span className={`text-[9px] font-bold ${overBudget ? 'text-red-400' : 'text-[var(--ink-4)]'}`}>
+        <span className={`text-[9px] font-bold ${overBudget ? (overPositive ? 'text-emerald-500' : 'text-red-400') : 'text-[var(--ink-4)]'}`}>
           {pctLabel}
         </span>
         <span className="font-mono tabular-nums text-[10px] text-[var(--ink-3)]">
@@ -154,6 +182,21 @@ export function BudgettenWidget({ size, data, href }: Props) {
     return (
       <WidgetShell module="kern" size={size} kicker="Budgetten" href={href}>
         <WidgetEmpty icon={LayoutGrid} message="Maak je eerste budget aan om je bestedingen te volgen." />
+      </WidgetShell>
+    )
+  }
+
+  if (size === 'mini') {
+    const onTrackMini = BUDGET_TYPE_CONFIGS.filter(c => {
+      const t = budgetTotals[c.key]
+      return t.limit > 0 && (t.spent <= t.limit || isOverPositive(c.key as 'income' | 'expense' | 'savings' | 'debt'))
+    }).length
+    const configuredMini = BUDGET_TYPE_CONFIGS.filter(c => budgetTotals[c.key].limit > 0).length
+    return (
+      <WidgetShell module="kern" size="mini" kicker="Budgetten" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {onTrackMini}/{configuredMini > 0 ? configuredMini : 4} op schema
+        </p>
       </WidgetShell>
     )
   }
@@ -183,10 +226,10 @@ export function BudgettenWidget({ size, data, href }: Props) {
     )
   }
 
-  // Budget health: how many of 4 types are on track (spent <= limit)
+  // Budget health: how many of 4 types are on track (spent <= limit, or over limit for positive types)
   const onTrackCount = BUDGET_TYPE_CONFIGS.filter(c => {
     const t = budgetTotals[c.key]
-    return t.limit > 0 && t.spent <= t.limit
+    return t.limit > 0 && (t.spent <= t.limit || isOverPositive(c.key as 'income' | 'expense' | 'savings' | 'debt'))
   }).length
   const configuredCount = BUDGET_TYPE_CONFIGS.filter(c => budgetTotals[c.key].limit > 0).length
 
@@ -206,6 +249,7 @@ export function BudgettenWidget({ size, data, href }: Props) {
             const t = budgetTotals[config.key]
             const hasData = t.limit > 0
             const onTrack = hasData && t.spent <= t.limit
+            const overPos = hasData && !onTrack && isOverPositive(config.key as 'income' | 'expense' | 'savings' | 'debt')
             return (
               <div
                 key={config.key}
@@ -213,7 +257,7 @@ export function BudgettenWidget({ size, data, href }: Props) {
                 style={{
                   backgroundColor: !hasData
                     ? 'var(--border-ed)'
-                    : onTrack
+                    : (onTrack || overPos)
                       ? 'var(--color-emerald-500, #10b981)'
                       : 'var(--color-red-500, #ef4444)',
                   opacity: hasEntered ? 1 : 0.3,
@@ -252,7 +296,9 @@ export function BudgettenWidget({ size, data, href }: Props) {
             const hasData = typeData.limit > 0
             const pct = progressPct(typeData.spent, typeData.limit)
             const overBudget = hasData && typeData.spent > typeData.limit
-            const fillColor = overBudget ? barWarnVar : barFillVar
+            const overPos = isOverPositive(config.key as 'income' | 'expense' | 'savings' | 'debt')
+            const isAboveThreshold = pct >= 80
+            const fillColor = overBudget ? (overPos ? 'var(--color-emerald-500, #10b981)' : 'var(--color-red-500, #ef4444)') : isAboveThreshold ? barWarnVar : barFillVar
 
             return (
               <div key={config.key} className="flex items-center gap-2">
@@ -272,7 +318,7 @@ export function BudgettenWidget({ size, data, href }: Props) {
                     }}
                   />
                 </div>
-                <span className={`font-mono tabular-nums text-[10px] w-10 text-right ${overBudget ? 'text-red-500' : 'text-[var(--ink-3)]'}`}>
+                <span className={`font-mono tabular-nums text-[10px] w-10 text-right ${overBudget ? (overPos ? 'text-emerald-600' : 'text-red-500') : 'text-[var(--ink-3)]'}`}>
                   {hasData ? `${Math.round(pct)}%` : '—'}
                 </span>
               </div>

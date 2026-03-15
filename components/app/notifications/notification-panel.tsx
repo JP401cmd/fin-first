@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useScrollLock } from '@/lib/hooks/use-scroll-lock'
 import { useNotifications } from './notification-provider'
 import { NotificationItem } from './notification-item'
 import { X, ChevronRight } from 'lucide-react'
@@ -121,14 +122,7 @@ export function NotificationModal() {
   } = useNotifications()
 
   // Lock body scroll when modal is open
-  useEffect(() => {
-    if (isModalOpen) {
-      document.body.style.overflow = 'hidden'
-      return () => {
-        document.body.style.overflow = ''
-      }
-    }
-  }, [isModalOpen])
+  useScrollLock(isModalOpen)
 
   // Close on Escape
   useEffect(() => {

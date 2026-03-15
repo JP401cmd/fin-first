@@ -14,6 +14,7 @@ import {
   formatFireAgeDelta,
 } from '@/lib/horizon-data'
 import { resolveFireParams } from '@/lib/fire-params'
+import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
 import {
   runSimulation,
   lifeEventsToCashflows,
@@ -23,6 +24,7 @@ import {
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { parseFireStrategy, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { SimChart } from '@/components/app/horizon/sim-chart'
+import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { WhatIfHeader } from '@/components/app/horizon/whatif-header'
 import { WhatIfSliders, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
@@ -60,6 +62,7 @@ export default function WhatIfPage() {
   const [fireStrategy, setFireStrategy] = useState<FireStrategyConfig | undefined>(undefined)
   const [userGrossReturn, setUserGrossReturn] = useState(DEFAULT_RETURN)
   const [userInflation, setUserInflation] = useState(INFLATION)
+  const [userAowAge, setUserAowAge] = useState<AowAge>({ years: 67, months: 0, fractional: 67, isDefinitive: false })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -137,6 +140,19 @@ export default function WhatIfPage() {
       const dob = profileResult.data?.date_of_birth ?? null
 
       setFireStrategy(parseFireStrategy(profileResult.data ?? {}))
+
+      // AOW-leeftijd ophalen op basis van geboortedatum
+      try {
+        const aowRes = await supabase
+          .from('aow_leeftijd')
+          .select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source')
+          .order('birth_date_from', { ascending: true })
+        if (aowRes.data && aowRes.data.length > 0) {
+          setUserAowAge(lookupAowAge(aowRes.data as AowLeeftijdRow[], dob))
+        }
+      } catch {
+        // Non-critical — fallback to 67
+      }
 
       // Resolve user's FIRE parameters (expected_return + inflation_rate)
       const fireParams = resolveFireParams(profileResult.data ?? {})
@@ -569,28 +585,39 @@ export default function WhatIfPage() {
             )}
 
             <div className="-mx-4 sm:-mx-6 md:-mx-8 overflow-hidden">
-              <SimChart
-                key={scenarioKey}
-                rows={simResult.rows}
-                fireAge={simResult.fireAge}
-                fireAgeFractional={simResult.fireAgeFractional}
-                currentAge={currentAge ?? 30}
-                endAge={simResult.displayEndAge}
-                cashflows={simCashflows}
-                fireTarget={simResult.requiredFirePortfolio}
-                strategy={simResult.strategy}
-                targetEndPortfolio={simResult.targetEndPortfolio}
-                baselineRows={baselineSim?.result.rows}
-                baselineFireAge={baselineFireAge}
-                dailyExpenseRate={input ? input.yearlyMustExpenses / 365 : undefined}
-              />
-              {events.length > 0 && (
-                <EventsTimeline
-                  events={events.filter(e => !e.whatIfDisabled)}
-                  currentAge={currentAge ?? 30}
-                  endAge={simResult.displayEndAge}
-                />
-              )}
+              <ZoomableChartContainer currentAge={currentAge ?? 30} endAge={simResult.displayEndAge}>
+                {(visibleMin, visibleMax) => (
+                  <>
+                    <SimChart
+                      key={scenarioKey}
+                      rows={simResult.rows}
+                      fireAge={simResult.fireAge}
+                      fireAgeFractional={simResult.fireAgeFractional}
+                      currentAge={currentAge ?? 30}
+                      endAge={simResult.displayEndAge}
+                      cashflows={simCashflows}
+                      fireTarget={simResult.requiredFirePortfolio}
+                      strategy={simResult.strategy}
+                      targetEndPortfolio={simResult.targetEndPortfolio}
+                      baselineRows={baselineSim?.result.rows}
+                      baselineFireAge={baselineFireAge}
+                      dailyExpenseRate={input ? input.yearlyMustExpenses / 365 : undefined}
+                      visibleMinAge={visibleMin}
+                      visibleMaxAge={visibleMax}
+                      aowAgeFractional={userAowAge.fractional}
+                    />
+                    {events.length > 0 && (
+                      <EventsTimeline
+                        events={events.filter(e => !e.whatIfDisabled)}
+                        currentAge={currentAge ?? 30}
+                        endAge={simResult.displayEndAge}
+                        visibleMinAge={visibleMin}
+                        visibleMaxAge={visibleMax}
+                      />
+                    )}
+                  </>
+                )}
+              </ZoomableChartContainer>
             </div>
 
             {/* Legenda + cashflow pills */}

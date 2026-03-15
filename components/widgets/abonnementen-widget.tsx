@@ -19,6 +19,17 @@ export function AbonnementenWidget({ size, data, href }: Props) {
     : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
 
+  // ── Mini-size ────────────────────────────────────────────
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="kern" size="mini" kicker="Abonnementen" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {formatCurrency(totalRecurringAmount)}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter-size: compact count + icon + label ────
   if (size === 'quarter') {
     return (

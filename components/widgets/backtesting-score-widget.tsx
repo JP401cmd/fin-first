@@ -24,6 +24,17 @@ export function BacktestingScoreWidget({ size, data, href }: Props) {
     backtestSuccessRate >= 85 ? 'text-emerald-600' :
     backtestSuccessRate >= 65 ? 'text-horizon-600' : 'text-red-600'
 
+  // ── Mini-size: success percentage ────────────────────────
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="horizon" size="mini" kicker="Historische Weerbaarheid" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {backtestSuccessRate}%
+        </p>
+      </WidgetShell>
+    )
+  }
+
   if (size === 'quarter') {
     return (
       <WidgetShell module="horizon" size={size} kicker="Historische Weerbaarheid" href={href}>

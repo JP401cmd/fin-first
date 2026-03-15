@@ -1,18 +1,38 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useRef, useEffect, type ReactNode } from 'react'
+import { usePathname } from 'next/navigation'
 
 /**
- * Wraps app content (header + main) and applies margin-right
- * based on the --chat-sidebar-width CSS variable set by ChatProvider.
- * This ensures the header, main content, and bottom nav all shrink
+ * Wraps app content and creates a viewport-like container that shrinks
  * when Will's chat panel is pinned as a sidebar.
+ *
+ * Uses position:fixed + contain:layout to create a CSS containing block
+ * for all fixed-position descendants (modals, bottom nav, etc.).
+ * This means position:fixed children are constrained to this wrapper
+ * instead of the browser viewport — no per-overlay right adjustments needed.
+ *
+ * contain:layout (unlike transform) does NOT break position:sticky,
+ * so the AppHeader sticky behavior is preserved.
  */
 export function ChatLayoutWrapper({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const pathname = usePathname()
+
+  // Scroll to top on route change (replaces default window scroll)
+  useEffect(() => {
+    ref.current?.scrollTo(0, 0)
+  }, [pathname])
+
   return (
     <div
-      className="transition-[margin-right] duration-300"
-      style={{ marginRight: 'var(--chat-sidebar-width, 0px)' }}
+      ref={ref}
+      data-scroll-container
+      className="fixed inset-0 overflow-y-auto bg-[var(--bg)] transition-[right] duration-300"
+      style={{
+        right: 'var(--chat-sidebar-width, 0px)',
+        contain: 'layout',
+      }}
     >
       {children}
     </div>

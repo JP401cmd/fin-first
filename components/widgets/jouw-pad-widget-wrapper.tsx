@@ -130,6 +130,17 @@ export function JouwPadWidgetWrapper({ size, data, href }: Props) {
 
   const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 700 })
 
+  // ── Mini-size: sovereignty level ──
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="cross" size="mini" kicker="Jouw Pad" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {levelDisplay} {levelName}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter-size: compact identity snapshot ──
   if (size === 'quarter') {
     return (

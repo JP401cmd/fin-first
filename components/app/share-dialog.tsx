@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { useScrollLock } from '@/lib/hooks/use-scroll-lock'
 import {
   Share2,
   Download,
@@ -128,14 +129,7 @@ export function ShareDialog({
   }, [])
 
   // Body scroll lock
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden'
-    }
-    return () => {
-      document.body.style.overflow = ''
-    }
-  }, [open])
+  useScrollLock(open)
 
   // ESC key handler
   useEffect(() => {
@@ -345,8 +339,7 @@ export function ShareDialog({
 
   return (
     <div
-      className={`fixed inset-0 z-[90] flex items-end sm:items-center justify-center transition-[right] duration-300 ${className || ''}`}
-      style={{ right: 'var(--chat-sidebar-width, 0px)' }}
+      className={`fixed inset-0 z-[90] flex items-end sm:items-center justify-center ${className || ''}`}
       role="dialog"
       aria-modal="true"
       aria-label="Delen"

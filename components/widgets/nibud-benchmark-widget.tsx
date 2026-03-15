@@ -38,6 +38,17 @@ export function NibudBenchmarkWidget({ size, data, href }: Props) {
   const comparison = computeNibudComparison(monthlyExpenses, budgetTotals)
   const overCount = comparison.filter((c) => c.overNorm).length
 
+  // ── Mini-size ────────────────────────────────────────────
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="kern" size="mini" kicker="NIBUD" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {overCount === 0 ? 'OK' : `${overCount}× Let op`}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter-size: health score indicator ────
   if (size === 'quarter') {
     return (

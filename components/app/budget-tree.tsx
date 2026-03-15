@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { BudgetIcon, formatCurrency, getTypeColors, type BudgetType } from '@/components/app/budget-shared'
+import { BudgetIcon, formatCurrency, getTypeColors, isOverPositive, computeBarSegments, type BudgetType } from '@/components/app/budget-shared'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
@@ -34,19 +34,12 @@ function ChildBar({
   rowIndex: number
 }) {
   const limit = beschikbaar !== undefined ? beschikbaar + spent : Number(child.default_limit)
-  const pct = limit > 0 ? (spent / limit) * 100 : 0
   const overBudget = spent > limit && limit > 0
-  const overPct = overBudget ? Math.min(((spent - limit) / limit) * 100, 40) : 0
   const alertThreshold = child.alert_threshold ?? 80
   const isHard = child.limit_type === 'hard'
-  const isAboveAlert = pct >= alertThreshold
   const colors = getTypeColors(budgetType)
-
-  const fillColorHex = overBudget
-    ? '#ef4444'
-    : isAboveAlert
-      ? colors.barHexWarn
-      : colors.barHex
+  const overPositive = isOverPositive(budgetType)
+  const seg = computeBarSegments(spent, limit, alertThreshold, colors, overPositive)
 
   return (
     <div
@@ -67,7 +60,7 @@ function ChildBar({
           {child.name}
         </span>
         <span className="shrink-0 font-mono text-xs tabular-nums">
-          <span className={overBudget ? 'text-red-600' : 'text-[var(--ink-2)]'}>
+          <span className={overBudget ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}>
             {formatCurrency(spent)}
           </span>
           <span className="text-[var(--ink-3)]"> / {formatCurrency(limit)}</span>
@@ -76,28 +69,45 @@ function ChildBar({
 
       {/* Row 2: progress bar (aligned with name, after icon column) */}
       <div className="mt-1.5 pl-[30px]">
-        <div className="relative h-1.5 w-full rounded-full bg-zinc-100">
-          {/* Fill */}
+        <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+          {/* Fill 1 — normaal (0 → threshold) */}
           <div
-            className="absolute inset-y-0 left-0 rounded-full"
+            className="absolute inset-y-0 left-0 rounded-l-full"
             style={{
-              width: hasEntered ? `${Math.min(pct, 100)}%` : '0%',
-              backgroundColor: fillColorHex,
+              width: hasEntered ? `${seg.normalPct}%` : '0%',
+              backgroundColor: seg.normalColor,
               transition: hasEntered
                 ? `width 500ms cubic-bezier(.22,1,.36,1) ${150 + rowIndex * 60}ms`
                 : 'none',
             }}
           />
 
-          {/* Over-budget extension */}
-          {overBudget && (
+          {/* Fill 2 — waarschuwing (threshold → 100%) */}
+          {seg.warnPct > 0 && (
             <div
-              className="absolute inset-y-0 rounded-r-full bg-red-500/70"
+              className="absolute inset-y-0 rounded-r-full"
               style={{
-                left: '100%',
-                width: hasEntered ? `${overPct}%` : '0%',
+                left: `${seg.warnLeft}%`,
+                width: hasEntered ? `${seg.warnPct}%` : '0%',
+                backgroundColor: seg.warnColor,
                 transition: hasEntered
-                  ? `width 500ms cubic-bezier(.22,1,.36,1) ${200 + rowIndex * 60}ms`
+                  ? `width 500ms cubic-bezier(.22,1,.36,1) ${180 + rowIndex * 60}ms`
+                  : 'none',
+              }}
+            />
+          )}
+
+          {/* Extension (100% → 105%) */}
+          {seg.extensionPct > 0 && (
+            <div
+              className="absolute inset-y-0 rounded-r-full"
+              style={{
+                left: `${seg.extensionLeft}%`,
+                width: hasEntered ? `${seg.extensionPct}%` : '0%',
+                backgroundColor: seg.extensionColor,
+                opacity: 0.7,
+                transition: hasEntered
+                  ? `width 500ms cubic-bezier(.22,1,.36,1) ${230 + rowIndex * 60}ms`
                   : 'none',
               }}
             />
@@ -107,7 +117,7 @@ function ChildBar({
           {alertThreshold > 0 && alertThreshold < 100 && (
             <div
               className="absolute top-0 bottom-0 w-px border-l border-dashed border-zinc-400"
-              style={{ left: `${alertThreshold}%`, marginTop: -2, marginBottom: -2 }}
+              style={{ left: `${seg.alertPosition}%`, marginTop: -2, marginBottom: -2 }}
             />
           )}
 
@@ -117,11 +127,11 @@ function ChildBar({
               isHard ? 'w-0.5' : 'w-0.5 border-l border-dashed'
             }`}
             style={{
-              left: '100%',
+              left: `${seg.limitPosition}%`,
               marginTop: -2,
               marginBottom: -2,
-              backgroundColor: isHard ? (overBudget ? '#ef4444' : colors.hex) : undefined,
-              borderColor: !isHard ? (overBudget ? '#ef4444' : colors.hex) : undefined,
+              backgroundColor: isHard ? (overBudget ? seg.overColor : colors.hex) : undefined,
+              borderColor: !isHard ? (overBudget ? seg.overColor : colors.hex) : undefined,
             }}
           />
         </div>
@@ -164,10 +174,8 @@ function TreeGroup({
 
   const pct = totalLimit > 0 ? Math.round((totalSpent / totalLimit) * 100) : 0
   const overBudget = totalSpent > totalLimit && totalLimit > 0
-  const isWarning = pct >= 70 && pct < 100
-
-  const fillPct = Math.min(pct, 100)
-  const fillColor = overBudget ? '#ef4444' : isWarning ? colors.barHexWarn : colors.barHex
+  const overPositive = isOverPositive(budgetType)
+  const seg = computeBarSegments(totalSpent, totalLimit, 80, colors, overPositive)
 
   // No children — show single compact card (no expand)
   if (parent.children.length === 0) {
@@ -190,25 +198,51 @@ function TreeGroup({
           </span>
           {/* Percentage badge */}
           <span className={`shrink-0 rounded-full bg-[var(--subtle)] px-2 py-0.5 text-xs font-medium ${
-            overBudget ? 'text-red-600' : isWarning ? `text-[${colors.barHexWarn}]` : 'text-[var(--ink-3)]'
+            overBudget ? (overPositive ? 'text-emerald-600' : 'text-red-600') : pct >= 80 ? `text-[${colors.barHexWarn}]` : 'text-[var(--ink-3)]'
           }`}>
             {pct}%
           </span>
           <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink-3)]">
-            <span className={overBudget ? 'text-red-600' : 'text-[var(--ink-2)]'}>{formatCurrency(totalSpent)}</span>
+            <span className={overBudget ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}>{formatCurrency(totalSpent)}</span>
             {' / '}{formatCurrency(totalLimit)}
           </span>
         </div>
         {/* Progress bar */}
-        <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-zinc-100">
+        <div className="relative mt-2 h-1 w-full overflow-hidden rounded-full bg-zinc-100">
+          {/* Fill 1 — normaal */}
           <div
-            className="h-full rounded-full"
+            className="absolute inset-y-0 left-0 rounded-l-full"
             style={{
-              width: hasEntered ? `${fillPct}%` : '0%',
-              backgroundColor: fillColor,
+              width: hasEntered ? `${seg.normalPct}%` : '0%',
+              backgroundColor: seg.normalColor,
               transition: hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1) 150ms' : 'none',
             }}
           />
+          {/* Fill 2 — waarschuwing */}
+          {seg.warnPct > 0 && (
+            <div
+              className="absolute inset-y-0 rounded-r-full"
+              style={{
+                left: `${seg.warnLeft}%`,
+                width: hasEntered ? `${seg.warnPct}%` : '0%',
+                backgroundColor: seg.warnColor,
+                transition: hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1) 180ms' : 'none',
+              }}
+            />
+          )}
+          {/* Extension */}
+          {seg.extensionPct > 0 && (
+            <div
+              className="absolute inset-y-0 rounded-r-full"
+              style={{
+                left: `${seg.extensionLeft}%`,
+                width: hasEntered ? `${seg.extensionPct}%` : '0%',
+                backgroundColor: seg.extensionColor,
+                opacity: 0.7,
+                transition: hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1) 230ms' : 'none',
+              }}
+            />
+          )}
         </div>
       </div>
     )
@@ -229,21 +263,26 @@ function TreeGroup({
         className="flex cursor-pointer items-center gap-3 p-3"
         onClick={() => setExpanded((v) => !v)}
       >
-        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${colors.bgDark}`}>
+        <button
+          type="button"
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${colors.bgDark} transition-transform hover:scale-110 hover:ring-2 hover:ring-[${colors.hex}]/30`}
+          onClick={(e) => { e.stopPropagation(); onNavigate(parent.id) }}
+          title="Details openen"
+        >
           <BudgetIcon name={parent.icon} className={`h-4 w-4 ${colors.text}`} />
-        </div>
+        </button>
         <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--ink)]">
           {parent.name}
         </span>
         {/* Percentage badge */}
         <span className={`shrink-0 rounded-full bg-[var(--subtle)] px-2 py-0.5 text-xs font-medium ${
-          overBudget ? 'text-red-600' : isWarning ? `text-[${colors.barHexWarn}]` : 'text-[var(--ink-3)]'
+          overBudget ? (overPositive ? 'text-emerald-600' : 'text-red-600') : pct >= 80 ? `text-[${colors.barHexWarn}]` : 'text-[var(--ink-3)]'
         }`}>
           {pct}%
         </span>
         {/* Amount */}
         <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink-3)]">
-          <span className={overBudget ? 'text-red-600' : 'text-[var(--ink-2)]'}>{formatCurrency(totalSpent)}</span>
+          <span className={overBudget ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}>{formatCurrency(totalSpent)}</span>
           {' / '}{formatCurrency(totalLimit)}
         </span>
         {/* Chevron */}
@@ -256,15 +295,41 @@ function TreeGroup({
 
       {/* Progress bar under header */}
       <div className="px-3 pb-3">
-        <div className="h-1 w-full overflow-hidden rounded-full bg-zinc-100">
+        <div className="relative h-1 w-full overflow-hidden rounded-full bg-zinc-100">
+          {/* Fill 1 — normaal */}
           <div
-            className="h-full rounded-full"
+            className="absolute inset-y-0 left-0 rounded-l-full"
             style={{
-              width: hasEntered ? `${fillPct}%` : '0%',
-              backgroundColor: fillColor,
+              width: hasEntered ? `${seg.normalPct}%` : '0%',
+              backgroundColor: seg.normalColor,
               transition: hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1) 150ms' : 'none',
             }}
           />
+          {/* Fill 2 — waarschuwing */}
+          {seg.warnPct > 0 && (
+            <div
+              className="absolute inset-y-0 rounded-r-full"
+              style={{
+                left: `${seg.warnLeft}%`,
+                width: hasEntered ? `${seg.warnPct}%` : '0%',
+                backgroundColor: seg.warnColor,
+                transition: hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1) 180ms' : 'none',
+              }}
+            />
+          )}
+          {/* Extension */}
+          {seg.extensionPct > 0 && (
+            <div
+              className="absolute inset-y-0 rounded-r-full"
+              style={{
+                left: `${seg.extensionLeft}%`,
+                width: hasEntered ? `${seg.extensionPct}%` : '0%',
+                backgroundColor: seg.extensionColor,
+                opacity: 0.7,
+                transition: hasEntered ? 'width 500ms cubic-bezier(.22,1,.36,1) 230ms' : 'none',
+              }}
+            />
+          )}
         </div>
       </div>
 

@@ -82,7 +82,7 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   topGoals: [
     { id: 'g1', name: 'Noodfonds 6 maanden', goal_type: 'savings', current_value: 12600, target_value: 18600, target_date: '2026-12-31', color: '#f59e0b', icon: 'shield' },
     { id: 'g2', name: 'Vakantie Japan', goal_type: 'savings', current_value: 2400, target_value: 5000, target_date: '2027-06-01', color: '#14b8a6', icon: 'plane' },
-    { id: 'g3', name: 'Studielening aflossen', goal_type: 'debt', current_value: 8500, target_value: 15000, target_date: '2028-01-01', color: '#ef4444', icon: 'trending-down' },
+    { id: 'g3', name: 'Studielening aflossen', goal_type: 'debt_payoff', current_value: 8500, target_value: 15000, target_date: '2028-01-01', color: '#ef4444', icon: 'trending-down' },
   ],
   recurringTransactions: 18,
   lifeEvents: 5,

@@ -21,6 +21,11 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }),
 }))
 
+// Mock useDisplaySize — always return stored size (desktop behavior)
+vi.mock('@/lib/hooks/use-display-size', () => ({
+  useDisplaySize: (size: string) => size,
+}))
+
 // Mock useFeatureAccess — all features enabled by default
 vi.mock('@/components/app/feature-access-provider', () => ({
   useFeatureAccess: () => ({ features: {}, phase: 'mastery', level: 6, netWorth: 100000, monthlyExpenses: 2000, freedomPct: 100, needsActivation: false, newlyUnlockedFeatures: [] }),
@@ -157,7 +162,7 @@ describe('DraggableWidgetGrid', () => {
     expect(screen.getByTestId('widget-item-acties')).toBeInTheDocument()
   })
 
-  it('applies sm:col-span-2 and row-span-2 to full-size widgets', () => {
+  it('applies col-span-2 and row-span-2 to full-size widgets', () => {
     const prefs = makePrefs(['fire_prognose'], ['full'])
     render(
       <DraggableWidgetGrid
@@ -170,10 +175,9 @@ describe('DraggableWidgetGrid', () => {
     const item = screen.getByTestId('widget-item-fire_prognose')
     expect(item.className).toContain('col-span-2')
     expect(item.className).toContain('row-span-2')
-    expect(item.className).not.toContain('col-span-4')
   })
 
-  it('applies col-span-2 to half-size widgets (2 cols wide, 1 row)', () => {
+  it('applies responsive span classes to half-size widgets', () => {
     const prefs = makePrefs(['netto_vermogen'], ['half'])
     render(
       <DraggableWidgetGrid
@@ -184,8 +188,10 @@ describe('DraggableWidgetGrid', () => {
     )
 
     const item = screen.getByTestId('widget-item-netto_vermogen')
-    expect(item.className).toContain('col-span-2')
-    expect(item.className).not.toContain('row-span-2')
+    // Half: row-span-2 sm:row-span-1 col-span-1 sm:col-span-2
+    expect(item.className).toContain('sm:col-span-2')
+    expect(item.className).toContain('row-span-2')
+    expect(item.className).toContain('sm:row-span-1')
   })
 
   it('shows Volgorde button when not in edit mode', () => {

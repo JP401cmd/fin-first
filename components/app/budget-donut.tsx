@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { type BudgetWithChildren } from '@/lib/budget-data'
-import { BudgetIcon, formatCurrency, type BudgetType } from '@/components/app/budget-shared'
+import { BudgetIcon, formatCurrency, isOverPositive, type BudgetType } from '@/components/app/budget-shared'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 interface BudgetDonutProps {
@@ -252,7 +252,7 @@ function TypeDonut({ budgetType, segments, onNavigate }: TypeDonutProps) {
           {formatCurrency(activeChild.spent)} / {formatCurrency(activeChild.limit)}
         </text>
         <text x={cx} y={cy + 18} textAnchor="middle"
-          className={`font-mono text-[10px] font-bold ${activeChild.spent > activeChild.limit ? 'fill-red-500' : 'fill-[var(--ink)]'}`}
+          className={`font-mono text-[10px] font-bold ${activeChild.spent > activeChild.limit ? (isOverPositive(budgetType) ? 'fill-emerald-500' : 'fill-red-500') : 'fill-[var(--ink)]'}`}
         >
           {childPct}%
         </text>
@@ -269,7 +269,7 @@ function TypeDonut({ budgetType, segments, onNavigate }: TypeDonutProps) {
           {formatCurrency(activeSeg.spent)} / {formatCurrency(activeSeg.limit)}
         </text>
         <text x={cx} y={cy + 18} textAnchor="middle"
-          className={`font-mono text-[10px] font-semibold ${activeSeg.spent > activeSeg.limit ? 'fill-red-500' : 'fill-[var(--ink)]'}`}
+          className={`font-mono text-[10px] font-semibold ${activeSeg.spent > activeSeg.limit ? (isOverPositive(budgetType) ? 'fill-emerald-500' : 'fill-red-500') : 'fill-[var(--ink)]'}`}
         >
           {segPct}% besteed
         </text>
@@ -285,7 +285,7 @@ function TypeDonut({ budgetType, segments, onNavigate }: TypeDonutProps) {
           van {formatCurrency(totalBudget)}
         </text>
         <text x={cx} y={cy + 20} textAnchor="middle"
-          className={`font-mono text-[10px] font-semibold ${pctUsed > 100 ? 'fill-red-500' : 'fill-[var(--ink-3)]'}`}
+          className={`font-mono text-[10px] font-semibold ${pctUsed > 100 ? (isOverPositive(budgetType) ? 'fill-emerald-500' : 'fill-red-500') : 'fill-[var(--ink-3)]'}`}
         >
           {pctUsed}%
         </text>
@@ -378,7 +378,7 @@ function TypeDonut({ budgetType, segments, onNavigate }: TypeDonutProps) {
                     <path
                       d={describeArc(cx, cy, outerR - outerWidth / 2, arc.start, arc.end)}
                       fill="none"
-                      stroke="#ef4444"
+                      stroke={isOverPositive(budgetType) ? '#10b981' : '#ef4444'}
                       strokeWidth={outerWidth + 6}
                       strokeLinecap="butt"
                       opacity={dimmed ? 0.06 : 0.25}
@@ -441,7 +441,7 @@ function TypeDonut({ budgetType, segments, onNavigate }: TypeDonutProps) {
                           <path
                             d={describeArc(cx, cy, innerR - innerWidth / 2, ca.start, ca.end)}
                             fill="none"
-                            stroke="#ef4444"
+                            stroke={isOverPositive(budgetType) ? '#10b981' : '#ef4444'}
                             strokeWidth={innerWidth + 4}
                             strokeLinecap="butt"
                             opacity={childDimmed ? 0.06 : 0.25}
@@ -493,14 +493,14 @@ function TypeDonut({ budgetType, segments, onNavigate }: TypeDonutProps) {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-medium text-[var(--ink)]">{seg.name}</p>
                     <p className="font-mono text-[10px] text-[var(--ink-3)]">
-                      <span className={isOver ? 'font-semibold text-red-600' : ''}>
+                      <span className={isOver ? (isOverPositive(budgetType) ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600') : ''}>
                         {formatCurrency(seg.spent)}
                       </span>
                       {' / '}
                       {formatCurrency(seg.limit)}
                     </p>
                   </div>
-                  <span className={`shrink-0 font-mono text-[10px] font-bold ${isOver ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
+                  <span className={`shrink-0 font-mono text-[10px] font-bold ${isOver ? (isOverPositive(budgetType) ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}`}>
                     {pct}%
                   </span>
                 </button>
@@ -530,13 +530,13 @@ function TypeDonut({ budgetType, segments, onNavigate }: TypeDonutProps) {
                           </div>
                           <span className="min-w-0 flex-1 truncate text-[10px] text-[var(--ink-2)]">{child.name}</span>
                           <span className="font-mono text-[10px] text-[var(--ink-3)]">
-                            <span className={childOver ? 'font-semibold text-red-600' : ''}>
+                            <span className={childOver ? (isOverPositive(budgetType) ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600') : ''}>
                               {formatCurrency(child.spent)}
                             </span>
                             {' / '}
                             {formatCurrency(child.limit)}
                           </span>
-                          <span className={`w-7 text-right font-mono text-[10px] font-medium ${childOver ? 'text-red-600' : 'text-[var(--ink-3)]'}`}>
+                          <span className={`w-7 text-right font-mono text-[10px] font-medium ${childOver ? (isOverPositive(budgetType) ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-3)]'}`}>
                             {childPct}%
                           </span>
                         </button>

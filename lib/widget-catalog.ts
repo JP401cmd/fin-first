@@ -4,7 +4,17 @@
 import { PHASES, DEFAULT_MATRIX } from '@/lib/feature-phases'
 import { WIDGET_TO_FEATURE } from '@/lib/feature-registry'
 
-export type WidgetSize = 'quarter' | 'half' | 'full'
+export type WidgetSize = 'mini' | 'quarter' | 'half' | 'full'
+
+/** Downsize a widget one step for mobile display: full→half, half→quarter, quarter→mini */
+export function downsizeForMobile(size: WidgetSize): WidgetSize {
+  switch (size) {
+    case 'full': return 'half'
+    case 'half': return 'quarter'
+    case 'quarter': return 'mini'
+    case 'mini': return 'mini'
+  }
+}
 export type WidgetModule = 'kern' | 'wil' | 'horizon' | 'cross'
 
 export interface WidgetDef {
@@ -588,7 +598,11 @@ export function mergeWidgetPrefs(saved: WidgetPrefs | null): WidgetPrefs {
   const savedMap = new Map(saved.widgets.map(w => [w.id, w]))
   const merged: WidgetPref[] = WIDGET_CATALOG.map((def, i) => {
     const existing = savedMap.get(def.id)
-    if (existing) return existing
+    if (existing) {
+      // Sanitize: mini is never persisted, fallback to quarter
+      if (existing.size === 'mini') existing.size = 'quarter'
+      return existing
+    }
     // New widget not in saved prefs — add with disabled default
     return { id: def.id, enabled: false, size: def.defaultSize, order: 100 + i }
   })

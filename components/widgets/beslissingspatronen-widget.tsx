@@ -44,6 +44,18 @@ export function BeslissingspatronenWidget({ size, data, href }: Props) {
     )
   }
 
+  // ── Mini size ───────────────────────────────────────────────
+  if (size === 'mini') {
+    const totalDays = sorted.reduce((sum, p) => sum + p.days, 0)
+    return (
+      <WidgetShell module="wil" size="mini" kicker="Beslissingspatronen" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          +{Math.round(totalDays)}d
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter size: summary only ────────────────────────────
   if (size === 'quarter') {
     const totalDays = sorted.reduce((sum, p) => sum + p.days, 0)

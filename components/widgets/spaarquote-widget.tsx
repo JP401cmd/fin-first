@@ -25,6 +25,21 @@ export function SpaarquoteWidget({ size, data, href }: Props) {
     )
   }
 
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="kern" size="mini" kicker="Spaarquote" href={href}>
+        <>
+          <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+            {rate.toFixed(1)}%
+          </p>
+          <div className="mt-0.5 h-[2px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+            <div className={`h-full rounded-full ${isPositive ? 'bg-emerald-500' : 'bg-red-400'}`} style={{ width: `${Math.min(Math.abs(rate), 100)}%` }} />
+          </div>
+        </>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter-size: groot percentage + kleur + mini progress bar ──
   if (size === 'quarter') {
     return (

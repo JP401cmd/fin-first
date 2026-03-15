@@ -25,6 +25,7 @@ import { GripVertical, X, Plus, Lock, Wand2 } from 'lucide-react'
 import { WidgetRenderer, type DashboardData } from './widget-renderer'
 import { reassignOrders } from '@/lib/widget-order'
 import { AutoDashboardWizard } from './auto-dashboard-wizard'
+import { useDisplaySize } from '@/lib/hooks/use-display-size'
 import type { WidgetPref, WidgetSize, WidgetModule } from '@/lib/widget-catalog'
 import { WIDGET_CATALOG, WIDGET_FEATURE_MAP, BUDGET_WIDGETS, getWidgetDef } from '@/lib/widget-catalog'
 import { isFeatureAccessible, type FeatureAccessMap } from '@/lib/compute-feature-access'
@@ -36,6 +37,7 @@ import { createClient } from '@/lib/supabase/client'
 /** Human-readable size label */
 function sizeLabel(size: WidgetSize): string {
   switch (size) {
+    case 'mini': return 'XS'
     case 'quarter': return '25%'
     case 'half': return '50%'
     case 'full': return '100%'
@@ -64,20 +66,27 @@ function SortableWidgetItem({ pref, data, features, isEditMode, isDragging, onRe
     isDragging: isSelfDragging,
   } = useSortable({ id: pref.id })
 
+  const displaySize = useDisplaySize(pref.size)
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
   }
 
+  // Responsive span classes based on stored size
+  // On mobile (<640px): quarter→mini(1col×1row), half→quarter(1col×2row), full→half(2col×2row)
+  // On desktop (sm+): quarter(1col×1row), half(2col×1row), full(2col×2row)
+  const spanClass =
+    pref.size === 'full'    ? 'col-span-2 row-span-2'
+    : pref.size === 'half'  ? 'row-span-2 sm:row-span-1 col-span-1 sm:col-span-2'
+    : pref.size === 'quarter' ? 'row-span-1'
+    : ''
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={
-        pref.size === 'full' ? 'col-span-2 row-span-2'
-        : pref.size === 'half' ? 'col-span-2'
-        : ''
-      }
+      className={spanClass}
       data-testid={`widget-item-${pref.id}`}
     >
       {/* Drop placeholder — visible where the widget was */}
@@ -98,7 +107,7 @@ function SortableWidgetItem({ pref, data, features, isEditMode, isDragging, onRe
             >
               <X className="h-3.5 w-3.5" />
             </button>
-            {/* Size selector buttons */}
+            {/* Size selector buttons — S/M/L only, mini is auto */}
             {(() => {
               const def = getWidgetDef(pref.id)
               const allowed = def?.sizes ?? (['quarter', 'half', 'full'] as WidgetSize[])
@@ -147,7 +156,7 @@ function SortableWidgetItem({ pref, data, features, isEditMode, isDragging, onRe
             </button>
           </div>
         )}
-        <WidgetRenderer id={pref.id} size={pref.size} data={data} features={features} />
+        <WidgetRenderer id={pref.id} size={displaySize} data={data} features={features} />
       </div>
       )}
     </div>
@@ -523,7 +532,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
         }}
       >
         <SortableContext items={ids} strategy={rectSortingStrategy} disabled={!isEditMode}>
-          <div className="grid grid-cols-2 lg:grid-cols-4 auto-rows-[140px] sm:auto-rows-[160px] gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 auto-rows-[64px] sm:auto-rows-[160px] gap-3 sm:gap-4">
             {activeWidgets.map(pref => (
               <SortableWidgetItem
                 key={pref.id}

@@ -13,6 +13,17 @@ export function MonteCarloWidget({ size, data, href }: Props) {
   const successRate = data.backtestSuccessRate
   const namedPaths = data.backtestNamedPaths
 
+  // ── Mini-size: success rate percentage ──────────────
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="horizon" size="mini" kicker="Monte Carlo" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {successRate != null ? `${successRate}%` : '—'}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter-size: big success % or placeholder ────
   if (size === 'quarter') {
     if (successRate == null) {

@@ -146,6 +146,16 @@ export function NettoVermogenWidget({ size, data, href }: Props) {
     )
   }
 
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="kern" size="mini" kicker={kickerLabel} href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {formatCurrency(netWorth)}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter-size: compact amount + freedom time + delta ────
   if (size === 'quarter') {
     return (

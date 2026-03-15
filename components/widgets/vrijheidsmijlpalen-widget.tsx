@@ -47,6 +47,18 @@ export function VrijheidsMijlpalenWidget({ size, data, href }: Props) {
   const nextMilestone = activeMilestoneIdx >= 0 ? MILESTONES[activeMilestoneIdx] : null
   const nextDate = nextMilestone ? getMilestoneDate(nextMilestone.pct) : null
 
+  // ── Mini-size: achieved/total milestones ────────────────
+  if (size === 'mini') {
+    const achieved = MILESTONES.filter(m => effectivePct >= m.pct).length
+    return (
+      <WidgetShell module="horizon" size="mini" kicker="Vrijheidsmijlpalen" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {achieved}/{MILESTONES.length} bereikt
+        </p>
+      </WidgetShell>
+    )
+  }
+
   if (size === 'quarter') {
     const fullyFree = effectivePct >= 100
     return (

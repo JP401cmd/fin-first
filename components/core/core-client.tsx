@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { computeCoreData, type FinancialInput, type FinancialMetrics } from '@/lib/core-metrics'
 import { createClient } from '@/lib/supabase/client'
-import { formatCurrency, BudgetIcon } from '@/components/app/budget-shared'
+import { formatCurrency, BudgetIcon, isOverPositive } from '@/components/app/budget-shared'
 import type { CorePageData } from '@/lib/core-data-loader'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -2673,6 +2673,7 @@ function BudgetLegendOverview({
         const c = typeColors(seg.budgetType)
         const pct = seg.limit > 0 ? Math.round((seg.spent / seg.limit) * 100) : 0
         const isOver = seg.spent > seg.limit && seg.limit > 0
+        const overPositive = isOver && isOverPositive(seg.budgetType)
         const isExpanded = expandedGroupId === seg.id
 
         return (
@@ -2699,7 +2700,7 @@ function BudgetLegendOverview({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-[var(--ink)]">{seg.name}</p>
                 <p className="text-xs text-[var(--ink-3)]">
-                  <span className={isOver ? 'font-semibold text-red-600' : ''}>
+                  <span className={isOver ? (overPositive ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600') : ''}>
                     {formatCurrency(seg.spent)}
                   </span>
                   {' / '}
@@ -2707,7 +2708,7 @@ function BudgetLegendOverview({
                 </p>
               </div>
 
-              <span className={`shrink-0 text-xs font-bold ${isOver ? 'text-red-600' : 'text-[var(--ink-2)]'}`}>
+              <span className={`shrink-0 text-xs font-bold ${isOver ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}`}>
                 {pct}%
               </span>
             </button>
@@ -2718,6 +2719,7 @@ function BudgetLegendOverview({
                 {seg.children.map((child, ci) => {
                   const childPct = child.limit > 0 ? Math.round((child.spent / child.limit) * 100) : 0
                   const childOver = child.spent > child.limit && child.limit > 0
+                  const childOverPos = childOver && isOverPositive(seg.budgetType)
                   const cc = childTypeColors(seg.budgetType, ci, seg.children.length)
 
                   return (
@@ -2735,13 +2737,13 @@ function BudgetLegendOverview({
                       </div>
                       <span className="min-w-0 flex-1 truncate text-xs text-[var(--ink-2)]">{child.name}</span>
                       <span className="text-xs text-[var(--ink-3)]">
-                        <span className={childOver ? 'font-semibold text-red-600' : ''}>
+                        <span className={childOver ? (childOverPos ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600') : ''}>
                           {formatCurrency(child.spent)}
                         </span>
                         {' / '}
                         {formatCurrency(child.limit)}
                       </span>
-                      <span className={`w-8 text-right text-xs font-medium ${childOver ? 'text-red-600' : 'text-[var(--ink-3)]'}`}>
+                      <span className={`w-8 text-right text-xs font-medium ${childOver ? (childOverPos ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-3)]'}`}>
                         {childPct}%
                       </span>
                     </button>

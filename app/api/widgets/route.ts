@@ -21,7 +21,7 @@ export async function PUT(request: Request) {
       .map(w => ({
         id: w.id,
         enabled: Boolean(w.enabled),
-        size: w.size === 'full' ? 'full' : w.size === 'quarter' ? 'quarter' : 'half',
+        size: w.size === 'full' ? 'full' : w.size === 'quarter' ? 'quarter' : w.size === 'mini' ? 'quarter' : 'half',
         order: Number(w.order) || 0,
       }))
 

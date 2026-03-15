@@ -16,6 +16,21 @@ export function SimVermogenspadWidget({ size, data, href }: Props) {
   const { simRows, fireAgeFractional } = data
   const { ref, hasEntered } = useInViewAnimation({ duration: 600 })
 
+  // ── Mini-size: FIRE portfolio amount ────────────────────
+  if (size === 'mini') {
+    const fireRow = simRows && fireAgeFractional != null
+      ? simRows.find(r => r.age >= fireAgeFractional)
+      : null
+    const firePortfolio = fireRow?.endPortfolio
+    return (
+      <WidgetShell module="horizon" size="mini" kicker="Vermogenspad" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {firePortfolio != null ? formatCurrency(firePortfolio) : '—'}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   if (!simRows || simRows.length === 0) {
     if (size === 'quarter') {
       return (

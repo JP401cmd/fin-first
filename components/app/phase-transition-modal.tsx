@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback } from 'react'
+import { useScrollLock } from '@/lib/hooks/use-scroll-lock'
 import { PHASES, FEATURES, DEFAULT_MATRIX } from '@/lib/feature-phases'
 import { FfinAvatar } from '@/components/app/avatars'
 import { X } from 'lucide-react'
@@ -153,6 +154,9 @@ export function PhaseTransitionModal({ oldPhase, newPhase, onClose }: Props) {
   const oldColors = PHASE_COLORS[oldPhase] ?? PHASE_COLORS.recovery
   const [isVisible, setIsVisible] = useState(false)
 
+  // Lock body scroll (component is conditionally rendered by parent)
+  useScrollLock(true)
+
   // Trigger entrance animation after mount
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 50)
@@ -194,7 +198,6 @@ export function PhaseTransitionModal({ oldPhase, newPhase, onClose }: Props) {
       className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-500 ${
         isVisible ? 'bg-black/50' : 'bg-black/0'
       }`}
-      style={{ right: 'var(--chat-sidebar-width, 0px)' }}
       onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"

@@ -29,7 +29,7 @@ import {
 } from 'lucide-react'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { createClient } from '@/lib/supabase/client'
-import { BudgetIcon } from '@/components/app/budget-shared'
+import { BudgetIcon, isOverPositive, type BudgetType } from '@/components/app/budget-shared'
 import {
   type Asset,
   type AssetType,
@@ -579,9 +579,10 @@ function CheckinPageContent() {
               <div className="card-editorial p-4">
                 <p className="label-editorial text-[var(--ink-3)] mb-3">Budgetten</p>
                 <div className="space-y-2.5">
-                  {snap.details.budgets.map((b: { name: string; icon: string | null; limit: number; spent: number }, i: number) => {
+                  {snap.details.budgets.map((b: { name: string; icon: string | null; limit: number; spent: number; budget_type?: string }, i: number) => {
                     const pct = b.limit > 0 ? Math.min(100, (b.spent / b.limit) * 100) : 0
                     const isOver = b.spent > b.limit
+                    const overPos = isOver && b.budget_type ? isOverPositive(b.budget_type as BudgetType) : false
                     return (
                       <div key={i}>
                         <div className="flex items-center justify-between mb-1">
@@ -589,13 +590,13 @@ function CheckinPageContent() {
                             {b.icon && <BudgetIcon name={b.icon} className="inline h-3.5 w-3.5 mr-1" />}
                             {b.name}
                           </span>
-                          <span className={`text-xs font-mono tabular-nums ${isOver ? 'text-red-500 font-semibold' : 'text-[var(--ink-3)]'}`}>
+                          <span className={`text-xs font-mono tabular-nums ${isOver ? (overPos ? 'text-emerald-600 font-semibold' : 'text-red-500 font-semibold') : 'text-[var(--ink-3)]'}`}>
                             {formatCurrency(b.spent)} / {formatCurrency(b.limit)}
                           </span>
                         </div>
                         <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--border-ed)]">
                           <div
-                            className={`h-full rounded-full ${isOver ? 'bg-red-500' : 'bg-emerald-500'}`}
+                            className={`h-full rounded-full ${isOver ? (overPos ? 'bg-emerald-500' : 'bg-red-500') : 'bg-emerald-500'}`}
                             style={{ width: `${pct}%` }}
                           />
                         </div>

@@ -23,6 +23,7 @@ import {
   type UserDefinedCashflow,
 } from '@/lib/horizon-data'
 import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
+import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
@@ -48,6 +49,7 @@ import { HouseholdFireSection } from '@/components/app/household-fire-section'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { SimChartModal } from '@/components/app/horizon/sim-chart-widget'
 import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverlay, type MonteCarloOverlay, type HouseholdPartnerOverlay } from '@/components/app/horizon/sim-chart'
+import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { parseFireStrategy, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
 
@@ -110,7 +112,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [actions, setActions] = useState<Action[]>(initialData.actions)
   const [debts, setDebts] = useState<Debt[]>(initialData.debts)
   const [monthlyDividendIncome, setMonthlyDividendIncome] = useState(0)
-  const [fireStrategy, setFireStrategy] = useState<FireStrategyConfig | undefined>(initialData.fireStrategy)
+  const [fireStrategy, setFireStrategy] = useState<FireStrategyConfig | undefined>(initialData?.fireStrategy ?? undefined)
+  const [userAowAge, setUserAowAge] = useState<AowAge>({ years: 67, months: 0, fractional: 67, isDefinitive: false })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [activeModal, setActiveModal] = useState<ActiveModal>(null)
   const [simModalOpen, setSimModalOpen] = useState(false)
 
@@ -160,6 +165,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [formErrors, setFormErrors] = useState<string[]>([])
   const [formWarnings, setFormWarnings] = useState<string[]>([])
   const [showCatalogFields, setShowCatalogFields] = useState(false)
+  const [useSuggestedSettings, setUseSuggestedSettings] = useState(true)
 
   // Compact life events UI state
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
@@ -303,6 +309,32 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
       // Berekeningsparameters uit profiel
       setFireParams(resolveFireParams(profileResult.data ?? {}))
+
+      // AOW-leeftijd ophalen op basis van geboortedatum
+      try {
+        const aowRes = await supabase
+          .from('aow_leeftijd')
+          .select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source')
+          .order('birth_date_from', { ascending: true })
+        if (aowRes.data && aowRes.data.length > 0) {
+          setUserAowAge(lookupAowAge(aowRes.data as AowLeeftijdRow[], dob))
+        }
+      } catch {
+        // Non-critical — fallback to 67
+      }
+
+      // Fetch dividend income for FIRE passive income calculations
+      let dividendMonthly = 0
+      try {
+        const divRes = await fetch('/api/dividends')
+        if (divRes.ok) {
+          const divData = await divRes.json()
+          dividendMonthly = divData.aggregate?.monthly_dividend_income ?? 0
+        }
+      } catch {
+        // Non-critical — continue without dividend data
+      }
+      setMonthlyDividendIncome(dividendMonthly)
 
       const horizonInput: FinancialInput = {
         totalAssets, totalDebts, monthlyIncome: effectiveMonthlyIncome, monthlyExpenses: effectiveMonthlyExpenses,
@@ -521,202 +553,226 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     }
   }
 
-  function openCatalogForm(type: string) {
+  /** Compute suggested (catalog-default) values for a given event type, using profile data */
+  function computeSuggestedValues(type: string): {
+    amount: number
+    age: number | ''
+    direction: 'income' | 'expense'
+    durationType: 'one_time' | 'period' | 'continuous'
+    duration: number | ''
+    isIndexed: boolean
+    metadata: Record<string, unknown>
+  } {
     const catalog = LIFE_EVENT_CATALOG[type]
-    setFormType(type)
-    setFormName(catalog?.label ?? '')
-    setFormDescription('')
-    setShowCatalogFields(false)
-    setFormDuration(catalog?.defaultDuration ?? 0)
-    setFormAge(catalog?.defaultAge !== undefined ? catalog.defaultAge : (currentAge ? currentAge + 5 : ''))
-    setFormIsIndexed(true)
-    // Determine duration type and direction from catalog defaults
+    const defaultDur = catalog?.defaultDuration ?? 0
+    let amount = 0
+    let direction: 'income' | 'expense' = 'expense'
+    let durationType: 'one_time' | 'period' | 'continuous' = 'one_time'
+    let duration: number | '' = defaultDur
+    let isIndexed = true
+
+    const effectiveDefaultAge = type === 'aow'
+      ? Math.ceil(userAowAge.fractional)
+      : catalog?.defaultAge
+    let age: number | '' = effectiveDefaultAge !== undefined ? effectiveDefaultAge : (currentAge ? currentAge + 5 : '')
+
+    // Determine from catalog cost properties
     const hasCost = (catalog?.defaultCost ?? 0) !== 0
     const hasMonthlyIncome = (catalog?.defaultMonthlyIncome ?? 0) !== 0
     const hasMonthlyExpense = (catalog?.defaultMonthlyCost ?? 0) !== 0
-    const defaultDur = catalog?.defaultDuration ?? 0
     if (hasCost) {
-      setFormDurationType('one_time')
+      durationType = 'one_time'
       const cost = catalog!.defaultCost
-      setFormDirection(cost > 0 ? 'expense' : 'income')
-      setFormAmount(Math.abs(cost))
+      direction = cost > 0 ? 'expense' : 'income'
+      amount = Math.abs(cost)
     } else if (hasMonthlyIncome) {
-      setFormDurationType(defaultDur > 0 ? 'period' : 'continuous')
-      setFormDirection(catalog!.defaultMonthlyIncome > 0 ? 'income' : 'expense')
-      setFormAmount(Math.abs(catalog!.defaultMonthlyIncome))
+      durationType = defaultDur > 0 ? 'period' : 'continuous'
+      direction = catalog!.defaultMonthlyIncome > 0 ? 'income' : 'expense'
+      amount = Math.abs(catalog!.defaultMonthlyIncome)
     } else if (hasMonthlyExpense) {
-      setFormDurationType(defaultDur > 0 ? 'period' : 'continuous')
-      setFormDirection('expense')
-      setFormAmount(Math.abs(catalog!.defaultMonthlyCost))
-    } else {
-      setFormDurationType('one_time')
-      setFormDirection('expense')
-      setFormAmount(0)
+      durationType = defaultDur > 0 ? 'period' : 'continuous'
+      direction = 'expense'
+      amount = Math.abs(catalog!.defaultMonthlyCost)
     }
+
     // Initialize metadata from catalog field defaults
-    const metaDefaults: Record<string, unknown> = {}
+    const metadata: Record<string, unknown> = {}
     if (catalog?.fields) {
       for (const f of catalog.fields) {
-        metaDefaults[f.key] = f.default
+        metadata[f.key] = f.default
       }
     }
+
     // ── Pre-fill from profile data ──
-    // Netto maandinkomen pre-fill for income-related events
     const profileIncome = effectiveInput?.monthlyIncome ?? 0
     if (profileIncome > 0) {
-      if (type === 'part_time' && metaDefaults.nettoInkomen !== undefined) {
-        metaDefaults.nettoInkomen = profileIncome
-      }
-      if (type === 'career_change' && metaDefaults.huidigNettoSalaris !== undefined) {
-        metaDefaults.huidigNettoSalaris = profileIncome
-      }
-      if (type === 'werkloosheid' && metaDefaults.huidigNetto !== undefined) {
-        metaDefaults.huidigNetto = profileIncome
-      }
+      if (type === 'part_time' && metadata.nettoInkomen !== undefined) metadata.nettoInkomen = profileIncome
+      if (type === 'career_change' && metadata.huidigNettoSalaris !== undefined) metadata.huidigNettoSalaris = profileIncome
+      if (type === 'werkloosheid' && metadata.huidigNetto !== undefined) metadata.huidigNetto = profileIncome
     }
+
     // AOW: pre-fill leefsituatie from household status
-    if (type === 'aow' && metaDefaults.leefsituatie !== undefined) {
-      metaDefaults.leefsituatie = isHouseholdView ? 'samenwonend' : 'alleenstaand'
+    if (type === 'aow' && metadata.leefsituatie !== undefined) {
+      metadata.leefsituatie = isHouseholdView ? 'samenwonend' : 'alleenstaand'
       const baseAmount = isHouseholdView ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY
-      const jarenBuiten = Number(metaDefaults.jarenBuitenNL ?? 0)
+      const jarenBuiten = Number(metadata.jarenBuitenNL ?? 0)
       const factor = Math.min(1, Math.max(0, (50 - jarenBuiten) / 50))
-      setFormAmount(Math.round(baseAmount * factor))
-      setFormDirection('income')
-      setFormDurationType('continuous')
+      amount = Math.round(baseAmount * factor)
+      direction = 'income'
+      durationType = 'continuous'
     }
-    setFormMetadata({ ...metaDefaults })
-    // Auto-calculate initial vermogensverlies for scheiding
+
+    // Scheiding: vermogensverlies + advocaat
     if (type === 'scheiding') {
-      const behoudPct = Number(metaDefaults.vermogensBehoudPct ?? 50)
-      const advocaat = Number(metaDefaults.advocaatKosten ?? 7500)
+      const behoudPct = Number(metadata.vermogensBehoudPct ?? 50)
+      const advocaat = Number(metadata.advocaatKosten ?? 7500)
       const vermogensverlies = Math.round(effectiveNetWorth * (1 - behoudPct / 100))
-      setFormAmount(Math.max(0, vermogensverlies + advocaat))
-      setFormDurationType('one_time')
-      setFormDirection('expense')
+      amount = Math.max(0, vermogensverlies + advocaat)
+      durationType = 'one_time'
+      direction = 'expense'
     }
-    // Auto-calculate initial transitievergoeding for werkloosheid
+
+    // Werkloosheid: transitievergoeding
     if (type === 'werkloosheid') {
-      const bruto = Number(metaDefaults.huidigBruto ?? 4000)
-      const jaren = Number(metaDefaults.dienstjaren ?? 5)
+      const bruto = Number(metadata.huidigBruto ?? 4000)
+      const jaren = Number(metadata.dienstjaren ?? 5)
       const transitie = Math.round(bruto / 3 * jaren)
-      metaDefaults.transitievergoeding = transitie
-      setFormMetadata({ ...metaDefaults })
-      setFormAmount(transitie)
-      setFormDurationType('one_time')
-      setFormDirection('income')
+      metadata.transitievergoeding = transitie
+      amount = transitie
+      durationType = 'one_time'
+      direction = 'income'
     }
-    // Auto-calculate initial kosten koper for house_purchase
+
+    // House purchase: kosten koper
     if (type === 'house_purchase') {
-      const prijs = Number(metaDefaults.aankoopprijs ?? 350000)
-      const isStarter = Boolean(metaDefaults.eersteWoning ?? true)
-      const hasNHG = Boolean(metaDefaults.nhg ?? false)
+      const prijs = Number(metadata.aankoopprijs ?? 350000)
+      const isStarter = Boolean(metadata.eersteWoning ?? true)
+      const hasNHG = Boolean(metadata.nhg ?? false)
       const overdracht = (isStarter && prijs <= 510000) ? 0 : Math.round(prijs * 0.02)
       const notaris = 1200
       const taxatie = 500
       const bankgarantie = Math.round(prijs * 0.001)
       const nhgKosten = (hasNHG && prijs <= 435000) ? Math.round(prijs * 0.006) : 0
-      const totaal = overdracht + notaris + taxatie + bankgarantie + nhgKosten
-      setFormAmount(totaal)
-      setFormDurationType('one_time')
-      setFormDirection('expense')
+      amount = overdracht + notaris + taxatie + bankgarantie + nhgKosten
+      durationType = 'one_time'
+      direction = 'expense'
     }
-    // Pre-fill house_sale from active mortgage debts
+
+    // House sale: netto overwaarde from mortgage debts
     if (type === 'house_sale' && debts.length > 0) {
       const mortgages = debts.filter(d => d.debt_type === 'mortgage' && d.is_active)
       if (mortgages.length > 0) {
         const totalBalance = mortgages.reduce((sum, m) => sum + Number(m.current_balance ?? 0), 0)
         const totalPayment = mortgages.reduce((sum, m) => sum + Number(m.monthly_payment ?? 0), 0)
-        if (totalBalance > 0) metaDefaults.resterendeHypotheek = totalBalance
-        if (totalPayment > 0) metaDefaults.oudeHypotheeklasten = totalPayment
-        setFormMetadata({ ...metaDefaults })
-        // Recalculate netto overwaarde with pre-filled values
-        const vp = Number(metaDefaults.verkoopprijs) || 400000
-        const rh = Number(metaDefaults.resterendeHypotheek) || 0
-        const mkPct = Number(metaDefaults.makelaarskosten) || 1.5
+        if (totalBalance > 0) metadata.resterendeHypotheek = totalBalance
+        if (totalPayment > 0) metadata.oudeHypotheeklasten = totalPayment
+        const vp = Number(metadata.verkoopprijs) || 400000
+        const rh = Number(metadata.resterendeHypotheek) || 0
+        const mkPct = Number(metadata.makelaarskosten) || 1.5
         const mkBedrag = Math.round(vp * mkPct / 100)
         const netto = vp - rh - mkBedrag
-        setFormAmount(Math.abs(netto))
-        setFormDirection(netto >= 0 ? 'income' : 'expense')
-        setFormDurationType('one_time')
+        amount = Math.abs(netto)
+        direction = netto >= 0 ? 'income' : 'expense'
+        durationType = 'one_time'
       }
     }
-    // Pension: set amount from brutoBedrag, age from ingangLeeftijd, isIndexed from toggle
+
+    // Pension: brutoBedrag as income
     if (type === 'pension') {
-      const brutoBedrag = Number(metaDefaults.brutoBedrag ?? 675)
-      setFormAmount(brutoBedrag)
-      setFormDurationType('continuous')
-      setFormDirection('income')
-      setFormAge(Number(metaDefaults.ingangLeeftijd ?? 67))
-      setFormIsIndexed(Boolean(metaDefaults.isGeindexeerd ?? false))
+      amount = Number(metadata.brutoBedrag ?? 675)
+      durationType = 'continuous'
+      direction = 'income'
+      age = Number(metadata.ingangLeeftijd ?? 67)
+      isIndexed = Boolean(metadata.isGeindexeerd ?? false)
     }
-    // Early retirement: set age from pensioenLeeftijd, calculate AOW gap
+
+    // Early retirement: AOW gap
     if (type === 'early_retirement') {
-      const pensioenLeeftijd = Number(metaDefaults.pensioenLeeftijd ?? 62)
+      const pensioenLeeftijd = Number(metadata.pensioenLeeftijd ?? 62)
       const aowGapMaanden = Math.max(0, (67 - pensioenLeeftijd) * 12)
       const maanduitgaven = effectiveInput?.monthlyExpenses ?? 3000
-      const overbrugging = Number(metaDefaults.overbruggingsUitkering ?? 0)
-      setFormAge(pensioenLeeftijd)
-      setFormAmount(Math.max(0, maanduitgaven - overbrugging))
-      setFormDurationType('period')
-      setFormDirection('expense')
-      setFormDuration(aowGapMaanden)
+      const overbrugging = Number(metadata.overbruggingsUitkering ?? 0)
+      age = pensioenLeeftijd
+      amount = Math.max(0, maanduitgaven - overbrugging)
+      durationType = 'period'
+      direction = 'expense'
+      duration = aowGapMaanden
     }
-    // World trip: set vertrekkosten as one-time cost, duration as period
+
+    // World trip: vertrekkosten as one-time
     if (type === 'world_trip') {
-      const vertrek = Number(metaDefaults.vertrekkosten ?? 4000)
-      setFormAmount(vertrek)
-      setFormDurationType('one_time')
-      setFormDirection('expense')
-      setFormDuration(catalog?.defaultDuration ?? 12)
+      amount = Number(metadata.vertrekkosten ?? 4000)
+      durationType = 'one_time'
+      direction = 'expense'
+      duration = catalog?.defaultDuration ?? 12
     }
-    // Sabbatical: pre-fill netto inkomen from profile, calculate initial loss
+
+    // Sabbatical: inkomensverlies
     if (type === 'sabbatical') {
-      const profileIncome = effectiveInput?.monthlyIncome ?? 3000
-      metaDefaults.nettoInkomen = profileIncome
-      setFormMetadata({ ...metaDefaults })
-      const doorbetalingsPct = Number(metaDefaults.doorbetalingsPct ?? 0)
-      const inkomensverlies = Math.round(profileIncome * (1 - doorbetalingsPct / 100))
-      setFormAmount(inkomensverlies)
-      setFormDurationType('period')
-      setFormDirection('income')
-      setFormDuration(catalog?.defaultDuration ?? 6)
+      const profileInc = effectiveInput?.monthlyIncome ?? 3000
+      metadata.nettoInkomen = profileInc
+      const doorbetalingsPct = Number(metadata.doorbetalingsPct ?? 0)
+      amount = Math.round(profileInc * (1 - doorbetalingsPct / 100))
+      durationType = 'period'
+      direction = 'income'
+      duration = catalog?.defaultDuration ?? 6
     }
-    // Renovation: set cost from type preset
+
+    // Renovation: cost from type preset
     if (type === 'renovation') {
-      const verbouwType = String(metaDefaults.type ?? 'keuken')
+      const verbouwType = String(metadata.type ?? 'keuken')
       const preset = VERBOUWING_TYPE_KOSTEN[verbouwType]
       if (preset) {
-        setFormAmount(preset.bedrag)
-        setFormDurationType('one_time')
-        setFormDirection('expense')
+        amount = preset.bedrag
+        durationType = 'one_time'
+        direction = 'expense'
       }
     }
-    // Part-time: auto-calculate income loss from hours ratio
+
+    // Part-time: income loss from hours ratio
     if (type === 'part_time') {
-      const huidigUren = Number(metaDefaults.huidigUren ?? 40)
-      const nieuwUren = Number(metaDefaults.nieuwUren ?? 32)
-      const nettoInkomen = Number(metaDefaults.nettoInkomen ?? 3000)
+      const huidigUren = Number(metadata.huidigUren ?? 40)
+      const nieuwUren = Number(metadata.nieuwUren ?? 32)
+      const nettoInkomen = Number(metadata.nettoInkomen ?? 3000)
       const reductie = 1 - (nieuwUren / huidigUren)
-      const inkomensVerlies = Math.round(nettoInkomen * reductie)
-      setFormAmount(inkomensVerlies)
-      setFormDirection('expense')
-      const isPermanent = Boolean(metaDefaults.isPermanent ?? false)
-      setFormDurationType(isPermanent ? 'continuous' : 'period')
-      if (!isPermanent) setFormDuration(catalog?.defaultDuration ?? 60)
+      amount = Math.round(nettoInkomen * reductie)
+      direction = 'expense'
+      const isPermanent = Boolean(metadata.isPermanent ?? false)
+      durationType = isPermanent ? 'continuous' : 'period'
+      if (!isPermanent) duration = catalog?.defaultDuration ?? 60
     }
-    // Study: set cost from type preset
+
+    // Study: cost from type preset
     if (type === 'study') {
-      const studieType = String(metaDefaults.studieType ?? 'master')
+      const studieType = String(metadata.studieType ?? 'master')
       const preset = STUDIE_TYPE_KOSTEN[studieType]
       if (preset) {
-        setFormAmount(preset.bedrag)
-        metaDefaults.collegegeld = preset.bedrag
-        setFormMetadata({ ...metaDefaults })
-        setFormDurationType('one_time')
-        setFormDirection('expense')
-        setFormDuration(preset.duur)
+        amount = preset.bedrag
+        metadata.collegegeld = preset.bedrag
+        durationType = 'one_time'
+        direction = 'expense'
+        duration = preset.duur
       }
     }
+
+    return { amount, age, direction, durationType, duration, isIndexed, metadata }
+  }
+
+  function openCatalogForm(type: string) {
+    const catalog = LIFE_EVENT_CATALOG[type]
+    const suggested = computeSuggestedValues(type)
+    setFormType(type)
+    setFormName(catalog?.label ?? '')
+    setFormDescription('')
+    setShowCatalogFields(false)
+    setUseSuggestedSettings(true)
+    setFormAmount(suggested.amount)
+    setFormAge(suggested.age)
+    setFormDirection(suggested.direction)
+    setFormDurationType(suggested.durationType)
+    setFormDuration(suggested.duration)
+    setFormIsIndexed(suggested.isIndexed)
+    setFormMetadata({ ...suggested.metadata })
     setEditingEvent(null)
     setFormCashflows([])
     setEditingCashflowId(null)
@@ -780,6 +836,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       }
     }
     setEditingEvent(ev)
+    setUseSuggestedSettings(Boolean(ev.metadata?.uses_suggested ?? false))
     setShowForm(true)
   }
 
@@ -818,9 +875,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       }
     }
 
-    // AOW-specific: warn if age < 60
+    // AOW-specific: warn if age deviates significantly from personal AOW age
     if (formType === 'aow' && typeof formAge === 'number' && formAge < 60) {
-      warnings.push('Let op: de AOW start wettelijk op leeftijd 67. Een eerdere leeftijd is onrealistisch.')
+      warnings.push(`Let op: je persoonlijke AOW-leeftijd is ${userAowAge.months > 0 ? `${userAowAge.years} jaar en ${userAowAge.months} maanden` : `${userAowAge.years} jaar`}. Een eerdere leeftijd dan 60 is onrealistisch.`)
     }
 
     // Children-specific: validate aantalKinderen
@@ -1160,7 +1217,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     // Special handling for early_retirement: income loss from pensioenleeftijd to AOW
     if (formType === 'early_retirement') {
       const pensioenLeeftijd = Number(formMetadata.pensioenLeeftijd ?? 62)
-      const aowLeeftijd = 67
+      const aowLeeftijd = Math.ceil(userAowAge.fractional)
       const aowGapMaanden = Math.max(0, (aowLeeftijd - pensioenLeeftijd) * 12)
       const maanduitgaven = effectiveInput?.monthlyExpenses ?? 3000
       const overbrugging = Number(formMetadata.overbruggingsUitkering ?? 0)
@@ -1198,7 +1255,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     }
 
     // Store custom cashflows and toelichting in metadata and compute backward-compatible flat fields
-    const metaWithCashflows: Record<string, unknown> = { ...formMetadata, toelichting: formDescription || undefined }
+    const metaWithCashflows: Record<string, unknown> = { ...formMetadata, toelichting: formDescription || undefined, uses_suggested: useSuggestedSettings }
     if (formCashflows.length > 0) {
       metaWithCashflows.cashflows = formCashflows
       // Backward-compatible flat fields from cashflows
@@ -1565,29 +1622,40 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               </div>
 
               <div className="-mx-4 sm:-mx-6 md:-mx-8 overflow-hidden">
-                <SimChart
-                  rows={simResult.rows}
-                  fireAge={simResult.fireAge}
-                  fireAgeFractional={simResult.fireAgeFractional}
-                  currentAge={currentAge ?? 30}
-                  endAge={simResult.displayEndAge}
-                  cashflows={simCashflows}
-                  fireTarget={simResult.requiredFirePortfolio}
-                  strategy={simResult.strategy}
-                  targetEndPortfolio={simResult.targetEndPortfolio}
-                  scenarioOverlays={scenarioOverlays}
-                  monteCarloOverlay={monteCarloOverlay}
-                  dailyExpenseRate={(effectiveInput?.yearlyMustExpenses ?? 0) / 365}
-                  householdOverlays={isHouseholdView ? householdOverlays ?? undefined : undefined}
-                />
-                {/* Events timeline aligned to same age axis */}
-                {events.length > 0 && (
-                  <EventsTimeline
-                    events={events}
-                    currentAge={currentAge ?? 30}
-                    endAge={simResult.displayEndAge}
-                  />
-                )}
+                <ZoomableChartContainer currentAge={currentAge ?? 30} endAge={simResult.displayEndAge}>
+                  {(visibleMin, visibleMax) => (
+                    <>
+                      <SimChart
+                        rows={simResult.rows}
+                        fireAge={simResult.fireAge}
+                        fireAgeFractional={simResult.fireAgeFractional}
+                        currentAge={currentAge ?? 30}
+                        endAge={simResult.displayEndAge}
+                        cashflows={simCashflows}
+                        fireTarget={simResult.requiredFirePortfolio}
+                        strategy={simResult.strategy}
+                        targetEndPortfolio={simResult.targetEndPortfolio}
+                        scenarioOverlays={scenarioOverlays}
+                        monteCarloOverlay={monteCarloOverlay}
+                        dailyExpenseRate={(effectiveInput?.yearlyMustExpenses ?? 0) / 365}
+                        householdOverlays={isHouseholdView ? householdOverlays ?? undefined : undefined}
+                        visibleMinAge={visibleMin}
+                        visibleMaxAge={visibleMax}
+                        aowAgeFractional={userAowAge.fractional}
+                      />
+                      {/* Events timeline aligned to same age axis */}
+                      {events.length > 0 && (
+                        <EventsTimeline
+                          events={events}
+                          currentAge={currentAge ?? 30}
+                          endAge={simResult.displayEndAge}
+                          visibleMinAge={visibleMin}
+                          visibleMaxAge={visibleMax}
+                        />
+                      )}
+                    </>
+                  )}
+                </ZoomableChartContainer>
               </div>
 
               {/* ── Legenda + detail-links onder de grafiek ── */}
@@ -1643,24 +1711,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   </div>
                 )}
               </div>
-
-              {simCashflows.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {simCashflows.map(cf => (
-                    <span
-                      key={cf.id}
-                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-sans text-[10px] font-medium ${
-                        cf.direction === 'income'
-                          ? 'border-horizon-200 bg-horizon-50 text-horizon-700'
-                          : 'border-kern-200 bg-kern-50/60 text-kern-700'
-                      }`}
-                    >
-                      {cf.direction === 'income' ? '↑' : '↓'}{' '}
-                      {cf.id === 'aow-prefill' ? 'AOW (staatspension)' : cf.name} (leeftijd {cf.fromAge})
-                    </span>
-                  ))}
-                </div>
-              )}
 
               <p className="mt-3 font-sans text-[10px] text-[var(--ink-4)]">
                 {STRATEGY_LABELS[simResult.strategy].name} &middot; Simulatie tot leeftijd {simResult.displayEndAge} &middot; Klik Details voor jaar-op-jaar tabel
@@ -1912,6 +1962,34 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                     </div>
                   </div>
 
+                  {/* Badge: voorgestelde of eigen waarden */}
+                  {selectedEvent.event_type !== 'custom' && evCatalog?.fields && evCatalog.fields.length > 0 && (
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      selectedEvent.metadata?.uses_suggested
+                        ? 'bg-horizon-100 text-horizon-700'
+                        : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {selectedEvent.metadata?.uses_suggested ? 'Voorgestelde waarden' : 'Eigen waarden'}
+                    </span>
+                  )}
+
+                  {/* AOW: voorgestelde leeftijd op basis van geboortedatum */}
+                  {selectedEvent.event_type === 'aow' && selectedEvent.target_age !== Math.ceil(userAowAge.fractional) && (
+                    <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium text-amber-800">
+                          Je persoonlijke AOW-leeftijd is {userAowAge.months > 0 ? `${userAowAge.years} jaar en ${userAowAge.months} maanden` : `${userAowAge.years} jaar`}
+                          <span className={`ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-medium ${userAowAge.isDefinitive ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {userAowAge.isDefinitive ? 'Definitief' : 'Verwacht'}
+                          </span>
+                        </p>
+                        <p className="text-[10px] text-amber-600">
+                          Ingesteld: leeftijd {selectedEvent.target_age}. Pas aan via bewerken.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Toelichting */}
                   {selectedEvent.metadata?.toelichting ? (
                     <p className="text-sm text-[var(--ink-2)] italic">{String(selectedEvent.metadata.toelichting)}</p>
@@ -1946,6 +2024,35 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               </div>
                             )
                           })}
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Vergelijking met voorgestelde waarden (alleen bij eigen waarden) */}
+                  {selectedEvent.event_type !== 'custom' && !selectedEvent.metadata?.uses_suggested && evCatalog?.fields && evCatalog.fields.length > 0 && (() => {
+                    const suggested = computeSuggestedValues(selectedEvent.event_type)
+                    const evAmount = Math.abs(Number(selectedEvent.one_time_cost) || Number(selectedEvent.monthly_income_change) || Number(selectedEvent.monthly_cost_change) || 0)
+                    const amtDiff = suggested.amount !== evAmount
+                    const ageDiff = suggested.age !== (selectedEvent.target_age ?? '')
+                    if (!amtDiff && !ageDiff) return null
+                    const sugDurLabel = suggested.durationType === 'one_time' ? 'Eenmalig' : suggested.durationType === 'continuous' ? 'Continu' : `${suggested.duration} mnd`
+                    return (
+                      <div className="rounded-[var(--r)] border border-horizon-200 bg-[var(--subtle)] p-3 space-y-1.5">
+                        <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">Vergelijking met voorgesteld</p>
+                        <div className="space-y-1 text-xs">
+                          <div className="flex justify-between text-[var(--ink-3)]">
+                            <span>Voorgesteld</span>
+                            <span className="font-mono tabular-nums">
+                              {suggested.age !== '' ? `${suggested.age} jaar, ` : ''}{formatCurrency(suggested.amount)}{suggested.durationType !== 'one_time' ? '/mnd' : ''} · {sugDurLabel}
+                            </span>
+                          </div>
+                          <div className="flex justify-between font-medium text-[var(--ink)]">
+                            <span>Opgeslagen</span>
+                            <span className="font-mono tabular-nums">
+                              {selectedEvent.target_age ? `${selectedEvent.target_age} jaar, ` : ''}{formatCurrency(evAmount)}{Number(selectedEvent.monthly_income_change) || Number(selectedEvent.monthly_cost_change) ? '/mnd' : ''}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     )
@@ -2360,6 +2467,40 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                     className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${(formErrors.some(e => e.includes('eeftijd')) || formWarnings.some(w => w.includes('AOW'))) ? 'border-amber-400 bg-amber-50/30' : 'border-[var(--border-ed)]'}`}
                     placeholder="bijv. 45"
                   />
+                  {/* AOW: voorgestelde leeftijd op basis van geboortedatum */}
+                  {formType === 'aow' && (
+                    <div className="mt-1.5 rounded-lg border border-horizon-200 bg-horizon-50/50 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Jouw AOW-leeftijd</p>
+                          <p className="text-xs text-[var(--ink-2)]">
+                            {userAowAge.months > 0
+                              ? `${userAowAge.years} jaar en ${userAowAge.months} maanden`
+                              : `${userAowAge.years} jaar`}
+                            <span className={`ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-medium ${
+                              userAowAge.isDefinitive
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-amber-100 text-amber-700'
+                            }`}>
+                              {userAowAge.isDefinitive ? 'Definitief' : 'Verwacht'}
+                            </span>
+                          </p>
+                        </div>
+                        {formAge !== Math.ceil(userAowAge.fractional) && (
+                          <button
+                            type="button"
+                            onClick={() => { setFormAge(Math.ceil(userAowAge.fractional)); setFormErrors([]); setFormWarnings([]) }}
+                            className="shrink-0 rounded-[var(--r)] border border-horizon-300 bg-horizon-50 px-2.5 py-1 text-[11px] font-medium text-horizon-700 hover:bg-horizon-100 transition-colors"
+                          >
+                            Overnemen
+                          </button>
+                        )}
+                      </div>
+                      <p className="mt-1 text-[10px] text-[var(--ink-4)]">
+                        Op basis van je geboortedatum. Bron: SVB / CBS-prognose.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Richting + bedrag */}
@@ -2434,21 +2575,80 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               {/* Extra impacts (geldstromen) worden hieronder getoond via de Geldstromen sectie */}
             </div>
 
-            {/* ── Voorgestelde instellingen (inklapbaar) ── */}
+            {/* ── Voorgestelde vs eigen instellingen ── */}
             {hasCatalogFields && (
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setShowCatalogFields(!showCatalogFields)}
-                  className="flex w-full items-center justify-between rounded-[var(--r)] border border-dashed border-horizon-200 bg-horizon-50/30 px-4 py-3 text-left transition-colors hover:bg-horizon-50/50"
-                >
-                  <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
-                    Voorgestelde instellingen
-                  </span>
-                  <ChevronDown className={`h-4 w-4 text-horizon-500 transition-transform ${showCatalogFields ? 'rotate-180' : ''}`} />
-                </button>
-                {showCatalogFields && (
-                <div className="mt-2 space-y-3 rounded-[var(--r)] border border-dashed border-horizon-200 bg-horizon-50/30 p-4">
+              <div className="space-y-3">
+                {/* Toggle: voorgestelde vs eigen waarden */}
+                <label className="flex cursor-pointer items-start gap-3 rounded-[var(--r)] border border-horizon-200 bg-horizon-50/30 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={useSuggestedSettings}
+                    onChange={e => {
+                      const checked = e.target.checked
+                      setUseSuggestedSettings(checked)
+                      if (checked) {
+                        const suggested = computeSuggestedValues(formType)
+                        setFormAmount(suggested.amount)
+                        setFormAge(suggested.age)
+                        setFormDirection(suggested.direction)
+                        setFormDurationType(suggested.durationType)
+                        setFormDuration(suggested.duration)
+                        setFormIsIndexed(suggested.isIndexed)
+                        setFormMetadata({ ...suggested.metadata })
+                      }
+                    }}
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-[var(--border-md)] accent-horizon-600"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-[var(--ink)]">Gebruik voorgestelde waarden</span>
+                    <p className="text-xs text-[var(--ink-3)]">Op basis van je profiel en actuele gegevens</p>
+                  </div>
+                </label>
+
+                {/* Read-only summary when using suggested values */}
+                {useSuggestedSettings && (() => {
+                  const suggested = computeSuggestedValues(formType)
+                  const catalog = LIFE_EVENT_CATALOG[formType]
+                  return (
+                    <div className="rounded-[var(--r)] border border-horizon-200 bg-horizon-50/30 p-4 space-y-2">
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-[var(--ink-2)]">
+                        {suggested.age !== '' && (
+                          <span>Leeftijd: <span className="font-mono tabular-nums font-medium text-[var(--ink)]">{suggested.age} jaar</span></span>
+                        )}
+                        <span>Bedrag: <span className="font-mono tabular-nums font-medium text-[var(--ink)]">{formatCurrency(suggested.amount)}{suggested.durationType !== 'one_time' ? '/mnd' : ''}</span></span>
+                        <span>{suggested.durationType === 'one_time' ? 'Eenmalig' : suggested.durationType === 'continuous' ? 'Continu' : `${suggested.duration} maanden`}</span>
+                      </div>
+                      {catalog?.fields && (() => {
+                        const visibleFields = catalog.fields!.filter((f: CatalogField) => {
+                          const val = suggested.metadata[f.key]
+                          return val !== undefined && val !== null
+                        })
+                        if (visibleFields.length === 0) return null
+                        return (
+                          <div className="border-t border-horizon-200 pt-2 space-y-0.5">
+                            {visibleFields.slice(0, 6).map((f: CatalogField) => {
+                              const val = suggested.metadata[f.key]
+                              const formatted = f.fieldType === 'toggle' ? (val ? 'Ja' : 'Nee')
+                                : f.fieldType === 'select' ? (f.options?.find(o => o.value === val)?.label ?? String(val))
+                                : f.fieldType === 'percentage' ? `${val}%`
+                                : String(val)
+                              return (
+                                <div key={f.key} className="flex justify-between text-xs text-[var(--ink-3)]">
+                                  <span>{f.label}</span>
+                                  <span className="font-mono tabular-nums">{formatted}</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  )
+                })()}
+
+                {/* Editable catalog fields when not using suggested values */}
+                {!useSuggestedSettings && (<>
+                <div className="space-y-3 rounded-[var(--r)] border border-dashed border-horizon-200 bg-horizon-50/30 p-4">
                   {LIFE_EVENT_CATALOG[formType].fields!.map((field: CatalogField) => {
                     // Conditionally hide huidigeAutoKosten when vervangtHuidigeAuto is false
                     if (formType === 'car_purchase' && field.key === 'huidigeAutoKosten' && !formMetadata.vervangtHuidigeAuto) {
@@ -3034,7 +3234,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       })()}
                       {formType === 'early_retirement' && field.key === 'overbruggingsUitkering' && (() => {
                         const pensioenLeeftijd = Number(formMetadata.pensioenLeeftijd ?? 62)
-                        const aowLeeftijd = 67
+                        const aowLeeftijd = Math.ceil(userAowAge.fractional)
                         const aowGapJaren = Math.max(0, aowLeeftijd - pensioenLeeftijd)
                         const aowGapMaanden = aowGapJaren * 12
                         const maanduitgaven = effectiveInput?.monthlyExpenses ?? 3000
@@ -3771,7 +3971,40 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                     )
                   })}
                 </div>
-              )}
+
+                {/* Vergelijking met voorgestelde waarden */}
+                {(() => {
+                  const suggested = computeSuggestedValues(formType)
+                  const suggestedAmt = suggested.amount
+                  const currentAmt = typeof formAmount === 'number' ? formAmount : 0
+                  const amtDiff = suggestedAmt !== currentAmt
+                  const ageDiff = suggested.age !== formAge
+                  const dirDiff = suggested.direction !== formDirection
+                  const durTypeDiff = suggested.durationType !== formDurationType
+                  if (!amtDiff && !ageDiff && !dirDiff && !durTypeDiff) return null
+                  const durLabel = (dt: string, dur: number | '') =>
+                    dt === 'one_time' ? 'Eenmalig' : dt === 'continuous' ? 'Continu' : `${dur} mnd`
+                  return (
+                    <div className="rounded-[var(--r)] border border-horizon-200 bg-[var(--subtle)] p-3 space-y-1.5">
+                      <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">Vergelijking</p>
+                      <div className="space-y-1 text-xs">
+                        <div className="flex justify-between text-[var(--ink-3)]">
+                          <span>Voorgesteld</span>
+                          <span className="font-mono tabular-nums">
+                            {suggested.age !== '' ? `${suggested.age} jaar, ` : ''}{formatCurrency(suggestedAmt)}{suggested.durationType !== 'one_time' ? '/mnd' : ''} · {durLabel(suggested.durationType, suggested.duration)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between font-medium text-[var(--ink)]">
+                          <span>Jouw keuze</span>
+                          <span className="font-mono tabular-nums">
+                            {formAge !== '' ? `${formAge} jaar, ` : ''}{formatCurrency(currentAmt)}{formDurationType !== 'one_time' ? '/mnd' : ''} · {durLabel(formDurationType, formDuration)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </>)}
             </div>
             )}
 
@@ -4412,8 +4645,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               )
               const yearlyIncomeAtFire = incomeCfAtFire.reduce((s, cf) => s + cf.amount * 12, 0)
 
-              // Inkomstenkasstromen actief op leeftijd 67 (AOW-leeftijd)
-              const aowAge = 67
+              // Inkomstenkasstromen actief op AOW-leeftijd (dynamisch uit aow_leeftijd tabel)
+              const aowAge = Math.ceil(userAowAge.fractional)
               const incomeCfAtAow = simCashflows.filter(cf =>
                 cf.direction === 'income' && cf.fromAge <= aowAge && (cf.toAge === null || cf.toAge > aowAge)
               )

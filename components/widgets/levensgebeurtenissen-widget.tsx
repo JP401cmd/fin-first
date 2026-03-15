@@ -88,6 +88,18 @@ export function LevensgebeurtenissenWidget({ size, data, href }: Props) {
   const { simRows, fireAgeFractional, topLifeEvents, lifeEvents } = data
   const { ref, hasEntered } = useInViewAnimation({ duration: 800 })
 
+  // ── Mini-size: active event count ───────────────────────
+  if (size === 'mini') {
+    const activeCount = lifeEvents
+    return (
+      <WidgetShell module="horizon" size="mini" kicker="Levensgebeurtenissen" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {activeCount} actief
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Text fallback when no simRows ───────────────────────
   if (!simRows || simRows.length === 0) {
     return <TextFallback size={size} lifeEvents={lifeEvents} topLifeEvents={topLifeEvents} href={href} />

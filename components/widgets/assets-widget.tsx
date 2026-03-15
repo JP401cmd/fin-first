@@ -46,6 +46,16 @@ export function AssetsWidget({ size, data, href }: Props) {
     )
   }
 
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="kern" size="mini" kicker="Vermogen" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {formatCurrency(totalAssets)}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   const dailyExp = monthlyExpenses / 30
   const ft = dailyExp > 0 && totalAssets > 0 ? calculateFreedomTime(totalAssets, dailyExp) : null
   const ftStr = ft ? formatFreedomTimeString(ft, 'short') : null

@@ -9,7 +9,8 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getDefaultBudgets, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
-import { BudgetIcon, formatCurrency, getTypeColors, iconMap, iconOptions, type BudgetType } from '@/components/app/budget-shared'
+import { BudgetIcon, formatCurrency, getTypeColors, isOverPositive, computeBarSegments, iconMap, iconOptions, type BudgetType } from '@/components/app/budget-shared'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { buildSegments, typeColors, childTypeColors } from '@/components/app/budget-donut'
 import { type BudgetRollover, formatPeriod, getCarriedAmount, getPreviousPeriod, computeRollover } from '@/lib/budget-rollover'
 import { BudgetTree } from '@/components/app/budget-tree'
@@ -1391,6 +1392,104 @@ function BudgetAllocationModal({
 // ── Budget legend (donut-style, under Sankey) ────────────────
 
 
+// ── Detail modal donut ring ──────────────────────────────────
+
+function DetailModalDonut({
+  spent, limit, remaining, pct, budgetType, colors, hasFreedomData, dailyExpenseRate,
+}: {
+  spent: number
+  limit: number
+  remaining: number
+  pct: number
+  budgetType: BudgetType
+  colors: ReturnType<typeof getTypeColors>
+  hasFreedomData: boolean
+  dailyExpenseRate: number
+}) {
+  const { ref, hasEntered } = useInViewAnimation({ duration: 600 })
+  const overBudget = spent > limit && limit > 0
+  const overPositive = overBudget && isOverPositive(budgetType)
+  const ratio = limit > 0 ? Math.min(spent / limit, 1) : 0
+
+  const ringSize = 120
+  const cx = ringSize / 2
+  const cy = ringSize / 2
+  const r = 48
+  const sw = 8
+  const circ = 2 * Math.PI * r
+  const cssType = budgetType === 'archive' ? 'other' : budgetType
+  const trackColor = `color-mix(in srgb, var(--color-${cssType}-300) 35%, transparent)`
+  const fillColor = overBudget
+    ? (overPositive ? '#10b981' : '#ef4444')
+    : `var(--color-${cssType}-500)`
+
+  return (
+    <div ref={ref} className="px-6 py-4">
+      {/* Ring chart */}
+      <div className="flex flex-col items-center">
+        <div className="relative">
+          <svg width={ringSize} height={ringSize}>
+            <circle cx={cx} cy={cy} r={r} fill="none" stroke={trackColor} strokeWidth={sw} />
+            <circle
+              cx={cx} cy={cy} r={r} fill="none" stroke={fillColor} strokeWidth={sw}
+              strokeLinecap="round"
+              strokeDasharray={circ}
+              strokeDashoffset={hasEntered ? circ * (1 - ratio) : circ}
+              transform={`rotate(-90 ${cx} ${cy})`}
+              style={{ transition: hasEntered ? 'stroke-dashoffset 600ms cubic-bezier(.22,1,.36,1)' : 'none' }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <p className={`font-mono text-2xl font-semibold tabular-nums leading-tight ${
+              overBudget ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink)]'
+            }`}>
+              {pct}%
+            </p>
+            <p className="font-mono text-[10px] text-[var(--ink-4)] tabular-nums leading-normal">
+              van {formatCurrency(limit)}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Compact 2-column under ring */}
+      <div className="mt-3 grid grid-cols-2 gap-3 text-center">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[.08em] text-[var(--ink-3)]">Besteed</p>
+          <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-[var(--ink)]" data-testid="modal-spent">
+            {formatCurrency(spent)}
+          </p>
+          {hasFreedomData && spent >= 100 && (
+            <p className="font-serif text-xs italic text-[var(--ink-3)]" data-testid="modal-spent-freedom">
+              ≈ {eurToFreedomTime(spent, dailyExpenseRate).formattedDagen}
+            </p>
+          )}
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[.08em] text-[var(--ink-3)]">
+            {remaining >= 0 ? 'Resterend' : (overPositive ? 'Boven doel' : 'Over budget')}
+          </p>
+          <p className={`mt-0.5 font-mono text-base font-bold tabular-nums ${
+            remaining >= 0 ? 'text-emerald-600' : (overPositive ? 'text-emerald-600' : 'text-red-600')
+          }`} data-testid="modal-remaining">
+            {formatCurrency(Math.abs(remaining))}
+          </p>
+          {hasFreedomData && Math.abs(remaining) >= 100 && (
+            <p className="font-serif text-xs italic text-[var(--ink-3)]" data-testid="modal-remaining-freedom">
+              {remaining >= 0
+                ? `nog ${eurToFreedomTime(remaining, dailyExpenseRate).formattedDagen}`
+                : (overPositive
+                  ? `+${eurToFreedomTime(Math.abs(remaining), dailyExpenseRate).formattedDagen}`
+                  : `${eurToFreedomTime(Math.abs(remaining), dailyExpenseRate).formattedDagen} ingeleverd`)
+              }
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Budget detail modal ──────────────────────────────────────
 
 function BudgetDetailModal({
@@ -1755,69 +1854,19 @@ function BudgetDetailModal({
           </div>
         </div>
 
-        {/* Spending summary */}
-        <div className="px-6 py-4">
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="rounded-lg bg-[var(--subtle)] p-3">
-              <p className="text-xs text-[var(--ink-3)]">Limiet</p>
-              <p className="mt-0.5 text-lg font-bold text-[var(--ink)]">{formatCurrency(limit)}</p>
-              {hasFreedomData && limit >= 100 && (
-                <p className="text-sm italic text-[var(--ink-3)]" data-testid="modal-limit-freedom">
-                  ≈ {eurToFreedomTime(limit, dailyExpenseRate).formattedDagen}
-                </p>
-              )}
-            </div>
-            <div className="rounded-lg bg-[var(--subtle)] p-3">
-              <p className="text-xs text-[var(--ink-3)]">Besteed</p>
-              <p className="mt-0.5 text-lg font-bold text-[var(--ink)]">{formatCurrency(spent)}</p>
-              {hasFreedomData && spent >= 100 && (
-                <p className="text-sm italic text-[var(--ink-3)]" data-testid="modal-spent-freedom">
-                  ≈ {eurToFreedomTime(spent, dailyExpenseRate).formattedDagen}
-                </p>
-              )}
-            </div>
-            <div className="rounded-lg bg-[var(--subtle)] p-3">
-              <p className="text-xs text-[var(--ink-3)]">Resterend</p>
-              <p className={`mt-0.5 text-lg font-bold ${remaining >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                {formatCurrency(remaining)}
-              </p>
-              {hasFreedomData && Math.abs(remaining) >= 100 && (
-                <p className={`text-sm italic text-[var(--ink-3)]`} data-testid="modal-remaining-freedom">
-                  {remaining >= 0
-                    ? `nog ${eurToFreedomTime(remaining, dailyExpenseRate).formattedDagen}`
-                    : <span className="text-red-500">{eurToFreedomTime(Math.abs(remaining), dailyExpenseRate).formattedDagen} ingeleverd</span>
-                  }
-                </p>
-              )}
-            </div>
-          </div>
+        {/* Spending summary — donut ring */}
+        <DetailModalDonut
+          spent={spent}
+          limit={limit}
+          remaining={remaining}
+          pct={pct}
+          budgetType={budgetType}
+          colors={colors}
+          hasFreedomData={hasFreedomData}
+          dailyExpenseRate={dailyExpenseRate}
+        />
 
-          <div className="mt-3">
-            <div className="h-2.5 w-full overflow-hidden rounded-full bg-zinc-100">
-              <div
-                className="h-full rounded-full transition-all"
-                style={{
-                  width: `${pct}%`,
-                  backgroundColor: spent > limit ? '#ef4444' : pct > 80 ? colors.barHexWarn : colors.barHex,
-                }}
-              />
-            </div>
-            <div className="mt-1 flex items-center justify-between">
-              {hasFreedomData && remaining >= 100 && (
-                <p className="text-sm italic text-[var(--ink-3)]" data-testid="modal-bar-freedom">
-                  nog {eurToFreedomTime(remaining, dailyExpenseRate).formattedDagen} deze maand
-                </p>
-              )}
-              {hasFreedomData && remaining <= 0 && spent > limit && Math.abs(remaining) >= 100 && (
-                <p className="text-sm italic text-[var(--ink-3)]" data-testid="modal-bar-freedom-over">
-                  <span className="text-red-500">{formatCurrency(Math.abs(remaining))} over — {eurToFreedomTime(Math.abs(remaining), dailyExpenseRate).formattedDagen} ingeleverd</span>
-                </p>
-              )}
-              {!hasFreedomData && <span />}
-              <p className="text-right text-xs text-[var(--ink-3)]">{pct}% besteed</p>
-            </div>
-          </div>
-
+        <div className="px-6 pb-4">
           {/* Per-partner breakdown for shared budgets */}
           {budgetPartnerSplit && hasFreedomData && spent >= 100 && (
             <div className="mt-3 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-3" data-testid="budget-partner-breakdown">
@@ -2195,21 +2244,42 @@ function BudgetDetailModal({
                             )}
                             {hasFreedomData && childSpent > childLimit && childSpent - childLimit >= 100 && (
                               <p className="text-sm italic text-[var(--ink-3)]" data-testid="child-freedom-over">
-                                <span className="text-red-500">{eurToFreedomTime(childSpent - childLimit, dailyExpenseRate).formattedDagen} ingeleverd</span>
+                                <span className={isOverPositive(budgetType) ? 'text-emerald-500' : 'text-red-500'}>
+                                  {isOverPositive(budgetType)
+                                    ? `+${eurToFreedomTime(childSpent - childLimit, dailyExpenseRate).formattedDagen}`
+                                    : `${eurToFreedomTime(childSpent - childLimit, dailyExpenseRate).formattedDagen} ingeleverd`}
+                                </span>
                               </p>
                             )}
                           </div>
                         </div>
                       </div>
-                      <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-zinc-100">
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${childPct}%`,
-                            backgroundColor: childSpent > childLimit ? '#ef4444' : colors.barHex,
-                          }}
-                        />
-                      </div>
+                      {(() => {
+                        const childSeg = computeBarSegments(childSpent, childLimit, child.alert_threshold ?? 80, colors, isOverPositive(budgetType))
+                        return (
+                          <div className="relative mt-1 h-1 w-full overflow-hidden rounded-full bg-zinc-100">
+                            {/* Fill 1 — normaal */}
+                            <div
+                              className="absolute inset-y-0 left-0 rounded-l-full"
+                              style={{ width: `${childSeg.normalPct}%`, backgroundColor: childSeg.normalColor }}
+                            />
+                            {/* Fill 2 — waarschuwing */}
+                            {childSeg.warnPct > 0 && (
+                              <div
+                                className="absolute inset-y-0 rounded-r-full"
+                                style={{ left: `${childSeg.warnLeft}%`, width: `${childSeg.warnPct}%`, backgroundColor: childSeg.warnColor }}
+                              />
+                            )}
+                            {/* Extension */}
+                            {childSeg.extensionPct > 0 && (
+                              <div
+                                className="absolute inset-y-0 rounded-r-full"
+                                style={{ left: `${childSeg.extensionLeft}%`, width: `${childSeg.extensionPct}%`, backgroundColor: childSeg.extensionColor, opacity: 0.7 }}
+                              />
+                            )}
+                          </div>
+                        )
+                      })()}
                     </div>
                   </div>
                 )
@@ -2352,7 +2422,9 @@ function BudgetDetailModal({
                       <span>{formatCurrency(hEntry.spent)} besteed</span>
                       {hEntry.limit > 0 && <span>/ {formatCurrency(hEntry.limit)} limiet</span>}
                       {hEntry.limit > 0 && (
-                        <span className={hEntry.spent > hEntry.limit ? 'font-semibold text-red-600' : 'text-emerald-600'}>
+                        <span className={hEntry.spent > hEntry.limit
+                          ? (isOverPositive(budgetType) ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600')
+                          : 'text-emerald-600'}>
                           {hEntry.spent > hEntry.limit ? '+' : '-'}{formatCurrency(Math.abs(hEntry.spent - hEntry.limit))}
                         </span>
                       )}
@@ -2487,7 +2559,9 @@ function BudgetDetailModal({
                         <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100">
                           <div
                             className={`h-full rounded-full transition-all ${
-                              forecast.exceedsLimit ? 'bg-red-500' : forecast.predicted / limit > 0.8 ? 'bg-kern-400' : 'bg-[var(--border-md)]'
+                              forecast.exceedsLimit
+                                ? (isOverPositive(budgetType) ? 'bg-emerald-500' : 'bg-red-500')
+                                : forecast.predicted / limit > 0.8 ? 'bg-kern-400' : 'bg-[var(--border-md)]'
                             }`}
                             style={{ width: `${Math.min((forecast.predicted / limit) * 100, 100)}%` }}
                           />
@@ -2511,7 +2585,7 @@ function BudgetDetailModal({
               </div>
 
               {/* Alert when predicted exceeds limit — altijd zichtbaar */}
-              {forecast.exceedsLimit && forecast.alertMessage && (
+              {forecast.exceedsLimit && forecast.alertMessage && !isOverPositive(budgetType) && (
                 <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3" data-testid="budget-forecast-alert">
                   <AlertCircle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
                   <div>
@@ -2588,8 +2662,12 @@ function BudgetDetailModal({
                       <span className="text-[var(--ink-3)]">Budgetlimiet</span>
                       <span className="tabular-nums text-[var(--ink-3)]">{formatCurrency(limit)}</span>
                     </div>
-                    <div className={`flex justify-between py-0.5 font-sans text-[11px] font-medium ${forecast.exceedsLimit ? 'text-red-600' : 'text-emerald-600'}`}>
-                      <span>{forecast.exceedsLimit ? 'Verwachte overschrijding' : 'Verwachte ruimte'}</span>
+                    <div className={`flex justify-between py-0.5 font-sans text-[11px] font-medium ${
+                      forecast.exceedsLimit
+                        ? (isOverPositive(budgetType) ? 'text-emerald-600' : 'text-red-600')
+                        : 'text-emerald-600'
+                    }`}>
+                      <span>{forecast.exceedsLimit ? (isOverPositive(budgetType) ? 'Verwacht boven doel' : 'Verwachte overschrijding') : 'Verwachte ruimte'}</span>
                       <span className="tabular-nums">{forecast.exceedsLimit ? '+' : ''}{formatCurrency(Math.abs(forecast.predicted - limit))}</span>
                     </div>
                   </div>

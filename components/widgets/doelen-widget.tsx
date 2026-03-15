@@ -172,6 +172,18 @@ export function DoelenWidget({ size, data, href }: Props) {
   const { ref: containerRef, hasEntered } = useInViewAnimation({ duration: 800 })
   const footerLabel = goals === 1 ? '1 actief doel' : `${goals} actieve doelen`
 
+  // ── Mini-size: achieved/total ────
+  if (size === 'mini') {
+    const achieved = topGoals.filter(g => goalPct(g) >= 100).length
+    return (
+      <WidgetShell module="wil" size="mini" kicker="Doelen" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {achieved}/{goals} bereikt
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter-size: eerste doel compact ───────────────────────
   if (size === 'quarter') {
     const goal = topGoals[0] ?? null

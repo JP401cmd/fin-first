@@ -42,6 +42,39 @@ export function HuishoudenActiviteitWidget({ size, data, href }: Props) {
     )
   }
 
+  // ── Mini size ───────────────────────────────────────────────
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="kern" size="mini" kicker="Huishouden Activiteit" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {items.length} {items.length === 1 ? 'item' : 'items'}
+        </p>
+      </WidgetShell>
+    )
+  }
+
+  // ── Quarter size ────────────────────────────────────────────
+  if (size === 'quarter') {
+    const preview = items.slice(0, 2)
+    return (
+      <WidgetShell module="kern" size={size} kicker="Huishouden Activiteit" href={href}>
+        <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
+          {items.length} {items.length === 1 ? 'item' : 'items'}
+        </p>
+        <div className="mt-1 space-y-1">
+          {preview.map(item => (
+            <div key={item.id} className="flex items-center justify-between gap-1">
+              <span className="text-[11px] text-[var(--ink-3)] truncate">{item.description || 'Transactie'}</span>
+              <span className="font-mono text-[11px] tabular-nums text-[var(--ink-2)] shrink-0">
+                {formatCurrency(item.amount)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </WidgetShell>
+    )
+  }
+
   const maxItems = size === 'full' ? 15 : 10
   const displayed = items.slice(0, maxItems)
   const hasMore = items.length > maxItems

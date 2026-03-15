@@ -188,7 +188,8 @@ export function SessionMonitor() {
   // ── Render re-login modal ────────────────────────────────────────
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-[right] duration-300"
+      style={{ right: 'var(--chat-sidebar-width, 0px)' }}
       role="dialog"
       aria-modal="true"
       aria-label="Sessie verlopen"

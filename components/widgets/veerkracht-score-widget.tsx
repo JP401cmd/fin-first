@@ -196,6 +196,17 @@ export function VeerkrachtScoreWidget({ size, data, href }: Props) {
   const debtHealthPct = Math.max(0, 100 - debtRatio) // Lower debt ratio = better
   const incomeCoveragePct = Math.min(Math.round(savingsRate * (100 / 30)), 100) // 30% savings rate = 100%
 
+  // ── Mini ─────────────────────────────────────────────────
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="horizon" size="mini" kicker="Veerkracht Score" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {score}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter ────────────────────────────────────────────────
   if (size === 'quarter') {
     return (

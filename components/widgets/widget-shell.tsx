@@ -24,10 +24,11 @@ const MODULE_KICKER: Record<WidgetModule, string> = {
   cross:   'text-[var(--ink-3)]',
 }
 
-// ── Fixed heights (match grid: quarter/half = 1 row, full = 2 rows) ──
-// Mobile: 140px rows, 12px gap → full = 140×2 + 12 = 296px
-// Desktop (sm+): 160px rows, 16px gap → full = 160×2 + 16 = 336px
+// ── Fixed heights (match grid row heights) ──
+// Mobile: 64px rows, 12px gap → mini = 64px, quarter = 64×2+12 = 140px, full = 140×2+12 = 296px (approximation via 2-row spans)
+// Desktop (sm+): 160px rows, 16px gap → quarter/half = 160px, full = 160×2 + 16 = 336px
 const SIZE_HEIGHT: Record<WidgetSize, string> = {
+  mini:    'h-[64px]',
   quarter: 'h-[140px] sm:h-[160px]',
   half:    'h-[140px] sm:h-[160px]',
   full:    'h-[296px] sm:h-[336px]',
@@ -53,12 +54,48 @@ export function WidgetShell({ module, size, kicker, href, onClick, children, cla
   const kickerColor = MODULE_KICKER[module]
   const h = SIZE_HEIGHT[size]
   const isInteractive = !!(href ?? onClick)
+  const isMini = size === 'mini'
   const isQuarter = size === 'quarter'
 
   const baseClasses = `group relative overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] transition-all ${h} ${className}`
   const interactiveClasses = isInteractive
-    ? `cursor-pointer text-left w-full ${hoverBorder} hover:shadow-[var(--s1)] hover:-translate-y-px`
+    ? isMini
+      ? `cursor-pointer text-left w-full ${hoverBorder} hover:shadow-[var(--s1)]`
+      : `cursor-pointer text-left w-full ${hoverBorder} hover:shadow-[var(--s1)] hover:-translate-y-px`
     : ''
+
+  // ── Mini layout: ultra-compact single row ──
+  if (isMini) {
+    const miniContent = (
+      <>
+        <div className={`h-[2px] w-full ${accent}`} />
+        <div className="flex h-[62px] items-center px-3">
+          <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
+            <p className={`text-[9px] font-bold uppercase tracking-[0.10em] leading-none ${kickerColor}`}>
+              {kicker}
+            </p>
+            <div className="min-w-0">{children}</div>
+          </div>
+        </div>
+      </>
+    )
+
+    if (href) {
+      return (
+        <Link href={href} className={`block ${baseClasses} ${interactiveClasses}`}>
+          {miniContent}
+        </Link>
+      )
+    }
+    if (onClick) {
+      return (
+        <button type="button" onClick={onClick} className={`${baseClasses} ${interactiveClasses}`}>
+          {miniContent}
+        </button>
+      )
+    }
+    return <div className={baseClasses}>{miniContent}</div>
+  }
 
   const content = kickerPosition === 'left' ? (
     <>
@@ -145,7 +182,20 @@ interface LockedWidgetShellProps {
 export function LockedWidgetShell({ module, size, name, requiredPhase }: LockedWidgetShellProps) {
   const accent = MODULE_ACCENT[module]
   const minH = SIZE_HEIGHT[size]
+  const isMini = size === 'mini'
   const isQuarter = size === 'quarter'
+
+  if (isMini) {
+    return (
+      <div className={`relative overflow-hidden rounded-[var(--r-lg)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/80 opacity-60 ${minH}`}>
+        <div className={`h-[2px] w-full ${accent} opacity-30`} />
+        <div className="flex h-[62px] items-center gap-2 px-3">
+          <Lock className="h-3 w-3 shrink-0 text-[var(--ink-4)]" />
+          <p className="text-xs font-medium text-[var(--ink-3)] truncate">{name}</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div

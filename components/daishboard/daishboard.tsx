@@ -13,6 +13,7 @@ import { BriefingHeader } from './briefing-header'
 import { BriefingCardGrid } from './briefing-card-grid'
 import { BriefingComposingIndicator } from './briefing-skeleton'
 import { BriefingFooter } from './briefing-footer'
+import { BriefingStaleBanner } from './briefing-stale-banner'
 
 interface Props {
   data: DashboardData
@@ -21,11 +22,11 @@ interface Props {
   aiEnabled?: boolean
 }
 
-/** Cache TTL: 2 hours */
-const CACHE_TTL_MS = 2 * 60 * 60 * 1000
+/** Stale threshold: 24 hours */
+const STALE_MS = 24 * 60 * 60 * 1000
 
-/** Stable cache key */
-const CACHE_KEY = 'briefing_v2'
+/** Stable cache key — v3 breaks old sessionStorage cache intentionally */
+const CACHE_KEY = 'briefing_v3'
 
 /** Key for previous briefing summary (session continuity) */
 const PREVIOUS_KEY = 'briefing_previous'
@@ -142,16 +143,15 @@ interface CachedBriefing extends BriefingComposeResponse {
   dataHash?: string
 }
 
-/** Read cache synchronously — called during initial render, not in an effect */
-function readCache(currentHash: string): BriefingComposeResponse | null {
+/** Read cache synchronously — called during initial render, not in an effect.
+ *  Cache is now persistent (localStorage). No TTL or hash invalidation —
+ *  the user decides when to refresh via the stale-banner or footer button. */
+function readCache(): CachedBriefing | null {
   try {
-    const raw = sessionStorage.getItem(CACHE_KEY)
+    const raw = localStorage.getItem(CACHE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as CachedBriefing
-    const age = Date.now() - new Date(parsed.composedAt).getTime()
-    // Invalidate if TTL expired, no cards, or data has changed
-    if (age >= CACHE_TTL_MS || parsed.cards.length === 0) return null
-    if (parsed.dataHash && parsed.dataHash !== currentHash) return null
+    if (!parsed.cards?.length) return null
     return parsed
   } catch { /* SSR / storage errors */ }
   return null
@@ -164,10 +164,11 @@ export function DAIshboard({ data, temporal, userName, aiEnabled = true }: Props
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [polling, setPolling] = useState(false)
+  const [cachedHash, setCachedHash] = useState<string | undefined>(undefined)
   const controllerRef = useRef<AbortController | null>(null)
   const hasFetchedRef = useRef(false)
 
-  // Compute data hash for cache invalidation
+  // Compute data hash for stale-banner data-changed detection
   const dataHash = hashDashboardData(data)
 
   // Log visit timestamp on mount for briefing frequency detection
@@ -178,14 +179,15 @@ export function DAIshboard({ data, temporal, userName, aiEnabled = true }: Props
   // Read cache after hydration but before paint — avoids hydration mismatch
   // while preventing a flash of the composing indicator for cached briefings
   useLayoutEffect(() => {
-    const cached = readCache(dataHash)
+    const cached = readCache()
     if (cached) {
       setCards(cached.cards)
       setComposedAt(cached.composedAt)
+      setCachedHash(cached.dataHash)
       setComposing(false)
       hasFetchedRef.current = true
     }
-  }, [dataHash])
+  }, [])
 
   const phase = data.currentPhaseId
   const level = data.sovereigntyLevel
@@ -304,7 +306,7 @@ export function DAIshboard({ data, temporal, userName, aiEnabled = true }: Props
           setComposing(false)
           setRefreshing(false)
           setPolling(false)
-          // Cache the complete response with data hash
+          // Cache the complete response with data hash in localStorage
           try {
             const cacheData: CachedBriefing = {
               cards: result.cards,
@@ -312,7 +314,8 @@ export function DAIshboard({ data, temporal, userName, aiEnabled = true }: Props
               source: 'ai',
               dataHash,
             }
-            sessionStorage.setItem(CACHE_KEY, JSON.stringify(cacheData))
+            localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData))
+            setCachedHash(dataHash)
           } catch { /* quota */ }
           // Save briefing summary for next-briefing continuity
           saveBriefingSummary(result.cards, result.composedAt)
@@ -339,7 +342,7 @@ export function DAIshboard({ data, temporal, userName, aiEnabled = true }: Props
   }, [polling, data, dataHash, temporal, cards.length])
 
   const handleRefresh = useCallback(() => {
-    try { sessionStorage.removeItem(CACHE_KEY) } catch { /* ignore */ }
+    try { localStorage.removeItem(CACHE_KEY) } catch { /* ignore */ }
     setPolling(false)
     streamFromAI(true)
   }, [streamFromAI])
@@ -402,6 +405,14 @@ export function DAIshboard({ data, temporal, userName, aiEnabled = true }: Props
             <div className="mb-4 text-center">
               <p className="text-xs text-[var(--ink-4)] animate-pulse">Will stelt je briefing samen...</p>
             </div>
+          )}
+          {!composing && composedAt && (Date.now() - new Date(composedAt).getTime()) >= STALE_MS && (
+            <BriefingStaleBanner
+              composedAt={composedAt}
+              dataChanged={cachedHash !== undefined && cachedHash !== dataHash}
+              onRefresh={handleRefresh}
+              refreshing={refreshing}
+            />
           )}
           <BriefingCardGrid cards={cards} data={data} onCardEngage={handleCardEngage} onFeedback={handleFeedback} />
           {!composing && composedAt && (

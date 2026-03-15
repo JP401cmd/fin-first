@@ -67,6 +67,17 @@ export function VoorstellenWidget({ size, data, href }: Props) {
 
   const topPriority = topRecommendations?.[0]?.priority ?? null
 
+  // ── Mini-size: active count ────
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="wil" size="mini" kicker="Voorstellen" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {recommendations} actief
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter-size: count + icon + priority dot ────
   if (size === 'quarter') {
     return (

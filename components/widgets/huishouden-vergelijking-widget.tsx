@@ -47,6 +47,29 @@ export function HuishoudenVergelijkingWidget({ size, data, href }: Props) {
   const partnerFreedomStr = partnerFreedom ? formatFreedomTimeString(partnerFreedom, 'short') : '—'
   const combinedFreedomStr = combinedFreedom ? formatFreedomTimeString(combinedFreedom, 'short') : '—'
 
+  // ── Mini size ───────────────────────────────────────────────
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="kern" size="mini" kicker="Huishouden Vergelijking" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {formatCurrency(ho.netWorth)}
+        </p>
+      </WidgetShell>
+    )
+  }
+
+  // ── Quarter size ────────────────────────────────────────────
+  if (size === 'quarter') {
+    return (
+      <WidgetShell module="kern" size={size} kicker="Huishouden Vergelijking" href={href}>
+        <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
+          {formatCurrency(ho.netWorth)}
+        </p>
+        <p className="mt-1 text-[11px] text-[var(--ink-3)]">Gecombineerd</p>
+      </WidgetShell>
+    )
+  }
+
   // Bar widths (relative to combined)
   const totalAbs = Math.abs(myNetWorth) + Math.abs(partnerNetWorth)
   const myBarPct = totalAbs > 0 ? (Math.abs(myNetWorth) / totalAbs) * 100 : 50

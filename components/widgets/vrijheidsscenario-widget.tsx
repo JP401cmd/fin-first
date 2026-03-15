@@ -30,6 +30,17 @@ export function VrijheidsScenarioWidget({ size, data, href }: Props) {
   const optAge = fireRange.optimistic.fireAge
   const bandwidth = pesAge && optAge ? Math.abs(Math.round(pesAge - optAge)) : null
 
+  // ── Mini-size: expected FIRE year ──────────────────
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="horizon" size="mini" kicker="Scenario's" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {expAge != null ? Math.round(expAge) : '—'}
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter-size: expected FIRE age + bandwidth ──
   if (size === 'quarter') {
     return (

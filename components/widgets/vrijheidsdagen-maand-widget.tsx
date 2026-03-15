@@ -89,6 +89,17 @@ export function VrijheidsdagenMaandWidget({ size, data, href }: Props) {
     )
   }
 
+  // ── Mini size ───────────────────────────────────────────────
+  if (size === 'mini') {
+    return (
+      <WidgetShell module="wil" size="mini" kicker="Vrijheidsdagen/maand" href={href}>
+        <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
+          {currentDays}d
+        </p>
+      </WidgetShell>
+    )
+  }
+
   // ── Quarter size: current month value only ───────────────────
   if (size === 'quarter') {
     return (
