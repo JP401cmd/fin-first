@@ -65,27 +65,26 @@ export async function GET(request: Request) {
     })
   }
 
-  // Step 3: Invitation email template (logged to console in dev mode)
+  // Step 3: Invitation link generation (invite_link returned in response)
   try {
-    // Verify the invite route has console.log invitation link
     const fs = await import('fs')
     const path = await import('path')
     const inviteRoutePath = path.join(process.cwd(), 'app', 'api', 'household', 'invite', 'route.ts')
     const inviteRouteContent = fs.readFileSync(inviteRoutePath, 'utf-8')
-    const hasConsoleLog = inviteRouteContent.includes('console.log') && inviteRouteContent.includes('HOUSEHOLD INVITATION')
     const hasInviteLink = inviteRouteContent.includes('inviteLink')
+    const hasInviteLinkInResponse = inviteRouteContent.includes('invite_link')
     results.push({
       step: 3,
-      name: 'Invitation email template (dev: console log)',
-      pass: hasConsoleLog && hasInviteLink,
-      details: hasConsoleLog && hasInviteLink
-        ? 'Invite route logs invitation details (To, From, Token, Link, Expires) to console for dev mode'
-        : 'Missing console log of invitation details',
+      name: 'Invitation link generation (returned in API response)',
+      pass: hasInviteLink && hasInviteLinkInResponse,
+      details: hasInviteLink && hasInviteLinkInResponse
+        ? 'Invite route generates invitation link and returns it in the API response (invite_link field)'
+        : 'Missing invite link generation or response field',
     })
   } catch (e) {
     results.push({
       step: 3,
-      name: 'Invitation email template (dev: console log)',
+      name: 'Invitation link generation',
       pass: false,
       details: `File read error: ${e}`,
     })

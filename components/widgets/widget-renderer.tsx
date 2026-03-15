@@ -1,45 +1,131 @@
-import { NettoVermogenWidget } from './netto-vermogen-widget'
-import { CashFlowWidget } from './cash-flow-widget'
-import { BudgettenWidget } from './budgetten-widget'
-import { AssetsWidget } from './assets-widget'
-import { SchuldenWidget } from './schulden-widget'
-import { HoldingsWidget } from './holdings-widget'
-import { VoorstellenWidget } from './voorstellen-widget'
-import { ActiesWidget } from './acties-widget'
-import { DoelenWidget } from './doelen-widget'
-import { FirePrognoseWidget } from './fire-prognose-widget'
-import { MonteCarloWidget } from './monte-carlo-widget'
-import { LevensgebeurtenissenWidget } from './levensgebeurtenissen-widget'
-import { SpaarquoteWidget } from './spaarquote-widget'
-import { VrijheidsvoortgangWidget } from './vrijheidsvoortgang-widget'
-import { AbonnementenWidget } from './abonnementen-widget'
-import { JouwPadWidgetWrapper } from './jouw-pad-widget-wrapper'
-import { VeerkrachtScoreWidget } from './veerkracht-score-widget'
-import { BelastingBox3Widget } from './belasting-box3-widget'
-import { TerugkerendeTransactiesWidget } from './terugkerende-transacties-widget'
-import { NibudBenchmarkWidget } from './nibud-benchmark-widget'
-import { VrijheidsScenarioWidget } from './vrijheidsscenario-widget'
-import { SimVermogenspadWidget } from './sim-vermogenspad-widget'
-import { PassiefInkomenWidget } from './passief-inkomen-widget'
-import { Box3DragWidget } from './box3-drag-widget'
-import { VrijheidsMijlpalenWidget } from './vrijheidsmijlpalen-widget'
-import { BacktestingScoreWidget } from './backtesting-score-widget'
-import { BudgetFavWidget } from './budget-fav-widget'
-import { MeldingenWidget } from './meldingen-widget'
-import { BadgesWidget } from './badges-widget'
-import { StreaksWidget } from './streaks-widget'
-import { AiInzichtWidget } from './ai-inzicht-widget'
-import { VolgendeStapWidget } from './volgende-stap-widget'
-import { MaandoverzichtWidget } from './maandoverzicht-widget'
-import { AgendaWidget } from './agenda-widget'
-import { NoodfondsWidget } from './noodfonds-widget'
-import { HuishoudenVergelijkingWidget } from './huishouden-vergelijking-widget'
-import { HuishoudenActiviteitWidget } from './huishouden-activiteit-widget'
-import { BeslissingspatronenWidget } from './beslissingspatronen-widget'
-import { VrijheidsdagenMaandWidget } from './vrijheidsdagen-maand-widget'
-import { WilskrachtWidget } from './wilskracht-widget'
-import { BerichtenWidget } from './berichten-widget'
-import { BudgetTrendWidget } from './budget-trend-widget'
+import dynamic from 'next/dynamic'
+
+const NettoVermogenWidget = dynamic(() =>
+  import('./netto-vermogen-widget').then(m => ({ default: m.NettoVermogenWidget }))
+)
+const CashFlowWidget = dynamic(() =>
+  import('./cash-flow-widget').then(m => ({ default: m.CashFlowWidget }))
+)
+const BudgettenWidget = dynamic(() =>
+  import('./budgetten-widget').then(m => ({ default: m.BudgettenWidget }))
+)
+const AssetsWidget = dynamic(() =>
+  import('./assets-widget').then(m => ({ default: m.AssetsWidget }))
+)
+const SchuldenWidget = dynamic(() =>
+  import('./schulden-widget').then(m => ({ default: m.SchuldenWidget }))
+)
+const HoldingsWidget = dynamic(() =>
+  import('./holdings-widget').then(m => ({ default: m.HoldingsWidget }))
+)
+const VoorstellenWidget = dynamic(() =>
+  import('./voorstellen-widget').then(m => ({ default: m.VoorstellenWidget }))
+)
+const ActiesWidget = dynamic(() =>
+  import('./acties-widget').then(m => ({ default: m.ActiesWidget }))
+)
+const DoelenWidget = dynamic(() =>
+  import('./doelen-widget').then(m => ({ default: m.DoelenWidget }))
+)
+const FirePrognoseWidget = dynamic(() =>
+  import('./fire-prognose-widget').then(m => ({ default: m.FirePrognoseWidget }))
+)
+const MonteCarloWidget = dynamic(() =>
+  import('./monte-carlo-widget').then(m => ({ default: m.MonteCarloWidget }))
+)
+const LevensgebeurtenissenWidget = dynamic(() =>
+  import('./levensgebeurtenissen-widget').then(m => ({ default: m.LevensgebeurtenissenWidget }))
+)
+const SpaarquoteWidget = dynamic(() =>
+  import('./spaarquote-widget').then(m => ({ default: m.SpaarquoteWidget }))
+)
+const VrijheidsvoortgangWidget = dynamic(() =>
+  import('./vrijheidsvoortgang-widget').then(m => ({ default: m.VrijheidsvoortgangWidget }))
+)
+const AbonnementenWidget = dynamic(() =>
+  import('./abonnementen-widget').then(m => ({ default: m.AbonnementenWidget }))
+)
+const JouwPadWidgetWrapper = dynamic(() =>
+  import('./jouw-pad-widget-wrapper').then(m => ({ default: m.JouwPadWidgetWrapper }))
+)
+const VeerkrachtScoreWidget = dynamic(() =>
+  import('./veerkracht-score-widget').then(m => ({ default: m.VeerkrachtScoreWidget }))
+)
+const BelastingBox3Widget = dynamic(() =>
+  import('./belasting-box3-widget').then(m => ({ default: m.BelastingBox3Widget }))
+)
+const TerugkerendeTransactiesWidget = dynamic(() =>
+  import('./terugkerende-transacties-widget').then(m => ({ default: m.TerugkerendeTransactiesWidget }))
+)
+const NibudBenchmarkWidget = dynamic(() =>
+  import('./nibud-benchmark-widget').then(m => ({ default: m.NibudBenchmarkWidget }))
+)
+const VrijheidsScenarioWidget = dynamic(() =>
+  import('./vrijheidsscenario-widget').then(m => ({ default: m.VrijheidsScenarioWidget }))
+)
+const SimVermogenspadWidget = dynamic(() =>
+  import('./sim-vermogenspad-widget').then(m => ({ default: m.SimVermogenspadWidget }))
+)
+const PassiefInkomenWidget = dynamic(() =>
+  import('./passief-inkomen-widget').then(m => ({ default: m.PassiefInkomenWidget }))
+)
+const Box3DragWidget = dynamic(() =>
+  import('./box3-drag-widget').then(m => ({ default: m.Box3DragWidget }))
+)
+const VrijheidsMijlpalenWidget = dynamic(() =>
+  import('./vrijheidsmijlpalen-widget').then(m => ({ default: m.VrijheidsMijlpalenWidget }))
+)
+const BacktestingScoreWidget = dynamic(() =>
+  import('./backtesting-score-widget').then(m => ({ default: m.BacktestingScoreWidget }))
+)
+const BudgetFavWidget = dynamic(() =>
+  import('./budget-fav-widget').then(m => ({ default: m.BudgetFavWidget }))
+)
+const MeldingenWidget = dynamic(() =>
+  import('./meldingen-widget').then(m => ({ default: m.MeldingenWidget }))
+)
+const BadgesWidget = dynamic(() =>
+  import('./badges-widget').then(m => ({ default: m.BadgesWidget }))
+)
+const StreaksWidget = dynamic(() =>
+  import('./streaks-widget').then(m => ({ default: m.StreaksWidget }))
+)
+const AiInzichtWidget = dynamic(() =>
+  import('./ai-inzicht-widget').then(m => ({ default: m.AiInzichtWidget }))
+)
+const VolgendeStapWidget = dynamic(() =>
+  import('./volgende-stap-widget').then(m => ({ default: m.VolgendeStapWidget }))
+)
+const MaandoverzichtWidget = dynamic(() =>
+  import('./maandoverzicht-widget').then(m => ({ default: m.MaandoverzichtWidget }))
+)
+const AgendaWidget = dynamic(() =>
+  import('./agenda-widget').then(m => ({ default: m.AgendaWidget }))
+)
+const NoodfondsWidget = dynamic(() =>
+  import('./noodfonds-widget').then(m => ({ default: m.NoodfondsWidget }))
+)
+const HuishoudenVergelijkingWidget = dynamic(() =>
+  import('./huishouden-vergelijking-widget').then(m => ({ default: m.HuishoudenVergelijkingWidget }))
+)
+const HuishoudenActiviteitWidget = dynamic(() =>
+  import('./huishouden-activiteit-widget').then(m => ({ default: m.HuishoudenActiviteitWidget }))
+)
+const BeslissingspatronenWidget = dynamic(() =>
+  import('./beslissingspatronen-widget').then(m => ({ default: m.BeslissingspatronenWidget }))
+)
+const VrijheidsdagenMaandWidget = dynamic(() =>
+  import('./vrijheidsdagen-maand-widget').then(m => ({ default: m.VrijheidsdagenMaandWidget }))
+)
+const WilskrachtWidget = dynamic(() =>
+  import('./wilskracht-widget').then(m => ({ default: m.WilskrachtWidget }))
+)
+const BerichtenWidget = dynamic(() =>
+  import('./berichten-widget').then(m => ({ default: m.BerichtenWidget }))
+)
+const BudgetTrendWidget = dynamic(() =>
+  import('./budget-trend-widget').then(m => ({ default: m.BudgetTrendWidget }))
+)
 import { getWidgetDef, WIDGET_HREFS, WIDGET_FEATURE_MAP, BUDGET_WIDGETS } from '@/lib/widget-catalog'
 import { isFeatureAccessible } from '@/lib/compute-feature-access'
 import type { FeatureAccessMap } from '@/lib/compute-feature-access'

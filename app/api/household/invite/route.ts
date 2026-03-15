@@ -150,15 +150,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Uitnodiging aanmaken mislukt' }, { status: 500 })
   }
 
-  // Log the invitation link to console (dev mode — no real email service)
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   const inviteLink = `${baseUrl}/household-invite?token=${invitation.token}`
-  console.log(`\n🏠 HOUSEHOLD INVITATION`)
-  console.log(`   To: ${trimmedEmail}`)
-  console.log(`   From: ${user.email}`)
-  console.log(`   Token: ${invitation.token}`)
-  console.log(`   Link: ${inviteLink}`)
-  console.log(`   Expires: ${invitation.expires_at}\n`)
 
   return NextResponse.json({
     success: true,

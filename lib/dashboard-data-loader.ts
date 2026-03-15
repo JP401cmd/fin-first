@@ -1,7 +1,9 @@
 // ── Dashboard Data Loader ──────────────────────────────────────
 // Extracts all data-loading logic from dashboard/page.tsx into a
 // reusable async function that only needs a SupabaseClient.
+// Wrapped with React cache() for request-level deduplication.
 
+import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   DashboardData,
@@ -74,8 +76,10 @@ export interface DashboardDataResult {
 }
 
 // ── Main loader ────────────────────────────────────────────────
+// Wrapped with React cache() — multiple calls within a single server
+// request return the same promise, avoiding duplicate DB round-trips.
 
-export async function loadDashboardData(supabase: SupabaseClient): Promise<DashboardDataResult> {
+export const loadDashboardData = cache(async function loadDashboardData(supabase: SupabaseClient): Promise<DashboardDataResult> {
   // Parallel data fetches for all module previews
   const now = new Date()
   const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0]
@@ -104,7 +108,7 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     supabase.from('actions')
       .select('id, title, status, freedom_days_impact, priority_score, due_date, source, completed_at, recommendation:recommendations(recommendation_type)')
       .in('status', ['open', 'postponed', 'completed']),
-    supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
+    supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }).limit(50),
     supabase.from('budgets').select('id, name, icon, default_limit, interval, budget_type, alert_threshold, parent_id, is_favorite').is('parent_id', null),
     supabase.from('recommendations').select('id, title, freedom_days_per_year, priority_score, recommendation_type, status').in('status', ['pending', 'postponed']),
     supabase.from('budgets').select('id, name, icon, parent_id, default_limit, budget_type, is_favorite').not('parent_id', 'is', null),
@@ -121,7 +125,7 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     supabase.from('user_badges').select('id, badge_id, earned_at'),
     supabase.from('user_streaks').select('id, streak_type, current_count, longest_count, last_activity_date'),
     supabase.from('next_step_completions').select('step_key, dismissed'),
-    supabase.from('transactions').select('amount, date, budget_id, transaction_type').lt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
+    supabase.from('transactions').select('amount, date, budget_id, transaction_type').lt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd).limit(2000),
   ])
 
   // Read budgeting_active from the profile query (already fetched above)
@@ -1302,4 +1306,4 @@ export async function loadDashboardData(supabase: SupabaseClient): Promise<Dashb
     activated,
     nextSteps,
   }
-}
+})
