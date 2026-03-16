@@ -696,28 +696,45 @@ export default function GidsPage() {
             color="var(--color-wil-400)"
             description={
               <>
-                TriFinity scant automatisch 12 maanden transactiegeschiedenis op
-                terugkerende patronen. Abonnementen, lidmaatschappen en vaste
-                lasten worden gedetecteerd met een{" "}
-                <strong>betrouwbaarheidsniveau</strong> (hoog, middel, laag) en
-                frequentie (wekelijks, maandelijks, per kwartaal, jaarlijks). Je
-                ziet het totale maandbedrag aan abonnementen en hoeveel{" "}
-                <strong>vrijheidsdagen</strong> die je per jaar kosten.
-                {" "}
-                Het <strong>opzegadvies</strong> toont welke abonnementen je het
-                minst gebruikt of de slechtste prijs-kwaliteitverhouding hebben.
-                Soms is het schrappen van twee vergeten abonnementen genoeg om een
+                Abonnementen zijn stille geldlekken. &euro;15 per maand klinkt
+                onschuldig, maar het kost je 2 dagen vrijheid per jaar. Elke.
+                Jaar. Weer.
+                <br />
+                <br />
+                TriFinity scant automatisch je transactiegeschiedenis op{" "}
+                <strong>terugkerende patronen</strong>: abonnementen,
+                verzekeringen, lidmaatschappen en andere vaste lasten. Elke
+                post wordt gedetecteerd met een frequentie (
+                <strong>
+                  wekelijks, maandelijks, per kwartaal, jaarlijks
+                </strong>
+                ) en een betrouwbaarheidsniveau (hoog, middel, laag). Je kunt
+                ze ook <strong>handmatig toevoegen</strong> als de automatische
+                detectie iets mist.
+                <br />
+                <br />
+                Per abonnement zie je de <strong>jaarlijkse kosten</strong> en
+                hoeveel <strong>vrijheidsdagen</strong> het je kost. Klein
+                bedrag, groot effect over jaren. De app toont welke
+                abonnementen de meeste vrijheidstijd kosten &mdash; zodat je
+                kunt overwegen of de waarde opweegt tegen de prijs. Soms is
+                het schrappen van twee vergeten abonnementen genoeg om een
                 halve vrijheidsdag per maand te winnen.
+                <br />
+                <br />
+                Gerelateerde widgets: <strong>vaste_lasten</strong>{" "}
+                (maandelijks totaal) en <strong>noodfonds</strong>{" "}
+                (buffer-berekening op basis van je vaste lasten).
               </>
             }
             howTo={{
               steps: [
-                "Importeer minimaal 3 maanden transacties \u2014 hoe meer, hoe beter de detectie",
-                "Ga naar De Wil \u2014 je abonnementen staan onderaan de pagina",
-                "Bekijk de gedetecteerde abonnementen met frequentie en maandbedrag",
-                "Tik op een abonnement voor de opzegflow met details en vrijheidsdagen-impact",
+                "Overzicht \u2014 Ga naar De Kern \u2192 Cash \u2192 Vaste lasten. Je ziet al je terugkerende kosten: abonnementen, verzekeringen, lidmaatschappen.",
+                "Detectie \u2014 De app herkent automatisch terugkerende transacties in je bankdata. Importeer minimaal 3 maanden \u2014 hoe meer, hoe beter de detectie. Je kunt ook handmatig toevoegen.",
+                "Impact \u2014 Per abonnement zie je de jaarlijkse kosten en hoeveel vrijheidsdagen het je kost. Klein bedrag, groot effect over jaren.",
+                "Opzeggen \u2014 De app toont welke abonnementen de meeste vrijheidstijd kosten. Overweeg of de waarde opweegt tegen de prijs.",
               ],
-              tip: "Check je abonnementen elk kwartaal. Vergeten streamingdiensten en ongebruikte sportschoolpassen zijn de meest voorkomende tijdlekken.",
+              tip: "Check je abonnementen elk kwartaal. Vergeten streamingdiensten en ongebruikte sportschoolpassen zijn de meest voorkomende tijdlekken. \u20ac15/maand = 2 vrijheidsdagen/jaar.",
             }}
           />
 
