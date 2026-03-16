@@ -72,7 +72,7 @@ function CategoryRow({ config, spent, limit, dailyExp, hasEntered }: CategoryRow
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-0.5">
       {/* Icon + label + amount + freedom time */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
@@ -95,8 +95,8 @@ function CategoryRow({ config, spent, limit, dailyExp, hasEntered }: CategoryRow
         </div>
       </div>
 
-      {/* Mini progress bar */}
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--border-ed)]">
+      {/* Mini progress bar — compact */}
+      <div className="h-1 w-full overflow-hidden rounded-full bg-[var(--border-ed)]">
         <div
           className="h-full rounded-full"
           style={{
@@ -136,7 +136,7 @@ function ComparisonBar({ label, current, previous, color, hasEntered }: Comparis
           </span>
         )}
       </div>
-      <div className="flex gap-1 items-end h-5">
+      <div className="flex gap-1 items-end h-4">
         {/* This month */}
         <div className="flex-1 flex items-end h-full">
           <div
@@ -276,7 +276,7 @@ export function CashFlowWidget({ size, data, href }: Props) {
 
         {/* ── 4 budget categories with mini progress bars ── */}
         <div className="mt-4 border-t border-dashed border-[var(--border-ed)]" />
-        <div className="mt-3 flex flex-col gap-2.5">
+        <div className="mt-3 flex flex-col gap-1.5">
           {CATEGORIES.map((config) => {
             const typeData = budgetTotals[config.key]
             return (
@@ -290,6 +290,18 @@ export function CashFlowWidget({ size, data, href }: Props) {
               />
             )
           })}
+        </div>
+
+        {/* ── Income vs Expenses summary row ── */}
+        <div className="mt-2 flex items-center justify-between rounded-[var(--r-sm)] bg-[var(--subtle)] px-2.5 py-1.5">
+          <div className="flex items-center gap-3 text-[11px]">
+            <span className="font-mono tabular-nums text-emerald-700">+{formatCurrency(monthlyIncome)}</span>
+            <span className="text-[var(--ink-4)]">−</span>
+            <span className="font-mono tabular-nums text-red-600">{formatCurrency(monthlyExpenses)}</span>
+          </div>
+          <span className={`font-mono tabular-nums text-[11px] font-semibold ${isPositive ? 'text-emerald-700' : 'text-red-600'}`}>
+            = {isPositive ? '+' : ''}{formatCurrency(cashFlow)}
+          </span>
         </div>
 
         {/* ── Previous month comparison barchart ── */}
