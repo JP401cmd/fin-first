@@ -38,8 +38,8 @@ export const GRID_TARGET_CELLS: Record<GridSize, number> = {
 /** Focus → widget IDs that get a scoring boost */
 export const FOCUS_WIDGET_BOOST: Record<FocusChoice, string[]> = {
   budget_cashflow: [
-    'cash_flow', 'budgetten', 'spaarquote', 'abonnementen',
-    'terugkerende_transacties', 'nibud_benchmark', 'noodfonds',
+    'cash_flow', 'budgetten', 'spaarquote', 'vaste_lasten',
+    'nibud_benchmark', 'noodfonds',
     'trend_inkomen', 'trend_uitgaven', 'trend_sparen', 'trend_schulden',
   ],
   assets_investments: [
@@ -76,8 +76,7 @@ export const WIDGET_POPULARITY: Record<string, number> = {
   jouw_pad: 6,
   maandoverzicht: 6,
   volgende_stap: 6,
-  terugkerende_transacties: 5,
-  abonnementen: 5,
+  vaste_lasten: 5,
   assets: 5,
   doelen: 5,
   voorstellen: 5,

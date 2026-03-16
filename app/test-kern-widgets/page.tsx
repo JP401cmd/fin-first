@@ -177,6 +177,16 @@ const MOCK_DATA: DashboardData = {
   weeklyFreedomDaysWon: 0,
   completionRatio: 0,
   willpowerScore: 'E',
+  inflationRate: 0.02,
+  grossReturn: 0.07,
+  weekOverview: {
+    weekExpenses: 0,
+    weekIncome: 0,
+    dailyExpenses: [],
+    weekBudget: 0,
+    prevWeekExpenses: 0,
+    topCategories: [],
+  },
 }
 
 const KERN_WIDGETS = [
@@ -188,8 +198,7 @@ const KERN_WIDGETS = [
   'belasting_box3',
   'spaarquote',
   'noodfonds',
-  'abonnementen',
-  'terugkerende_transacties',
+  'vaste_lasten',
   'nibud_benchmark',
   'maandoverzicht',
 ]

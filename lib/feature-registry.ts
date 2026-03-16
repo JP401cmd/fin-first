@@ -65,7 +65,7 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     module: 'kern',
     requiredTier: 'gratis',
     defaultPhase: 'stability',
-    widgets: ['cash_flow', 'maandoverzicht', 'terugkerende_transacties'],
+    widgets: ['cash_flow', 'maandoverzicht', 'vaste_lasten'],
     legacyIds: ['cashflow_sankey', 'cashflow_forecast'],
   },
   {
@@ -189,7 +189,7 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     module: 'ai',
     requiredTier: 'ai',
     defaultPhase: 'stability',
-    widgets: ['abonnementen'],
+    widgets: [],
     legacyIds: [
       'ai_categorize', 'spending_patterns', 'ai_subscriptions',
       'ai_spending_patterns', 'ai_budget_insights',

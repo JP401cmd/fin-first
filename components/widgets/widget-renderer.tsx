@@ -78,6 +78,9 @@ const BacktestingScoreWidget = dynamic(() =>
 const InflatieImpactWidget = dynamic(() =>
   import('./inflatie-impact-widget').then(m => ({ default: m.InflatieImpactWidget }))
 )
+const BeleggingsrendementWidget = dynamic(() =>
+  import('./beleggingsrendement-widget').then(m => ({ default: m.BeleggingsrendementWidget }))
+)
 const BudgetFavWidget = dynamic(() =>
   import('./budget-fav-widget').then(m => ({ default: m.BudgetFavWidget }))
 )
@@ -502,6 +505,8 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
       return <BacktestingScoreWidget size={size} data={data} href={href} />
     case 'inflatie_impact':
       return <InflatieImpactWidget size={size} data={data} href={href} />
+    case 'beleggingsrendement':
+      return <BeleggingsrendementWidget size={size} data={data} href={href} />
     case 'meldingen':
       return <MeldingenWidget size={size} data={data} href={href} />
     case 'ai_inzicht':
