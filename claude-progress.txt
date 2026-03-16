@@ -1,3 +1,27 @@
+## Session 2026-03-17 - Features #141, #162
+
+### Feature #141: Gids content: Mobiel - PASSING
+- Enriched existing Mobiel GuideTopicCard in Overal section
+- Value text: "Je financiën altijd bij de hand"
+- Added responsive design details: 4-col to 1/2-col grid, compact charts, horizontal scrolling tables
+- Added PWA installation instructions: Safari (Delen → Zet op beginscherm) and Chrome
+- Touch optimization: swipe, drag & drop widgets, BottomSheets, 44px touch targets
+- Mobile differences: bottom navigation, widget format adaptation, vertical briefing scroll
+- HowTo expanded from 3 to 5 steps + enriched PWA tip
+
+### Feature #162: Gids content: Vrijheidsinsteek - PASSING
+- Enriched existing Vrijheidsinsteek GuideTopicCard (first in Overal section)
+- New opening: "TriFinity is geen budgetapp. Het is een vrijheidsapp."
+- Added concrete freedom-time examples: €500 besparen = X dagen, €30/maand abonnement = Y dagen
+- Enhanced three-module descriptions: De Kern (fundament), De Wil (actiemotor), De Horizon (toekomstvisie)
+- Added sovereignty groeipad: Recovery → Stability → Momentum → Mastery
+- "Geen oordeel" section: feiten en mogelijkheden, jij kiest wat vrijheid betekent
+
+### Current Status
+- 2 features completed this session (#141, #162)
+- Zero TypeScript errors (verified via 307 auth redirect)
+- Commit: b567d40c
+
 ## Session 2026-03-16 - Features #129, #130
 
 ### Feature #129: Gids content: FIRE-projectie met levensgebeurtenissen - PASSING
@@ -13829,3 +13853,25 @@ For Feature #51 (Transaction Import):
 - 2 features completed this session (#143, #144)
 - Zero TypeScript errors (page compiles, 307 auth redirect)
 - Commit: c6298ec8
+
+## Session 2026-03-17 - Features #145, #146
+
+### Feature #145: Gids content: Vermogensbeheer - PASSING
+- Updated GuideTopicCard with enriched content matching all 8 feature steps
+- Waarde-tekst: "Al je bezittingen op één plek — van je spaarrekening tot je ETF-portfolio, van je huis tot je crypto. Samen vormen ze je opgeslagen tijd."
+- Updated from 13 to 11 asset types (matching actual app support): cash, spaarrekening, belegging, pensioen, vastgoed, crypto, voertuig, fysiek bezit, deelneming, levensverzekering, vordering
+- Added: holdings beheren (ticker/ISIN, koop/verkoop/dividend), broker-import (DEGIRO/Saxo Bank/ING Beleggen), twee views (Vermogen-overzicht + Holdings-overzicht), waardering via check-in, favorieten als widget
+- HowTo expanded to 6 detailed steps covering all feature requirements
+
+### Feature #146: Gids content: Schuldenbeheer - PASSING
+- Updated GuideTopicCard with enriched content matching all 7 feature steps
+- Waarde-tekst: "Elke schuld is negatieve vrijheidstijd. Door slim af te lossen win je maanden — soms jaren — terug."
+- Updated from 11 to 7 debt types with subtypes: hypotheek (5 varianten), studieschuld (3 stelsels), persoonlijke lening (2 vormen), creditcard, doorlopend krediet, belastingschuld (4 typen), familielening
+- Sneeuwbal vs Lawine strategieën met simulatie-details (einddatum, totale rente, besparing)
+- Added: €100 extra aflossing simulatie, netto vermogen + FIRE-datum impact, huishouden split-modes (50/50, inkomen-ratio, handmatig, één draagt alles)
+- HowTo expanded to 5 detailed steps covering all feature requirements
+
+### Current Status
+- 2 features completed this session (#145, #146)
+- Zero TypeScript errors
+- Commit: 001c054d
