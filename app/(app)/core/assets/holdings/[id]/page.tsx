@@ -4,12 +4,13 @@ import Link from 'next/link'
 import { ArrowLeft, Briefcase, TrendingUp, TrendingDown, DollarSign } from 'lucide-react'
 import HoldingTransactionLogClient from './transaction-log-client'
 import HoldingValueChartClient from './value-chart-client'
+import { HoldingFavoriteButton } from './holding-favorite-button'
 
 // UUID v4 regex for validation
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(value)
+function formatCurrency(value: number, cur: string = 'EUR'): string {
+  return new Intl.NumberFormat('nl-NL', { style: 'currency', currency: cur }).format(value)
 }
 
 export default async function HoldingDetailPage({
@@ -45,6 +46,7 @@ export default async function HoldingDetailPage({
 
   const name = holdingData.name as string
   const ticker = holdingData.ticker as string | null
+  const currency = (holdingData.currency as string) || 'EUR'
   const units = Number(holdingData.units) || 0
   const avgPrice = Number(holdingData.avg_purchase_price) || 0
   const currentPrice = Number(holdingData.current_price) || avgPrice
@@ -73,15 +75,21 @@ export default async function HoldingDetailPage({
           <div className="flex-1">
             <h1 className="text-xl font-bold text-[var(--ink)]" data-testid="holding-name">{name}</h1>
             {ticker && (
-              <p className="mt-0.5 text-sm font-medium text-kern-600" data-testid="holding-ticker">{ticker}</p>
+              <p className="mt-0.5 text-sm font-medium text-kern-600" data-testid="holding-ticker">
+                {ticker}
+                {currency !== 'EUR' && <span className="ml-2 rounded-full bg-kern-100 px-1.5 py-0.5 text-[10px] font-semibold text-kern-700">{currency}</span>}
+              </p>
             )}
           </div>
-          <Link
-            href="/core/assets/holdings"
-            className="rounded-lg border border-kern-200 bg-[var(--paper)] px-3 py-1.5 text-xs font-medium text-kern-700 hover:bg-kern-50"
-          >
-            Alle holdings
-          </Link>
+          <div className="flex items-center gap-2">
+            <HoldingFavoriteButton holdingId={id} initialFavorite={holdingData.is_favorite ?? false} />
+            <Link
+              href="/core/assets/holdings"
+              className="rounded-lg border border-kern-200 bg-[var(--paper)] px-3 py-1.5 text-xs font-medium text-kern-700 hover:bg-kern-50"
+            >
+              Alle holdings
+            </Link>
+          </div>
         </div>
 
         {/* KPI cards */}
@@ -89,7 +97,7 @@ export default async function HoldingDetailPage({
           <div>
             <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Huidige waarde</p>
             <p className="mt-1 text-lg font-bold text-[var(--ink)]" data-testid="holding-value">
-              {formatCurrency(holdingValue)}
+              {formatCurrency(holdingValue, currency)}
             </p>
           </div>
           <div>
@@ -98,16 +106,16 @@ export default async function HoldingDetailPage({
               {units}
             </p>
             <p className="text-xs text-[var(--ink-3)]">
-              @ {formatCurrency(currentPrice)} per eenheid
+              @ {formatCurrency(currentPrice, currency)} per eenheid
             </p>
           </div>
           <div>
             <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Gem. aankoopprijs</p>
             <p className="mt-1 text-lg font-bold text-[var(--ink)]" data-testid="holding-avg-price">
-              {formatCurrency(avgPrice)}
+              {formatCurrency(avgPrice, currency)}
             </p>
             <p className="text-xs text-[var(--ink-3)]">
-              kostenbasis: {formatCurrency(costBasis)}
+              kostenbasis: {formatCurrency(costBasis, currency)}
             </p>
           </div>
           <div>
@@ -118,7 +126,7 @@ export default async function HoldingDetailPage({
                   {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}%
                 </p>
                 <p className={`text-xs font-medium ${returnValue >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {returnValue >= 0 ? '+' : ''}{formatCurrency(returnValue)}
+                  {returnValue >= 0 ? '+' : ''}{formatCurrency(returnValue, currency)}
                 </p>
               </>
             ) : (

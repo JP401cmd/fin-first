@@ -616,7 +616,10 @@ export default function HoldingsPage() {
               </div>
               <div className="shrink-0 text-right">
                 <p className={`text-sm font-semibold ${soldOut ? 'text-[var(--ink-3)]' : stale ? 'text-kern-700' : 'text-[var(--ink)]'}`} data-testid={`holding-value-${holding.id}`}>
-                  {formatCurrency(Math.max(0, value))}
+                  {holding.currency && holding.currency !== 'EUR'
+                    ? new Intl.NumberFormat('nl-NL', { style: 'currency', currency: holding.currency }).format(Math.max(0, value))
+                    : formatCurrency(Math.max(0, value))
+                  }
                   {stale && !soldOut && <span className="text-[10px] font-normal text-kern-500 block">laatste bekende prijs</span>}
                 </p>
                 {/* Daily change from price feed */}
