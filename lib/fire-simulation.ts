@@ -12,6 +12,7 @@ import {
   type ChildrenMetadata,
   type AOWMetadata,
   type InheritanceMetadata,
+  type BegrafenisMetadata,
   NIBUD_CHILDREN_MONTHLY_COST,
   NL_AOW_MONTHLY,
   NL_AOW_MONTHLY_SAMENWONEND,
@@ -459,6 +460,39 @@ export function lifeEventsToCashflows(events: LifeEvent[]): SimCashflow[] {
           type: 'one_time',
           direction: 'income',
           amount: netto,
+          fromAge: age,
+          toAge: age,
+          indexed: false,
+        })
+      }
+      skipGenericCost = true
+    }
+
+    // Begrafenis: eenmalige kost = uitvaartkosten + extraWensen - verzekeringDekking + grafrechten
+    if (ev.event_type === 'begrafenis') {
+      const m = meta as BegrafenisMetadata
+      const uitvaartkosten = Number(m.uitvaartkosten ?? 9000)
+      const extraWensen = Number(m.extraWensen ?? 0)
+      const heeftVerzekering = m.heeftVerzekering ?? false
+      const verzekeringDekking = heeftVerzekering ? Number(m.verzekeringDekking ?? 0) : 0
+      const uitvaartType = m.uitvaartType ?? 'begraven'
+      const grafrechtenJaar = Number(m.grafrechtenJaar ?? 20)
+
+      // Grafrechten: alleen bij begraven of natuurbegraven (niet bij crematie)
+      // Geschatte kosten: ~€150/jaar voor grafrechten
+      const grafrechtenKosten = (uitvaartType === 'begraven' || uitvaartType === 'natuurbegraven') && grafrechtenJaar > 0
+        ? Math.round(grafrechtenJaar * 150)
+        : 0
+
+      const nettoKosten = Math.max(0, uitvaartkosten + extraWensen + grafrechtenKosten - verzekeringDekking)
+
+      if (nettoKosten > 0) {
+        flows.push({
+          id: `le-begrafenis-${ev.id}`,
+          name: ev.name,
+          type: 'one_time',
+          direction: 'expense',
+          amount: nettoKosten,
           fromAge: age,
           toAge: age,
           indexed: false,

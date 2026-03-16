@@ -408,6 +408,15 @@ export interface SchenkingMetadata {
   doelBestemming?: 'vrij' | 'studie' | 'woning' | 'onderneming'
 }
 
+export interface BegrafenisMetadata {
+  uitvaartType?: 'begraven' | 'crematie' | 'natuurbegraven'
+  uitvaartkosten?: number
+  heeftVerzekering?: boolean
+  verzekeringDekking?: number
+  grafrechtenJaar?: number
+  extraWensen?: number
+}
+
 /** Schenkingsvrijstellingen 2026 (Belastingdienst) per jaar per ontvanger */
 export const SCHENKING_VRIJSTELLING: Record<string, number> = {
   kind: 6633,
@@ -519,6 +528,7 @@ export type LifeEventMetadataMap = {
   scheiding: ScheidingMetadata
   werkloosheid: WerkloosheidMetadata
   schenking: SchenkingMetadata
+  begrafenis: BegrafenisMetadata
   custom: Record<string, unknown>
 }
 
@@ -1162,6 +1172,30 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
         { value: 'woning', label: 'Woning (jubelton afgeschaft)' },
         { value: 'onderneming', label: 'Onderneming' },
       ], tip: 'De jubelton (eenmalige verhoogde vrijstelling voor woning) is afgeschaft per 2024. Andere doelen hebben geen extra fiscaal voordeel.' },
+    ],
+  },
+  begrafenis: {
+    label: 'Begrafenis / Uitvaart',
+    icon: 'Flower2',
+    group: 'leven',
+    impactRange: '€7.000–€15.000 eenmalig',
+    defaultCost: 9000,
+    defaultMonthlyCost: 0,
+    defaultMonthlyIncome: 0,
+    defaultDuration: 0,
+    description: 'Kosten van je eigen uitvaart, inclusief verzekering en nalatenschap',
+    tip: 'Gemiddelde uitvaartkosten NL 2026: €8.000–€12.000. Crematie is gemiddeld €1.000–€2.000 goedkoper dan begraven. Een naturapolis dekt de diensten, een sommenpolis keert een vast bedrag uit. Zonder verzekering vallen de kosten op je nabestaanden.',
+    fields: [
+      { key: 'uitvaartType', label: 'Type uitvaart', fieldType: 'select', default: 'begraven', options: [
+        { value: 'begraven', label: 'Begraven' },
+        { value: 'crematie', label: 'Crematie' },
+        { value: 'natuurbegraven', label: 'Natuurbegraven' },
+      ], tip: 'Begraven: €9.000–€14.000. Crematie: €6.000–€10.000. Natuurbegraven: €3.000–€6.000. Prijzen incl. uitvaartverzorging, kist/urn, rouwkaarten, koffietafel.' },
+      { key: 'uitvaartkosten', label: 'Geschatte uitvaartkosten', fieldType: 'number', default: 9000, tip: 'Totale geschatte uitvaartkosten. Nibud 2026: gemiddeld €8.000–€12.000. Inclusief: verzorging (€2.500), kist (€500–€3.000), begraafplaats/crematorium (€1.500–€4.000), rouwkaarten, bloemen, koffietafel, grafsteen.' },
+      { key: 'heeftVerzekering', label: 'Uitvaartverzekering', fieldType: 'toggle', default: false, tip: 'Heb je een uitvaartverzekering? Naturapolis: uitvaartondernemer regelt alles. Sommenpolis: vast bedrag (check of het nog toereikend is, veel oude polissen dekken maar €3.000–€5.000).' },
+      { key: 'verzekeringDekking', label: 'Dekkingsbedrag verzekering', fieldType: 'number', default: 0, suffix: '€', tip: 'Dekkingsbedrag van je uitvaartverzekering. Naturapolis: vul de geschatte waarde in. Sommenpolis: het verzekerde bedrag. Verschil met uitvaartkosten = restkosten voor nabestaanden.' },
+      { key: 'grafrechtenJaar', label: 'Grafrechten (jaren)', fieldType: 'number', default: 20, suffix: 'jaar', tip: 'Grafrechten worden afgekocht voor 10–30 jaar. Kosten: €1.500–€5.000 voor 20 jaar, afhankelijk van gemeente. Bij crematie niet van toepassing.' },
+      { key: 'extraWensen', label: 'Extra wensen', fieldType: 'number', default: 0, tip: 'Rouwadvertentie (€500–€2.000), bijzondere locatie, muzikanten, speciale kist, uitgebreide koffietafel, etc.' },
     ],
   },
   custom: {
