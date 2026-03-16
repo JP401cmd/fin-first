@@ -13,6 +13,9 @@ import {
   TrendingUp,
   BarChart3,
   LayoutDashboard,
+  RefreshCw,
+  Bell,
+  FileText,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
@@ -288,60 +291,39 @@ export default function GidsPage() {
             color="var(--color-kern-400)"
             description={
               <>
-                Je budget is de kaart van je uitgaven — het laat zien waar je levenstijd naartoe gaat.
-                TriFinity start met 6 hoofdcategorieën en 24 subcategorieën die je volledig kunt
-                aanpassen. Elk budget heeft een type (inkomsten, uitgaven, sparen, schulden of verborgen)
-                en is gemarkeerd als essentieel of niet-essentieel. Dat onderscheid is cruciaal: je
-                FIRE-berekening gebruikt je essentiële uitgaven om te bepalen hoeveel vermogen je nodig
-                hebt.
-                <br />
-                <br />
-                Drie weergaven geven je inzicht: de boomweergave toont je hiërarchie met
-                voortgangsbalken, de donutweergave je verdeling, en de sparklines tonen 6-maanden
-                trends. Het maandrapport vat alles samen in gewonnen of verloren vrijheidsdagen. En het
-                mooiste: budget is optioneel — vul alleen je geschatte maanduitgaven in en TriFinity
-                doet de rest.
+                Ontdek waar je levenstijd naartoe stroomt. TriFinity verdeelt je uitgaven over <strong>6 hoofdcategorieën en 24 subcategorieën</strong> met vijf budgettypes (inkomsten, uitgaven, sparen, schulden, verborgen). Elke categorie markeer je als <strong>essentieel of niet-essentieel</strong> — dat bepaalt rechtstreeks je FIRE-berekening. Drie weergaven geven inzicht: <strong>boomstructuur</strong> met voortgangsbalken, <strong>donutgrafiek</strong> voor verdeling, en <strong>sparklines</strong> voor 6-maanden trends. Tik op een categorie voor het <strong>kassabon</strong>-detail en zie je maandrapport in gewonnen of verloren <strong>vrijheidsdagen</strong>. Budgetteren is volledig optioneel — vul alleen je geschatte maanduitgaven in en TriFinity doet de rest.
               </>
             }
             howTo={{
               steps: [
-                "Ga naar De Kern \u2192 Budgetten \u2014 je standaardplan staat klaar met 6 categorie\u00ebn",
-                "Pas limieten aan per categorie en kies het interval (maand, kwartaal, jaar) en overschotgedrag (reset, doorschuiven of beleggen)",
-                "Markeer elke categorie als essentieel of niet-essentieel \u2014 dit be\u00efnvloedt je FIRE-berekening direct",
-                "Na transactie-import worden uitgaven automatisch aan budgetten gekoppeld via AI-categorisatie",
+                "Ga naar De Kern → Budgetten — je standaardplan staat klaar met 6 categorieën",
+                "Pas limieten aan per categorie en kies interval (maand, kwartaal, jaar) en overschotgedrag (reset, doorschuiven of beleggen)",
+                "Markeer elke categorie als essentieel of niet-essentieel — dit beïnvloedt je FIRE-berekening direct",
+                "Na transactie-import worden uitgaven automatisch gekoppeld via AI-categorisatie",
                 "Bekijk je voortgang in boom-, donut- of sparkline-weergave en tik op een categorie voor de kassabon-details",
               ],
-              tip: "Begin simpel \u2014 pas alleen de limieten aan van je top-5 uitgavencategorie\u00ebn. De rest verfijn je later.",
+              tip: "Begin simpel — pas alleen de limieten aan van je top-5 uitgavencategorieën. De rest verfijn je later.",
             }}
           />
 
           <GuideTopicCard
-            icon={Receipt}
+            icon={FileText}
             title="Belasting"
             color="var(--color-kern-400)"
             description={
               <>
-                TriFinity berekent automatisch je Box 3 vermogensrendementsheffing op basis van je
-                bezittingen en schulden. De berekening kent het verschil tussen spaargeld (lager forfait)
-                en beleggingen (hoger forfait), en welke bezittingen zijn vrijgesteld. Schulden worden
-                verrekend boven de drempelwaarde.
-                <br />
-                <br />
-                Heb je een partner? De partneroptimalisatie berekent de fiscaal voordeligste verdeling
-                van jullie gezamenlijke grondslag — dat kan honderden euro&apos;s schelen. Vergelijk twee
-                belastingjaren naast elkaar en gebruik het scenariomodel om te zien wat er verandert als
-                je vermogen groeit.
+                Zie in één oogopslag hoeveel vrijheidstijd de fiscus kost. TriFinity berekent automatisch je <strong>Box 3</strong> vermogensrendementsheffing met het juiste forfait per vermogenstype — <strong>spaargeld</strong> (lager forfait) versus <strong>beleggingen</strong> (hoger forfait) — en verrekent schulden boven de drempel. Heb je een partner? De <strong>partneroptimalisatie</strong> berekent de fiscaal voordeligste verdeling van jullie gezamenlijke grondslag. Vergelijk <strong>twee belastingjaren</strong> naast elkaar en gebruik het <strong>scenariomodel</strong> om te zien wat er verandert als je vermogen groeit. Voor DGA&apos;s berekent TriFinity ook <strong>Box 2</strong>: aanmerkelijk belang, dividenduitkeringen en de wet excessief lenen bij een eigen BV.
               </>
             }
             howTo={{
               steps: [
-                "Ga naar De Kern \u2192 Belasting \u2014 je Box 3 wordt automatisch berekend op basis van je geregistreerde bezittingen en schulden",
+                "Ga naar De Kern → Belasting — je Box 3 wordt automatisch berekend op basis van je geregistreerde bezittingen en schulden",
                 "Controleer de classificatie: spaargeld, beleggingen en vrijgestelde bezittingen worden automatisch ingedeeld",
-                "Wissel tussen belastingjaren (2025/2026) om het verschil te zien",
-                'Activeer "Partner" om de optimale verdeling van de grondslag te berekenen',
+                "Wissel tussen belastingjaren (2025/2026) om het verschil in forfaittarieven te zien",
+                "Activeer \"Partner\" om de optimale verdeling van de grondslag te berekenen — dat kan honderden euro's schelen",
                 "Open het scenariomodel om te simuleren wat er verandert bij meer spaargeld, meer beleggingen of hogere schulden",
               ],
-              tip: "Check je belastingpagina na elke grote vermogenswijziging \u2014 een verschuiving van spaargeld naar beleggingen kan je belastingdruk flink veranderen.",
+              tip: "Check je belastingpagina na elke grote vermogenswijziging — een verschuiving van spaargeld naar beleggingen kan je belastingdruk flink veranderen.",
             }}
           />
         </ReisStapSection>
@@ -432,6 +414,74 @@ export default function GidsPage() {
           ctaLabel="Start een scenario"
           ctaHref="/horizon/whatif"
           isComplete={false}
+        />
+      </div>
+
+      {/* ── Overal ── */}
+      <p className="label-editorial mb-3 text-[var(--ink-3)]">Overal</p>
+      <div className="mb-6 grid grid-cols-1 gap-2 sm:mb-8 lg:grid-cols-2">
+        <GuideTopicCard
+          icon={RefreshCw}
+          title="Check-in"
+          color="var(--ink-2)"
+          description={
+            <>
+              Eén keer per maand neem je 10 minuten voor je financiële gezondheid. De check-in is een 7-stappen wizard: terugblik op vorige maand (vermogenswijziging, inkomsten, uitgaven, gewonnen vrijheidsdagen), bezittingen bijwerken, schulden bijwerken, doelen checken, budgetten evalueren, vooruitblik op komende maand, en een moment voor reflectie met vrije notities.
+              {' '}
+              Will bereidt gespreksstarters voor op basis van je recente financiële veranderingen — ideaal als startpunt voor reflectie of een gesprek met je partner. Je kunt eerdere check-ins terugbladeren om je groei over maanden te zien.
+            </>
+          }
+          howTo={{
+            steps: [
+              'Ga naar De Kern → Check-in (of volg de herinnering in je meldingen)',
+              'Stap 1: Bekijk de terugblik — vergelijk vorige maand met nu',
+              'Stap 2-5: Werk bezittingen, schulden, doelen en budgetten bij',
+              'Stap 6: Bekijk de vooruitblik met komende rekeningen en events',
+              'Stap 7: Schrijf een korte reflectie — wat ging goed, wat kan beter?',
+            ],
+            tip: 'Plan je check-in op een vaste dag (bijv. de eerste zondag van de maand). Routine maakt het moeiteloos.',
+          }}
+        />
+
+        <GuideTopicCard
+          icon={Bell}
+          title="Meldingen"
+          color="var(--ink-2)"
+          description={
+            <>
+              TriFinity stuurt je meldingen wanneer het ertoe doet: budgetgrenzen die naderen, ongebruikelijke transacties, vermogensmijlpalen die je bereikt, level-ups in je soevereiniteit, en aanbevelingen die klaarstaan. Urgente alerts verschijnen bovenaan, dagelijkse meldingen daaronder, en eerdere meldingen zijn per dag terug te bladeren. Per type kun je meldingen aan of uitzetten.
+            </>
+          }
+          howTo={{
+            steps: [
+              'Meldingen verschijnen via het bel-icoon in de navigatiebalk',
+              'Tik op een melding om naar het relevante onderdeel te gaan',
+              'Beheer je meldingsvoorkeuren via Identiteit → Instellingen → Notificaties',
+            ],
+            tip: 'Laat budgetalerts en mijlpalen aan staan — ze houden je gemotiveerd zonder overweldigd te raken.',
+          }}
+        />
+
+        <GuideTopicCard
+          icon={FileText}
+          title="Rapporten"
+          color="var(--ink-2)"
+          description={
+            <>
+              Vertaal je financiële data naar leesbare rapporten die je kunt bewaren en terugbladeren. Drie rapporttypes geven je overzicht vanuit verschillende invalshoeken: een <strong>perioderapport</strong> vat je inkomsten, uitgaven en vermogensverandering samen over een maand, kwartaal of jaar. Het <strong>balansrapport</strong> toont al je bezittingen en schulden op één peildatum — je vermogen uitgedrukt in vrijheidstijd. En het <strong>budgetrapport</strong> laat zien hoe je werkelijke uitgaven zich verhouden tot je budgetgrenzen per categorie.
+              {' '}
+              Elk rapport begint met een AI-inleiding: Will schrijft een korte, persoonlijke samenvatting van de belangrijkste bevindingen. Eenmaal gegenereerd kun je rapporten opslaan en later terugvinden op je rapportages-overzichtspagina.
+            </>
+          }
+          howTo={{
+            steps: [
+              'Ga naar Rapportages via het profielmenu of de navigatie',
+              'Kies je rapporttype (periode, balans of budget) en selecteer de gewenste periode',
+              'Genereer het rapport — Will schrijft automatisch een persoonlijke inleiding',
+              'Bewaar het rapport om het later terug te lezen of te vergelijken met eerdere periodes',
+            ],
+            tip: 'Genereer na elke maandelijkse check-in een perioderapport. Zo bouw je een financieel archief op dat je groei over maanden en jaren zichtbaar maakt.',
+          }}
         />
       </div>
 
