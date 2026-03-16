@@ -989,44 +989,54 @@ export default function GidsPage() {
             valueText="FIRE bereiken is één ding. Weten hoe je je vermogen veilig opneemt is minstens zo belangrijk. Kies een strategie die past bij jouw leven."
             description={
               <>
-                TriFinity ondersteunt drie eindstrategie_REPLACE_BLOCK_en \u2014 en dan? Je onttrekkingsstrategie
-                bepaalt{" "}
-                <strong>hoe je je vermogen veilig opneemt</strong> zodat je nooit
-                zonder zit. TriFinity ondersteunt drie eindstrategie\u00ebn:{" "}
-                <strong>Perpetueel</strong> \u2014 je vermogen blijft eeuwig
-                intact en je leeft van het rendement. Ideaal als je wilt nalaten
-                of oneindig financieel vrij wilt zijn.{" "}
-                <strong>Legacy</strong> \u2014 je onttrekt z\u00f3 dat er een
-                vooraf bepaald bedrag overblijft voor erfgenamen, terwijl je
-                tussentijds maximaal van je vermogen geniet.{" "}
-                <strong>Deplete</strong> \u2014 je maakt alles op voor een
-                gekozen eindleeftijd. Maximale besteding, niets over.
-                {" "}
-                Het <strong>veilige onttrekkingspercentage (SWR)</strong> bepaalt
-                hoeveel je jaarlijks kunt opnemen. In de Nederlandse context
-                hanteert TriFinity standaard het NL SWR van ~3,5%, lager dan de
-                Amerikaanse 4%-regel, omdat Box 3 belasting je effectief
-                rendement verlaagt. Je SWR wordt automatisch berekend op basis
-                van je gekozen eindstrategie, verwacht rendement en inflatie.
-                {" "}
-                <strong>Box 3 impact:</strong> Nederland belast fictief rendement
-                op vermogen boven de vrijstelling (\u20ac57.000 p.p.). Bij
-                onttrekking daalt je vermogen, waardoor je Box 3 heffing elk jaar
-                lager wordt \u2014 een natuurlijk belastingvoordeel. TriFinity
-                rekent dit mee in de simulatie: je ziet het netto-effect na
-                belasting, niet alleen het bruto rendement.
+                TriFinity ondersteunt drie eindstrategieën (FireEndStrategy):
+                <br />
+                <br />
+                <strong>Perpetual (eeuwigdurend)</strong> — je neemt jaarlijks
+                ~4% op en laat je vermogen intact. Je leeft van het rendement,
+                en je kapitaal raakt nooit op. Conservatief maar veilig. Ideaal
+                als je wilt dat je geld &apos;nooit&apos; opraakt of als je wilt
+                nalaten aan erfgenamen.
+                <br />
+                <br />
+                <strong>Legacy (nalaten)</strong> — je houdt een vastgesteld
+                bedrag over voor je erfgenamen. De rest gebruik je voor jezelf.
+                Stel in hoeveel je wilt nalaten — TriFinity berekent hoeveel je
+                jaarlijks kunt opnemen zodat precies dat bedrag overblijft.
+                <br />
+                <br />
+                <strong>Deplete (opbranden)</strong> — je bouwt je vermogen
+                bewust af tot €0 op een gekozen leeftijd (bijv. 90 jaar).
+                Hierdoor kun je eerder stoppen met werken of meer uitgeven.
+                Maximale besteding, niets over — maar je hebt ook geen buffer
+                als je langer leeft dan gepland.
+                <br />
+                <br />
+                <strong>Instellen:</strong> ga naar Identiteit → Instellingen →
+                FIRE-parameters (sectie C). Kies je strategie, eindleeftijd en
+                eventueel legacy-bedrag. Alle projecties — FIRE-datum,
+                vermogenspad, Monte Carlo simulatie — passen zich direct aan.
+                <br />
+                <br />
+                <strong>SWR-monitor:</strong> de SWR-widget op je dashboard toont
+                je huidige vs. benodigde onttrekkingspercentage, gecorrigeerd
+                voor Box 3 belasting en inflatie. In Nederland is de effectieve
+                SWR lager dan de Amerikaanse 4%-regel, omdat
+                vermogensbelasting je effectief rendement verlaagt. TriFinity
+                rekent dit mee: je ziet het netto-effect na belasting, niet
+                alleen het bruto rendement.
               </>
             }
             howTo={{
               steps: [
-                "Ga naar Identiteit \u2192 Instellingen \u2192 FIRE Instellingen en kies je eindstrategie: perpetueel, legacy of deplete",
-                "Stel je verwacht rendement en inflatiepercentage in \u2014 deze bepalen je SWR en benodigd FIRE-vermogen",
-                "Ga naar De Horizon \u2014 je onttrekkingsstrategie wordt direct verwerkt in de FIRE-projectie en Monte Carlo simulatie",
-                "Vergelijk de drie strategie\u00ebn: perpetueel vereist het meeste vermogen, deplete het minste \u2014 maar geeft geen buffer",
-                "Bekijk het Box 3 effect: je ziet hoeveel belasting je betaalt bij onttrekking en hoe die daalt naarmate je vermogen afneemt",
-                "Bekijk het effect op je netto onttrekking na belasting \u2014 dat is wat je echt maandelijks te besteden hebt",
+                "Ga naar Identiteit → Instellingen → FIRE Instellingen en kies je eindstrategie: perpetueel, legacy of deplete",
+                "Stel je verwacht rendement en inflatiepercentage in — deze bepalen je SWR en benodigd FIRE-vermogen",
+                "Bij Legacy: voer het gewenste nalatenschapsbedrag in. Bij Deplete: kies je eindleeftijd (bijv. 85 of 90 jaar)",
+                "Ga naar De Horizon — je onttrekkingsstrategie wordt direct verwerkt in de FIRE-projectie en het vermogenspad",
+                "Vergelijk de drie strategieën: perpetueel vereist het meeste vermogen, deplete het minste — maar geeft geen buffer",
+                "Bekijk de SWR-monitor widget op je dashboard — deze toont je veilige onttrekking gecorrigeerd voor Box 3 belasting en inflatie",
               ],
-              tip: "Begin met perpetueel als veilige basis. Als je FIRE-datum te ver weg lijkt, experimenteer met deplete \u2014 je ziet direct hoeveel jaar eerder je vrij bent. Legacy is de gulden middenweg als je ook aan erfgenamen denkt.",
+              tip: "Begin met perpetueel als veilige basis. Als je FIRE-datum te ver weg lijkt, experimenteer met deplete — je ziet direct hoeveel jaar eerder je vrij bent. Legacy is de gulden middenweg als je ook aan erfgenamen denkt.",
             }}
           />
         </ReisStapSection>
@@ -1131,20 +1141,19 @@ export default function GidsPage() {
             color="var(--color-horizon-400)"
             description={
               <>
-                De Horizon wordt steeds slimmer. Dit zijn features die we aan het
-                bouwen zijn:
+                De Horizon wordt steeds scherper. Dit staat op de planning:
                 <ul className="mt-2 list-disc pl-4 space-y-1">
                   <li>
-                    <strong>Glijpad-visualisatie</strong> &mdash; een interactieve
-                    grafiek die je vermogensafbouw na FIRE toont per
-                    onttrekkingsstrategie, inclusief belastingeffect en
-                    inflatiecorrectie over de jaren.
+                    <strong>Pensioensimulatie</strong> &mdash; koppel je AOW,
+                    aanvullend pensioen en lijfrente aan je FIRE-berekening. Zie
+                    wanneer welk inkomen ingaat en hoeveel eigen vermogen je tot
+                    die tijd nodig hebt.
                   </li>
                   <li>
-                    <strong>Pensioen-integratie</strong> &mdash; koppel je AOW en
-                    aanvullend pensioen aan je FIRE-berekening. Zie wanneer welk
-                    inkomen ingaat en hoeveel eigen vermogen je tot die tijd nodig
-                    hebt.
+                    <strong>Internationale belastingvergelijking</strong> &mdash;
+                    vergelijk je vermogensbelasting met andere landen. Wat als je
+                    in Portugal, Belgi&euml; of Duitsland woont? Ontdek het
+                    fiscale effect op je FIRE-datum.
                   </li>
                   <li>
                     <strong>Scenario-vergelijker</strong> &mdash; sla meerdere
@@ -1356,46 +1365,51 @@ export default function GidsPage() {
           color="var(--ink-2)"
           description={
             <>
-              <strong>Diepere analyse wanneer je dat wilt.</strong> Rapporten
-              vertalen je financiële data naar leesbare overzichten die je kunt
-              bewaren, terugbladeren en vergelijken over periodes.
+              <strong>
+                Soms wil je het grotere plaatje. Rapporten geven je een diepere
+                analyse — per maand, kwartaal of jaar.
+              </strong>{" "}
+              Drie rapporttypen helpen je patronen en groei te begrijpen.
               {" "}
-              Het <strong>perioderapport</strong> vat je inkomsten, uitgaven en
-              vermogensverandering samen over een maand, kwartaal of jaar. Je
-              ziet precies waar je geld naartoe ging en hoe je vermogen zich
-              ontwikkelde — ideaal als maandelijkse terugblik.
+              Het <strong>balansrapport</strong> toont je vermogensopbouw over
+              tijd: hoe je bezittingen en schulden zijn veranderd per maand of
+              kwartaal. Cash, beleggingen, vastgoed en pensioen tegenover
+              hypotheek en overige schulden — je netto vermogen uitgedrukt in
+              vrijheidstijd.
               {" "}
-              Het <strong>balansrapport</strong> toont al je bezittingen en
-              schulden op één peildatum: cash, beleggingen, vastgoed en pensioen
-              aan de ene kant, hypotheek en overige schulden aan de andere. Je
-              netto vermogen wordt uitgedrukt in vrijheidstijd, zodat je direct
-              ziet hoeveel jaren onafhankelijkheid je hebt opgebouwd.
+              Het <strong>budgetrapport</strong> laat je uitgaven per categorie
+              zien met maand-op-maand trends. Zie direct waar je meer of minder
+              uitgeeft dan vorige periodes en waar je structureel boven of onder
+              budget zit.
               {" "}
-              Het <strong>budgetrapport</strong> laat zien hoe je werkelijke
-              uitgaven zich verhouden tot je budgetgrenzen per categorie. Trends
-              over meerdere maanden maken zichtbaar waar je structureel boven of
-              onder budget zit.
+              Het <strong>jaaroverzicht</strong> is een complete samenvatting van
+              je financiële jaar: totaal inkomen, uitgaven, gespaarde bedragen,
+              vermogensgroei en bereikte doelen — alles in één overzicht.
               {" "}
-              Een <strong>jaaroverzicht</strong> combineert al deze perspectieven
-              in één samenvattend rapport: totale inkomsten en uitgaven,
-              vermogensgroei, top-budgetcategorieën en mijlpalen die je dat jaar
-              bereikte.
+              <strong>Periodes:</strong> kies uit maand (tot 24 maanden terug),
+              kwartaal (8 kwartalen) of jaar (5 jaar). Elke sectie in een
+              rapport is configureerbaar — je bepaalt zelf welke onderdelen je
+              wilt zien.
               {" "}
-              Elk rapport begint met een <strong>AI-inleiding</strong>: Will
-              schrijft een korte, persoonlijke samenvatting van de belangrijkste
-              bevindingen. Eenmaal gegenereerd kun je rapporten opslaan en later
-              terugvinden op je rapportages-overzichtspagina.
+              Optioneel voegt de <strong>AI-samenvatting</strong> een geschreven
+              analyse toe: Will benoemt patronen, bijzonderheden en
+              aandachtspunten. Dit is opt-in — je kiest zelf of je de
+              AI-analyse wilt genereren.
+              {" "}
+              Elk rapport kun je <strong>downloaden als PDF</strong> voor je
+              administratie of om te delen.
             </>
           }
           howTo={{
             steps: [
-              "Ga naar Rapportages via het profielmenu (tussen Identiteit en Uitloggen) of via de navigatie",
-              "Kies je rapporttype: perioderapport, balansrapport, budgetrapport of jaaroverzicht",
-              "Selecteer de gewenste periode — een maand, kwartaal of volledig jaar",
-              "Genereer het rapport — Will schrijft automatisch een persoonlijke AI-inleiding met de belangrijkste inzichten",
-              "Bewaar het rapport om het later terug te lezen of te vergelijken met eerdere periodes",
+              "Openen — Ga naar Rapportages via het profielmenu rechtsboven (tussen Identiteit en Uitloggen)",
+              "Balansrapport — Kies 'Balansrapport' en selecteer een periode om je vermogensopbouw over tijd te zien",
+              "Budgetrapport — Bekijk je uitgaven per categorie met trends: waar geef je meer of minder uit dan vorige periodes?",
+              "Jaaroverzicht — Genereer een complete samenvatting van je financiële jaar met totalen, groei en mijlpalen",
+              "AI-samenvatting — Schakel optioneel de AI-analyse in voor een geschreven samenvatting van patronen en bijzonderheden",
+              "Download — Exporteer elk rapport als PDF voor je administratie of om te delen",
             ],
-            tip: "Genereer na elke maandelijkse check-in een perioderapport. Zo bouw je een financieel archief op dat je groei over maanden en jaren zichtbaar maakt.",
+            tip: "Genereer na elke maandelijkse check-in een balansrapport. Zo bouw je een financieel archief op dat je groei over maanden en jaren zichtbaar maakt.",
           }}
         />
 
@@ -1546,42 +1560,64 @@ export default function GidsPage() {
           icon={Users}
           title="Huishouden & Partner"
           color="var(--ink-2)"
+          valueText="Financiële vrijheid bereik je samen. TriFinity ondersteunt elke verdeling — van volledig gezamenlijk tot gescheiden met gedeeld zicht."
           description={
             <>
-              Samen financiële vrijheid bereiken — dat is de kern van het
-              huishoudperspectief. Nodig je partner uit en beheer jullie
-              financiën samen, met respect voor individuele privacy. Per
-              bezitting, rekening of schuld kies je het{" "}
-              <strong>eigenaarschap</strong>: persoonlijk (alleen voor jou
-              zichtbaar), gedeeld (zichtbaar voor jullie beiden) of verborgen.
-              Per categorie (vermogen, schulden, inkomsten) stel je het{" "}
-              <strong>zichtbaarheidsniveau</strong> in: volledig, alleen totalen
-              of volledig verborgen.
-              {" "}
-              <strong>Gedeeld vermogen</strong> combineert jullie gezamenlijke
-              rekeningen, beleggingen en vastgoed tot één huishoud-netto-vermogen
-              — uitgedrukt in gezamenlijke vrijheidstijd. De kostenverdeling is
-              configureerbaar: gelijk of naar rato van inkomen, met een primaire
-              betaler voor gezamenlijke lasten. <strong>Gedeelde doelen</strong>{" "}
-              laten jullie samen sparen naar een gemeenschappelijk doel.
-              {" "}
-              De <strong>gezamenlijke FIRE-projectie</strong> berekent jullie pad
-              naar financiële vrijheid met twee inkomens, gedeelde uitgaven en
-              gecombineerd vermogen. Op elke pagina wissel je via een toggle
-              tussen je persoonlijke en huishoudperspectief.
+              Nodig je partner uit via Identiteit → Profiel →
+              Huishouden en beheer jullie financiën samen, met respect voor
+              ieders privacy.
+              <br />
+              <br />
+              <strong>Verdeling</strong> — Kies hoe jullie kosten
+              verdelen: gelijk (50/50), naar inkomen (wie meer verdient betaalt
+              meer), handmatig (zelf percentages instellen), of één
+              draagt alles. De gekozen split-mode geldt voor alle gedeelde
+              uitgaven en wordt automatisch doorberekend.
+              <br />
+              <br />
+              <strong>Privacy per categorie</strong> — Per categorie
+              (vermogen, schulden, budgetten, transacties, inkomen) kies je wat
+              je partner ziet: alles (full), alleen totalen (totals) of niets
+              (hidden). Persoonlijk blijft altijd persoonlijk.
+              <br />
+              <br />
+              <strong>Eigenaarschap</strong> — Elke rekening, asset of
+              schuld markeer je als &lsquo;persoonlijk&rsquo; of
+              &lsquo;gedeeld&rsquo;. Persoonlijke items zijn alleen voor jou
+              zichtbaar; gedeelde items tellen mee in het huishoudoverzicht en
+              de gezamenlijke vrijheidstijd.
+              <br />
+              <br />
+              <strong>Gezamenlijke FIRE-projectie</strong> — De Horizon
+              berekent jullie gezamenlijke pad naar financiële vrijheid met
+              twee inkomens, gedeelde uitgaven en gecombineerd vermogen —
+              één vrijheidsdatum voor het hele huishouden.
+              <br />
+              <br />
+              <strong>Meldingen</strong> — Stel in of je meldingen krijgt
+              over je partners transacties: altijd (all_shared), boven een
+              drempelbedrag (threshold), per categorie (categories), of nooit
+              (disabled). Zo houd je samen overzicht zonder elkaars privacy te
+              schenden.
+              <br />
+              <br />
+              <strong>Widgets</strong> — Twee huishoud-widgets op het
+              dashboard: <em>huishouden_vergelijking</em> (wie draagt wat bij) en{" "}
+              <em>huishouden_activiteit</em> (recente gedeelde transacties en
+              activiteit).
             </>
           }
           howTo={{
             steps: [
-              "Ga naar Identiteit \u2192 Delen en nodig je partner uit via e-mailadres",
+              "Ga naar Identiteit \u2192 Profiel \u2192 Huishouden en nodig je partner uit via e-mailadres",
               "Je partner ontvangt een uitnodigingslink en maakt een eigen account aan",
-              "Stel het huishouden in: kies een huishoudnaam en configureer de kostenverdeling (50/50 of aangepast percentage)",
-              "Markeer rekeningen en bezittingen als persoonlijk of gedeeld \u2014 dit bepaalt wat je partner kan zien",
-              "Configureer per categorie het privacyniveau: volledig, totalen of verborgen",
+              "Kies de kostenverdeling: gelijk (50/50), naar inkomen, handmatig percentage, of \u00e9\u00e9n draagt alles",
+              "Markeer rekeningen, bezittingen en schulden als persoonlijk of gedeeld \u2014 dit bepaalt wat meetelt in het huishoudoverzicht",
+              "Configureer per categorie (vermogen, schulden, budgetten, transacties, inkomen) het privacyniveau: volledig, totalen of verborgen",
+              "Stel partner-meldingen in: altijd, boven een drempel, per categorie, of nooit",
               "Bekijk de gezamenlijke FIRE-projectie op De Horizon \u2014 twee inkomens, gedeelde uitgaven, \u00e9\u00e9n vrijheidsdatum",
-              "Wissel op elke pagina tussen persoonlijk en huishoudperspectief via de toggle",
             ],
-            tip: "Bespreek samen welk privacyniveau jullie prettig vinden voordat je het instelt. Begin met totalen delen en breid uit als het vertrouwen groeit.",
+            tip: "Bespreek samen welk privacyniveau jullie prettig vinden voordat je het instelt. Begin met \u2018totalen\u2019 delen en breid uit als het vertrouwen groeit.",
           }}
         />
 
