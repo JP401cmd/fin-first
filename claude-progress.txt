@@ -1,3 +1,25 @@
+## Session 2026-03-16 - Features #109, #110
+
+### Feature #109: Drop badges/streaks tabellen in Supabase - PASSING
+- Created migration 20260316600001_drop_badges_streaks_tables.sql
+- DROP TABLE IF EXISTS user_streaks, user_badges, badges CASCADE
+- Removed CREATE TABLE statements from apply-migration/route.ts and beheer/migration/page.tsx
+- Removed /api/badges/evaluate fire-and-forget calls from login/page.tsx and snapshots/route.ts
+- Removed unused `headers` import from snapshots/route.ts
+- Updated migration status check to exclude dropped tables
+- Zero TypeScript errors, zero console errors
+- Commit: b827b411
+
+### Feature #110: Verwijder showStreak tool uit AI briefing - PASSING
+- Verified: lib/ai/dna/briefing.ts already has NO showStreak tool or streak instructions
+- The cleanup was already done in previous sessions (features #34-36)
+- Only streak references remaining are local variables in condense.ts/trends.ts (counting consecutive growth months — not gamification)
+- No code changes needed (verification-only)
+
+### Current Status
+- 2 features completed this session (#109, #110)
+- ~107/175 features passing
+
 ## Session 2026-03-16 - Features #86, #87, #88
 
 ### Feature #86: Broker CSV import (DEGIRO, Saxo, ING) - PASSING
@@ -13434,3 +13456,20 @@ For Feature #51 (Transaction Import):
 - 2 features completed this session (#99, #106)
 - Zero TypeScript errors in all changed files
 - Zero console errors verified via browser
+
+## Session 2026-03-16 - Features #111, #112
+
+### Feature #111: Verwijder streak briefing types - PASSING
+- Removed streak interface and union member from briefing types.ts
+- Removed streak from CARD_SPAN record
+- Deleted streak-card.tsx component
+- Removed showStreak tool and case from compose route and briefing DNA
+- Zero TypeScript errors after cleanup
+
+### Feature #112: Cleanup Notification type in widget-renderer - PASSING
+- Verified: Notification type already clean (badge/streak removed in Feature #36)
+- No code changes needed
+
+### Current Status
+- 2 features completed this session (#111, #112)
+- Commit: b947400a
