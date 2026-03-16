@@ -821,8 +821,7 @@ export default function GidsPage() {
             color="var(--color-wil-400)"
             description={
               <>
-                De Wil groeit mee met jou. Dit zijn features die we aan het
-                bouwen zijn:
+                De Wil groeit mee met jou. Dit staat op de planning:
                 <ul className="mt-2 list-disc pl-4 space-y-1">
                   <li>
                     <strong>Uitgavenpatronen</strong> &mdash; automatische
@@ -864,7 +863,7 @@ export default function GidsPage() {
                 ]
               : ["Bereken wanneer werken optioneel wordt"]
           }
-          valueSentence="Zie je toekomst in drie scenario's — en kies welk pad je wilt bewandelen."
+          valueSentence="De Horizon laat zien wanneer je financieel vrij bent. Niet als fantasie, maar als berekening — gebaseerd op je werkelijke cijfers, je plannen, en de onzekerheden van het leven."
           ctaLabel="Bekijk je prognose"
           ctaHref="/horizon"
           isComplete={!!progress?.steps.hasFireData && !!progress?.steps.hasLifeEvents}
@@ -875,23 +874,23 @@ export default function GidsPage() {
             color="var(--color-horizon-400)"
             description={
               <>
-                De FIRE-berekening beantwoordt de belangrijkste vraag:{" "}
-                <strong>wanneer ben je financieel vrij?</strong> TriFinity toont
-                je netto vermogensgrafiek over 30+ jaar met drie scenario&apos;s
-                \u2014 pessimistisch, verwacht en optimistisch \u2014 op basis
-                van je huidige vermogen, spaarquote, verwacht rendement en
-                uitgavenpatroon. Je ziet je verwachte FIRE-leeftijd, de countdown
-                in jaren/maanden/dagen, en het volledige vermogenspad tot aan je
-                financi\u00eble vrijheid.
+                De app berekent op welke leeftijd je genoeg vermogen hebt om van
+                te leven zonder te werken. Gebaseerd op je{" "}
+                <strong>huidige vermogen</strong>,{" "}
+                <strong>spaarquote</strong>,{" "}
+                <strong>verwacht rendement</strong> en{" "}
+                <strong>uitgaven</strong>. TriFinity toont je netto
+                vermogensgrafiek over 30+ jaar met drie scenario&apos;s \u2014
+                pessimistisch, verwacht en optimistisch. Je ziet je verwachte
+                FIRE-leeftijd, de countdown in jaren/maanden/dagen, en het
+                volledige vermogenspad tot aan je financi\u00eble vrijheid.
                 {" "}
-                De kern van de berekening is de{" "}
-                <strong>Safe Withdrawal Rate (SWR)</strong>: je jaarlijkse
-                uitgaven gedeeld door de SWR bepaalt hoeveel vermogen je nodig
-                hebt. Stel je eigen <strong>verwacht rendement</strong> en{" "}
-                <strong>inflatiepercentage</strong> in via Instellingen \u2014
-                deze parameters bepalen direct je projectie. Kies je
-                FIRE-eindstrategie: <strong>perpetueel</strong> (eeuwig leven van
-                je vermogen), <strong>legacy</strong> (nalaten aan erfgenamen) of{" "}
+                <strong>Scenario&apos;s:</strong> vergelijk optimistisch, verwacht
+                en pessimistisch. Pas je verwacht rendement aan van{" "}
+                <strong>4% tot 10%</strong> en zie hoe je FIRE-leeftijd
+                verschuift. Kies je FIRE-eindstrategie:{" "}
+                <strong>perpetueel</strong> (eeuwig leven van je vermogen),{" "}
+                <strong>legacy</strong> (nalaten aan erfgenamen) of{" "}
                 <strong>deplete</strong> (alles opmaken voor een bepaalde
                 leeftijd). Box 3 belasting wordt automatisch meegerekend in de
                 simulatie.
@@ -901,7 +900,7 @@ export default function GidsPage() {
               steps: [
                 "Ga naar De Horizon \u2014 je FIRE-prognose wordt automatisch berekend zodra je vermogen en uitgaven hebt ingevuld",
                 "Lees de vermogensgrafiek: de x-as toont je leeftijd, de y-as je vermogen. De drie lijnen zijn pessimistisch, verwacht en optimistisch",
-                "Vergelijk de scenario\u2019s: elk heeft een eigen FIRE-leeftijd en vermogenspad \u2014 zo zie je de bandbreedte van je toekomst",
+                "Vergelijk de scenario\u2019s: pas je verwacht rendement aan van 4% tot 10% en zie direct hoe je FIRE-leeftijd verschuift",
                 "Pas je verwacht rendement, inflatie en SWR aan via Identiteit \u2192 Instellingen \u2192 FIRE Instellingen",
                 "Kies je eindstrategie: perpetueel, legacy of deplete \u2014 elk verandert je benodigd vermogen",
                 "Bekijk de countdown: hoeveel jaar, maanden en dagen tot je FIRE-datum",
@@ -917,13 +916,15 @@ export default function GidsPage() {
             description={
               <>
                 Het leven verloopt niet in een rechte lijn \u2014 en je
-                financi\u00ebn ook niet. Voeg toekomstige gebeurtenissen toe die je
+                financi\u00ebn ook niet. Voeg belangrijke momenten toe die je
                 financi\u00eble pad be\u00efnvloeden: een{" "}
-                <strong>kind</strong> krijgen (hogere maandlasten), een{" "}
-                <strong>huis</strong> kopen (grote aankoop + hypotheek),{" "}
-                <strong>pensioen</strong> ontvangen (extra inkomen na AOW-leeftijd),
-                trouwen, studie betalen, eerder stoppen met werken, een wereldreis
-                maken of een erfenis ontvangen. TriFinity heeft een catalogus van{" "}
+                <strong>kind</strong> krijgen (\u20ac800/maand extra), een{" "}
+                <strong>huis</strong> kopen (eenmalige kosten + hypotheek),{" "}
+                <strong>pensioen</strong> (AOW-inkomen erbij),{" "}
+                <strong>erfenis</strong> ontvangen,
+                trouwen, studie betalen, eerder stoppen met werken of een wereldreis
+                maken. Elk event verschuift je FIRE-datum \u2014 je ziet de
+                impact direct. TriFinity heeft een catalogus van{" "}
                 <strong>50+ voorgedefinieerde events</strong> met realistische
                 cashflow-schattingen.
                 {" "}
@@ -953,18 +954,19 @@ export default function GidsPage() {
             description={
               <>
                 E\u00e9n prognose is een gok \u2014 duizend prognoses zijn een
-                strategie. De <strong>Monte Carlo simulatie</strong> draait 1.000
-                willekeurige marktscenario&apos;s en toont hoe robuust je plan is.
-                Je ziet de <strong>slaagkans</strong> (in hoeveel scenario&apos;s
-                haal je FIRE), de <strong>bandbreedtes</strong> van mogelijke
-                FIRE-leeftijden (p10, p25, p50, p75, p90) en het vermogenspad per
-                percentiel \u2014 van het slechtste tot het beste geval.
+                strategie. De <strong>Monte Carlo simulatie</strong> draait{" "}
+                <strong>1.000 simulaties met willekeurige rendementen</strong>{" "}
+                (goede en slechte jaren) en toont hoe robuust je plan is. Je ziet
+                de <strong>slaagkans</strong> van je plan: &ldquo;In 85% van de
+                gevallen red je het.&rdquo; De <strong>bandbreedtes</strong>{" "}
+                tonen het best-case en worst-case scenario (p10, p25, p50, p75,
+                p90) en het vermogenspad per percentiel.
                 {" "}
-                De <strong>backtesting</strong> voegt historische realiteit toe: hoe
-                zou je plan het hebben gedaan tijdens de dotcom-crash, de
-                financi\u00eble crisis van 2008 of de COVID-dip? Je ziet hoe
-                betrouwbaar je plan is op basis van \u00e9chte historische data.
-                De backtestscore geeft je een concreet getal: het percentage
+                <strong>Backtesting:</strong> stel je was 30 jaar geleden begonnen
+                met exact dit plan \u2014 zou het gewerkt hebben? Historische
+                data toont hoe robuust je strategie is, door de dotcom-crash, de
+                financi\u00eble crisis van 2008 en de COVID-dip heen. De
+                backtestscore geeft je een concreet getal: het percentage
                 historische crisisperiodes waarin je plan overeind bleef.
               </>
             }
