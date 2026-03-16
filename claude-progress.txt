@@ -1,3 +1,14 @@
+## Session 2026-03-16 - Feature #9
+
+### Feature #9: Content: Netto vermogen - PASSING
+- GuideTopicCard already fully implemented in gids page (reis-stap 1)
+- Description covers: automatische snapshots, vrijheidspercentage, spaarquote, veerkrachtscore, FIRE-leeftijd, compositie-analyse
+- 4 how-steps: auto-berekend, balanssnapshot, vermogensgrafiek, vergelijk periodes
+- Tip: maandelijkse check-in als ideaal moment
+- BarChart3 icon, kern-400 color
+- Zero TypeScript errors
+- Could not verify via browser (Supabase auth required)
+
 ## Session 2026-03-16 - Features #29, #22, #33
 
 ### Feature #29: Content: Mobiel - PASSING
