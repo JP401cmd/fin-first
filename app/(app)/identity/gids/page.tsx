@@ -1172,19 +1172,46 @@ export default function GidsPage() {
           color="var(--ink-2)"
           description={
             <>
-              Vertaal je financiële data naar leesbare rapporten die je kunt bewaren en terugbladeren. Drie rapporttypes geven je overzicht vanuit verschillende invalshoeken: een <strong>perioderapport</strong> vat je inkomsten, uitgaven en vermogensverandering samen over een maand, kwartaal of jaar. Het <strong>balansrapport</strong> toont al je bezittingen en schulden op één peildatum — je vermogen uitgedrukt in vrijheidstijd. En het <strong>budgetrapport</strong> laat zien hoe je werkelijke uitgaven zich verhouden tot je budgetgrenzen per categorie.
-              {' '}
-              Elk rapport begint met een AI-inleiding: Will schrijft een korte, persoonlijke samenvatting van de belangrijkste bevindingen. Eenmaal gegenereerd kun je rapporten opslaan en later terugvinden op je rapportages-overzichtspagina.
+              <strong>Diepere analyse wanneer je dat wilt.</strong> Rapporten
+              vertalen je financiële data naar leesbare overzichten die je kunt
+              bewaren, terugbladeren en vergelijken over periodes.
+              {" "}
+              Het <strong>perioderapport</strong> vat je inkomsten, uitgaven en
+              vermogensverandering samen over een maand, kwartaal of jaar. Je
+              ziet precies waar je geld naartoe ging en hoe je vermogen zich
+              ontwikkelde — ideaal als maandelijkse terugblik.
+              {" "}
+              Het <strong>balansrapport</strong> toont al je bezittingen en
+              schulden op één peildatum: cash, beleggingen, vastgoed en pensioen
+              aan de ene kant, hypotheek en overige schulden aan de andere. Je
+              netto vermogen wordt uitgedrukt in vrijheidstijd, zodat je direct
+              ziet hoeveel jaren onafhankelijkheid je hebt opgebouwd.
+              {" "}
+              Het <strong>budgetrapport</strong> laat zien hoe je werkelijke
+              uitgaven zich verhouden tot je budgetgrenzen per categorie. Trends
+              over meerdere maanden maken zichtbaar waar je structureel boven of
+              onder budget zit.
+              {" "}
+              Een <strong>jaaroverzicht</strong> combineert al deze perspectieven
+              in één samenvattend rapport: totale inkomsten en uitgaven,
+              vermogensgroei, top-budgetcategorieën en mijlpalen die je dat jaar
+              bereikte.
+              {" "}
+              Elk rapport begint met een <strong>AI-inleiding</strong>: Will
+              schrijft een korte, persoonlijke samenvatting van de belangrijkste
+              bevindingen. Eenmaal gegenereerd kun je rapporten opslaan en later
+              terugvinden op je rapportages-overzichtspagina.
             </>
           }
           howTo={{
             steps: [
-              'Ga naar Rapportages via het profielmenu of de navigatie',
-              'Kies je rapporttype (periode, balans of budget) en selecteer de gewenste periode',
-              'Genereer het rapport — Will schrijft automatisch een persoonlijke inleiding',
-              'Bewaar het rapport om het later terug te lezen of te vergelijken met eerdere periodes',
+              "Ga naar Rapportages via het profielmenu (tussen Identiteit en Uitloggen) of via de navigatie",
+              "Kies je rapporttype: perioderapport, balansrapport, budgetrapport of jaaroverzicht",
+              "Selecteer de gewenste periode — een maand, kwartaal of volledig jaar",
+              "Genereer het rapport — Will schrijft automatisch een persoonlijke AI-inleiding met de belangrijkste inzichten",
+              "Bewaar het rapport om het later terug te lezen of te vergelijken met eerdere periodes",
             ],
-            tip: 'Genereer na elke maandelijkse check-in een perioderapport. Zo bouw je een financieel archief op dat je groei over maanden en jaren zichtbaar maakt.',
+            tip: "Genereer na elke maandelijkse check-in een perioderapport. Zo bouw je een financieel archief op dat je groei over maanden en jaren zichtbaar maakt.",
           }}
         />
 
