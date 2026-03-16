@@ -1,3 +1,37 @@
+## Session 2026-03-16 - Features #48, #49, #50
+
+### Feature #48: netto_vermogen: getallen bij trendlijn + half verticaal passen - PASSING
+- Added start/current/forecast value labels as SVG text elements on sparkline
+- Increased half-size SVG height from 36 to 44 to prevent clipping
+- Adjusted padding (top: 10, bottom: 6) to accommodate value labels
+- Show axis labels ("12m geleden" / "+6m prognose") for both half and full sizes
+- Value labels use font-mono with appropriate colors (kern-t for current, hor-t for forecast, ink-4 for start)
+- Labels animate in with fade transition after sparkline draws
+- Commit: ec2a11ba
+
+### Feature #49: cash_flow full: progressbars indikken voor betere vergelijking - PASSING
+- Reduced category progress bar height from h-1.5 to h-1
+- Reduced row gap from gap-2.5 to gap-1.5, internal spacing from space-y-1 to space-y-0.5
+- Reduced comparison bar height from h-5 to h-4
+- Added prominent income vs expense summary row: "+€X − €Y = €Z" in subtle background
+- Summary row uses emerald/red coloring for positive/negative net cashflow
+- Commit: f0945002
+
+### Feature #50: budgetten full: bars indikken, meer ruimte netto maandbalans - PASSING
+- Reduced budget bar height from h-2 to h-1.5, row gap from gap-3 to gap-2
+- Merged spent/limit amounts into header row (BudgetRow Laag 1) for single-line per category
+- Reduced internal spacing from space-y-1 to space-y-0.5
+- Added subtle colored background (emerald-50/red-50) to netto maandbalans section
+- Increased netto balance font from text-xl to text-2xl for prominence
+- Percentage indicator moved to compact right-aligned position
+- Commit: 4d36af0f
+
+### Current Status
+- 3 features completed this session (#48, #49, #50)
+- Zero TypeScript errors in changed files
+- Could not verify via browser (Supabase auth required, no test credentials)
+- 50/68 features passing (73.5%)
+
 ## Session 2026-03-16 - Features #20, #21
 
 ### Feature #20: Content: Droomscenario / What-If - PASSING
