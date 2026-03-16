@@ -168,6 +168,16 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [showCatalogFields, setShowCatalogFields] = useState(false)
   const [useSuggestedSettings, setUseSuggestedSettings] = useState(true)
 
+  // Pension PDF auto-fill state
+  const [pensionParseResult, setPensionParseResult] = useState<{
+    aowBedrag: number | null
+    regelingen: Array<{ fondsNaam: string; brutoBedrag: number; ingangLeeftijd: number; isGeindexeerd: boolean; type: string }>
+    nabestaandenpensioen: number | null
+    samenvatting: string
+  } | null>(null)
+  const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set())
+  const [selectedRegelingIndex, setSelectedRegelingIndex] = useState(0)
+
   // Compact life events UI state
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
   const [viewModalMode, setViewModalMode] = useState<'view' | 'edit'>('view')
@@ -777,6 +787,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     setEditingEvent(null)
     setFormCashflows([])
     setEditingCashflowId(null)
+    setPensionParseResult(null)
+    setAutoFilledFields(new Set())
+    setSelectedRegelingIndex(0)
     setShowForm(true)
   }
 
@@ -1319,6 +1332,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     setEditingCashflowId(null)
     setFormDescription('')
     setShowCatalogFields(false)
+    setPensionParseResult(null)
+    setAutoFilledFields(new Set())
+    setSelectedRegelingIndex(0)
     if (selectedEventId) {
       setSelectedEventId(null)
       setViewModalMode('view')
@@ -2381,6 +2397,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           } else {
             setShowForm(false); setEditingEvent(null); setFormErrors([]); setFormWarnings([])
           }
+          setPensionParseResult(null); setAutoFilledFields(new Set()); setSelectedRegelingIndex(0)
         }} title={editingEvent ? 'Evenement bewerken' : 'Nieuw evenement'}>
           <div className="space-y-5 p-6">
             {/* Back button when editing from view modal */}
@@ -2412,29 +2429,113 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 <PensionInstructionPanel />
                 <PensionPdfUpload
                   onFileSelected={(f) => console.log('[pension] PDF selected:', f.name)}
-                  onFileRemoved={() => console.log('[pension] PDF removed')}
+                  onFileRemoved={() => {
+                    console.log('[pension] PDF removed')
+                    setPensionParseResult(null)
+                    setAutoFilledFields(new Set())
+                    setSelectedRegelingIndex(0)
+                  }}
                   onParseResult={(result) => {
                     console.log('[pension] Parse result:', result)
-                    // Auto-fill form fields from parsed pension data
                     if (result && typeof result === 'object' && 'regelingen' in result) {
-                      const data = result as { aowBedrag?: number; regelingen?: Array<{ brutoBedrag?: number; ingangLeeftijd?: number; isGeindexeerd?: boolean }> }
+                      const data = result as {
+                        aowBedrag: number | null
+                        regelingen: Array<{ fondsNaam: string; brutoBedrag: number; ingangLeeftijd: number; isGeindexeerd: boolean; type: string }>
+                        nabestaandenpensioen: number | null
+                        samenvatting: string
+                      }
+                      setPensionParseResult(data)
+                      setSelectedRegelingIndex(0)
+
+                      // Auto-fill from first regeling
                       const firstRegeling = data.regelingen?.[0]
                       if (firstRegeling) {
+                        const newAutoFilled = new Set<string>()
+
                         if (firstRegeling.brutoBedrag != null) {
                           setFormMetadata(prev => ({ ...prev, brutoBedrag: firstRegeling.brutoBedrag }))
                           setFormAmount(firstRegeling.brutoBedrag)
+                          newAutoFilled.add('brutoBedrag')
                         }
                         if (firstRegeling.ingangLeeftijd != null) {
                           setFormMetadata(prev => ({ ...prev, ingangLeeftijd: firstRegeling.ingangLeeftijd }))
                           setFormAge(firstRegeling.ingangLeeftijd)
+                          newAutoFilled.add('ingangLeeftijd')
                         }
                         if (firstRegeling.isGeindexeerd != null) {
                           setFormMetadata(prev => ({ ...prev, isGeindexeerd: firstRegeling.isGeindexeerd }))
+                          newAutoFilled.add('isGeindexeerd')
                         }
+                        // Map pension type to form pensioenType
+                        const typeMap: Record<string, string> = {
+                          'ouderdomspensioen': 'bedrijf',
+                          'nabestaandenpensioen': 'bedrijf',
+                          'arbeidsongeschiktheidspensioen': 'bedrijf',
+                          'overig': 'bedrijf',
+                        }
+                        setFormMetadata(prev => ({ ...prev, pensioenType: typeMap[firstRegeling.type] || 'bedrijf' }))
+                        newAutoFilled.add('pensioenType')
+
+                        // Set name from fondsNaam
+                        if (firstRegeling.fondsNaam) {
+                          setFormName(`Pensioen - ${firstRegeling.fondsNaam}`)
+                          newAutoFilled.add('name')
+                        }
+
+                        // Store nabestaandenpensioen in metadata if available
+                        if (data.nabestaandenpensioen != null) {
+                          setFormMetadata(prev => ({ ...prev, nabestaandenpensioen: data.nabestaandenpensioen }))
+                          newAutoFilled.add('nabestaandenpensioen')
+                        }
+
+                        setAutoFilledFields(newAutoFilled)
+                        // Disable suggested settings — we have real data from the PDF
+                        setUseSuggestedSettings(false)
                       }
                     }
                   }}
                 />
+                {/* Summary card with parsed pension data */}
+                {pensionParseResult && (
+                  <PensionParseSummaryCard
+                    result={pensionParseResult}
+                    selectedIndex={selectedRegelingIndex}
+                    onSelectRegeling={(idx) => {
+                      setSelectedRegelingIndex(idx)
+                      const regeling = pensionParseResult.regelingen[idx]
+                      if (regeling) {
+                        const newAutoFilled = new Set<string>()
+                        setFormMetadata(prev => ({
+                          ...prev,
+                          brutoBedrag: regeling.brutoBedrag,
+                          ingangLeeftijd: regeling.ingangLeeftijd,
+                          isGeindexeerd: regeling.isGeindexeerd,
+                          pensioenType: 'bedrijf',
+                        }))
+                        setFormAmount(regeling.brutoBedrag)
+                        setFormAge(regeling.ingangLeeftijd)
+                        if (regeling.fondsNaam) {
+                          setFormName(`Pensioen - ${regeling.fondsNaam}`)
+                          newAutoFilled.add('name')
+                        }
+                        newAutoFilled.add('brutoBedrag')
+                        newAutoFilled.add('ingangLeeftijd')
+                        newAutoFilled.add('isGeindexeerd')
+                        newAutoFilled.add('pensioenType')
+                        if (pensionParseResult.nabestaandenpensioen != null) {
+                          newAutoFilled.add('nabestaandenpensioen')
+                        }
+                        setAutoFilledFields(newAutoFilled)
+                        setUseSuggestedSettings(false)
+                      }
+                    }}
+                    onReupload={() => {
+                      setPensionParseResult(null)
+                      setAutoFilledFields(new Set())
+                      setSelectedRegelingIndex(0)
+                    }}
+                  />
+                )}
               </>
             )}
 
@@ -2442,10 +2543,20 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             <div className="space-y-4">
               {/* Naam */}
               <div>
-                <label className="text-xs font-medium text-[var(--ink-3)]">Naam</label>
+                <label className="text-xs font-medium text-[var(--ink-3)] flex items-center gap-1.5">
+                  Naam
+                  {autoFilledFields.has('name') && (
+                    <span className="inline-flex items-center rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">PDF</span>
+                  )}
+                </label>
                 <input
-                  type="text" value={formName} onChange={e => { setFormName(e.target.value); setFormErrors([]) }}
-                  className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${formErrors.some(e => e.includes('naam')) ? 'border-red-400 bg-red-50/30' : 'border-[var(--border-ed)]'}`}
+                  type="text" value={formName} onChange={e => {
+                    setFormName(e.target.value); setFormErrors([])
+                    if (autoFilledFields.has('name')) {
+                      setAutoFilledFields(prev => { const next = new Set(prev); next.delete('name'); return next })
+                    }
+                  }}
+                  className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${formErrors.some(e => e.includes('naam')) ? 'border-red-400 bg-red-50/30' : autoFilledFields.has('name') ? 'border-sky-300 bg-sky-50/30' : 'border-[var(--border-ed)]'}`}
                 />
               </div>
 
@@ -2494,10 +2605,20 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
                 {/* Leeftijd */}
                 <div>
-                  <label className="text-xs font-medium text-[var(--ink-3)]">Vanaf welke leeftijd?</label>
+                  <label className="text-xs font-medium text-[var(--ink-3)] flex items-center gap-1.5">
+                    Vanaf welke leeftijd?
+                    {autoFilledFields.has('ingangLeeftijd') && (
+                      <span className="inline-flex items-center rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">PDF</span>
+                    )}
+                  </label>
                   <input
-                    type="number" value={formAge} onChange={e => { setFormAge(e.target.value ? Number(e.target.value) : ''); setFormErrors([]); setFormWarnings([]) }}
-                    className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${(formErrors.some(e => e.includes('eeftijd')) || formWarnings.some(w => w.includes('AOW'))) ? 'border-amber-400 bg-amber-50/30' : 'border-[var(--border-ed)]'}`}
+                    type="number" value={formAge} onChange={e => {
+                      setFormAge(e.target.value ? Number(e.target.value) : ''); setFormErrors([]); setFormWarnings([])
+                      if (autoFilledFields.has('ingangLeeftijd')) {
+                        setAutoFilledFields(prev => { const next = new Set(prev); next.delete('ingangLeeftijd'); return next })
+                      }
+                    }}
+                    className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${(formErrors.some(e => e.includes('eeftijd')) || formWarnings.some(w => w.includes('AOW'))) ? 'border-amber-400 bg-amber-50/30' : autoFilledFields.has('ingangLeeftijd') ? 'border-sky-300 bg-sky-50/30' : 'border-[var(--border-ed)]'}`}
                     placeholder="bijv. 45"
                   />
                   {/* AOW: voorgestelde leeftijd op basis van geboortedatum */}
@@ -2538,8 +2659,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
                 {/* Richting + bedrag */}
                 <div>
-                  <label className="text-xs font-medium text-[var(--ink-3)]">
+                  <label className="text-xs font-medium text-[var(--ink-3)] flex items-center gap-1.5">
                     {formDurationType === 'one_time' ? 'Bedrag' : 'Maandbedrag'}
+                    {autoFilledFields.has('brutoBedrag') && (
+                      <span className="inline-flex items-center rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">PDF</span>
+                    )}
                   </label>
                   <div className="mt-1 flex gap-2">
                     <div className="flex overflow-hidden rounded-[var(--r)] border border-[var(--border-ed)]">
@@ -2570,8 +2694,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       type="number"
                       min="0"
                       value={formAmount}
-                      onChange={e => { setFormAmount(e.target.value ? Number(e.target.value) : ''); setFormErrors([]) }}
-                      className={`min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${formErrors.some(e => e.includes('edrag')) ? 'border-red-400 bg-red-50/30' : 'border-[var(--border-ed)]'}`}
+                      onChange={e => {
+                        setFormAmount(e.target.value ? Number(e.target.value) : ''); setFormErrors([])
+                        if (autoFilledFields.has('brutoBedrag')) {
+                          setAutoFilledFields(prev => { const next = new Set(prev); next.delete('brutoBedrag'); return next })
+                        }
+                      }}
+                      className={`min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${formErrors.some(e => e.includes('edrag')) ? 'border-red-400 bg-red-50/30' : autoFilledFields.has('brutoBedrag') ? 'border-sky-300 bg-sky-50/30' : 'border-[var(--border-ed)]'}`}
                       placeholder="0"
                     />
                   </div>
@@ -2693,10 +2822,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                     }
                     return (
                     <div key={field.key}>
-                      <label className="text-xs font-medium text-[var(--ink-3)]">
+                      <label className="text-xs font-medium text-[var(--ink-3)] flex items-center gap-1.5">
                         {field.label}
                         {field.tip && (
-                          <span className="ml-1 font-normal text-[var(--ink-4)]" title={field.tip}>ⓘ</span>
+                          <span className="font-normal text-[var(--ink-4)]" title={field.tip}>ⓘ</span>
+                        )}
+                        {autoFilledFields.has(field.key) && (
+                          <span className="inline-flex items-center rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">PDF</span>
                         )}
                       </label>
                       {field.fieldType === 'number' || field.fieldType === 'percentage' ? (
@@ -2708,6 +2840,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               const val = e.target.value ? Number(e.target.value) : ''
                               const updated = { ...formMetadata, [field.key]: val }
                               setFormMetadata(updated)
+                              // Clear auto-fill marking when user manually changes a field
+                              if (autoFilledFields.has(field.key)) {
+                                setAutoFilledFields(prev => { const next = new Set(prev); next.delete(field.key); return next })
+                              }
                               // Auto-calculate netto overwaarde for house_sale
                               if (formType === 'house_sale' && ['verkoopprijs', 'resterendeHypotheek', 'makelaarskosten'].includes(field.key)) {
                                 const vp = Number(updated.verkoopprijs) || 0
@@ -2843,7 +2979,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                 // No need to change formAmount here — save handler combines them
                               }
                             }}
-                            className="min-w-0 flex-1 rounded-lg border border-[var(--border-ed)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                            className={`min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${autoFilledFields.has(field.key) ? 'border-sky-300 bg-sky-50/30' : 'border-[var(--border-ed)]'}`}
                           />
                           {field.suffix && (
                             <span className="shrink-0 text-xs text-[var(--ink-3)]">{field.suffix}</span>
@@ -2856,6 +2992,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             const val = e.target.value
                             const numVal = field.options?.some(o => typeof o.value === 'number') ? Number(val) : val
                             setFormMetadata(prev => ({ ...prev, [field.key]: numVal }))
+                            if (autoFilledFields.has(field.key)) {
+                              setAutoFilledFields(prev => { const next = new Set(prev); next.delete(field.key); return next })
+                            }
                             if (formType === 'children' && field.key === 'aantalKinderen') {
                               setFormAmount(nibudChildrenCost(Number(val)))
                             }
@@ -2941,7 +3080,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               }
                             }
                           }}
-                          className="mt-1 w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none"
+                          className={`mt-1 w-full rounded-lg border bg-[var(--paper)] px-3 py-2 text-sm focus:border-horizon-500 focus:outline-none ${autoFilledFields.has(field.key) ? 'border-sky-300 bg-sky-50/30' : 'border-[var(--border-ed)]'}`}
                         >
                           {field.options?.map(opt => (
                             <option key={String(opt.value)} value={String(opt.value)}>{opt.label}</option>
@@ -2954,6 +3093,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             checked={formMetadata[field.key] !== undefined ? Boolean(formMetadata[field.key]) : Boolean(field.default)}
                             onChange={e => {
                               const checked = e.target.checked
+                              if (autoFilledFields.has(field.key)) {
+                                setAutoFilledFields(prev => { const next = new Set(prev); next.delete(field.key); return next })
+                              }
                               setFormMetadata(prev => {
                                 const updated = { ...prev, [field.key]: checked }
                                 // Recalculate kosten koper when eersteWoning or nhg toggles
@@ -4959,6 +5101,111 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           />
         </>
       )}
+    </div>
+  )
+}
+
+// ── Pension parse summary card ────────────────────────────────
+
+type PensionParseSummaryResult = {
+  aowBedrag: number | null
+  regelingen: Array<{ fondsNaam: string; brutoBedrag: number; ingangLeeftijd: number; isGeindexeerd: boolean; type: string }>
+  nabestaandenpensioen: number | null
+  samenvatting: string
+}
+
+const PENSION_TYPE_LABELS: Record<string, string> = {
+  ouderdomspensioen: 'Ouderdomspensioen',
+  nabestaandenpensioen: 'Nabestaandenpensioen',
+  arbeidsongeschiktheidspensioen: 'Arbeidsongeschiktheids\u00ADpensioen',
+  overig: 'Overig',
+}
+
+function PensionParseSummaryCard({
+  result,
+  selectedIndex,
+  onSelectRegeling,
+  onReupload,
+}: {
+  result: PensionParseSummaryResult
+  selectedIndex: number
+  onSelectRegeling: (idx: number) => void
+  onReupload: () => void
+}) {
+  const hasMultiple = result.regelingen.length > 1
+
+  return (
+    <div className="rounded-[var(--r)] border border-horizon-200 bg-horizon-50/40 p-4 space-y-3">
+      {/* Samenvatting */}
+      <p className="text-sm text-[var(--ink-2)] leading-relaxed">{result.samenvatting}</p>
+
+      {/* AOW bedrag */}
+      {result.aowBedrag != null && (
+        <div className="flex items-center justify-between rounded-lg bg-white/60 px-3 py-2 border border-horizon-100">
+          <span className="text-xs font-medium text-[var(--ink-3)]">AOW (verwacht)</span>
+          <span className="font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">{formatCurrency(result.aowBedrag)}/mnd</span>
+        </div>
+      )}
+
+      {/* Regelingen */}
+      {result.regelingen.length > 0 && (
+        <div className="space-y-2">
+          {hasMultiple && (
+            <p className="text-xs font-medium text-horizon-700">
+              We hebben {result.regelingen.length} pensioenregelingen gevonden. Selecteer welke je wilt invullen, of maak voor elke regeling een aparte levensgebeurtenis aan.
+            </p>
+          )}
+          {result.regelingen.map((regeling, idx) => {
+            const isSelected = idx === selectedIndex
+            return (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => onSelectRegeling(idx)}
+                className={`w-full text-left rounded-lg border px-3 py-2.5 transition-colors ${
+                  isSelected
+                    ? 'border-horizon-400 bg-white ring-1 ring-horizon-200'
+                    : 'border-horizon-100 bg-white/60 hover:border-horizon-300'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-[var(--ink)] truncate">{regeling.fondsNaam}</p>
+                    <p className="text-xs text-[var(--ink-3)]">
+                      {PENSION_TYPE_LABELS[regeling.type] || regeling.type}
+                      {' \u00B7 '}vanaf {regeling.ingangLeeftijd} jaar
+                      {regeling.isGeindexeerd && ' \u00B7 ge\u00EFndexeerd'}
+                    </p>
+                  </div>
+                  <span className="shrink-0 font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">
+                    {formatCurrency(regeling.brutoBedrag)}/mnd
+                  </span>
+                </div>
+                {isSelected && hasMultiple && (
+                  <p className="mt-1 text-[10px] font-medium text-horizon-600 uppercase tracking-wide">Geselecteerd</p>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Nabestaandenpensioen */}
+      {result.nabestaandenpensioen != null && (
+        <div className="flex items-center justify-between rounded-lg bg-white/60 px-3 py-2 border border-horizon-100">
+          <span className="text-xs font-medium text-[var(--ink-3)]">Nabestaandenpensioen</span>
+          <span className="font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">{formatCurrency(result.nabestaandenpensioen)}/mnd</span>
+        </div>
+      )}
+
+      {/* Opnieuw uploaden */}
+      <button
+        type="button"
+        onClick={onReupload}
+        className="w-full text-center text-xs text-[var(--ink-3)] hover:text-horizon-600 transition-colors underline underline-offset-2"
+      >
+        Opnieuw uploaden
+      </button>
     </div>
   )
 }

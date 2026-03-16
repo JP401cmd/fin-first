@@ -112,6 +112,13 @@ export function PensionPdfUpload({ onFileSelected, onFileRemoved, onParseResult 
             <X className="h-4 w-4" />
           </button>
         </div>
+        <button
+          type="button"
+          onClick={handleRemove}
+          className="mt-2 w-full text-center text-xs text-[var(--ink-3)] hover:text-horizon-600 transition-colors underline underline-offset-2"
+        >
+          Opnieuw uploaden
+        </button>
       </div>
     )
   }
