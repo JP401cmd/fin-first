@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { headers } from 'next/headers'
 import { computeFireProjection, computeResilienceScore, NL_SWR, type FinancialInput } from '@/lib/horizon-data'
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
@@ -245,25 +244,6 @@ export async function POST() {
 
   // Capture per-entity balance snapshots (fire-and-forget, non-critical)
   captureBalanceSnapshots(supabase, user.id, today, rawAssets, rawDebts).catch(() => {})
-
-  // Trigger badge evaluation after snapshot creation (fire-and-forget, server-side)
-  try {
-    const headersList = await headers()
-    const host = headersList.get('host') || 'localhost:3000'
-    const protocol = host.startsWith('localhost') ? 'http' : 'https'
-    const cookie = headersList.get('cookie') || ''
-
-    fetch(`${protocol}://${host}/api/badges/evaluate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cookie': cookie,
-      },
-      body: JSON.stringify({ trigger: 'month_close' }),
-    }).catch(() => {}) // Fire-and-forget, non-blocking
-  } catch {
-    // Silent fail — badge evaluation is non-critical
-  }
 
   return NextResponse.json({
     snapshot: {

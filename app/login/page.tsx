@@ -31,13 +31,6 @@ function LoginForm() {
       setError(error.message)
       setLoading(false)
     } else {
-      // Trigger badge evaluation after successful login (fire-and-forget)
-      fetch('/api/badges/evaluate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trigger: 'login' }),
-      }).catch(() => {}) // Silent fail — badges are non-critical
-
       // Redirect to the originally requested page or dashboard
       const destination = redirectTo && redirectTo.startsWith('/') ? redirectTo : '/will'
       router.push(destination)
