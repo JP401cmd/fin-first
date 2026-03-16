@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Check, Landmark, Receipt, Zap, Compass } from 'lucide-react'
 
 /* ── Types ─────────────────────── */
@@ -60,6 +60,58 @@ const REIS_STAPPEN: ReisStap[] = [
   },
 ]
 
+/* ── Hooks ─────────────────────── */
+
+/** Track which ReisStapSection is currently most visible in the viewport */
+function useActiveStep() {
+  const [activeIndex, setActiveIndex] = useState(-1)
+  const ratios = useRef(new Map<string, number>())
+
+  useEffect(() => {
+    const ids = REIS_STAPPEN.map((_, i) => `guide-reis-${i + 1}`)
+    const elements = ids.map(id => document.getElementById(id)).filter(Boolean) as HTMLElement[]
+
+    if (elements.length === 0) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          ratios.current.set(entry.target.id, entry.intersectionRatio)
+        }
+
+        // Find the section with the highest visibility ratio
+        let bestIdx = -1
+        let bestRatio = 0
+        for (let i = 0; i < ids.length; i++) {
+          const r = ratios.current.get(ids[i]) ?? 0
+          if (r > bestRatio) {
+            bestRatio = r
+            bestIdx = i
+          }
+        }
+
+        if (bestRatio > 0) {
+          setActiveIndex(bestIdx)
+        }
+      },
+      {
+        // Multiple thresholds for smooth tracking
+        threshold: [0, 0.1, 0.25, 0.5, 0.75, 1],
+        // Offset for the sticky header
+        rootMargin: '-80px 0px -20% 0px',
+      }
+    )
+
+    for (const el of elements) {
+      observer.observe(el)
+    }
+
+    return () => observer.disconnect()
+  }, [])
+
+  return activeIndex
+}
+
 /* ── Component ─────────────────────── */
 
 function scrollToStep(stepNumber: number) {
@@ -72,6 +124,7 @@ function scrollToStep(stepNumber: number) {
 export function GuideProgressBar() {
   const [steps, setSteps] = useState<GuideProgressSteps | null>(null)
   const [animate, setAnimate] = useState(false)
+  const activeIndex = useActiveStep()
 
   useEffect(() => {
     async function fetchProgress() {
@@ -117,24 +170,27 @@ export function GuideProgressBar() {
       <div className="flex gap-1">
         {REIS_STAPPEN.map((stap, i) => {
           const isDone = stap.check(steps)
+          const isActive = i === activeIndex
           return (
             <button
               key={i}
               type="button"
               aria-label={`Ga naar stap ${i + 1}: ${stap.label}`}
               onClick={() => scrollToStep(stap.scrollTarget)}
-              className="relative h-2 flex-1 rounded-full overflow-hidden cursor-pointer transition-opacity hover:opacity-80"
+              className="relative flex-1 rounded-full overflow-hidden cursor-pointer transition-all hover:opacity-80"
               style={{
                 backgroundColor: 'var(--border-ed)',
+                height: isActive ? '4px' : '3px',
               }}
             >
               <div
                 className="absolute inset-0 rounded-full pointer-events-none"
                 style={{
-                  backgroundColor: isDone ? stap.color : 'transparent',
-                  transform: animate && isDone ? 'scaleX(1)' : 'scaleX(0)',
+                  backgroundColor: isDone ? stap.color : isActive ? stap.color : 'transparent',
+                  opacity: isDone ? 1 : isActive ? 0.35 : 0,
+                  transform: animate && (isDone || isActive) ? 'scaleX(1)' : 'scaleX(0)',
                   transformOrigin: 'left',
-                  transition: `transform 0.5s ease-out ${i * 0.12}s`,
+                  transition: `transform 0.5s ease-out ${i * 0.12}s, opacity 0.3s ease`,
                 }}
               />
             </button>
@@ -146,6 +202,7 @@ export function GuideProgressBar() {
       <div className="mt-2.5 flex gap-1">
         {REIS_STAPPEN.map((stap, i) => {
           const isDone = stap.check(steps)
+          const isActive = i === activeIndex
           const Icon = stap.icon
           return (
             <button
@@ -156,10 +213,13 @@ export function GuideProgressBar() {
               className="flex flex-1 flex-col items-center gap-1 cursor-pointer group"
             >
               <div
-                className="flex h-6 w-6 items-center justify-center rounded-full transition-all duration-300 group-hover:scale-110"
+                className="flex items-center justify-center rounded-full transition-all duration-300 group-hover:scale-110"
                 style={{
-                  backgroundColor: isDone ? stap.bgColor : 'var(--subtle)',
-                  color: isDone ? stap.color : 'var(--ink-4)',
+                  width: isActive ? '28px' : '24px',
+                  height: isActive ? '28px' : '24px',
+                  backgroundColor: isDone ? stap.bgColor : isActive ? stap.bgColor : 'var(--subtle)',
+                  color: isDone ? stap.color : isActive ? stap.color : 'var(--ink-4)',
+                  boxShadow: isActive ? `0 0 0 2px ${stap.color}` : 'none',
                   transitionDelay: `${i * 0.12}s`,
                 }}
               >
@@ -170,9 +230,10 @@ export function GuideProgressBar() {
                 )}
               </div>
               <span
-                className="text-center text-[10px] sm:text-[11px] leading-tight group-hover:text-[var(--ink)]"
+                className="text-center text-[10px] sm:text-[11px] leading-tight transition-colors duration-200 group-hover:text-[var(--ink)]"
                 style={{
-                  color: isDone ? 'var(--ink-2)' : 'var(--ink-4)',
+                  color: isActive ? 'var(--ink)' : isDone ? 'var(--ink-2)' : 'var(--ink-4)',
+                  fontWeight: isActive ? 600 : 400,
                 }}
               >
                 {stap.label}
