@@ -234,4 +234,6 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   weeklyFreedomDaysWon: 3,
   completionRatio: 20,
   willpowerScore: 'D',
+  inflationRate: 0.02,
+  grossReturn: 0.07,
 }

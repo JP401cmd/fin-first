@@ -42,8 +42,8 @@ const SpaarquoteWidget = dynamic(() =>
 const VrijheidsvoortgangWidget = dynamic(() =>
   import('./vrijheidsvoortgang-widget').then(m => ({ default: m.VrijheidsvoortgangWidget }))
 )
-const AbonnementenWidget = dynamic(() =>
-  import('./abonnementen-widget').then(m => ({ default: m.AbonnementenWidget }))
+const VasteLastenWidget = dynamic(() =>
+  import('./vaste-lasten-widget').then(m => ({ default: m.VasteLastenWidget }))
 )
 const JouwPadWidgetWrapper = dynamic(() =>
   import('./jouw-pad-widget-wrapper').then(m => ({ default: m.JouwPadWidgetWrapper }))
@@ -53,9 +53,6 @@ const VeerkrachtScoreWidget = dynamic(() =>
 )
 const BelastingBox3Widget = dynamic(() =>
   import('./belasting-box3-widget').then(m => ({ default: m.BelastingBox3Widget }))
-)
-const TerugkerendeTransactiesWidget = dynamic(() =>
-  import('./terugkerende-transacties-widget').then(m => ({ default: m.TerugkerendeTransactiesWidget }))
 )
 const NibudBenchmarkWidget = dynamic(() =>
   import('./nibud-benchmark-widget').then(m => ({ default: m.NibudBenchmarkWidget }))
@@ -77,6 +74,9 @@ const VrijheidsMijlpalenWidget = dynamic(() =>
 )
 const BacktestingScoreWidget = dynamic(() =>
   import('./backtesting-score-widget').then(m => ({ default: m.BacktestingScoreWidget }))
+)
+const InflatieImpactWidget = dynamic(() =>
+  import('./inflatie-impact-widget').then(m => ({ default: m.InflatieImpactWidget }))
 )
 const BudgetFavWidget = dynamic(() =>
   import('./budget-fav-widget').then(m => ({ default: m.BudgetFavWidget }))
@@ -116,6 +116,9 @@ const WilskrachtWidget = dynamic(() =>
 )
 const BerichtenWidget = dynamic(() =>
   import('./berichten-widget').then(m => ({ default: m.BerichtenWidget }))
+)
+const WeekoverzichtWidget = dynamic(() =>
+  import('./weekoverzicht-widget').then(m => ({ default: m.WeekoverzichtWidget }))
 )
 const BudgetTrendWidget = dynamic(() =>
   import('./budget-trend-widget').then(m => ({ default: m.BudgetTrendWidget }))
@@ -389,6 +392,20 @@ export interface DashboardData {
   weeklyFreedomDaysWon: number
   completionRatio: number
   willpowerScore: string  // 'A' | 'B' | 'C' | 'D' | 'E'
+  // FIRE parameters from user profile
+  inflationRate: number   // e.g. 0.02
+  grossReturn: number     // e.g. 0.07
+  // Weekoverzicht widget data
+  weekOverview: WeekOverviewData
+}
+
+export interface WeekOverviewData {
+  weekExpenses: number
+  weekIncome: number
+  dailyExpenses: { day: string; label: string; amount: number }[]
+  weekBudget: number
+  prevWeekExpenses: number
+  topCategories: { name: string; amount: number }[]
 }
 
 export interface HouseholdActivityItem {
@@ -461,16 +478,14 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
       return <SpaarquoteWidget size={size} data={data} href={href} />
     case 'vrijheidsvoortgang':
       return <VrijheidsvoortgangWidget size={size} data={data} href={href} />
-    case 'abonnementen':
-      return <AbonnementenWidget size={size} data={data} href={href} />
+    case 'vaste_lasten':
+      return <VasteLastenWidget size={size} data={data} href={href} />
     case 'jouw_pad':
       return <JouwPadWidgetWrapper size={size} data={data} href={href} />
     case 'veerkracht_score':
       return <VeerkrachtScoreWidget size={size} data={data} href={href} />
     case 'belasting_box3':
       return <BelastingBox3Widget size={size} data={data} href={href} />
-    case 'terugkerende_transacties':
-      return <TerugkerendeTransactiesWidget size={size} data={data} href={href} />
     case 'nibud_benchmark':
       return <NibudBenchmarkWidget size={size} data={data} href={href} />
     case 'vrijheidsscenarios':
@@ -485,6 +500,8 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
       return <VrijheidsMijlpalenWidget size={size} data={data} href={href} />
     case 'backtesting_score':
       return <BacktestingScoreWidget size={size} data={data} href={href} />
+    case 'inflatie_impact':
+      return <InflatieImpactWidget size={size} data={data} href={href} />
     case 'meldingen':
       return <MeldingenWidget size={size} data={data} href={href} />
     case 'ai_inzicht':
@@ -493,6 +510,8 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
       return <VolgendeStapWidget size={size} data={data} href={href} />
     case 'maandoverzicht':
       return <MaandoverzichtWidget size={size} data={data} href={href} />
+    case 'weekoverzicht':
+      return <WeekoverzichtWidget size={size} data={data} href={href} />
     case 'agenda':
       return <AgendaWidget size={size} data={data} href={href} />
     case 'noodfonds':

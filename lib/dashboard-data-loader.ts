@@ -1243,6 +1243,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     weeklyFreedomDaysWon,
     completionRatio,
     willpowerScore,
+    inflationRate: fireParams.inflationRate,
+    grossReturn: fireParams.grossReturn,
   }
 
   return {

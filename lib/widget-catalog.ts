@@ -208,9 +208,9 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     minLevel: -2,
   },
   {
-    id: 'abonnementen',
-    name: 'Abonnementen',
-    description: 'Maandelijkse vaste lasten kalender',
+    id: 'vaste_lasten',
+    name: 'Vaste Lasten',
+    description: 'Abonnementen en terugkerende kosten in één overzicht',
     module: 'kern',
     sizes: ['quarter', 'half', 'full'],
     defaultSize: 'half',
@@ -244,15 +244,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultSize: 'half',
     minLevel: 1,
     requiredPhase: 'Stability',
-  },
-  {
-    id: 'terugkerende_transacties',
-    name: 'Vaste Lasten',
-    description: 'Terugkerende transacties dit jaar',
-    module: 'kern',
-    sizes: ['quarter', 'half', 'full'],
-    defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'nibud_benchmark',
@@ -321,6 +312,15 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultSize: 'half',
     minLevel: 3,
     requiredPhase: 'Momentum',
+  },
+  {
+    id: 'inflatie_impact',
+    name: 'Inflatie-impact',
+    description: 'Koopkrachtverlies door inflatie over tijd',
+    module: 'horizon',
+    sizes: ['mini', 'quarter', 'half', 'full'],
+    defaultSize: 'half',
+    minLevel: -2,
   },
   {
     id: 'meldingen',
@@ -497,11 +497,10 @@ export const WIDGET_HREFS: Record<string, string> = {
   levensgebeurtenissen:     '/horizon?modal=life_events',
   spaarquote:               '/core',
   vrijheidsvoortgang:       '/horizon',
-  abonnementen:             '/will?modal=subscriptions',
+  vaste_lasten:             '/core/cash',
   jouw_pad:                 '/identity',
   veerkracht_score:         '/horizon',
   belasting_box3:           '/core/debts',
-  terugkerende_transacties: '/core/cash',
   nibud_benchmark:          '/core',
   vrijheidsscenarios:       '/horizon?modal=scenarios',
   sim_vermogenspad:         '/horizon?modal=simulations',
@@ -509,6 +508,7 @@ export const WIDGET_HREFS: Record<string, string> = {
   box3_drag:                '/core/debts',
   vrijheidsmijlpalen:       '/horizon',
   backtesting_score:        '/horizon?modal=backtesting',
+  inflatie_impact:          '/identity/instellingen',
   meldingen:                '/berichten',
   ai_inzicht:               '/berichten',
   volgende_stap:            '/will',
@@ -550,9 +550,8 @@ export const BUDGET_WIDGETS = new Set([
   'cash_flow',
   'budgetten',
   'spaarquote',
-  'terugkerende_transacties',
+  'vaste_lasten',
   'nibud_benchmark',
-  'abonnementen',
   'noodfonds',
   'trend_inkomen',
   'trend_uitgaven',
@@ -575,7 +574,26 @@ export function getWidgetDef(id: string): WidgetDef | undefined {
 export function mergeWidgetPrefs(saved: WidgetPrefs | null): WidgetPrefs {
   if (!saved?.widgets) return DEFAULT_WIDGET_PREFS
 
-  const savedMap = new Map(saved.widgets.map(w => [w.id, w]))
+  // ── Migration: merge old abonnementen + terugkerende_transacties → vaste_lasten ──
+  // If user had either old widget, map it to the new consolidated widget.
+  const migratedWidgets = saved.widgets.map(w => {
+    if (w.id === 'abonnementen' || w.id === 'terugkerende_transacties') {
+      return { ...w, id: 'vaste_lasten' }
+    }
+    return w
+  })
+  // Deduplicate: if both old widgets existed, keep the enabled one (or the first)
+  const seen = new Set<string>()
+  const deduped = migratedWidgets.filter(w => {
+    if (seen.has(w.id)) {
+      // Keep the already-seen entry unless this one is enabled and the previous was not
+      return false
+    }
+    seen.add(w.id)
+    return true
+  })
+
+  const savedMap = new Map(deduped.map(w => [w.id, w]))
   const merged: WidgetPref[] = WIDGET_CATALOG.map((def, i) => {
     const existing = savedMap.get(def.id)
     if (existing) {
