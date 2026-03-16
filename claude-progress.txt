@@ -13326,3 +13326,59 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 96/96 features passing (100%)
 - All features complete!
+
+## Session 2026-03-16 - Features #100, #101
+
+### Feature #100: Parallelle AI-categorisatie met batches - PASSING
+- Added `runWithConcurrency` semaphore pattern (max 3 concurrent requests)
+- Replaced sequential for-loop with parallel batch processing
+- Added progress tracking: aiProgress state (current, total, skippedHighConf)
+- UI: progress bar + "Will categoriseert… X van Y transacties"
+- Failed batches tracked in aiFailedBatches state
+- Retry button for failed subset only (enrichWithAI retryPayloads param)
+- Applied same parallel pattern to AICategorizeSheet component
+
+### Feature #101: AI-categorisatie overslaan bij hoge rule-confidence - PASSING
+- Changed threshold from 0.7 to 0.8: only confidence < 0.8 sent to AI
+- High-confidence rule matches (>= 0.8) skipped from AI calls
+- UI during loading: "X transacties automatisch herkend (overgeslagen)"
+- UI in ready banner: "· X automatisch herkend"
+- Saves API calls and speeds up categorization significantly
+
+### Current Status
+- 2 features completed this session (#100, #101)
+- Zero TypeScript errors in changed files
+- Commit: dfce140d
+
+## Session 2026-03-16 - Features #97, #98
+
+### Feature #97: Frequentie-gebaseerde budget matching - PASSING
+- Created `buildFrequencyMap(userId, supabase)` in lib/parsers/categorize.ts
+  - Queries all historical transactions with budget_id, aggregates by counterparty_name and counterparty_iban
+  - Finds most-used budget per counterparty, requires 3+ matches, confidence 0.6-0.95
+  - Returns Map keyed by "name:xxx" or "iban:xxx" prefix
+- Created `frequencyMatch(counterpartyName, counterpartyIban, freqMap)` for per-transaction lookup
+- Updated `categorizeTransaction` to accept optional `freqMap` parameter
+  - New priority order: 0) transfers, 1) corrections (1.0), 2) frequency (0.6-0.95), 3) keywords (0.7-1.0), 4) AI
+  - Added `category_source` to return type
+- Integrated into import page: builds freq map during initial data load (async, non-blocking)
+- Integrated into bank-connect sync route: builds freq map before categorization
+- Added 10 unit tests covering all matching scenarios (vitest)
+- Zero TypeScript errors, all tests pass
+- Commit: 4f4a0750
+
+### Feature #98: Live correctie-propagatie tijdens import - PASSING
+- Modified `updateRowBudget` to auto-propagate budget to all sibling transactions
+  - Same counterparty_name or description match
+  - Skips rows with `userManuallyChanged` flag, transfers, and skipped rows
+  - Shows toast: "Budget toegepast op X vergelijkbare transacties" via useToast
+- Added `userManuallyChanged` field to ImportRow type
+- Removed old bulk-apply prompt UI (no longer needed — propagation is automatic)
+- Preserved category_corrections save logic (corrections still persist to DB)
+- Updated handleImport to use row's category_source when available
+- Zero TypeScript errors
+- Commit: 99c0da83
+
+### Current Status
+- 2 features completed this session (#97, #98)
+- 98/175 features passing (56.0%)

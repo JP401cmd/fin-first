@@ -77,7 +77,6 @@ export async function updateSession(request: NextRequest) {
     '/test-user-isolation',
     '/test-budget-workflow',
     '/api/apply-migration',
-    '/api/apply-badges-migration',
     '/api/verify-schema',
     '/test-migration',
     '/test-onboarding-workflow',
