@@ -986,9 +986,10 @@ export default function GidsPage() {
             icon={ArrowDownToLine}
             title="Onttrekkingsstrategie"
             color="var(--color-horizon-400)"
+            valueText="FIRE bereiken is één ding. Weten hoe je je vermogen veilig opneemt is minstens zo belangrijk. Kies een strategie die past bij jouw leven."
             description={
               <>
-                Je hebt FIRE bereikt \u2014 en dan? Je onttrekkingsstrategie
+                TriFinity ondersteunt drie eindstrategie_MARKER_en \u2014 en dan? Je onttrekkingsstrategie
                 bepaalt{" "}
                 <strong>hoe je je vermogen veilig opneemt</strong> zodat je nooit
                 zonder zit. TriFinity ondersteunt drie eindstrategie\u00ebn:{" "}
@@ -1050,31 +1051,41 @@ export default function GidsPage() {
             color="var(--color-horizon-400)"
             description={
               <>
-                <strong>Experimenteer met je toekomst.</strong> Wat als je 20% meer
-                zou verdienen? Wat als je over 3 jaar parttime gaat werken? Wat als
-                je emigreert naar Portugal? De <strong>What-If builder</strong> laat
-                je alternatieve toekomsten verkennen via vijf schuifbalken:{" "}
-                <strong>inkomen</strong>, werkdagen, spaarquote,{" "}
-                <strong>rendement</strong> en <strong>uitgaven</strong>. Kies een
-                snelpreset (optimistisch, verwacht, pessimistisch) of stel elk
-                parameter handmatig in.
+                Wat als je minder gaat werken? Wat als je een bonus krijgt? Wat als
+                je een jaar pauze neemt?{" "}
+                <strong>
+                  Het droomscenario laat je experimenteren zonder risico.
+                </strong>
                 {" "}
-                Je ziet direct het effect op je <strong>FIRE-datum</strong>,
-                vermogenspad en slaagkans. Voeg levensgebeurtenissen toe aan je
-                scenario en vergelijk het naast je huidige baseline in een{" "}
-                <strong>split-view</strong>. De SimChart toont beide paden met
-                percentiellijnen, zodat je niet alleen het verwachte maar ook het
-                beste en slechtste geval ziet \u2014 inclusief partnerperspectief
-                bij een huishouden.
+                Ga naar De Horizon \u2192 Droomscenario en verschuif de sliders:{" "}
+                <strong>maandelijks inkomen</strong>, werkdagen/week (0\u20135),
+                spaarquote (%), verwacht rendement (%) en{" "}
+                <strong>extra maandelijkse inleg</strong>. De FIRE-grafiek past
+                zich direct aan.
+                {" "}
+                <strong>Levensgebeurtenissen:</strong> voeg events toe aan je
+                scenario (sabbatical, verhuizing, kind). Per event zie je hoeveel
+                maanden je FIRE-datum verschuift.{" "}
+                <strong>Presets:</strong> klik op een preset \u2014{" "}
+                <em>sabbatical</em>, <em>bonus</em>, <em>loonsverhoging</em>,{" "}
+                <em>minder werken</em> \u2014 om snel een scenario te laden.{" "}
+                <strong>Vergelijken:</strong> sla scenario&apos;s op en vergelijk
+                ze naast elkaar. De kassabon-vergelijking toont per regel het
+                verschil met je huidige situatie: baseline vs what-if.{" "}
+                <strong>Will-chat:</strong> open Will vanuit je scenario. De AI
+                kent je aanpassingen en geeft gerichte suggesties: &ldquo;Als je
+                die sabbatical wilt, kun je dit doen om het te
+                compenseren.&rdquo;
               </>
             }
             howTo={{
               steps: [
-                "Ga naar De Horizon \u2192 What-If om een nieuw scenario te openen",
-                "Pas parameters aan: versleep de schuifbalken voor inkomen, uitgaven, rendement, werkdagen en spaarquote",
-                "Of kies een snelpreset (optimist, koershouder, zuinig) als startpunt en verfijn van daaruit",
-                "Voeg levensgebeurtenissen toe aan je scenario om hun impact op je FIRE-datum te zien",
-                "Open de vergelijkingsmodal om je scenario naast je huidige situatie te leggen",
+                "Ga naar De Horizon \u2192 Droomscenario om een nieuw scenario te openen",
+                "Verschuif de sliders: inkomen, werkdagen, spaarquote, rendement en extra maandelijkse inleg \u2014 de FIRE-grafiek past zich direct aan",
+                "Klik op een preset (sabbatical, bonus, loonsverhoging, minder werken) om snel een scenario te laden en van daaruit te verfijnen",
+                "Voeg levensgebeurtenissen toe: per event zie je hoeveel maanden je FIRE-datum verschuift",
+                "Sla scenario\u2019s op en vergelijk ze: de kassabon-vergelijking toont per regel het verschil met je huidige situatie",
+                "Open Will vanuit je scenario \u2014 de AI kent je aanpassingen en geeft gerichte suggesties om je droom haalbaar te maken",
               ],
               tip: "Probeer: \u201cWat als ik mijn spaarquote met 10% verhoog en over 5 jaar een kind krijg?\u201d \u2014 de combinatie geeft het eerlijkste beeld.",
             }}
@@ -1205,30 +1216,43 @@ export default function GidsPage() {
           icon={Rss}
           title="TriFinity Post"
           color="var(--ink-2)"
+          valueText="Financieel nieuws dat er toe doet — voor jou. Geen clickbait over crypto-hypes, maar inzichten die relevant zijn voor jóuw portfolio, jóuw situatie, jóuw doelen."
           description={
             <>
-              <strong>TriFinity Post</strong> is je persoonlijke financi\u00eble
-              nieuwsfeed \u2014 actueel nieuws en artikelen die relevant zijn
-              voor jouw situatie. De AI analyseert financieel nieuws en schrijft
-              samenvattingen die rekening houden met je portfolio, vermogen en
-              doelen. Zo lees je niet zomaar nieuws, maar nieuws dat er voor jou
-              toe doet.
-              {" "}
-              Artikelen worden <strong>dagelijks automatisch gegenereerd</strong>{" "}
-              en verschijnen als kaarten die je kunt openen en lezen. De inhoud
-              is altijd gepersonaliseerd: als rentestanden veranderen en jij een
-              hypotheek hebt, legt de AI uit wat dat voor jou betekent. Als
-              markten bewegen en jij belegt, krijg je context bij de cijfers.
+              <strong>TriFinity Post</strong> is je persoonlijke financiële
+              nieuwsfeed. De AI analyseert actueel financieel nieuws en schrijft
+              artikelen die rekening houden met jouw portfolio, vermogen,
+              budgetdata en doelen. Zo lees je geen generiek nieuws, maar
+              inzichten die er voor jou toe doen.
+              <br />
+              <br />
+              <strong>Personalisatie:</strong> de AI weet welke beleggingen je
+              hebt, hoe je budget ervoor staat, en wat je doelen zijn. Een
+              artikel over de AEX is relevant als je Nederlandse aandelen bezit.
+              Een artikel over energieprijzen is relevant als je energiebudget
+              stijgt. Een rentebesluit van de ECB krijgt context als je een
+              hypotheek hebt.
+              <br />
+              <br />
+              <strong>Progressive loading:</strong> artikelen worden gegenereerd
+              terwijl je kijkt — ze verschijnen één voor één als kaarten met
+              vloeiende CSS-animaties. Je hoeft niet te wachten tot alles klaar
+              is: de eerste kaarten zijn er binnen seconden.
+              <br />
+              <br />
+              <strong>Dagelijks vers:</strong> nieuwe artikelen worden elke dag
+              beschikbaar. Tik op verversen voor verse content op basis van de
+              nieuwste data en je meest recente financiële situatie.
             </>
           }
           howTo={{
             steps: [
-              "Open TriFinity Post via het nieuwsicoon in de navigatie of het dashboard",
-              "Scroll door de artikelkaarten \u2014 elk artikel is een korte, leesbare samenvatting",
-              "Tik op een artikel om het volledige stuk te lezen met persoonlijke context",
-              "Nieuwe artikelen verschijnen dagelijks automatisch op basis van actueel nieuws",
+              "Ga naar Berichten via de navigatie of het dashboard — de AI genereert artikelen terwijl je kijkt, ze verschijnen één voor één als kaarten",
+              "Lees de artikelkaarten — elk artikel is een korte, leesbare samenvatting van financieel nieuws dat relevant is voor jouw situatie",
+              "De AI personaliseert op basis van je beleggingen, budget en doelen: een artikel over de AEX verschijnt als je Nederlandse aandelen hebt, energieprijzen als je energiebudget stijgt",
+              "Tik op verversen voor nieuwe artikelen — dagelijks beschikbaar, gebaseerd op de nieuwste data en je actuele financiële positie",
             ],
-            tip: "Lees elke ochtend 2-3 artikelen bij je koffie. Het kost 5 minuten en houdt je financieel scherp \u2014 zonder zelf nieuwssites af te struinen.",
+            tip: "Lees elke ochtend 2-3 artikelen bij je koffie. Het kost 5 minuten en houdt je financieel scherp — zonder zelf nieuwssites af te struinen.",
           }}
         />
 
