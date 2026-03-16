@@ -1662,41 +1662,41 @@ export default function GidsPage() {
           color="var(--ink-2)"
           description={
             <>
-              Je financiën altijd bij de hand \u2014 TriFinity is volledig{" "}
-              <strong>responsive</strong> en werkt als een native app op je telefoon.
-              Het{" "}
-              <strong>responsive design</strong> past elk scherm automatisch aan:
-              widgets schalen van 4-koloms grid op desktop naar 1- of 2-koloms op
-              mobiel, grafieken worden compacter en tabellen scrollen horizontaal.
+              <strong>
+                Je financiën altijd bij de hand. TriFinity werkt volledig op je
+                telefoon — geen app store nodig, gewoon installeren vanuit je
+                browser.
+              </strong>{" "}
+              TriFinity is een{" "}
+              <strong>Progressive Web App (PWA)</strong>: installeerbaar op je
+              telefoon zonder app store. Open de app in je mobiele browser, voeg
+              toe aan je startscherm en je hebt een volwaardige app met
+              fullscreen modus en snelle laadtijden.
               {" "}
-              Je kunt TriFinity installeren als{" "}
-              <strong>PWA (Progressive Web App)</strong> \u2014 voeg de app toe aan
-              je startscherm via je browser en je krijgt een app-achtige ervaring
-              zonder download uit de App Store. De app opent dan fullscreen, onthoudt
-              je sessie en laadt razendsnel.
+              Het <strong>responsive design</strong> schaalt automatisch: widgets
+              passen zich aan naar kleiner formaat op mobiel. Full-widgets worden
+              half, quarter-widgets worden mini. Het 4-koloms grid op desktop
+              wordt 1- of 2-koloms op mobiel, grafieken worden compacter en
+              tabellen scrollen horizontaal.
               {" "}
-              Alle interacties zijn <strong>touch-geoptimaliseerd</strong>: swipe
-              door je transacties, drag &amp; drop widgets op het dashboard om ze te
-              herschikken, en modals schuiven als <strong>BottomSheets</strong> van
-              onderen omhoog die je wegveegt. Alle touch targets zijn minimaal 44px
-              voor comfortabel tikken.
+              Alle interacties zijn <strong>touch-geoptimaliseerd</strong>: tik
+              op bedragen voor kassabon-details via BottomSheets die van onderen
+              omhoog schuiven. Veeg door grafieken. Sleep widgets naar een nieuwe
+              positie via drag &amp; drop. Alle touch targets zijn minimaal 44px.
               {" "}
-              Een paar dingen werken anders op mobiel: de{" "}
-              <strong>bottom navigation</strong> vervangt de sidebar en geeft met
-              \u00e9\u00e9n tik toegang tot De Kern, De Wil en De Horizon \u2014
-              kleurgecodeerd per module. Widget-formaten passen zich aan (full
-              widgets worden compacter, quarter widgets vullen de volle breedte).
-              Tab-gebaseerde layouts houden complexe pagina&apos;s overzichtelijk en
-              de briefing scrollt verticaal in plaats van als kaartendeck.
+              <strong>Alles beschikbaar:</strong> importeren, check-in,
+              Will-chat, scenario&apos;s — alles werkt op mobiel. De layout past
+              zich aan, de functionaliteit niet. De bottom navigation geeft met
+              één tik toegang tot De Kern, De Wil en De Horizon —
+              kleurgecodeerd per module.
             </>
           }
           howTo={{
             steps: [
-              "Open TriFinity in je mobiele browser (Safari of Chrome) \u2014 de app past zich automatisch aan",
-              "Installeer als PWA: tik op \u2018Delen\u2019 \u2192 \u2018Zet op beginscherm\u2019 (Safari) of het installatie-icoontje (Chrome)",
-              "Gebruik de bottom navigation onderaan om tussen modules te wisselen",
-              "Herschik je dashboard-widgets door ze lang ingedrukt te houden en te verslepen",
-              "Veeg BottomSheets naar beneden om ze te sluiten, of tik buiten het paneel",
+              "Installeren \u2014 Open TriFinity in je mobiele browser. Tik op \u2018Toevoegen aan startscherm\u2019 (iOS: deel-knop \u2192 Zet op beginscherm. Android: menu \u2192 Installeren). De app opent voortaan als volwaardige app.",
+              "Widgets op mobiel \u2014 Widgets schalen automatisch naar een kleiner formaat. Je kunt de volgorde ook op mobiel aanpassen via drag & drop (lang ingedrukt houden en verslepen).",
+              "Touch \u2014 Tik op bedragen voor kassabon-details (BottomSheet). Veeg door grafieken. Sleep widgets naar een nieuwe positie.",
+              "Alles beschikbaar \u2014 Importeren, check-in, Will-chat, scenario\u2019s \u2014 alles werkt op mobiel. De layout past zich aan, de functionaliteit niet.",
             ],
             tip: "Installeer TriFinity als PWA op je startscherm \u2014 je krijgt dan een app-icoon, fullscreen modus en snellere laadtijden. Check elke ochtend je briefing terwijl je koffie drinkt.",
           }}
