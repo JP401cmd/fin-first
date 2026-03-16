@@ -15,7 +15,6 @@ import { CountdownCard } from './cards/countdown-card'
 import { GoalProgressCard } from './cards/goal-progress-card'
 import { BudgetBarCard } from './cards/budget-bar-card'
 import { QuoteCard } from './cards/quote-card'
-import { StreakCard } from './cards/streak-card'
 import { RecurringCard } from './cards/recurring-card'
 import { LifeEventCard } from './cards/life-event-card'
 import { NextStepBriefingCard } from './cards/next-step-card'
@@ -51,7 +50,6 @@ function renderCard(card: BriefingCardSpec, data: DashboardData) {
     case 'goalProgress': return <GoalProgressCard spec={card} />
     case 'budgetBar': return <BudgetBarCard spec={card} />
     case 'quote': return <QuoteCard spec={card} />
-    case 'streak': return <StreakCard spec={card} />
     case 'recurring': return <RecurringCard spec={card} />
     case 'lifeEvent': return <LifeEventCard spec={card} />
     case 'nextStep': return <NextStepBriefingCard spec={card} />

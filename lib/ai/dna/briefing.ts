@@ -70,11 +70,6 @@ showLifeEvent: Toon een komende levensgebeurtenis met countdown. Gebruik als er 
   - Combineer met showAction voor concrete voorbereidingsstappen
   - Gebruik module "horizon" voor toekomst-events
 
-showStreak: Vier positieve streaks (vermogensgroei, budget compliance, etc). Gebruik als er een actieve streak is van minstens 2 perioden.
-  - Positieve bekrachtiging: vuur-visueel motiverend
-  - Ideaal als boost in het midden van de briefing
-  - Niet gebruiken als er geen actieve streaks in de data staan
-
 showNextStep: Toon een concrete volgende stap suggestie. Gebruik max 2x per briefing, kies de meest impactvolle stappen uit de VOLGENDE STAPPEN data.
   - Prioriteer stappen die de meeste vrijheidstijd opleveren
   - Gebruik de dismissKey uit de VOLGENDE STAPPEN data voor dismiss-tracking
@@ -125,7 +120,6 @@ Default href per card type:
 - showSparkline (expenseHistory) → "/core/budgets"
 - showRecurring → "/core/cash"
 - showLifeEvent → "/horizon"
-- showStreak → contextafhankelijk (kies de route die past bij het streak-onderwerp)
 - showNextStep → volgt uit de VOLGENDE STAPPEN data (kern→"/core/*", wil→"/will", horizon→"/horizon")
 - showDiscover → de relevante pagina van de feature (bijv. "/core/belasting", "/horizon")
 - showDecisionPatterns → "/will"
@@ -138,7 +132,6 @@ Default href per card type:
 - Wissel 1-kolom cards (metric, progressRing, countdown, goalProgress, budgetBar) af met 2-kolom cards
 - showRecurring nooit als eerste card — eerst context geven met een insight of metric
 - showQuote als mooie afsluiter van de briefing of als rustpunt halverwege
-- showStreak als positieve boost, bij voorkeur na een metric of progressRing card
 - showLifeEvent bij voorkeur na een horizon-gerelateerde card (FIRE, countdown)
 - showNextStep werkt goed na een metric of insight card als logische vervolgactie
 - showDiscover als lichte afsluiter, nooit als eerste card — plaats near het einde van de briefing
@@ -373,7 +366,6 @@ function getPhaseEmphasis(phase: string): string {
 - Benadruk schuld-alerts, budget-basics, positief momentum
 - Vier kleine winsten (elke euro minder schuld = vrijheid teruggewonnen)
 - Gebruik showBudgetBar voor dagelijkse budgetbewaking
-- Gebruik showStreak om positieve streaks te vieren (bijv. "3 weken binnen budget") — motiverend in deze fase
 - Gebruik showRecurring om vaste lasten inzichtelijk te maken — bewustwording van maandelijkse drains
 - Vermijd FIRE/horizon cards — die zijn nu niet relevant
 - Vermijd showQuote en showLifeEvent — te vroeg in deze fase`
@@ -391,7 +383,6 @@ function getPhaseEmphasis(phase: string): string {
 - Benadruk FIRE countdown, scenariovergelijkingen
 - Toon groeitrends en vermogensopbouw
 - Gebruik showComparison voor maand-op-maand vooruitgang
-- Gebruik showStreak om groeistreaks te vieren (bijv. "6 maanden vermogensgroei") — bevestiging van momentum
 - Gebruik showQuote als inspirerende reflectie over vrijheid en vermogensopbouw
 - Belasting-optimalisatie tips waar relevant`
     case 'mastery':
@@ -588,18 +579,6 @@ export const briefingTools = {
       text: z.string().describe('Het citaat zelf (max 2-3 zinnen, motiverend of reflectief)'),
       attribution: z.string().optional().describe('Bron van het citaat, bijv. "Will" of "Stoicijnse wijsheid"'),
       module: moduleEnum.describe('Kleurmodule (gebruik "wil" voor redactionele citaten)'),
-    }),
-  }),
-
-  showStreak: tool({
-    description: 'Vier een positieve streak (bijv. 4 maanden vermogensgroei, 12 dagen binnen budget). Vuur-visueel.',
-    inputSchema: z.object({
-      label: z.string().describe('Streak naam, bijv. "Vermogensgroei"'),
-      count: z.number().describe('Aantal perioden, bijv. 4'),
-      unit: z.enum(['dagen', 'weken', 'maanden']).describe('Tijdseenheid'),
-      description: z.string().describe('Korte beschrijving, bijv. "Al 4 maanden op rij stijgt je vermogen"'),
-      module: moduleEnum.describe('Kleurmodule'),
-      href: z.string().optional().describe('Link naar detail pagina'),
     }),
   }),
 

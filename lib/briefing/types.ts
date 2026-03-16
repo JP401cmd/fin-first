@@ -153,16 +153,6 @@ export interface QuoteCardSpec {
   module: CardModule
 }
 
-export interface StreakCardSpec {
-  type: 'streak'
-  label: string
-  count: number
-  unit: 'dagen' | 'weken' | 'maanden'
-  description: string
-  module: CardModule
-  href?: string
-}
-
 export interface RecurringCardSpec {
   type: 'recurring'
   title: string
@@ -236,7 +226,6 @@ export type BriefingCardSpec =
   | GoalProgressCardSpec
   | BudgetBarCardSpec
   | QuoteCardSpec
-  | StreakCardSpec
   | RecurringCardSpec
   | LifeEventCardSpec
   | NextStepCardSpec
@@ -323,7 +312,6 @@ export const CARD_SPAN: Record<BriefingCardSpec['type'], number> = {
   insight: 2,
   milestone: 4,
   quote: 2,
-  streak: 1,
   recurring: 2,
   lifeEvent: 2,
   nextStep: 2,

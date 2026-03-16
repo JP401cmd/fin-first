@@ -48,8 +48,6 @@ function toolCallToCardSpec(toolName: string, input: Record<string, unknown>): B
       return { type: 'budgetBar', ...input } as BriefingCardSpec
     case 'showQuote':
       return { type: 'quote', ...input } as BriefingCardSpec
-    case 'showStreak':
-      return { type: 'streak', ...input } as BriefingCardSpec
     case 'showRecurring':
       return { type: 'recurring', ...input } as BriefingCardSpec
     case 'showLifeEvent':
