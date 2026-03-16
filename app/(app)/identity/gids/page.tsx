@@ -27,6 +27,7 @@ import {
   Rocket,
   Sun,
   Rss,
+  SlidersHorizontal,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
@@ -318,7 +319,13 @@ export default function GidsPage() {
             color="var(--color-kern-400)"
             description={
               <>
-                Ontdek waar je levenstijd naartoe stroomt. TriFinity verdeelt je uitgaven over <strong>6 hoofdcategorieën en 24 subcategorieën</strong> met vijf budgettypes (inkomsten, uitgaven, sparen, schulden, verborgen). Per categorie kies je een <strong>doeltype</strong>: vast bedrag, percentage van inkomen of flexibel — zo past je plan bij jouw situatie. Elke categorie markeer je als <strong>essentieel of niet-essentieel</strong>, wat rechtstreeks je FIRE-berekening bepaalt. Drie weergaven geven inzicht: <strong>boomstructuur</strong> met voortgangsbalken, <strong>donutgrafiek</strong> voor verdeling, en <strong>sparklines</strong> voor 6-maanden trends. De <strong>maand-op-maand vergelijking</strong> toont hoe je bestedingspatroon verschuift. Tik op een categorie voor het <strong>kassabon</strong>-detail met elke transactie en zie je maandrapport in gewonnen of verloren <strong>vrijheidsdagen</strong>. Favoriete budgetten pin je als <strong>widget op je dashboard</strong> zodat je ze altijd in beeld hebt. Budgetteren is volledig optioneel — vul alleen je geschatte maanduitgaven in en TriFinity doet de rest.
+                Een budget is geen beperking — het is een spiegel. Je ziet waar je tijd naartoe gaat, zodat je bewust kunt kiezen waar je vrijheid groeit.
+                <br /><br />
+                TriFinity verdeelt je uitgaven over <strong>6 hoofdcategorieën en 24 subcategorieën</strong> met vijf budgettypes (inkomsten, uitgaven, sparen, schulden, verborgen). Per categorie kies je een <strong>doeltype</strong>: vast bedrag, percentage van inkomen of flexibel — zo past je plan bij jouw situatie. Elke categorie markeer je als <strong>essentieel of niet-essentieel</strong>, wat rechtstreeks je FIRE-berekening bepaalt.
+                <br /><br />
+                Drie weergaven geven inzicht: <strong>boomstructuur</strong> met voortgangsbalken, <strong>donutgrafiek</strong> voor verdeling, en <strong>sparklines</strong> voor 6-maanden trends. De <strong>maand-op-maand vergelijking</strong> toont hoe je bestedingspatroon verschuift. Tik op een categorie voor het <strong>kassabon</strong>-detail met elke transactie en zie je maandrapport in gewonnen of verloren <strong>vrijheidsdagen</strong>.
+                <br /><br />
+                Favoriete budgetten pin je als <strong>widget op je dashboard</strong> in 4 formaten (mini, quarter, half, full) zodat je ze altijd in beeld hebt. Budgetteren is volledig optioneel — vul alleen je geschatte maanduitgaven in en TriFinity doet de rest.
               </>
             }
             howTo={{
@@ -1316,6 +1323,49 @@ export default function GidsPage() {
         />
 
         <GuideTopicCard
+          icon={SlidersHorizontal}
+          title="App instellingen"
+          color="var(--ink-2)"
+          description={
+            <>
+              <strong>Maak de app helemaal van jou.</strong> In Instellingen pas
+              je TriFinity aan op jouw wensen en situatie. Alles is gebundeld in
+              vijf secties op \u00e9\u00e9n overzichtelijke pagina.
+              {" "}
+              <strong>Widgets</strong>: kies welke widgets op je dashboard
+              verschijnen. Schakel ze aan of uit, en ontdek nieuwe widgets
+              naarmate je soevereiniteitsniveau stijgt. Elk widget-formaat (mini,
+              quarter, half, full) past zich automatisch aan je scherm aan.
+              {" "}
+              <strong>FIRE-parameters</strong>: stel je verwacht bruto rendement
+              en inflatie in. Deze twee getallen sturen al je
+              FIRE-berekeningen, projecties en scenario&apos;s. Kies ook je
+              eindstrategie: eeuwig kapitaal behouden (perpetual), nalatenschap
+              achterlaten (legacy) of vermogen opgebruiken (deplete).
+              {" "}
+              <strong>Weergave</strong>: personaliseer je modulekleuren voor De
+              Kern, De Wil en De Horizon. Kies uit vooraf samengestelde paletten
+              of stel je eigen kleuren in.
+              {" "}
+              <strong>Notificaties</strong>: bepaal welke meldingen je wilt
+              ontvangen \u2014 budgetgrenzen, vermogensmijlpalen, level-ups en
+              aanbevelingen. Per type aan of uitzetten.
+            </>
+          }
+          howTo={{
+            steps: [
+              "Ga naar Identiteit \u2192 Instellingen om alle opties op \u00e9\u00e9n plek te zien",
+              "Sectie A (Notificaties): kies per type welke meldingen je wilt ontvangen",
+              "Sectie B (Widgets): schakel widgets aan/uit en ontdek nieuwe opties per niveau",
+              "Sectie C (FIRE): stel verwacht rendement, inflatie en eindstrategie in \u2014 dit stuurt al je prognoses",
+              "Sectie D (Weergave): pas modulekleuren aan met voorgedefinieerde of eigen kleuren",
+              "Sectie E (Gegevens): exporteer al je data of verwijder je account",
+            ],
+            tip: "Begin met de FIRE-parameters \u2014 die hebben de grootste impact op al je berekeningen. Een verschil van 1% rendement kan je FIRE-datum jaren verschuiven.",
+          }}
+        />
+
+        <GuideTopicCard
           icon={Users}
           title="Huishouden & Partner"
           color="var(--ink-2)"
@@ -1364,7 +1414,7 @@ export default function GidsPage() {
           color="var(--ink-2)"
           description={
             <>
-              TriFinity is volledig geoptimaliseerd voor je telefoon. De{" "}
+              Je financiën altijd bij de hand — TriFinity is volledig De{" "}
               <strong>bottom navigation</strong> geeft je met \u00e9\u00e9n tik
               toegang tot De Kern, De Wil en De Horizon \u2014 kleurgecodeerd per
               module. Alle touch targets zijn minimaal 44px, modals schuiven als{" "}
