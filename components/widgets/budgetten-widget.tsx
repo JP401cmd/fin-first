@@ -102,20 +102,25 @@ function BudgetRow({ config, limit, spent, hasEntered }: BudgetRowProps) {
   const seg = computeBarSegments(spent, limit, 80, { barHex: barFillVar, barHexWarn: barWarnVar }, overPositive)
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-0.5">
 
-      {/* Laag 1: icoon + type label */}
-      <div className="flex items-center gap-1.5">
-        <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[var(--r-sm)] ${iconBg}`}>
-          <Icon className={iconText} size={9} strokeWidth={2} />
+      {/* Laag 1: icoon + type label + amount */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[var(--r-sm)] ${iconBg}`}>
+            <Icon className={iconText} size={9} strokeWidth={2} />
+          </div>
+          <span className={`text-[10px] font-bold uppercase tracking-[0.09em] ${hasData ? labelText : 'text-[var(--ink-3)]'}`}>
+            {label}
+          </span>
         </div>
-        <span className={`text-[10px] font-bold uppercase tracking-[0.09em] ${hasData ? labelText : 'text-[var(--ink-3)]'}`}>
-          {label}
+        <span className={`font-mono tabular-nums text-[10px] ${overBudget ? (overPositive ? 'text-emerald-600 font-semibold' : 'text-red-500 font-semibold') : 'text-[var(--ink-3)]'}`}>
+          {hasData ? `${formatCurrency(spent)} / ${formatCurrency(limit)}` : '—'}
         </span>
       </div>
 
-      {/* Laag 2: voortgangsbalk — track neutraal, 2 fill segmenten + extensie */}
-      <div className="relative h-2 w-full overflow-hidden rounded-full bg-[var(--border-ed)]">
+      {/* Laag 2: voortgangsbalk — compact */}
+      <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-[var(--border-ed)]">
         {/* Fill 1 — normaal */}
         <div
           className="absolute inset-y-0 left-0 rounded-l-full"
@@ -152,18 +157,14 @@ function BudgetRow({ config, limit, spent, hasEntered }: BudgetRowProps) {
         )}
       </div>
 
-      {/* Laag 3: €spent · percentage · budget €limit */}
-      <div className="flex items-center justify-between gap-1">
-        <span className={`font-mono tabular-nums text-[10px] ${overBudget ? (overPositive ? 'text-emerald-600 font-semibold' : 'text-red-500 font-semibold') : 'text-[var(--ink-3)]'}`}>
-          {hasData ? formatCurrency(spent) : '—'}
-        </span>
-        <span className={`text-[9px] font-bold ${overBudget ? (overPositive ? 'text-emerald-500' : 'text-red-400') : 'text-[var(--ink-4)]'}`}>
-          {pctLabel}
-        </span>
-        <span className="font-mono tabular-nums text-[10px] text-[var(--ink-3)]">
-          {hasData ? formatCurrency(limit) : '—'}
-        </span>
-      </div>
+      {/* Laag 3: percentage indicator */}
+      {hasData && (
+        <div className="flex justify-end">
+          <span className={`text-[9px] font-bold ${overBudget ? (overPositive ? 'text-emerald-500' : 'text-red-400') : 'text-[var(--ink-4)]'}`}>
+            {pctLabel}
+          </span>
+        </div>
+      )}
 
     </div>
   )
@@ -333,7 +334,7 @@ export function BudgettenWidget({ size, data, href }: Props) {
     <WidgetShell module="kern" size={size} kicker="Budgetten" href={href}>
 
       {/* ── Vier budget-rijen ── */}
-      <div ref={inViewRef} className="flex flex-col gap-3">
+      <div ref={inViewRef} className="flex flex-col gap-2">
         {BUDGET_TYPE_CONFIGS.map((config) => {
           const typeData = budgetTotals[config.key]
           return (
@@ -348,28 +349,30 @@ export function BudgettenWidget({ size, data, href }: Props) {
         })}
       </div>
 
-      {/* ── Netto maandbalans (full-size) ── */}
+      {/* ── Netto maandbalans (full-size) — prominent summary ── */}
       {isFullSize && (
         <>
-          <div className="mt-4 border-t border-dashed border-[var(--border-ed)]" />
-          <div className="mt-3 flex items-end justify-between">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-                Netto maandbalans
-              </p>
-              <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-4)]">
-                Inkomen min alle uitgaven
-              </p>
-            </div>
-            <div className="text-right">
-              <p className={`font-mono tabular-nums text-xl font-semibold ${isNettoPositief ? 'text-emerald-700' : 'text-red-600'}`}>
-                {isNettoPositief ? '+' : ''}{formatCurrency(nettoBalans)}
-              </p>
-              {freedomStr && (
-                <p className="font-serif italic text-[11px] text-[var(--ink-3)]">
-                  {isNettoPositief ? `+${freedomStr} vrijheid` : `${freedomStr} achter`}
+          <div className="mt-3 border-t border-dashed border-[var(--border-ed)]" />
+          <div className={`mt-3 rounded-[var(--r-md)] px-3 py-2.5 ${isNettoPositief ? 'bg-emerald-50/60' : 'bg-red-50/60'}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                  Netto maandbalans
                 </p>
-              )}
+                <p className="mt-0.5 font-serif italic text-[11px] text-[var(--ink-4)]">
+                  Inkomen min alle uitgaven
+                </p>
+              </div>
+              <div className="text-right">
+                <p className={`font-mono tabular-nums text-2xl font-semibold ${isNettoPositief ? 'text-emerald-700' : 'text-red-600'}`}>
+                  {isNettoPositief ? '+' : ''}{formatCurrency(nettoBalans)}
+                </p>
+                {freedomStr && (
+                  <p className="font-serif italic text-[11px] text-[var(--ink-3)]">
+                    {isNettoPositief ? `+${freedomStr} vrijheid` : `${freedomStr} achter`}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </>
