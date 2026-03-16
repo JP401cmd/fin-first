@@ -451,7 +451,7 @@ export function BenchmarkComparisonChart({
                 opacity: hoveredBenchmark && hoveredBenchmark !== b.id ? 0.3 : 1,
               }}
             />
-            <span className="text-[11px] text-[var(--ink-3)]">{b.name}</span>
+            <span className="text-[11px] text-[var(--ink-3)]">{b.name}{b.dataSource === 'synthetic' ? '*' : ''}</span>
             <span className={`text-[11px] font-medium ${b.returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
               {b.returnPct >= 0 ? '+' : ''}{b.returnPct.toFixed(1)}%
             </span>
@@ -504,6 +504,13 @@ export function BenchmarkComparisonChart({
             )}
           </p>
         </div>
+      )}
+      {/* Data source disclaimer */}
+      {comparison.benchmarks.some(b => b.dataSource === 'synthetic') && (
+        <p className="mt-2 text-[10px] text-[var(--ink-4)] italic" data-testid="benchmark-disclaimer">
+          * Sommige benchmarkdata is geschat op basis van historisch gemiddeld rendement.
+          Echte marktdata was niet beschikbaar.
+        </p>
       )}
     </div>
   )

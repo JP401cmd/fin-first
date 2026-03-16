@@ -8,14 +8,6 @@ import HoldingValueChartClient from './value-chart-client'
 // UUID v4 regex for validation
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-/**
- * Check if the holdings table exists by trying a lightweight query.
- */
-async function holdingsTableExists(supabase: Awaited<ReturnType<typeof createClient>>): Promise<boolean> {
-  const { error } = await supabase.from('holdings').select('id').limit(0)
-  return !error || !error.message.includes('Could not find')
-}
-
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(value)
 }
@@ -40,49 +32,14 @@ export default async function HoldingDetailPage({
     notFound()
   }
 
-  // Try the dedicated holdings table first, fall back to assets
-  const hasTable = await holdingsTableExists(supabase)
+  const { data: holdingData, error } = await supabase
+    .from('holdings')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .maybeSingle()
 
-  let holdingData: Record<string, unknown> | null = null
-
-  if (hasTable) {
-    const { data, error } = await supabase
-      .from('holdings')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    if (!error && data) {
-      holdingData = data
-    }
-  }
-
-  // Fallback: try the assets table if not found in holdings
-  if (!holdingData) {
-    const { data: asset, error: assetError } = await supabase
-      .from('assets')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    if (!assetError && asset) {
-      holdingData = {
-        id: asset.id,
-        name: asset.name,
-        ticker: asset.ticker_symbol || null,
-        asset_type: asset.asset_type,
-        notes: asset.notes,
-        units: 1,
-        avg_purchase_price: Number(asset.purchase_value) || 0,
-        current_price: Number(asset.current_value) || 0,
-      }
-    }
-  }
-
-  // If still not found, show the not-found page
-  if (!holdingData) {
+  if (error || !holdingData) {
     notFound()
   }
 

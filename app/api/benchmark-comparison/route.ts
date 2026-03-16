@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   buildPortfolioHistory,
   compareToBenchmarks,
+  fetchAllRealBenchmarkData,
   TIME_PERIODS,
 } from '@/lib/benchmark-comparison'
 
@@ -78,13 +79,31 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Compare to benchmarks
-    const comparison = compareToBenchmarks(portfolioHistory, period)
+    // Determine benchmark date range from portfolio history
+    const benchStartDate = new Date(portfolioHistory[0].date)
+    const benchEndDate = new Date()
+
+    // Fetch real benchmark data from Yahoo Finance (with automatic fallback)
+    const realBenchmarkData = await fetchAllRealBenchmarkData(benchStartDate, benchEndDate)
+
+    // Compare to benchmarks (uses real data when available, synthetic as fallback)
+    const comparison = compareToBenchmarks(portfolioHistory, period, realBenchmarkData)
+
+    // Count how many benchmarks use real vs synthetic data
+    const realCount = comparison?.benchmarks.filter(b => b.dataSource === 'yahoo_finance').length ?? 0
+    const syntheticCount = comparison?.benchmarks.filter(b => b.dataSource === 'synthetic').length ?? 0
 
     return NextResponse.json({
       comparison,
       portfolio_months: portfolioHistory.length,
       holdings_count: holdings.length,
+      benchmark_data_source: {
+        real: realCount,
+        synthetic: syntheticCount,
+        disclaimer: syntheticCount > 0
+          ? 'Sommige benchmarkdata is geschat op basis van historisch gemiddeld rendement. Echte marktdata was niet beschikbaar.'
+          : undefined,
+      },
     })
   } catch (error) {
     console.error('Benchmark comparison error:', error)

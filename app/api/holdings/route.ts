@@ -1,22 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { syncAssetValueFromHoldings } from '@/lib/holdings-sync'
-
-/**
- * Check if the holdings table exists by trying a lightweight query.
- * Returns true if the dedicated holdings table is available, false otherwise.
- */
-async function holdingsTableExists(supabase: Awaited<ReturnType<typeof createClient>>): Promise<boolean> {
-  const { error } = await supabase.from('holdings').select('id').limit(0)
-  return !error || !error.message.includes('Could not find')
-}
+import { getEURRateSync } from '@/lib/forex'
 
 /**
  * GET /api/holdings — List user's investment holdings.
  *
- * Primary: reads from the dedicated `holdings` table.
- * Fallback: if the holdings table doesn't exist yet, reads investment-type
- * assets from the `assets` table and maps them to a holdings-compatible shape.
+ * Reads from the dedicated `holdings` table.
  *
  * Query params:
  *   ?asset_id=<uuid> — filter holdings for a specific asset
@@ -33,58 +23,20 @@ export async function GET(request: NextRequest) {
   const assetIdFilter = searchParams.get('asset_id')
 
   try {
-    const hasTable = await holdingsTableExists(supabase)
-
-    if (hasTable) {
-      let query = supabase
-        .from('holdings')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-
-      if (assetIdFilter) {
-        query = query.eq('asset_id', assetIdFilter)
-      }
-
-      const { data: holdings, error } = await query
-
-      if (error) {
-        return NextResponse.json({
-          holdings: [],
-          total_value: 0,
-          total_cost: 0,
-          source: 'empty',
-          message: 'Kon holdings niet laden',
-        })
-      }
-
-      const totalValue = holdings.reduce((sum, h) => {
-        const price = h.current_price ?? h.avg_purchase_price
-        return sum + (price * h.units)
-      }, 0)
-
-      const totalCost = holdings.reduce((sum, h) => {
-        return sum + (h.avg_purchase_price * h.units)
-      }, 0)
-
-      return NextResponse.json({
-        holdings,
-        total_value: totalValue,
-        total_cost: totalCost,
-        source: 'holdings_table',
-      })
-    }
-
-    // Fallback: use assets table, filtering for investment-like types
-    const { data: assets, error: assetsError } = await supabase
-      .from('assets')
+    let query = supabase
+      .from('holdings')
       .select('*')
       .eq('user_id', user.id)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
 
-    if (assetsError) {
+    if (assetIdFilter) {
+      query = query.eq('asset_id', assetIdFilter)
+    }
+
+    const { data: holdings, error } = await query
+
+    if (error) {
       return NextResponse.json({
         holdings: [],
         total_value: 0,
@@ -94,38 +46,24 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Map assets to holdings-compatible shape
-    const holdings = (assets || []).map((a) => ({
-      id: a.id,
-      user_id: a.user_id,
-      asset_id: a.id,
-      ticker: a.ticker_symbol || null,
-      isin: null,
-      name: a.name,
-      units: 1,
-      avg_purchase_price: Number(a.purchase_value) || 0,
-      current_price: Number(a.current_value) || 0,
-      last_price_update: a.updated_at || null,
-      purchase_date: a.purchase_date || null,
-      notes: a.notes || null,
-      is_active: true,
-      created_at: a.created_at,
-      updated_at: a.updated_at || a.created_at,
-      // Extra fields from assets for display
-      asset_type: a.asset_type,
-      institution: a.institution,
-      expected_return: a.expected_return,
-      monthly_contribution: a.monthly_contribution,
-    }))
+    const totalValue = holdings.reduce((sum, h) => {
+      const price = h.current_price ?? h.avg_purchase_price
+      const currency = (h.currency as string) || 'EUR'
+      const eurRate = getEURRateSync(currency)
+      return sum + (price * h.units * eurRate)
+    }, 0)
 
-    const totalValue = holdings.reduce((sum, h) => sum + (h.current_price || 0), 0)
-    const totalCost = holdings.reduce((sum, h) => sum + (h.avg_purchase_price || 0), 0)
+    const totalCost = holdings.reduce((sum, h) => {
+      const currency = (h.currency as string) || 'EUR'
+      const eurRate = getEURRateSync(currency)
+      return sum + (h.avg_purchase_price * h.units * eurRate)
+    }, 0)
 
     return NextResponse.json({
       holdings,
       total_value: totalValue,
       total_cost: totalCost,
-      source: 'assets_fallback',
+      source: 'holdings_table',
     })
   } catch {
     return NextResponse.json({
@@ -140,8 +78,7 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/holdings — Create a new holding.
  *
- * Primary: inserts into the dedicated `holdings` table.
- * Fallback: if the holdings table doesn't exist, creates an asset in the `assets` table.
+ * Inserts into the dedicated `holdings` table.
  *
  * Expected body: { name, ticker?, isin?, units?, avg_purchase_price?, current_price?, purchase_date?, notes?, asset_type? }
  */
@@ -191,7 +128,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Request body moet een JSON-object zijn' }, { status: 400 })
     }
 
-    const { name, ticker, isin, units, avg_purchase_price, current_price, purchase_date, notes, asset_type } = body
+    const { name, ticker, isin, units, avg_purchase_price, current_price, purchase_date, notes, asset_type, currency } = body
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return NextResponse.json({ error: 'Naam is verplicht en moet een niet-lege string zijn' }, { status: 400 })
@@ -235,159 +172,80 @@ export async function POST(request: NextRequest) {
     // Check if user wants to force-create despite duplicate warning
     const forceDuplicate = body.force_duplicate === true
 
-    const hasTable = await holdingsTableExists(supabase)
-
-    if (hasTable) {
-      // Get a default asset_id (first investment asset, or null)
-      let assetId = body.asset_id || null
-      if (!assetId) {
-        const { data: investmentAsset } = await supabase
-          .from('assets')
-          .select('id')
-          .eq('user_id', user.id)
-          .in('asset_type', ['investment', 'crypto', 'savings'])
-          .limit(1)
-          .single()
-        assetId = investmentAsset?.id || null
-      }
-
-      // Check for duplicate ticker within the same asset (if ticker is provided)
-      if (ticker && typeof ticker === 'string' && ticker.trim().length > 0 && !forceDuplicate) {
-        const tickerNorm = ticker.trim().toUpperCase()
-
-        // Build query: same user, same ticker, active holdings
-        let dupeQuery = supabase
-          .from('holdings')
-          .select('id, name, ticker, asset_id')
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .ilike('ticker', tickerNorm)
-
-        // If we have an asset_id, also check within the same asset
-        if (assetId) {
-          dupeQuery = dupeQuery.eq('asset_id', assetId)
-        }
-
-        const { data: duplicates } = await dupeQuery
-
-        if (duplicates && duplicates.length > 0) {
-          return NextResponse.json({
-            warning: true,
-            message: `Er bestaat al een actieve holding met ticker "${tickerNorm}"${assetId ? ' voor dit vermogensobject' : ''}. Wil je toch doorgaan?`,
-            existing_holdings: duplicates.map((d) => ({
-              id: d.id,
-              name: d.name,
-              ticker: d.ticker,
-            })),
-          }, { status: 409 })
-        }
-      }
-
-      const { data: holding, error } = await supabase
-        .from('holdings')
-        .insert({
-          user_id: user.id,
-          asset_id: assetId,
-          name,
-          ticker: ticker || null,
-          isin: isin || null,
-          units: Number(units) || 1,
-          avg_purchase_price: Number(avg_purchase_price) || 0,
-          current_price: current_price != null ? Number(current_price) : null,
-          purchase_date: purchase_date || null,
-          notes: notes || null,
-          is_active: true,
-        })
-        .select()
+    // Get a default asset_id (first investment asset, or null)
+    let assetId = body.asset_id || null
+    if (!assetId) {
+      const { data: investmentAsset } = await supabase
+        .from('assets')
+        .select('id')
+        .eq('user_id', user.id)
+        .in('asset_type', ['investment', 'crypto', 'savings'])
+        .limit(1)
         .single()
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
-      }
-
-      // Sync parent asset's current_value from all holdings
-      if (holding && holding.asset_id) {
-        await syncAssetValueFromHoldings(supabase, holding.asset_id, user.id)
-      }
-
-      const responseBody = { holding, source: 'holdings_table' }
-      // Cache the successful response for idempotency
-      if (idempotencyKey) {
-        const cacheKey = `${user.id}:${idempotencyKey}`
-        idempotencyCache.set(cacheKey, { response: { body: responseBody, status: 201 }, timestamp: Date.now() })
-      }
-      return NextResponse.json(responseBody, { status: 201 })
+      assetId = investmentAsset?.id || null
     }
 
-    // Fallback: create an asset in the assets table
-    // Check for duplicate ticker in assets fallback (if ticker is provided)
+    // Check for duplicate ticker within the same asset (if ticker is provided)
     if (ticker && typeof ticker === 'string' && ticker.trim().length > 0 && !forceDuplicate) {
       const tickerNorm = ticker.trim().toUpperCase()
-      const { data: dupeAssets } = await supabase
-        .from('assets')
-        .select('id, name, ticker_symbol')
+
+      // Build query: same user, same ticker, active holdings
+      let dupeQuery = supabase
+        .from('holdings')
+        .select('id, name, ticker, asset_id')
         .eq('user_id', user.id)
         .eq('is_active', true)
-        .ilike('ticker_symbol', tickerNorm)
+        .ilike('ticker', tickerNorm)
 
-      if (dupeAssets && dupeAssets.length > 0) {
+      // If we have an asset_id, also check within the same asset
+      if (assetId) {
+        dupeQuery = dupeQuery.eq('asset_id', assetId)
+      }
+
+      const { data: duplicates } = await dupeQuery
+
+      if (duplicates && duplicates.length > 0) {
         return NextResponse.json({
           warning: true,
-          message: `Er bestaat al een actieve holding met ticker "${tickerNorm}". Wil je toch doorgaan?`,
-          existing_holdings: dupeAssets.map((a) => ({
-            id: a.id,
-            name: a.name,
-            ticker: a.ticker_symbol,
+          message: `Er bestaat al een actieve holding met ticker "${tickerNorm}"${assetId ? ' voor dit vermogensobject' : ''}. Wil je toch doorgaan?`,
+          existing_holdings: duplicates.map((d) => ({
+            id: d.id,
+            name: d.name,
+            ticker: d.ticker,
           })),
         }, { status: 409 })
       }
     }
 
-    const assetTypeToUse = asset_type || 'investment'
-    const currentVal = Number(current_price) || Number(avg_purchase_price) || 0
-    const purchaseVal = Number(avg_purchase_price) || currentVal
-
-    const { data: asset, error: assetError } = await supabase
-      .from('assets')
+    const { data: holding, error } = await supabase
+      .from('holdings')
       .insert({
         user_id: user.id,
+        asset_id: assetId,
         name,
-        asset_type: assetTypeToUse,
-        current_value: currentVal * (Number(units) || 1),
-        purchase_value: purchaseVal * (Number(units) || 1),
+        ticker: ticker || null,
+        isin: isin || null,
+        units: Number(units) || 1,
+        avg_purchase_price: Number(avg_purchase_price) || 0,
+        current_price: current_price != null ? Number(current_price) : null,
+        currency: typeof currency === 'string' && currency.trim().length > 0 ? currency.trim().toUpperCase() : 'EUR',
         purchase_date: purchase_date || null,
-        expected_return: 7,
-        monthly_contribution: 0,
-        institution: null,
         notes: notes || null,
-        ticker_symbol: ticker || isin || null,
+        is_active: true,
       })
       .select()
       .single()
 
-    if (assetError) {
-      return NextResponse.json({ error: assetError.message }, { status: 500 })
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Map asset back to holding shape
-    const holding = {
-      id: asset.id,
-      user_id: asset.user_id,
-      asset_id: asset.id,
-      ticker: asset.ticker_symbol || null,
-      isin: null,
-      name: asset.name,
-      units: Number(units) || 1,
-      avg_purchase_price: purchaseVal,
-      current_price: currentVal,
-      purchase_date: asset.purchase_date,
-      notes: asset.notes,
-      is_active: true,
-      created_at: asset.created_at,
-      updated_at: asset.created_at,
+    // Sync parent asset's current_value from all holdings
+    if (holding && holding.asset_id) {
+      await syncAssetValueFromHoldings(supabase, holding.asset_id, user.id)
     }
 
-    const responseBody = { holding, source: 'assets_fallback' }
+    const responseBody = { holding, source: 'holdings_table' }
     // Cache the successful response for idempotency
     if (idempotencyKey) {
       const cacheKey = `${user.id}:${idempotencyKey}`
@@ -446,116 +304,70 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Units moet een getal zijn' }, { status: 400 })
     }
 
-    const hasTable = await holdingsTableExists(supabase)
-
-    if (hasTable) {
-      // --- Optimistic concurrency check ---
-      // If the client sent expected_updated_at, verify the row hasn't changed since
-      const expectedUpdatedAt = body.expected_updated_at as string | undefined
-      if (expectedUpdatedAt) {
-        const { data: currentRow, error: fetchError } = await supabase
-          .from('holdings')
-          .select('updated_at, name, units, avg_purchase_price, current_price, ticker, notes')
-          .eq('id', id)
-          .eq('user_id', user.id)
-          .single()
-
-        if (fetchError) {
-          return NextResponse.json({ error: fetchError.message }, { status: 500 })
-        }
-
-        if (currentRow) {
-          // Compare timestamps — normalize both to millisecond precision
-          const serverTime = new Date(currentRow.updated_at).getTime()
-          const clientTime = new Date(expectedUpdatedAt).getTime()
-
-          if (serverTime !== clientTime) {
-            return NextResponse.json({
-              error: 'conflict',
-              message: 'Deze holding is ondertussen door een andere sessie gewijzigd. Herlaad de gegevens en probeer opnieuw.',
-              conflict: true,
-              server_state: currentRow,
-              server_updated_at: currentRow.updated_at,
-              client_updated_at: expectedUpdatedAt,
-            }, { status: 409 })
-          }
-        }
-      }
-
-      // Build update object with only provided fields
-      const updates: Record<string, unknown> = {}
-      if (body.current_price !== undefined) updates.current_price = Number(body.current_price)
-      if (body.units !== undefined) updates.units = Number(body.units)
-      if (body.avg_purchase_price !== undefined) updates.avg_purchase_price = Number(body.avg_purchase_price)
-      if (body.name !== undefined) updates.name = body.name
-      if (body.ticker !== undefined) updates.ticker = body.ticker || null
-      if (body.notes !== undefined) updates.notes = body.notes || null
-      if (body.current_price !== undefined) updates.last_price_update = new Date().toISOString()
-      // Always bump updated_at on write so future conflict checks work
-      updates.updated_at = new Date().toISOString()
-
-      const { data: holding, error } = await supabase
+    // --- Optimistic concurrency check ---
+    // If the client sent expected_updated_at, verify the row hasn't changed since
+    const expectedUpdatedAt = body.expected_updated_at as string | undefined
+    if (expectedUpdatedAt) {
+      const { data: currentRow, error: fetchError } = await supabase
         .from('holdings')
-        .update(updates)
+        .select('updated_at, name, units, avg_purchase_price, current_price, ticker, notes')
         .eq('id', id)
         .eq('user_id', user.id)
-        .select()
         .single()
 
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
+      if (fetchError) {
+        return NextResponse.json({ error: fetchError.message }, { status: 500 })
       }
 
-      // Sync linked asset's current_value from all holdings (aggregate)
-      if (holding && holding.asset_id && (body.current_price !== undefined || body.units !== undefined)) {
-        await syncAssetValueFromHoldings(supabase, holding.asset_id, user.id)
-      }
+      if (currentRow) {
+        // Compare timestamps — normalize both to millisecond precision
+        const serverTime = new Date(currentRow.updated_at).getTime()
+        const clientTime = new Date(expectedUpdatedAt).getTime()
 
-      return NextResponse.json({ holding, source: 'holdings_table' })
+        if (serverTime !== clientTime) {
+          return NextResponse.json({
+            error: 'conflict',
+            message: 'Deze holding is ondertussen door een andere sessie gewijzigd. Herlaad de gegevens en probeer opnieuw.',
+            conflict: true,
+            server_state: currentRow,
+            server_updated_at: currentRow.updated_at,
+            client_updated_at: expectedUpdatedAt,
+          }, { status: 409 })
+        }
+      }
     }
 
-    // Fallback: update asset in the assets table
-    // (Assets fallback does not have optimistic locking — last write wins)
+    // Build update object with only provided fields
     const updates: Record<string, unknown> = {}
-    if (body.current_price !== undefined) {
-      const units = body.units || 1
-      updates.current_value = Number(body.current_price) * Number(units)
-    }
+    if (body.current_price !== undefined) updates.current_price = Number(body.current_price)
+    if (body.units !== undefined) updates.units = Number(body.units)
+    if (body.avg_purchase_price !== undefined) updates.avg_purchase_price = Number(body.avg_purchase_price)
     if (body.name !== undefined) updates.name = body.name
+    if (body.ticker !== undefined) updates.ticker = body.ticker || null
     if (body.notes !== undefined) updates.notes = body.notes || null
-    if (body.ticker !== undefined) updates.ticker_symbol = body.ticker || null
+    if (body.currency !== undefined && typeof body.currency === 'string') updates.currency = body.currency.trim().toUpperCase() || 'EUR'
+    if (body.current_price !== undefined) updates.last_price_update = new Date().toISOString()
+    // Always bump updated_at on write so future conflict checks work
+    updates.updated_at = new Date().toISOString()
 
-    const { data: asset, error: assetError } = await supabase
-      .from('assets')
+    const { data: holding, error } = await supabase
+      .from('holdings')
       .update(updates)
       .eq('id', id)
       .eq('user_id', user.id)
       .select()
       .single()
 
-    if (assetError) {
-      return NextResponse.json({ error: assetError.message }, { status: 500 })
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Map asset back to holding shape
-    const holding = {
-      id: asset.id,
-      user_id: asset.user_id,
-      asset_id: asset.id,
-      ticker: asset.ticker_symbol || null,
-      isin: null,
-      name: asset.name,
-      units: body.units || 1,
-      avg_purchase_price: Number(asset.purchase_value) || 0,
-      current_price: Number(asset.current_value) / (Number(body.units) || 1),
-      purchase_date: asset.purchase_date,
-      notes: asset.notes,
-      is_active: true,
-      created_at: asset.created_at,
-      updated_at: asset.updated_at || asset.created_at,
+    // Sync linked asset's current_value from all holdings (aggregate)
+    if (holding && holding.asset_id && (body.current_price !== undefined || body.units !== undefined)) {
+      await syncAssetValueFromHoldings(supabase, holding.asset_id, user.id)
     }
 
-    return NextResponse.json({ holding, source: 'assets_fallback' })
+    return NextResponse.json({ holding, source: 'holdings_table' })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Onbekende fout'
     return NextResponse.json({ error: message }, { status: 500 })
@@ -583,42 +395,27 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    const hasTable = await holdingsTableExists(supabase)
+    // Fetch asset_id before deleting so we can sync the parent asset afterwards
+    const { data: holdingToDelete } = await supabase
+      .from('holdings')
+      .select('asset_id')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single()
 
-    if (hasTable) {
-      // Fetch asset_id before deleting so we can sync the parent asset afterwards
-      const { data: holdingToDelete } = await supabase
-        .from('holdings')
-        .select('asset_id')
-        .eq('id', id)
-        .eq('user_id', user.id)
-        .single()
+    const { error } = await supabase
+      .from('holdings')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id)
 
-      const { error } = await supabase
-        .from('holdings')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', user.id)
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
 
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
-      }
-
-      // Sync parent asset's current_value after deletion
-      if (holdingToDelete?.asset_id) {
-        await syncAssetValueFromHoldings(supabase, holdingToDelete.asset_id, user.id)
-      }
-    } else {
-      // Fallback: delete from assets table
-      const { error } = await supabase
-        .from('assets')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', user.id)
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
-      }
+    // Sync parent asset's current_value after deletion
+    if (holdingToDelete?.asset_id) {
+      await syncAssetValueFromHoldings(supabase, holdingToDelete.asset_id, user.id)
     }
 
     return NextResponse.json({ success: true })

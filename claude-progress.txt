@@ -1,3 +1,25 @@
+## Session 2026-03-16 - Feature #4
+
+### Feature #4: ReisStapSection component - PASSING
+- Component already fully implemented at components/app/reis-stap-section.tsx
+- Verified all 8 feature steps against implementation:
+  1. Props: id, step, icon, title, color, subtitle, statusLines, valueSentence, ctaLabel, ctaHref, isComplete, children
+  2. Accent bar: h-[3px] div with backgroundColor: color
+  3. Header: step number badge (rounded-full, white text), icon box (bg-subtle), title
+  4. Status box: "Jouw status" label, number highlighting with font-mono tabular-nums
+  5. Italic value sentence: font-serif italic text
+  6. CTA button: Link with backgroundColor: color + ArrowRight icon
+  7. scroll-mt-24 and id attribute for progress bar linking
+  8. Children slot for nested GuideTopicCards (border-t separated section)
+- Component used 5+ times in gids page (imported and rendering)
+- Zero TypeScript errors in component file
+- Zero console errors
+- No code changes needed (verification-only)
+
+### Current Status
+- 1 feature verified and marked passing (#4)
+- 70/95 features passing (73.7%)
+
 ## Session 2026-03-16 - Features #67, #68
 
 ### Feature #67: Progress bar titels gelijkstellen aan staptitels - PASSING
@@ -12987,3 +13009,30 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#81)
 - 69/90 features passing (76.7%)
+
+## Session 2026-03-16 - Features #69, #71, #73
+
+### Feature #69: Database: is_favorite kolom op holdings - PASSING
+- Created migration: 20260316100002_add_holdings_is_favorite.sql
+- ALTER TABLE holdings ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN DEFAULT false
+- Follows same pattern as budgets.is_favorite
+
+### Feature #71: DashboardData: favoriteHoldings laden - PASSING
+- Added holdings query to Promise.all: supabase.from('holdings').select(...).eq('is_favorite', true)
+- Computes per holding: totalValue (units × current_price), totalCost (units × avg_purchase_price)
+- Computes returnPct and dailyChangePct from previous_close
+- Added FavoriteHolding type to widget-renderer.tsx DashboardData interface
+- Added holding_fav:* dynamic widget pref injection (same pattern as budget_fav)
+
+### Feature #73: HoldingFavWidget component: mini formaat - PASSING
+- Modified existing holding-fav-widget.tsx
+- Mini: ticker/name (max 6 chars) as kicker + currentPrice font-mono + dailyChangePct green/red
+- WidgetShell module='kern', href to /core/assets/holdings/{id}
+- useInViewAnimation for fade+slide entry animation
+- Zero TypeScript errors, zero console errors
+- Commit: 850ba1be
+
+### Current Status
+- 3 features completed this session (#69, #71, #73)
+- Zero TypeScript errors in changed files
+- Zero console errors verified via browser

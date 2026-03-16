@@ -49,6 +49,8 @@ export interface ComparisonResult {
     returnPct: number
     dataPoints: BenchmarkDataPoint[]
     alpha: number // portfolio return - benchmark return
+    /** Whether data comes from real Yahoo Finance data or synthetic random walk */
+    dataSource?: 'yahoo_finance' | 'synthetic'
   }[]
 }
 
@@ -78,6 +80,13 @@ export const BENCHMARKS: BenchmarkInfo[] = [
   },
 ]
 
+/** Yahoo Finance ticker symbols for each benchmark */
+export const BENCHMARK_TICKERS: Record<BenchmarkId, string> = {
+  aex: '^AEX',
+  msci_world: 'IWDA.AS',
+  sp500: '^GSPC',
+}
+
 export const TIME_PERIODS: TimePeriod[] = [
   { id: '1m', label: '1M', months: 1 },
   { id: '3m', label: '3M', months: 3 },
@@ -87,7 +96,118 @@ export const TIME_PERIODS: TimePeriod[] = [
   { id: 'all', label: 'Alles', months: 0 },
 ]
 
-// ── Benchmark data generation ────────────────────────────────
+// ── Real benchmark data from Yahoo Finance ───────────────────
+
+/** Cache for real benchmark data (1 hour TTL) */
+const benchmarkCache = new Map<string, { data: BenchmarkDataPoint[]; expiresAt: number }>()
+const BENCHMARK_CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour
+
+/**
+ * Fetch real historical monthly closing prices from Yahoo Finance.
+ * Returns data points normalized to 100 at the start of the period.
+ * Returns null if the API is unavailable or data is insufficient.
+ */
+export async function fetchRealBenchmarkData(
+  benchmarkId: BenchmarkId,
+  startDate: Date,
+  endDate: Date,
+): Promise<BenchmarkDataPoint[] | null> {
+  const ticker = BENCHMARK_TICKERS[benchmarkId]
+  if (!ticker) return null
+
+  // Check cache
+  const cacheKey = `${benchmarkId}:${startDate.toISOString().split('T')[0]}:${endDate.toISOString().split('T')[0]}`
+  const cached = benchmarkCache.get(cacheKey)
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.data
+  }
+
+  try {
+    // Yahoo Finance chart API with monthly interval
+    // period1/period2 are Unix timestamps
+    const period1 = Math.floor(startDate.getTime() / 1000)
+    const period2 = Math.floor(endDate.getTime() / 1000)
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1mo&period1=${period1}&period2=${period2}`
+
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; TriFinity/1.0)',
+        'Accept': 'application/json',
+      },
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+    })
+
+    if (!res.ok) return null
+
+    const data = await res.json()
+    const result = data?.chart?.result?.[0]
+    if (!result) return null
+
+    const timestamps: number[] = result.timestamp || []
+    const closes: (number | null)[] = result.indicators?.quote?.[0]?.close || []
+
+    if (timestamps.length < 2 || closes.length < 2) return null
+
+    // Build data points from real closing prices
+    const rawPoints: { date: string; close: number }[] = []
+    for (let i = 0; i < timestamps.length; i++) {
+      const close = closes[i]
+      if (close === null || close === undefined || isNaN(close)) continue
+      const d = new Date(timestamps[i] * 1000)
+      const dateStr = d.toISOString().split('T')[0]
+      rawPoints.push({ date: dateStr, close })
+    }
+
+    if (rawPoints.length < 2) return null
+
+    // Normalize to base 100
+    const baseValue = rawPoints[0].close
+    if (baseValue <= 0) return null
+
+    const points: BenchmarkDataPoint[] = rawPoints.map(p => ({
+      date: p.date,
+      value: Math.round((p.close / baseValue) * 10000) / 100,
+    }))
+
+    // Cache the result
+    benchmarkCache.set(cacheKey, { data: points, expiresAt: Date.now() + BENCHMARK_CACHE_TTL_MS })
+
+    // Evict expired cache entries
+    if (benchmarkCache.size > 50) {
+      const now = Date.now()
+      for (const [k, v] of Array.from(benchmarkCache.entries())) {
+        if (now >= v.expiresAt) benchmarkCache.delete(k)
+      }
+    }
+
+    return points
+  } catch {
+    // Network error, timeout, parse error — return null (caller uses synthetic fallback)
+    return null
+  }
+}
+
+/**
+ * Fetch real benchmark data for all benchmarks in parallel.
+ * Returns a map of benchmarkId → data points (null if unavailable).
+ */
+export async function fetchAllRealBenchmarkData(
+  startDate: Date,
+  endDate: Date,
+): Promise<Map<BenchmarkId, BenchmarkDataPoint[] | null>> {
+  const results = new Map<BenchmarkId, BenchmarkDataPoint[] | null>()
+
+  // Fetch all benchmarks in parallel
+  const promises = BENCHMARKS.map(async (bench) => {
+    const data = await fetchRealBenchmarkData(bench.id, startDate, endDate)
+    results.set(bench.id, data)
+  })
+
+  await Promise.all(promises)
+  return results
+}
+
+// ── Synthetic benchmark data generation (fallback) ───────────
 // Generate realistic benchmark data using a random walk seeded by the benchmark
 // and date, so results are consistent across renders.
 
@@ -321,10 +441,12 @@ export function normalizeToBase100(
 
 /**
  * Compare portfolio performance against benchmarks for a given time period.
+ * If realBenchmarkData is provided, uses real market data; otherwise falls back to synthetic.
  */
 export function compareToBenchmarks(
   portfolioSnapshots: HoldingSnapshot[],
   period: TimePeriod,
+  realBenchmarkData?: Map<BenchmarkId, BenchmarkDataPoint[] | null>,
 ): ComparisonResult | null {
   if (portfolioSnapshots.length < 2) return null
 
@@ -355,10 +477,15 @@ export function compareToBenchmarks(
       const portfolioReturn = calculateTimeWeightedReturn(allFiltered)
 
       const benchmarks = BENCHMARKS.map((bench, idx) => {
-        const benchData = generateBenchmarkData(bench, startDate, now, idx)
+        // Prefer real data, fall back to synthetic
+        const realData = realBenchmarkData?.get(bench.id)
+        const benchData = realData && realData.length >= 2
+          ? realData
+          : generateBenchmarkData(bench, startDate, now, idx)
         const benchReturn = benchData.length >= 2
           ? ((benchData[benchData.length - 1].value / benchData[0].value) - 1) * 100
           : 0
+        const isReal = !!(realData && realData.length >= 2)
 
         return {
           id: bench.id,
@@ -367,6 +494,7 @@ export function compareToBenchmarks(
           returnPct: Math.round(benchReturn * 100) / 100,
           dataPoints: benchData,
           alpha: Math.round((portfolioReturn - benchReturn) * 100) / 100,
+          dataSource: isReal ? 'yahoo_finance' as const : 'synthetic' as const,
         }
       })
 
@@ -386,10 +514,15 @@ export function compareToBenchmarks(
   const portfolioReturn = calculateTimeWeightedReturn(filtered)
 
   const benchmarks = BENCHMARKS.map((bench, idx) => {
-    const benchData = generateBenchmarkData(bench, startDate, now, idx)
+    // Prefer real data, fall back to synthetic
+    const realData = realBenchmarkData?.get(bench.id)
+    const benchData = realData && realData.length >= 2
+      ? realData
+      : generateBenchmarkData(bench, startDate, now, idx)
     const benchReturn = benchData.length >= 2
       ? ((benchData[benchData.length - 1].value / benchData[0].value) - 1) * 100
       : 0
+    const isReal = !!(realData && realData.length >= 2)
 
     return {
       id: bench.id,
@@ -398,6 +531,7 @@ export function compareToBenchmarks(
       returnPct: Math.round(benchReturn * 100) / 100,
       dataPoints: benchData,
       alpha: Math.round((portfolioReturn - benchReturn) * 100) / 100,
+      dataSource: isReal ? 'yahoo_finance' as const : 'synthetic' as const,
     }
   })
 

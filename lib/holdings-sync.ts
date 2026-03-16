@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getEURRateSync } from '@/lib/forex'
 
 /**
  * Aggregate all active holdings for a given asset and sync the total to the
@@ -6,9 +7,10 @@ import { createClient } from '@/lib/supabase/server'
  * sum of (current_price * units) across all its holdings.
  *
  * Portfolio tracker is source of truth when holdings exist for an asset:
- * - When there are active holdings, asset.current_value = SUM(holdings value)
+ * - When there are active holdings, asset.current_value = SUM(holdings value in EUR)
  * - When all holdings are removed, asset.current_value becomes 0
  *
+ * Foreign currency holdings are converted to EUR using cached/fallback rates.
  * This is a non-critical operation: errors don't fail the calling operation.
  */
 export async function syncAssetValueFromHoldings(
@@ -19,7 +21,7 @@ export async function syncAssetValueFromHoldings(
   try {
     const { data: holdings } = await supabase
       .from('holdings')
-      .select('units, current_price, avg_purchase_price')
+      .select('units, current_price, avg_purchase_price, currency')
       .eq('asset_id', assetId)
       .eq('user_id', userId)
       .eq('is_active', true)
@@ -28,7 +30,9 @@ export async function syncAssetValueFromHoldings(
 
     const totalValue = holdings.reduce((sum, h) => {
       const price = h.current_price ?? h.avg_purchase_price
-      return sum + (price * h.units)
+      const currency = (h.currency as string) || 'EUR'
+      const eurRate = getEURRateSync(currency)
+      return sum + (price * h.units * eurRate)
     }, 0)
 
     await supabase
@@ -50,6 +54,8 @@ export async function syncAssetValueFromHoldings(
  *
  * When an asset has active holdings, the portfolio tracker is the source of truth
  * and manual edits to current_value would be overwritten on the next sync.
+ *
+ * Returns EUR-equivalent total value.
  */
 export async function assetHasActiveHoldings(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -59,7 +65,7 @@ export async function assetHasActiveHoldings(
   try {
     const { data: holdings } = await supabase
       .from('holdings')
-      .select('units, current_price, avg_purchase_price')
+      .select('units, current_price, avg_purchase_price, currency')
       .eq('asset_id', assetId)
       .eq('user_id', userId)
       .eq('is_active', true)
@@ -70,7 +76,9 @@ export async function assetHasActiveHoldings(
 
     const totalValue = holdings.reduce((sum, h) => {
       const price = h.current_price ?? h.avg_purchase_price
-      return sum + (price * h.units)
+      const currency = (h.currency as string) || 'EUR'
+      const eurRate = getEURRateSync(currency)
+      return sum + (price * h.units * eurRate)
     }, 0)
 
     return { hasHoldings: true, holdingsCount: holdings.length, totalValue }

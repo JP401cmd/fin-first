@@ -39,9 +39,8 @@ export async function GET(
       .eq('user_id', user.id)
       .maybeSingle()
 
-    if (holdingError && holdingError.message.includes('Could not find')) {
-      // holdings table doesn't exist — try assets fallback
-      return buildFromAsset(supabase, holdingId, user.id)
+    if (holdingError) {
+      return NextResponse.json({ error: holdingError.message }, { status: 500 })
     }
 
     if (!holding) {
@@ -49,17 +48,12 @@ export async function GET(
     }
 
     // Get all transactions for this holding
-    const { data: transactions, error: txError } = await supabase
+    const { data: transactions } = await supabase
       .from('holding_transactions')
       .select('*')
       .eq('holding_id', holdingId)
       .eq('user_id', user.id)
       .order('date', { ascending: true })
-
-    if (txError && txError.message.includes('Could not find')) {
-      // Table doesn't exist — return single-point chart with current value
-      return buildSinglePoint(holding)
-    }
 
     const txList = transactions || []
 
@@ -150,107 +144,10 @@ export async function GET(
       current_units: currentUnits,
       current_price: currentPrice,
     })
-  } catch (err) {
+  } catch {
     return NextResponse.json(
       { error: 'Er is een fout opgetreden' },
       { status: 500 }
     )
   }
-}
-
-/**
- * Fallback: build value history from a single asset record (no holdings table).
- */
-async function buildFromAsset(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  assetId: string,
-  userId: string
-) {
-  const { data: asset, error } = await supabase
-    .from('assets')
-    .select('*')
-    .eq('id', assetId)
-    .eq('user_id', userId)
-    .maybeSingle()
-
-  if (error || !asset) {
-    return NextResponse.json({ error: 'Holding niet gevonden' }, { status: 404 })
-  }
-
-  const purchaseValue = Number(asset.purchase_value) || 0
-  const currentValue = Number(asset.current_value) || purchaseValue
-  const today = new Date().toISOString().split('T')[0]
-  const history = []
-
-  if (asset.purchase_date) {
-    history.push({
-      date: asset.purchase_date,
-      value: purchaseValue,
-      units: 1,
-      price: purchaseValue,
-      event: 'Aankoop',
-      cost_basis: purchaseValue,
-    })
-  }
-
-  history.push({
-    date: today,
-    value: currentValue,
-    units: 1,
-    price: currentValue,
-    event: 'Huidig',
-    cost_basis: purchaseValue,
-  })
-
-  return NextResponse.json({
-    holding_id: assetId,
-    holding_name: asset.name,
-    ticker: asset.ticker_symbol || null,
-    history,
-    current_value: currentValue,
-    current_units: 1,
-    current_price: currentValue,
-  })
-}
-
-/**
- * Build a minimal single-point response when no transaction table exists.
- */
-function buildSinglePoint(holding: Record<string, unknown>) {
-  const currentPrice = Number(holding.current_price) || Number(holding.avg_purchase_price) || 0
-  const units = Number(holding.units) || 0
-  const value = currentPrice * units
-  const today = new Date().toISOString().split('T')[0]
-  const history = []
-
-  if (holding.purchase_date) {
-    const purchasePrice = Number(holding.avg_purchase_price) || 0
-    history.push({
-      date: String(holding.purchase_date),
-      value: purchasePrice * units,
-      units,
-      price: purchasePrice,
-      event: 'Aankoop',
-      cost_basis: purchasePrice * units,
-    })
-  }
-
-  history.push({
-    date: today,
-    value: parseFloat(value.toFixed(2)),
-    units,
-    price: currentPrice,
-    event: 'Huidig',
-    cost_basis: parseFloat((units * (Number(holding.avg_purchase_price) || 0)).toFixed(2)),
-  })
-
-  return NextResponse.json({
-    holding_id: String(holding.id),
-    holding_name: String(holding.name),
-    ticker: holding.ticker || null,
-    history,
-    current_value: parseFloat(value.toFixed(2)),
-    current_units: units,
-    current_price: currentPrice,
-  })
 }

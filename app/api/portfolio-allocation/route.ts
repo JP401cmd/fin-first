@@ -26,45 +26,18 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // First, ensure the classification columns exist by attempting to read them
-    // This gracefully handles the case where columns don't exist yet
-    let holdings: Array<{
-      id: string
-      name: string
-      ticker: string | null
-      units: number
-      avg_purchase_price: number
-      current_price: number | null
-      is_active: boolean
-      asset_class?: string | null
-      sector?: string | null
-      geography?: string | null
-    }> = []
+    const { data, error } = await supabase
+      .from('holdings')
+      .select('id, name, ticker, units, avg_purchase_price, current_price, is_active, asset_class, sector, geography')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
 
-    try {
-      const { data, error } = await supabase
-        .from('holdings')
-        .select('id, name, ticker, units, avg_purchase_price, current_price, is_active, asset_class, sector, geography')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      holdings = data || []
-    } catch {
-      // If the columns don't exist yet, try without them
-      const { data, error } = await supabase
-        .from('holdings')
-        .select('id, name, ticker, units, avg_purchase_price, current_price, is_active')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        return NextResponse.json({ error: 'Kon holdings niet laden' }, { status: 500 })
-      }
-      holdings = (data || []).map(h => ({ ...h, asset_class: null, sector: null, geography: null }))
+    if (error) {
+      return NextResponse.json({ error: 'Kon holdings niet laden' }, { status: 500 })
     }
+
+    const holdings = data || []
 
     // Compute holding values
     const holdingsWithValues = holdings.map((h) => {

@@ -26,75 +26,25 @@ export async function GET(
   }
 
   try {
-    // Try the dedicated holdings table first
-    const { error: tableCheckError } = await supabase.from('holdings').select('id').limit(0)
-    const hasHoldingsTable = !tableCheckError || !tableCheckError.message.includes('Could not find')
-
-    if (hasHoldingsTable) {
-      const { data: holding, error } = await supabase
-        .from('holdings')
-        .select('*')
-        .eq('id', id)
-        .eq('user_id', user.id)
-        .maybeSingle()
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
-      }
-
-      if (!holding) {
-        return NextResponse.json(
-          { error: 'Holding niet gevonden', notFound: true },
-          { status: 404 }
-        )
-      }
-
-      return NextResponse.json({ holding, source: 'holdings_table' })
-    }
-
-    // Fallback: try the assets table
-    const { data: asset, error: assetError } = await supabase
-      .from('assets')
+    const { data: holding, error } = await supabase
+      .from('holdings')
       .select('*')
       .eq('id', id)
       .eq('user_id', user.id)
       .maybeSingle()
 
-    if (assetError) {
-      return NextResponse.json({ error: assetError.message }, { status: 500 })
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    if (!asset) {
+    if (!holding) {
       return NextResponse.json(
         { error: 'Holding niet gevonden', notFound: true },
         { status: 404 }
       )
     }
 
-    // Map asset to holding shape
-    const holding = {
-      id: asset.id,
-      user_id: asset.user_id,
-      asset_id: asset.id,
-      ticker: asset.ticker_symbol || null,
-      isin: null,
-      name: asset.name,
-      units: 1,
-      avg_purchase_price: Number(asset.purchase_value) || 0,
-      current_price: Number(asset.current_value) || 0,
-      last_price_update: asset.updated_at || null,
-      purchase_date: asset.purchase_date || null,
-      notes: asset.notes || null,
-      is_active: true,
-      created_at: asset.created_at,
-      updated_at: asset.updated_at || asset.created_at,
-      asset_type: asset.asset_type,
-      institution: asset.institution,
-      expected_return: asset.expected_return,
-      monthly_contribution: asset.monthly_contribution,
-    }
-
-    return NextResponse.json({ holding, source: 'assets_fallback' })
+    return NextResponse.json({ holding, source: 'holdings_table' })
   } catch {
     return NextResponse.json({ error: 'Er is een fout opgetreden' }, { status: 500 })
   }

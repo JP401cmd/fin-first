@@ -32,18 +32,6 @@ export async function POST(request: NextRequest) {
 
     const holdingId = body?.holding_id as string | undefined
 
-    // Check if holdings table exists
-    const { error: tableCheck } = await supabase.from('holdings').select('id').limit(0)
-    const hasTable = !tableCheck || !tableCheck.message.includes('Could not find')
-
-    if (!hasTable) {
-      return NextResponse.json({
-        results: [],
-        message: 'Holdings tabel niet beschikbaar',
-        source: 'no_table',
-      })
-    }
-
     // Fetch holdings that have tickers
     let query = supabase
       .from('holdings')
@@ -89,18 +77,21 @@ export async function POST(request: NextRequest) {
         const priceData = await fetchPriceData(holding.ticker || holding.isin || '')
 
         if (priceData !== null) {
-          // Successfully got a price — update the holding
+          // Successfully got a price — update the holding with all fields
           const updateFields: Record<string, unknown> = {
             current_price: priceData.price,
             last_price_update: new Date().toISOString(),
           }
 
-          // Store previous_close and daily change if available
           if (priceData.previousClose !== null) {
             updateFields.previous_close = priceData.previousClose
           }
           if (priceData.dailyChangePercent !== null) {
             updateFields.daily_change_percent = priceData.dailyChangePercent
+          }
+          // Store detected currency from Yahoo Finance
+          if (priceData.currency) {
+            updateFields.currency = priceData.currency
           }
 
           const { error: updateError } = await supabase
@@ -110,27 +101,15 @@ export async function POST(request: NextRequest) {
             .eq('user_id', user.id)
 
           if (updateError) {
-            // If the columns don't exist yet, try without them
-            const { error: fallbackError } = await supabase
-              .from('holdings')
-              .update({
-                current_price: priceData.price,
-                last_price_update: new Date().toISOString(),
-              })
-              .eq('id', holding.id)
-              .eq('user_id', user.id)
-
-            if (fallbackError) {
-              results.push({
-                id: holding.id,
-                ticker: holding.ticker,
-                status: 'error' as const,
-                error: 'Kon prijs niet opslaan',
-                current_price: holding.current_price,
-                last_price_update: holding.last_price_update,
-              })
-              continue
-            }
+            results.push({
+              id: holding.id,
+              ticker: holding.ticker,
+              status: 'error' as const,
+              error: 'Kon prijs niet opslaan',
+              current_price: holding.current_price,
+              last_price_update: holding.last_price_update,
+            })
+            continue
           }
 
           // Sync linked asset value — aggregate ALL holdings for the asset,

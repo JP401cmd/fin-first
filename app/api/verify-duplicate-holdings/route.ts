@@ -27,22 +27,16 @@ export async function GET() {
   // by querying the database
 
   try {
-    // Test 1: Check that the POST endpoint returns 409 for duplicate tickers
-    // We'll simulate by checking the holdings table structure
+    // Test 1: Verify that the holdings table is queryable
     const { error: tableCheck } = await supabase.from('holdings').select('id').limit(0)
-    const holdingsTableExists = !tableCheck || !tableCheck.message?.includes('Could not find')
 
     results.push({
       test: 'Holdings table exists',
-      pass: holdingsTableExists,
-      detail: holdingsTableExists
+      pass: !tableCheck,
+      detail: !tableCheck
         ? 'Holdings tabel gevonden in database'
-        : `Tabel niet gevonden: ${tableCheck?.message || 'onbekende fout'}`,
+        : `Tabel fout: ${tableCheck?.message || 'onbekende fout'}`,
     })
-
-    // Test 2: Check that the API route file has duplicate detection code
-    // We verify by testing the endpoint behavior with a test user ID
-    // Since we're unauthenticated, we test code presence indirectly
 
     // If we have a user, do real tests
     if (user) {

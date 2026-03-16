@@ -598,6 +598,9 @@ export default function HoldingsPage() {
                 <p className="truncate text-xs text-[var(--ink-3)]">
                   {holding.ticker && <span className={`font-medium ${soldOut ? 'text-[var(--ink-3)]' : 'text-kern-600'}`}>{holding.ticker}</span>}
                   {holding.ticker && ' · '}
+                  {holding.currency && holding.currency !== 'EUR' && (
+                    <><span className="font-medium text-kern-500">{holding.currency}</span>{' · '}</>
+                  )}
                   {soldOut ? <span className="text-[var(--ink-3)]">0 eenheden</span> : `${holding.units} eenheden`}
                   {holding.institution && ` · ${holding.institution}`}
                   {holding.purchase_date && ` · ${new Date(holding.purchase_date).toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' })}`}

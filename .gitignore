@@ -9,9 +9,11 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+.pnpm-lock.yaml
 
 # testing
 /coverage
+/.playwright-mcp
 
 # next.js
 /.next/
@@ -40,6 +42,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# uploads
+public/uploads
+
+nul
 .playwright-cli/
 .playwright/
-.worktrees/

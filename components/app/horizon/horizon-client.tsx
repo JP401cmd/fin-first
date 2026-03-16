@@ -39,7 +39,7 @@ import {
   AlertTriangle, Calendar, BarChart3, Clock, FlaskConical, Landmark,
   Plus, X, Trash2, Edit3, Zap, Target, History, Sparkles,
   DollarSign, TableProperties,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, ExternalLink,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -2403,6 +2403,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               <div className="rounded-[var(--r)] border border-horizon-100 bg-horizon-50/50 p-3 text-sm italic text-[var(--ink-3)]">
                 <span className="not-italic font-medium text-horizon-700">Tip:</span> {LIFE_EVENT_CATALOG[formType].tip}
               </div>
+            )}
+
+            {/* ── Instructiepanel: mijnpensioenoverzicht.nl (pension & early_retirement) ── */}
+            {(formType === 'pension' || formType === 'early_retirement') && (
+              <PensionInstructionPanel />
             )}
 
             {/* ── SECTIE: Naam & Toelichting ── */}
@@ -4926,6 +4931,64 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           />
         </>
       )}
+    </div>
+  )
+}
+
+// ── Pension instruction panel ────────────────────────────────
+
+function PensionInstructionPanel() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]">
+      {/* Subtitle */}
+      <p className="px-3 pt-3 text-xs font-medium text-[var(--ink-2)]">
+        Wij hebben van u nodig: <span className="font-semibold text-[var(--ink)]">Samenvatting Mijnpensioenoverzicht.nl</span>
+      </p>
+      {/* Collapsible header */}
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="flex w-full items-center gap-2 px-3 pb-3 pt-2 text-left text-sm font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors"
+      >
+        <Info className="h-3.5 w-3.5 shrink-0" />
+        <span>Hoe werkt het?</span>
+        <ChevronDown className={`ml-auto h-3.5 w-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {/* Collapsible content */}
+      <div
+        className={`overflow-hidden transition-all duration-200 ${open ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}
+      >
+        <div className="space-y-3 border-t border-[var(--border-ed)] px-3 pb-3 pt-3">
+          <ol className="list-none space-y-2.5 text-[13px] leading-relaxed text-[var(--ink-3)]">
+            <li className="flex gap-2">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-horizon-100 text-[11px] font-bold text-horizon-700">1</span>
+              <span>Log in met <strong className="font-medium text-[var(--ink-2)]">DigiD</strong> op mijnpensioenoverzicht.nl</span>
+            </li>
+            <li className="flex gap-2">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-horizon-100 text-[11px] font-bold text-horizon-700">2</span>
+              <span>Vink je levenssituatie aan → klik <strong className="font-medium text-[var(--ink-2)]">&apos;Bekijk mijn pensioenoverzicht&apos;</strong></span>
+            </li>
+            <li className="flex gap-2">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-horizon-100 text-[11px] font-bold text-horizon-700">3</span>
+              <span>Twee keer <strong className="font-medium text-[var(--ink-2)]">&apos;Volgende&apos;</strong> → klik <strong className="font-medium text-[var(--ink-2)]">&apos;Bekijk mijn te bereiken pensioen&apos;</strong></span>
+            </li>
+            <li className="flex gap-2">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-horizon-100 text-[11px] font-bold text-horizon-700">4</span>
+              <span>Rechtsboven: klik <strong className="font-medium text-[var(--ink-2)]">&apos;Download gegevens of samenvatting&apos;</strong> → sla op als PDF</span>
+            </li>
+          </ol>
+          <a
+            href="https://www.mijnpensioenoverzicht.nl"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md bg-horizon-50 px-3 py-1.5 text-[13px] font-medium text-horizon-700 hover:bg-horizon-100 transition-colors"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            Ga naar mijnpensioenoverzicht.nl
+          </a>
+        </div>
+      </div>
     </div>
   )
 }
