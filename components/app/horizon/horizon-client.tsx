@@ -48,6 +48,7 @@ import { FeatureGate } from '@/components/app/feature-gate'
 import { HouseholdFireSection } from '@/components/app/household-fire-section'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { SimChartModal } from '@/components/app/horizon/sim-chart-widget'
+import { PensionPdfUpload } from '@/components/app/horizon/pension-pdf-upload'
 import { SimChart, buildScenarioVariants, SCENARIO_VARIANTS, type ScenarioOverlay, type MonteCarloOverlay, type HouseholdPartnerOverlay } from '@/components/app/horizon/sim-chart'
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
@@ -2407,7 +2408,34 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
             {/* ── Instructiepanel: mijnpensioenoverzicht.nl (pension & early_retirement) ── */}
             {(formType === 'pension' || formType === 'early_retirement') && (
-              <PensionInstructionPanel />
+              <>
+                <PensionInstructionPanel />
+                <PensionPdfUpload
+                  onFileSelected={(f) => console.log('[pension] PDF selected:', f.name)}
+                  onFileRemoved={() => console.log('[pension] PDF removed')}
+                  onParseResult={(result) => {
+                    console.log('[pension] Parse result:', result)
+                    // Auto-fill form fields from parsed pension data
+                    if (result && typeof result === 'object' && 'regelingen' in result) {
+                      const data = result as { aowBedrag?: number; regelingen?: Array<{ brutoBedrag?: number; ingangLeeftijd?: number; isGeindexeerd?: boolean }> }
+                      const firstRegeling = data.regelingen?.[0]
+                      if (firstRegeling) {
+                        if (firstRegeling.brutoBedrag != null) {
+                          setFormMetadata(prev => ({ ...prev, brutoBedrag: firstRegeling.brutoBedrag }))
+                          setFormAmount(firstRegeling.brutoBedrag)
+                        }
+                        if (firstRegeling.ingangLeeftijd != null) {
+                          setFormMetadata(prev => ({ ...prev, ingangLeeftijd: firstRegeling.ingangLeeftijd }))
+                          setFormAge(firstRegeling.ingangLeeftijd)
+                        }
+                        if (firstRegeling.isGeindexeerd != null) {
+                          setFormMetadata(prev => ({ ...prev, isGeindexeerd: firstRegeling.isGeindexeerd }))
+                        }
+                      }
+                    }
+                  }}
+                />
+              </>
             )}
 
             {/* ── SECTIE: Naam & Toelichting ── */}
