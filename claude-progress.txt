@@ -1,3 +1,38 @@
+## Session 2026-03-16 - Features #46, #47
+
+### Feature #46: Nieuwe widget: Weekoverzicht - PASSING
+- Created weekoverzicht-widget.tsx with mini/quarter/half/full sizes
+- Mini: total week expenses as single number
+- Quarter: week expenses + progress bar + budget percentage
+- Half: daily bar chart (Mon-Sun) SVG + budget reference line + budget amount
+- Full: daily bar chart with amounts + top 3 categories + previous week comparison
+- Added WeekOverviewData interface to DashboardData
+- Computed week data from existing expenseTx12Result/income12Result in dashboard-data-loader
+- Weekly budget = monthly expense limit / 4.33
+- Budget-gated via BUDGET_WIDGETS set
+- Catalog entry: kern module, all sizes, minLevel -2
+- WIDGET_HREFS: /core/budgets
+- Zero TypeScript errors, zero console errors
+- Verified in browser: all sizes render correctly with test data
+- Commit: 39eddc9d
+
+### Feature #47: Nieuwe widget: SWR Monitor - PASSING
+- Created swr-monitor-widget.tsx with quarter/half/full sizes
+- Quarter: effective SWR (2.88%) + status badge (Veilig/Goed/Matig/Krap)
+- Half: SWR + gauge bar with Trinity Study (4%) and NL standaard (2.88%) markers + legend
+- Full: gauge bar + Rendement scenario's (±1% return) with multipliers + current withdrawal rate check
+- Computes effectiveSwr from grossReturn - BOX3_DRAG - inflationRate (existing DashboardData fields)
+- Shows "Te hoog" warning when actual withdrawal rate exceeds effective SWR
+- Scenario comparison: Pessimistisch/Huidig/Optimistisch with SWR + multiplier
+- Catalog entry: horizon module, quarter/half/full, minLevel 1, requiredPhase Stability
+- WIDGET_HREFS: /identity/instellingen (where FIRE params are configured)
+- Zero TypeScript errors, zero console errors
+- Verified in browser: all sizes render correctly with mock data
+
+### Current Status
+- 2 features completed this session (#46, #47)
+- Both marked as passing
+
 ## Session 2026-03-16 - Features #16, #17, #18
 
 ### Feature #16: Content: FIRE-projectie - PASSING
