@@ -12962,3 +12962,28 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 1 feature completed this session (#66)
 - Zero TypeScript errors
+
+## Session 2026-03-16 - Feature #81
+
+### Feature #81: Fix DELETE transactie herberekening - PASSING
+- Added replayTransactions() function to holding-transactions API route
+  - Sorts all remaining transactions chronologically (date + created_at)
+  - Buy: weighted average price calculation
+  - Sell: units decrease, avg stays same; reset both to 0 if fully sold
+  - Dividend: no effect on units/avg_purchase_price
+- Updated DELETE handler to:
+  1. Fetch transaction holding_id before deletion
+  2. Delete the transaction from DB
+  3. Fetch all remaining transactions for that holding
+  4. Replay them to compute new units + avg_purchase_price
+  5. Update the holding record with recalculated values
+  6. Sync parent asset value via syncAssetValueFromHoldings()
+- Both code paths covered: holding_transactions table + valuations fallback
+- Added delete button with confirmation UI in holding-transaction-log.tsx
+- Created holding-fav-widget.tsx (was missing, causing build error)
+- Zero TypeScript errors in all changed files
+- Commit: 01d77359
+
+### Current Status
+- 1 feature completed this session (#81)
+- 69/90 features passing (76.7%)
