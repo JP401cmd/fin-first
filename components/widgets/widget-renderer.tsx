@@ -123,6 +123,9 @@ const WilskrachtWidget = dynamic(() =>
 const BerichtenWidget = dynamic(() =>
   import('./berichten-widget').then(m => ({ default: m.BerichtenWidget }))
 )
+const SwrMonitorWidget = dynamic(() =>
+  import('./swr-monitor-widget').then(m => ({ default: m.SwrMonitorWidget }))
+)
 const WeekoverzichtWidget = dynamic(() =>
   import('./weekoverzicht-widget').then(m => ({ default: m.WeekoverzichtWidget }))
 )
@@ -524,6 +527,8 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
       return <MaandoverzichtWidget size={size} data={data} href={href} />
     case 'weekoverzicht':
       return <WeekoverzichtWidget size={size} data={data} href={href} />
+    case 'swr_monitor':
+      return <SwrMonitorWidget size={size} data={data} href={href} />
     case 'agenda':
       return <AgendaWidget size={size} data={data} href={href} />
     case 'noodfonds':

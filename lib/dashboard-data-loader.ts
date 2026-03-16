@@ -1328,6 +1328,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     willpowerScore,
     inflationRate: fireParams.inflationRate,
     grossReturn: fireParams.grossReturn,
+    currentAge: dob ? ageAtDate(dob) : null,
     weekOverview,
   }
 

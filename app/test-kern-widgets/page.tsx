@@ -179,6 +179,7 @@ const MOCK_DATA: DashboardData = {
   willpowerScore: 'E',
   inflationRate: 0.02,
   grossReturn: 0.07,
+  currentAge: 35,
   weekOverview: {
     weekExpenses: 342.50,
     weekIncome: 0,
