@@ -1,3 +1,39 @@
+## Session 2026-03-16 - Features #91, #92, #93
+
+### Feature #91: Instructiepanel mijnpensioenoverzicht.nl - PASSING
+- Already implemented by another agent (found in HEAD)
+- PensionInstructionPanel component with collapsible 'Hoe werkt het?' section
+- 4-step DigiD instructions with numbered badges
+- External link to mijnpensioenoverzicht.nl (new tab)
+- Shown in pension & early_retirement forms, before Naam & Toelichting section
+
+### Feature #92: PDF-upload component voor pensioenoverzicht - PASSING
+- Created pension-pdf-upload.tsx as separate component
+- Drag-and-drop zone with file input fallback (hidden sm:inline for responsive)
+- Status states: idle (upload icon) → uploading (spinner) → success (check + filename) → error (alert + message)
+- Validates PDF type and 10MB max size
+- Remove button to clear and re-upload
+- Auto-calls /api/pension/parse on file selection
+- Auto-fills form metadata (brutoBedrag, ingangLeeftijd, isGeindexeerd) from parse result
+- Placed below PensionInstructionPanel in horizon-client.tsx
+
+### Feature #93: API endpoint: PDF parsing pensioenoverzicht - PASSING
+- Created app/api/pension/parse/route.ts
+- POST handler: multipart/form-data, auth required (401), PDF validation, 10MB limit
+- Sends PDF as base64 to AI model via generateObject (Vercel AI SDK)
+- PensionParseResult schema: aowBedrag, regelingen[]{fondsNaam, brutoBedrag, ingangLeeftijd, isGeindexeerd, type}, nabestaandenpensioen, samenvatting
+- Rate limiting: 5 uploads per user per hour (in-memory)
+- Error handling: AI config errors (503), parse errors (500)
+- Verified: 401 response for unauthenticated requests
+- Zero TypeScript errors in all files
+- Commit: 80156eea
+
+### Current Status
+- 3 features completed this session (#91, #92, #93)
+- 73/95 features passing (76.8%)
+- Zero TypeScript errors in changed files
+- Could not test full flow via browser (Supabase auth required, no test credentials)
+
 ## Session 2026-03-16 - Features #79, #82, #80
 
 ### Feature #79: Migreer ontbrekende kolommen naar holdings tabel - PASSING
@@ -13151,3 +13187,32 @@ For Feature #51 (Transaction Import):
 ### Current Status
 - 3 features completed this session (#72, #77, #70)
 - 80/95 features passing (84.2%)
+
+## Session 2026-03-16 - Features #74, #75, #76
+
+### Feature #74: HoldingFavWidget component: quarter formaat - PASSING
+- Added quarter size variant to holding-fav-widget.tsx
+- Donut ReturnRing SVG (110px) showing returnPct with green/red coloring
+- Ring animates via useInViewAnimation + strokeDashoffset transition
+- Total value (units × price) below ring in font-mono
+- Kicker shows ticker or name
+- HOLDING_FAV_SIZES updated to include 'quarter' (externally also added 'half', 'full')
+
+### Feature #75: HoldingFavWidget component: half formaat - PASSING
+- Compact ring (80px) on left + details on right
+- Right side: ticker label, total value, cost, return amount + daily change %
+- All amounts in font-mono tabular-nums
+- Green/red coloring for positive/negative returns
+
+### Feature #76: HoldingFavWidget component: full formaat - PASSING
+- Header: ticker + current price + daily change %
+- Centered return ring (100px) with animated fill
+- 6-metric KPI grid (2 columns): totale waarde, kostprijs, rendement (€), dagverandering (€), eenheden, totaal rendement (%)
+- KpiCell helper component with label + value + optional color
+- All amounts font-mono, green/red for gain/loss
+
+### Current Status
+- 3 features completed this session (#74, #75, #76)
+- Zero TypeScript errors in changed files
+- ReturnRing component refactored with configurable diameter, strokeWidth, fontSize
+- Commit: 2ce44986
