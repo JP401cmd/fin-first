@@ -312,9 +312,10 @@ function pickSmallestFittingSize(
   return null
 }
 
-/** Look up allowed sizes for a widget (handles budget_fav:* dynamically) */
+/** Look up allowed sizes for a widget (handles budget_fav:* and holding_fav:* dynamically) */
 function lookupSizes(id: string, catalog: WidgetDef[]): WidgetSize[] {
   if (id.startsWith('budget_fav:')) return ['quarter', 'half', 'full']
+  if (id.startsWith('holding_fav:')) return ['quarter', 'half', 'full']
   const def = catalog.find(w => w.id === id)
   return def?.sizes ?? ['quarter', 'half', 'full']
 }

@@ -607,8 +607,8 @@ export const BUDGET_WIDGETS = new Set([
 /** Allowed sizes for dynamic budget_fav:* widgets */
 export const BUDGET_FAV_SIZES: WidgetSize[] = ['quarter', 'half', 'full']
 
-/** Allowed sizes for dynamic holding_fav:* widgets */
-export const HOLDING_FAV_SIZES: WidgetSize[] = ['mini']
+/** Allowed sizes for dynamic holding_fav:* widgets (geen mini) */
+export const HOLDING_FAV_SIZES: WidgetSize[] = ['quarter', 'half', 'full']
 
 /** Get the widget definition by id */
 export function getWidgetDef(id: string): WidgetDef | undefined {

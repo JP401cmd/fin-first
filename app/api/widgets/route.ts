@@ -17,7 +17,7 @@ export async function PUT(request: Request) {
     // Validate widget ids against catalog + dynamic budget_fav: prefix
     const validIds = new Set(WIDGET_CATALOG.map(w => w.id))
     const sanitized: WidgetPref[] = body.widgets
-      .filter(w => validIds.has(w.id) || w.id.startsWith('budget_fav:'))
+      .filter(w => validIds.has(w.id) || w.id.startsWith('budget_fav:') || w.id.startsWith('holding_fav:'))
       .map(w => ({
         id: w.id,
         enabled: Boolean(w.enabled),
