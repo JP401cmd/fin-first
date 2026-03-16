@@ -335,9 +335,60 @@ export async function POST(request: NextRequest) {
 }
 
 /**
+ * Replay all transactions for a holding chronologically and compute the final
+ * units and avg_purchase_price. This is the single source of truth after any
+ * transaction mutation (especially DELETE).
+ *
+ * Rules:
+ *   - buy: weighted average price, units increase
+ *   - sell: units decrease, avg stays the same
+ *   - dividend: no effect on units/avg
+ */
+function replayTransactions(
+  transactions: Array<{ type: string; units: number; price_per_unit: number; date: string; created_at: string }>
+): { units: number; avgPurchasePrice: number } {
+  // Sort chronologically (ascending by date, then created_at)
+  const sorted = [...transactions].sort((a, b) => {
+    const dateCompare = a.date.localeCompare(b.date)
+    if (dateCompare !== 0) return dateCompare
+    return (a.created_at || '').localeCompare(b.created_at || '')
+  })
+
+  let units = 0
+  let avgPrice = 0
+
+  for (const tx of sorted) {
+    const numUnits = Number(tx.units) || 0
+    const numPrice = Number(tx.price_per_unit) || 0
+
+    if (tx.type === 'buy') {
+      const newUnits = units + numUnits
+      avgPrice = newUnits > 0
+        ? (units * avgPrice + numUnits * numPrice) / newUnits
+        : numPrice
+      units = newUnits
+    } else if (tx.type === 'sell') {
+      units = Math.max(0, units - numUnits)
+      // avg_purchase_price stays the same for sells
+      if (units <= 0) {
+        units = 0
+        avgPrice = 0
+      }
+    }
+    // dividend: no effect on units/avg_purchase_price
+  }
+
+  return {
+    units: parseFloat(units.toFixed(6)),
+    avgPurchasePrice: parseFloat(avgPrice.toFixed(4)),
+  }
+}
+
+/**
  * DELETE /api/holding-transactions?id=<uuid>
  *
- * Delete a holding transaction. Note: this does NOT reverse the holding's units change.
+ * Delete a holding transaction and replay remaining transactions to recalculate
+ * the holding's units and avg_purchase_price.
  */
 export async function DELETE(request: NextRequest) {
   const supabase = await createClient()
@@ -356,8 +407,22 @@ export async function DELETE(request: NextRequest) {
 
   try {
     const hasTable = await holdingTransactionsTableExists(supabase)
+    const hasHoldingsTable = await holdingsTableExists(supabase)
+
+    let holdingId: string | null = null
 
     if (hasTable) {
+      // 1. Get the transaction before deleting (to know the holding_id)
+      const { data: txToDelete } = await supabase
+        .from('holding_transactions')
+        .select('holding_id')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      holdingId = txToDelete?.holding_id || null
+
+      // 2. Delete the transaction
       const { error } = await supabase
         .from('holding_transactions')
         .delete()
@@ -367,8 +432,62 @@ export async function DELETE(request: NextRequest) {
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
+
+      // 3. Replay remaining transactions to recalculate holding
+      if (holdingId && hasHoldingsTable) {
+        const { data: remaining } = await supabase
+          .from('holding_transactions')
+          .select('type, units, price_per_unit, date, created_at')
+          .eq('holding_id', holdingId)
+          .eq('user_id', user.id)
+          .order('date', { ascending: true })
+          .order('created_at', { ascending: true })
+
+        const { units: newUnits, avgPurchasePrice: newAvg } = replayTransactions(remaining || [])
+
+        // 4. Update the holding with recalculated values
+        const { error: updateErr } = await supabase
+          .from('holdings')
+          .update({
+            units: newUnits,
+            avg_purchase_price: newAvg,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', holdingId)
+          .eq('user_id', user.id)
+
+        // 5. Sync parent asset value
+        const { data: holding } = await supabase
+          .from('holdings')
+          .select('asset_id')
+          .eq('id', holdingId)
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        if (holding?.asset_id) {
+          await syncAssetValueFromHoldings(supabase, holding.asset_id, user.id)
+        }
+
+        return NextResponse.json({
+          success: true,
+          holding_updated: !updateErr,
+          new_units: newUnits,
+          new_avg_price: newAvg,
+          asset_synced: !!holding?.asset_id,
+        })
+      }
     } else {
-      // Fallback: delete from valuations table
+      // Fallback: get holding_id from valuations before deleting
+      const { data: valToDelete } = await supabase
+        .from('valuations')
+        .select('entity_id')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      holdingId = valToDelete?.entity_id || null
+
+      // Delete from valuations table
       const { error } = await supabase
         .from('valuations')
         .delete()
@@ -378,9 +497,73 @@ export async function DELETE(request: NextRequest) {
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
+
+      // Replay from remaining valuations
+      if (holdingId && hasHoldingsTable) {
+        const { data: valRows } = await supabase
+          .from('valuations')
+          .select('*')
+          .eq('entity_id', holdingId)
+          .eq('user_id', user.id)
+          .in('entity_type', ['holding_tx_buy', 'holding_tx_sell', 'holding_tx_dividend'])
+          .order('valuation_date', { ascending: true })
+
+        // Map valuations to transaction shape for replay
+        const remaining = (valRows || []).map((v: Record<string, unknown>) => {
+          const txType = (v.entity_type as string).replace('holding_tx_', '')
+          let units = 1
+          let pricePerUnit = Number(v.value) || 0
+          try {
+            const meta = JSON.parse(v.notes as string || '{}')
+            units = meta.units ?? 1
+            pricePerUnit = meta.price_per_unit ?? pricePerUnit
+          } catch {
+            // plain text notes
+          }
+          return {
+            type: txType,
+            units,
+            price_per_unit: pricePerUnit,
+            date: v.valuation_date as string,
+            created_at: v.created_at as string,
+          }
+        })
+
+        const { units: newUnits, avgPurchasePrice: newAvg } = replayTransactions(remaining)
+
+        await supabase
+          .from('holdings')
+          .update({
+            units: newUnits,
+            avg_purchase_price: newAvg,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', holdingId)
+          .eq('user_id', user.id)
+
+        // Sync parent asset
+        const { data: holding } = await supabase
+          .from('holdings')
+          .select('asset_id')
+          .eq('id', holdingId)
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        if (holding?.asset_id) {
+          await syncAssetValueFromHoldings(supabase, holding.asset_id, user.id)
+        }
+
+        return NextResponse.json({
+          success: true,
+          holding_updated: true,
+          new_units: newUnits,
+          new_avg_price: newAvg,
+          asset_synced: !!holding?.asset_id,
+        })
+      }
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, holding_updated: false })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Onbekende fout'
     return NextResponse.json({ error: message }, { status: 500 })

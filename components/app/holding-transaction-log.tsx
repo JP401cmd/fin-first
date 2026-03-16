@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   ArrowUpRight, ArrowDownRight, DollarSign, Receipt,
   TrendingUp, TrendingDown, Loader2, AlertTriangle,
-  Plus, ChevronDown, ChevronUp,
+  Plus, ChevronDown, ChevronUp, Trash2,
 } from 'lucide-react'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
@@ -88,6 +88,8 @@ export default function HoldingTransactionLog({
   const [error, setError] = useState<string | null>(null)
   const [expandedTx, setExpandedTx] = useState<string | null>(null)
   const [showNewTxForm, setShowNewTxForm] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   const loadTransactions = useCallback(async () => {
     try {
@@ -106,6 +108,27 @@ export default function HoldingTransactionLog({
       setLoading(false)
     }
   }, [holdingId])
+
+  const handleDeleteTransaction = useCallback(async (txId: string) => {
+    if (deleting) return
+    setDeleting(txId)
+    try {
+      const res = await fetch(`/api/holding-transactions?id=${txId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Verwijderen mislukt')
+      }
+      setDeleteConfirm(null)
+      setExpandedTx(null)
+      setLoading(true)
+      loadTransactions()
+      onTransactionAdded?.() // refresh parent holding data too
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Verwijderen mislukt')
+    } finally {
+      setDeleting(null)
+    }
+  }, [deleting, loadTransactions, onTransactionAdded])
 
   useEffect(() => {
     loadTransactions()
@@ -312,6 +335,37 @@ export default function HoldingTransactionLog({
                           value={formatCurrency(tx.cumulative_dividends)}
                           colored={tx.cumulative_dividends}
                         />
+                      )}
+                    </div>
+                    {/* Delete transaction button */}
+                    <div className="mt-3 flex justify-end border-t border-[var(--border-ed)] pt-3">
+                      {deleteConfirm === tx.id ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-[var(--ink-3)]">Transactie verwijderen?</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(tx.id) }}
+                            disabled={deleting === tx.id}
+                            className="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                            data-testid={`tx-delete-confirm-${tx.id}`}
+                          >
+                            {deleting === tx.id ? 'Bezig...' : 'Ja, verwijder'}
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDeleteConfirm(null) }}
+                            className="rounded-lg border border-[var(--border-ed)] px-2.5 py-1 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+                          >
+                            Annuleren
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeleteConfirm(tx.id) }}
+                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                          data-testid={`tx-delete-trigger-${tx.id}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          Verwijderen
+                        </button>
                       )}
                     </div>
                   </div>
