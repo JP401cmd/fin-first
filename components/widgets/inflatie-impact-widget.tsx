@@ -155,16 +155,19 @@ export function InflatieImpactWidget({ size, data, href }: Props) {
     )
   }
 
-  // ── Half (default): SVG curve + key milestones ─────────────
-  const svgWidth = 200
-  const svgHeight = 80
+  // ── Half (default): SVG curve with inline labels ──────────
+  const svgWidth = 240
+  const svgHeight = 90
   const maxYears = 30
   const points = buildPurchasingPowerPoints(inflationRate, maxYears)
   const { pathD, fillD } = buildSvgPath(points, svgWidth, svgHeight, maxYears)
 
-  const val10 = 1000 * Math.pow(1 - inflationRate, 10)
-  const val20 = 1000 * Math.pow(1 - inflationRate, 20)
-  const val30 = 1000 * Math.pow(1 - inflationRate, 30)
+  const milestones = [
+    { year: 0, label: '€1.000' },
+    { year: 10, label: formatCurrency(1000 * Math.pow(1 - inflationRate, 10)) },
+    { year: 20, label: formatCurrency(1000 * Math.pow(1 - inflationRate, 20)) },
+    { year: 30, label: formatCurrency(1000 * Math.pow(1 - inflationRate, 30)) },
+  ]
 
   return (
     <WidgetShell module="horizon" size={size} kicker="Inflatie-impact" href={href}>
@@ -176,7 +179,7 @@ export function InflatieImpactWidget({ size, data, href }: Props) {
         <span className="text-[10px] text-[var(--ink-3)]">/jaar</span>
       </div>
 
-      {/* SVG declining curve */}
+      {/* SVG declining curve with value labels */}
       <div className="mt-2">
         <svg
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
@@ -186,24 +189,50 @@ export function InflatieImpactWidget({ size, data, href }: Props) {
         >
           <path d={fillD} fill="var(--horizon-100, #e0f2fe)" opacity={0.5} />
           <path d={pathD} fill="none" stroke="var(--horizon-500, #0ea5e9)" strokeWidth={2} />
+          {/* Milestone dots and labels on the curve */}
+          {milestones.map(({ year, label }) => {
+            const cx = (year / maxYears) * svgWidth
+            const val = 1000 * Math.pow(1 - inflationRate, year)
+            const cy = svgHeight - (val / 1000) * svgHeight
+            const isFirst = year === 0
+            const isLast = year === maxYears
+            // Position label above curve, except last point which goes below
+            const labelY = isLast ? Math.min(cy + 12, svgHeight) : Math.max(cy - 6, 8)
+            return (
+              <g key={year}>
+                <circle cx={cx} cy={cy} r={2.5} fill="var(--horizon-500, #0ea5e9)" />
+                <text
+                  x={isFirst ? cx + 4 : isLast ? cx : cx}
+                  y={labelY}
+                  fontSize={8}
+                  fontFamily="var(--font-mono, ui-monospace, monospace)"
+                  fontWeight={isFirst || isLast ? 600 : 400}
+                  fill={isFirst ? 'var(--ink)' : isLast ? 'var(--horizon-700, #0369a1)' : 'var(--ink-3)'}
+                  textAnchor={isFirst ? 'start' : isLast ? 'end' : 'middle'}
+                >
+                  {label}
+                </text>
+                {!isFirst && (
+                  <text
+                    x={isLast ? cx : cx}
+                    y={labelY + 9}
+                    fontSize={7}
+                    fill="var(--ink-4)"
+                    textAnchor={isLast ? 'end' : 'middle'}
+                  >
+                    {year}j
+                  </text>
+                )}
+              </g>
+            )
+          })}
         </svg>
       </div>
 
-      {/* Key milestones */}
-      <div className="mt-2 space-y-0.5 text-xs text-[var(--ink-3)]">
-        <div className="flex justify-between">
-          <span>Over 10 jaar:</span>
-          <span className="font-mono tabular-nums text-[var(--ink)]">{formatCurrency(val10)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Over 20 jaar:</span>
-          <span className="font-mono tabular-nums text-[var(--ink)]">{formatCurrency(val20)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Over 30 jaar:</span>
-          <span className="font-mono tabular-nums text-[var(--ink)]">{formatCurrency(val30)}</span>
-        </div>
-      </div>
+      {/* Footnote */}
+      <p className="mt-1.5 font-serif italic text-[10px] text-[var(--ink-4)]">
+        Koopkracht van €1.000 over {maxYears} jaar
+      </p>
     </WidgetShell>
   )
 }
