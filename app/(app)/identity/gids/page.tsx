@@ -502,12 +502,15 @@ export default function GidsPage() {
             color="var(--color-wil-400)"
             description={
               <>
-                Je persoonlijke actiebord werkt als een kanban: drie kolommen \u2014{" "}
-                <strong>open</strong>, <strong>uitgesteld</strong> en{" "}
-                <strong>voltooid</strong>. Acties komen binnen via geaccepteerde
-                voorstellen of je maakt ze zelf aan. Elke actie heeft een
-                vrijheidsdagen-impact, een bron (Will, check-in of handmatig) en
-                optioneel een deadline.
+                Van inzicht naar actie \u2014 het actiebord is waar je voorstellen
+                omzet in concrete stappen. Je persoonlijke kanban-bord heeft drie
+                kolommen: <strong>open</strong> (te doen),{" "}
+                <strong>uitgesteld</strong> (bewaard voor later) en{" "}
+                <strong>voltooid</strong> (afgerond). Sleep acties tussen kolommen
+                met <strong>drag &amp; drop</strong> om je voortgang bij te houden.
+                Acties komen binnen via geaccepteerde voorstellen of je maakt ze
+                zelf handmatig aan. Elke actie heeft een vrijheidsdagen-impact,
+                een bron (Will, check-in of handmatig) en optioneel een deadline.
                 {" "}
                 Het afronden van acties is waar de magie zit: elke voltooide actie
                 levert <strong>vrijheidsdagen</strong> op die meetellen in je
@@ -519,10 +522,10 @@ export default function GidsPage() {
             howTo={{
               steps: [
                 "Ga naar De Wil \u2014 je acties staan in de middelste kolom \u201cActie\u201d",
+                "Maak een nieuwe actie aan met \u201c+ Nieuwe actie\u201d of accepteer een voorstel \u2014 beide verschijnen in de kolom \u201cOpen\u201d",
+                "Sleep acties tussen kolommen: van open naar uitgesteld, of direct naar voltooid",
                 "Tik op een actie voor details, vrijheidsdagen-impact en instructies",
-                "Markeer een actie als voltooid wanneer je hem hebt uitgevoerd",
-                "Maak handmatige acties aan met \u201c+ Nieuwe actie\u201d voor eigen financi\u00eble stappen",
-                "Uitgestelde acties verplaats je terug naar open wanneer je eraan toe bent",
+                "Markeer een actie als voltooid wanneer je hem hebt uitgevoerd \u2014 je gewonnen vrijheidsdagen tellen mee",
               ],
               tip: "Plan elke week \u00e9\u00e9n actie in. Consistent kleine stappen > af en toe een sprint.",
             }}
@@ -626,6 +629,43 @@ export default function GidsPage() {
                 "Ga naar Identiteit \u2192 Instellingen \u2192 Widgets om widgets aan/uit te zetten",
               ],
               tip: "Begin met de standaard 7 widgets. Voeg pas meer toe als je weet welke inzichten je dagelijks wilt zien \u2014 minder is meer.",
+            }}
+          />
+
+          <GuideTopicCard
+            icon={Newspaper}
+            title="Briefing (DAIshboard)"
+            color="var(--color-wil-400)"
+            description={
+              <>
+                Elke dag een persoonlijke financi&euml;le update &mdash; dat is
+                je briefing. Schakel je dashboard over naar{" "}
+                <strong>DAIshboard-modus</strong> en Will componeert een
+                AI-samengestelde briefing op basis van je actuele data. De
+                briefing bevat tot <strong>23 verschillende kaarttypes</strong>:
+                metrics, sparklines, mijlpalen, budgetbalken, inzichten,
+                checklists, vergelijkingen en doelvoortgang. De inhoud past zich
+                aan: &apos;s ochtends focus op de dag, aan het einde van de
+                maand op je maandresultaat.
+                {" "}
+                Will analyseert je transacties, vermogensmutaties,
+                budgetvoortgang en FIRE-prognose en selecteert de meest
+                relevante inzichten. De briefing wordt{" "}
+                <strong>progressief geladen</strong> &mdash; kaarten verschijnen
+                zodra ze klaar zijn. Na 24 uur verschijnt een stale-banner zodat
+                je weet dat de data niet meer actueel is. Ververs handmatig
+                wanneer je wilt.
+              </>
+            }
+            howTo={{
+              steps: [
+                "Op je dashboard: wissel naar DAIshboard-modus via de toggle bovenaan",
+                "De briefing genereert automatisch \u2014 kaarten verschijnen progressief zodra ze klaar zijn",
+                "Scroll door je persoonlijke briefing en tik op kaarten voor meer detail",
+                "Ververs de briefing handmatig wanneer je nieuwe data hebt toegevoegd",
+                "Na 24 uur verschijnt een stale-banner \u2014 ververs voor actuele inzichten",
+              ],
+              tip: "Check je briefing elke ochtend als financi\u00eble routine \u2014 het kost 30 seconden en houdt je scherp op je financi\u00eble voortgang.",
             }}
           />
         </ReisStapSection>
