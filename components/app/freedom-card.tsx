@@ -83,7 +83,7 @@ function renderFreedomCardToCanvas(data: FreedomCardData): HTMLCanvasElement {
   }
 
   // Main card background
-  roundRect(0, 0, W, H, 32)
+  roundRect(0, 0, W, H, 0)
   ctx.fillStyle = bgGrad
   ctx.fill()
 
@@ -154,7 +154,7 @@ function renderFreedomCardToCanvas(data: FreedomCardData): HTMLCanvasElement {
   // Progress bar
   const barW = W - pad * 2
   const barH = 16
-  roundRect(pad, y, barW, barH, 8)
+  roundRect(pad, y, barW, barH, 0)
   ctx.fillStyle = PROGRESS_BG
   ctx.fill()
 
@@ -164,7 +164,7 @@ function renderFreedomCardToCanvas(data: FreedomCardData): HTMLCanvasElement {
     progGrad.addColorStop(0, AMBER_400)
     progGrad.addColorStop(0.5, TEAL_400)
     progGrad.addColorStop(1, PURPLE_500)
-    roundRect(pad, y, fillW, barH, 8)
+    roundRect(pad, y, fillW, barH, 0)
     ctx.fillStyle = progGrad
     ctx.fill()
   }
@@ -198,7 +198,7 @@ function renderFreedomCardToCanvas(data: FreedomCardData): HTMLCanvasElement {
 
   // Helper to draw stat card
   function drawStatCard(x: number, y: number, label: string, value: string, color: string) {
-    roundRect(x, y, cardW, cardH, 16)
+    roundRect(x, y, cardW, cardH, 0)
     ctx.fillStyle = 'rgba(39, 39, 42, 0.8)'
     ctx.fill()
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useId, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useScrollLock } from '@/lib/hooks/use-scroll-lock'
 
@@ -341,7 +342,7 @@ export function BottomSheet({ open, onClose, title, children, size = 'md' }: Bot
 
   if (!visible) return null
 
-  return (
+  return createPortal(
     <div
       ref={backdropRef}
       className="fixed inset-0 z-50 flex items-end justify-center md:items-center"
@@ -385,6 +386,7 @@ export function BottomSheet({ open, onClose, title, children, size = 'md' }: Bot
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

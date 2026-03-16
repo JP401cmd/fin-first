@@ -1391,7 +1391,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       <section data-testid="horizon-hero" className="card-editorial overflow-hidden">
         <div className="h-1.5 bg-horizon-500" />
 
-        <div className="p-3 sm:p-6 md:p-8">
+        <div className="p-4 sm:p-6 md:p-8">
           {/* Header rij: kicker + Details pill */}
           <div className="mb-3 sm:mb-6 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">

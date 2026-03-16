@@ -58,6 +58,7 @@ const DynDebtsPage = dynamic(() => import('@/app/(app)/core/debts/page'), {
 import { usePerspective } from '@/components/app/perspective-provider'
 import { KernMissionControl } from '@/components/app/core/kern-mission-control'
 import { Users, EyeOff } from 'lucide-react'
+import { FhinAvatar } from '@/components/app/avatars'
 
 export default function CorePage({ initialData }: { initialData?: CorePageData }) {
   const router = useRouter()
@@ -910,24 +911,7 @@ const [debtProgress, setDebtProgress] = useState<{ totalOriginal: number; totalC
       <section data-testid="kern-hero" className="card-editorial overflow-hidden">
         <div className="h-1.5 bg-kern-500" />
 
-        <div className="p-3 sm:p-6 md:p-8">
-          <div className="mb-3 sm:mb-6 flex items-center gap-3">
-            {(isHouseholdView || isPartnerView) && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-kern-50 px-2 py-0.5 text-[10px] font-medium text-kern-700">
-                <Users className="h-3 w-3" /> {isPartnerView ? (partnerName ?? 'Partner') : 'Huishouden'}
-              </span>
-            )}
-            {isHouseholdView && partnerHiddenCategories.length > 0 && (
-              <span
-                className="inline-flex items-center gap-1 rounded-full bg-[var(--subtle)] px-2 py-0.5 text-[10px] text-[var(--ink-4)]"
-                title="Niet alle partnerdata is zichtbaar vanwege privacy-instellingen"
-                data-testid="privacy-hidden-notice"
-              >
-                <EyeOff className="h-3 w-3" /> Beperkte zichtbaarheid
-              </span>
-            )}
-          </div>
-
+        <div className="p-4 sm:p-6 md:p-8">
           {needsActivation ? (
             <>
               <div className="mb-3 sm:mb-5">

@@ -32,6 +32,7 @@ TriFinity is een **persoonlijk financieel dagblad**, geen fintech-dashboard. Elk
 - **Data = monospace**: DM Mono voor alle bedragen en cijfers, altijd tabular-nums
 - **Elk getal is klikbaar**: Kassabon (receipt breakdown) als standaard interactiepatroon
 - **Beweging is functioneel**: fadeUp entrance, hover lift, progress fill — nooit decoratief
+- **Scherpe hoeken**: Geen border-radius op kaarten, containers en UI-elementen — versterkt de krant-esthetiek. Alleen `rounded-full` voor cirkelvormige elementen (badges, avatars, pills).
 
 ## Kwaliteitstoets (pas dit toe op ELKE review)
 
@@ -74,6 +75,7 @@ TriFinity is een **persoonlijk financieel dagblad**, geen fintech-dashboard. Elk
 - [ ] Past het in het bestaande design systeem?
 - [ ] Geen nieuwe kleuren, fonts of patronen zonder goede reden?
 - [ ] Hergebruik van bestaande tokens en utilities?
+- [ ] Geen `rounded-*` classes (behalve `rounded-full`) — alle hoeken zijn scherp?
 
 ## Hoe je communiceert
 

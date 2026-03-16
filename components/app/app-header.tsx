@@ -3,9 +3,10 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bell } from 'lucide-react'
+import { Bell, Users } from 'lucide-react'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
+import { usePerspective } from '@/components/app/perspective-provider'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 
 const staticNavItems = [
@@ -32,6 +33,7 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
   const menuRef = useRef<HTMLDivElement>(null)
 
   const { needsActivation } = useFeatureAccess()
+  const { perspective, isHousehold, partnerName } = usePerspective()
   const { unreadCount, openModal } = useNotifications()
 
   const navItems = needsActivation
@@ -119,6 +121,11 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
               <span className="hidden max-w-[140px] truncate sm:inline">
                 {email}
               </span>
+              {isHousehold && perspective !== 'personal' && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-kern-50 px-2 py-0.5 text-[10px] font-medium text-kern-700">
+                  <Users className="h-3 w-3" /> {perspective === 'partner' ? (partnerName ?? 'Partner') : 'Huishouden'}
+                </span>
+              )}
             </button>
             {menuOpen && (
               <div className="absolute right-0 mt-2 w-48 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] py-1 shadow-[var(--s2)]">
