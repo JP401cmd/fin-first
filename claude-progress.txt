@@ -13248,3 +13248,64 @@ For Feature #51 (Transaction Import):
 - Zero TypeScript errors in changed files
 - ReturnRing component refactored with configurable diameter, strokeWidth, fontSize
 - Commit: 2ce44986
+
+## Session 2026-03-16 - Features #89, #90
+
+### Feature #89: Stock split transactietype - PASSING
+- Added 'split' to holding_transactions type CHECK constraint via migration
+- Updated computeRunningPnL: split multiplies runningUnits, cost basis unchanged, avg auto-adjusts
+- Updated replayTransactions: split type multiplies units, divides avgPrice
+- Updated POST handler: split sets price_per_unit=0, total_amount=0, holding units×multiplier, avg÷multiplier
+- UI: violet-themed split button in 4-column type selector
+- Split form: multiplier input (min 2) with preview ("10 eenheden → 20 eenheden")
+- Transaction log: shows "2:1 split" instead of units@price, no P&L display
+- Zero TypeScript errors, zero console errors
+- Commit: 00454d7d
+
+### Feature #90: Prijs-alerts en rebalancing-notificaties - PASSING
+- Created holding_alerts table: id, user_id, holding_id, type (price_above/price_below/return_threshold/rebalance_drift), threshold, is_active, last_triggered_at
+- Full CRUD API at /api/holding-alerts (GET/POST/PATCH/DELETE) with auth
+- HoldingAlerts client component: create alerts with type selector, threshold input, toggle active, delete
+- Alert checking integrated into GET /api/notifications (section 8):
+  - price_above: triggers when current_price >= threshold
+  - price_below: triggers when current_price <= threshold
+  - return_threshold: triggers when |return%| >= threshold
+  - rebalance_drift: checks all asset_class allocations vs target_allocations, triggers when max drift > threshold
+- Added 'holding_alert' to NotificationType union, notification-item MODULE_MAP, NOTIFICATION_TYPES list, default notifPrefs
+- Alerts section shown in holding detail page between header and value chart
+- Zero TypeScript errors, zero console errors
+- Commit: 0c0f5c56
+
+### Current Status
+- 2 features completed this session (#89, #90)
+- 86/95 features passing (90.5%)
+
+## Session 2026-03-16 - Feature #95
+
+### Feature #95: Opslag en koppeling PDF aan levensgebeurtenis - PASSING
+- Created Supabase Storage bucket 'pension-documents' (private, PDF only, 10MB max)
+- Migration: 20260316500001_create_pension_documents_bucket.sql with RLS (own documents only)
+- Created /api/pension/storage API route with POST (upload), GET (signed download URL), DELETE (cleanup)
+  - All endpoints verify auth + ownership of life event
+  - POST uses upsert:true to allow overwriting on re-upload
+  - GET generates 1-hour signed URL for secure download
+  - DELETE removes file from storage + clears pensionPdfPath from metadata
+- ensureBucket() creates bucket at runtime if migration hasn't been applied
+- Updated PensionPdfUpload component:
+  - New props: lifeEventId, existingPdfPath
+  - Shows stored PDF with download button when existing PDF present
+  - "Opnieuw uploaden" overwrites existing file
+  - Exported uploadPensionPdfToStorage() and deletePensionPdfFromStorage() helpers
+- Updated horizon-client.tsx:
+  - Insert now returns event ID (.select('id').single()) for PDF storage after save
+  - pendingPensionFileRef holds file until after save, then uploads to storage
+  - deleteEvent() calls deletePensionPdfFromStorage() for cleanup
+  - PensionPdfDownloadLink component in view modal for pension events with stored PDF
+  - Passes lifeEventId + existingPdfPath to PensionPdfUpload in edit mode
+- Zero TypeScript errors in changed files
+- All API endpoints correctly reject unauthenticated requests (401)
+- Commit: 52f35783
+
+### Current Status
+- 95/95 features passing (100%)
+- All features complete!
