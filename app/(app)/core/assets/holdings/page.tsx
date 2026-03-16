@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { Plus, Trash2, X, TrendingUp, ArrowLeft, Loader2, Briefcase, Edit3, Receipt, ArrowUpRight, ArrowDownRight, DollarSign, PieChart, RefreshCw, AlertTriangle, Clock, CheckCircle } from 'lucide-react'
+import { Plus, Trash2, X, TrendingUp, ArrowLeft, Loader2, Briefcase, Edit3, Receipt, ArrowUpRight, ArrowDownRight, DollarSign, PieChart, RefreshCw, AlertTriangle, Clock, CheckCircle, Upload } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/components/app/budget-shared'
 import PortfolioAllocationVisualization, { type HoldingForAllocation } from '@/components/app/portfolio-allocation-chart'
@@ -28,6 +28,8 @@ type Holding = {
   is_active: boolean
   created_at: string
   updated_at: string
+  // Currency (ISO 4217 code, default EUR)
+  currency?: string
   // Price feed data
   previous_close?: number | null
   daily_change_percent?: number | null
@@ -371,6 +373,14 @@ export default function HoldingsPage() {
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
               {refreshing ? 'Vernieuwen...' : 'Prijzen vernieuwen'}
             </button>
+            <Link
+              href="/core/assets/holdings/import"
+              className="inline-flex items-center gap-2 rounded-lg border border-kern-200 bg-kern-50 px-3 py-2 text-sm font-medium text-kern-700 hover:bg-kern-100"
+              title="CSV importeren"
+            >
+              <Upload className="h-4 w-4" />
+              <span className="hidden sm:inline">CSV import</span>
+            </Link>
             <button
               onClick={() => setShowForm(true)}
               className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
@@ -501,15 +511,24 @@ export default function HoldingsPage() {
             <Briefcase className="mx-auto h-10 w-10 text-[var(--ink-4)]" />
             <p className="mt-3 text-sm font-medium text-[var(--ink-2)]">Nog geen holdings</p>
             <p className="mt-1 text-xs text-[var(--ink-3)]">
-              Voeg je eerste holding toe om je portfolio te volgen.
+              Voeg je eerste holding toe of importeer vanuit je broker.
             </p>
-            <button
-              onClick={() => setShowForm(true)}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
-            >
-              <Plus className="h-4 w-4" />
-              Eerste holding toevoegen
-            </button>
+            <div className="mt-4 flex items-center justify-center gap-3">
+              <button
+                onClick={() => setShowForm(true)}
+                className="inline-flex items-center gap-2 rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700"
+              >
+                <Plus className="h-4 w-4" />
+                Holding toevoegen
+              </button>
+              <Link
+                href="/core/assets/holdings/import"
+                className="inline-flex items-center gap-2 rounded-lg border border-kern-200 bg-kern-50 px-4 py-2 text-sm font-medium text-kern-700 hover:bg-kern-100"
+              >
+                <Upload className="h-4 w-4" />
+                CSV import
+              </Link>
+            </div>
           </div>
         )}
 
