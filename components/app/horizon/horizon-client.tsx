@@ -2031,7 +2031,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   ) : null}
 
                   {/* Pension PDF download link */}
-                  {selectedEvent.metadata?.pensionPdfPath && (
+                  {!!selectedEvent.metadata?.pensionPdfPath && (
                     <PensionPdfDownloadLink lifeEventId={selectedEvent.id} />
                   )}
 
