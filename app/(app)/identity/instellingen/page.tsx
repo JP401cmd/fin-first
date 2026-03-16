@@ -114,7 +114,7 @@ export default function InstellingenPage() {
   // ─ Section A: Notificaties ─
   const [notifPrefs, setNotifPrefs] = useState<Record<string, boolean>>({
     budget: true, sync: true,
-    recommendation: true, insight: true, levelup: true,
+    recommendation: true, insight: true, levelup: true, holding_alert: true,
   })
   const [notifLoading, setNotifLoading] = useState(true)
   const [notifSaving, setNotifSaving] = useState(false)

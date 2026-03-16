@@ -14,6 +14,7 @@ export type NotificationType =
   | 'levelup'
   | 'partner_transaction'
   | 'horizon'
+  | 'holding_alert'
 
 export type Notification = {
   id: string
@@ -590,6 +591,122 @@ export async function GET(request: NextRequest) {
       }
     } catch (err) {
       console.error('Horizon notification error:', err)
+    }
+
+    // ── 8. Holding alerts (price & rebalancing) ──────────────────────
+
+    try {
+      const { data: activeAlerts } = await supabase
+        .from('holding_alerts')
+        .select('id, holding_id, type, threshold, last_triggered_at')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+
+      if (activeAlerts && activeAlerts.length > 0) {
+        // Fetch holdings data for alert evaluation
+        const holdingIds = [...new Set(activeAlerts.filter(a => a.holding_id).map(a => a.holding_id))]
+        const { data: holdingsData } = holdingIds.length > 0
+          ? await supabase
+              .from('holdings')
+              .select('id, name, ticker, current_price, avg_purchase_price, units, asset_class')
+              .eq('user_id', user.id)
+              .in('id', holdingIds)
+          : { data: [] }
+
+        const holdingsMap = new Map((holdingsData || []).map(h => [h.id, h]))
+
+        // For rebalance alerts, compute allocation percentages
+        const { data: allHoldings } = await supabase
+          .from('holdings')
+          .select('id, current_price, units, asset_class')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+
+        const totalPortfolioValue = (allHoldings || []).reduce((sum, h) => {
+          return sum + ((Number(h.current_price) || 0) * (Number(h.units) || 0))
+        }, 0)
+
+        // Get target allocations for drift detection
+        const { data: targets } = await supabase
+          .from('target_allocations')
+          .select('category, target_pct')
+          .eq('user_id', user.id)
+          .eq('view_mode', 'asset_class')
+
+        const targetMap = new Map((targets || []).map(t => [t.category, Number(t.target_pct)]))
+
+        // Compute current allocations by asset_class
+        const currentAlloc = new Map<string, number>()
+        for (const h of (allHoldings || [])) {
+          const val = (Number(h.current_price) || 0) * (Number(h.units) || 0)
+          const cls = (h.asset_class as string) || 'Overig'
+          currentAlloc.set(cls, (currentAlloc.get(cls) || 0) + val)
+        }
+
+        for (const alert of activeAlerts) {
+          const holding = alert.holding_id ? holdingsMap.get(alert.holding_id) : null
+          const currentPrice = holding ? Number(holding.current_price) || 0 : 0
+          const avgPrice = holding ? Number(holding.avg_purchase_price) || 0 : 0
+          const holdingName = holding ? (holding.ticker || holding.name || 'Holding') : 'Portfolio'
+
+          let triggered = false
+          let title = ''
+          let description = ''
+
+          if (alert.type === 'price_above' && holding) {
+            triggered = currentPrice >= alert.threshold
+            const formatted = currentPrice.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR' })
+            const thresholdFormatted = Number(alert.threshold).toLocaleString('nl-NL', { style: 'currency', currency: 'EUR' })
+            title = `${holdingName} bereikt ${thresholdFormatted}`
+            description = `De prijs van ${holdingName} staat nu op ${formatted}, boven je alert van ${thresholdFormatted}.`
+          } else if (alert.type === 'price_below' && holding) {
+            triggered = currentPrice > 0 && currentPrice <= alert.threshold
+            const formatted = currentPrice.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR' })
+            const thresholdFormatted = Number(alert.threshold).toLocaleString('nl-NL', { style: 'currency', currency: 'EUR' })
+            title = `${holdingName} onder ${thresholdFormatted}`
+            description = `De prijs van ${holdingName} staat nu op ${formatted}, onder je alert van ${thresholdFormatted}.`
+          } else if (alert.type === 'return_threshold' && holding && avgPrice > 0) {
+            const returnPct = ((currentPrice - avgPrice) / avgPrice) * 100
+            triggered = Math.abs(returnPct) >= Math.abs(alert.threshold)
+            title = `${holdingName} rendement ${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(1)}%`
+            description = `Het rendement van ${holdingName} heeft je drempel van ${alert.threshold}% bereikt.`
+          } else if (alert.type === 'rebalance_drift' && totalPortfolioValue > 0) {
+            // Check max drift across all asset classes with targets
+            let maxDrift = 0
+            let driftClass = ''
+            for (const [cls, targetPct] of targetMap) {
+              const currentVal = currentAlloc.get(cls) || 0
+              const currentPct = (currentVal / totalPortfolioValue) * 100
+              const drift = Math.abs(currentPct - targetPct)
+              if (drift > maxDrift) {
+                maxDrift = drift
+                driftClass = cls
+              }
+            }
+            triggered = maxDrift > alert.threshold
+            title = `Portfolio allocatie-drift: ${maxDrift.toFixed(1)}%`
+            description = `${driftClass} wijkt ${maxDrift.toFixed(1)}% af van je doelallocatie. Overweeg herbalancering.`
+          }
+
+          if (triggered) {
+            const id = `holding_alert_${alert.id}`
+            notifications.push({
+              id,
+              type: 'holding_alert',
+              priority: 2,
+              title,
+              description,
+              icon: alert.type === 'rebalance_drift' ? 'BarChart3' : 'Bell',
+              color: alert.type === 'price_below' ? 'red' : alert.type === 'price_above' ? 'green' : 'blue',
+              createdAt: now,
+              read: readIds.includes(id),
+              actionUrl: alert.holding_id ? `/core/assets/holdings/${alert.holding_id}` : '/core/assets/holdings',
+            })
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Holding alert notification error:', err)
     }
 
     // Sort by priority (lower = higher priority)

@@ -6,6 +6,7 @@ import HoldingTransactionLogClient from './transaction-log-client'
 import HoldingValueChartClient from './value-chart-client'
 import { HoldingFavoriteButton } from './holding-favorite-button'
 import { calculateHoldingBox3 } from '@/lib/box3-holdings'
+import HoldingAlertsClient from './alerts-client'
 
 // UUID v4 regex for validation
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -173,6 +174,15 @@ export default async function HoldingDetailPage({
           <span>Belastbaar: <span className="font-mono tabular-nums font-medium text-[var(--ink-2)]">{formatCurrency(box3Info.taxableValue)}</span></span>
         </div>
       </div>
+
+      {/* Price Alerts Section */}
+      <section className="mt-6" data-testid="alerts-section">
+        <HoldingAlertsClient
+          holdingId={id}
+          holdingName={name}
+          currentPrice={currentPrice}
+        />
+      </section>
 
       {/* Value Chart Section */}
       <section className="mt-6" data-testid="value-chart-section">

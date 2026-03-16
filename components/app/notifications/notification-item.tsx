@@ -27,6 +27,7 @@ const MODULE_MAP: Record<NotificationType, ModuleInfo> = {
   levelup:             { label: 'DE HORIZON', colorVar: 'var(--hor)',    textVar: 'var(--hor-t)',    lightVar: 'var(--hor-l)',  mediumVar: 'var(--hor-m)' },
   partner_transaction: { label: 'DE KERN',    colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
   horizon:             { label: 'DE HORIZON', colorVar: 'var(--hor)',    textVar: 'var(--hor-t)',    lightVar: 'var(--hor-l)',  mediumVar: 'var(--hor-m)' },
+  holding_alert:       { label: 'DE KERN',    colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
 }
 
 function formatTime(dateStr: string): string {
