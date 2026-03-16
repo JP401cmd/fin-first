@@ -1,3 +1,65 @@
+## Session 2026-03-16 - Features #30, #31, #32
+
+### Feature #30: Pagina-assemblage: Hero + Voortgangsbalk + Reis-stappen 1-2 - PASSING
+- Rewrote Hero section: shorter, personal greeting, philosophy quote integrated
+- Updated GuideProgressBar with scrollTarget per segment
+- Reis-stap 1 with 4 GuideTopicCards: Cash, Vermogensbeheer, Schuldenbeheer, Netto vermogen
+- Reis-stap 2 with 2 GuideTopicCards: Budgetteren, Belasting
+- Removed old guideSection useState, GuideAccordion, GuideFeature
+- Page reduced from 1153 to 445 lines
+
+### Feature #31: Reis-stappen 3-5 + Overal + Bestaande componenten - PASSING
+- Step 3: 4 GuideTopicCards (Voorstellen, Acties, Doelen, Abonnementen)
+- Step 4: 4 GuideTopicCards (FIRE, Levensgebeurtenissen, Monte Carlo, Onttrekking)
+- Step 5: 2 GuideTopicCards (What-If, Will AI-chat)
+- Overal: 8 cards (Dashboard, Briefing, Check-in, Meldingen, Rapporten, Profiel, Huishouden, Mobiel)
+- 25 GuideTopicCards total, page at 956 lines
+
+### Feature #32: Polish en verificatie - PASSING
+- Verified responsive layout, smooth scroll, multiple dropdowns, CTA links, touch targets, data pass-through
+- Zero TypeScript errors, zero console errors
+
+## Session 2026-03-16 - Features #37, #38, #39
+
+### Feature #37: Beperk minimum formaat levensgebeurtenissen widget - PASSING
+- Removed 'quarter' from sizes in widget-catalog.ts (now ['half', 'full'])
+- Added graceful fallback in mergeWidgetPrefs: if saved size not in allowed sizes, falls back to defaultSize
+- This ensures existing users with quarter setting get automatically migrated to half
+
+### Feature #38: Beperk minimum formaat nibud_benchmark widget - PASSING
+- Removed 'quarter' from sizes in widget-catalog.ts (now ['half', 'full'])
+- Graceful fallback already in place from #37
+
+### Feature #39: Beperk minimum formaat beslissingspatronen widget - PASSING
+- Already restricted to ['half', 'full'] in widget-catalog.ts — no changes needed
+- Verified and marked passing
+
+### Current Status
+- 3 features completed this session (#37, #38, #39)
+- Zero TypeScript errors in changed files
+- Commit: 6329d299
+
+## Session 2026-03-16 - Features #10, #11
+
+### Feature #10: Content: Budgetteren - PASSING
+- Rewrote description to compact, value-first single paragraph (was two paragraphs with <br/>)
+- Covers: 6 hoofd + 24 subcategorieën, 5 budgettypes, essentieel/niet-essentieel, 3 weergaven (boom/donut/sparklines), kassabon-detail, vrijheidsdagen, optioneel budgetteren
+- 5 how-steps + tip retained and cleaned up
+- Integrated as GuideTopicCard in reis-stap 2
+
+### Feature #11: Content: Belasting - PASSING
+- Rewrote description to value-first single paragraph, added Box 2 coverage
+- Covers: Box 3 berekening, spaargeld vs beleggingen forfait, partneroptimalisatie, twee belastingjaren, scenariomodel, Box 2 (aanmerkelijk belang, dividenduitkeringen, wet excessief lenen)
+- Changed icon from Receipt to FileText for better visual differentiation
+- 5 how-steps + tip retained and enhanced (added "honderden euro's schelen" to partner step)
+- Integrated as GuideTopicCard in reis-stap 2
+
+### Current Status
+- 2 features completed this session (#10, #11)
+- Zero TypeScript errors in changed files
+- Could not verify via browser (Supabase auth required, no test credentials)
+- Commit: 7284790e
+
 ## Session 2026-03-16 - Feature #9
 
 ### Feature #9: Content: Netto vermogen - PASSING
@@ -12451,3 +12513,74 @@ For Feature #51 (Transaction Import):
 - 3 features completed this session (#6, #7, #8)
 - Zero TypeScript errors in changed files
 - All cards integrated as GuideTopicCard in ReisStapSection (reis-stap 1)
+
+## Session 2026-03-16 - Features #24, #25, #26 (Batch verification)
+
+### Feature #24: Content: Check-in - PASSING
+- Already implemented in commit 228cf742 (previous session)
+- Verified: GuideTopicCard with RefreshCw icon in Overal section
+- Description covers: 7-step wizard, conversation starters, historical browsing, month comparison
+- 5 how-steps + tip present
+- Marked as passing (was missing status update from previous session)
+
+### Feature #25: Content: Meldingen - PASSING
+- Already implemented in commit 228cf742 (previous session)
+- Verified: GuideTopicCard with Bell icon in Overal section
+- Description covers: budget alerts, milestones, anomalies, level-ups, urgency sorting, per-type preferences
+- 3 how-steps + tip present
+- Marked as passing (was missing status update from previous session)
+
+### Feature #26: Content: Rapporten - PASSING
+- Already implemented in commit 17bcefb5 (previous session)
+- Verified: GuideTopicCard with FileText icon in Overal section
+- Description covers: 3 report types (periode, balans, budget), AI introduction, saved reports
+- 4 how-steps + tip present
+- Marked as passing (was missing status update from previous session)
+
+### Current Status
+- 3 features verified and marked passing this session (#24, #25, #26)
+- These were already implemented but status wasn't synced to feature tracker
+
+## Session 2026-03-16 - Features #40, #41
+
+### Feature #40: Beperk minimum formaat wilskracht widget - PASSING
+- Removed 'quarter' from sizes array in widget-catalog.ts for wilskracht
+- Widget now only allows 'half' and 'full' sizes (radar chart unreadable at quarter)
+- Graceful fallback via mergeWidgetPrefs line 584-585: existing quarter prefs auto-fallback to defaultSize ('half')
+
+### Feature #41: Beperk minimum formaat sim_vermogenspad widget - PASSING
+- Removed 'quarter' from sizes array in widget-catalog.ts for sim_vermogenspad
+- Widget now only allows 'half' and 'full' sizes (SVG graph loses detail at quarter)
+- Same graceful fallback mechanism applies
+- Zero TypeScript errors in changed files
+- Zero console errors in browser
+- Commit: b88ace6b
+
+## Session 2026-03-16 - Features #34, #35, #36
+
+### Feature #34: Verwijder badges widget - PASSING
+- Deleted badges-widget.tsx from components/widgets/
+- Removed catalog entry, WIDGET_HREFS, dynamic import, switch case
+- Removed BadgeSummary interface and badgeSummary from DashboardData
+- Removed server-side badge queries (badges, user_badges) from dashboard-data-loader
+- Cleaned up mock data, test data, and briefing condense references
+
+### Feature #35: Verwijder streaks widget - PASSING
+- Deleted streaks-widget.tsx from components/widgets/
+- Removed catalog entry, WIDGET_HREFS, dynamic import, switch case
+- Removed StreakData interface and streaks from DashboardData
+- Removed server-side user_streaks query from dashboard-data-loader
+- Removed streak computation and streak notifications logic
+- Cleaned up mock data, test data, briefing condense, and auto-dashboard-builder
+
+### Feature #36: Cleanup badge/streak referenties in meldingen-widget - PASSING
+- Removed 'badge' and 'streak' from TYPE_ICONS and TYPE_LABELS in meldingen-widget.tsx
+- Removed 'badge' and 'streak' from Notification type union in widget-renderer.tsx
+- Updated test notification data (changed streak type to milestone)
+- Left briefing card StreakCardSpec untouched (separate system from widget)
+
+### Current Status
+- 3 features completed this session (#34, #35, #36)
+- Zero TypeScript errors
+- Zero console errors verified via browser
+- Commit: 2cb56e87
