@@ -1,3 +1,26 @@
+## Session 2026-03-17 - Features #142, #171
+
+### Feature #142: Gids pagina: module-gebaseerde naslagwerk-indeling - PASSING
+- Created GuideNaslagwerk component (components/app/guide-naslagwerk.tsx)
+- 4 module sections: De Kern (8), De Wil (8), De Horizon (6), Algemeen (10) = 32 topics
+- Desktop (lg+): horizontal tab bar with module-colored dots and active underline indicator
+- Mobile (<lg): vertical accordions with expand/collapse animation (grid-template-rows pattern)
+- Compact NaslagwerkItem: 6x6 icon + title + summary + scroll-to-anchor arrow
+- Module colors: kern-400, wil-400, horizon-400, ink-3 for algemeen
+- Calm reference styling: bg-[var(--paper)] + border-[var(--border-ed)]
+- Scroll-to-journey linking via smooth scrollIntoView for topics with anchors
+- Placed between "Overal" section and ConceptFlipCards
+- Zero TypeScript errors
+- Commit: 22bb33ce
+
+### Feature #171: Gids pagina: module-gebaseerde naslagwerk-indeling (duplicate) - PASSING
+- Duplicate of #142 (identical feature name and requirements)
+- Already fully implemented by #142
+- All 9 verification steps satisfied by the existing GuideNaslagwerk component
+
+### Current Status
+- 2 features completed this session (#142, #171)
+
 ## Session 2026-03-17 - Features #149, #150
 
 ### Feature #149: Gids content: Check-in - PASSING
@@ -13920,3 +13943,28 @@ For Feature #51 (Transaction Import):
 - 2 features completed this session (#152, #153)
 - Zero TypeScript errors
 - Commit: f0303bc2
+
+## Session 2026-03-17 - Features #154, #155
+
+### Feature #154: Gids content: Acties - PASSING
+- Enhanced existing Acties GuideTopicCard with enriched content
+- Waarde-tekst: "Inzicht zonder actie verandert niets..."
+- Overzicht: 4 statussen (open, postponed, completed, rejected), 3 bronnen (ai, manual, chat), vrijheidsdagen
+- Aanmaken: zelf, AI-voorstel, Will-gesprekken automatisch
+- Voltooien: gewonnen vrijheidsdagen maandtotaal, archief, FIRE-datum verschuift
+- Uitstellen/afwijzen: beide beschreven met gedrag
+- HowTo expanded to 6 steps including widgets (acties, beslissingspatronen, vrijheidsdagen_maand)
+
+### Feature #155: Gids content: Doelen - PASSING
+- Enhanced existing Doelen GuideTopicCard with enriched content
+- Waarde-tekst: "Een doel zonder plan is een wens..."
+- 8 doeltypes listed with internal names: savings_goal, debt_payoff, wealth_milestone, income_goal, spending_reduction, investment_return, net_worth_target, custom
+- Koppeling: automatische voortgang via spaarrekening/belegging/schuld
+- Voortgangsformule: (huidig − start) / (doel − start) × 100%
+- Check-in stap 4 updates alle doelen in één keer
+- HowTo expanded to 6 steps including personaliseren (kleur/icoon) en widget
+
+### Current Status
+- 2 features completed this session (#154, #155)
+- Zero TypeScript errors
+- Commit: 491d943c
