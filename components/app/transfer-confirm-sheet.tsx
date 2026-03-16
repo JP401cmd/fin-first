@@ -154,6 +154,22 @@ export function TransferConfirmSheet({
       budget_id: selectedBudgetId,
     })
 
+    // Also save IBAN correction if IBAN is available (more reliable matching)
+    if (tx.counterparty_iban) {
+      const normalizedIban = tx.counterparty_iban.replace(/\s/g, '').toUpperCase()
+      await supabase.from('category_corrections')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('match_field', 'counterparty_iban')
+        .ilike('match_value', normalizedIban)
+      await supabase.from('category_corrections').insert({
+        user_id: user.id,
+        match_field: 'counterparty_iban',
+        match_value: normalizedIban,
+        budget_id: selectedBudgetId,
+      })
+    }
+
     // Find budget name for done message
     const budgetName = budgetGroups
       .flatMap(g => [g.parent, ...g.children])

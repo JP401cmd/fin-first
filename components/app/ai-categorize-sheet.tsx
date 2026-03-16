@@ -15,6 +15,7 @@ type Transaction = {
   date: string
   description: string
   counterparty_name: string | null
+  counterparty_iban: string | null
   amount: number
   import_hash: string | null
   budget_id: string | null
@@ -86,12 +87,14 @@ export function AICategorizeSheet({ transactions, budgets, budgetGroups, onClose
   const [ruleCount, setRuleCount] = useState(0)
   const [bulkUpdated, setBulkUpdated] = useState(0)
   const [bulkApplyPrompt, setBulkApplyPrompt] = useState<BulkApplyPrompt | null>(null)
+  const [aiBatchProgress, setAiBatchProgress] = useState({ current: 0, total: 0 })
 
-  // ── Fetch AI suggestions ──────────────────────────────────────────────────
+  // ── Fetch AI suggestions (parallel batches, max 3 concurrent) ─────────────
 
   const fetchSuggestions = useCallback(async () => {
     setPhase('ai')
     setAiError(null)
+    setAiBatchProgress({ current: 0, total: 0 })
 
     try {
       const payload = transactions.map((tx) => ({
@@ -103,22 +106,42 @@ export function AICategorizeSheet({ transactions, budgets, budgetGroups, onClose
       }))
 
       // Split into batches of 20
-      const allResults: AISuggestion[] = []
+      const batches: typeof payload[] = []
       for (let i = 0; i < payload.length; i += 20) {
-        const res = await fetch('/api/ai/categorize', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transactions: payload.slice(i, i + 20) }),
-        })
-
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}))
-          throw new Error((data as { error?: string }).error ?? 'AI-analyse niet beschikbaar')
-        }
-
-        const data = await res.json() as { results: AISuggestion[] }
-        allResults.push(...data.results)
+        batches.push(payload.slice(i, i + 20))
       }
+
+      setAiBatchProgress({ current: 0, total: payload.length })
+
+      // Parallel fetch with max 3 concurrent (semaphore pattern)
+      const allResults: AISuggestion[] = []
+      let completedCount = 0
+      let nextIdx = 0
+
+      async function runWorker(): Promise<void> {
+        while (nextIdx < batches.length) {
+          const idx = nextIdx++
+          const batch = batches[idx]
+          const res = await fetch('/api/ai/categorize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transactions: batch }),
+          })
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}))
+            throw new Error((errData as { error?: string }).error ?? 'AI-analyse niet beschikbaar')
+          }
+
+          const data = await res.json() as { results: AISuggestion[] }
+          allResults.push(...data.results)
+          completedCount += batch.length
+          setAiBatchProgress((prev) => ({ ...prev, current: completedCount }))
+        }
+      }
+
+      const workers = Array.from({ length: Math.min(3, batches.length) }, () => runWorker())
+      await Promise.all(workers)
 
       // Build suggestion map
       const suggestionMap = new Map<string, AISuggestion>()
@@ -314,6 +337,18 @@ export function AICategorizeSheet({ transactions, budgets, budgetGroups, onClose
             .insert({ user_id: user.id, match_field: matchField, match_value: matchValue, budget_id: row.acceptedBudgetId })
           rules++
 
+          // Also save IBAN correction if IBAN is available (more reliable matching)
+          if (row.tx.counterparty_iban) {
+            const normalizedIban = row.tx.counterparty_iban.replace(/\s/g, '').toUpperCase()
+            await supabase.from('category_corrections')
+              .delete()
+              .eq('user_id', user.id)
+              .eq('match_field', 'counterparty_iban')
+              .ilike('match_value', normalizedIban)
+            await supabase.from('category_corrections')
+              .insert({ user_id: user.id, match_field: 'counterparty_iban', match_value: normalizedIban, budget_id: row.acceptedBudgetId })
+          }
+
           // Retroactively apply rule to all uncategorised matching transactions
           let bulkQuery = supabase
             .from('transactions')
@@ -326,6 +361,19 @@ export function AICategorizeSheet({ transactions, budgets, budgetGroups, onClose
             bulkQuery = bulkQuery.ilike('counterparty_name', matchValue)
           } else {
             bulkQuery = bulkQuery.ilike('description', `%${matchValue}%`)
+          }
+
+          // Also match by IBAN for retroactive application
+          if (row.tx.counterparty_iban) {
+            const { data: ibanBulk } = await supabase
+              .from('transactions')
+              .update({ budget_id: row.acceptedBudgetId, category_source: 'rule' })
+              .eq('user_id', user.id)
+              .is('budget_id', null)
+              .neq('id', row.tx.id)
+              .eq('counterparty_iban', row.tx.counterparty_iban)
+              .select('id')
+            bulk += ibanBulk?.length ?? 0
           }
 
           const { data: bulkResult } = await bulkQuery.select('id')
@@ -400,8 +448,26 @@ export function AICategorizeSheet({ transactions, budgets, budgetGroups, onClose
         <div className="space-y-4 py-6">
           <div className="flex flex-col items-center gap-3 pb-2">
             <Loader2 className="h-7 w-7 animate-spin text-wil-500" />
-            <p className="text-sm font-medium text-[var(--ink-2)]">Will analyseert</p>
+            <p className="text-sm font-medium text-[var(--ink-2)]">
+              {aiBatchProgress.total > 0
+                ? <>Will categoriseert… <span className="font-mono tabular-nums">{aiBatchProgress.current}</span> van <span className="font-mono tabular-nums">{aiBatchProgress.total}</span> transacties</>
+                : 'Will analyseert'
+              }
+            </p>
           </div>
+
+          {/* Progress bar */}
+          {aiBatchProgress.total > 0 && (
+            <div className="h-1.5 rounded-full bg-wil-100 overflow-hidden mx-4">
+              <div
+                className="h-1.5 rounded-full bg-wil-500"
+                style={{
+                  width: `${(aiBatchProgress.current / aiBatchProgress.total) * 100}%`,
+                  transition: 'width 0.4s ease-out',
+                }}
+              />
+            </div>
+          )}
 
           {/* Fhin editorial quote card */}
           <div className="rounded-[var(--r-lg)] border border-dashed border-wil-200 bg-wil-50/50 px-4 py-3">

@@ -8,7 +8,7 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 
 type CategoryRule = {
   id: string
-  match_field: 'counterparty_name' | 'description'
+  match_field: 'counterparty_name' | 'description' | 'counterparty_iban'
   match_value: string
   budget_id: string
   auto_apply: boolean
@@ -21,6 +21,7 @@ interface CategoryRulesSheetProps {
 }
 
 const MATCH_FIELD_LABELS: Record<string, string> = {
+  counterparty_iban: 'IBAN',
   counterparty_name: 'Tegenpartij',
   description: 'Omschrijving',
 }
@@ -29,7 +30,7 @@ export function CategoryRulesSheet({ budgets, onClose }: CategoryRulesSheetProps
   const [rules, setRules] = useState<CategoryRule[]>([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({
-    matchField: 'counterparty_name' as 'counterparty_name' | 'description',
+    matchField: 'counterparty_name' as 'counterparty_name' | 'description' | 'counterparty_iban',
     matchValue: '',
     budgetId: '',
     autoApply: true,
@@ -100,16 +101,17 @@ export function CategoryRulesSheet({ budgets, onClose }: CategoryRulesSheetProps
               onChange={(e) =>
                 setForm((f) => ({
                   ...f,
-                  matchField: e.target.value as 'counterparty_name' | 'description',
+                  matchField: e.target.value as 'counterparty_name' | 'description' | 'counterparty_iban',
                 }))
               }
             >
+              <option value="counterparty_iban">IBAN</option>
               <option value="counterparty_name">Tegenpartij</option>
               <option value="description">Omschrijving</option>
             </select>
             <input
               className="flex-1 rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-xs text-[var(--ink)] placeholder-[var(--ink-4)] focus:outline-none focus:ring-2 focus:ring-kern-400"
-              placeholder="bv. Spotify, Netflix, Albert Heijn…"
+              placeholder={form.matchField === 'counterparty_iban' ? 'bv. NL91ABNA0417164300' : 'bv. Spotify, Netflix, Albert Heijn…'}
               value={form.matchValue}
               onChange={(e) => setForm((f) => ({ ...f, matchValue: e.target.value }))}
             />

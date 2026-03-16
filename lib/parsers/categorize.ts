@@ -3,6 +3,13 @@
  * Matches Dutch transaction descriptions to budget categories using keywords.
  * Uses budget slugs for stable matching (not display names).
  *
+ * Priority order:
+ *   0. Own-account transfer detection
+ *   1. User corrections (category_corrections table) — confidence 1.0
+ *   2. Frequency-based matching (historical transactions) — confidence 0.6–0.95
+ *   3. Keyword rules (static) — confidence 0.7–1.0
+ *   4. AI categorization (external)
+ *
  * AI-ready: the function interface allows a future categorizeWithAI() fallback
  * via a Supabase Edge Function.
  */
@@ -67,9 +74,115 @@ const RULES: CategoryRule[] = [
  * Loaded from the `category_corrections` table during import.
  */
 export type CategoryCorrection = {
-  match_field: 'counterparty_name' | 'description'
+  match_field: 'counterparty_name' | 'description' | 'counterparty_iban'
   match_value: string
   budget_id: string
+}
+
+/**
+ * A frequency-based match result from historical transaction data.
+ * Key is lowercase counterparty_name or counterparty_iban.
+ */
+export type FrequencyMatch = {
+  budget_id: string
+  count: number
+  total: number
+  confidence: number
+}
+
+/**
+ * Build a frequency map from the user's historical transactions.
+ * Groups transactions by counterparty_name and counterparty_iban,
+ * finding the most-used budget_id for each counterparty.
+ *
+ * Returns a Map keyed by lowercase counterparty identifier → FrequencyMatch.
+ * Only includes entries with 3+ matches and confidence >= 0.6.
+ *
+ * @param userId - The authenticated user's ID
+ * @param supabase - Supabase client instance (browser or server)
+ */
+export async function buildFrequencyMap(
+  userId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+): Promise<Map<string, FrequencyMatch>> {
+  const map = new Map<string, FrequencyMatch>()
+
+  // Query all transactions with a budget_id, grouped by counterparty + budget
+  // We fetch raw data and aggregate in JS to avoid RPC dependency
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('counterparty_name, counterparty_iban, budget_id')
+    .eq('user_id', userId)
+    .not('budget_id', 'is', null)
+    .not('counterparty_name', 'is', null)
+
+  if (error || !data) return map
+
+  // Aggregate: counterparty → { budget_id → count }
+  const byName = new Map<string, Map<string, number>>()
+  const byIban = new Map<string, Map<string, number>>()
+
+  for (const row of data as { counterparty_name: string | null; counterparty_iban: string | null; budget_id: string }[]) {
+    if (row.counterparty_name) {
+      const key = row.counterparty_name.toLowerCase()
+      if (!byName.has(key)) byName.set(key, new Map())
+      const counts = byName.get(key)!
+      counts.set(row.budget_id, (counts.get(row.budget_id) ?? 0) + 1)
+    }
+    if (row.counterparty_iban) {
+      const key = row.counterparty_iban.replace(/\s/g, '').toUpperCase()
+      if (!byIban.has(key)) byIban.set(key, new Map())
+      const counts = byIban.get(key)!
+      counts.set(row.budget_id, (counts.get(row.budget_id) ?? 0) + 1)
+    }
+  }
+
+  // For each counterparty, find the budget with the highest count
+  function addBestMatch(source: Map<string, Map<string, number>>, prefix: string) {
+    for (const [key, counts] of source) {
+      let bestBudgetId = ''
+      let bestCount = 0
+      let total = 0
+      for (const [budgetId, count] of counts) {
+        total += count
+        if (count > bestCount) {
+          bestCount = count
+          bestBudgetId = budgetId
+        }
+      }
+      // Require at least 3 matches
+      if (bestCount < 3) continue
+      const confidence = Math.min(0.95, Math.max(0.6, bestCount / total))
+      const mapKey = prefix + key
+      map.set(mapKey, { budget_id: bestBudgetId, count: bestCount, total, confidence })
+    }
+  }
+
+  addBestMatch(byName, 'name:')
+  addBestMatch(byIban, 'iban:')
+
+  return map
+}
+
+/**
+ * Look up a single transaction in the pre-built frequency map.
+ * Checks counterparty_name first, then counterparty_iban.
+ */
+export function frequencyMatch(
+  counterpartyName: string | null,
+  counterpartyIban: string | null,
+  frequencyMap: Map<string, FrequencyMatch>,
+): FrequencyMatch | null {
+  if (counterpartyName) {
+    const match = frequencyMap.get('name:' + counterpartyName.toLowerCase())
+    if (match) return match
+  }
+  if (counterpartyIban) {
+    const match = frequencyMap.get('iban:' + counterpartyIban.replace(/\s/g, '').toUpperCase())
+    if (match) return match
+  }
+  return null
 }
 
 /**
@@ -88,10 +201,12 @@ export function isOwnAccountTransfer(
 
 /**
  * Categorize a transaction based on its description and counterparty.
- * Checks user corrections first (highest priority), then falls back to rules.
  * Priority 0: own-account transfer detection (when ownIbans + counterpartyIban provided).
+ * Priority 1: user corrections (category_corrections) — confidence 1.0
+ * Priority 2: frequency-based matching (historical transactions) — confidence 0.6–0.95
+ * Priority 3: keyword rules (static) — confidence 0.7–1.0
  *
- * @returns budget_id, confidence, budgetName, and optional isTransfer flag.
+ * @returns budget_id, confidence, budgetName, category_source, and optional isTransfer flag.
  */
 export function categorizeTransaction(
   description: string,
@@ -101,10 +216,11 @@ export function categorizeTransaction(
   corrections?: CategoryCorrection[],
   ownIbans?: Set<string>,
   counterpartyIban?: string | null,
-): { budget_id: string | null; confidence: number; budgetName: string | null; isTransfer?: boolean } {
+  freqMap?: Map<string, FrequencyMatch>,
+): { budget_id: string | null; confidence: number; budgetName: string | null; isTransfer?: boolean; category_source?: string } {
   // Priority 0: own-account transfer detection
   if (ownIbans && counterpartyIban && isOwnAccountTransfer(counterpartyIban, ownIbans)) {
-    return { budget_id: null, confidence: 1.0, budgetName: null, isTransfer: true }
+    return { budget_id: null, confidence: 1.0, budgetName: null, isTransfer: true, category_source: 'transfer' }
   }
 
   const searchText = `${description} ${counterparty ?? ''}`.toLowerCase()
@@ -118,22 +234,50 @@ export function categorizeTransaction(
     if (b.id) idMap.set(b.id, b)
   }
 
-  // Priority 1: Check user corrections (exact match on counterparty or description)
+  // Priority 1: Check user corrections
+  // Sub-priority: IBAN (most reliable) → counterparty_name → description
   if (corrections && corrections.length > 0) {
+    // 1a: IBAN corrections first (highest reliability)
+    if (counterpartyIban) {
+      const normalizedIban = counterpartyIban.replace(/\s/g, '').toUpperCase()
+      for (const c of corrections) {
+        if (c.match_field === 'counterparty_iban' && c.match_value.replace(/\s/g, '').toUpperCase() === normalizedIban) {
+          const budget = idMap.get(c.budget_id)
+          return { budget_id: c.budget_id, confidence: 1.0, budgetName: budget?.name ?? null, category_source: 'correction' }
+        }
+      }
+    }
+    // 1b: counterparty_name and description corrections
     for (const c of corrections) {
       const needle = c.match_value.toLowerCase()
       if (c.match_field === 'counterparty_name' && counterparty && counterparty.toLowerCase() === needle) {
         const budget = idMap.get(c.budget_id)
-        return { budget_id: c.budget_id, confidence: 1.0, budgetName: budget?.name ?? null }
+        return { budget_id: c.budget_id, confidence: 1.0, budgetName: budget?.name ?? null, category_source: 'correction' }
       }
       if (c.match_field === 'description' && description.toLowerCase().includes(needle)) {
         const budget = idMap.get(c.budget_id)
-        return { budget_id: c.budget_id, confidence: 0.95, budgetName: budget?.name ?? null }
+        return { budget_id: c.budget_id, confidence: 0.95, budgetName: budget?.name ?? null, category_source: 'correction' }
       }
     }
   }
 
-  // Priority 2: Rule-based matching
+  // Priority 2: Frequency-based matching (learned from historical transactions)
+  if (freqMap && freqMap.size > 0) {
+    const freqResult = frequencyMatch(counterparty, counterpartyIban ?? null, freqMap)
+    if (freqResult) {
+      const budget = idMap.get(freqResult.budget_id)
+      if (budget) {
+        return {
+          budget_id: freqResult.budget_id,
+          confidence: freqResult.confidence,
+          budgetName: budget.name ?? null,
+          category_source: 'frequency',
+        }
+      }
+    }
+  }
+
+  // Priority 3: Rule-based matching (static keyword rules)
   let bestMatch: { budgetSlug: string; confidence: number } | null = null
 
   for (const rule of RULES) {
@@ -162,5 +306,6 @@ export function categorizeTransaction(
     budget_id: budget?.id ?? null,
     confidence: budget ? bestMatch.confidence : 0,
     budgetName: budget?.name ?? null,
+    category_source: 'rule',
   }
 }
