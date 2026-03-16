@@ -44,13 +44,7 @@ type ImportRow = ParsedTransaction & {
   userManuallyChanged?: boolean
 }
 
-type BulkApplyPrompt = {
-  matchField: 'counterparty_name' | 'description'
-  matchValue: string
-  budgetId: string
-  budgetName: string
-  siblingCount: number
-}
+// BulkApplyPrompt removed — live correction propagation now auto-applies
 
 function isNetworkFailure(err: unknown): boolean {
   if (err instanceof TypeError && (
@@ -96,6 +90,9 @@ export default function ImportPage() {
   const [parsing, setParsing] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0, failed: 0 })
+  const [failedBatches, setFailedBatches] = useState<{ batchIdx: number; error: string; retries: number; rows: Record<string, unknown>[] }[]>([])
+  const [showFailedDetails, setShowFailedDetails] = useState(false)
+  const [retrying, setRetrying] = useState(false)
   const [importedBatchIndex, setImportedBatchIndex] = useState(0)
   const [importStartTime, setImportStartTime] = useState<number | null>(null)
   const [isNetworkError, setIsNetworkError] = useState(false)
@@ -115,9 +112,9 @@ export default function ImportPage() {
   const [aiReady, setAiReady] = useState(false)
   const [aiError, setAiError] = useState(false)
   const [aiProgress, setAiProgress] = useState({ current: 0, total: 0, skippedHighConf: 0 })
-  const [aiFailedBatches, setAiFailedBatches] = useState<Array<{ index: number; payload: Array<{ import_hash: string; description: string; counterparty_name: string; amount: number; reference: string }> }>>([])
+  const [aiFailedBatches, setAiFailedBatches] = useState<Array<{ index: number; payload: Array<{ import_hash: string; description: string; counterparty_name: string | null; amount: number; reference: string | null }> }>>([])
   const [aiRetrying, setAiRetrying] = useState(false)
-  const [bulkApplyPrompt, setBulkApplyPrompt] = useState<BulkApplyPrompt | null>(null)
+  // bulkApplyPrompt removed — live correction propagation now applies automatically
   const [checkingDups, setCheckingDups] = useState(false)
   const PAGE_SIZE = 50
   const [currentPage, setCurrentPage] = useState(0)
@@ -245,7 +242,7 @@ export default function ImportPage() {
 
     try {
       // Build batches of 20
-      let batches: Array<{ index: number; payload: Array<{ import_hash: string; description: string; counterparty_name: string; amount: number; reference: string }> }>
+      let batches: Array<{ index: number; payload: Array<{ import_hash: string; description: string; counterparty_name: string | null; amount: number; reference: string | null }> }>
 
       if (retryPayloads) {
         batches = retryPayloads.map((b, i) => ({ index: i, payload: b.payload }))
@@ -640,76 +637,84 @@ export default function ImportPage() {
   }
 
   function updateRowBudget(index: number, budgetId: string, source: 'user' | 'ai' = 'user') {
-    setBulkApplyPrompt(null)
     const row = rows[index]
     const budget = budgets.find((b) => b.id === budgetId)
-    setRows((prev) => prev.map((r, i) => {
-      if (i !== index) return r
-      return {
-        ...r,
-        budget_id: budgetId || null,
-        budgetName: budget?.name ?? null,
-        confidence: budgetId ? 1.0 : 0,
-        category_source: budgetId ? source : null,
-        aiAccepted: source === 'ai',
-      }
-    }))
+    const isUserChange = source === 'user'
 
-    if (budgetId && row) {
-      const matchField = row.counterparty_name ? 'counterparty_name' : 'description'
-      const matchValue = row.counterparty_name || row.description
-      if (matchValue) {
-        void (async () => {
-          const supabase = createClient()
-          const { data: { user } } = await supabase.auth.getUser()
-          if (!user) return
-          await supabase.from('category_corrections')
-            .delete()
-            .eq('user_id', user.id)
-            .eq('match_field', matchField)
-            .ilike('match_value', matchValue)
-          await supabase.from('category_corrections')
-            .insert({ user_id: user.id, match_field: matchField, match_value: matchValue, budget_id: budgetId })
-          setCorrections(prev => {
-            const filtered = prev.filter(c => !(c.match_field === matchField && c.match_value.toLowerCase() === matchValue.toLowerCase()))
-            return [...filtered, { match_field: matchField as 'counterparty_name' | 'description', match_value: matchValue, budget_id: budgetId }]
-          })
-        })()
-      }
+    // Determine counterparty match criteria
+    const matchField = row?.counterparty_name ? 'counterparty_name' as const : 'description' as const
+    const matchValue = row?.counterparty_name || row?.description || ''
 
-      if (budget) {
-        const matchField = row.counterparty_name ? 'counterparty_name' as const : 'description' as const
-        const matchValue = row.counterparty_name || row.description
-        if (matchValue) {
-          const siblings = rows.filter((r, i) =>
-            i !== index &&
-            r.budget_id === null &&
-            !r.isTransfer &&
-            !r.skipImport &&
-            (matchField === 'counterparty_name'
-              ? r.counterparty_name?.toLowerCase() === matchValue.toLowerCase()
-              : r.description?.toLowerCase().includes(matchValue.toLowerCase()))
-          )
-          if (siblings.length > 0) {
-            setBulkApplyPrompt({ matchField, matchValue, budgetId, budgetName: budget.name, siblingCount: siblings.length })
+    // Update the target row + auto-propagate to siblings with same counterparty
+    setRows((prev) => {
+      let siblingCount = 0
+      const updated = prev.map((r, i) => {
+        // The row being changed
+        if (i === index) {
+          return {
+            ...r,
+            budget_id: budgetId || null,
+            budgetName: budget?.name ?? null,
+            confidence: budgetId ? 1.0 : 0,
+            category_source: budgetId ? (isUserChange ? 'correction' : source) : null,
+            aiAccepted: source === 'ai',
+            userManuallyChanged: isUserChange,
           }
         }
-      }
-    }
-  }
+        // Auto-propagate to siblings: same counterparty, not manually changed, not transfer, not skipped
+        if (isUserChange && budgetId && matchValue && !r.userManuallyChanged && !r.isTransfer && !r.skipImport) {
+          const matches = matchField === 'counterparty_name'
+            ? r.counterparty_name?.toLowerCase() === matchValue.toLowerCase()
+            : r.description?.toLowerCase().includes(matchValue.toLowerCase())
+          if (matches) {
+            siblingCount++
+            return {
+              ...r,
+              budget_id: budgetId,
+              budgetName: budget?.name ?? null,
+              confidence: 1.0,
+              category_source: 'correction',
+              aiAccepted: false,
+            }
+          }
+        }
+        return r
+      })
 
-  function applyToSiblings() {
-    if (!bulkApplyPrompt) return
-    const { matchField, matchValue, budgetId, budgetName } = bulkApplyPrompt
-    setRows((prev) => prev.map((r) => {
-      if (r.budget_id !== null || r.isTransfer || r.skipImport) return r
-      const matches = matchField === 'counterparty_name'
-        ? r.counterparty_name?.toLowerCase() === matchValue.toLowerCase()
-        : r.description?.toLowerCase().includes(matchValue.toLowerCase())
-      if (!matches) return r
-      return { ...r, budget_id: budgetId, budgetName, confidence: 1.0, aiAccepted: false }
-    }))
-    setBulkApplyPrompt(null)
+      // Show toast for auto-propagated siblings (deferred to avoid setState-in-render)
+      if (siblingCount > 0 && budget) {
+        setTimeout(() => {
+          addToast({
+            type: 'success',
+            title: `Budget toegepast op ${siblingCount} vergelijkbare transactie${siblingCount === 1 ? '' : 's'}`,
+            message: `${budget.name} → ${matchValue}`,
+            duration: 3000,
+          })
+        }, 0)
+      }
+
+      return updated
+    })
+
+    // Save correction to category_corrections table
+    if (budgetId && row && matchValue && isUserChange) {
+      void (async () => {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        await supabase.from('category_corrections')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('match_field', matchField)
+          .ilike('match_value', matchValue)
+        await supabase.from('category_corrections')
+          .insert({ user_id: user.id, match_field: matchField, match_value: matchValue, budget_id: budgetId })
+        setCorrections(prev => {
+          const filtered = prev.filter(c => !(c.match_field === matchField && c.match_value.toLowerCase() === matchValue.toLowerCase()))
+          return [...filtered, { match_field: matchField as 'counterparty_name' | 'description', match_value: matchValue, budget_id: budgetId }]
+        })
+      })()
+    }
   }
 
   function toggleSkip(index: number) {
@@ -767,7 +772,7 @@ export default function ImportPage() {
       counterparty_iban: r.counterparty_iban,
       budget_id: r.isTransfer ? null : r.budget_id,
       is_income: r.amount > 0,
-      category_source: r.isTransfer ? 'transfer' : (r.aiAccepted ? 'ai' : r.budget_id ? 'rule' : 'import'),
+      category_source: r.isTransfer ? 'transfer' : (r.category_source ?? (r.aiAccepted ? 'ai' : r.budget_id ? 'rule' : 'import')),
       import_hash: r.import_hash,
       reference: r.reference,
       transaction_type: r.isTransfer ? 'transfer' : r.transaction_type,
@@ -784,47 +789,28 @@ export default function ImportPage() {
     setImportStartTime(Date.now())
     let failedCount = 0
 
+    const newFailedBatches: typeof failedBatches = []
+
     for (let batchIdx = startBatch; batchIdx < batches.length; batchIdx++) {
+      let batchFailed = false
+      let batchError = ""
+
       try {
         const { error: insertError } = await supabase
-          .from('transactions')
+          .from("transactions")
           .insert(batches[batchIdx])
-
         if (insertError) {
-          if (isNetworkFailure(insertError)) {
-            const imported = batchIdx * BATCH_SIZE
-            setImportedBatchIndex(batchIdx)
-            setImportProgress({ current: imported, total: insertRows.length, failed: failedCount })
-            setIsNetworkError(true)
-            setError(
-              imported > 0
-                ? `Netwerkfout: ${imported} van ${insertRows.length} transacties zijn al geïmporteerd. Controleer je verbinding en klik "Opnieuw proberen" om de rest te importeren.`
-                : 'Geen internetverbinding. Controleer je netwerk en probeer het opnieuw.'
-            )
-            setImporting(false)
-            return
-          }
-          setError(`Fout bij importeren: ${insertError.message}`)
-          setImporting(false)
-          return
+          batchFailed = true
+          batchError = insertError.message
         }
       } catch (err) {
-        const imported = batchIdx * BATCH_SIZE
-        setImportedBatchIndex(batchIdx)
-        setImportProgress({ current: imported, total: insertRows.length, failed: failedCount })
+        batchFailed = true
+        batchError = err instanceof Error ? err.message : "Onbekende fout"
+      }
 
-        if (isNetworkFailure(err)) {
-          setIsNetworkError(true)
-          setError(
-            imported > 0
-              ? `Netwerkfout: ${imported} van ${insertRows.length} transacties zijn al geïmporteerd. Controleer je verbinding en klik "Opnieuw proberen" om de rest te importeren.`
-              : 'Geen internetverbinding. Controleer je netwerk en probeer het opnieuw.'
-          )
-        } else {
-          setError(`Onverwachte fout bij importeren. ${imported > 0 ? `${imported} transacties zijn al geïmporteerd.` : ''} Probeer het opnieuw.`)
-        }
-        setImporting(false)
-        return
+      if (batchFailed) {
+        failedCount += batches[batchIdx].length
+        newFailedBatches.push({ batchIdx, error: batchError, retries: 0, rows: batches[batchIdx] })
       }
 
       const progressCount = Math.min((batchIdx + 1) * BATCH_SIZE, insertRows.length)
@@ -832,14 +818,55 @@ export default function ImportPage() {
       setImportedBatchIndex(batchIdx + 1)
     }
 
+    setFailedBatches(newFailedBatches)
     setImportedBatchIndex(0)
     setImportStartTime(null)
     setStep(4)
     setImporting(false)
 
     // Link transfer pairs in background (non-blocking)
-    linkUnmatchedTransfers(supabase, user!.id).catch(console.error)
+    if (failedCount < insertRows.length) {
+      linkUnmatchedTransfers(supabase, user!.id).catch(console.error)
+    }
+  }
 
+  async function retryFailedBatches() {
+    if (failedBatches.length === 0) return
+    setRetrying(true)
+    setError("")
+    const supabase = createClient()
+    const remaining: typeof failedBatches = []
+
+    for (const fb of failedBatches) {
+      if (fb.retries >= 2) {
+        remaining.push(fb)
+        continue
+      }
+      let ok = true
+      let errMsg = ""
+      try {
+        const { error: insertError } = await supabase.from("transactions").insert(fb.rows)
+        if (insertError) { ok = false; errMsg = insertError.message }
+      } catch (err) {
+        ok = false
+        errMsg = err instanceof Error ? err.message : "Onbekende fout"
+      }
+      if (!ok) {
+        remaining.push({ ...fb, retries: fb.retries + 1, error: errMsg })
+      }
+    }
+
+    const stillFailed = remaining.reduce((sum, fb) => sum + fb.rows.length, 0)
+    setFailedBatches(remaining)
+    setImportProgress((prev) => ({ ...prev, failed: stillFailed }))
+
+    if (remaining.length === 0) {
+      const { data } = await supabase.auth.getUser()
+      if (data.user) linkUnmatchedTransfers(supabase, data.user.id).catch(console.error)
+    } else if (remaining.every((fb) => fb.retries >= 2)) {
+      setError(`${stillFailed} transacties konden niet worden geïmporteerd na meerdere pogingen.`)
+    }
+    setRetrying(false)
   }
 
   const newCount = rows.filter((r) => !r.isDuplicate).length
@@ -1522,32 +1549,7 @@ export default function ImportPage() {
             </div>
           )}
 
-          {/* Bulk-apply prompt */}
-          {bulkApplyPrompt && (
-            <div className="flex items-center justify-between gap-3 rounded-[var(--r)] border border-dashed border-wil-300 bg-wil-50/50 px-4 py-3 text-sm">
-              <p className="text-[var(--ink-2)]">
-                <span className="font-medium text-[var(--ink)]">{bulkApplyPrompt.siblingCount}</span> andere{' '}
-                <span className="font-medium text-[var(--ink)]">'{bulkApplyPrompt.matchValue}'</span>-transacties.{' '}
-                Ook als <span className="font-medium text-[var(--ink)]">{bulkApplyPrompt.budgetName}</span>?
-              </p>
-              <div className="flex shrink-0 gap-2">
-                <button
-                  type="button"
-                  onClick={applyToSiblings}
-                  className="rounded-[var(--r-sm)] bg-wil-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-wil-700"
-                >
-                  Ja, allemaal
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBulkApplyPrompt(null)}
-                  className="rounded-[var(--r-sm)] border border-[var(--border-md)] px-3 py-1.5 text-xs text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-                >
-                  Overslaan
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Bulk-apply is now automatic — see updateRowBudget auto-propagation + toast */}
 
           {/* Transfer banner */}
           {rows.some((r) => r.isTransfer && !r.skipImport) && (
@@ -1727,15 +1729,77 @@ export default function ImportPage() {
                   </span>
                 )}
               </div>
+              {/* Retry failed batches */}
+              {failedBatches.length > 0 && (
+                <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-left">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-red-800">
+                      {failedBatches.reduce((s, fb) => s + fb.rows.length, 0)} transacties in{" "}
+                      {failedBatches.length} batch{failedBatches.length > 1 ? "es" : ""} mislukt
+                    </p>
+                    <div className="flex items-center gap-2">
+                      {failedBatches.some((fb) => fb.retries < 2) && (
+                        <button
+                          type="button"
+                          onClick={() => void retryFailedBatches()}
+                          disabled={retrying}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                        >
+                          {retrying ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-3.5 w-3.5" />
+                          )}
+                          {retrying ? "Bezig..." : "Opnieuw proberen"}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowFailedDetails((v) => !v)}
+                        className="text-xs text-red-600 underline hover:text-red-800"
+                      >
+                        {showFailedDetails ? "Verberg details" : "Toon details"}
+                      </button>
+                    </div>
+                  </div>
+                  {failedBatches.some((fb) => fb.retries >= 2) && (
+                    <p className="mt-1 text-xs text-red-600">
+                      Sommige batches hebben het maximum aantal pogingen (2) bereikt.
+                    </p>
+                  )}
+                  {showFailedDetails && (
+                    <div className="mt-3 max-h-48 overflow-y-auto space-y-2">
+                      {failedBatches.map((fb, i) => (
+                        <div
+                          key={i}
+                          className="rounded border border-red-200 bg-white p-2 text-xs"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium text-red-800">
+                              Batch {fb.batchIdx + 1} — {fb.rows.length} transacties
+                            </span>
+                            <span className="text-red-500">
+                              {fb.retries >= 2
+                                ? "Max pogingen bereikt"
+                                : `Poging ${fb.retries}/2`}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 text-red-600 truncate">{fb.error}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="mt-3 flex justify-center gap-6 text-sm text-[var(--ink-3)]">
                 <span>
-                  Totaal bij:{' '}
+                  Totaal bij:{" "}
                   <strong className="text-emerald-600 font-mono tabular-nums">
                     {formatCurrency(totalBij)}
                   </strong>
                 </span>
                 <span>
-                  Totaal af:{' '}
+                  Totaal af:{" "}
                   <strong className="text-red-600 font-mono tabular-nums">
                     {formatCurrency(Math.abs(totalAf))}
                   </strong>

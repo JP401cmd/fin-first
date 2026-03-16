@@ -20,7 +20,7 @@ function mockBudget(id: string, name: string, slug: string): Budget {
     icon: null,
     color: null,
     is_income: false,
-  } as Budget
+  } as unknown as Budget
 }
 
 // ── frequencyMatch ────────────────────────────────────────────────────
