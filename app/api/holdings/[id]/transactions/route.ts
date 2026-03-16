@@ -15,7 +15,7 @@ import { syncAssetValueFromHoldings } from '@/lib/holdings-sync'
  */
 function computeRunningPnL(transactions: Array<{
   id: string
-  type: 'buy' | 'sell' | 'dividend'
+  type: 'buy' | 'sell' | 'dividend' | 'split'
   units: number
   price_per_unit: number
   total_amount: number
@@ -58,6 +58,15 @@ function computeRunningPnL(transactions: Array<{
       if (runningUnits <= 0) {
         runningCostBasis = 0
         runningUnits = 0
+      }
+    } else if (tx.type === 'split') {
+      // Stock split: multiply units by multiplier, divide avg price
+      // Total value stays the same, no P&L impact
+      const multiplier = numUnits // units field stores the split multiplier
+      if (multiplier > 0 && runningUnits > 0) {
+        runningUnits *= multiplier
+        // Cost basis stays the same (total investment unchanged)
+        // Avg price adjusts automatically since costBasis / units
       }
     } else if (tx.type === 'dividend') {
       cumulativeDividends += totalAmount
@@ -134,7 +143,7 @@ export async function GET(
       id: string
       holding_id: string
       user_id: string
-      type: 'buy' | 'sell' | 'dividend'
+      type: 'buy' | 'sell' | 'dividend' | 'split'
       units: number
       price_per_unit: number
       total_amount: number
@@ -224,19 +233,25 @@ export async function POST(
     const body = await request.json()
     const { type, units, price_per_unit, date, notes } = body
 
-    if (!type || !units || !price_per_unit || !date) {
+    if (!type || !units || !date) {
       return NextResponse.json({
-        error: 'type, units, price_per_unit, and date are required',
+        error: 'type, units, and date are required',
       }, { status: 400 })
     }
 
-    if (!['buy', 'sell', 'dividend'].includes(type)) {
-      return NextResponse.json({ error: 'type must be buy, sell, or dividend' }, { status: 400 })
+    if (type !== 'split' && !price_per_unit) {
+      return NextResponse.json({
+        error: 'price_per_unit is required for buy, sell, and dividend transactions',
+      }, { status: 400 })
+    }
+
+    if (!['buy', 'sell', 'dividend', 'split'].includes(type)) {
+      return NextResponse.json({ error: 'type must be buy, sell, dividend, or split' }, { status: 400 })
     }
 
     const numUnits = Number(units)
-    const numPrice = Number(price_per_unit)
-    const totalAmount = numUnits * numPrice
+    const numPrice = type === 'split' ? 0 : Number(price_per_unit)
+    const totalAmount = type === 'split' ? 0 : numUnits * numPrice
 
     // Insert into holding_transactions table
     const { data: transaction, error } = await supabase
@@ -285,6 +300,14 @@ export async function POST(
         realizedPnl = (numPrice - currentAvg) * numUnits
         newUnits = Math.max(0, currentUnits - numUnits)
         // avg stays the same for sells
+      } else if (type === 'split') {
+        // Stock split: units × multiplier, avg ÷ multiplier
+        // Total value stays the same
+        const multiplier = numUnits
+        if (multiplier > 0 && currentUnits > 0) {
+          newUnits = currentUnits * multiplier
+          newAvg = currentAvg / multiplier
+        }
       }
       // dividend: no change to units
 
@@ -336,6 +359,7 @@ export async function POST(
  * Rules:
  *   - buy: weighted average price, units increase
  *   - sell: units decrease, avg stays the same
+ *   - split: units × multiplier, avg ÷ multiplier (total value unchanged)
  *   - dividend: no effect on units/avg
  */
 function replayTransactions(
@@ -365,6 +389,13 @@ function replayTransactions(
       if (units <= 0) {
         units = 0
         avgPrice = 0
+      }
+    } else if (tx.type === 'split') {
+      // Stock split: units × multiplier, avg ÷ multiplier
+      const multiplier = numUnits
+      if (multiplier > 0 && units > 0) {
+        units *= multiplier
+        avgPrice /= multiplier
       }
     }
   }

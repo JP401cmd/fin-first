@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   ArrowUpRight, ArrowDownRight, DollarSign, Receipt,
   TrendingUp, TrendingDown, Loader2, AlertTriangle,
-  Plus, ChevronDown, ChevronUp, Trash2,
+  Plus, ChevronDown, ChevronUp, Trash2, Split,
 } from 'lucide-react'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
@@ -12,7 +12,7 @@ import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 type TransactionWithPnL = {
   id: string
   holding_id: string
-  type: 'buy' | 'sell' | 'dividend'
+  type: 'buy' | 'sell' | 'dividend' | 'split'
   units: number
   price_per_unit: number
   total_amount: number
@@ -73,6 +73,15 @@ const typeConfig = {
     border: 'border-kern-200',
     badgeBg: 'bg-kern-100',
     sign: '+',
+  },
+  split: {
+    label: 'Split',
+    icon: Split,
+    color: 'text-violet-600',
+    bg: 'bg-violet-50',
+    border: 'border-violet-200',
+    badgeBg: 'bg-violet-100',
+    sign: '',
   },
 }
 
@@ -240,7 +249,7 @@ export default function HoldingTransactionLog({
           <Receipt className="mx-auto h-10 w-10 text-[var(--ink-4)]" />
           <p className="mt-3 text-sm font-medium text-[var(--ink-2)]">Nog geen transacties</p>
           <p className="mt-1 text-xs text-[var(--ink-3)]">
-            Registreer je eerste koop-, verkoop- of dividendtransactie.
+            Registreer je eerste koop-, verkoop-, dividend- of splittransactie.
           </p>
         </div>
       ) : (
@@ -281,22 +290,33 @@ export default function HoldingTransactionLog({
                       )}
                     </div>
                     <p className="text-xs text-[var(--ink-3)]">
-                      {tx.units} eenhe{tx.units === 1 ? 'id' : 'den'} @ {formatCurrency(tx.price_per_unit)}
+                      {tx.type === 'split'
+                        ? `${tx.units}:1 split`
+                        : `${tx.units} eenhe${tx.units === 1 ? 'id' : 'den'} @ ${formatCurrency(tx.price_per_unit)}`
+                      }
                     </p>
                   </div>
 
                   {/* Transaction amount */}
                   <div className="shrink-0 text-right">
-                    <p className={`text-sm font-semibold ${cfg.color}`}>
-                      {cfg.sign}{formatCurrency(tx.total_amount)}
-                    </p>
-                    <FreedomTimeBadge amount={tx.total_amount} className="mt-0.5 justify-end text-[10px]" />
-                    {tx.type === 'sell' && tx.realized_pnl !== 0 && (
-                      <p className={`text-xs font-medium ${tx.realized_pnl >= 0 ? 'text-emerald-600' : 'text-red-600'}`}
-                         data-testid="tx-realized-pnl"
-                      >
-                        W/V: {tx.realized_pnl >= 0 ? '+' : ''}{formatCurrency(tx.realized_pnl)}
+                    {tx.type === 'split' ? (
+                      <p className={`text-sm font-semibold ${cfg.color}`}>
+                        {tx.units}:1
                       </p>
+                    ) : (
+                      <>
+                        <p className={`text-sm font-semibold ${cfg.color}`}>
+                          {cfg.sign}{formatCurrency(tx.total_amount)}
+                        </p>
+                        <FreedomTimeBadge amount={tx.total_amount} className="mt-0.5 justify-end text-[10px]" />
+                        {tx.type === 'sell' && tx.realized_pnl !== 0 && (
+                          <p className={`text-xs font-medium ${tx.realized_pnl >= 0 ? 'text-emerald-600' : 'text-red-600'}`}
+                             data-testid="tx-realized-pnl"
+                          >
+                            W/V: {tx.realized_pnl >= 0 ? '+' : ''}{formatCurrency(tx.realized_pnl)}
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
 
@@ -461,7 +481,7 @@ function InlineTransactionForm({
   onSaved: () => void
   onCancel: () => void
 }) {
-  const [txType, setTxType] = useState<'buy' | 'sell' | 'dividend'>('buy')
+  const [txType, setTxType] = useState<'buy' | 'sell' | 'dividend' | 'split'>('buy')
   const [units, setUnits] = useState('')
   const [pricePerUnit, setPricePerUnit] = useState(String(currentPrice || ''))
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
@@ -469,13 +489,16 @@ function InlineTransactionForm({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const totalAmount = (Number(units) || 0) * (Number(pricePerUnit) || 0)
+  const totalAmount = txType === 'split' ? 0 : (Number(units) || 0) * (Number(pricePerUnit) || 0)
   const sellExceedsOwned = txType === 'sell' && Number(units) > currentUnits
   const sellFromZero = txType === 'sell' && currentUnits <= 0
+  const splitInvalid = txType === 'split' && (Number(units) || 0) < 2
 
   async function handleSave() {
-    if (!units || !pricePerUnit || !date) return
+    if (!units || !date) return
+    if (txType !== 'split' && !pricePerUnit) return
     if (txType === 'sell' && (sellExceedsOwned || sellFromZero)) return
+    if (txType === 'split' && splitInvalid) return
     setSaving(true)
     setError(null)
 
@@ -486,7 +509,7 @@ function InlineTransactionForm({
         body: JSON.stringify({
           type: txType,
           units: Number(units),
-          price_per_unit: Number(pricePerUnit),
+          price_per_unit: txType === 'split' ? 0 : Number(pricePerUnit),
           date,
           notes: notes || null,
         }),
@@ -514,8 +537,8 @@ function InlineTransactionForm({
       )}
 
       {/* Type selector */}
-      <div className="mb-3 grid grid-cols-3 gap-2">
-        {(['buy', 'sell', 'dividend'] as const).map((t) => {
+      <div className="mb-3 grid grid-cols-4 gap-2">
+        {(['buy', 'sell', 'dividend', 'split'] as const).map((t) => {
           const cfg = typeConfig[t]
           const Icon = cfg.icon
           return (
@@ -537,65 +560,103 @@ function InlineTransactionForm({
       </div>
 
       {/* Fields */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div>
-          <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">
-            {txType === 'dividend' ? 'Bedrag per eenheid' : 'Eenheden'} *
-          </label>
-          <div className="relative">
+      {txType === 'split' ? (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">
+              Split ratio (bijv. 2 voor 2:1) *
+            </label>
             <input
               type="number"
-              step="0.001"
+              step="1"
+              min="2"
               value={units}
               onChange={(e) => setUnits(e.target.value)}
               className={`w-full rounded-lg border px-2.5 py-1.5 text-sm ${
-                sellExceedsOwned || sellFromZero ? 'border-red-300 bg-red-50/50' : 'border-[var(--border-ed)]'
+                splitInvalid && units ? 'border-red-300 bg-red-50/50' : 'border-[var(--border-ed)]'
               }`}
-              placeholder="10"
+              placeholder="2"
               autoFocus
               data-testid="tx-units-input"
             />
-            {txType === 'sell' && currentUnits > 0 && (
-              <button
-                type="button"
-                onClick={() => setUnits(String(currentUnits))}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-medium text-red-600 hover:text-red-700"
-                data-testid="sell-all-inline-btn"
-              >
-                Alles
-              </button>
+            {currentUnits > 0 && Number(units) >= 2 && (
+              <p className="mt-1 text-[10px] text-[var(--ink-3)]">
+                {currentUnits} eenheden &rarr; {currentUnits * Number(units)} eenheden
+              </p>
             )}
           </div>
-        </div>
-        <div>
-          <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Prijs *</label>
-          <input
-            type="number"
-            step="0.01"
-            value={pricePerUnit}
-            onChange={(e) => setPricePerUnit(e.target.value)}
-            className="w-full rounded-lg border border-[var(--border-ed)] px-2.5 py-1.5 text-sm"
-            placeholder="50.00"
-            data-testid="tx-price-input"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Datum *</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-full rounded-lg border border-[var(--border-ed)] px-2.5 py-1.5 text-sm"
-            data-testid="tx-date-input"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Totaal</label>
-          <div className="flex items-center rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-2.5 py-1.5 text-sm font-medium text-[var(--ink-2)]">
-            {formatCurrency(totalAmount)}
+          <div>
+            <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Datum *</label>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="w-full rounded-lg border border-[var(--border-ed)] px-2.5 py-1.5 text-sm"
+              data-testid="tx-date-input"
+            />
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div>
+            <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">
+              {txType === 'dividend' ? 'Bedrag per eenheid' : 'Eenheden'} *
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                step="0.001"
+                value={units}
+                onChange={(e) => setUnits(e.target.value)}
+                className={`w-full rounded-lg border px-2.5 py-1.5 text-sm ${
+                  sellExceedsOwned || sellFromZero ? 'border-red-300 bg-red-50/50' : 'border-[var(--border-ed)]'
+                }`}
+                placeholder="10"
+                autoFocus
+                data-testid="tx-units-input"
+              />
+              {txType === 'sell' && currentUnits > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setUnits(String(currentUnits))}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-medium text-red-600 hover:text-red-700"
+                  data-testid="sell-all-inline-btn"
+                >
+                  Alles
+                </button>
+              )}
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Prijs *</label>
+            <input
+              type="number"
+              step="0.01"
+              value={pricePerUnit}
+              onChange={(e) => setPricePerUnit(e.target.value)}
+              className="w-full rounded-lg border border-[var(--border-ed)] px-2.5 py-1.5 text-sm"
+              placeholder="50.00"
+              data-testid="tx-price-input"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Datum *</label>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="w-full rounded-lg border border-[var(--border-ed)] px-2.5 py-1.5 text-sm"
+              data-testid="tx-date-input"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[10px] font-medium text-[var(--ink-3)]">Totaal</label>
+            <div className="flex items-center rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-2.5 py-1.5 text-sm font-medium text-[var(--ink-2)]">
+              {formatCurrency(totalAmount)}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Sell validation */}
       {(sellExceedsOwned || sellFromZero) && (
@@ -604,6 +665,14 @@ function InlineTransactionForm({
           {sellFromZero
             ? 'Deze holding heeft 0 eenheden. Je kunt niet verkopen.'
             : `Je hebt maar ${currentUnits} eenheden. Je kunt niet meer verkopen dan je bezit.`}
+        </div>
+      )}
+
+      {/* Split validation */}
+      {txType === 'split' && splitInvalid && units && (
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-red-600">
+          <AlertTriangle className="h-3 w-3" />
+          Split ratio moet minimaal 2 zijn (bijv. 2 voor een 2:1 split).
         </div>
       )}
 
@@ -624,10 +693,11 @@ function InlineTransactionForm({
         </button>
         <button
           onClick={handleSave}
-          disabled={saving || !units || !pricePerUnit || !date || sellExceedsOwned || sellFromZero}
+          disabled={saving || !units || !date || (txType !== 'split' && !pricePerUnit) || sellExceedsOwned || sellFromZero || (txType === 'split' && splitInvalid)}
           className={`rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 ${
             txType === 'buy' ? 'bg-emerald-600 hover:bg-emerald-700' :
             txType === 'sell' ? 'bg-red-600 hover:bg-red-700' :
+            txType === 'split' ? 'bg-violet-600 hover:bg-violet-700' :
             'bg-kern-600 hover:bg-kern-700'
           }`}
           data-testid="tx-save-btn"
