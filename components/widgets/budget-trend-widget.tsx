@@ -69,6 +69,12 @@ const TYPE_CONFIGS: Record<BudgetType, TypeConfig> = {
 
 // ── Sparkline SVG ────────────────────────────────────────────
 
+function formatCompact(v: number): string {
+  if (v >= 10000) return `${(v / 1000).toFixed(0)}k`
+  if (v >= 1000) return `${(v / 1000).toFixed(1)}k`.replace('.0k', 'k')
+  return v.toFixed(0)
+}
+
 function Sparkline({
   points,
   width,
@@ -77,6 +83,7 @@ function Sparkline({
   fillColor,
   limitValue,
   hasEntered,
+  showLabels = false,
 }: {
   points: { month: string; value: number }[]
   width: number
@@ -85,6 +92,7 @@ function Sparkline({
   fillColor: string
   limitValue?: number
   hasEntered: boolean
+  showLabels?: boolean
 }) {
   if (points.length < 2) return null
 
@@ -93,13 +101,18 @@ function Sparkline({
   const max = Math.max(...allValues)
   const min = Math.min(0, ...allValues)
   const range = max - min || 1
+  const labelPadX = showLabels ? 28 : 0
   const pad = 2
 
-  const toX = (i: number) => pad + (i / (points.length - 1)) * (width - pad * 2)
+  const toX = (i: number) => pad + (i / (points.length - 1)) * (width - pad * 2 - labelPadX)
   const toY = (v: number) => height - pad - ((v - min) / range) * (height - pad * 2)
 
   const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(p.value).toFixed(1)}`).join(' ')
   const areaPath = `${linePath} L${toX(points.length - 1).toFixed(1)},${height} L${toX(0).toFixed(1)},${height} Z`
+
+  const firstVal = points[0].value
+  const lastVal = points[points.length - 1].value
+  const fontSize = height >= 50 ? 8 : 7
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} className="block">
@@ -136,6 +149,32 @@ function Sparkline({
           opacity={hasEntered ? 0.5 : 0}
           style={{ transition: 'opacity 600ms ease 300ms' }}
         />
+      )}
+      {/* Start and end value labels */}
+      {showLabels && hasEntered && (
+        <>
+          <text
+            x={toX(0)}
+            y={toY(firstVal) - 4}
+            fontSize={fontSize}
+            fill="var(--ink-3)"
+            fontFamily="var(--font-mono)"
+            textAnchor="start"
+          >
+            {formatCompact(firstVal)}
+          </text>
+          <text
+            x={toX(points.length - 1) + 4}
+            y={toY(lastVal) + 3}
+            fontSize={fontSize}
+            fill={strokeColor}
+            fontFamily="var(--font-mono)"
+            fontWeight={600}
+            textAnchor="start"
+          >
+            {formatCompact(lastVal)}
+          </text>
+        </>
       )}
     </svg>
   )
@@ -263,11 +302,12 @@ export function BudgetTrendWidget({ budgetType, size, data, href }: Props) {
             <div className="flex-1 min-h-0">
               <Sparkline
                 points={sparkData6}
-                width={200}
+                width={220}
                 height={40}
                 strokeColor={config.strokeColor}
                 fillColor={config.fillColor}
                 hasEntered={hasEntered}
+                showLabels
               />
             </div>
           )}
@@ -302,12 +342,13 @@ export function BudgetTrendWidget({ budgetType, size, data, href }: Props) {
           <div className="flex-1 min-h-0">
             <Sparkline
               points={sparkData12}
-              width={280}
+              width={300}
               height={60}
               strokeColor={config.strokeColor}
               fillColor={config.fillColor}
               limitValue={budgetLimit > 0 ? budgetLimit : undefined}
               hasEntered={hasEntered}
+              showLabels
             />
           </div>
         )}
