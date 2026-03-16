@@ -184,7 +184,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     name: 'Levensgebeurtenissen',
     description: 'Impact van life events op je plan',
     module: 'horizon',
-    sizes: ['quarter', 'half', 'full'],
+    sizes: ['half', 'full'],
     defaultSize: 'half',
     minLevel: 1,
     requiredPhase: 'Stability',
@@ -259,7 +259,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     name: 'NIBUD Benchmark',
     description: 'Vergelijking met NIBUD richtlijnen',
     module: 'kern',
-    sizes: ['quarter', 'half', 'full'],
+    sizes: ['half', 'full'],
     defaultSize: 'full',
     minLevel: -2,
   },
@@ -326,24 +326,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     id: 'meldingen',
     name: 'Meldingen',
     description: 'Notificaties en waarschuwingen',
-    module: 'cross',
-    sizes: ['quarter', 'half', 'full'],
-    defaultSize: 'half',
-    minLevel: -2,
-  },
-  {
-    id: 'badges',
-    name: 'Badges',
-    description: 'Verdiende badges en voortgang',
-    module: 'cross',
-    sizes: ['quarter', 'half', 'full'],
-    defaultSize: 'half',
-    minLevel: -2,
-  },
-  {
-    id: 'streaks',
-    name: 'Streaks',
-    description: 'Login-, budget- en actie-streaks',
     module: 'cross',
     sizes: ['quarter', 'half', 'full'],
     defaultSize: 'half',
@@ -528,8 +510,6 @@ export const WIDGET_HREFS: Record<string, string> = {
   vrijheidsmijlpalen:       '/horizon',
   backtesting_score:        '/horizon?modal=backtesting',
   meldingen:                '/berichten',
-  badges:                   '/identity',
-  streaks:                  '/identity',
   ai_inzicht:               '/berichten',
   volgende_stap:            '/will',
   maandoverzicht:           '/core',
@@ -601,6 +581,8 @@ export function mergeWidgetPrefs(saved: WidgetPrefs | null): WidgetPrefs {
     if (existing) {
       // Sanitize: mini is never persisted, fallback to quarter
       if (existing.size === 'mini') existing.size = 'quarter'
+      // Sanitize: if saved size is not in allowed sizes, fallback to defaultSize
+      if (!def.sizes.includes(existing.size)) existing.size = def.defaultSize
       return existing
     }
     // New widget not in saved prefs — add with disabled default
