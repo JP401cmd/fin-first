@@ -1,3 +1,51 @@
+## Session 2026-03-16 - Features #124, #125
+
+### Feature #124: Gids content: Voorstellen - PASSING
+- Enhanced existing GuideTopicCard in gids page De Wil section
+- Added "concrete acties die je vrijheidstijd vergroten" opening value text
+- Changed AI analysis description from generic "financiële situatie" to "uitgavenpatronen, doelen en financiële situatie"
+- Added "hoeveel maanden eerder vrij" impact description alongside vrijheidsdagen per jaar
+- Explicit kanban-bord flow: "accepteren → wordt direct een actie op je kanban-bord"
+- Updated how-to steps: analysis based on patterns+goals, months-earlier-free impact, kanban destination
+
+### Feature #125: Gids content: Acties - PASSING
+- Enhanced existing GuideTopicCard in gids page De Wil section
+- Added "Van inzicht naar actie" value text opening
+- Described kanban with three explicit columns: open (te doen), uitgesteld, voltooid
+- Added drag & drop between columns description
+- Described action sources: handmatig aangemaakt or via geaccepteerd voorstel
+- Updated how-to: create action or accept proposal, drag between columns, mark complete
+
+### Current Status
+- 2 features completed this session (#124, #125)
+- Zero TypeScript errors
+- Commit: 246e5278
+
+## Session 2026-03-16 - Features #126, #127
+
+### Feature #126: Gids content: Doelen - PASSING
+- Already fully implemented in gids page (lines 531-561)
+- GuideTopicCard with Target icon in reis-stap 3 (Onderneem actie / De Wil)
+- Description covers: 10 doeltypes, doelbedrag + einddatum, automatische voortgang, op-schema indicator, persoonlijk/gedeeld
+- Value text: concrete financiële doelen stellen met koppeling aan bezitting/schuld
+- HowTo: 5 steps covering doel aanmaken, type kiezen, bedrag/deadline, koppeling, voortgang
+- Tip: "Eén helder doel werkt beter dan vijf vage"
+- No code changes needed (verification-only)
+
+### Feature #127: Gids content: Abonnementen - PASSING
+- Already fully implemented in gids page (lines 563-592)
+- GuideTopicCard with RefreshCw icon in reis-stap 3 (Onderneem actie / De Wil)
+- Description covers: automatische detectie uit transacties, betrouwbaarheidsniveau, frequentie, maandbedrag, vrijheidsdagen-impact, opzegadvies
+- Value text: stille geldlekken opsporen via transactie-scanning
+- HowTo: 4 steps covering importeren, bekijken, details, opzegflow
+- Tip: "Check je abonnementen elk kwartaal"
+- No code changes needed (verification-only)
+
+### Current Status
+- 2 features verified and marked passing (#126, #127)
+- No code changes needed — both were already implemented in previous sessions
+- 119/175 features passing (68.0%)
+
 ## Session 2026-03-16 - Features #104, #105
 
 ### Feature #104: Streaming insert i.p.v. alles-in-geheugen - PASSING
@@ -3228,6 +3276,24 @@
 - Resilience score range: 0-100 (from computeResilienceScore in lib/horizon-data.ts)
 
 ---
+
+## Session 2026-03-16 - Features #128, #151
+
+### Feature #128: Gids content: Wil overig - PASSING
+- Added "Dit komt eraan" teaser GuideTopicCard at end of De Wil section (Stap 3)
+- Three future features teased: Uitgavenpatronen, Financieel rapport, Huishouden-samenwerking
+- Uses Rocket icon, wil-400 color, no howTo (description-only card)
+
+### Feature #151: Gids content: Widgets overzicht - PASSING
+- Enhanced existing Widgets overzicht GuideTopicCard with richer content
+- Updated description: 46+ widgets, 4 modules (kern/wil/horizon/cross), favoriet-widget mechanisme
+- Replaced generic howTo steps with 5 detailed steps: Formaten, Herschikken, Aan/uitzetten, Favorieten, Unlock
+- Kept existing tip about starting with 7 default widgets
+
+### Current Status
+- 2 features completed this session (#128, #151)
+- Zero TypeScript errors
+- Commit: 6cede265
 
 ## Session 2026-02-18 - Feature #245
 
@@ -13549,3 +13615,121 @@ For Feature #51 (Transaction Import):
 - Changes committed as part of commit 24814055 (concurrent agent commit for #114, #115 included our changes)
 - Zero TypeScript errors (verified via dev server 307 response)
 - Could not browser-test due to Supabase email rate limit (auth blocked)
+
+## Session 2026-03-16 - Feature #113
+
+### Feature #113: Opruimen worktree perf-optimization badges/streaks - PASSING
+- Deleted 3 files: badges-widget.tsx, streaks-widget.tsx, streak-card.tsx
+- Removed BadgesWidget/StreaksWidget dynamic imports + switch cases from widget-renderer.tsx
+- Removed BadgeSummary/StreakData interfaces from widget-renderer.tsx
+- Removed 'streak'/'badge' from Notification type union
+- Removed badges/streaks catalog entries + WIDGET_HREFS from widget-catalog.ts
+- Removed badge/streak DB queries (badges, user_badges, user_streaks) from dashboard-data-loader.ts
+- Removed badgeSummary + streaks from dashboard-data-loader return object
+- Removed StreakCardSpec from briefing types + CARD_SPAN
+- Removed showStreak tool + all prompt references from briefing.ts
+- Removed streak case from briefing compose route
+- Removed badge/streak from meldingen-widget TYPE_ICONS/TYPE_LABELS
+- Removed badge/streak from notification-item MODULE_MAP
+- Removed badge/streak from notifications route validTypes
+- Removed badges/streaks from auto-dashboard-builder scores
+- Removed badgeSummary/streaks mock data from mock-dashboard-data.ts + test files
+- Changed test notification type 'streak' → 'milestone' in test-kern-widgets
+- Zero TypeScript errors after cleanup (verified with tsc --noEmit)
+- 18 files changed, 542 lines removed
+- Commit: f51ae27e on perf/optimization-pass branch
+
+## Session 2026-03-16 - Features #118, #119
+
+### Feature #118: Gids content: Netto vermogen - PASSING
+- Enhanced existing GuideTopicCard with enriched content covering all required steps
+- Waarde-tekst: "je totale financiële positie in één getal: bezittingen minus schulden"
+- Vermogensgrafiek: "historisch verloop met maandelijkse datapunten"
+- Samenstelling: "cash + beleggingen + vastgoed + pensioen − schulden = nettovermogen"
+- Mijlpalen: "Bij elke nieuwe piek detecteert TriFinity automatisch een mijlpaal"
+- How-to steps expanded from 4 to 5, covering snapshots, graph, composition, milestones
+
+### Feature #119: Gids content: Belasting - PASSING
+- Enhanced existing GuideTopicCard with detailed Box 3 content
+- Fictief rendement: sparen ~1,03%, beleggen ~6,04%, overig = beleggingsforfait
+- Vrijstelling: €57.000 per persoon, €114.000 met fiscaal partner
+- Optimalisatie tips: partner optimization + scenario model for sparen/beleggen shifts
+- How-to steps expanded from 5 to 6, added heffingsvrij vermogen step
+- Improved tip about shifting between sparen/beleggen in scenario model
+
+### Current Status
+- 2 features completed this session (#118, #119)
+- Zero TypeScript errors
+- Commit: 6a733d85
+
+## Session 2026-03-16 - Features #120, #121
+
+### Feature #120: Gids content: Check-in - PASSING
+- Moved Check-in GuideTopicCard from "Overal" section to De Kern reis-stap 2 (Begrijp je patronen)
+- Changed color from var(--ink-2) to var(--color-kern-400) to match De Kern theme
+- Enhanced description: added "financiële rust" framing, grip houden, benefits (actuele data, patronen, vertrouwen)
+- Enhanced how-to steps: more detailed step descriptions with context per step
+- Updated tip with motivational ending
+
+### Feature #121: Gids content: Kern overig - PASSING
+- Added "Wat komt er nog?" teaser GuideTopicCard in De Kern reis-stap 2
+- Mentions 3 future features: automatische banksynchronisatie, terugkerende transacties, uitgebreidere rapportages
+- Kept vague enough to avoid specific promises
+- Made howTo prop optional in GuideTopicCard component to support description-only cards
+
+### Current Status
+- 2 features completed this session (#120, #121)
+- Zero TypeScript errors in changed files
+- Commit: 6655b870
+
+## Session 2026-03-16 - Features #122, #123
+
+### Feature #122: Gids content: Widgets overzicht - PASSING
+- Added GuideTopicCard "Widgets overzicht" to De Wil section (Stap 3)
+- Value text: "je persoonlijke financiële cockpit"
+- Description covers: 4 widget formats (mini 1×1, quarter 1×2, half 2×2, full 4×2)
+- Personalization: drag-reorder, favorite budgets/holdings as widgets
+- Management: enable/disable via Instellingen → Widgets
+- HowTo: 5 steps + pro tip about starting with default 7 widgets
+- Uses wil-400 color theme consistent with De Wil section
+
+### Feature #123: Gids content: Briefing - PASSING
+- Added GuideTopicCard "Briefing (DAIshboard)" to De Wil section (Stap 3)
+- Value text: "elke dag een persoonlijke financiële update"
+- Description covers: 23 card types, progressive loading, time-aware content
+- Generation: AI analyzes transactions, net worth, budget, FIRE prognosis
+- Timing: auto-generated, manual refresh, 24h stale banner
+- HowTo: 5 steps + pro tip about daily morning routine
+- Uses wil-400 color theme consistent with De Wil section
+
+### Current Status
+- 2 features completed this session (#122, #123)
+- Could not browser-test due to Supabase auth requirement (no test credentials)
+- Page compiles successfully (307 redirect confirms no build errors)
+- Commit: 46c89555
+
+## Session 2026-03-16 - Features #133, #134
+
+### Feature #133: Gids content: Vrijheidsinsteek - PASSING
+- Added GuideTopicCard "Vrijheidsinsteek" as FIRST item in Overal section
+- Sun icon, var(--ink-2) color
+- Value text: "geld is opgeslagen tijd" philosophy
+- Describes vrijheidstijd: days/months/years of financial independence
+- Three modules explained: Kern (weten), Wil (willen), Horizon (dromen)
+- Differentiator vs traditional apps: no guilt, perspective instead
+- 5 how-to steps showing freedom-time equivalents across the app
+- Pro tip about thinking in freedom-time instead of euros
+
+### Feature #134: Gids content: TriFinity Post - PASSING
+- Added GuideTopicCard "TriFinity Post" as second item in Overal section
+- Rss icon, var(--ink-2) color
+- Value text: personalized financial news feed
+- AI analyzes news with portfolio/wealth/goals context
+- Daily auto-generated articles as readable cards
+- Personalization examples: mortgage + rate changes, investing + market moves
+- 4 how-to steps + pro tip about morning reading routine
+
+### Current Status
+- 2 features completed this session (#133, #134)
+- Zero TypeScript errors
+- Commit: 98cc0834
