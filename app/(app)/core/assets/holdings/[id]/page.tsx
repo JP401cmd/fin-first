@@ -5,6 +5,7 @@ import { ArrowLeft, Briefcase, TrendingUp, TrendingDown, DollarSign } from 'luci
 import HoldingTransactionLogClient from './transaction-log-client'
 import HoldingValueChartClient from './value-chart-client'
 import { HoldingFavoriteButton } from './holding-favorite-button'
+import { calculateHoldingBox3 } from '@/lib/box3-holdings'
 
 // UUID v4 regex for validation
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -54,6 +55,20 @@ export default async function HoldingDetailPage({
   const costBasis = avgPrice * units
   const returnPct = costBasis > 0 ? ((holdingValue - costBasis) / costBasis) * 100 : 0
   const returnValue = holdingValue - costBasis
+
+  // Fetch total portfolio value for Box 3 proportional exemption calculation
+  const { data: allHoldings } = await supabase
+    .from('holdings')
+    .select('current_price, avg_purchase_price, units')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+
+  const totalPortfolioValue = (allHoldings || []).reduce((sum, h) => {
+    const price = Number(h.current_price) || Number(h.avg_purchase_price) || 0
+    return sum + (price * (Number(h.units) || 0))
+  }, 0)
+
+  const box3Info = calculateHoldingBox3(holdingValue, totalPortfolioValue)
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8" data-testid="holding-detail-page">
@@ -135,6 +150,29 @@ export default async function HoldingDetailPage({
           </div>
         </div>
       </section>
+
+      {/* Box 3 belastingimpact */}
+      <div className="mt-4 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Geschatte Box 3 heffing</p>
+            <p className="mt-1 text-lg font-bold font-mono tabular-nums text-[var(--ink)]">
+              {formatCurrency(box3Info.annualTax)}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Effectief tarief</p>
+            <p className="mt-1 text-sm font-bold font-mono tabular-nums text-[var(--ink)]">
+              {(box3Info.effectiveRate * 100).toFixed(2)}%
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-[var(--ink-3)]">
+          <span>Forfaitair rendement: <span className="font-mono tabular-nums font-medium text-[var(--ink-2)]">{(box3Info.forfaitRate * 100).toFixed(2)}%</span></span>
+          <span>Heffingsvrij: <span className="font-mono tabular-nums font-medium text-[var(--ink-2)]">{formatCurrency(box3Info.allocatedExemption)}</span></span>
+          <span>Belastbaar: <span className="font-mono tabular-nums font-medium text-[var(--ink-2)]">{formatCurrency(box3Info.taxableValue)}</span></span>
+        </div>
+      </div>
 
       {/* Value Chart Section */}
       <section className="mt-6" data-testid="value-chart-section">

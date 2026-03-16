@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Plus, Trash2, X, TrendingUp, ArrowLeft, Loader2, Briefcase, Edit3, Receipt, ArrowUpRight, ArrowDownRight, DollarSign, PieChart, RefreshCw, AlertTriangle, Clock, CheckCircle, Upload } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/components/app/budget-shared'
+import { calculatePortfolioBox3 } from '@/lib/box3-holdings'
 import PortfolioAllocationVisualization, { type HoldingForAllocation } from '@/components/app/portfolio-allocation-chart'
 import { BenchmarkComparisonChart } from '@/components/app/benchmark-comparison-chart'
 import { TIME_PERIODS, type TimePeriod, type ComparisonResult } from '@/lib/benchmark-comparison'
@@ -300,6 +301,15 @@ export default function HoldingsPage() {
 
   const totalReturn = totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0
 
+  // Box 3 tax summary for the entire portfolio
+  const box3Summary = useMemo(() => {
+    const holdingValues = holdings.map(h => ({
+      id: h.id,
+      value: (h.current_price ?? h.avg_purchase_price) * Math.max(0, h.units),
+    }))
+    return calculatePortfolioBox3(holdingValues)
+  }, [holdings])
+
   // Compute allocation data for donut chart — each holding as a slice
   const allocationData = useMemo(() => {
     if (holdings.length === 0) return []
@@ -456,6 +466,26 @@ export default function HoldingsPage() {
             )}
           </div>
         </div>
+
+        {/* Box 3 belastingimpact */}
+        {box3Summary.totalValue > 0 && (
+          <div className="mt-4 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-3 sm:p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Totale Box 3 heffing</p>
+                <p className="mt-1 text-lg font-bold font-mono tabular-nums text-[var(--ink)]">
+                  {formatCurrency(box3Summary.totalTax)}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Effectief tarief</p>
+                <p className="mt-1 text-sm font-bold font-mono tabular-nums text-[var(--ink)]">
+                  {(box3Summary.effectiveRate * 100).toFixed(2)}%
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Portfolio allocation visualization — donut chart with sector/geography/asset class views */}
