@@ -46,6 +46,41 @@ type ImportRow = ParsedTransaction & {
 
 // BulkApplyPrompt removed — live correction propagation now auto-applies
 
+// --- Import session persistence (localStorage) ---
+const IMPORT_SESSION_KEY = 'fintwo_import_session'
+
+type ImportSession = {
+  id: string
+  accountId: string
+  fileName: string
+  totalRows: number
+  completedBatchIndex: number
+  importedHashes: string[]
+  startedAt: number
+}
+
+function saveImportSession(session: ImportSession) {
+  try { localStorage.setItem(IMPORT_SESSION_KEY, JSON.stringify(session)) } catch { /* quota exceeded */ }
+}
+
+function loadImportSession(): ImportSession | null {
+  try {
+    const raw = localStorage.getItem(IMPORT_SESSION_KEY)
+    if (!raw) return null
+    const session = JSON.parse(raw) as ImportSession
+    // Expire sessions older than 24 hours
+    if (Date.now() - session.startedAt > 24 * 60 * 60 * 1000) {
+      localStorage.removeItem(IMPORT_SESSION_KEY)
+      return null
+    }
+    return session
+  } catch { return null }
+}
+
+function clearImportSession() {
+  try { localStorage.removeItem(IMPORT_SESSION_KEY) } catch { /* ignore */ }
+}
+
 function isNetworkFailure(err: unknown): boolean {
   if (err instanceof TypeError && (
     err.message.includes('Failed to fetch') ||
@@ -116,6 +151,7 @@ export default function ImportPage() {
   const [aiRetrying, setAiRetrying] = useState(false)
   // bulkApplyPrompt removed — live correction propagation now applies automatically
   const [checkingDups, setCheckingDups] = useState(false)
+  const [pendingSession, setPendingSession] = useState<ImportSession | null>(null)
   const PAGE_SIZE = 50
   const [currentPage, setCurrentPage] = useState(0)
   const [confidenceFilter, setConfidenceFilter] = useState<'all' | 'low' | 'none'>('all')
@@ -193,6 +229,14 @@ export default function ImportPage() {
   useEffect(() => {
     loadInitialData()
   }, [loadInitialData])
+
+  // Check for pending import session on mount
+  useEffect(() => {
+    const session = loadImportSession()
+    if (session) {
+      setPendingSession(session)
+    }
+  }, [])
 
   // Semaphore for limiting concurrent AI requests
   async function runWithConcurrency<T>(
@@ -396,10 +440,17 @@ export default function ImportPage() {
         }
       }
 
+      // Also check hashes from pending import session (crash recovery)
+      const pendingHashes = new Set<string>()
+      const session = loadImportSession()
+      if (session?.importedHashes) {
+        for (const h of session.importedHashes) pendingHashes.add(h)
+      }
+
       const markDups = (r: ImportRow) => {
         const normalizedAmount = String(parseFloat(String(r.amount)))
         const contentKey = `${r.date}|${normalizedAmount}|${r.description.slice(0, 100)}`
-        const isDuplicate = contentSet.has(contentKey)
+        const isDuplicate = contentSet.has(contentKey) || pendingHashes.has(r.import_hash)
         return {
           ...r,
           isDuplicate,
@@ -789,6 +840,19 @@ export default function ImportPage() {
     setImportStartTime(Date.now())
     let failedCount = 0
 
+    // Persist import session to localStorage for crash recovery
+    const sessionId = `import_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+    const importedHashesSoFar: string[] = []
+    saveImportSession({
+      id: sessionId,
+      accountId: selectedAccountId,
+      fileName,
+      totalRows: insertRows.length,
+      completedBatchIndex: startBatch,
+      importedHashes: importedHashesSoFar,
+      startedAt: Date.now(),
+    })
+
     const newFailedBatches: typeof failedBatches = []
 
     for (let batchIdx = startBatch; batchIdx < batches.length; batchIdx++) {
@@ -811,12 +875,32 @@ export default function ImportPage() {
       if (batchFailed) {
         failedCount += batches[batchIdx].length
         newFailedBatches.push({ batchIdx, error: batchError, retries: 0, rows: batches[batchIdx] })
+      } else {
+        // Track successfully imported hashes for crash recovery
+        for (const row of batches[batchIdx]) {
+          importedHashesSoFar.push((row as { import_hash: string }).import_hash)
+        }
       }
 
       const progressCount = Math.min((batchIdx + 1) * BATCH_SIZE, insertRows.length)
       setImportProgress({ current: progressCount, total: insertRows.length, failed: failedCount })
       setImportedBatchIndex(batchIdx + 1)
+
+      // Update localStorage session after each batch
+      saveImportSession({
+        id: sessionId,
+        accountId: selectedAccountId,
+        fileName,
+        totalRows: insertRows.length,
+        completedBatchIndex: batchIdx + 1,
+        importedHashes: importedHashesSoFar,
+        startedAt: Date.now(),
+      })
     }
+
+    // Import complete — clear session from localStorage
+    clearImportSession()
+    setPendingSession(null)
 
     setFailedBatches(newFailedBatches)
     setImportedBatchIndex(0)
@@ -1026,6 +1110,54 @@ export default function ImportPage() {
                   style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
                 />
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Pending import session banner */}
+      {pendingSession && step === 1 && (
+        <div className="mb-4 rounded-lg border border-kern-300 bg-kern-50 p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-kern-800">
+                Onafgeronde import gevonden
+              </p>
+              <p className="mt-1 text-xs text-kern-600">
+                Bestand: <strong>{pendingSession.fileName}</strong> — {pendingSession.importedHashes.length} van {pendingSession.totalRows} transacties geïmporteerd.
+              </p>
+              <p className="mt-0.5 text-xs text-[var(--ink-4)]">
+                Gestart op {new Date(pendingSession.startedAt).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  clearImportSession()
+                  setPendingSession(null)
+                }}
+                className="rounded border border-[var(--border-md)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+              >
+                Verwijderen
+              </button>
+            </div>
+          </div>
+          {pendingSession.importedHashes.length > 0 && (
+            <div className="mt-3">
+              <div className="flex justify-between text-xs text-kern-600 mb-1">
+                <span>{pendingSession.importedHashes.length} van {pendingSession.totalRows} geïmporteerd</span>
+                <span>{Math.round((pendingSession.importedHashes.length / pendingSession.totalRows) * 100)}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-kern-200">
+                <div
+                  className="h-2 rounded-full bg-kern-500 transition-all"
+                  style={{ width: `${(pendingSession.importedHashes.length / pendingSession.totalRows) * 100}%` }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-kern-600">
+                Upload hetzelfde bestand opnieuw om verder te gaan. Al geïmporteerde transacties worden automatisch overgeslagen.
+              </p>
             </div>
           )}
         </div>

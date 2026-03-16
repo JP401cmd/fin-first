@@ -178,18 +178,20 @@ export default function GidsPage() {
             color="var(--color-kern-400)"
             description={
               <>
-                Koppel je bankrekeningen via <strong>TrueLayer</strong> voor automatische synchronisatie, of importeer transacties handmatig via <strong>MT940, CSV of OFX</strong>. Zodra je transacties binnenkomen, categoriseert de AI ze automatisch met een <strong>betrouwbaarheidsscore</strong> — zodat je ziet hoe zeker de toewijzing is.
+                Je cashpositie is het fundament van je vermogen — het startpunt van elke berekening. Voeg je <strong>betaal- en spaarrekeningen</strong> toe en houd je saldo actueel. Koppel je bank via <strong>TrueLayer</strong> voor automatische synchronisatie, of importeer transacties handmatig via <strong>MT940, CSV of OFX</strong>. Bij het uploaden doorloop je een stap-voor-stap proces: bestand selecteren, rekening kiezen, transacties reviewen en importeren.
                 {' '}
-                <strong>Duplicaatdetectie</strong> voorkomt dubbele boekingen bij herhaalde imports. <strong>Transfer matching</strong> herkent overboekingen tussen eigen rekeningen en filtert ze uit je uitgavenanalyse. Stel <strong>tegenpartijregels</strong> in zodat toekomstige transacties van dezelfde betaler automatisch in de juiste categorie landen. Het resultaat: een compleet, opgeschoond kasoverzicht — de basis voor al je budgetten en patronen.
+                Zodra je transacties binnenkomen, categoriseert de AI ze automatisch met een <strong>betrouwbaarheidsscore</strong>. Drie categorisatiebronnen werken samen: <strong>tegenpartijregels</strong> (IBAN en naam), <strong>frequentie-matching</strong> (patronen uit je historie) en <strong>AI-analyse</strong> voor nieuwe transacties. Elke handmatige correctie wordt opgeslagen als regel en automatisch toegepast bij toekomstige imports — zo wordt het systeem steeds slimmer. <strong>Duplicaatdetectie</strong> voorkomt dubbele boekingen en <strong>transfer matching</strong> herkent overboekingen tussen eigen rekeningen. Het resultaat: een compleet, opgeschoond kasoverzicht als basis voor al je budgetten en vrijheidsberekeningen.
               </>
             }
             howTo={{
               steps: [
-                "Ga naar De Kern → Cash en voeg je betaal- en spaarrekeningen toe",
-                "Koppel via TrueLayer voor automatisch bijwerken, of importeer een MT940/CSV/OFX bestand",
-                "Controleer de AI-categorisatie — accepteer suggesties of wijs handmatig toe",
-                "Stel tegenpartijregels in voor terugkerende betalingen (bijv. Albert Heijn → Boodschappen)",
-                "Bekijk je Sankey-diagram om in één oogopslag te zien waar je vrijheidstijd naartoe stroomt",
+                "Ga naar De Kern → Cash en voeg je betaal- en spaarrekeningen toe (betaalrekening, spaarrekening, gezamenlijk, etc.)",
+                "Voer het huidige saldo in — dit is je startpunt voor vermogensberekeningen",
+                "Koppel via TrueLayer voor automatisch bijwerken: kies je bank, log in, en je transacties worden gesynchroniseerd",
+                "Of importeer handmatig: ga naar Cash → Import, selecteer een MT940/CSV/OFX bestand, kies de rekening, en review de transacties voor import",
+                "Controleer de AI-categorisatie — de betrouwbaarheidsscore toont hoe zeker elke toewijzing is, sorteer op laagste confidence om onzekere matches te reviewen",
+                "Corrigeer waar nodig — elke correctie wordt automatisch een regel die bij volgende imports direct wordt toegepast",
+                "Stel tegenpartijregels in voor terugkerende betalingen (bijv. Albert Heijn → Boodschappen) op basis van naam of IBAN",
               ],
               tip: "Importeer minimaal 3 maanden aan transacties — dan herkent de AI je vaste patronen en wordt de categorisatie steeds nauwkeuriger.",
             }}
@@ -203,7 +205,7 @@ export default function GidsPage() {
               <>
                 Registreer al je bezittingen over <strong>13 types</strong>: spaargeld, beleggingen, crypto, vastgoed, eigen woning, pensioenfondsen, lijfrente, levensverzekeringen, deelnemingen, vorderingen, DGA-leningen, opties en overig. Elk type heeft eigen velden, waarderingslogica en fiscale classificatie. Per bezitting zie je niet alleen de huidige waarde, maar ook hoeveel <strong>vrijheidstijd</strong> die vertegenwoordigt.
                 {' '}
-                Op de <strong>holdings-pagina</strong> volg je individuele posities met actuele koersen, rendement per periode en portfolio-allocatie. Vergelijk je rendement met een <strong>benchmark</strong> om te zien of je de markt bijhoudt. <strong>Dividendtracking</strong> toont je passief inkomen per bezitting. Voer periodiek een <strong>herwaardering</strong> uit om je vastgoed en overige bezittingen actueel te houden — je ziet direct het effect op je nettovermogen en vrijheidstijd.
+                Op de <strong>holdings-pagina</strong> volg je individuele posities met actuele koersen, rendement per periode en portfolio-allocatie. Importeer je posities in bulk via <strong>broker-import</strong>: upload een CSV van <strong>DEGIRO, Saxo of ING Beleggen</strong> en je holdings worden automatisch aangemaakt met de juiste koersen en aantallen. Vergelijk je rendement met een <strong>benchmark</strong> om te zien of je de markt bijhoudt. <strong>Dividendtracking</strong> toont je passief inkomen per bezitting. Voer periodiek een <strong>herwaardering</strong> uit om je vastgoed en overige bezittingen actueel te houden — je ziet direct het effect op je nettovermogen en vrijheidstijd.
               </>
             }
             howTo={{
@@ -211,6 +213,7 @@ export default function GidsPage() {
                 "Ga naar De Kern → Bezittingen en voeg je eerste bezitting toe (bijv. beleggingsrekening)",
                 "Kies het juiste type — elk type heeft eigen velden zoals ISIN, rendement, of WOZ-waarde",
                 "Voeg holdings toe aan je beleggingsrekening om individuele posities te volgen",
+                "Of importeer in bulk: upload een CSV van DEGIRO, Saxo of ING Beleggen via de broker-import knop",
                 "Vergelijk je rendement met de benchmark op de holdings-pagina",
                 "Werk waarderingen periodiek bij via herwaardering — vooral voor vastgoed en overige bezittingen",
               ],
@@ -226,7 +229,7 @@ export default function GidsPage() {
               <>
                 Beheer <strong>11 schuldtypes</strong>: hypotheek, studieschuld, persoonlijke lening, creditcard, doorlopend krediet, zakelijke lening, familielening, belastingschuld, private lease, telefoonabonnement en overig. Elk type heeft eigen renteberekening, looptijd en fiscale behandeling. <strong>NHG-hypotheken</strong> en <strong>belastingaftrek</strong> worden automatisch meegenomen in je nettolastenberekening.
                 {' '}
-                Vergelijk twee <strong>aflossingsstrategieën</strong>: sneeuwbal (kleinste schuld eerst, motiverend) versus lawine (hoogste rente eerst, goedkoopst). Simuleer het effect van <strong>extra aflossingen</strong> en zie direct hoeveel sneller je schuldenvrij bent — uitgedrukt in teruggewonnen vrijheidstijd. Bij een huishouden verdeelt TriFinity schulden automatisch over <strong>partners</strong> op basis van de eigendomsverhouding.
+                Vergelijk twee <strong>aflossingsstrategieën</strong>: sneeuwbal (kleinste schuld eerst, motiverend) versus lawine (hoogste rente eerst, goedkoopst). Simuleer het effect van <strong>extra aflossingen</strong> en zie direct hoeveel sneller je schuldenvrij bent — uitgedrukt in teruggewonnen vrijheidstijd. Elke afgeloste schuld verhoogt je <strong>netto vermogen</strong> en verschuift je <strong>FIRE-datum</strong> naar voren: minder vaste lasten betekent een lagere jaarlijkse uitgavendrempel en dus eerder financiële vrijheid. Bij een huishouden verdeelt TriFinity schulden automatisch over <strong>partners</strong> op basis van de eigendomsverhouding.
               </>
             }
             howTo={{
@@ -235,6 +238,7 @@ export default function GidsPage() {
                 "Vul rente, looptijd en maandlast in — NHG en belastingaftrek worden automatisch berekend",
                 "Vergelijk sneeuwbal vs. lawine in het strategiescherm om de optimale aflosvolgorde te vinden",
                 "Simuleer extra aflossingen en zie hoeveel vrijheidstijd je terugwint",
+                "Bekijk het effect op je netto vermogen en FIRE-datum — minder schuld = lagere uitgaven = eerder vrij",
                 "Bij een huishouden: stel de eigendomsverhouding in per schuld voor een correcte partnerverdeling",
               ],
               tip: "Focus op schulden met de hoogste rente boven 4% — elke euro extra aflossing levert daar het meeste vrijheidstijd op.",
@@ -299,16 +303,19 @@ export default function GidsPage() {
             color="var(--color-kern-400)"
             description={
               <>
-                Ontdek waar je levenstijd naartoe stroomt. TriFinity verdeelt je uitgaven over <strong>6 hoofdcategorieën en 24 subcategorieën</strong> met vijf budgettypes (inkomsten, uitgaven, sparen, schulden, verborgen). Elke categorie markeer je als <strong>essentieel of niet-essentieel</strong> — dat bepaalt rechtstreeks je FIRE-berekening. Drie weergaven geven inzicht: <strong>boomstructuur</strong> met voortgangsbalken, <strong>donutgrafiek</strong> voor verdeling, en <strong>sparklines</strong> voor 6-maanden trends. Tik op een categorie voor het <strong>kassabon</strong>-detail en zie je maandrapport in gewonnen of verloren <strong>vrijheidsdagen</strong>. Budgetteren is volledig optioneel — vul alleen je geschatte maanduitgaven in en TriFinity doet de rest.
+                Ontdek waar je levenstijd naartoe stroomt. TriFinity verdeelt je uitgaven over <strong>6 hoofdcategorieën en 24 subcategorieën</strong> met vijf budgettypes (inkomsten, uitgaven, sparen, schulden, verborgen). Per categorie kies je een <strong>doeltype</strong>: vast bedrag, percentage van inkomen of flexibel — zo past je plan bij jouw situatie. Elke categorie markeer je als <strong>essentieel of niet-essentieel</strong>, wat rechtstreeks je FIRE-berekening bepaalt. Drie weergaven geven inzicht: <strong>boomstructuur</strong> met voortgangsbalken, <strong>donutgrafiek</strong> voor verdeling, en <strong>sparklines</strong> voor 6-maanden trends. De <strong>maand-op-maand vergelijking</strong> toont hoe je bestedingspatroon verschuift. Tik op een categorie voor het <strong>kassabon</strong>-detail met elke transactie en zie je maandrapport in gewonnen of verloren <strong>vrijheidsdagen</strong>. Favoriete budgetten pin je als <strong>widget op je dashboard</strong> zodat je ze altijd in beeld hebt. Budgetteren is volledig optioneel — vul alleen je geschatte maanduitgaven in en TriFinity doet de rest.
               </>
             }
             howTo={{
               steps: [
                 "Ga naar De Kern → Budgetten — je standaardplan staat klaar met 6 categorieën",
-                "Pas limieten aan per categorie en kies interval (maand, kwartaal, jaar) en overschotgedrag (reset, doorschuiven of beleggen)",
+                "Stel per categorie een doeltype in: vast bedrag (bijv. €400/mnd), percentage van inkomen (bijv. 30%) of flexibel (geen limiet, alleen tracking)",
+                "Kies het interval (maand, kwartaal, jaar) en overschotgedrag (reset, doorschuiven of beleggen)",
                 "Markeer elke categorie als essentieel of niet-essentieel — dit beïnvloedt je FIRE-berekening direct",
                 "Na transactie-import worden uitgaven automatisch gekoppeld via AI-categorisatie",
                 "Bekijk je voortgang in boom-, donut- of sparkline-weergave en tik op een categorie voor de kassabon-details",
+                "Vergelijk maanden onderling om trends te ontdekken — de maandrapportage toont verschuivingen in je bestedingspatroon",
+                "Markeer een budget als favoriet (♥) om het als widget op je dashboard te pinnen",
               ],
               tip: "Begin simpel — pas alleen de limieten aan van je top-5 uitgavencategorieën. De rest verfijn je later.",
             }}
