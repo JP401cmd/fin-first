@@ -251,24 +251,36 @@ export default function GidsPage() {
             color="var(--color-kern-400)"
             description={
               <>
-                Je nettovermogen is je totale bezittingen minus je schulden — het fundament van je
-                financiële vrijheid. TriFinity maakt automatisch snapshots van je vermogensontwikkeling,
-                zodat je over maanden en jaren kunt terugkijken hoe je groeit. Per snapshot zie je niet
-                alleen het bedrag, maar ook je vrijheidspercentage, spaarquote, veerkrachtscore en
-                geschatte FIRE-leeftijd.
+                Je nettovermogen is je totale financiële positie in één getal:{" "}
+                <strong>bezittingen minus schulden</strong>. Het is het fundament van je financiële
+                vrijheid — elke euro netto vermogen staat voor opgeslagen levenstijd. TriFinity
+                maakt automatisch snapshots van je vermogensontwikkeling, zodat je over maanden en
+                jaren kunt terugkijken hoe je groeit. Per snapshot zie je niet alleen het bedrag,
+                maar ook je vrijheidspercentage, spaarquote, veerkrachtscore en geschatte
+                FIRE-leeftijd.
                 <br />
                 <br />
-                De compositie-analyse laat zien hoe je vermogen is opgebouwd: hoeveel zit in spaargeld
-                versus beleggingen, hoeveel in vastgoed versus pensioen. Zo ontdek je of je vermogen
-                goed gespreid is of te afhankelijk van één pijler.
+                De <strong>vermogensgrafiek</strong> toont je historisch verloop met maandelijkse
+                datapunten — zo zie je seizoenspatronen, dips en groeiversnellingen in één
+                oogopslag. De <strong>samenstelling</strong> laat zien hoe je vermogen is opgebouwd:
+                cash (betaal- en spaarrekeningen) + beleggingen + vastgoed + pensioen − schulden =
+                nettovermogen. Zo ontdek je of je vermogen goed gespreid is of te afhankelijk van
+                één pijler.
+                <br />
+                <br />
+                Bij elke nieuwe piek detecteert TriFinity automatisch een{" "}
+                <strong>mijlpaal</strong> — een nieuw vermogensrecord. Deze mijlpalen verschijnen
+                in je tijdlijn en meldingen, zodat je ziet wanneer je een nieuw hoogterecord
+                bereikt en hoe lang het duurde om daar te komen.
               </>
             }
             howTo={{
               steps: [
                 "Je nettovermogen wordt automatisch berekend zodra je bezittingen en schulden hebt toegevoegd",
-                "Bij elke herwaardering maakt TriFinity een balanssnapshot per bezitting en schuld",
-                "Bekijk de vermogensgrafiek op De Kern voor je netto vermogen over tijd",
-                "Vergelijk periodes om trends te ontdekken in je vermogensgroei",
+                "Bij elke herwaardering maakt TriFinity een balanssnapshot — je ziet het bedrag, de samenstelling en je vrijheidstijd",
+                "Bekijk de vermogensgrafiek op De Kern voor je historisch verloop met maandelijkse snapshots",
+                "Analyseer de samenstelling: hoeveel zit in cash, beleggingen, vastgoed en pensioen versus schulden",
+                "Vergelijk periodes om trends te ontdekken — mijlpalen markeren automatisch nieuwe vermogensrecords",
               ],
               tip: "De maandelijkse check-in is het ideale moment om je vermogen bij te werken en je voortgang te zien.",
             }}
@@ -327,19 +339,96 @@ export default function GidsPage() {
             color="var(--color-kern-400)"
             description={
               <>
-                Zie in één oogopslag hoeveel vrijheidstijd de fiscus kost. TriFinity berekent automatisch je <strong>Box 3</strong> vermogensrendementsheffing met het juiste forfait per vermogenstype — <strong>spaargeld</strong> (lager forfait) versus <strong>beleggingen</strong> (hoger forfait) — en verrekent schulden boven de drempel. Heb je een partner? De <strong>partneroptimalisatie</strong> berekent de fiscaal voordeligste verdeling van jullie gezamenlijke grondslag. Vergelijk <strong>twee belastingjaren</strong> naast elkaar en gebruik het <strong>scenariomodel</strong> om te zien wat er verandert als je vermogen groeit. Voor DGA&apos;s berekent TriFinity ook <strong>Box 2</strong>: aanmerkelijk belang, dividenduitkeringen en de wet excessief lenen bij een eigen BV.
+                Weet wat je betaalt en hoe je optimaliseert. TriFinity berekent automatisch
+                je <strong>Box 3</strong> vermogensrendementsheffing op basis van het{" "}
+                <strong>fictief rendement</strong> per vermogenstype: spaargeld wordt belast
+                tegen een lager forfait (~1,03%), beleggingen tegen een hoger forfait (~6,04%)
+                en overige bezittingen (vastgoed, crypto) tegen het beleggingsforfait. Schulden
+                boven de drempel verlagen je grondslag.
+                <br />
+                <br />
+                Je hebt recht op een <strong>heffingsvrij vermogen</strong> van ~€57.000 per
+                persoon (peiljaar 2025). Met een fiscaal partner verdubbelt dit naar ~€114.000.
+                Pas als je netto vermogen daarboven uitkomt, betaal je 36% belasting over het
+                fictieve rendement. De <strong>partneroptimalisatie</strong> berekent automatisch
+                de fiscaal voordeligste verdeling van jullie gezamenlijke grondslag — dat kan
+                honderden euro&apos;s per jaar schelen.
+                <br />
+                <br />
+                Vergelijk <strong>twee belastingjaren</strong> naast elkaar om tariefwijzigingen
+                te zien en gebruik het <strong>scenariomodel</strong> om te simuleren wat er
+                verandert als je vermogen groeit of verschuift tussen sparen en beleggen. Voor
+                DGA&apos;s berekent TriFinity ook <strong>Box 2</strong>: aanmerkelijk belang,
+                dividenduitkeringen en de wet excessief lenen bij een eigen BV.
               </>
             }
             howTo={{
               steps: [
                 "Ga naar De Kern → Belasting — je Box 3 wordt automatisch berekend op basis van je geregistreerde bezittingen en schulden",
-                "Controleer de classificatie: spaargeld, beleggingen en vrijgestelde bezittingen worden automatisch ingedeeld",
-                "Wissel tussen belastingjaren (2025/2026) om het verschil in forfaittarieven te zien",
-                "Activeer \"Partner\" om de optimale verdeling van de grondslag te berekenen — dat kan honderden euro's schelen",
+                "Controleer de classificatie: spaargeld (laag forfait), beleggingen (hoog forfait) en vrijgestelde bezittingen worden automatisch ingedeeld",
+                "Bekijk je heffingsvrij vermogen — €57.000 per persoon, €114.000 met fiscaal partner — en hoeveel je daarboven betaalt",
+                "Wissel tussen belastingjaren (2025/2026) om het verschil in forfaittarieven en vrijstellingen te vergelijken",
+                "Activeer \"Partner\" om de optimale verdeling van de grondslag te berekenen — verschuif spaargeld naar de partner met lagere grondslag",
                 "Open het scenariomodel om te simuleren wat er verandert bij meer spaargeld, meer beleggingen of hogere schulden",
               ],
-              tip: "Check je belastingpagina na elke grote vermogenswijziging — een verschuiving van spaargeld naar beleggingen kan je belastingdruk flink veranderen.",
+              tip: "Verschuif vermogen van beleggingen naar spaargeld (of andersom) in het scenariomodel om te zien welk forfait je het minste kost. Elke €10.000 verschuiving kan tientallen euro's per jaar schelen.",
             }}
+          />
+
+          <GuideTopicCard
+            icon={RefreshCw}
+            title="Check-in"
+            color="var(--color-kern-400)"
+            description={
+              <>
+                Maandelijks 10 minuten voor financiële rust. De check-in is jouw
+                vaste moment om stil te staan bij je geld — niet om te stressen,
+                maar om <strong>grip te houden</strong>. Een 7-stappen wizard
+                begeleidt je: terugblik op vorige maand (vermogenswijziging,
+                inkomsten, uitgaven, gewonnen vrijheidsdagen), bezittingen
+                bijwerken, schulden bijwerken, doelen checken, budgetten
+                evalueren, vooruitblik op komende maand, en een moment voor
+                reflectie met vrije notities.
+                {' '}
+                Will bereidt <strong>gespreksstarters</strong> voor op basis van
+                je recente financiële veranderingen — ideaal als startpunt voor
+                reflectie of een gesprek met je partner. Je kunt eerdere
+                check-ins terugbladeren om je <strong>groei over maanden</strong>{' '}
+                te zien. Het resultaat: altijd actuele data voor betere
+                projecties, eerder herkennen van patronen, en het vertrouwen dat
+                je financiën kloppen.
+              </>
+            }
+            howTo={{
+              steps: [
+                'Ga naar De Kern → Check-in (of volg de herinnering in je meldingen)',
+                'Stap 1: Bekijk de terugblik — vergelijk vorige maand met nu (vermogen, inkomsten, uitgaven, vrijheidsdagen)',
+                'Stap 2-3: Werk bezittingen en schulden bij — zo blijft je nettovermogen actueel',
+                'Stap 4-5: Check je doelen en evalueer je budgetten — liggen ze op koers?',
+                'Stap 6: Bekijk de vooruitblik met komende rekeningen en levensgebeurtenissen',
+                'Stap 7: Schrijf een korte reflectie — wat ging goed, wat kan beter?',
+              ],
+              tip: 'Plan je check-in op een vaste dag (bijv. de eerste zondag van de maand). Routine maakt het moeiteloos — en na drie maanden wil je niet meer zonder.',
+            }}
+          />
+
+          <GuideTopicCard
+            icon={Compass}
+            title="Wat komt er nog?"
+            color="var(--color-kern-400)"
+            description={
+              <>
+                De Kern groeit mee met jouw behoeften. We werken aan nieuwe
+                mogelijkheden om je financiële fundament nog sterker te maken —
+                denk aan <strong>automatische banksynchronisatie</strong> zodat je
+                saldi en transacties vanzelf binnenkomen, slimmere herkenning van{' '}
+                <strong>terugkerende transacties</strong> die automatisch
+                gekoppeld worden aan de juiste budgetten, en uitgebreidere{' '}
+                <strong>rapportages</strong> waarmee je dieper in je patronen
+                kunt duiken. Houd de gids in de gaten — nieuwe features
+                verschijnen hier zodra ze klaar zijn.
+              </>
+            }
           />
         </ReisStapSection>
 
@@ -496,6 +585,44 @@ export default function GidsPage() {
                 "Tik op een abonnement voor de opzegflow met details en vrijheidsdagen-impact",
               ],
               tip: "Check je abonnementen elk kwartaal. Vergeten streamingdiensten en ongebruikte sportschoolpassen zijn de meest voorkomende tijdlekken.",
+            }}
+          />
+
+          <GuideTopicCard
+            icon={LayoutDashboard}
+            title="Widgets overzicht"
+            color="var(--color-wil-400)"
+            description={
+              <>
+                Je dashboard is je persoonlijke financi&euml;le cockpit &mdash;
+                een verzameling widgets die je in &eacute;&eacute;n oogopslag
+                laten zien hoe je er financieel voor staat. Elke widget toont een
+                specifiek inzicht: van nettovermogen en budgetvoortgang tot
+                FIRE-prognose en actielijst. Widgets komen in{" "}
+                <strong>vier formaten</strong>: <strong>mini</strong> (1&times;1)
+                voor compacte cijfers, <strong>quarter</strong> (1&times;2) voor
+                een enkel KPI met context, <strong>half</strong> (2&times;2) voor
+                grafieken en lijsten, en <strong>full</strong> (4&times;2) voor
+                uitgebreide overzichten met meerdere datapunten.
+                {" "}
+                Personaliseer je cockpit door widgets te{" "}
+                <strong>slepen</strong> naar de gewenste positie, formaten aan te
+                passen en favoriete budgetten of holdings als eigen widget toe te
+                voegen. Schakel widgets aan of uit via Instellingen &mdash; zo
+                zie je alleen wat voor jou relevant is. Nieuwe widgets
+                ontgrendelen automatisch naarmate je soevereiniteitsniveau
+                stijgt.
+              </>
+            }
+            howTo={{
+              steps: [
+                "Je dashboard is je startpagina na inloggen \u2014 alle widgets staan hier",
+                "Sleep widgets naar een andere positie door ze vast te houden en te verplaatsen",
+                "Kies het juiste formaat per widget: mini (1\u00d71), quarter (1\u00d72), half (2\u00d72) of full (4\u00d72)",
+                "Voeg favoriete budgetten of holdings toe als persoonlijke widget via het dashboard",
+                "Ga naar Identiteit \u2192 Instellingen \u2192 Widgets om widgets aan/uit te zetten",
+              ],
+              tip: "Begin met de standaard 7 widgets. Voeg pas meer toe als je weet welke inzichten je dagelijks wilt zien \u2014 minder is meer.",
             }}
           />
         </ReisStapSection>
@@ -740,29 +867,6 @@ export default function GidsPage() {
       {/* ── Overal ── */}
       <p className="label-editorial mb-3 text-[var(--ink-3)]">Overal</p>
       <div className="mb-6 grid grid-cols-1 gap-2 sm:mb-8 lg:grid-cols-2">
-        <GuideTopicCard
-          icon={RefreshCw}
-          title="Check-in"
-          color="var(--ink-2)"
-          description={
-            <>
-              Eén keer per maand neem je 10 minuten voor je financiële gezondheid. De check-in is een 7-stappen wizard: terugblik op vorige maand (vermogenswijziging, inkomsten, uitgaven, gewonnen vrijheidsdagen), bezittingen bijwerken, schulden bijwerken, doelen checken, budgetten evalueren, vooruitblik op komende maand, en een moment voor reflectie met vrije notities.
-              {' '}
-              Will bereidt gespreksstarters voor op basis van je recente financiële veranderingen — ideaal als startpunt voor reflectie of een gesprek met je partner. Je kunt eerdere check-ins terugbladeren om je groei over maanden te zien.
-            </>
-          }
-          howTo={{
-            steps: [
-              'Ga naar De Kern → Check-in (of volg de herinnering in je meldingen)',
-              'Stap 1: Bekijk de terugblik — vergelijk vorige maand met nu',
-              'Stap 2-5: Werk bezittingen, schulden, doelen en budgetten bij',
-              'Stap 6: Bekijk de vooruitblik met komende rekeningen en events',
-              'Stap 7: Schrijf een korte reflectie — wat ging goed, wat kan beter?',
-            ],
-            tip: 'Plan je check-in op een vaste dag (bijv. de eerste zondag van de maand). Routine maakt het moeiteloos.',
-          }}
-        />
-
         <GuideTopicCard
           icon={Bell}
           title="Meldingen"
