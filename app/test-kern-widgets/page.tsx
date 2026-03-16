@@ -180,6 +180,7 @@ const MOCK_DATA: DashboardData = {
   inflationRate: 0.02,
   grossReturn: 0.07,
   currentAge: 35,
+  favoriteHoldings: [],
   weekOverview: {
     weekExpenses: 342.50,
     weekIncome: 0,

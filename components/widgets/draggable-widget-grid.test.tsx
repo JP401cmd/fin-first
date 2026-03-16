@@ -102,6 +102,7 @@ const mockData: DashboardData = {
   prevMonthExpenses: 0,
   netWorthDelta: null,
   favoriteBudgets: [],
+  favoriteHoldings: [],
   allBudgets: [] as { id: string; name: string; icon: string; budgetType: 'income' | 'expense' | 'savings' | 'debt'; isFavorite: boolean; parentId: string | null }[],
   notifications: [],
   aiInsights: [],

@@ -13,7 +13,7 @@ import type {
   TopRecommendation,
   TopLifeEvent,
   Notification,
-
+  FavoriteHolding,
   AiInsight,
   NextStep,
   UpcomingEvent,
@@ -100,6 +100,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     bankAccountsResult, favBudgetsResult, prevMonthTxResult,
     nextStepCompletionsResult,
     expenseTx12Result,
+    favHoldingsResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id, transaction_type').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('id, current_value, monthly_contribution, asset_type, purchase_value, expected_return, net_worth_inclusion_pct, tax_benefit').eq('is_active', true),
@@ -124,6 +125,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('transactions').select('amount, transaction_type, budget_id').gte('date', prevMonthStart).lt('date', monthStart),
     supabase.from('next_step_completions').select('step_key, dismissed'),
     supabase.from('transactions').select('amount, date, budget_id, transaction_type').lt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd).limit(2000),
+    supabase.from('holdings').select('id, name, ticker, units, avg_purchase_price, current_price, previous_close, last_price_update, is_favorite').eq('is_favorite', true),
   ])
 
   // Read budgeting_active from the profile query (already fetched above)
@@ -297,6 +299,37 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       budgetType: fb.budget_type as 'income' | 'expense' | 'savings' | 'debt' | 'archive',
       limit,
       spent,
+    }
+  })
+
+  // Favorite holdings: compute derived metrics for each
+  const favHoldingsRaw = (favHoldingsResult.data ?? []) as {
+    id: string; name: string; ticker: string | null; units: number;
+    avg_purchase_price: number; current_price: number; previous_close: number | null;
+    last_price_update: string | null; is_favorite: boolean
+  }[]
+  const favoriteHoldings = favHoldingsRaw.map(h => {
+    const units = Number(h.units)
+    const currentPrice = Number(h.current_price)
+    const avgPurchasePrice = Number(h.avg_purchase_price)
+    const totalValue = units * currentPrice
+    const totalCost = units * avgPurchasePrice
+    const returnPct = totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0
+    const prevClose = h.previous_close != null ? Number(h.previous_close) : null
+    const dailyChangePct = prevClose != null && prevClose > 0
+      ? ((currentPrice - prevClose) / prevClose) * 100
+      : 0
+    return {
+      id: h.id,
+      name: h.name,
+      ticker: h.ticker,
+      units,
+      currentPrice,
+      totalValue,
+      totalCost,
+      returnPct: Math.round(returnPct * 100) / 100,
+      dailyChangePct: Math.round(dailyChangePct * 100) / 100,
+      lastPriceUpdate: h.last_price_update,
     }
   })
 
@@ -558,10 +591,25 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       size: 'quarter' as WidgetSize,
       order: lowestOrder - 100 + i,
     }))
+  // Inject dynamic favorite holding widget prefs (merge with saved positions)
+  const savedHoldingFavIds = new Set(widgetPrefs.widgets.filter(w => w.id.startsWith('holding_fav:')).map(w => w.id))
+  const currentHoldingFavIds = new Set(favoriteHoldings.map(h => `holding_fav:${h.id}`))
+  const newHoldingFavPrefs: WidgetPref[] = favoriteHoldings
+    .filter(h => !savedHoldingFavIds.has(`holding_fav:${h.id}`))
+    .map((h, i) => ({
+      id: `holding_fav:${h.id}`,
+      enabled: true,
+      size: 'mini' as WidgetSize,
+      order: lowestOrder - 200 + i,
+    }))
+
   // Combine: catalog widgets + saved fav prefs (only if still favorited) + new fav prefs
   const allWidgetPrefs = [
-    ...widgetPrefs.widgets.filter(w => !w.id.startsWith('budget_fav:') || currentFavIds.has(w.id)),
+    ...widgetPrefs.widgets
+      .filter(w => !w.id.startsWith('budget_fav:') || currentFavIds.has(w.id))
+      .filter(w => !w.id.startsWith('holding_fav:') || currentHoldingFavIds.has(w.id)),
     ...newFavPrefs,
+    ...newHoldingFavPrefs,
   ]
   const activeWidgets = allWidgetPrefs
     .filter(w => w.enabled)
@@ -1305,6 +1353,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     prevMonthExpenses,
     netWorthDelta: netWorthDeltaComputed,
     favoriteBudgets,
+    favoriteHoldings,
     allBudgets,
     // Real widget data from queries and computations
     notifications,

@@ -607,6 +607,9 @@ export const BUDGET_WIDGETS = new Set([
 /** Allowed sizes for dynamic budget_fav:* widgets */
 export const BUDGET_FAV_SIZES: WidgetSize[] = ['quarter', 'half', 'full']
 
+/** Allowed sizes for dynamic holding_fav:* widgets */
+export const HOLDING_FAV_SIZES: WidgetSize[] = ['mini']
+
 /** Get the widget definition by id */
 export function getWidgetDef(id: string): WidgetDef | undefined {
   return WIDGET_CATALOG.find(w => w.id === id)
@@ -650,9 +653,9 @@ export function mergeWidgetPrefs(saved: WidgetPrefs | null): WidgetPrefs {
     return { id: def.id, enabled: false, size: def.defaultSize, order: 100 + i }
   })
 
-  // Preserve dynamic widget prefs (budget_fav:*) from saved data
+  // Preserve dynamic widget prefs (budget_fav:*, holding_fav:*) from saved data
   for (const w of saved.widgets) {
-    if (w.id.startsWith('budget_fav:')) merged.push(w)
+    if (w.id.startsWith('budget_fav:') || w.id.startsWith('holding_fav:')) merged.push(w)
   }
 
   return { widgets: merged }

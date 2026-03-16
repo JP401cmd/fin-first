@@ -87,6 +87,9 @@ const PensioenAowWidget = dynamic(() =>
 const BudgetFavWidget = dynamic(() =>
   import('./budget-fav-widget').then(m => ({ default: m.BudgetFavWidget }))
 )
+const HoldingFavWidget = dynamic(() =>
+  import('./holding-fav-widget').then(m => ({ default: m.HoldingFavWidget }))
+)
 const MeldingenWidget = dynamic(() =>
   import('./meldingen-widget').then(m => ({ default: m.MeldingenWidget }))
 )
@@ -253,6 +256,19 @@ export interface EmergencyFund {
   isComplete: boolean
 }
 
+export interface FavoriteHolding {
+  id: string
+  name: string
+  ticker: string | null
+  units: number
+  currentPrice: number
+  totalValue: number
+  totalCost: number
+  returnPct: number
+  dailyChangePct: number
+  lastPriceUpdate: string | null
+}
+
 export interface DashboardData {
   // Core financial
   netWorth: number
@@ -337,6 +353,8 @@ export interface DashboardData {
     limit: number
     spent: number
   }[]
+  // Favorite holdings for dynamic mini-widgets
+  favoriteHoldings: FavoriteHolding[]
   // All budgets (parents + children, non-archive) for auto-dashboard wizard
   allBudgets: {
     id: string
@@ -449,6 +467,14 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
     const fav = data.favoriteBudgets.find(b => b.id === budgetId)
     if (!fav) return null
     return <BudgetFavWidget size={size} budget={fav} />
+  }
+
+  // Handle dynamic favorite holding widgets
+  if (id.startsWith('holding_fav:')) {
+    const holdingId = id.slice('holding_fav:'.length)
+    const holding = data.favoriteHoldings.find(h => h.id === holdingId)
+    if (!holding) return null
+    return <HoldingFavWidget size={size} holding={holding} />
   }
 
   const def = getWidgetDef(id)
