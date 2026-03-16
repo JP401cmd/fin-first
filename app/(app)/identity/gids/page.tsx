@@ -13,6 +13,7 @@ import { OntdekkenSection } from '@/components/app/ontdekken-section'
 import { GuideProgressBar } from '@/components/app/guide-progress-bar'
 import GuideFaq from '@/components/app/guide-faq'
 import GuideProTips from '@/components/app/guide-pro-tips'
+import GuideTopicCard from '@/components/app/guide-topic-card'
 
 /* ── Types ─────────────────────── */
 
@@ -957,6 +958,27 @@ export default function GidsPage() {
             </div>
           </GuideAccordion>
 
+          <GuideTopicCard
+            icon={Sparkles}
+            title="DAIshboard / Briefing"
+            color="var(--ink-2)"
+            description={
+              <>
+                Schakel over naar de DAIshboard-modus en je dashboard transformeert in een AI-samengestelde briefing. Will analyseert je financiële data en componeert een persoonlijk overzicht met tot 23 verschillende kaarttypes: metrics, sparklines, mijlpalen, inzichten, checklists, vergelijkingen, doelvoortgang, budgetbalken en meer. De briefing wordt progressief geladen — kaarten verschijnen zodra ze klaar zijn.
+                {' '}
+                Elke briefing is tijdsbewust: &apos;s ochtends focus op de dag, aan het einde van de maand op je maandresultaat. De briefing onthoudt wat je eerder hebt gezien en varieert de inhoud. Na 24 uur verschijnt een stale-banner zodat je weet dat de data niet meer actueel is.
+              </>
+            }
+            howTo={{
+              steps: [
+                'Op je dashboard: wissel naar DAIshboard-modus via de toggle bovenaan',
+                'De briefing genereert automatisch — kaarten verschijnen progressief',
+                'Scroll door je persoonlijke briefing en tik op kaarten voor meer detail',
+              ],
+              tip: 'Check je briefing elke ochtend als financiële routine — het kost 30 seconden en houdt je scherp.',
+            }}
+          />
+
           <GuideAccordion
             id="alg-will"
             icon={<MessageSquare className="h-4 w-4" />}
@@ -975,6 +997,29 @@ export default function GidsPage() {
               </GuideFeature>
             </div>
           </GuideAccordion>
+
+          <GuideTopicCard
+            icon={RefreshCw}
+            title="Check-in"
+            color="var(--ink-2)"
+            description={
+              <>
+                Eén keer per maand neem je 10 minuten voor je financiële gezondheid. De check-in is een 7-stappen wizard: terugblik op vorige maand (vermogenswijziging, inkomsten, uitgaven, gewonnen vrijheidsdagen), bezittingen bijwerken, schulden bijwerken, doelen checken, budgetten evalueren, vooruitblik op komende maand, en een moment voor reflectie met vrije notities.
+                {' '}
+                Will bereidt gespreksstarters voor op basis van je recente financiële veranderingen — ideaal als startpunt voor reflectie of een gesprek met je partner. Je kunt eerdere check-ins terugbladeren om je groei over maanden te zien.
+              </>
+            }
+            howTo={{
+              steps: [
+                'Ga naar De Kern → Check-in (of volg de herinnering in je meldingen)',
+                'Stap 1: Bekijk de terugblik — vergelijk vorige maand met nu',
+                'Stap 2-5: Werk bezittingen, schulden, doelen en budgetten bij',
+                'Stap 6: Bekijk de vooruitblik met komende rekeningen en events',
+                'Stap 7: Schrijf een korte reflectie — wat ging goed, wat kan beter?',
+              ],
+              tip: 'Plan je check-in op een vaste dag (bijv. de eerste zondag van de maand). Routine maakt het moeiteloos.',
+            }}
+          />
 
           <GuideAccordion
             id="alg-huishouden"
@@ -1036,24 +1081,24 @@ export default function GidsPage() {
             </div>
           </GuideAccordion>
 
-          <GuideAccordion
-            id="alg-meldingen"
-            icon={<Bell className="h-4 w-4" />}
+          <GuideTopicCard
+            icon={Bell}
             title="Meldingen"
-            tagline="Alerts, mijlpalen en detectie"
             color="var(--ink-2)"
-            open={guideSection === 'alg-meldingen'}
-            onToggle={() => setGuideSection(guideSection === 'alg-meldingen' ? null : 'alg-meldingen')}
-          >
-            <div className="space-y-2">
-              <GuideFeature title="Budget-alerts">
-                Ontvang meldingen wanneer je een budgetgrens nadert of overschrijdt. Blijf op de hoogte zonder constant te checken.
-              </GuideFeature>
-              <GuideFeature title="Mijlpalen en anomalieën">
-                Vier automatische mijlpalen in je vermogensgroei en ontvang waarschuwingen bij ongebruikelijke transacties of patronen.
-              </GuideFeature>
-            </div>
-          </GuideAccordion>
+            description={
+              <>
+                TriFinity stuurt je meldingen wanneer het ertoe doet: budgetgrenzen die naderen, ongebruikelijke transacties, vermogensmijlpalen die je bereikt, level-ups in je soevereiniteit, en aanbevelingen die klaarstaan. Urgente alerts verschijnen bovenaan, dagelijkse meldingen daaronder, en eerdere meldingen zijn per dag terug te bladeren. Per type kun je meldingen aan of uitzetten.
+              </>
+            }
+            howTo={{
+              steps: [
+                'Meldingen verschijnen via het bel-icoon in de navigatiebalk',
+                'Tik op een melding om naar het relevante onderdeel te gaan',
+                'Beheer je meldingsvoorkeuren via Identiteit → Instellingen → Notificaties',
+              ],
+              tip: 'Laat budgetalerts en mijlpalen aan staan — ze houden je gemotiveerd zonder overweldigd te raken.',
+            }}
+          />
 
           <GuideAccordion
             id="alg-rapporten"
