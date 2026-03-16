@@ -14,6 +14,7 @@ import { ActionCenter } from './action-center'
 import { CollapsibleSection } from '@/components/app/collapsible-section'
 import { OpzegModal } from '@/components/app/opzeg-modal'
 import { MonthlyCheckinCard } from '@/components/dashboard/monthly-checkin-card'
+import { ChevronRight } from 'lucide-react'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
 
 type SubscriptionItem = {
@@ -57,6 +58,7 @@ export function WillLanding({
   const [subscriptionMonthly, setSubscriptionMonthly] = useState(0)
   const [subscriptionsOpen, setSubscriptionsOpen] = useState(false)
   const [opzegTarget, setOpzegTarget] = useState<CancellationMetadata | null>(null)
+  const [opzegSubscription, setOpzegSubscription] = useState<SubscriptionItem | null>(null)
 
   // Deep-link: open modal via ?modal= URL param
   useEffect(() => {
@@ -159,16 +161,50 @@ export function WillLanding({
                 {subscriptions.map(sub => (
                   <div
                     key={sub.id}
-                    className="flex items-center justify-between rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      const metadata: CancellationMetadata = {
+                        type: 'subscription_cancellation',
+                        subscription_name: sub.name,
+                        monthly_amount: sub.monthlyAmount,
+                        frequency: sub.frequency,
+                        user_name: userProfile?.full_name ?? '',
+                        user_address: '',
+                        user_postcode: '',
+                        user_city: '',
+                      }
+                      setOpzegSubscription(sub)
+                      handleCancellationOpen(metadata)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        const metadata: CancellationMetadata = {
+                          type: 'subscription_cancellation',
+                          subscription_name: sub.name,
+                          monthly_amount: sub.monthlyAmount,
+                          frequency: sub.frequency,
+                          user_name: userProfile?.full_name ?? '',
+                          user_address: '',
+                          user_postcode: '',
+                          user_city: '',
+                        }
+                        setOpzegSubscription(sub)
+                        handleCancellationOpen(metadata)
+                      }
+                    }}
+                    className="flex cursor-pointer items-center justify-between rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 transition-colors hover:bg-[var(--subtle)]"
                   >
                     <div>
                       <p className="text-sm font-medium text-[var(--ink)]">{sub.name}</p>
                       <p className="text-xs text-[var(--ink-3)]">{sub.frequency}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="flex items-center gap-2">
                       <p className="font-mono text-sm tabular-nums text-[var(--ink)]">
                         €{sub.monthlyAmount.toFixed(2)}/mnd
                       </p>
+                      <ChevronRight className="h-4 w-4 text-[var(--ink-4)]" />
                     </div>
                   </div>
                 ))}
@@ -186,11 +222,11 @@ export function WillLanding({
         {/* ── Opzeg Modal ────────────────────────────────────── */}
         <OpzegModal
           open={!!opzegTarget}
-          onClose={() => setOpzegTarget(null)}
-          subscription={null}
+          onClose={() => { setOpzegTarget(null); setOpzegSubscription(null) }}
+          subscription={opzegSubscription}
           initialMetadata={opzegTarget ?? undefined}
           userProfile={userProfile}
-          onSavedToActionList={() => {}}
+          onSavedToActionList={() => { setOpzegTarget(null); setOpzegSubscription(null) }}
         />
       </div>
     </FreedomDaysAnimationProvider>
