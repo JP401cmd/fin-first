@@ -1,3 +1,47 @@
+## Session 2026-03-16 - Features #16, #17, #18
+
+### Feature #16: Content: FIRE-projectie - PASSING
+- Already implemented in gids page (lines 517-550)
+- GuideTopicCard with Compass icon in reis-stap 4 (Kijk vooruit)
+- Description covers: 3 scenarios (pessimistisch/verwacht/optimistisch), FIRE-leeftijd, countdown, configureerbare parameters (rendement/inflatie), 3 eindstrategieën (perpetueel/legacy/deplete), Box 3 belasting
+- 5 how-steps + tip present
+- Marked as passing (was already implemented by previous session)
+
+### Feature #17: Content: Levensgebeurtenissen - PASSING
+- Already implemented in gids page (lines 552-582)
+- GuideTopicCard with Sparkles icon in reis-stap 4 (Kijk vooruit)
+- Description covers: 50+ catalogus-events, cashflow-schattingen, cumulatief FIRE-effect, eigen events aanmaken, in-/uitschakelen
+- 5 how-steps + tip present
+- Marked as passing (was already implemented by previous session)
+
+### Feature #18: Content: Monte Carlo & backtesting - PASSING
+- Already implemented in gids page (lines 584-613)
+- GuideTopicCard with LineChart icon in reis-stap 4 (Kijk vooruit)
+- Description covers: 1000 marktscenario's, slagingspercentage, percentielspreiding (p10-p90), backtestscore, historische crises (dotcom, 2008, COVID)
+- 4 how-steps + tip present
+- Marked as passing (was already implemented by previous session)
+
+### Current Status
+- 3 features verified and marked passing this session (#16, #17, #18)
+- No code changes needed (all already implemented)
+- Overall: 42/47 features passing (89%)
+
+## Session 2026-03-16 - Feature #15
+
+### Feature #15: Content: Abonnementen - PASSING
+- Already implemented in gids page (lines 464-493)
+- GuideTopicCard with RefreshCw icon in reis-stap 3 (Onderneem actie)
+- Description covers: automatische detectie 12 maanden, betrouwbaarheidsniveaus (hoog/middel/laag), frequentieherkenning (wekelijks/maandelijks/kwartaal/jaarlijks), vrijheidsdagen-impact, opzegadvies
+- 4 how-steps + tip present
+- Also fixed build error: pensioen-aow-widget.tsx was missing (created by another agent during this session)
+- Zero console errors, zero TypeScript errors
+- Marked as passing
+
+### Current Status
+- 1 feature verified and marked passing this session (#15)
+- Build error fixed (pensioen-aow-widget.tsx was missing, now resolved)
+- No code changes needed for feature #15 (content already in place)
+
 ## Session 2026-03-16 - Feature #42
 
 ### Feature #42: Merge abonnementen en terugkerende_transacties widgets - PASSING
@@ -12607,3 +12651,70 @@ For Feature #51 (Transaction Import):
 - Zero TypeScript errors
 - Zero console errors verified via browser
 - Commit: 2cb56e87
+
+## Session 2026-03-16 - Features #12, #13, #14 (Batch verification)
+
+### Feature #12: Content: Voorstellen - PASSING
+- Already implemented in gids page (lines 367-398)
+- GuideTopicCard with Sparkles icon in reis-stap 3 (Onderneem actie)
+- Description covers: 5 aanbevelingstypen, vrijheidsdagen-impact, prioriteitsscore, accepteren/uitstellen/afwijzen
+- 4 how-steps + tip present
+- Marked as passing
+
+### Feature #13: Content: Acties - PASSING
+- Already implemented in gids page (lines 400-430)
+- GuideTopicCard with Zap icon in reis-stap 3 (Onderneem actie)
+- Description covers: kanban-bord (open/uitgesteld/voltooid), vrijheidsdagen per actie, brontracking, deadlines, gamification
+- 5 how-steps + tip present
+- Marked as passing
+
+### Feature #14: Content: Doelen - PASSING
+- Already implemented in gids page (lines 432-462)
+- GuideTopicCard with Target icon in reis-stap 3 (Onderneem actie)
+- Description covers: 10 doeltypes, koppeling aan bezittingen/schulden, automatische voortgang, on-track indicator, persoonlijk/gedeeld
+- 5 how-steps + tip present
+- Marked as passing
+
+### Current Status
+- 3 features verified and marked passing this session (#12, #13, #14)
+- These were already implemented by previous sessions but status wasn't synced to feature tracker
+- No code changes needed
+
+## Session 2026-03-16 - Features #43, #44, #45
+
+### Feature #43: Nieuwe widget: Inflatie-impact - PASSING
+- Created inflatie-impact-widget.tsx with 4 size variants
+- Mini: inflation percentage (e.g. "2.0%")
+- Quarter: percentage + "Over 10 jaar is €1.000 nog maar €X waard"
+- Half: SVG declining purchasing power curve + 10/20/30yr milestones
+- Full: SVG curve + table per 5-year interval + FIRE target impact column
+- Added inflationRate and grossReturn fields to DashboardData interface
+- Added fireParams data to dashboard-data-loader return
+- Added catalog entry, WIDGET_HREFS, dynamic import, switch case
+- Commit: a2a6da3a
+
+### Feature #44: Nieuwe widget: Beleggingsrendement - PASSING
+- Created beleggingsrendement-widget.tsx with 4 size variants
+- Mini: since-inception return % with green/red coloring
+- Quarter: return % + absolute gain/loss amount
+- Half: return % + sparkline from netWorthHistory + expected vs actual comparison
+- Full: sparkline + per-asset-type breakdown table (Beleggingen/Pensioen/Crypto)
+- Filters assetsByType for investment/retirement/crypto types
+- Shows WidgetEmpty when no investments exist
+- Commit: 157121ff
+
+### Feature #45: Nieuwe widget: Pensioen/AOW - PASSING
+- Created pensioen-aow-widget.tsx with 4 size variants
+- Mini: years to AOW (e.g. "32j")
+- Quarter: years + expected monthly amount (alleenstaand)
+- Half: countdown + AOW coverage progress bar + FIRE pot reduction
+- Full: alleenstaand/samenwonend comparison table + coverage bar + FIRE impact breakdown
+- Added currentAge field to DashboardData (computed from profile date_of_birth)
+- Uses NL_AOW_AGE, NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND from constants
+- Gracefully handles missing birth date
+- Commit: b31a0a6a
+
+### Current Status
+- 3 features completed this session (#43, #44, #45)
+- Zero TypeScript errors in all changed files
+- All widgets follow existing patterns (WidgetShell, design tokens, editorial style)

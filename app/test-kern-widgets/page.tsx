@@ -224,6 +224,11 @@ const WIL_WIDGETS = [
   'volgende_stap',
 ]
 
+const HORIZON_WIDGETS = [
+  'fire_prognose',
+  'swr_monitor',
+]
+
 const CROSS_WIDGETS = [
   'meldingen',
   'ai_inzicht',
@@ -265,6 +270,29 @@ export default function TestKernWidgetsPage() {
       {/* ── Wil-module widgets ── */}
       <h1 className="text-2xl font-bold mt-12 pt-8 border-t-2">Wil Widget Format Test</h1>
       {WIL_WIDGETS.map((widgetId) => (
+        <div key={widgetId} className="space-y-3">
+          <h2 className="text-lg font-semibold border-b pb-1">{widgetId}</h2>
+          <div className="grid grid-cols-2 gap-4">
+            {SIZES.map((size) => (
+              <div
+                key={size}
+                className={
+                  size === 'full' ? 'col-span-2' :
+                  size === 'half' ? 'col-span-2' :
+                  'col-span-1'
+                }
+              >
+                <p className="text-xs text-zinc-400 mb-1 font-mono">{size}</p>
+                <WidgetRenderer id={widgetId} size={size} data={MOCK_DATA} features={{}} />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {/* ── Horizon widgets ── */}
+      <h1 className="text-2xl font-bold mt-12 pt-8 border-t-2">Horizon Widget Format Test</h1>
+      {HORIZON_WIDGETS.map((widgetId) => (
         <div key={widgetId} className="space-y-3">
           <h2 className="text-lg font-semibold border-b pb-1">{widgetId}</h2>
           <div className="grid grid-cols-2 gap-4">
