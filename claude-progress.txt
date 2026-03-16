@@ -13764,3 +13764,68 @@ For Feature #51 (Transaction Import):
 - Enhanced existing card: eigenaarschap per item, gedeeld vermogen, gezamenlijke FIRE-projectie
 - Expanded howTo from 5 to 7 steps
 - Commit: 11827004
+
+## Session 2026-03-17 - Features #139, #140
+
+### Feature #139: Gids content: Meldingen - PASSING
+- Enhanced existing Meldingen GuideTopicCard in Overal section
+- Added waarde-tekst: "Weet wat belangrijk is zonder constant te checken"
+- Described all 7 notification types: Budget alerts, Synchronisatie, Aanbevelingen, Inzichten, Level-ups, Horizon-alerts, Prijs-alerts
+- Described instellingen: per type aan/uit via Identiteit → Instellingen → Notificaties
+- Expanded howTo from 3 to 5 steps including prijs-alerts setup
+- Updated tip: start with all on, disable after a week
+
+### Feature #140: Gids content: Rapporten - PASSING
+- Enhanced existing Rapporten GuideTopicCard in Overal section
+- Added waarde-tekst: "Diepere analyse wanneer je dat wilt"
+- Described 4 report types: perioderapport, balansrapport, budgetrapport, jaaroverzicht
+- Balansrapport: bezittingen vs schulden, vermogen in vrijheidstijd
+- Budgetrapport: werkelijke vs budgetgrenzen, trends over maanden
+- Jaaroverzicht: combined perspective with totals, growth, milestones
+- AI-inleiding mentioned for all report types
+- Expanded howTo from 4 to 5 steps with more specific instructions
+
+### Current Status
+- 2 features completed this session (#139, #140)
+- Zero TypeScript errors
+- Commit: 400792f1
+
+## Session 2026-03-17 - Features #137, #138
+
+### Feature #137: Gids content: Profiel instellingen - PASSING
+- Enhanced existing Profiel & Instellingen GuideTopicCard with data sovereignty framing
+- Added bold opening: 'Jouw data, jouw controle'
+- Listed profile fields: naam, geboortedatum, pensioenleeftijd, inkomen
+- Added data-eigenaarschap paragraph: JSON export, account deletion
+- Expanded howTo from 4 to 6 steps, covering all settings sections A-E
+
+### Feature #138: Gids content: App instellingen - PASSING
+- Added new GuideTopicCard 'App instellingen' with SlidersHorizontal icon
+- Value text: 'Maak de app helemaal van jou'
+- Covers: Widgets (aan/uit, formaat), FIRE-parameters (rendement, inflatie, eindstrategie), Weergave (modulekleuren), Notificaties
+- 6 howTo steps covering sections A-E
+- Pro tip about FIRE-parameters impact
+
+### Current Status
+- 2 features completed this session (#137, #138)
+- Zero TypeScript errors
+- Commit: c080cee4
+
+## Session 2026-03-17 - Features #143, #144
+
+### Feature #143: Gids content: Budgetteren - PASSING
+- Updated waarde-tekst to: "Een budget is geen beperking — het is een spiegel..."
+- Structured description with <br> paragraphs: doeltypes, analyse/kassabon, favorieten (4 formaten)
+- Rewrote howTo steps: budgetplan opzetten, doeltypes, parent-budgetten, analyse/kassabon, favorieten
+- All 6 feature steps verified as covered
+
+### Feature #144: Gids content: Cash rekeningen - PASSING
+- Updated waarde-tekst to: "Je bankrekeningen zijn het fundament. Elke euro die binnenkomt of vertrekt..."
+- Structured description: 5 rekeningtypes, 4-staps import-wizard, CSV-presets, 3 categorisatiemethoden, SHA-256 duplicaatdetectie, eigen overboekingen
+- Rewrote howTo steps: rekening toevoegen, transacties importeren, bankconnectie, automatische categorisatie, eigen overboekingen
+- All 7 feature steps verified as covered
+
+### Current Status
+- 2 features completed this session (#143, #144)
+- Zero TypeScript errors (page compiles, 307 auth redirect)
+- Commit: c6298ec8

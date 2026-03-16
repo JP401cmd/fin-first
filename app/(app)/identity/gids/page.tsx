@@ -240,21 +240,40 @@ export default function GidsPage() {
             color="var(--color-kern-400)"
             description={
               <>
-                Beheer <strong>11 schuldtypes</strong>: hypotheek, studieschuld, persoonlijke lening, creditcard, doorlopend krediet, zakelijke lening, familielening, belastingschuld, private lease, telefoonabonnement en overig. Elk type heeft eigen renteberekening, looptijd en fiscale behandeling. <strong>NHG-hypotheken</strong> en <strong>belastingaftrek</strong> worden automatisch meegenomen in je nettolastenberekening.
-                {' '}
-                Vergelijk twee <strong>aflossingsstrategieën</strong>: sneeuwbal (kleinste schuld eerst, motiverend) versus lawine (hoogste rente eerst, goedkoopst). Simuleer het effect van <strong>extra aflossingen</strong> en zie direct hoeveel sneller je schuldenvrij bent — uitgedrukt in teruggewonnen vrijheidstijd. Elke afgeloste schuld verhoogt je <strong>netto vermogen</strong> en verschuift je <strong>FIRE-datum</strong> naar voren: minder vaste lasten betekent een lagere jaarlijkse uitgavendrempel en dus eerder financiële vrijheid. Bij een huishouden verdeelt TriFinity schulden automatisch over <strong>partners</strong> op basis van de eigendomsverhouding.
+                Elke schuld is negatieve vrijheidstijd. Door slim af te lossen win je
+                maanden — soms jaren — <strong>terug</strong>.
+                <br />
+                <br />
+                Beheer <strong>7 schuldtypes</strong>: hypotheek
+                (annuïteit/lineair/aflossingsvrij/spaar/belegging), studieschuld (oud/nieuw
+                stelsel/SF35), persoonlijke lening (aflopend/doorlopend), creditcard, doorlopend
+                krediet, belastingschuld (IB/voorlopige aanslag/Box 3/BTW) en familielening. Elk
+                type heeft eigen renteberekening, looptijd en fiscale behandeling.
+                <br />
+                <br />
+                Vergelijk twee <strong>aflossingsstrategieën</strong>:{' '}
+                <strong>Sneeuwbal</strong> (los eerst de kleinste schuld af voor snelle
+                motivatie-wins) versus <strong>Lawine</strong> (los eerst de hoogste rente af om
+                totaal de minste rente te betalen). De simulatie toont per strategie: einddatum,
+                totale rente en hoeveel je bespaart. Pas variabelen aan — wat als je €100 extra
+                per maand aflost? De grafiek toont het verschil in looptijd en kosten.
+                <br />
+                <br />
+                Elke schuld beïnvloedt je <strong>netto vermogen</strong> en je{' '}
+                <strong>FIRE-datum</strong>. De app berekent hoeveel vrijheidsdagen je wint door
+                sneller af te lossen. Bij een partner kun je schulden verdelen: gelijk (50/50),
+                naar inkomenverhouding, handmatig, of één draagt alles.
               </>
             }
             howTo={{
               steps: [
-                "Ga naar De Kern → Schulden en voeg je schulden toe (hypotheek, studielening, etc.)",
-                "Vul rente, looptijd en maandlast in — NHG en belastingaftrek worden automatisch berekend",
-                "Vergelijk sneeuwbal vs. lawine in het strategiescherm om de optimale aflosvolgorde te vinden",
-                "Simuleer extra aflossingen en zie hoeveel vrijheidstijd je terugwint",
-                "Bekijk het effect op je netto vermogen en FIRE-datum — minder schuld = lagere uitgaven = eerder vrij",
-                "Bij een huishouden: stel de eigendomsverhouding in per schuld voor een correcte partnerverdeling",
+                'Ga naar De Kern → Schulden → Nieuw. Kies het type (hypotheek, studieschuld, lening, etc.), voer het openstaande bedrag, rentepercentage en maandelijkse aflossing in.',
+                'Vergelijk twee aanpakken: Sneeuwbal (kleinste schuld eerst voor motivatie) vs. Lawine (hoogste rente eerst voor minste kosten). De simulatie toont per strategie: einddatum, totale rente en besparing.',
+                'Simuleer extra aflossingen: wat als je €100 extra per maand aflost? De grafiek toont het verschil in looptijd en kosten.',
+                'Bekijk de impact op je netto vermogen en FIRE-datum — elke afgeloste schuld verlaagt je uitgavendrempel en brengt financiële vrijheid dichterbij.',
+                'Bij een huishouden: verdeel schulden over partners — gelijk (50/50), naar inkomenverhouding, handmatig, of één draagt alles.',
               ],
-              tip: "Focus op schulden met de hoogste rente boven 4% — elke euro extra aflossing levert daar het meeste vrijheidstijd op.",
+              tip: 'Focus op schulden met de hoogste rente boven 4% — elke euro extra aflossing levert daar het meeste vrijheidstijd op.',
             }}
           />
 
@@ -1423,22 +1442,43 @@ export default function GidsPage() {
           color="var(--ink-2)"
           description={
             <>
-              Je financiën altijd bij de hand — TriFinity is volledig{" "}
-              <strong>bottom navigation</strong> geeft je met \u00e9\u00e9n tik
-              toegang tot De Kern, De Wil en De Horizon \u2014 kleurgecodeerd per
-              module. Alle touch targets zijn minimaal 44px, modals schuiven als{" "}
-              <strong>BottomSheets</strong> van onderen omhoog en kunnen worden
-              weggeveegd. Widgets passen zich automatisch aan het kleinere scherm
-              aan en tab-gebaseerde layouts houden de navigatie overzichtelijk.
+              Je financiën altijd bij de hand \u2014 TriFinity is volledig{" "}
+              <strong>responsive</strong> en werkt als een native app op je telefoon.
+              Het{" "}
+              <strong>responsive design</strong> past elk scherm automatisch aan:
+              widgets schalen van 4-koloms grid op desktop naar 1- of 2-koloms op
+              mobiel, grafieken worden compacter en tabellen scrollen horizontaal.
+              {" "}
+              Je kunt TriFinity installeren als{" "}
+              <strong>PWA (Progressive Web App)</strong> \u2014 voeg de app toe aan
+              je startscherm via je browser en je krijgt een app-achtige ervaring
+              zonder download uit de App Store. De app opent dan fullscreen, onthoudt
+              je sessie en laadt razendsnel.
+              {" "}
+              Alle interacties zijn <strong>touch-geoptimaliseerd</strong>: swipe
+              door je transacties, drag &amp; drop widgets op het dashboard om ze te
+              herschikken, en modals schuiven als <strong>BottomSheets</strong> van
+              onderen omhoog die je wegveegt. Alle touch targets zijn minimaal 44px
+              voor comfortabel tikken.
+              {" "}
+              Een paar dingen werken anders op mobiel: de{" "}
+              <strong>bottom navigation</strong> vervangt de sidebar en geeft met
+              \u00e9\u00e9n tik toegang tot De Kern, De Wil en De Horizon \u2014
+              kleurgecodeerd per module. Widget-formaten passen zich aan (full
+              widgets worden compacter, quarter widgets vullen de volle breedte).
+              Tab-gebaseerde layouts houden complexe pagina&apos;s overzichtelijk en
+              de briefing scrollt verticaal in plaats van als kaartendeck.
             </>
           }
           howTo={{
             steps: [
-              "Open TriFinity in je mobiele browser \u2014 de app past zich automatisch aan",
+              "Open TriFinity in je mobiele browser (Safari of Chrome) \u2014 de app past zich automatisch aan",
+              "Installeer als PWA: tik op \u2018Delen\u2019 \u2192 \u2018Zet op beginscherm\u2019 (Safari) of het installatie-icoontje (Chrome)",
               "Gebruik de bottom navigation onderaan om tussen modules te wisselen",
-              "Veeg BottomSheets naar beneden om ze te sluiten",
+              "Herschik je dashboard-widgets door ze lang ingedrukt te houden en te verslepen",
+              "Veeg BottomSheets naar beneden om ze te sluiten, of tik buiten het paneel",
             ],
-            tip: "Voeg TriFinity toe aan je startscherm voor een app-achtige ervaring zonder download.",
+            tip: "Installeer TriFinity als PWA op je startscherm \u2014 je krijgt dan een app-icoon, fullscreen modus en snellere laadtijden. Check elke ochtend je briefing terwijl je koffie drinkt.",
           }}
         />
       </div>
