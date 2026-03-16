@@ -1,3 +1,24 @@
+## Session 2026-03-17 - Features #149, #150
+
+### Feature #149: Gids content: Check-in - PASSING
+- Enhanced existing Check-in GuideTopicCard in De Kern section
+- Waarde-tekst: "Tien minuten per maand. Dat is alles wat het kost om grip te houden op je financiële koers."
+- Detailed 7-step flow description: Terugblik (metrics), Bijwerken (stappen 2-5), Vooruitblik (FIRE herberekening), Reflectie (AI-gespreksstarterskaarten)
+- Historie section: eerdere check-ins opvraagbaar, patronen over tijd
+- HowTo expanded to 6 steps covering all 7 wizard steps + historie
+- All 8 feature steps verified as covered
+
+### Feature #150: Gids content: Kern overig - PASSING
+- Enhanced existing "Wat komt er nog?" GuideTopicCard in De Kern section
+- Intro: "We bouwen continu aan De Kern. Dit staat op de planning:"
+- 3 teasers: automatische banksynchronisatie, slimmere terugkerende transacties, zelflerende categorisatie
+- Inviting closing: "Heb je een idee? Laat het ons weten"
+- All 4 feature steps verified as covered
+
+### Current Status
+- 2 features completed this session (#149, #150)
+- Zero TypeScript errors (verified with tsc --noEmit)
+
 ## Session 2026-03-17 - Features #141, #162
 
 ### Feature #141: Gids content: Mobiel - PASSING
@@ -13875,3 +13896,27 @@ For Feature #51 (Transaction Import):
 - 2 features completed this session (#145, #146)
 - Zero TypeScript errors
 - Commit: 001c054d
+
+## Session 2026-03-17 - Features #152, #153
+
+### Feature #152: Gids content: Briefing - PASSING
+- Updated existing Briefing (DAIshboard) GuideTopicCard in De Wil section
+- Waarde-tekst: "Elke dag een persoonlijke financiële update. Geen generiek nieuws, maar inzichten gebaseerd op jóuw cijfers, jóuw doelen, jóuw situatie."
+- Description: budget (overschrijdingen, trends), vermogen (veranderingen, rendement), acties (wat kun je vandaag doen)
+- Context-afhankelijk: rond salarisdag andere inzichten dan eind van de maand
+- Progressive loading: kaarten verschijnen één voor één
+- HowTo restructured: Openen (Berichten/De Wil), Inhoud (budget/vermogen/acties), Verversen (nieuwe briefing)
+
+### Feature #153: Gids content: Voorstellen - PASSING
+- Updated existing Voorstellen GuideTopicCard in De Wil section
+- Waarde-tekst: "Voorstellen zijn concrete stappen die je vrijheidstijd vergroten. Geen vaag advies, maar acties met een berekende impact."
+- Five categories: belegging-optimalisatie, schuld-aflossing, doel-activering, budget-setup, veerkracht-verbetering
+- Three sources: AI (automatisch), Will (via chat), zelf aanmaken
+- Impact: hoeveel maanden eerder financieel vrij, gebaseerd op werkelijke cijfers
+- HowTo restructured: Bekijken, Impact, Accepteren, Bronnen
+- Feedback loop: accepteren/afwijzen beïnvloedt toekomstige voorstellen
+
+### Current Status
+- 2 features completed this session (#152, #153)
+- Zero TypeScript errors
+- Commit: f0303bc2
