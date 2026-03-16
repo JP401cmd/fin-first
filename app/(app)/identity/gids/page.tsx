@@ -989,7 +989,7 @@ export default function GidsPage() {
             valueText="FIRE bereiken is één ding. Weten hoe je je vermogen veilig opneemt is minstens zo belangrijk. Kies een strategie die past bij jouw leven."
             description={
               <>
-                TriFinity ondersteunt drie eindstrategie_MARKER_en \u2014 en dan? Je onttrekkingsstrategie
+                TriFinity ondersteunt drie eindstrategie_REPLACE_BLOCK_en \u2014 en dan? Je onttrekkingsstrategie
                 bepaalt{" "}
                 <strong>hoe je je vermogen veilig opneemt</strong> zodat je nooit
                 zonder zit. TriFinity ondersteunt drie eindstrategie\u00ebn:{" "}
@@ -1260,35 +1260,44 @@ export default function GidsPage() {
           icon={Sparkles}
           title="Will — je AI-assistent"
           color="var(--ink-2)"
+          valueText="Will is je persoonlijke financiële adviseur. Hij kent je cijfers, je doelen, en je situatie — en hij is altijd beschikbaar. Stel elke vraag die je wilt."
           description={
             <>
-              Will is je eigen financiële adviseur die jouw situatie kent. Hij
-              heeft drie persoonlijkheden:{" "}
-              <strong>FHIN</strong> (De Kern) beantwoordt vragen over je
-              vermogen, uitgaven en transacties.{" "}
-              <strong>FINN</strong> (De Wil) geeft concrete aanbevelingen en
-              actieplannen.{" "}
-              <strong>FFIN</strong> (De Horizon) helpt je dromen vertalen naar
-              financiële plannen en scenario&apos;s.
-              {" "}
-              Will gebruikt uitsluitend jouw data binnen TriFinity: transacties,
-              budgetten, vermogen, doelen, levensgebeurtenissen en
-              FIRE-parameters. <strong>Niets wordt extern gedeeld</strong> —
-              alle communicatie blijft binnen je account en gevoelige gegevens
-              worden automatisch gemaskeerd. Will is{" "}
-              <strong>context-aware</strong>: op elke pagina weet hij welke data
-              relevant is en past hij zijn antwoorden aan op wat je aan het doen
-              bent.
+              <strong>Will</strong> is je eigen financiële adviseur die jouw
+              situatie kent. Tik op de Will-knop (rechtsonder) of ga naar Will
+              in het menu — hij is beschikbaar op elke pagina en kent de context
+              van waar je bent.
+              <br />
+              <br />
+              <strong>Vragen stellen:</strong> vraag Will alles:{" "}
+              &ldquo;Kan ik me een vakantie van &euro;3000 veroorloven?&rdquo;,{" "}
+              &ldquo;Hoe kan ik sneller schuldenvrij worden?&rdquo;,{" "}
+              &ldquo;Wat is het effect als ik &euro;200/maand meer spaar?&rdquo;.
+              Will rekent het uit met je werkelijke cijfers.
+              <br />
+              <br />
+              <strong>Acties:</strong> Will kan voorstellen doen die direct als
+              actie op je bord verschijnen. Vanuit een gesprek naar een concrete
+              stap.
+              <br />
+              <br />
+              <strong>Scenario-modus:</strong> in het Droomscenario kent Will je
+              aanpassingen. Hij geeft advies specifiek voor dat scenario —
+              zodat je kunt verkennen wat een andere keuze betekent.
+              <br />
+              <br />
+              <strong>Privacy:</strong> Will draait op AI-modellen. Je data
+              wordt niet opgeslagen buiten je sessie. Gevoelige gegevens worden
+              automatisch gemaskeerd. Je kunt Will uitschakelen via Instellingen.
             </>
           }
           howTo={{
             steps: [
-              "Tik op het chat-icoon rechtsonder op elke pagina om Will te openen",
-              "Stel een vraag in je eigen woorden \u2014 Will begrijpt natuurlijke taal en past zich aan op de context",
-              "Vraag over je budget: \u201cHoeveel geef ik uit aan boodschappen?\u201d \u2014 Will analyseert je transacties",
-              "Vraag over je vermogen: \u201cHoe staat mijn netto vermogen ervoor?\u201d \u2014 Will toont trends en mijlpalen",
-              "Vraag over FIRE: \u201cWanneer ben ik financieel vrij?\u201d \u2014 Will berekent scenario\u2019s met jouw parameters",
-              "Beschrijf een droom: \u201cIk wil over 5 jaar een huis kopen\u201d \u2014 Will vertaalt het naar een concreet plan",
+              "Tik op de Will-knop rechtsonder op elke pagina, of ga naar Will in het menu — Will kent de context van waar je bent",
+              "Stel elke vraag: 'Kan ik me een vakantie van €3000 veroorloven?' — Will rekent het uit met je werkelijke cijfers",
+              "Will kan voorstellen doen die direct als actie op je bord verschijnen — vanuit een gesprek naar een concrete stap",
+              "In het Droomscenario kent Will je aanpassingen en geeft advies specifiek voor dat scenario",
+              "Je kunt Will uitschakelen via Identiteit → Instellingen — je data wordt niet opgeslagen buiten je sessie",
             ],
             tip: "Will wordt slimmer naarmate je meer data hebt. Begin met een eenvoudige vraag: \u201cWat is het belangrijkste dat ik nu kan doen?\u201d",
           }}

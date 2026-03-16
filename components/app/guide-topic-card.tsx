@@ -7,6 +7,8 @@ import GuideHowTo from '@/components/app/guide-how-to'
 interface GuideTopicCardProps {
   icon: LucideIcon
   title: string
+  /** Bold value-first sentence shown above the description */
+  valueText?: string
   description: ReactNode
   howTo?: { steps: string[]; tip?: string }
   color: string
@@ -22,6 +24,7 @@ interface GuideTopicCardProps {
 export default function GuideTopicCard({
   icon: Icon,
   title,
+  valueText,
   description,
   howTo,
   color,
@@ -40,6 +43,11 @@ export default function GuideTopicCard({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[13px] font-semibold text-[var(--ink)]">{title}</p>
+          {valueText && (
+            <p className="mt-1 text-[12px] font-medium leading-relaxed text-[var(--ink)]">
+              {valueText}
+            </p>
+          )}
           <div className="mt-1 text-[12px] leading-relaxed text-[var(--ink-2)]">
             {description}
           </div>
