@@ -895,12 +895,14 @@ export default function GidsPage() {
             color="var(--color-horizon-400)"
             description={
               <>
-                Wat als je 20% meer zou verdienen? Wat als je over 3 jaar parttime
-                gaat werken? Wat als je emigreert naar Portugal? De{" "}
-                <strong>What-If builder</strong> laat je experimenteren met
-                alternatieve toekomsten via vijf schuifbalken: inkomen, werkdagen,
-                spaarquote, rendement en uitgaven. Kies een snelpreset
-                (optimistisch, verwacht, pessimistisch) of stel alles handmatig in.
+                <strong>Experimenteer met je toekomst.</strong> Wat als je 20% meer
+                zou verdienen? Wat als je over 3 jaar parttime gaat werken? Wat als
+                je emigreert naar Portugal? De <strong>What-If builder</strong> laat
+                je alternatieve toekomsten verkennen via vijf schuifbalken:{" "}
+                <strong>inkomen</strong>, werkdagen, spaarquote,{" "}
+                <strong>rendement</strong> en <strong>uitgaven</strong>. Kies een
+                snelpreset (optimistisch, verwacht, pessimistisch) of stel elk
+                parameter handmatig in.
                 {" "}
                 Je ziet direct het effect op je <strong>FIRE-datum</strong>,
                 vermogenspad en slaagkans. Voeg levensgebeurtenissen toe aan je
@@ -913,10 +915,10 @@ export default function GidsPage() {
             }
             howTo={{
               steps: [
-                "Ga naar De Horizon \u2192 What-If",
-                "Versleep de schuifbalken voor inkomen, werkdagen, spaarquote, rendement en uitgaven",
-                "Of kies een snelpreset (optimist, koershouder, zuinig) als startpunt",
-                "Voeg levensgebeurtenissen toe aan je scenario om hun impact te zien",
+                "Ga naar De Horizon \u2192 What-If om een nieuw scenario te openen",
+                "Pas parameters aan: versleep de schuifbalken voor inkomen, uitgaven, rendement, werkdagen en spaarquote",
+                "Of kies een snelpreset (optimist, koershouder, zuinig) als startpunt en verfijn van daaruit",
+                "Voeg levensgebeurtenissen toe aan je scenario om hun impact op je FIRE-datum te zien",
                 "Open de vergelijkingsmodal om je scenario naast je huidige situatie te leggen",
               ],
               tip: "Probeer: \u201cWat als ik mijn spaarquote met 10% verhoog en over 5 jaar een kind krijg?\u201d \u2014 de combinatie geeft het eerlijkste beeld.",
