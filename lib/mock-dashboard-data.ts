@@ -236,4 +236,24 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   willpowerScore: 'D',
   inflationRate: 0.02,
   grossReturn: 0.07,
+  weekOverview: {
+    weekExpenses: 342.50,
+    weekIncome: 0,
+    dailyExpenses: [
+      { day: '2026-03-09', label: 'ma', amount: 45.20 },
+      { day: '2026-03-10', label: 'di', amount: 78.90 },
+      { day: '2026-03-11', label: 'wo', amount: 32.10 },
+      { day: '2026-03-12', label: 'do', amount: 95.00 },
+      { day: '2026-03-13', label: 'vr', amount: 61.30 },
+      { day: '2026-03-14', label: 'za', amount: 30.00 },
+      { day: '2026-03-15', label: 'zo', amount: 0 },
+    ],
+    weekBudget: 461.89,
+    prevWeekExpenses: 398.00,
+    topCategories: [
+      { name: 'Boodschappen', amount: 145.20 },
+      { name: 'Horeca', amount: 95.00 },
+      { name: 'Transport', amount: 61.30 },
+    ],
+  },
 }

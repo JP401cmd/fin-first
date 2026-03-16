@@ -81,6 +81,9 @@ const InflatieImpactWidget = dynamic(() =>
 const BeleggingsrendementWidget = dynamic(() =>
   import('./beleggingsrendement-widget').then(m => ({ default: m.BeleggingsrendementWidget }))
 )
+const PensioenAowWidget = dynamic(() =>
+  import('./pensioen-aow-widget').then(m => ({ default: m.PensioenAowWidget }))
+)
 const BudgetFavWidget = dynamic(() =>
   import('./budget-fav-widget').then(m => ({ default: m.BudgetFavWidget }))
 )
@@ -398,6 +401,8 @@ export interface DashboardData {
   // FIRE parameters from user profile
   inflationRate: number   // e.g. 0.02
   grossReturn: number     // e.g. 0.07
+  // Current age of user (null if no date_of_birth)
+  currentAge: number | null
   // Weekoverzicht widget data
   weekOverview: WeekOverviewData
 }
@@ -507,6 +512,8 @@ export function WidgetRenderer({ id, size, data, features }: WidgetRendererProps
       return <InflatieImpactWidget size={size} data={data} href={href} />
     case 'beleggingsrendement':
       return <BeleggingsrendementWidget size={size} data={data} href={href} />
+    case 'pensioen_aow':
+      return <PensioenAowWidget size={size} data={data} href={href} />
     case 'meldingen':
       return <MeldingenWidget size={size} data={data} href={href} />
     case 'ai_inzicht':

@@ -18,6 +18,7 @@ import type {
   NextStep,
   UpcomingEvent,
   HouseholdActivityItem,
+  WeekOverviewData,
 } from '@/components/widgets/widget-renderer'
 import type { WidgetPref } from '@/lib/widget-catalog'
 import type { FireProjection, FireCountdown } from '@/lib/horizon-data'
@@ -1154,6 +1155,88 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     : completionRatio > 20 ? 'D'
     : 'E'
 
+  // ── Week Overview: compute weekly expenses from transaction data ──
+  const DAY_LABELS = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo']
+  const weekEndDate = new Date(weekStart)
+  weekEndDate.setDate(weekStart.getDate() + 7)
+  const prevWeekStart = new Date(weekStart)
+  prevWeekStart.setDate(weekStart.getDate() - 7)
+
+  // Build daily expense map for current week (Mon=0 .. Sun=6)
+  const dailyExpenseMap = new Map<string, number>()
+  const weekCategoryMap = new Map<string, number>()
+  let weekExpensesTotal = 0
+  let weekIncomeTotal = 0
+  let prevWeekExpensesTotal = 0
+
+  // Combine expense + income transactions for the week range
+  const allWeekTx = [
+    ...((expenseTx12Result.data ?? []) as { amount: number; date: string; budget_id?: string | null; transaction_type?: string | null }[]),
+    ...((income12Result.data ?? []) as { amount: number; date: string; budget_id?: string | null; transaction_type?: string | null }[]),
+  ].filter(isRealTx)
+
+  const weekStartStr = weekStart.toISOString().split('T')[0]
+  const weekEndStr = weekEndDate.toISOString().split('T')[0]
+  const prevWeekStartStr = prevWeekStart.toISOString().split('T')[0]
+
+  for (const tx of allWeekTx) {
+    const d = tx.date as string
+    const amt = Number(tx.amount)
+
+    // Current week
+    if (d >= weekStartStr && d < weekEndStr) {
+      if (amt < 0) {
+        const absAmt = Math.abs(amt)
+        weekExpensesTotal += absAmt
+        dailyExpenseMap.set(d, (dailyExpenseMap.get(d) ?? 0) + absAmt)
+        // Category aggregation
+        if (tx.budget_id) {
+          const catName = budgetNameMap.get(tx.budget_id) ?? 'Overig'
+          weekCategoryMap.set(catName, (weekCategoryMap.get(catName) ?? 0) + absAmt)
+        }
+      } else if (amt > 0) {
+        weekIncomeTotal += amt
+      }
+    }
+    // Previous week (expenses only for comparison)
+    if (d >= prevWeekStartStr && d < weekStartStr && amt < 0) {
+      prevWeekExpensesTotal += Math.abs(amt)
+    }
+  }
+
+  // Build 7-day array (Mon-Sun)
+  const weekDailyExpenses: WeekOverviewData['dailyExpenses'] = []
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(weekStart)
+    day.setDate(weekStart.getDate() + i)
+    const dayStr = day.toISOString().split('T')[0]
+    weekDailyExpenses.push({
+      day: dayStr,
+      label: DAY_LABELS[i],
+      amount: Math.round((dailyExpenseMap.get(dayStr) ?? 0) * 100) / 100,
+    })
+  }
+
+  // Weekly budget = monthly expense budget / 4.33
+  const weekBudget = budgetTotals.expense.limit > 0
+    ? Math.round((budgetTotals.expense.limit / 4.33) * 100) / 100
+    : 0
+
+  // Top 3 categories by amount
+  const topWeekCategories = Array.from(weekCategoryMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([name, amount]) => ({ name, amount: Math.round(amount * 100) / 100 }))
+
+  const weekOverview: WeekOverviewData = {
+    weekExpenses: Math.round(weekExpensesTotal * 100) / 100,
+    weekIncome: Math.round(weekIncomeTotal * 100) / 100,
+    dailyExpenses: weekDailyExpenses,
+    weekBudget,
+    prevWeekExpenses: Math.round(prevWeekExpensesTotal * 100) / 100,
+    topCategories: topWeekCategories,
+  }
+
   // DashboardData bundle for widgets
   const dashboardData: DashboardData = {
     netWorth,
@@ -1245,6 +1328,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     willpowerScore,
     inflationRate: fireParams.inflationRate,
     grossReturn: fireParams.grossReturn,
+    weekOverview,
   }
 
   return {

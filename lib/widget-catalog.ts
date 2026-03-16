@@ -333,6 +333,15 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     requiredPhase: 'Stability',
   },
   {
+    id: 'pensioen_aow',
+    name: 'Pensioen / AOW',
+    description: 'AOW-leeftijd countdown en verwacht bedrag',
+    module: 'horizon',
+    sizes: ['mini', 'quarter', 'half', 'full'],
+    defaultSize: 'half',
+    minLevel: -2,
+  },
+  {
     id: 'meldingen',
     name: 'Meldingen',
     description: 'Notificaties en waarschuwingen',
@@ -529,6 +538,7 @@ export const WIDGET_HREFS: Record<string, string> = {
   backtesting_score:        '/horizon?modal=backtesting',
   inflatie_impact:          '/identity/instellingen',
   beleggingsrendement:      '/core/assets',
+  pensioen_aow:             '/horizon',
   meldingen:                '/berichten',
   ai_inzicht:               '/berichten',
   volgende_stap:            '/will',

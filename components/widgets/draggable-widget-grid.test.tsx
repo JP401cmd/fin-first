@@ -132,6 +132,14 @@ const mockData: DashboardData = {
   willpowerScore: 'E',
   inflationRate: 0.02,
   grossReturn: 0.07,
+  weekOverview: {
+    weekExpenses: 0,
+    weekIncome: 0,
+    dailyExpenses: [],
+    weekBudget: 0,
+    prevWeekExpenses: 0,
+    topCategories: [],
+  },
 }
 
 const makePrefs = (ids: string[], sizes: ('half' | 'full')[] = []): WidgetPref[] =>
