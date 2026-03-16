@@ -1,11 +1,6 @@
-import dynamic from 'next/dynamic'
+import { Breadcrumb } from '@/components/app/breadcrumb'
 import { ModuleNav } from '@/components/app/module-nav'
 import { identityNav } from '@/lib/navigation'
-
-const Breadcrumb = dynamic(
-  () => import('@/components/app/breadcrumb').then(m => ({ default: m.Breadcrumb })),
-  { ssr: false }
-)
 
 export default function IdentityLayout({ children }: { children: React.ReactNode }) {
   return (
