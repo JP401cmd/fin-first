@@ -847,30 +847,43 @@ export default function GidsPage() {
             description={
               <>
                 Je hebt FIRE bereikt \u2014 en dan? Je onttrekkingsstrategie
-                bepaalt hoe je je vermogen opneemt zonder dat het opraakt. TriFinity
-                biedt vier methoden: de klassieke{" "}
-                <strong>4%-regel</strong> (vast percentage per jaar),{" "}
-                <strong>dynamische onttrekking</strong> (past mee met
-                marktprestaties), de{" "}
-                <strong>vloer-plafondmethode</strong> (minimum gegarandeerd, extra
-                in goede jaren) en de{" "}
-                <strong>bucket-strategie</strong> (drie emmers: cash voor nu,
-                obligaties voor 5 jaar, aandelen voor de lange termijn).
+                bepaalt{" "}
+                <strong>hoe je je vermogen veilig opneemt</strong> zodat je nooit
+                zonder zit. TriFinity ondersteunt drie eindstrategie\u00ebn:{" "}
+                <strong>Perpetueel</strong> \u2014 je vermogen blijft eeuwig
+                intact en je leeft van het rendement. Ideaal als je wilt nalaten
+                of oneindig financieel vrij wilt zijn.{" "}
+                <strong>Legacy</strong> \u2014 je onttrekt z\u00f3 dat er een
+                vooraf bepaald bedrag overblijft voor erfgenamen, terwijl je
+                tussentijds maximaal van je vermogen geniet.{" "}
+                <strong>Deplete</strong> \u2014 je maakt alles op voor een
+                gekozen eindleeftijd. Maximale besteding, niets over.
                 {" "}
-                Elke strategie toont hoelang je vermogen meegaat, hoeveel
-                flexibiliteit je hebt in slechte marktjaren, en wat je jaarlijkse
-                inkomen wordt. Zo kies je niet op gevoel maar op basis van
-                simulatie.
+                Het <strong>veilige onttrekkingspercentage (SWR)</strong> bepaalt
+                hoeveel je jaarlijks kunt opnemen. In de Nederlandse context
+                hanteert TriFinity standaard het NL SWR van ~3,5%, lager dan de
+                Amerikaanse 4%-regel, omdat Box 3 belasting je effectief
+                rendement verlaagt. Je SWR wordt automatisch berekend op basis
+                van je gekozen eindstrategie, verwacht rendement en inflatie.
+                {" "}
+                <strong>Box 3 impact:</strong> Nederland belast fictief rendement
+                op vermogen boven de vrijstelling (\u20ac57.000 p.p.). Bij
+                onttrekking daalt je vermogen, waardoor je Box 3 heffing elk jaar
+                lager wordt \u2014 een natuurlijk belastingvoordeel. TriFinity
+                rekent dit mee in de simulatie: je ziet het netto-effect na
+                belasting, niet alleen het bruto rendement.
               </>
             }
             howTo={{
               steps: [
-                "Ga naar De Horizon \u2192 Onttrekkingsstrategie",
-                "Vergelijk de vier methoden naast elkaar met je eigen vermogen en uitgaven",
-                "Bekijk per strategie het gesimuleerde vermogensverloop en jaarlijkse inkomen",
-                "Kies de strategie die past bij je risicoprofiel \u2014 conservatief (bucket), flexibel (dynamisch) of eenvoudig (4%-regel)",
+                "Ga naar Identiteit \u2192 Instellingen \u2192 FIRE Instellingen en kies je eindstrategie: perpetueel, legacy of deplete",
+                "Stel je verwacht rendement en inflatiepercentage in \u2014 deze bepalen je SWR en benodigd FIRE-vermogen",
+                "Ga naar De Horizon \u2014 je onttrekkingsstrategie wordt direct verwerkt in de FIRE-projectie en Monte Carlo simulatie",
+                "Vergelijk de drie strategie\u00ebn: perpetueel vereist het meeste vermogen, deplete het minste \u2014 maar geeft geen buffer",
+                "Bekijk het Box 3 effect: je ziet hoeveel belasting je betaalt bij onttrekking en hoe die daalt naarmate je vermogen afneemt",
+                "Bekijk het effect op je netto onttrekking na belasting \u2014 dat is wat je echt maandelijks te besteden hebt",
               ],
-              tip: "De bucket-strategie is het meest intu\u00eftief: je hebt altijd 2\u20133 jaar cash bij de hand, ongeacht wat de markt doet.",
+              tip: "Begin met perpetueel als veilige basis. Als je FIRE-datum te ver weg lijkt, experimenteer met deplete \u2014 je ziet direct hoeveel jaar eerder je vrij bent. Legacy is de gulden middenweg als je ook aan erfgenamen denkt.",
             }}
           />
         </ReisStapSection>
@@ -957,6 +970,38 @@ export default function GidsPage() {
               ],
               tip: "Will wordt slimmer naarmate je meer data hebt. Begin met een eenvoudige vraag: \u201cWat is het belangrijkste dat ik nu kan doen?\u201d",
             }}
+          />
+
+          <GuideTopicCard
+            icon={Rocket}
+            title="Wat komt er nog?"
+            color="var(--color-horizon-400)"
+            description={
+              <>
+                De Horizon wordt steeds slimmer. Dit zijn features die we aan het
+                bouwen zijn:
+                <ul className="mt-2 list-disc pl-4 space-y-1">
+                  <li>
+                    <strong>Glijpad-visualisatie</strong> &mdash; een interactieve
+                    grafiek die je vermogensafbouw na FIRE toont per
+                    onttrekkingsstrategie, inclusief belastingeffect en
+                    inflatiecorrectie over de jaren.
+                  </li>
+                  <li>
+                    <strong>Pensioen-integratie</strong> &mdash; koppel je AOW en
+                    aanvullend pensioen aan je FIRE-berekening. Zie wanneer welk
+                    inkomen ingaat en hoeveel eigen vermogen je tot die tijd nodig
+                    hebt.
+                  </li>
+                  <li>
+                    <strong>Scenario-vergelijker</strong> &mdash; sla meerdere
+                    What-If scenario's op en vergelijk ze naast elkaar in
+                    \u00e9\u00e9n overzicht: FIRE-leeftijd, slaagkans en
+                    vermogenspad per scenario.
+                  </li>
+                </ul>
+              </>
+            }
           />
         </ReisStapSection>
       </div>
@@ -1207,24 +1252,39 @@ export default function GidsPage() {
           color="var(--ink-2)"
           description={
             <>
-              Je profiel bevat de basis voor alle berekeningen: naam,
-              geboortedatum, inkomen en huishoudsamenstelling. Je{" "}
+              <strong>Jouw data, jouw controle.</strong> Je profiel bevat de
+              persoonlijke gegevens die de basis vormen voor alle berekeningen in
+              TriFinity: <strong>naam</strong>, <strong>geboortedatum</strong>,{" "}
+              <strong>pensioenleeftijd</strong>, <strong>inkomen</strong> en
+              huishoudsamenstelling. Deze gegevens bepalen je
+              vrijheidstijdberekeningen, FIRE-prognoses en soevereiniteitsniveau.
+              {" "}
+              Je{" "}
               <strong>soevereiniteitsniveau</strong> (van Herstel tot Meesterschap)
-              wordt automatisch berekend en ontgrendelt progressief nieuwe functies.
+              wordt automatisch berekend op basis van je financi\u00eble positie en
+              ontgrendelt progressief nieuwe functies en widgets.
               In <strong>Instellingen</strong> beheer je alles vanuit \u00e9\u00e9n
               hub: notificatievoorkeuren, widget-selectie, FIRE-parameters (verwacht
               rendement, inflatie, eindstrategie), weergaveopties (typografie,
-              modulekleuren) en gegevensbeheer (export, verwijdering).
+              modulekleuren) en gegevensbeheer.
+              {" "}
+              TriFinity respecteert je <strong>data-eigenaarschap</strong>{" "}
+              volledig. Je kunt op elk moment al je gegevens exporteren als
+              JSON-bestand \u2014 transacties, budgetten, vermogen, doelen, alles. En
+              als je wilt stoppen, kun je je account volledig verwijderen via
+              Instellingen \u2192 Gegevens. Je data is van jou, altijd.
             </>
           }
           howTo={{
             steps: [
-              "Ga naar Identiteit \u2192 Profiel voor je persoonlijke gegevens en huishoudprofiel",
+              "Ga naar Identiteit \u2192 Profiel om je persoonlijke gegevens te bekijken en bewerken",
+              "Pas je naam, geboortedatum, pensioenleeftijd en inkomen aan \u2014 deze sturen al je berekeningen",
               "Ga naar Identiteit \u2192 Instellingen voor alle app-instellingen op \u00e9\u00e9n plek",
               "Sectie C (FIRE) is het belangrijkst: stel hier je verwacht rendement, inflatie en eindstrategie in",
-              "Sectie D (Weergave) laat je de app personaliseren met eigen kleuren",
+              "Sectie D (Weergave) laat je de app personaliseren met eigen modulekleuren",
+              "Sectie E (Gegevens) biedt data-export en account-verwijdering \u2014 jouw data, jouw keuze",
             ],
-            tip: "Controleer je FIRE-parameters minstens jaarlijks \u2014 je verwacht rendement kan veranderen met je beleggingsstrategie.",
+            tip: "Controleer je profielgegevens en FIRE-parameters minstens jaarlijks. Je geboortedatum en pensioenleeftijd bepalen je hele FIRE-tijdlijn, en je verwacht rendement kan veranderen met je beleggingsstrategie.",
           }}
         />
 

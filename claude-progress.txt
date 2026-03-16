@@ -1,3 +1,23 @@
+## Session 2026-03-16 - Features #129, #130
+
+### Feature #129: Gids content: FIRE-projectie met levensgebeurtenissen - PASSING
+- Enhanced FIRE-projectie card: "wanneer ben je financieel vrij?" + SWR explanation + vermogensgrafiek
+- Enhanced Levensgebeurtenissen card: explicit kind/huis/pensioen impact examples + vermogensgrafiek markering
+- Enhanced Monte Carlo & backtesting card: "bandbreedtes" terminology, slaagkans emphasis, historische betrouwbaarheid
+- How-to steps: added "Lees de vermogensgrafiek" + "Vergelijk de scenario's" + "Lees de bandbreedtes"
+- All 7 feature steps verified as covered
+
+### Feature #130: Gids content: Droomscenario - PASSING
+- Enhanced Droomscenario/What-If card: bold "Experimenteer met je toekomst" opening + explicit parameter names
+- Enhanced how-to: "om een nieuw scenario te openen" + "Pas parameters aan" with explicit parameter list
+- Enhanced Will AI-chat: "persoonlijk advies" emphasis + added 5th how-to step about concrete scenario-based advice
+- All 5 feature steps verified as covered
+
+### Current Status
+- 2 features completed this session (#129, #130)
+- Zero TypeScript errors in changed files
+- Commit: a502954d
+
 ## Session 2026-03-16 - Features #124, #125
 
 ### Feature #124: Gids content: Voorstellen - PASSING
@@ -13733,3 +13753,14 @@ For Feature #51 (Transaction Import):
 - 2 features completed this session (#133, #134)
 - Zero TypeScript errors
 - Commit: 98cc0834
+
+## Session 2026-03-16 - Features #135, #136
+
+### Feature #135: Gids content: Will (AI-assistent) - PASSING
+- Added new GuideTopicCard to Overal section with Sparkles icon
+- Value text, three personalities, privacy, 6 howTo steps
+
+### Feature #136: Gids content: Huishouden - PASSING
+- Enhanced existing card: eigenaarschap per item, gedeeld vermogen, gezamenlijke FIRE-projectie
+- Expanded howTo from 5 to 7 steps
+- Commit: 11827004
